@@ -25,7 +25,7 @@ const AGENT_ID = 'child-recovery-agent'
 const HANDLE = handleId.agent(AGENT_ID)
 
 const withJournal = async (body) => {
-  const created = agentJournal.create({ directory: mkdtempSync(join(tmpdir(), 'wxs-child-recovery-')) })
+  const created = await agentJournal.create({ directory: mkdtempSync(join(tmpdir(), 'wxs-child-recovery-')) })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     await body(created.journal)
@@ -34,8 +34,8 @@ const withJournal = async (body) => {
   }
 }
 
-const linkedPorts = (journal, messages, observations, pulse = undefined, snapshotResult = okResult(toList(messages))) => {
-  const linked = handleController.link(journal, PARENT, AGENT_ID, CHILD, 'fast-coder', roles.of('Coder'))
+const linkedPorts = async (journal, messages, observations, pulse = undefined, snapshotResult = okResult(toList(messages))) => {
+  const linked = await handleController.link(journal, PARENT, AGENT_ID, CHILD, 'fast-coder', roles.of('Coder'))
   assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
   const clock = clockPort.createVirtual()
   return new Ports(
@@ -56,7 +56,7 @@ const linkedPorts = (journal, messages, observations, pulse = undefined, snapsho
 test('VERIFY_008_child_recovery_workflow_commits_terminal_snapshot_then_pulses', async () => {
   await withJournal(async (journal) => {
     let pulses = 0
-    const ports = linkedPorts(
+    const ports = await linkedPorts(
       journal,
       [
         { Id: 'user-1', Role: 'user', Finish: undefined, Parts: [{ tag: 0, fields: ['recover'] }] },
@@ -79,7 +79,7 @@ test('VERIFY_008_child_recovery_workflow_commits_terminal_snapshot_then_pulses',
 
 test('VERIFY_008_child_recovery_workflow_returns_active_without_committing_when_child_is_live', async () => {
   await withJournal(async (journal) => {
-    const ports = linkedPorts(
+    const ports = await linkedPorts(
       journal,
       [
         { Id: 'user-1', Role: 'user', Finish: undefined, Parts: [{ tag: 0, fields: ['recover'] }] },
@@ -98,7 +98,7 @@ test('VERIFY_008_child_recovery_workflow_returns_active_without_committing_when_
 
 test('VERIFY_008_child_recovery_workflow_waits_without_committing_when_snapshot_is_unreadable', async () => {
   await withJournal(async (journal) => {
-    const ports = linkedPorts(journal, [], [], undefined, errorResult('snapshot unavailable'))
+    const ports = await linkedPorts(journal, [], [], undefined, errorResult('snapshot unavailable'))
 
     const result = await resolveAndCommit(ports)
 
@@ -110,12 +110,12 @@ test('VERIFY_008_child_recovery_workflow_waits_without_committing_when_snapshot_
 
 test('VERIFY_008_child_recovery_workflow_blocks_retired_handle', async () => {
   await withJournal(async (journal) => {
-    const ports = linkedPorts(journal, [], [])
+    const ports = await linkedPorts(journal, [], [])
     // EXEC-004: retire is legal only after a completion cell exists
     // (CompletedAwaitingJoin). Retiring a bare Active handle is refused.
-    const completed = handleController.recordCompletion(journal, PARENT, AGENT_ID, 'Terminal', 'done', CHILD)
+    const completed = await handleController.recordCompletion(journal, PARENT, AGENT_ID, 'Terminal', 'done', CHILD)
     assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
-    const retired = handleController.retire(journal, PARENT, AGENT_ID)
+    const retired = await handleController.retire(journal, PARENT, AGENT_ID)
     assert.equal(retired.ok, true, retired.ok ? '' : retired.error)
 
     const result = await resolveAndCommit(ports)
@@ -128,7 +128,7 @@ test('VERIFY_008_child_recovery_workflow_blocks_retired_handle', async () => {
 
 test('VERIFY_008_child_recovery_workflow_incomplete_when_terminal_body_is_blank', async () => {
   await withJournal(async (journal) => {
-    const ports = linkedPorts(
+    const ports = await linkedPorts(
       journal,
       [
         { Id: 'user-1', Role: 'user', Finish: undefined, Parts: [{ tag: 0, fields: ['recover'] }] },

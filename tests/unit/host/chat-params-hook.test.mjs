@@ -1,5 +1,5 @@
-// PROMPT-006: chat.params observes real root choices and may compatibility-pin
-// parented children, while SendPrompt owns the actual execution-binding gate.
+// PROMPT-006: chat.params observes/validates real provider message bindings.
+// SendPrompt owns the actual execution-binding gate; chat.params never rewrites output.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -69,7 +69,7 @@ test('CHAT_PARAMS_root_session_does_not_override_explicit_user_model', () => {
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 
-test('CHAT_PARAMS_parented_session_compat_pin_uses_frozen_child_agent', async () => {
+test('CHAT_PARAMS_parented_session_requires_provider_message_binding', async () => {
   const child = sessionId('ses_chat_params_child')
   const sessions = createSessionPort(
     { CreateChildSession: async () => ({ tag: 0, fields: [child] }) },
@@ -78,19 +78,22 @@ test('CHAT_PARAMS_parented_session_compat_pin_uses_frozen_child_agent', async ()
   const created = await sessions.CreateChildSession(sessionId('ses_chat_params_root'), { Agent: 'deep-coder' })
   assert.equal(created.tag, 0)
 
-  const hook = create(undefined, () => inventoryOf(slashConfig()))
+  const hook = create()
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
-  applyHook(hook, { sessionID: 'ses_chat_params_child', agent: 'fast-coder' }, output)
-  assert.equal(output.model.modelID, 'deep-opus')
+  assert.throws(
+    () => applyHook(hook, { sessionID: 'ses_chat_params_child', agent: 'fast-coder' }, output),
+    /chat\.params input\.message has no agent\/model binding/,
+  )
+  assert.equal(output.model.modelID, 'fast-haiku', 'chat.params never rewrites Host output')
 })
 
 test('CHAT_PARAMS_agent_less_root_does_not_invent_binding_from_journal', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-chat-params-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   try {
     const sid = sessionId('ses_selected_deep')
-    const seeded = agentJournal.appendAgent(
+    const seeded = await agentJournal.appendAgent(
       stream.session(sid),
       undefined,
       agentFact('AuthorityRootAccepted', {

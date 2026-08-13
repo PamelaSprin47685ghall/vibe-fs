@@ -57,24 +57,26 @@ module RecordWorkflow =
         (snapshot: ProjectionSet)
         (reviewerSessionId: SessionId)
         (requiresChronicle: bool)
-        =
-        let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
+        : Task<RecordReadiness> =
+        task {
+            let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
 
-        match
-            LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshot
-                journal
-                snapshot
-                reviewerSessionId
-                false
-                fullCanonicalCoverage
-        with
-        | Some record when
-            not (String.IsNullOrWhiteSpace record)
-            && (not requiresChronicle || hasRenderedChronicle record)
-            ->
-            RecordReadiness.Ready record
-        | Some _ -> RecordReadiness.Unavailable "canonical LWR has no rendered Chronicle"
-        | None -> RecordReadiness.Unavailable "canonical LWR is unavailable"
+            match!
+                LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshot
+                    journal
+                    snapshot
+                    reviewerSessionId
+                    false
+                    fullCanonicalCoverage
+            with
+            | Some record when
+                not (String.IsNullOrWhiteSpace record)
+                && (not requiresChronicle || hasRenderedChronicle record)
+                ->
+                return RecordReadiness.Ready record
+            | Some _ -> return RecordReadiness.Unavailable "canonical LWR has no rendered Chronicle"
+            | None -> return RecordReadiness.Unavailable "canonical LWR is unavailable"
+        }
 
     let private coverageCanAdvance (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
         match SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations with
@@ -91,26 +93,28 @@ module RecordWorkflow =
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (requiresTerminalFrontier: bool)
-        =
-        match AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections with
-        | None -> RecordReadiness.Unavailable "reviewer projection is unavailable"
-        | Some session ->
-            match session.ReviewGuard with
-            | None -> RecordReadiness.Unavailable "review barrier is unavailable"
-            | Some guard when guard.CurrentBarrierId <> Some barrierId ->
-                RecordReadiness.Unavailable "review barrier no longer matches the finality member"
-            | Some guard ->
-                match guard.TerminalFrontier with
-                | Some frontier when frontier.BarrierId <> barrierId ->
-                    RecordReadiness.Unavailable "terminal frontier no longer matches the finality barrier"
-                | Some frontier ->
-                    match materialize journal snapshot reviewerSessionId true with
-                    | RecordReadiness.Ready record -> RecordReadiness.Ready record
-                    | RecordReadiness.Unavailable _ when coverageCanAdvance snapshot reviewerSessionId ->
-                        RecordReadiness.AwaitJournal
-                    | other -> other
-                | None when requiresTerminalFrontier -> RecordReadiness.AwaitJournal
-                | None -> materialize journal snapshot reviewerSessionId false
+        : Task<RecordReadiness> =
+        task {
+            match AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections with
+            | None -> return RecordReadiness.Unavailable "reviewer projection is unavailable"
+            | Some session ->
+                match session.ReviewGuard with
+                | None -> return RecordReadiness.Unavailable "review barrier is unavailable"
+                | Some guard when guard.CurrentBarrierId <> Some barrierId ->
+                    return RecordReadiness.Unavailable "review barrier no longer matches the finality member"
+                | Some guard ->
+                    match guard.TerminalFrontier with
+                    | Some frontier when frontier.BarrierId <> barrierId ->
+                        return RecordReadiness.Unavailable "terminal frontier no longer matches the finality barrier"
+                    | Some _ ->
+                        match! materialize journal snapshot reviewerSessionId true with
+                        | RecordReadiness.Ready record -> return RecordReadiness.Ready record
+                        | RecordReadiness.Unavailable _ when coverageCanAdvance snapshot reviewerSessionId ->
+                            return RecordReadiness.AwaitJournal
+                        | other -> return other
+                    | None when requiresTerminalFrontier -> return RecordReadiness.AwaitJournal
+                    | None -> return! materialize journal snapshot reviewerSessionId false
+        }
 
     let awaitCanonicalWorkRecord
         (journal: AgentJournal)
@@ -121,7 +125,7 @@ module RecordWorkflow =
             task {
                 let snapshot, revision = AgentJournal.snapshotWithRevision journal
 
-                match readiness journal snapshot reviewerSessionId barrierId true with
+                match! readiness journal snapshot reviewerSessionId barrierId true with
                 | RecordReadiness.Ready record -> return Ok record
                 | RecordReadiness.Unavailable reason -> return Error reason
                 | RecordReadiness.AwaitJournal ->
@@ -141,10 +145,13 @@ module RecordWorkflow =
             task {
                 let snapshot, revision = AgentJournal.snapshotWithRevision journal
 
-                let states =
-                    ordered
-                    |> List.map (fun memberInfo ->
-                        memberInfo, readiness journal snapshot memberInfo.ReviewerSessionId memberInfo.BarrierId false)
+                let states = ResizeArray<EnlistedMember * RecordReadiness>()
+
+                for memberInfo in ordered do
+                    let! state = readiness journal snapshot memberInfo.ReviewerSessionId memberInfo.BarrierId false
+                    states.Add(memberInfo, state)
+
+                let states = states |> Seq.toList
 
                 match
                     states

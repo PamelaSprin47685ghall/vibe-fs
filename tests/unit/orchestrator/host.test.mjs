@@ -141,7 +141,7 @@ const gitDir = (label) => {
  * member-level branches run without initializeEngine; when false the host
  * initializes its own engine lazily through host.gitPort (init/sweep/caching).
  */
-const liveOrchestrator = (options = {}) => {
+const liveOrchestrator = async (options = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hostcov-'))
   const repoDir = join(dir, 'repo')
   mkdirSync(repoDir)
@@ -151,7 +151,7 @@ const liveOrchestrator = (options = {}) => {
     ['-C', repoDir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'],
     { stdio: 'ignore' },
   )
-  const opened = options.journal === false ? null : agentJournal.create({ directory: dir })
+  const opened = options.journal === false ? null : await agentJournal.create({ directory: dir })
   if (opened) assert.equal(opened.ok, true, 'journal must open')
 
   const sessions = fakeSessions(options.sessionBehaviour)
@@ -165,8 +165,8 @@ const liveOrchestrator = (options = {}) => {
     () => {},
     options.repoPath ?? repoDir,
     options.targetBranch ?? '',
-    () => undefined,
-    () => undefined,
+    async () => undefined,
+    async () => undefined,
   )
   const host = new OrchestratorHost(deps, makeSessionId('ses_orphost'))
   host.gitPort = options.gitPort ?? fakeGitPort()
@@ -179,8 +179,8 @@ const liveOrchestrator = (options = {}) => {
       repoDir,
       targetRef('main'),
       {
-        AppendFact: (streamId, factValue) => {
-          const appended = agentJournal.appendAgent(streamId, undefined, factValue, opened.journal)
+        AppendFact: async (streamId, factValue) => {
+          const appended = await agentJournal.appendAgent(streamId, undefined, factValue, opened.journal)
           return appended.ok ? { tag: 0, fields: [appended.value] } : { tag: 1, fields: ['append failed'] }
         },
         Snapshot: () => agentJournal.snapshot(opened.journal),
@@ -209,7 +209,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // ── initializeEngine / engine() ───────────────────────────────────────────────
 
 test('HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
-  const live = liveOrchestrator({ seedEngine: false })
+  const live = await liveOrchestrator({ seedEngine: false })
   const first = await forkManagerJob(live.host, managerJobId('hostfw1'), 'fast-manager', 'build the thing')
   assert.equal(first.ok, true, first.ok ? '' : first.error)
   assert.equal(first.value, join(tmpdir(), 'wanxiangshu-hostfw1'), 'the engine default worktree path is used')
@@ -227,7 +227,7 @@ test('HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
 })
 
 test('HOST_engine_init_failure_is_reported_and_cached', async () => {
-  const live = liveOrchestrator({
+  const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
     gitPort: fakeGitPort({ freezeError: 'detached head' }),
@@ -243,7 +243,7 @@ test('HOST_engine_init_failure_is_reported_and_cached', async () => {
 })
 
 test('HOST_sweep_failure_aborts_engine_initialization', async () => {
-  const live = liveOrchestrator({
+  const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
     gitPort: fakeGitPort({ listError: 'no .git' }),
@@ -258,7 +258,7 @@ test('HOST_sweep_failure_aborts_engine_initialization', async () => {
 // ── member-level branches over the real engine ───────────────────────────────
 
 test('HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   live.host.engineInstance.git.IsDirty = async () => true
 
   const result = await forkManagerJob(live.host, managerJobId('hostfw5'), 'fast-manager', 'x')
@@ -268,7 +268,7 @@ test('HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
 })
 
 test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const result = await continueManagerJob(live.host, managerJobId('hostfw6'), 'keep going')
   assert.equal(result.ok, false)
   assert.match(result.error, /Unknown manager job|no longer active/i)
@@ -276,7 +276,7 @@ test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
 })
 
 test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const forked = await forkManagerJob(live.host, managerJobId('hostfw8'), 'fast-manager', 'first pass')
   assert.equal(forked.ok, true, forked.ok ? '' : forked.error)
 
@@ -287,7 +287,7 @@ test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () =>
 })
 
 test('HOST_JoinPublished_renders_a_string', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   const rendered = await hostJoinPublished(live.host)
   assert.equal(typeof rendered, 'string')
   assert.ok(rendered.length > 0, 'compat join must render something')
@@ -295,7 +295,7 @@ test('HOST_JoinPublished_renders_a_string', async () => {
 })
 
 test('HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
-  const live = liveOrchestrator({
+  const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
     gitPort: fakeGitPort({ freezeError: 'bad repo' }),
@@ -306,8 +306,8 @@ test('HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async
   live.cleanup()
 })
 
-test('HOST_Cancel_reaches_the_runtime_without_throwing', () => {
-  const live = liveOrchestrator({ journal: false })
+test('HOST_Cancel_reaches_the_runtime_without_throwing', async () => {
+  const live = await liveOrchestrator({ journal: false })
   hostCancel(live.host)
   live.cleanup()
 })
@@ -315,7 +315,7 @@ test('HOST_Cancel_reaches_the_runtime_without_throwing', () => {
 // ── manager port internals ────────────────────────────────────────────────────
 
 test('HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   // Never forked, never registered: AwaitAgent fails fast with unknown agent.
   const result = resultOf(await live.host.managerPort.AwaitManager(managerJobId('hostfw9')))
   assert.equal(result.ok, false)
@@ -324,7 +324,7 @@ test('HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
 })
 
 test('HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const worktree = gitDir('awm')
   try {
     const started = resultOf(
@@ -346,7 +346,7 @@ test('HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', asyn
 })
 
 test('HOST_resumeManager_unknown_job_is_rejected', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   const result = resultOf(
     await live.host.managerPort.ResumeManager(managerJobId('hostfw11'), worktreePath('/tmp/wt'), 'resolve the conflict'),
   )
@@ -356,7 +356,7 @@ test('HOST_resumeManager_unknown_job_is_rejected', async () => {
 })
 
 test('HOST_terminateChildren_tears_down_manager_and_reviewer_children', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   // Seed the runtime child map directly: manager + one reviewer (job-reviewer-<bar>).
   const managerSid = sessionId('ses_mgr')
   const reviewerSid = sessionId('ses_rev')
@@ -377,7 +377,7 @@ test('HOST_terminateChildren_tears_down_manager_and_reviewer_children', async ()
 test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
   let live
   let barrierVisibleAtSend = false
-  live = liveOrchestrator({
+  live = await liveOrchestrator({
     sessionBehaviour: {
       onSendPrompt: (reviewerId) => {
         const reviewerKey = reviewerId?.fields?.[0] ?? reviewerId
@@ -407,7 +407,7 @@ test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async (
 })
 
 test('HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', async () => {
-  const live = liveOrchestrator({ journal: false })
+  const live = await liveOrchestrator({ journal: false })
   const worktree = gitDir('rvf')
   try {
     const result = resultOf(

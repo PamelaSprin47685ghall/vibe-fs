@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
@@ -134,30 +135,32 @@ module HostCompactionGate =
         (journal: AgentJournal)
         (sessionId: SessionId)
         (observed: ProviderRunIdentity list)
-        : Result<ProviderRunIdentity option, string> =
-        let snapshot = AgentJournal.snapshot journal
+        : Task<Result<ProviderRunIdentity option, string>> =
+        task {
+            let snapshot = AgentJournal.snapshot journal
 
-        let epoch =
-            AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.PrefixEpoch)
-            |> Option.defaultValue PrefixEpochProjection.empty
+            let epoch =
+                AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.PrefixEpoch)
+                |> Option.defaultValue PrefixEpochProjection.empty
 
-        // "Already reanchored" is answered from the durable projection, not a runtime
-        // set: the observation repeats on every reconcile, and a memory-only set would
-        // let a restart reanchor the same compaction a second time.
-        match HostCompactionPolicy.nextReanchor observed (fun run -> PrefixEpochProjection.isReanchored run epoch) with
-        | None -> Ok None
-        | Some run ->
-            let fact =
-                ContextFact.ContextReanchored
-                    {| SessionId = sessionId
-                       PreviousEpochId = epoch.EpochId
-                       NextEpochId = PrefixEpochId.next epoch.EpochId
-                       ObservedCompactionRun = run |}
+            // "Already reanchored" is answered from the durable projection, not a runtime
+            // set: the observation repeats on every reconcile, and a memory-only set would
+            // let a restart reanchor the same compaction a second time.
+            match HostCompactionPolicy.nextReanchor observed (fun run -> PrefixEpochProjection.isReanchored run epoch) with
+            | None -> return Ok None
+            | Some run ->
+                let fact =
+                    ContextFact.ContextReanchored
+                        {| SessionId = sessionId
+                           PreviousEpochId = epoch.EpochId
+                           NextEpochId = PrefixEpochId.next epoch.EpochId
+                           ObservedCompactionRun = run |}
 
-            match AgentJournal.appendAgent (StreamId.Session sessionId) (Some run) fact journal with
-            | Ok _ -> Ok(Some run)
-            | Error failure -> Error(JournalAppendFailure.describe failure)
+                match! AgentJournal.appendAgent (StreamId.Session sessionId) (Some run) fact journal with
+                | Ok _ -> return Ok(Some run)
+                | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
 
     /// HOST-006 startup probe: judge the first turn of the first managed session.
     ///

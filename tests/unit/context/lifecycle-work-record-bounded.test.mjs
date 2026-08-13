@@ -25,12 +25,12 @@ const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Jour
 
 const SEM = sessionId('ses_bounded_lwr')
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'lwr-bounded-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -39,11 +39,11 @@ const withJournal = (fn) => {
 
 const lastSequence = (trace) => Number(listItems(xTraceParts(trace)).at(-1).Cursor.Sequence)
 
-const commitY = (journal, { from, to, body, n }) => {
-  const written = agentJournal.writeBlob(body, journal)
+const commitY = async (journal, { from, to, body, n }) => {
+  const written = await agentJournal.writeBlob(body, journal)
   assert.equal(written.ok, true, written.ok ? '' : JSON.stringify(written.error))
   const run = `msg_y${n}`
-  const result = agentJournal.appendAgent(
+  const result = await agentJournal.appendAgent(
     stream.session(SEM),
     providerRun(run),
     agentFact('BlogObservationCommitted', {
@@ -70,10 +70,10 @@ const commitY = (journal, { from, to, body, n }) => {
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
 }
 
-const seedTwoInvocations = (journal) => {
-  xTraceCapture.captureOpening(journal, SEM, 'first charge', [])
+const seedTwoInvocations = async (journal) => {
+  await xTraceCapture.captureOpening(journal, SEM, 'first charge', [])
 
-  const inv1 = xTraceCapture.captureProjection(
+  const inv1 = await xTraceCapture.captureProjection(
     journal,
     SEM,
     xTraceCapture.semantic({
@@ -93,9 +93,9 @@ const seedTwoInvocations = (journal) => {
   // through >= StartInclusive - 1 would admit PRIOR_Y_INV1 into inv2.
   assert.equal(inv1Through, 2, `inv1 last part must be 2, got ${inv1Through}`)
   assert.equal(s1, 3, `inv2 StartInclusive must be one-past inv1 (3), got ${s1}`)
-  commitY(journal, { from: 0, to: inv1Through, body: 'PRIOR_Y_INV1', n: 1 })
+  await commitY(journal, { from: 0, to: inv1Through, body: 'PRIOR_Y_INV1', n: 1 })
 
-  const inv2 = xTraceCapture.captureProjection(
+  const inv2 = await xTraceCapture.captureProjection(
     journal,
     SEM,
     xTraceCapture.semantic({
@@ -115,20 +115,20 @@ const seedTwoInvocations = (journal) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', () => {
-  withJournal((journal) => {
-    const { s1, s2, inv1Through, inv2Through } = seedTwoInvocations(journal)
+test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async () => {
+  await withJournal(async (journal) => {
+    const { s1, s2, inv1Through, inv2Through } = await seedTwoInvocations(journal)
     // CURRENT Y through == inv2 StartInclusive. Inclusive-through keeps it;
     // treating Next as exclusive (through > Start) would drop CURRENT_Y_INV2.
     assert.equal(s1, inv1Through + 1, 'CURRENT Y through must equal StartInclusive')
-    commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
+    await commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
 
-    const full = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    const full = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
     assert.equal(typeof full, 'string')
     assert.match(full, /PRIOR_Y_INV1/, 'unbounded Chronicle still holds the prior Y frame')
     assert.match(full, /CURRENT_Y_INV2/)
 
-    const bounded = lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
+    const bounded = await lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
       StartInclusive: { Sequence: s1 },
       EndExclusive: { Sequence: s2 },
     })
@@ -141,11 +141,11 @@ test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', () =>
   })
 })
 
-test('COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', () => {
-  withJournal((journal) => {
-    const { s1, s2 } = seedTwoInvocations(journal)
+test('COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
+  await withJournal(async (journal) => {
+    const { s1, s2 } = await seedTwoInvocations(journal)
 
-    const bounded = lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
+    const bounded = await lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
       StartInclusive: { Sequence: s1 },
       EndExclusive: { Sequence: s2 },
     })

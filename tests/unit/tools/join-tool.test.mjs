@@ -87,7 +87,7 @@ test('JOIN_waiting_recovery_is_retryable_without_machine_state', async () => {
 
 test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-'))
-  const opened = agentJournal.create({ directory })
+  const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')
 
   const runtimeScope = scope()
@@ -117,7 +117,7 @@ test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
 
 test('JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-pty-name-'))
-  const opened = agentJournal.create({ directory })
+  const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')
 
   const ptyPort = new PtyPort(undefined, () => Promise.resolve({ tag: 0, fields: [] }), undefined)
@@ -162,7 +162,7 @@ test('JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async
 
 test('JOIN_ready_invalid_permit_surfaces_not_found', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-'))
-  const opened = agentJournal.create({ directory })
+  const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')
 
   const runtimeScope = scope()

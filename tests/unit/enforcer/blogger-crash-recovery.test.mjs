@@ -236,11 +236,11 @@ test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run'
     probe.repairState
 
   const directory = mkdtempSync(join(tmpdir(), 'enforcer-153-repairstate-'))
-  const created = agentJournal.create({ directory })
+  const created = await agentJournal.create({ directory })
   assert.equal(created.ok, true)
   const journal = created.journal
   const blog = sessionId('ses-blog')
-  const root = AgentJournalModule_appendAgent(
+  const root = await AgentJournalModule_appendAgent(
     stream.session(blog),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -258,7 +258,7 @@ test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run'
   assert.equal(caseOf(root), 'Ok')
 
   const digest = (await import('../support/domain.mjs')).authority.repairPayloadDigest(providerRun('asst-p1'), 'blogger-missing-tool')
-  const claimed = AgentJournalModule_appendAgent(
+  const claimed = await AgentJournalModule_appendAgent(
     stream.session(blog),
     undefined,
     agentFact('PluginPromptClaimed', {

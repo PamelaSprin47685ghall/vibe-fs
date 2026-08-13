@@ -36,7 +36,7 @@ module FinalityHostPort =
                 onRunStarted = scope.RunStarted,
                 parentWorkRecordFor =
                     (fun _ -> LifecycleWorkRecordProjection.lifecycleWorkRecord scope.Journal managerSessionId true),
-                childWorkRecordFor = (fun _ -> None),
+                childWorkRecordFor = (fun _ -> Task.FromResult None),
                 ?sessionSnapshot = scope.Snapshot,
                 managerOpensReviewBarrier = false,
                 ownership = HandleOwnership.HostOwnedHidden

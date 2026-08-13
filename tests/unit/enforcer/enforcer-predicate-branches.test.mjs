@@ -45,11 +45,11 @@ const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('
 
 const withHarness = async (fn, { link = true, material = 0 } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-predicates-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   const journal = created.journal
   if (link) {
-    const res = AgentJournalModule_appendAgent(
+    const res = await AgentJournalModule_appendAgent(
       streamSession(MAIN),
       undefined,
       agentFact('CompanionBloggerLinked', {
@@ -61,7 +61,7 @@ const withHarness = async (fn, { link = true, material = 0 } = {}) => {
     )
     assert.equal(caseOf(res), 'Ok')
   }
-  const auth = AgentJournalModule_appendAgent(
+  const auth = await AgentJournalModule_appendAgent(
     streamSession(BLOG),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -82,7 +82,7 @@ const withHarness = async (fn, { link = true, material = 0 } = {}) => {
     for (let i = 0; i < material; i++) {
       turns.push({ role: i % 2 === 0 ? 'user' : 'assistant', parts: [xTraceCapture.text(`turn-${i}`)] })
     }
-    xTraceCapture.captureProjection(journal, sessionId(MAIN), xTraceCapture.semantic({ messages: turns }))
+    await xTraceCapture.captureProjection(journal, sessionId(MAIN), xTraceCapture.semantic({ messages: turns }))
   }
 
   const scope = parkedTransform.scope()
@@ -378,7 +378,7 @@ test('ENFORCER_null_part_in_transcript_is_ignored', async () => {
 test('ENFORCER_load_effective_frames_missing_association', async () => {
   await withHarness(
     async ({ journal }) => {
-      const result = loadEffectiveFrames(journal, sessionId(MAIN))
+      const result = await loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 1)
       assert.equal(caseOf(result.fields[0]), 'MissingAssociation')
     },
@@ -388,7 +388,7 @@ test('ENFORCER_load_effective_frames_missing_association', async () => {
 
 test('ENFORCER_load_effective_frames_empty_ok', async () => {
   await withHarness(async ({ journal }) => {
-    const result = loadEffectiveFrames(journal, sessionId(MAIN))
+    const result = await loadEffectiveFrames(journal, sessionId(MAIN))
     assert.equal(result.tag, 0)
     assert.equal(listItems(result.fields[0][0]).length, 0, 'no frames yet')
   })
@@ -409,7 +409,7 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
       } finally {
         parkedTransform.host(scope).ParkTransform = original
       }
-      const result = loadEffectiveFrames(journal, sessionId(MAIN))
+      const result = await loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 0)
       const [resolved, epoch] = result.fields[0]
       assert.equal(listItems(resolved).length, 1)
@@ -439,7 +439,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
       agentJournal.deleteBlob(journal, frame.TextRef)
-      const result = loadEffectiveFrames(journal, sessionId(MAIN))
+      const result = await loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 1)
       assert.equal(caseOf(result.fields[0]), 'MissingFrameBlob')
     },
@@ -464,7 +464,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
       agentJournal.replaceBlobContent(journal, frame.TextRef, 'tampered body')
-      const result = loadEffectiveFrames(journal, sessionId(MAIN))
+      const result = await loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 1)
       assert.equal(caseOf(result.fields[0]), 'DigestMismatch')
     },

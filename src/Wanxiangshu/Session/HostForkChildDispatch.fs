@@ -27,7 +27,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordFor: SessionId -> string option)
+        (childWorkRecordFor: SessionId -> Task<string option>)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -84,14 +84,15 @@ module HostForkChildDispatch =
 
                 match result with
                 | ForkResult.NotFound _ ->
-                    HostForkRunLifecycle.failRun
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        sessions
-                        run
-                        "Fork runtime is cancelled"
+                    do!
+                        HostForkRunLifecycle.failRun
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            sessions
+                            run
+                            "Fork runtime is cancelled"
 
                     return Error "Fork runtime is cancelled"
                 | _ ->
@@ -103,18 +104,19 @@ module HostForkChildDispatch =
                     match sent, result with
                     | Ok(), (ForkResult.Nudged _ | ForkResult.Created _) -> return Ok result
                     | Ok(), _ ->
-                        HostForkRunLifecycle.failRun
-                            gate
-                            pendingRuns
-                            journal
-                            parentId
-                            sessions
-                            run
-                            "Existing agent did not accept a new run"
+                        do!
+                            HostForkRunLifecycle.failRun
+                                gate
+                                pendingRuns
+                                journal
+                                parentId
+                                sessions
+                                run
+                                "Existing agent did not accept a new run"
 
                         return Error "Existing agent did not accept a new run"
                     | Error err, _ ->
-                        HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
+                        do! HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
                         return Error err
         }
 
@@ -191,12 +193,15 @@ module HostForkChildDispatch =
         // EXEC-009: durable abandon before aborting. A crash mid-Cancel must not
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
-        match HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt with
-        | Error err ->
-            // Journal failure during abandon is a durable-state bug; surface it.
-            async { return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err)) }
-        | Ok() ->
-            async {
+        async {
+            match!
+                HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
+                |> Async.AwaitTask
+            with
+            | Error err ->
+                // Journal failure during abandon is a durable-state bug; surface it.
+                return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err))
+            | Ok() ->
                 do! Async.AwaitTask(ptyPort.CloseAll())
                 Pty.unregisterParentAbort parentKey parentAbortToken
 
@@ -217,4 +222,4 @@ module HostForkChildDispatch =
 
                     return ()
                 | Error err -> return raise (InvalidOperationException(sprintf "Parent teardown failed: %s" err))
-            }
+        }

@@ -21,15 +21,15 @@ const caseRec = (sessionId, q, a, observations = []) => ({
   LastAccessOrder: 0,
 })
 
-test('CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', () => {
+test('CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () => {
   const raw = createRaw()
   const store = createStore(raw)
   const question = 'Persistence after restart'
 
-  const archived = resultOf(archive(store, raw, caseRec('idx-private-1', question, 'A', [fileRead('a.txt', 'h1')])))
+  const archived = resultOf(await archive(store, raw, caseRec('idx-private-1', question, 'A', [fileRead('a.txt', 'h1')])))
   assert.equal(archived.ok, true, `archive ok, got ${JSON.stringify(archived.error)}`)
 
-  const snap = refresh(store, raw, 10)
+  const snap = await refresh(store, raw, 10)
   assert.equal(typeof snap.Epoch, 'bigint')
   const entries = listItems(snap.Cases)
   assert.equal(entries.length, 1)
@@ -45,7 +45,7 @@ test('CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', () => {
   assert.equal(cached.Epoch, snap.Epoch)
   assert.deepEqual(listItems(cached.Cases), entries)
 
-  const found = resultOf(resolve(store, raw, 10, entries[0].Shelfmark))
+  const found = resultOf(await resolve(store, raw, 10, entries[0].Shelfmark))
   assert.equal(found.ok, true)
   assert.equal(found.value.SessionId, 'idx-private-1', 'internal lookup keeps durable identity behind the shelfmark')
 })
@@ -61,29 +61,29 @@ test('CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
   assert.equal(first.includes('private-session-a'), false)
 })
 
-test('CASEBOOK_invalidate_then_refresh_advances_epoch', () => {
+test('CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
   const raw = createRaw()
   const store = createStore(raw)
-  resultOf(archive(store, raw, caseRec('idx-s2', 'Q', 'A', [])))
+  resultOf(await archive(store, raw, caseRec('idx-s2', 'Q', 'A', [])))
 
-  const first = refresh(store, raw, 10)
-  const stable = refresh(store, raw, 10)
+  const first = await refresh(store, raw, 10)
+  const stable = await refresh(store, raw, 10)
   assert.equal(stable.Epoch, first.Epoch, 'same visible index without invalidate keeps epoch')
   assert.deepEqual(listItems(stable.Cases), listItems(first.Cases))
 
   invalidate()
-  const advanced = refresh(store, raw, 10)
+  const advanced = await refresh(store, raw, 10)
   assert.equal(advanced.Epoch, first.Epoch + 1n, 'invalidate forces epoch bump on next refresh')
   assert.equal(listItems(advanced.Cases).length, 1)
 })
 
-test('CASEBOOK_visible_set_change_advances_epoch', () => {
+test('CASEBOOK_visible_set_change_advances_epoch', async () => {
   const raw = createRaw()
   const store = createStore(raw)
 
-  const empty = refresh(store, raw, 10)
-  resultOf(archive(store, raw, caseRec('idx-s3', 'A new canonical question', 'A', [])))
-  const after = refresh(store, raw, 10)
+  const empty = await refresh(store, raw, 10)
+  resultOf(await archive(store, raw, caseRec('idx-s3', 'A new canonical question', 'A', [])))
+  const after = await refresh(store, raw, 10)
 
   assert.equal(after.Epoch > empty.Epoch, true, 'provider-visible index change must advance epoch')
   assert.equal(listItems(after.Cases).some((entry) => entry.Question === 'A new canonical question'), true)

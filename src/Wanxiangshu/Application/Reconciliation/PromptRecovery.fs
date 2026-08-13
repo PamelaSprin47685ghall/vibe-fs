@@ -89,23 +89,29 @@ module PromptRecovery =
                     // The claim's own origin decides which acceptance this is: an
                     // AgentOwnerRoot claim must also register its Authority Root
                     // (PROMPT-005 order), a continuation must not.
-                    let accepted =
+                    let! accepted =
                         match claim.Origin with
                         | PromptAuthority.PromptOrigin.AuthorityRoot _ ->
-                            runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical
-                            |> Result.map ignore
+                            task {
+                                match! runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical with
+                                | Ok _ -> return Ok()
+                                | Error reason -> return Error reason
+                            }
                         | PromptAuthority.PromptOrigin.Continuation _
                         | PromptAuthority.PromptOrigin.HostInternal
                         | PromptAuthority.PromptOrigin.UnknownOrigin ->
-                            runtime.AcceptContinuation claim.PromptKey sessionId physical
-                            |> Result.map ignore
+                            task {
+                                match! runtime.AcceptContinuation claim.PromptKey sessionId physical with
+                                | Ok _ -> return Ok()
+                                | Error reason -> return Error reason
+                            }
 
                     match accepted with
                     | Ok() -> return report (Proven physical)
                     | Error reason -> return report (Unreadable reason)
 
                 | None when PromptAuthority.recoveryBudgetSpent runtimeStartCount claim ->
-                    match runtime.Abandon claim.PromptKey sessionId PromptAbandonReason.UnresolvedAfterRecovery with
+                    match! runtime.Abandon claim.PromptKey sessionId PromptAbandonReason.UnresolvedAfterRecovery with
                     | Ok() -> return report GaveUp
                     | Error reason -> return report (Unreadable reason)
 

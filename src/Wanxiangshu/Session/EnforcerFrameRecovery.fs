@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
@@ -30,43 +31,48 @@ module EnforcerFrameRecovery =
     let loadEffectiveFrames
         (journal: AgentJournal)
         (mainSessionId: SessionId)
-        : Result<ResolvedBlogFrame list * FrameEpochId, FrameLoadError> =
-        let projections = AgentJournal.snapshot journal
+        : Task<Result<ResolvedBlogFrame list * FrameEpochId, FrameLoadError>> =
+        task {
+            let projections = AgentJournal.snapshot journal
 
-        match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
-        | None -> Error FrameLoadError.MissingAssociation
-        | Some _ ->
-            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-            | None -> Error FrameLoadError.MissingBlogSession
-            | Some session ->
-                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
+            | None -> return Error FrameLoadError.MissingAssociation
+            | Some _ ->
+                match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
+                | None -> return Error FrameLoadError.MissingBlogSession
+                | Some session ->
+                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-                if List.isEmpty blog.Frames then
-                    Ok([], blog.FrameEpochId)
-                else
-                    let rec load remaining acc =
-                        match remaining with
-                        | [] -> Ok(List.rev acc, blog.FrameEpochId)
-                        | frame :: rest ->
-                            match journal.Writer.BlobWriter.Read frame.TextRef with
-                            | Error _ -> Error(FrameLoadError.MissingFrameBlob(BlobDigest.value frame.Digest))
-                            | Ok text ->
-                                if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
-                                    Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
-                                else
-                                    let kind =
-                                        match frame.Kind with
-                                        | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
-                                        | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
+                    if List.isEmpty blog.Frames then
+                        return Ok([], blog.FrameEpochId)
+                    else
+                        let rec load remaining acc =
+                            task {
+                                match remaining with
+                                | [] -> return Ok(List.rev acc, blog.FrameEpochId)
+                                | frame :: rest ->
+                                    match! journal.Writer.BlobWriter.Read frame.TextRef with
+                                    | Error _ ->
+                                        return Error(FrameLoadError.MissingFrameBlob(BlobDigest.value frame.Digest))
+                                    | Ok text ->
+                                        if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
+                                            return Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
+                                        else
+                                            let kind =
+                                                match frame.Kind with
+                                                | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
+                                                | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
 
-                                    let resolved: ResolvedBlogFrame =
-                                        { Kind = kind
-                                          Digest = BlobDigest.value frame.Digest
-                                          Body = text }
+                                            let resolved: ResolvedBlogFrame =
+                                                { Kind = kind
+                                                  Digest = BlobDigest.value frame.Digest
+                                                  Body = text }
 
-                                    load rest (resolved :: acc)
+                                            return! load rest (resolved :: acc)
+                            }
 
-                    load (BlogProjection.frames blog) []
+                        return! load (BlogProjection.frames blog) []
+        }
 
     /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
     /// Snapshot → InsertBlogFrames → Planner → Builder-shaped Host messages.
@@ -76,138 +82,139 @@ module EnforcerFrameRecovery =
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
         (ctx: BloggerRequestContext)
-        : obj list option =
-        let projections = AgentJournal.snapshot journal
+        : Task<obj list option> =
+        task {
+            let projections = AgentJournal.snapshot journal
 
-        let mainSessionId =
-            SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
+            let mainSessionId =
+                SessionAssociationProjection.tryMainSessionOf
+                    bloggerSessionId
+                    projections.AgentProjections.Associations
 
-        match mainSessionId with
-        | None -> None
-        | Some owner ->
-            // Zero frames is legitimate (first Main before any Entry). Missing
-            // association was already filtered. Blob load still fail-closed.
-            match loadEffectiveFrames journal owner with
-            | Error FrameLoadError.MissingAssociation
-            | Error FrameLoadError.MissingBlogSession -> None
-            | Error(FrameLoadError.MissingFrameBlob _)
-            | Error(FrameLoadError.DigestMismatch _)
-            | Error FrameLoadError.EpochMismatch -> None
-            | Ok(resolvedFrames, frameEpoch) ->
-                let requestKind, squashCount, delta =
-                    match ctx with
-                    | BloggerRequestContext.Main main ->
-                        let messageId =
-                            CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
+            match mainSessionId with
+            | None -> return None
+            | Some owner ->
+                // Zero frames is legitimate (first Main before any Entry). Missing
+                // association was already filtered. Blob load still fail-closed.
+                match! loadEffectiveFrames journal owner with
+                | Error FrameLoadError.MissingAssociation
+                | Error FrameLoadError.MissingBlogSession
+                | Error(FrameLoadError.MissingFrameBlob _)
+                | Error(FrameLoadError.DigestMismatch _)
+                | Error FrameLoadError.EpochMismatch -> return None
+                | Ok(resolvedFrames, frameEpoch) ->
+                    let requestKind, squashCount, delta =
+                        match ctx with
+                        | BloggerRequestContext.Main main ->
+                            let messageId =
+                                CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-                        "normal", 0, Some(messageId, main.Toml)
-                    | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
+                            "normal", 0, Some(messageId, main.Toml)
+                        | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
 
-                // ENFORCER-070/071: RecentTips from main session (oldest → newest).
-                // Same source for normal / squash / restart / recovery / compaction rebuilds.
-                let previousTips =
-                    match projections.AgentProjections.Sessions |> Map.tryFind owner with
-                    | Some session ->
-                        session.Enforcement
-                        |> Option.map EnforcementProjection.recentTips
-                        |> Option.defaultValue []
-                        |> List.map (fun tip -> tip.FieldName, tip.CycleId)
-                    | None -> []
+                    // ENFORCER-070/071: RecentTips from main session (oldest → newest).
+                    // Same source for normal / squash / restart / recovery / compaction rebuilds.
+                    let previousTips =
+                        match projections.AgentProjections.Sessions |> Map.tryFind owner with
+                        | Some session ->
+                            session.Enforcement
+                            |> Option.map EnforcementProjection.recentTips
+                            |> Option.defaultValue []
+                            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+                        | None -> []
 
-                let lang = ProviderProse.languageOf owner
+                    let lang = ProviderProse.languageOf owner
 
-                let blogFramesIntent: BlogFramesIntent =
-                    { RequestKind = requestKind
-                      SquashFrameCount = squashCount
-                      BloggerSessionId = SessionId.value bloggerSessionId
-                      FrameEpoch = FrameEpochId.value frameEpoch
-                      PhysicalDelta = delta
-                      PreviousTips = previousTips
-                      NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
-                      SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
+                    let blogFramesIntent: BlogFramesIntent =
+                        { RequestKind = requestKind
+                          SquashFrameCount = squashCount
+                          BloggerSessionId = SessionId.value bloggerSessionId
+                          FrameEpoch = FrameEpochId.value frameEpoch
+                          PhysicalDelta = delta
+                          PreviousTips = previousTips
+                          NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
+                          SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
 
-                let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-                    { ProviderId = None
-                      ModelId = None
-                      Variant = None
-                      Tools = []
-                      System = []
-                      Messages = [] }
+                    let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
+                        { ProviderId = None
+                          ModelId = None
+                          Variant = None
+                          Tools = []
+                          System = []
+                          Messages = [] }
 
-                let snapshot: ProjectionSnapshot =
-                    { CurrentProjection = emptyCurrent
-                      CommittedPrefix = None
-                      BlogFrames = resolvedFrames
-                      TransportMessages = Set.empty
-                      HostReanchor = None }
+                    let snapshot: ProjectionSnapshot =
+                        { CurrentProjection = emptyCurrent
+                          CommittedPrefix = None
+                          BlogFrames = resolvedFrames
+                          TransportMessages = Set.empty
+                          HostReanchor = None }
 
-                let intents = [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
+                    let intents = [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
 
-                match ProjectionPlanner.plan intents with
-                | Error _ -> None
-                | Ok ordered ->
-                    // PROJ-004：Canonical Renderer 单次产出 wire + Host id 侧信道。
-                    // 禁止二次 CompanionProjectionBuilder.build。
-                    let rendered =
-                        ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
+                    match ProjectionPlanner.plan intents with
+                    | Error _ -> return None
+                    | Ok ordered ->
+                        let rendered =
+                            ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
 
-                    let n = List.length rendered.Messages
+                        let n = List.length rendered.Messages
 
-                    if
-                        List.length rendered.HostMessageIds <> n
-                        || List.length rendered.HostIsPhysical <> n
-                    then
-                        None
-                    else
-                        // C6: rebuild frames/instruction are synthetic projections, not new
-                        // user authority. New Work delta is marked physical for diagnostics;
-                        // HOST-010 still binds authority pre-transform.
-                        // Fail-closed：每条 rebuild 消息必须带代数 MessageId。
-                        let zipped =
-                            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+                        if
+                            List.length rendered.HostMessageIds <> n
+                            || List.length rendered.HostIsPhysical <> n
+                        then
+                            return None
+                        else
+                            let zipped =
+                                List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
 
-                        let rec toHost
-                            (acc: obj list)
-                            (items: (ProviderProjection.WireMessage * string option * bool) list)
-                            =
-                            match items with
-                            | [] -> Some(List.rev acc)
-                            | (msg, None, _) :: _ -> None
-                            | (msg, Some messageId, isPhysical) :: tail ->
-                                let text =
-                                    msg.Parts
-                                    |> List.tryPick (function
-                                        | ProviderProjection.WireText t -> Some t
-                                        | _ -> None)
-                                    |> Option.defaultValue ""
+                            let rec toHost
+                                (acc: obj list)
+                                (items: (ProviderProjection.WireMessage * string option * bool) list)
+                                =
+                                match items with
+                                | [] -> Some(List.rev acc)
+                                | (_, None, _) :: _ -> None
+                                | (msg, Some messageId, isPhysical) :: tail ->
+                                    let text =
+                                        msg.Parts
+                                        |> List.tryPick (function
+                                            | ProviderProjection.WireText t -> Some t
+                                            | _ -> None)
+                                        |> Option.defaultValue ""
 
-                                let hostMsg =
-                                    createObj
-                                        [ "info",
-                                          box (
-                                              createObj
-                                                  [ "id", box messageId
-                                                    "role", box msg.Role
-                                                    "synthetic", box (not isPhysical)
-                                                    "source",
-                                                    box (
-                                                        if isPhysical then
-                                                            "physical-delta"
-                                                        else
-                                                            "synthetic-projection"
-                                                    ) ]
-                                          )
-                                          "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
+                                    let hostMsg =
+                                        createObj
+                                            [ "info",
+                                              box (
+                                                  createObj
+                                                      [ "id", box messageId
+                                                        "role", box msg.Role
+                                                        "synthetic", box (not isPhysical)
+                                                        "source",
+                                                        box (
+                                                            if isPhysical then
+                                                                "physical-delta"
+                                                            else
+                                                                "synthetic-projection"
+                                                        ) ]
+                                              )
+                                              "parts",
+                                              box [| createObj [ "type", box "text"; "text", box text ] |] ]
 
-                                toHost (hostMsg :: acc) tail
+                                    toHost (hostMsg :: acc) tail
 
-                        toHost [] zipped
+                            return toHost [] zipped
+        }
 
     /// Dead-code hygiene: never default a rebuild miss to []. Callers that still
     /// need a list must pass the Host rawMessages as fallback.
-    let rebuildFromContext journal bloggerSessionId ctx (fallback: obj list) =
-        tryRebuildFromContext journal bloggerSessionId ctx
-        |> Option.defaultValue fallback
+    let rebuildFromContext journal bloggerSessionId ctx (fallback: obj list) : Task<obj list> =
+        task {
+            let! rebuilt = tryRebuildFromContext journal bloggerSessionId ctx
+            return rebuilt |> Option.defaultValue fallback
+        }
 
     /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
     /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
@@ -247,125 +254,130 @@ module EnforcerFrameRecovery =
 
     /// C5: inverse of BloggerCoordinator.materializeRequest blob.
     /// Full typed context — never leave cutoff/digest at zero defaults.
-    let tryReloadRequestContext (journal: AgentJournal) (openReq: OpenBloggerRequest) : BloggerRequestContext option =
-        match journal.Writer.BlobWriter.Read openReq.ContextRef with
-        | Error _ -> None
-        | Ok json ->
-            try
-                let raw = Fable.Core.JS.JSON.parse json
+    let tryReloadRequestContext
+        (journal: AgentJournal)
+        (openReq: OpenBloggerRequest)
+        : Task<BloggerRequestContext option> =
+        task {
+            match! journal.Writer.BlobWriter.Read openReq.ContextRef with
+            | Error _ -> return None
+            | Ok json ->
+                let decoded =
+                    try
+                        let raw = Fable.Core.JS.JSON.parse json
 
-                let hasKey (key: string) : bool =
-                    emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
+                        let hasKey (key: string) : bool =
+                            emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
 
-                let asString (key: string) : string =
-                    if not (hasKey key) then
-                        ""
-                    else
-                        let value = raw?(key)
+                        let asString (key: string) : string =
+                            if not (hasKey key) then
+                                ""
+                            else
+                                let value = raw?(key)
 
-                        if isNull value then
-                            ""
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            unbox<string> value
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            string (unbox<float> value)
-                        else
-                            ""
+                                if isNull value then
+                                    ""
+                                elif emitJsExpr value "typeof $0 === 'string'" then
+                                    unbox<string> value
+                                elif emitJsExpr value "typeof $0 === 'number'" then
+                                    string (unbox<float> value)
+                                else
+                                    ""
 
-                let asInt64 (key: string) : int64 option =
-                    if not (hasKey key) then
-                        None
-                    else
-                        let value = raw?(key)
-
-                        if isNull value then
-                            None
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            Some(int64 (unbox<float> value))
-                        elif emitJsExpr value "typeof $0 === 'bigint'" then
-                            Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            let text = unbox<string> value
-
-                            if String.IsNullOrWhiteSpace text then
+                        let asInt64 (key: string) : int64 option =
+                            if not (hasKey key) then
                                 None
                             else
-                                Some(int64 (float text))
-                        else
-                            None
+                                let value = raw?(key)
 
-                let asInt (key: string) : int option =
-                    if not (hasKey key) then
-                        None
-                    else
-                        let value = raw?(key)
+                                if isNull value then
+                                    None
+                                elif emitJsExpr value "typeof $0 === 'number'" then
+                                    Some(int64 (unbox<float> value))
+                                elif emitJsExpr value "typeof $0 === 'bigint'" then
+                                    Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
+                                elif emitJsExpr value "typeof $0 === 'string'" then
+                                    let text = unbox<string> value
 
-                        if isNull value then
-                            None
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            Some(int (unbox<float> value))
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            let text = unbox<string> value
+                                    if String.IsNullOrWhiteSpace text then None else Some(int64 (float text))
+                                else
+                                    None
 
-                            if String.IsNullOrWhiteSpace text then
+                        let asInt (key: string) : int option =
+                            if not (hasKey key) then
                                 None
                             else
-                                Some(int (float text))
+                                let value = raw?(key)
+
+                                if isNull value then
+                                    None
+                                elif emitJsExpr value "typeof $0 === 'number'" then
+                                    Some(int (unbox<float> value))
+                                elif emitJsExpr value "typeof $0 === 'string'" then
+                                    let text = unbox<string> value
+
+                                    if String.IsNullOrWhiteSpace text then None else Some(int (float text))
+                                else
+                                    None
+
+                        if openReq.RequestKind = "squash" then
+                            let covered =
+                                asInt "covered_frame_count"
+                                |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
+
+                            Some(
+                                BloggerRequestContext.Squash
+                                    { RequestId = openReq.RequestId
+                                      MainSessionId = openReq.MainSessionId
+                                      BloggerSessionId = openReq.BloggerSessionId
+                                      FrameEpochId = openReq.FrameEpochId
+                                      CoveredFrameCount = covered
+                                      FrameDigests = openReq.SelectedFrameDigests
+                                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                            )
                         else
-                            None
+                            let toml = asString "toml"
+                            let deltaDigestRaw = asString "delta_digest"
 
-                if openReq.RequestKind = "squash" then
-                    let covered =
-                        asInt "covered_frame_count"
-                        |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
+                            let deltaDigest =
+                                if String.IsNullOrWhiteSpace deltaDigestRaw then
+                                    if String.IsNullOrWhiteSpace toml then
+                                        openReq.ContextDigest
+                                    else
+                                        BlobDigest.create (HostDigest.sha256Hex toml)
+                                else
+                                    BlobDigest.create deltaDigestRaw
 
-                    Some(
-                        BloggerRequestContext.Squash
-                            { RequestId = openReq.RequestId
-                              MainSessionId = openReq.MainSessionId
-                              BloggerSessionId = openReq.BloggerSessionId
-                              FrameEpochId = openReq.FrameEpochId
-                              CoveredFrameCount = covered
-                              FrameDigests = openReq.SelectedFrameDigests
-                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                    )
-                else
-                    let toml = asString "toml"
-                    let deltaDigestRaw = asString "delta_digest"
+                            let prevIngest =
+                                asInt64 "prev_ingest"
+                                |> Option.defaultValue openReq.PreviousIngestedThroughSequence
 
-                    let deltaDigest =
-                        if String.IsNullOrWhiteSpace deltaDigestRaw then
-                            if String.IsNullOrWhiteSpace toml then
-                                openReq.ContextDigest
-                            else
-                                BlobDigest.create (HostDigest.sha256Hex toml)
-                        else
-                            BlobDigest.create deltaDigestRaw
+                            let nextIngest =
+                                asInt64 "next_ingest"
+                                |> Option.defaultValue openReq.NextIngestedThroughSequence
 
-                    let prevIngest =
-                        asInt64 "prev_ingest"
-                        |> Option.defaultValue openReq.PreviousIngestedThroughSequence
+                            Some(
+                                BloggerRequestContext.Main
+                                    { RequestId = openReq.RequestId
+                                      MainSessionId = openReq.MainSessionId
+                                      BloggerSessionId = openReq.BloggerSessionId
+                                      Toml = toml
+                                      PreviousIngestedThroughSequence = prevIngest
+                                      NextIngestedThroughSequence = nextIngest
+                                      PreviousCoverableTurnCutoffExclusive =
+                                        asInt "prev_cutoff" |> Option.defaultValue 0
+                                      NextCoverableTurnCutoffExclusive =
+                                        asInt "next_cutoff" |> Option.defaultValue 0
+                                      NextCoveredPrefixDigest = asString "next_prefix_digest"
+                                      FrameEpochId = openReq.FrameEpochId
+                                      DeltaDigest = deltaDigest
+                                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                            )
+                    with _ ->
+                        None
 
-                    let nextIngest =
-                        asInt64 "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
-
-                    Some(
-                        BloggerRequestContext.Main
-                            { RequestId = openReq.RequestId
-                              MainSessionId = openReq.MainSessionId
-                              BloggerSessionId = openReq.BloggerSessionId
-                              Toml = toml
-                              PreviousIngestedThroughSequence = prevIngest
-                              NextIngestedThroughSequence = nextIngest
-                              PreviousCoverableTurnCutoffExclusive = asInt "prev_cutoff" |> Option.defaultValue 0
-                              NextCoverableTurnCutoffExclusive = asInt "next_cutoff" |> Option.defaultValue 0
-                              NextCoveredPrefixDigest = asString "next_prefix_digest"
-                              FrameEpochId = openReq.FrameEpochId
-                              DeltaDigest = deltaDigest
-                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                    )
-            with _ ->
-                None
+                return decoded
+        }
 
     /// Live commit authority: InFlight payload only.
     /// Completed-blog transform must NEVER heal InFlight from durable open —
@@ -383,18 +395,20 @@ module EnforcerFrameRecovery =
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
-        : BloggerRequestContext option =
-        let key = SessionId.value bloggerSessionId
+        : Task<BloggerRequestContext option> =
+        task {
+            let key = SessionId.value bloggerSessionId
 
-        match scope.TryPeekCurrentRequest key with
-        | Some ctx -> Some ctx
-        | None ->
-            let openReq =
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-                |> Option.bind (fun session -> session.BloggerCycles)
-                |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+            match scope.TryPeekCurrentRequest key with
+            | Some ctx -> return Some ctx
+            | None ->
+                let openReq =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Map.tryFind mainSessionId
+                    |> Option.bind (fun session -> session.BloggerCycles)
+                    |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
-            match openReq with
-            | None -> None
-            | Some req -> tryReloadRequestContext journal req
+                match openReq with
+                | None -> return None
+                | Some req -> return! tryReloadRequestContext journal req
+        }

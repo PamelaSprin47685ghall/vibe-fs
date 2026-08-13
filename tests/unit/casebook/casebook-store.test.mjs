@@ -27,8 +27,8 @@ const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(
 const fileRead = (path, hash) => new Observation(obsIndex('FileRead'), [path, hash])
 const globResult = (pattern, paths) => new Observation(obsIndex('GlobResult'), [pattern, toList(paths)])
 
-const unwrap = (result) => {
-  const r = resultOf(result)
+const unwrap = async (result) => {
+  const r = resultOf(await result)
   assert.equal(r.ok, true, `expected Ok, got ${JSON.stringify(r.error)}`)
   return r.value
 }
@@ -41,16 +41,16 @@ const caseRec = (sessionId, q, a, observations) => ({
   LastAccessOrder: 0,
 })
 
-test('CASE007_captured_refreshed_round_trip_through_eventstore', () => {
+test('CASE007_captured_refreshed_round_trip_through_eventstore', async () => {
   const raw = createRaw()
   const store = createStore(raw)
 
-  const first = unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
-  unwrap(
+  const first = await unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
+  await unwrap(
     appendRefreshed(store, toList([first]), 's1', 'Q1b', 'A1b', toList([fileRead('a.txt', 'h1'), globResult('*.fs', ['x'])])),
   )
 
-  const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  const events = await unwrap(loadEvents(raw, await store.OpenSnapshot()))
   const types = listItems(events).map((e) => caseOf(e)).sort()
   assert.deepEqual(types, ['CaseCaptured', 'CaseRefreshed'])
 
@@ -60,31 +60,31 @@ test('CASE007_captured_refreshed_round_trip_through_eventstore', () => {
   assert.equal(listItems(s1.Observations).length, 2)
 })
 
-test('CASE007_accessed_and_evicted_events_round_trip', () => {
+test('CASE007_accessed_and_evicted_events_round_trip', async () => {
   const raw = createRaw()
   const store = createStore(raw)
 
-  const first = unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q', 'A', [])))
-  unwrap(appendAccessed(store, toList([first]), 's1'))
-  const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  const first = await unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q', 'A', [])))
+  await unwrap(appendAccessed(store, toList([first]), 's1'))
+  const events = await unwrap(loadEvents(raw, await store.OpenSnapshot()))
   assert.deepEqual(listItems(events).map((e) => caseOf(e)).sort(), ['CaseAccessed', 'CaseCaptured'])
 
   // eviction is expressed as an event too
-  const evictedId = unwrap(appendEvicted(store, toList([first]), 's1'))
-  const allEvents = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  const evictedId = await unwrap(appendEvicted(store, toList([first]), 's1'))
+  const allEvents = await unwrap(loadEvents(raw, await store.OpenSnapshot()))
   assert.deepEqual(listItems(allEvents).map((e) => caseOf(e)).sort(), ['CaseAccessed', 'CaseCaptured', 'CaseEvicted'])
   assert.equal(mapEntries(project(10, allEvents)).length, 0)
   assert.equal(evictedId !== undefined, true)
 })
 
-test('CASE007_loadEnvelopes_keeps_event_ids_for_linear_parents', () => {
+test('CASE007_loadEnvelopes_keeps_event_ids_for_linear_parents', async () => {
   const raw = createRaw()
   const store = createStore(raw)
 
-  const first = unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q', 'A', [])))
-  const second = unwrap(appendCaptured(store, toList([first]), caseRec('s2', 'Q2', 'A2', [])))
+  const first = await unwrap(appendCaptured(store, toList([]), caseRec('s1', 'Q', 'A', [])))
+  const second = await unwrap(appendCaptured(store, toList([first]), caseRec('s2', 'Q2', 'A2', [])))
 
-  const envelopes = unwrap(loadEnvelopes(raw, store.OpenSnapshot()))
+  const envelopes = await unwrap(loadEnvelopes(raw, await store.OpenSnapshot()))
   assert.equal(listItems(envelopes).length, 2)
   const head = headOf(envelopes)
   assert.equal(head !== undefined, true)
@@ -116,10 +116,10 @@ test('CASE004_005_workflow_archive_fetch_freshness', async () => {
   const raw = createRaw()
   const store = createStore(raw)
 
-  const archived = archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))
+  const archived = await archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))
   assert.equal(resultOf(archived).ok, true, `archive ok, got ${JSON.stringify(resultOf(archived).error)}`)
 
-  const fetched = fetchCase(store, raw, 10, 's1')
+  const fetched = await fetchCase(store, raw, 10, 's1')
   assert.equal(resultOf(fetched).ok, true)
   const caseObj = resultOf(fetched).value
   assert.equal(caseObj !== undefined, true)
@@ -175,23 +175,23 @@ test('CASE006_refresh_publishes_revision_and_needsRefresh_detects_stale', async 
     const raw = createRaw()
     const store = createStore(raw)
     // archive with observation matching current content
-    resultOf(archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', hash('hello'))])))
+    resultOf(await archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', hash('hello'))])))
     // still fresh → no refresh needed
-    const fresh = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    const fresh = resultOf(await needsRefresh(store, raw, 10, 's1', dir))
     assert.equal(fresh.ok, true)
     assert.equal(fresh.value, false)
     // content changed → refresh needed
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    const stale = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    const stale = resultOf(await needsRefresh(store, raw, 10, 's1', dir))
     assert.equal(stale.ok, true)
     assert.equal(stale.value, true)
     // Bookkeeper revises → Refreshed lands and the projection carries new A
-    const refreshed = resultOf(refreshCase(store, raw, 's1', 'Q1b', 'A1b', toList([fileRead('a.txt', hash('changed'))])))
+    const refreshed = resultOf(await refreshCase(store, raw, 's1', 'Q1b', 'A1b', toList([fileRead('a.txt', hash('changed'))])))
     assert.equal(refreshed.ok, true, `refresh ok, got ${JSON.stringify(refreshed.error)}`)
-    const fetched = resultOf(fetchCase(store, raw, 10, 's1'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's1'))
     assert.equal(fetched.value.A, 'A1b')
     // after revision matches the current worktree again → no refresh needed
-    const settled = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    const settled = resultOf(await needsRefresh(store, raw, 10, 's1', dir))
     assert.equal(settled.value, false)
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -202,13 +202,13 @@ test('CASE010_finalize_is_exactly_once_per_scope', async () => {
   const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
   const raw = createRaw()
   const store = createStore(raw)
-  const first = resultOf(finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A', [])))
+  const first = resultOf(await finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A', [])))
   assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
-  const second = resultOf(finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A2', [])))
+  const second = resultOf(await finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A2', [])))
   assert.equal(second.ok, false, 'second finalize must be refused')
   assert.equal(second.error.includes('already finalized'), true)
   // a different scope still archives
-  const other = resultOf(finalizeCase(store, raw, caseRec('scope-2', 'Q', 'A', [])))
+  const other = resultOf(await finalizeCase(store, raw, caseRec('scope-2', 'Q', 'A', [])))
   assert.equal(other.ok, true)
 })
 

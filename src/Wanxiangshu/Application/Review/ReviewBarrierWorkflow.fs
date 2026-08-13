@@ -81,7 +81,7 @@ module ReviewBarrierWorkflow =
             match! host.ForkReviewer() with
             | Error error -> return Error(ReviewBarrierFailure.CannotCreateReviewer error)
             | Ok reviewerSessionId ->
-                match ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
+                match! ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
                 | Error error -> return Error(ReviewBarrierFailure.CannotOpenBarrier error)
                 | Ok() ->
                     let rec awaitWitness () =

@@ -84,19 +84,19 @@ test('STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_outpu
   assert.equal(Lifecycle.StrengthLifecycle_reconcileEvent(projection, realTurn), undefined)
 })
 
-test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', () => {
+test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   const messages = toList([{ id: 'user-1' }, { id: 'run-1' }, { id: 'user-2' }])
   const messageIdOf = (message) => message.id
-  const load = () => ok(frame)
+  const load = async () => ok(frame)
 
-  const beforePromotion = resultOf(Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection))
+  const beforePromotion = resultOf(await Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection))
   assert.equal(beforePromotion.ok, true)
   assert.equal(listItems(beforePromotion.value).length, 0)
 
   projection = apply(projection, promoted(frame))
-  const afterPromotion = resultOf(Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection))
+  const afterPromotion = resultOf(await Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection))
   assert.equal(afterPromotion.ok, true)
   const [plan] = listItems(afterPromotion.value)
   assert.equal(plan.BeforeMessageIndex, 1)
@@ -105,7 +105,7 @@ test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_ex
 
   projection = apply(projection, Events.StrengthEvents_traced(decision('d1'), 10n, 14n))
   const tracedPlans = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection),
+    await Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection),
   )
   assert.equal(tracedPlans.ok, true)
   const [tracedPlan] = listItems(tracedPlans.value)
@@ -114,13 +114,13 @@ test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_ex
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(20n, tracedPlan), false)
 
   const missingAnchor = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, toList([{ id: 'user-1' }]), load, projection),
+    await Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, toList([{ id: 'user-1' }]), load, projection),
   )
   assert.equal(missingAnchor.ok, false)
   assert.match(missingAnchor.error, /target anchor is absent/i)
 })
 
-test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', () => {
+test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
   const frame = bundle()
   const projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   assert.equal(Projection.StrengthProjectionModule_isPromoted(decision('d1'), projection), false)
@@ -131,28 +131,28 @@ test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', () 
   ))
   assert.equal(traced.ok, false)
 
-  const replay = resultOf(Lifecycle.StrengthLifecycle_replayPlans(
+  const replay = resultOf(await Lifecycle.StrengthLifecycle_replayPlans(
     session('owner'),
     (message) => message.id,
     toList([{ id: 'user-1' }, { id: 'run-1' }]),
-    () => ok(frame),
+    async () => ok(frame),
     projection,
   ))
   assert.equal(replay.ok, true)
   assert.equal(listItems(replay.value).length, 0)
 })
 
-test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', () => {
+test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   projection = apply(projection, promoted(frame))
   projection = apply(projection, Events.StrengthEvents_traced(decision('d1'), 40n, 44n))
 
-  const [plan] = listItems(resultOf(Lifecycle.StrengthLifecycle_replayPlans(
+  const [plan] = listItems(resultOf(await Lifecycle.StrengthLifecycle_replayPlans(
     session('owner'),
     (message) => message.id,
     toList([{ id: 'user-1' }, { id: 'run-1' }]),
-    () => ok(frame),
+    async () => ok(frame),
     projection,
   )).value)
 

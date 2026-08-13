@@ -92,29 +92,19 @@ module EnforcerHost =
     let private projectionFromXTrace
         (journal: AgentJournal)
         (xTrace: XTraceProjectionState)
-        : ProviderProjection.ProviderSemanticProjection =
-        let byTurn =
-            XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
-            |> List.groupBy (fun part -> part.Turn)
-            |> List.sortBy fst
+        : Task<ProviderProjection.ProviderSemanticProjection> =
+        task {
+            let byTurn =
+                XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
+                |> List.groupBy (fun part -> part.Turn)
+                |> List.sortBy fst
 
-        let messages =
-            byTurn
-            |> List.choose (fun (_turn, parts) ->
-                let ordered = parts |> List.sortBy (fun p -> p.PartIndex)
-
-                let role =
-                    ordered
-                    |> List.tryHead
-                    |> Option.map (fun p -> p.Role)
-                    |> Option.defaultValue "user"
-
-                let semanticParts =
-                    ordered
-                    |> List.choose (fun part ->
-                        match journal.Writer.BlobWriter.Read part.TextRef with
-                        | Error _ -> None
-                        | Ok body ->
+            let readSemanticPart (part: XTracePartRef) =
+                task {
+                    match! journal.Writer.BlobWriter.Read part.TextRef with
+                    | Error _ -> return None
+                    | Ok body ->
+                        return
                             match part.Kind with
                             | "text" -> Some(ProviderProjection.SemanticText body)
                             | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
@@ -124,23 +114,51 @@ module EnforcerHost =
                             | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
                             | "media_omitted" ->
                                 let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
-
                                 Some(ProviderProjection.SemanticMedia(mediaType, ""))
-                            | _ -> None)
+                            | _ -> None
+                }
 
-                if List.isEmpty semanticParts then
-                    None
-                else
-                    Some
-                        { ProviderProjection.SemanticMessage.Role = role
-                          ProviderProjection.SemanticMessage.Parts = semanticParts })
+            let readTurn (_turn, parts) =
+                task {
+                    let ordered = parts |> List.sortBy (fun p -> p.PartIndex)
 
-        { ProviderId = None
-          ModelId = None
-          Variant = None
-          Tools = []
-          System = []
-          Messages = messages }
+                    let role =
+                        ordered
+                        |> List.tryHead
+                        |> Option.map (fun p -> p.Role)
+                        |> Option.defaultValue "user"
+
+                    let semanticParts = ResizeArray<_>()
+
+                    for part in ordered do
+                        match! readSemanticPart part with
+                        | Some semantic -> semanticParts.Add semantic
+                        | None -> ()
+
+                    if semanticParts.Count = 0 then
+                        return None
+                    else
+                        return
+                            Some
+                                { ProviderProjection.SemanticMessage.Role = role
+                                  ProviderProjection.SemanticMessage.Parts = semanticParts |> Seq.toList }
+                }
+
+            let messages = ResizeArray<_>()
+
+            for turn in byTurn do
+                match! readTurn turn with
+                | Some message -> messages.Add message
+                | None -> ()
+
+            return
+                { ProviderId = None
+                  ModelId = None
+                  Variant = None
+                  Tools = []
+                  System = []
+                  Messages = messages |> Seq.toList }
+        }
 
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
@@ -208,38 +226,41 @@ module EnforcerHost =
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
-        : BloggerRequestContext option =
-        let key = SessionId.value bloggerSessionId
+        : Task<BloggerRequestContext option> =
+        task {
+            let key = SessionId.value bloggerSessionId
 
-        if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId scope key then
-            None
-        else
-            let session =
-                AgentProjection.tryFind mainSessionId (AgentJournal.snapshot journal).AgentProjections
-                |> Option.defaultValue AgentProjection.emptySession
+            if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId scope key then
+                return None
+            else
+                let session =
+                    AgentProjection.tryFind mainSessionId (AgentJournal.snapshot journal).AgentProjections
+                    |> Option.defaultValue AgentProjection.emptySession
 
-            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
 
-            let epoch =
-                session.PrefixEpoch
-                |> Option.map (fun e -> e.EpochId)
-                |> Option.defaultValue PrefixEpochId.initial
+                let epoch =
+                    session.PrefixEpoch
+                    |> Option.map (fun e -> e.EpochId)
+                    |> Option.defaultValue PrefixEpochId.initial
 
-            let projection = projectionFromXTrace journal xTrace
+                let! projection = projectionFromXTrace journal xTrace
 
-            let ingestCursor =
-                XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+                let ingestCursor =
+                    XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
 
-            match
-                BloggerDelta.nextChunk
-                    BloggerDelta.DeltaLimitBytes
-                    ingestCursor
-                    blog.Coverage.CoverableTurnCutoffExclusive
-                    projection.Messages
-            with
-            | None -> None
-            | Some chunk -> mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk
+                match
+                    BloggerDelta.nextChunk
+                        BloggerDelta.DeltaLimitBytes
+                        ingestCursor
+                        blog.Coverage.CoverableTurnCutoffExclusive
+                        projection.Messages
+                with
+                | None -> return None
+                | Some chunk ->
+                    return mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk
+        }
 
     /// The Blogger continuation-transform handler.
     ///

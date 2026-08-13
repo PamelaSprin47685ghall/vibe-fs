@@ -62,9 +62,9 @@ const fakeSessions = (behaviour = {}) => {
   }
 }
 
-const live = (behaviour = {}, { disposedJournal = false } = {}) => {
+const live = async (behaviour = {}, { disposedJournal = false } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hfa-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
   if (disposedJournal) opened.dispose()
   const sessions = fakeSessions(behaviour)
@@ -82,14 +82,14 @@ const live = (behaviour = {}, { disposedJournal = false } = {}) => {
   }
 }
 
-const link = (j, agentId, child, agent = 'fast-coder') => {
-  const result = HandleController_link(j, PARENT, agentId, child, agent, Role.Coder, HandleOwnership.DurableParentHandle)
+const link = async (j, agentId, child, agent = 'fast-coder') => {
+  const result = await HandleController_link(j, PARENT, agentId, child, agent, Role.Coder, HandleOwnership.DurableParentHandle)
   assert.equal(result.tag, 0, result.tag === 1 ? result.fields[0] : '')
 }
 
 const abandon = async (j, agentId) => {
   const { handleController } = await import('../support/domain.mjs')
-  const result = handleController.recordAbandon(j, PARENT, agentId, 'DeadlineExceeded')
+  const result = await handleController.recordAbandon(j, PARENT, agentId, 'DeadlineExceeded')
   assert.equal(result.ok, true, result.ok ? '' : result.error)
 }
 
@@ -97,17 +97,17 @@ const retire = async (j, agentId) => {
   const { agentCompletion, handleCompletionCodec, handleController, handleId } = await import('../support/domain.mjs')
   const sealed = agentCompletion.completedRun({ runId: `run-${agentId}`, agentId, agentName: 'fast-coder', workRecord: 'w' })
   const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-  const recorded = handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, sessionId('ses_c'))
+  const recorded = await handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, sessionId('ses_c'))
   assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
-  const consumed = handleController.consume(j, PARENT, handleId.agent(agentId))
+  const consumed = await handleController.consume(j, PARENT, handleId.agent(agentId))
   assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
 }
 
 // ── Fork refusals ────────────────────────────────────────────────────────────
 
 test('HFA_fork_retired_handle_is_refused_before_spawn', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'hf1', sessionId('ses_c'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'hf1', sessionId('ses_c'))
   await retire(liveCtx.journal, 'hf1')
 
   const result = await fork(liveCtx.runtime, 'hf1', Role.Coder, 'fast-coder', 'do work')
@@ -118,8 +118,8 @@ test('HFA_fork_retired_handle_is_refused_before_spawn', async () => {
 })
 
 test('HFA_fork_abandoned_handle_is_refused_before_spawn', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'hf2', sessionId('ses_c'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'hf2', sessionId('ses_c'))
   await abandon(liveCtx.journal, 'hf2')
 
   const result = await fork(liveCtx.runtime, 'hf2', Role.Coder, 'fast-coder', 'do work')
@@ -130,7 +130,7 @@ test('HFA_fork_abandoned_handle_is_refused_before_spawn', async () => {
 })
 
 test('HFA_fork_create_session_failure_surfaces_host_error', async () => {
-  const liveCtx = live({ createError: 'host refused' })
+  const liveCtx = await live({ createError: 'host refused' })
   const result = await fork(liveCtx.runtime, 'hf3', Role.Coder, 'fast-coder', 'do work')
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'host refused')
@@ -140,7 +140,7 @@ test('HFA_fork_create_session_failure_surfaces_host_error', async () => {
 test('HFA_fork_linkage_failure_aborts_the_new_child', async () => {
   // A journal whose writer is gone makes the HandleLinked append fail; the
   // freshly created child session must be aborted and the error surfaced.
-  const liveCtx = live({}, { disposedJournal: true })
+  const liveCtx = await live({}, { disposedJournal: true })
   const result = await fork(liveCtx.runtime, 'hf4', Role.Coder, 'fast-coder', 'do work')
 
   assert.equal(result.tag, 1)
@@ -151,7 +151,7 @@ test('HFA_fork_linkage_failure_aborts_the_new_child', async () => {
 })
 
 test('HFA_fork_send_failure_fails_the_pending_run', async () => {
-  const liveCtx = live({ sendError: 'prompt rejected' })
+  const liveCtx = await live({ sendError: 'prompt rejected' })
   const result = await fork(liveCtx.runtime, 'hf5', Role.Coder, 'fast-coder', 'do work')
 
   assert.equal(result.tag, 1)
@@ -159,7 +159,7 @@ test('HFA_fork_send_failure_fails_the_pending_run', async () => {
   assert.equal(pendingRunCount(liveCtx.runtime), 0, 'the run must be failed, not left pending')
 
   // The failure was written durably: the handle is joinable with a failed item.
-  const drained = JoinDrain_drainFromJournal(liveCtx.journal, PARENT, 5, utcOffset('2024-01-01T00:00:00.000Z'))
+  const drained = await JoinDrain_drainFromJournal(liveCtx.journal, PARENT, 5, utcOffset('2024-01-01T00:00:00.000Z'))
   assert.equal(drained.tag, 0, drained.tag === 1 ? drained.fields[0] : '')
   const items = listItems(drained.fields[0])
   assert.equal(items.length, 1)
@@ -168,7 +168,7 @@ test('HFA_fork_send_failure_fails_the_pending_run', async () => {
 })
 
 test('HFA_fork_cancelled_runtime_is_not_found_and_fails_run', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   cancelRuntime(liveCtx.runtime)
   const result = await fork(liveCtx.runtime, 'hf6', Role.Coder, 'fast-coder', 'do work')
   assert.equal(result.tag, 1)
@@ -180,7 +180,7 @@ test('HFA_fork_cancelled_runtime_is_not_found_and_fails_run', async () => {
 // ── Reuse ────────────────────────────────────────────────────────────────────
 
 test('HFA_reuse_unknown_agent_id_is_error', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await reuse(liveCtx.runtime, 'ghost', 'continue please')
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'Unknown agent id: ghost')
@@ -188,8 +188,8 @@ test('HFA_reuse_unknown_agent_id_is_error', async () => {
 })
 
 test('HFA_reuse_abandoned_handle_is_retired_error', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'hf7', sessionId('ses_c'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'hf7', sessionId('ses_c'))
   await abandon(liveCtx.journal, 'hf7')
 
   const result = await reuse(liveCtx.runtime, 'hf7', 'continue please')
@@ -199,7 +199,7 @@ test('HFA_reuse_abandoned_handle_is_retired_error', async () => {
 })
 
 test('HFA_reuse_after_join_sends_prompt_on_same_child', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const forked = await fork(liveCtx.runtime, 'hf8', Role.Coder, 'fast-coder', 'first task')
   assert.equal(forked.tag, 0)
   assert.equal(caseOf(forked.fields[0]), 'Created')
@@ -222,7 +222,7 @@ test('HFA_reuse_after_join_sends_prompt_on_same_child', async () => {
 })
 
 test('HFA_existing_fork_keeps_deep_agent_when_caller_passes_fast', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const first = await fork(liveCtx.runtime, 'hf-deep', Role.Coder, 'deep-coder', 'first task')
   assert.equal(first.tag, 0, first.tag === 1 ? first.fields[0] : '')
 
@@ -242,7 +242,7 @@ test('HFA_existing_fork_keeps_deep_agent_when_caller_passes_fast', async () => {
 })
 
 test('HFA_reuse_keeps_deep_agent', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const first = await fork(liveCtx.runtime, 'hf-reuse-deep', Role.Coder, 'deep-coder', 'first task')
   assert.equal(first.tag, 0, first.tag === 1 ? first.fields[0] : '')
 

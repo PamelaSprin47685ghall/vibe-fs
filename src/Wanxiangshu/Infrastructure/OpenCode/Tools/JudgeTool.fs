@@ -155,9 +155,9 @@ module JudgeTool =
                           ToolCallId = toolCallId
                           Verdict = value }
 
-                    match VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
+                    match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
                     | Ok VerdictDecision.ChallengeUnproven ->
-                        match
+                        match!
                             ReviewSeal.bindToRun
                                 journal
                                 scope.PendingReviewSeals
@@ -167,7 +167,7 @@ module JudgeTool =
                         | Error ReviewSeal.NoPendingSeal -> return challengeUnproven context
                         | Error(ReviewSeal.AppendFailed _) -> return notReceived context Path.ChallengeProofNotRecorded
                         | Ok _ ->
-                            match VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
+                            match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
                             | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
                             | Ok VerdictDecision.ChallengeUnproven -> return challengeUnproven context
                             | Ok decision ->

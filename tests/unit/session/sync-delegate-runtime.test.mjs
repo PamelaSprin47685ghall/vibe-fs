@@ -10,7 +10,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
@@ -44,6 +43,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  toList,
   xTraceCapture,
 } from '../support/domain.mjs'
 
@@ -66,12 +66,12 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
 let activeJournal
 const transcripts = new Map()
 
-const captureLastAssistant = (delegateKey, answer) => {
+const captureLastAssistant = async (delegateKey, answer) => {
   const key = String(delegateKey)
   const messages = transcripts.get(key) ?? []
   messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
   transcripts.set(key, messages)
-  xTraceCapture.captureProjection(
+  await xTraceCapture.captureProjection(
     activeJournal,
     sessionId(delegateKey),
     xTraceCapture.semantic({ messages }),
@@ -81,7 +81,7 @@ const captureLastAssistant = (delegateKey, answer) => {
 const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
   SessionPersona_clearAllForTests()
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-'))
-  const opened = agentJournal.create({ directory: base })
+  const opened = await agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   activeJournal = opened.journal
   transcripts.clear()
@@ -166,7 +166,7 @@ const waitFor = async (predicate, message, ms = 2000) => {
 }
 
 const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_return') => {
-  captureLastAssistant(delegateKey, answer)
+  await captureLastAssistant(delegateKey, answer)
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
@@ -177,7 +177,7 @@ test('EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_o
     const run = providerRun('asst_batch')
     const firstCall = toolCallId('call_first')
     const secondCall = toolCallId('call_second')
-    const callOrder = ofArray([firstCall, secondCall])
+    const callOrder = toList([firstCall, secondCall])
 
     // Arrival order is deliberately reversed. Provider order, not scheduler
     // timing, defines prompt concatenation and canonical result ownership.
@@ -468,7 +468,7 @@ test('EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', asyn
     // Append this invocation's trace parts to the delegate session (Recent work).
     // captureProjection syncs a full semantic transcript; isolated single-message
     // calls collide on g:0/turn:0/part:0 and drop later parts.
-    captureLastAssistant(delegateId, 'inspector working body')
+    await captureLastAssistant(delegateId, 'inspector working body')
 
     await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'formal inspector answer', 'asst_bounded')
     const done = resultOf(await pending)

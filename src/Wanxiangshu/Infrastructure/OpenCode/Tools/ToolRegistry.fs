@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
@@ -103,8 +104,8 @@ module ToolRegistry =
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
-        (parentWorkRecordFor: (string -> string option) option)
-        (childWorkRecordFor: (string -> string option) option)
+        (parentWorkRecordFor: (string -> Task<string option>) option)
+        (childWorkRecordFor: (string -> Task<string option>) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)

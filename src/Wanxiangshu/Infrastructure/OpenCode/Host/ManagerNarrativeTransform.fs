@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
@@ -185,243 +186,204 @@ module ManagerNarrativeTransform =
         (sessionId: string option)
         (traceState: XTraceProjectionState option)
         (rawMessages: obj list)
-        : obj list option =
-        match journal, sessionId with
-        | None, _
-        | _, None -> None
-        | Some durable, Some sessionIdValue ->
-            let sid = SessionId.create sessionIdValue
-            let snapshot = AgentJournal.snapshot durable
+        : Task<obj list option> =
+        task {
+            match journal, sessionId with
+            | None, _
+            | _, None -> return None
+            | Some durable, Some sessionIdValue ->
+                let sid = SessionId.create sessionIdValue
+                let snapshot = AgentJournal.snapshot durable
 
-            let lifecycle =
-                AgentProjection.tryFind sid snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ManagerLife)
-                |> Option.defaultValue ManagerLifecycleProjection.empty
+                let lifecycle =
+                    AgentProjection.tryFind sid snapshot.AgentProjections
+                    |> Option.bind (fun session -> session.ManagerLife)
+                    |> Option.defaultValue ManagerLifecycleProjection.empty
 
-            match lifecycle.CurrentLife with
-            // A Life is open: its Opening message is rewritten on EVERY provider
-            // request — the transform is a request-level view layer and the Host
-            // persists the raw conversation, so each request must re-apply the
-            // narrative (GLORY-015 idempotence is by message identity, never by
-            // text matching). This runs regardless of who the last user message
-            // is: a later continuation (e.g. the Activation) or work-time message
-            // must not suppress the opening rewrite, or the next request breaks
-            // the ARCH-004 seal. The narrative derives from the DURABLE opening
-            // blob, never from the message's current text, so a persisted rewrite
-            // never stacks a second tail. Migration Lives (AgentOwnerRoot
-            // managers) are never rewritten — the Host's assignment is not a
-            // Birth (GLORY-012/068).
-            | Some life ->
-                let openingId = PhysicalUserMessageId.value life.OpeningUserMessageId
+                let fallbackMessageText messageIndex =
+                    match ProviderWireCapture.decodeMessage (List.item messageIndex rawMessages) with
+                    | Some message ->
+                        message.Parts
+                        |> List.choose (function
+                            | WireText text -> Some text
+                            | _ -> None)
+                        |> String.concat "\n"
+                    | None -> ""
 
-                rawMessages
-                |> List.tryFindIndex (fun raw -> ProviderWireDecode.hostMessageId raw = Some openingId)
-                |> Option.bind (fun messageIndex ->
-                    let rawText =
-                        match durable.Writer.BlobWriter.Read life.OpeningTextRef with
-                        | Ok text -> text
-                        | Error _ ->
-                            // Blob unavailable: fall back to the current message
-                            // text (best effort; a persisted rewrite would stack,
-                            // so prefer the blob).
-                            match ProviderWireCapture.decodeMessage (List.item messageIndex rawMessages) with
-                            | Some message ->
-                                message.Parts
-                                |> List.choose (function
-                                    | WireText text -> Some text
-                                    | _ -> None)
-                                |> String.concat "\n"
-                            | None -> ""
+                let readOpeningText blobRef messageIndex =
+                    task {
+                        match! durable.Writer.BlobWriter.Read blobRef with
+                        | Ok text -> return text
+                        | Error _ -> return fallbackMessageText messageIndex
+                    }
 
-                    if String.IsNullOrWhiteSpace rawText then
-                        None
+                match lifecycle.CurrentLife with
+                // A Life is open: its Opening message is rewritten on EVERY provider
+                // request. The durable opening remains authoritative; the current
+                // wire text is only a best-effort fallback when the blob is unavailable.
+                | Some life ->
+                    let openingId = PhysicalUserMessageId.value life.OpeningUserMessageId
+
+                    match
+                        rawMessages
+                        |> List.tryFindIndex (fun raw -> ProviderWireDecode.hostMessageId raw = Some openingId)
+                    with
+                    | None -> return None
+                    | Some messageIndex ->
+                        let! rawText = readOpeningText life.OpeningTextRef messageIndex
+
+                        if String.IsNullOrWhiteSpace rawText then
+                            return None
+                        else
+                            let narrative =
+                                if List.isEmpty lifecycle.CompletedLives then
+                                    birthProjection sid rawText
+                                else
+                                    reawakeningProjection sid rawText
+
+                            return Some(rewriteMessage rawMessages messageIndex narrative)
+                // No open Life: a new HumanRoot opens one (GLORY-012/063).
+                | None ->
+                    if not (isHumanRootManager durable sid) then
+                        return None
                     else
-                        let narrative =
-                            if List.isEmpty lifecycle.CompletedLives then
-                                birthProjection sid rawText
+                        match lastUserMessage rawMessages with
+                        | None -> return None
+                        | Some(messageIndex, messageId, raw) ->
+                            let isTitleRequest =
+                                let fromContent =
+                                    ProviderWireDecode.topLevelString raw "content"
+                                    |> Option.exists (fun text ->
+                                        text.StartsWith(
+                                            "Generate a title for this conversation:",
+                                            StringComparison.Ordinal
+                                        ))
+
+                                fromContent
+                                || (match ProviderWireCapture.decodeMessage raw with
+                                    | Some message ->
+                                        message.Parts
+                                        |> List.exists (function
+                                            | WireText text ->
+                                                text.StartsWith(
+                                                    "Generate a title for this conversation:",
+                                                    StringComparison.Ordinal
+                                                )
+                                            | _ -> false)
+                                    | None -> false)
+
+                            if isTitleRequest || ProviderWireDecode.isCompactionMarker raw then
+                                return None
+                            elif
+                                isAcceptedContinuation durable sid messageId
+                                || isMessageFromCompletedLife traceState messageId
+                                || hasSuicideAfter rawMessages messageIndex
+                            then
+                                // A post-completion continuation must keep the completed
+                                // Life's opening rewrite byte-stable (ARCH-004).
+                                match List.tryHead lifecycle.CompletedLives with
+                                | None -> return None
+                                | Some completedLife ->
+                                    let openingId =
+                                        PhysicalUserMessageId.value completedLife.OpeningUserMessageId
+
+                                    match
+                                        rawMessages
+                                        |> List.tryFindIndex (fun item ->
+                                            ProviderWireDecode.hostMessageId item = Some openingId)
+                                    with
+                                    | None -> return None
+                                    | Some completedOpeningIndex ->
+                                        let! rawText =
+                                            readOpeningText completedLife.OpeningTextRef completedOpeningIndex
+
+                                        if String.IsNullOrWhiteSpace rawText then
+                                            return None
+                                        else
+                                            let narrative =
+                                                if List.length lifecycle.CompletedLives = 1 then
+                                                    birthProjection sid rawText
+                                                else
+                                                    reawakeningProjection sid rawText
+
+                                            return
+                                                Some(
+                                                    rewriteMessage
+                                                        rawMessages
+                                                        completedOpeningIndex
+                                                        narrative
+                                                )
                             else
-                                reawakeningProjection sid rawText
+                                let messageIdValue = PhysicalUserMessageId.create messageId
 
-                        Some(rewriteMessage rawMessages messageIndex narrative))
-            // No open Life: a new HumanRoot opens one (GLORY-012/063).
-            | None ->
-                if not (isHumanRootManager durable sid) then
-                    None
-                else
-                    match lastUserMessage rawMessages with
-                    | None -> None
-                    | Some(messageIndex, messageId, raw) ->
-                        // The Host's title request carries its own marker user
-                        // message in the preamble (measured: "Generate a title for
-                        // this conversation:"); it is Host-synthesized, never a
-                        // HumanRoot, and must not open a Life (GLORY-012). The
-                        // marker lives on the message's top-level `content` field
-                        // (Host 1.18 assembly), not in `parts`.
-                        let isTitleRequest =
-                            let fromContent =
-                                ProviderWireDecode.topLevelString raw "content"
-                                |> Option.exists (fun text ->
-                                    text.StartsWith(
-                                        "Generate a title for this conversation:",
-                                        StringComparison.Ordinal
-                                    ))
+                                // GLORY-069: upgrade an already-active Manager with
+                                // historical XTrace into a migration Life, without
+                                // manufacturing a new Birth.
+                                let migrateExistingLife () =
+                                    task {
+                                        match traceState with
+                                        | Some state ->
+                                            let hasHistory = state.Parts |> List.exists (fun p -> p.Turn <> 0)
 
-                            fromContent
-                            || (match ProviderWireCapture.decodeMessage raw with
-                                | Some message ->
-                                    message.Parts
-                                    |> List.exists (function
-                                        | WireText text ->
-                                            text.StartsWith(
-                                                "Generate a title for this conversation:",
-                                                StringComparison.Ordinal
-                                            )
-                                        | _ -> false)
-                                | None -> false)
+                                            match state.Opening, hasHistory with
+                                            | Some opening, true when List.isEmpty lifecycle.CompletedLives ->
+                                                let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
-                        // GLORY-012: not a title request, not a continuation, not
-                        // a compaction replay.
-                        if isTitleRequest || ProviderWireDecode.isCompactionMarker raw then
-                            None
-                        elif
-                            isAcceptedContinuation durable sid messageId
-                            || isMessageFromCompletedLife traceState messageId
-                            || hasSuicideAfter rawMessages messageIndex
-                        then
-                            // GLORY-0xx: after a Life completed, a continuation
-                            // (e.g. the join guard) or a post-completion step of the completed Life
-                            // must still see the same opening rewrite as the previous request, or the
-                            // ARCH-004 seal breaks (measured: msg[1] reverted to
-                            // the raw assignment on the second join-guard turn
-                            // once CurrentLife became None).
-                            match List.tryHead lifecycle.CompletedLives with
-                            | None -> None
-                            | Some completedLife ->
-                                let openingId = PhysicalUserMessageId.value completedLife.OpeningUserMessageId
+                                                match!
+                                                    ManagerLifeWorkflow.ensureMigrated
+                                                        durable
+                                                        sid
+                                                        lifeId
+                                                        messageIdValue
+                                                        opening.AssignmentText
+                                                        (XTraceProjection.headSequence state + 1L)
+                                                with
+                                                | Error error ->
+                                                    return raise (InvalidOperationException error)
+                                                | Ok() -> return true
+                                            | _ -> return false
+                                        | None -> return false
+                                    }
 
-                                rawMessages
-                                |> List.tryFindIndex (fun raw -> ProviderWireDecode.hostMessageId raw = Some openingId)
-                                |> Option.bind (fun messageIndex ->
-                                    let rawText =
-                                        match durable.Writer.BlobWriter.Read completedLife.OpeningTextRef with
-                                        | Ok text -> text
-                                        | Error _ ->
-                                            match
-                                                ProviderWireCapture.decodeMessage (List.item messageIndex rawMessages)
-                                            with
-                                            | Some message ->
-                                                message.Parts
-                                                |> List.choose (function
-                                                    | WireText text -> Some text
-                                                    | _ -> None)
-                                                |> String.concat "\n"
-                                            | None -> ""
+                                let! migrated = migrateExistingLife ()
+
+                                if migrated then
+                                    return None
+                                else
+                                    let rawText = fallbackMessageText messageIndex
 
                                     if String.IsNullOrWhiteSpace rawText then
-                                        None
+                                        return None
                                     else
-                                        // Keep the rewrite byte-identical to the
-                                        // completed Life's own opening rewrite:
-                                        // the seal compares the previous wire
-                                        // verbatim, and the first rewrite was the
-                                        // Birth narrative (measured: the join
-                                        // guard's second delivery broke the seal
-                                        // when this branch switched to the
-                                        // reawakening narrative).
                                         let narrative =
-                                            if List.length lifecycle.CompletedLives = 1 then
+                                            if List.isEmpty lifecycle.CompletedLives then
                                                 birthProjection sid rawText
                                             else
                                                 reawakeningProjection sid rawText
 
-                                        Some(rewriteMessage rawMessages messageIndex narrative))
-                        else
-                            let messageIdValue = PhysicalUserMessageId.create messageId
-
-                            // GLORY-069: an already-active Manager (upgrade path)
-                            // has an XTrace Opening but no Life. Build one
-                            // migration Life, treat it as already WorkActivated,
-                            // and never re-manufacture a Birth for it.
-                            //
-                            // The Opening of THIS round's first HumanRoot is also
-                            // present (captured at chat.message), so history — a
-                            // part from an earlier turn — is what distinguishes a
-                            // migrated session from a brand-new one. A session
-                            // whose whole XTrace is this round's opening is a new
-                            // Life and takes the normal Birth path (GLORY-071).
-                            let migrateExistingLife () =
-                                match traceState with
-                                | Some state ->
-                                    let hasHistory = state.Parts |> List.exists (fun p -> p.Turn <> 0)
-
-                                    match state.Opening, hasHistory with
-                                    | Some opening, true when List.isEmpty lifecycle.CompletedLives ->
                                         let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
-                                        match
-                                            ManagerLifeWorkflow.ensureMigrated
+                                        let cursor =
+                                            openingCursorOf traceState messageIndex
+                                            |> Option.defaultValue (
+                                                traceState
+                                                |> Option.map XTraceProjection.headSequence
+                                                |> Option.defaultValue 0L
+                                            )
+
+                                        match!
+                                            ManagerLifeWorkflow.ensureOpening
                                                 durable
                                                 sid
                                                 lifeId
                                                 messageIdValue
-                                                opening.AssignmentText
-                                                (XTraceProjection.headSequence state + 1L)
+                                                rawText
+                                                cursor
                                         with
-                                        | Error error -> raise (InvalidOperationException error)
-                                        | Ok() -> ()
-
-                                        true
-                                    | _ -> false
-                                | None -> false
-
-                            if migrateExistingLife () then
-                                // GLORY-069: the migrated Manager keeps working;
-                                // this HumanRoot is not re-Birthed.
-                                None
-                            else
-                                // The raw user text: the durable Opening (GLORY-013).
-                                let rawText =
-                                    match ProviderWireCapture.decodeMessage raw with
-                                    | Some message ->
-                                        message.Parts
-                                        |> List.choose (function
-                                            | WireText text -> Some text
-                                            | _ -> None)
-                                        |> String.concat "\n"
-                                    | None -> ""
-
-                                if String.IsNullOrWhiteSpace rawText then
-                                    None
-                                else
-                                    let narrative =
-                                        if List.isEmpty lifecycle.CompletedLives then
-                                            birthProjection sid rawText
-                                        else
-                                            reawakeningProjection sid rawText
-
-                                    let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
-
-                                    let cursor =
-                                        openingCursorOf traceState messageIndex
-                                        |> Option.defaultValue (
-                                            traceState
-                                            |> Option.map XTraceProjection.headSequence
-                                            |> Option.defaultValue 0L
-                                        )
-
-                                    match
-                                        ManagerLifeWorkflow.ensureOpening
-                                            durable
-                                            sid
-                                            lifeId
-                                            messageIdValue
-                                            rawText
-                                            cursor
-                                    with
-                                    | Error error -> raise (InvalidOperationException error)
-                                    | Ok() -> ()
-
-                                    Some(rewriteMessage rawMessages messageIndex narrative)
+                                        | Error error -> return raise (InvalidOperationException error)
+                                        | Ok() ->
+                                            return Some(rewriteMessage rawMessages messageIndex narrative)
+        }
 
     /// GLORY-021 legacy: if a historical Activation message is still in the wire,
     /// append inert WorkActivated. Production BlindPlan never sends Activation;
@@ -431,70 +393,56 @@ module ManagerNarrativeTransform =
         (sessionId: string option)
         (traceState: XTraceProjectionState option)
         (rawMessages: obj list)
-        : unit =
-        match journal, sessionId, traceState with
-        | None, _, _
-        | _, None, _
-        | _, _, None -> ()
-        | Some durable, Some sessionIdValue, Some state ->
-            let sid = SessionId.create sessionIdValue
+        : Task =
+        task {
+            match journal, sessionId, traceState with
+            | None, _, _
+            | _, None, _
+            | _, _, None -> ()
+            | Some durable, Some sessionIdValue, Some state ->
+                let sid = SessionId.create sessionIdValue
+                let snapshot = AgentJournal.snapshot durable
 
-            // GLORY-021: the floor fix is keyed on the Life alone — an accepted
-            // Activation for a Life that was opened by a HumanRoot. The
-            // `isHumanRootManager` run check is deliberately not repeated here:
-            // the ActiveLogicalRun on a continuation request describes the
-            // continuation, and a Life can only have been opened by a HumanRoot
-            // (GLORY-012), so the Life itself is the authority.
-            let snapshot = AgentJournal.snapshot durable
+                let lifecycle =
+                    AgentProjection.tryFind sid snapshot.AgentProjections
+                    |> Option.bind (fun session -> session.ManagerLife)
+                    |> Option.defaultValue ManagerLifecycleProjection.empty
 
-            let lifecycle =
-                AgentProjection.tryFind sid snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ManagerLife)
-                |> Option.defaultValue ManagerLifecycleProjection.empty
+                match lifecycle.CurrentLife with
+                | Some life when life.ProtectedPrefixEnd.IsNone && not life.Completed ->
+                    let activationMessage =
+                        rawMessages
+                        |> List.tryFind (fun raw ->
+                            match ProviderWireCapture.decodeMessage raw with
+                            | Some message when message.Role = "user" ->
+                                message.Parts
+                                |> List.exists (function
+                                    | WireText text ->
+                                        workActivationAnchors.Value
+                                        |> List.exists (fun anchor ->
+                                            text.Contains(anchor, StringComparison.Ordinal))
+                                    | _ -> false)
+                            | _ -> false)
 
-            match lifecycle.CurrentLife with
-            | Some life when life.ProtectedPrefixEnd.IsNone && not life.Completed ->
-                // GLORY-021: find the Activation message by its canonical text
-                // rather than the AcceptedContinuationIds ledger. The ledger is
-                // updated by the accept path which races the first transform of
-                // the Activation request (measured: the first Activation
-                // transform sees no ledger entry on some runs, and the floor is
-                // only fixed by a later transform). The Activation message is the
-                // user message whose text begins with the canonical Activation
-                // prompt; a Life can only have been opened by a HumanRoot
-                // (GLORY-012), so within a Life the match is unambiguous.
-                let activationMessage =
-                    rawMessages
-                    |> List.tryFind (fun raw ->
-                        match ProviderWireCapture.decodeMessage raw with
-                        | Some message when message.Role = "user" ->
-                            message.Parts
-                            |> List.exists (function
-                                | WireText text ->
-                                    // Comment-only activation matches WorkActivation first line (any locale).
-                                    workActivationAnchors.Value
-                                    |> List.exists (fun anchor -> text.Contains(anchor, StringComparison.Ordinal))
-                                | _ -> false)
-                        | _ -> false)
+                    match activationMessage with
+                    | None -> ()
+                    | Some raw ->
+                        let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
 
-                match activationMessage with
-                | None -> ()
-                | Some raw ->
-                    let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
+                        let promptKey =
+                            match promptKeyOfMessage raw with
+                            | Some key -> key
+                            | None -> PromptKey.create ""
 
-                    let promptKey =
-                        match promptKeyOfMessage raw with
-                        | Some key -> key
-                        | None ->
-                            // GLORY-021: the compression floor must be fixed once
-                            // the Activation landed, even when the Host did not
-                            // preserve the PROMPT-011 metadata on the persisted
-                            // message (the key is audit-only; the floor is the
-                            // contract). A later transform re-checks and is
-                            // idempotent either way.
-                            PromptKey.create ""
-
-                    match ManagerLifeWorkflow.acceptActivation durable sid life.LifeId promptKey protectedPrefixEnd with
-                    | Error error -> raise (InvalidOperationException error)
-                    | Ok() -> ()
-            | _ -> ()
+                        match!
+                            ManagerLifeWorkflow.acceptActivation
+                                durable
+                                sid
+                                life.LifeId
+                                promptKey
+                                protectedPrefixEnd
+                        with
+                        | Error error -> return raise (InvalidOperationException error)
+                        | Ok() -> ()
+                | _ -> ()
+        }

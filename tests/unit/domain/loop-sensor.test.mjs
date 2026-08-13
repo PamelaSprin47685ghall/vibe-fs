@@ -226,12 +226,12 @@ test('LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
   assert.match(runtimeNudge.providerRetry, /The previous physical attempt did not complete/)
 })
 
-test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {
+test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', async () => {
   // Layer-2 half of TurnCompletionProgram on TurnAborted:
   //   isArmed → ClearArmed → FallbackController.recordConfirmedFailure("loop-kill")
   // The sensor only arms; the controller is the single cursor writer.
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-bridge-'))
-  const created = agentJournal.create({ directory, runtime: 'rt_loop' })
+  const created = await agentJournal.create({ directory, runtime: 'rt_loop' })
   assert.equal(created.ok, true, created.ok ? '' : created.error)
 
   const sensor = loopSensor.create({
@@ -243,7 +243,7 @@ test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {
     const journal = created.journal
     const SESSION = 'ses_bridge'
     const runtime = PromptDispatcher.forJournal(journal)
-    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(
+    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(
       runtime,
       sessionId(SESSION),
       physicalUser('msg_u1'),
@@ -260,7 +260,7 @@ test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {
     loopSensor.clearArmed(sensor, SESSION)
     assert.equal(loopSensor.isArmed(sensor, SESSION), false)
 
-    const first = fallbackController.recordConfirmedFailure(
+    const first = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,
@@ -277,7 +277,7 @@ test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {
     )
 
     // Same provider run observed twice (idle + retry race) advances once.
-    const second = fallbackController.recordConfirmedFailure(
+    const second = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,
@@ -304,12 +304,12 @@ test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {
   }
 })
 
-test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
+test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', async () => {
   // LOOP-008: sensor never mutates Offset. Cursor arithmetic stays in
   // FallbackController (FALLBACK-003). Same ProviderRun is deduped once.
   // (Reuses the bridge shape already proven by LOOP_006_armed_abort_bridges_….)
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-008-'))
-  const created = agentJournal.create({ directory, runtime: 'rt_loop_008' })
+  const created = await agentJournal.create({ directory, runtime: 'rt_loop_008' })
   assert.equal(created.ok, true, created.ok ? '' : created.error)
 
   // Sensor has no journal handle — it cannot be a second Offset writer.
@@ -319,7 +319,7 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
     const journal = created.journal
     const SESSION = 'ses_008'
     const runtime = PromptDispatcher.forJournal(journal)
-    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(
+    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(
       runtime,
       sessionId(SESSION),
       physicalUser('msg_u008'),
@@ -335,7 +335,7 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
     )
     assert.equal(before.offset, 0)
 
-    const first = fallbackController.recordConfirmedFailure(
+    const first = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,
@@ -352,7 +352,7 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
       { offset: 1, failures: 1 },
     )
 
-    const second = fallbackController.recordConfirmedFailure(
+    const second = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,
@@ -374,18 +374,18 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
   }
 })
 
-test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', () => {
+test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', async () => {
   // FALLBACK-005: the 12th consecutive failure is immediately final — the
   // controller returns Exhausted and writes FallbackExhausted; a 13th
   // confirmed failure on the same run stays AlreadyRecorded (nothing written).
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-exhaust-'))
-  const created = agentJournal.create({ directory, runtime: 'rt_loop_ex' })
+  const created = await agentJournal.create({ directory, runtime: 'rt_loop_ex' })
   assert.equal(created.ok, true, created.ok ? '' : created.error)
   const journal = created.journal
   const SESSION = 'ses_exhaust'
 
   try {
-    const runtime = PromptDispatcher.Runtime__AcceptHumanRoot(
+    const runtime = await PromptDispatcher.Runtime__AcceptHumanRoot(
       promptDispatcher.forJournal(journal),
       sessionId(SESSION),
       physicalUser('msg_u1'),
@@ -394,7 +394,7 @@ test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', () => 
     assert.equal(runtime.tag ?? 0, 0)
 
     for (let i = 1; i <= 11; i += 1) {
-      const advanced = fallbackController.recordConfirmedFailure(
+      const advanced = await fallbackController.recordConfirmedFailure(
         journal,
         cursor.defaultBudget,
         SESSION,
@@ -404,7 +404,7 @@ test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', () => 
       assert.deepEqual(advanced, { ok: true, outcome: 'Advanced' }, `attempt ${i} must advance`)
     }
 
-    const twelfth = fallbackController.recordConfirmedFailure(
+    const twelfth = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,
@@ -419,7 +419,7 @@ test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', () => 
     assert.equal(exhaustedState.failures, 12, 'twelve confirmed failures recorded')
     assert.equal(exhaustedState.exhausted, true, 'FallbackExhausted folded')
 
-    const thirteenth = fallbackController.recordConfirmedFailure(
+    const thirteenth = await fallbackController.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
       SESSION,

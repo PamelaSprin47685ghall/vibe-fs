@@ -63,7 +63,7 @@ module HostCompactionObserver =
                 if List.isEmpty observed then
                     ()
                 else
-                    match HostCompactionGate.reanchorObserved durable sessionId observed with
+                    match! HostCompactionGate.reanchorObserved durable sessionId observed with
                     | Ok None
                     | Ok(Some _) -> ()
                     // A failed append here is not fatal to the turn that just

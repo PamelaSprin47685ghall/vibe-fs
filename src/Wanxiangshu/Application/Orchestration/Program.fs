@@ -74,7 +74,7 @@ module OrchestratorProgram =
             match! readHead deps job with
             | Error verdict -> return Error verdict
             | Ok candidate ->
-                return
+                return!
                     append
                         deps
                         job
@@ -94,7 +94,7 @@ module OrchestratorProgram =
             match! readHead deps job with
             | Error verdict -> return Error verdict
             | Ok rebased ->
-                return
+                return!
                     append
                         deps
                         job
@@ -141,7 +141,7 @@ module OrchestratorProgram =
                     match! readHead deps job with
                     | Error verdict -> return Error verdict
                     | Ok candidate ->
-                        match recordConflict deps job candidate targetHead files with
+                        match! recordConflict deps job candidate targetHead files with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             let prompt = OrchestratorPrompts.buildConflictResumePrompt files
@@ -308,7 +308,7 @@ module OrchestratorProgram =
                 // missing. Written without re-acquiring the gate — there is no ref
                 // mutation left to protect, and taking the lock would block a job that
                 // still has real work.
-                match
+                match!
                     append
                         deps
                         job

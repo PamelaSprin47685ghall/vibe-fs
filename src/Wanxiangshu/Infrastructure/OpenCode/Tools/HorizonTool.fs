@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
@@ -89,21 +90,23 @@ module HorizonTool =
         (journal: AgentJournal)
         (snapshot: ProjectionSet)
         (handle: HandleRecord)
-        : string =
-        let label = labelForHandle language handle
+        : Task<string> =
+        task {
+            let label = labelForHandle language handle
 
-        let latestFrame =
-            AgentProjection.tryFind handle.ChildSessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.Blog)
-            |> Option.bind (BlogProjection.frames >> List.tryLast)
+            let latestFrame =
+                AgentProjection.tryFind handle.ChildSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.Blog)
+                |> Option.bind (BlogProjection.frames >> List.tryLast)
 
-        match latestFrame with
-        | None -> labeled language Path.NoWorkYet label
-        | Some frame ->
-            match journal.Writer.BlobWriter.Read frame.TextRef with
-            | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
-                ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ])
-            | _ -> labeled language Path.LatestWorkUnavailable label
+            match latestFrame with
+            | None -> return labeled language Path.NoWorkYet label
+            | Some frame ->
+                match! journal.Writer.BlobWriter.Read frame.TextRef with
+                | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
+                    return ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ])
+                | _ -> return labeled language Path.LatestWorkUnavailable label
+        }
 
     let private lineForPty language (record: PtyRecord) : string =
         let label =
@@ -139,16 +142,18 @@ module HorizonTool =
                     let runtimeByAgentId =
                         agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
 
-                    let agentLines =
-                        HandleProjection.listable durableHandles
-                        |> List.collect (fun handle ->
-                            match HandleId.tryAgent handle.Handle with
-                            | Some handleId ->
-                                let agentId = AgentHandleId.value handleId
+                    let agentLines = ResizeArray<string>()
 
-                                [ lineForHandle language handle (Map.tryFind agentId runtimeByAgentId)
-                                  workRecordForHandle language journal snapshot handle ]
-                            | None -> [])
+                    for handle in HandleProjection.listable durableHandles do
+                        match HandleId.tryAgent handle.Handle with
+                        | Some handleId ->
+                            let agentId = AgentHandleId.value handleId
+                            agentLines.Add(lineForHandle language handle (Map.tryFind agentId runtimeByAgentId))
+                            let! workRecord = workRecordForHandle language journal snapshot handle
+                            agentLines.Add workRecord
+                        | None -> ()
+
+                    let agentLines = agentLines |> Seq.toList
 
                     let ptyLines =
                         ptys

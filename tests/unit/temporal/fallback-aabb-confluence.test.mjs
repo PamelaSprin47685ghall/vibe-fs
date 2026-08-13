@@ -363,7 +363,7 @@ test('THEOREM_fallback_precedence_one_winner_for_one_cursor', () => {
 //
 // G4R §12: world1 → durable facts F, DROP EPHEMERAL, world2 := recover(F) → same cursor, no resurrection.
 
-test('THEOREM_drop_ephemeral_preserves_fallback_cursor', () => {
+test('THEOREM_drop_ephemeral_preserves_fallback_cursor', async () => {
   const dir = `temporal-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
   // Pure algebra: envelopes prove confluence/dedupe at Fold level.
@@ -380,7 +380,7 @@ test('THEOREM_drop_ephemeral_preserves_fallback_cursor', () => {
   // Durable survival: write the SAME facts through AgentJournal's single writer (inner AgentFact),
   // then crash (dropEphemeral) and prove the recovered projection equals the pure one.
   const vt1 = createVirtualClock()
-  const created1 = agentJournal.create({ directory: dir, runtime: 'rt_1', pid: 4242, startedAt: '2026-01-01T00:00:00Z' })
+  const created1 = await agentJournal.create({ directory: dir, runtime: 'rt_1', pid: 4242, startedAt: '2026-01-01T00:00:00Z' })
   assert.equal(created1.ok, true, created1.ok ? '' : String(created1.error))
   const world1b = { vt: vt1, journal: created1.journal, raw: created1.raw, directory: dir, dispose: created1.dispose }
   const streamA = stream.session(SESSION_A)
@@ -391,7 +391,7 @@ test('THEOREM_drop_ephemeral_preserves_fallback_cursor', () => {
     advanceAgentFact(SES_A, 'run_L', 'msg_u1', 'run_2', 1, 2, 2),
   ]
   for (const af of agentFacts) {
-    const appended = agentJournal.appendAgent(streamA, undefined, af, world1b.journal)
+    const appended = await agentJournal.appendAgent(streamA, undefined, af, world1b.journal)
     assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))
   }
 
@@ -400,13 +400,13 @@ test('THEOREM_drop_ephemeral_preserves_fallback_cursor', () => {
   assert.deepEqual(snapBeforeFallback, beforeFallback, 'durable snapshot must match pure fold')
 
   // Crash: drop ephemeral, recover durable via same EventStore directory.
-  const world2 = dropEphemeral(world1b, { runtime: 'rt_recovered', pid: 4243 })
+  const world2 = await dropEphemeral(world1b, { runtime: 'rt_recovered', pid: 4243 })
   const after = agentJournal.snapshot(world2.journal)
   const afterFallback = fallbackProjection.read(fold.session(after, SES_A).Fallback)
   assert.deepEqual(afterFallback, beforeFallback, 'durable fallback cursor must survive dropEphemeral')
 
   // Replay of a duplicate via the durable fold still absorbs (no double-count).
-  const persisted = agentJournal.persistedEnvelopes(world2.journal)
+  const persisted = await agentJournal.persistedEnvelopes(world2.journal)
   const replay = fold.apply(fold.empty, persisted)
   assert.equal(replay.ok, true, replay.ok ? '' : JSON.stringify(replay.error))
   const replayFallback = fallbackProjection.read(fold.session(replay.value, SES_A).Fallback)
@@ -427,7 +427,7 @@ test('THEOREM_drop_ephemeral_preserves_fallback_cursor', () => {
 test('TEMPORAL_runTrace_advances_clock_and_appends_durably', async () => {
   const vt = createVirtualClock()
   const dir = `temporal-runtrace-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const created = agentJournal.create({ directory: dir, runtime: 'rt_trace', pid: 4242 })
+  const created = await agentJournal.create({ directory: dir, runtime: 'rt_trace', pid: 4242 })
   assert.equal(created.ok, true)
   const world = { vt, journal: created.journal, raw: created.raw, directory: dir, dispose: created.dispose }
 
@@ -444,7 +444,7 @@ test('TEMPORAL_runTrace_advances_clock_and_appends_durably', async () => {
     DurableTraceEvents.appendAgentFact(streamA, providerRun('run_1'), advanceAgentFact(SES_A, 'run_L', 'msg_u1', 'run_1', 0, 1, 1)),
     DurableTraceEvents.advanceClock(20),
   ]
-  runTrace(world, events)
+  await runTrace(world, events)
   await handle.delay()
   assert.equal(fired, 1, '50ms timer must fire after two advances totalling 50ms')
   const snap = agentJournal.snapshot(world.journal)

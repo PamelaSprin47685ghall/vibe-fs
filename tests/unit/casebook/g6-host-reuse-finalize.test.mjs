@@ -102,7 +102,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   const messages = delegateMessages.get(delegateKey) ?? []
   messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
   delegateMessages.set(delegateKey, messages)
-  xTraceCapture.captureProjection(
+  await xTraceCapture.captureProjection(
     activeJournal,
     sessionId(delegateKey),
     xTraceCapture.semantic({ messages }),
@@ -134,7 +134,7 @@ const withHarness = async (fn) => {
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
 
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   activeJournal = opened.journal
 
@@ -247,7 +247,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const published = resultOf(fetchCase(store, raw, 10, delegateId))
+    const published = resultOf(await fetchCase(store, raw, 10, delegateId))
     assert.equal(published.ok, true)
     assert.equal(published.value !== undefined && published.value !== null, true, 'Case exists after ReuseScope close')
     assert.equal(published.value.SessionId, delegateId)
@@ -259,7 +259,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     cleanupInspector(delegateId)
 
     const [rawCold, storeCold] = acquire(gitCommonDir(dir))
-    const cold = resultOf(fetchCase(storeCold, rawCold, 10, delegateId))
+    const cold = resultOf(await fetchCase(storeCold, rawCold, 10, delegateId))
     assert.equal(cold.ok, true)
     assert.equal(cold.value !== undefined && cold.value !== null, true, 'cleanup must not delete published Case (cold reuse)')
     assert.equal(cold.value.SessionId, delegateId)
@@ -270,7 +270,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     assert.equal(second.ok, false, 'finalize twice is refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
-    const still = resultOf(fetchCase(store, raw, 10, delegateId))
+    const still = resultOf(await fetchCase(store, raw, 10, delegateId))
     assert.equal(still.value.SessionId, delegateId, 'original Case retained after refused second finalize')
     assert.equal(createCalls.length, 1, 'createChild stays once after scope close')
   })

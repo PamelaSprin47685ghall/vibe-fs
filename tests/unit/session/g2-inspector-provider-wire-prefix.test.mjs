@@ -108,7 +108,7 @@ const withHarness = async (fn, options = {}) => {
     ? options.promptModel
     : INSPECTOR_MODEL
   const base = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
-  const opened = agentJournal.create({ directory: base })
+  const opened = await agentJournal.create({ directory: base })
   activeJournal = opened.journal
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
 
@@ -221,7 +221,7 @@ const settlePendingInvoke = async (runtime, { appendAssistantFromReturn, xtraceM
   const messages = xtraceMessages.get(delegateKey) ?? []
   messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
   xtraceMessages.set(delegateKey, messages)
-  xTraceCapture.captureProjection(
+  await xTraceCapture.captureProjection(
     activeJournal,
     sessionId(delegateKey),
     xTraceCapture.semantic({ messages }),

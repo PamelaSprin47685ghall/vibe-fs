@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
@@ -506,19 +507,21 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal)
         (sessionId: SessionId)
         (pair: PairProgrammingGuidelineWire)
-        : Result<unit, string> =
-        let fact =
-            HostFact.PairProgrammingGuidelineAnchored
-                {| SessionId = sessionId
-                   Ordinal = pair.Ordinal
-                   CallId = ToolCallId.create pair.CallId
-                   MarkerText = pair.MarkerText
-                   CallGap = pair.CallGap
-                   ResultGap = pair.ResultGap |}
+        : Task<Result<unit, string>> =
+        task {
+            let fact =
+                HostFact.PairProgrammingGuidelineAnchored
+                    {| SessionId = sessionId
+                       Ordinal = pair.Ordinal
+                       CallId = ToolCallId.create pair.CallId
+                       MarkerText = pair.MarkerText
+                       CallGap = pair.CallGap
+                       ResultGap = pair.ResultGap |}
 
-        match AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
-        | Ok _ -> Ok()
-        | Error failure -> Error(JournalAppendFailure.describe failure)
+            match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
+            | Ok _ -> return Ok()
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
 
     // ── 入口 ─────────────────────────────────────────────────────────────────
 
@@ -538,73 +541,74 @@ module PairProgrammingThoughtTransform =
         (sessionId: string option)
         (markerText: string)
         (rawMessages: obj list)
-        : Result<obj list, string> =
-        let key = transcriptKey sessionId
+        : Task<Result<obj list, string>> =
+        task {
+            let key = transcriptKey sessionId
 
-        let strippedCallIds =
-            rawMessages
-            |> List.filter isPairProgrammingThought
-            |> List.choose syntheticCallIdOf
+            let strippedCallIds =
+                rawMessages
+                |> List.filter isPairProgrammingThought
+                |> List.choose syntheticCallIdOf
 
-        let realMessages = rawMessages |> List.filter (isPairProgrammingThought >> not)
-        let providerId = providerIdFromMessages realMessages
+            let realMessages = rawMessages |> List.filter (isPairProgrammingThought >> not)
+            let providerId = providerIdFromMessages realMessages
 
-        let history, append =
-            match journal, sessionId with
-            | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
-                let session = SessionId.create sid
-                readDurableHistory durable session, appendDurable durable session
-            | _ -> readMemoryHistory key, appendMemory key
+            let history, append =
+                match journal, sessionId with
+                | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
+                    let session = SessionId.create sid
+                    readDurableHistory durable session, appendDurable durable session
+                | _ -> readMemoryHistory key, (fun pair -> Task.FromResult(appendMemory key pair))
 
-        // Strip is legal only when durable identity explains the synthetic.
-        // This also accepts historical Cursor text projections from older builds.
-        let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
+            let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
 
-        let orphaned =
-            strippedCallIds
-            |> List.filter (fun callId -> not (Set.contains callId knownCallIds))
+            let orphaned =
+                strippedCallIds
+                |> List.filter (fun callId -> not (Set.contains callId knownCallIds))
 
-        if not (List.isEmpty orphaned) then
-            Error(
-                sprintf
-                    "synthetic messages without durable record (callId %s, HOST-013)"
-                    (String.Join(", ", orphaned |> List.truncate 3))
-            )
-        else
-            match decideCurrentPlacement realMessages with
-            | Error error -> Error error
-            | Ok(callGap, resultGap) ->
-                let existing =
-                    history
-                    |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
+            if not (List.isEmpty orphaned) then
+                return
+                    Error(
+                        sprintf
+                            "synthetic messages without durable record (callId %s, HOST-013)"
+                            (String.Join(", ", orphaned |> List.truncate 3))
+                    )
+            else
+                match decideCurrentPlacement realMessages with
+                | Error error -> return Error error
+                | Ok(callGap, resultGap) ->
+                    let existing =
+                        history
+                        |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
 
-                match existing with
-                | Some _ -> replay providerId realMessages history
-                | None when skipAutoInjectedRequested providerId -> replay providerId realMessages history
-                | None ->
-                    let ordinal =
-                        match history with
-                        | [] -> 1L
-                        | pairs -> (List.last pairs).Ordinal + 1L
+                    match existing with
+                    | Some _ -> return replay providerId realMessages history
+                    | None when skipAutoInjectedRequested providerId -> return replay providerId realMessages history
+                    | None ->
+                        let ordinal =
+                            match history with
+                            | [] -> 1L
+                            | pairs -> (List.last pairs).Ordinal + 1L
 
-                    let candidate =
-                        { Ordinal = ordinal
-                          CallId = stableCallId sessionId ordinal
-                          MarkerText = markerText
-                          CallGap = callGap
-                          ResultGap = resultGap }
+                        let candidate =
+                            { Ordinal = ordinal
+                              CallId = stableCallId sessionId ordinal
+                              MarkerText = markerText
+                              CallGap = callGap
+                              ResultGap = resultGap }
 
-                    match replay providerId realMessages (history @ [ candidate ]) with
-                    | Error error -> Error error
-                    | Ok rendered ->
-                        match append candidate with
-                        | Ok() -> Ok rendered
-                        | Error error -> Error error
+                        match replay providerId realMessages (history @ [ candidate ]) with
+                        | Error error -> return Error error
+                        | Ok rendered ->
+                            match! append candidate with
+                            | Ok() -> return Ok rendered
+                            | Error error -> return Error error
+        }
 
     let tryInject
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
         (rawMessages: obj list)
-        : Result<obj list, string> =
+        : Task<Result<obj list, string>> =
         tryInjectCore journal sessionId markerText rawMessages

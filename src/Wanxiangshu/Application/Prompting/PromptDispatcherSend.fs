@@ -58,50 +58,60 @@ module PromptDispatcherSend =
             (outcome: SendOutcome)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
-            (acceptPhysical: PhysicalUserMessageId -> Result<unit, string>)
-            : Result<PromptKey, string> =
-            // PROMPT-007: Detached never observes PhysicalAccepted at the caller.
-            let acceptanceCallback =
-                match awaitMode with
-                | PromptDispatcher.AwaitMode.Detached -> None
-                | PromptDispatcher.AwaitMode.Await -> onAccepted
+            (acceptPhysical: PhysicalUserMessageId -> Task<Result<unit, string>>)
+            : Task<Result<PromptKey, string>> =
+            task {
+                // PROMPT-007: Detached never observes PhysicalAccepted at the caller.
+                let acceptanceCallback =
+                    match awaitMode with
+                    | PromptDispatcher.AwaitMode.Detached -> None
+                    | PromptDispatcher.AwaitMode.Await -> onAccepted
 
-            let submitted (receipt: TransportReceipt) =
-                PromptFact.PluginPromptSubmitted
-                    {| PromptKey = key
-                       SessionId = sessionId
-                       Receipt = receipt |}
-                |> this.Persist sessionId None
+                let submitted (receipt: TransportReceipt) =
+                    PromptFact.PluginPromptSubmitted
+                        {| PromptKey = key
+                           SessionId = sessionId
+                           Receipt = receipt |}
+                    |> this.Persist sessionId None
 
-            // `Abandoned` is written by `Runtime.Abandon` (PROMPT-005 single writer).
-            // Constructing the fact here as well would make PROMPT-011's recovery a
-            // second writer of the same fact with its own copy of the payload shape.
-            let abandon (reason: PromptAbandonReason) (error: string) =
-                this.Abandon key sessionId reason |> Result.bind (fun () -> Error error)
+                // `Abandoned` is written by `Runtime.Abandon` (PROMPT-005 single writer).
+                // Constructing the fact here as well would make PROMPT-011's recovery a
+                // second writer of the same fact with its own copy of the payload shape.
+                let abandon (reason: PromptAbandonReason) (error: string) =
+                    task {
+                        match! this.Abandon key sessionId reason with
+                        | Ok() -> return Error error
+                        | Error persistError -> return Error persistError
+                    }
 
-            match outcome with
-            | AdmittedWithReceipt receipt ->
-                // PROMPT-005: an `accepted-*` receipt is not a message identity, so
-                // the chain stops at Submitted. `chat.message` supplies the physical
-                // id later and PromptIngress writes PhysicalAccepted then.
-                // PROMPT-007 Detached: this is already a complete success for the caller.
-                submitted receipt |> Result.map (fun () -> key)
+                match outcome with
+                | AdmittedWithReceipt receipt ->
+                    // PROMPT-005: an `accepted-*` receipt is not a message identity, so
+                    // the chain stops at Submitted. `chat.message` supplies the physical
+                    // id later and PromptIngress writes PhysicalAccepted then.
+                    // PROMPT-007 Detached: this is already a complete success for the caller.
+                    let! persisted = submitted receipt
+                    return persisted |> Result.map (fun () -> key)
 
-            | AdmittedWithPhysicalMessage physicalId ->
-                // The Host answered with a real id. That answer is still the
-                // transport receipt — it is simply not admission-shaped — so the
-                // four-stage chain stays intact instead of skipping Submitted.
-                submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId))
-                |> Result.bind (fun () -> acceptPhysical physicalId)
-                |> Result.map (fun () ->
-                    acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
-                    key)
+                | AdmittedWithPhysicalMessage physicalId ->
+                    // The Host answered with a real id. That answer is still the
+                    // transport receipt — it is simply not admission-shaped — so the
+                    // four-stage chain stays intact instead of skipping Submitted.
+                    match! submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId)) with
+                    | Error error -> return Error error
+                    | Ok() ->
+                        match! acceptPhysical physicalId with
+                        | Error error -> return Error error
+                        | Ok() ->
+                            acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
+                            return Ok key
 
-            | Retryable error -> abandon (PromptAbandonReason.SendFailed error) error
-            | Fatal error -> abandon (PromptAbandonReason.SendFailed error) error
+                | Retryable error -> return! abandon (PromptAbandonReason.SendFailed error) error
+                | Fatal error -> return! abandon (PromptAbandonReason.SendFailed error) error
 
-            | AcceptanceUnknown reason ->
-                Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
+                | AcceptanceUnknown reason ->
+                    return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
+            }
 
         /// PROMPT-002: a plugin-owned Authority Root.
         ///
@@ -142,7 +152,7 @@ module PromptDispatcherSend =
                                EffectiveAgent = claim.EffectiveAgent
                                PayloadDigest = payloadDigest |}
 
-                    match this.Persist sessionId None claimed with
+                    match! this.Persist sessionId None claimed with
                     | Error error -> return Error error
                     | Ok() ->
                         // EXEC-003: the terminal listener must exist before the prompt
@@ -159,10 +169,13 @@ module PromptDispatcherSend =
 
                         let! outcome = port.SendPrompt(sessionId, text, options)
 
-                        return
+                        return!
                             this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
-                                this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
-                                |> Result.map ignore)
+                                task {
+                                    match! this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent with
+                                    | Ok _ -> return Ok()
+                                    | Error error -> return Error error
+                                })
             }
 
         member this.SendAgentOwnerRoot
@@ -239,7 +252,7 @@ module PromptDispatcherSend =
                            EffectiveAgent = claim.EffectiveAgent
                            PayloadDigest = payloadDigest |}
 
-                match this.Persist sessionId None claimed with
+                match! this.Persist sessionId None claimed with
                 | Error error -> return Error error
                 | Ok() ->
                     use _listener = this.SubscribeNoOp port sessionId
@@ -258,9 +271,13 @@ module PromptDispatcherSend =
 
                     let! outcome = port.SendPrompt(sessionId, text, options)
 
-                    return
+                    return!
                         this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
-                            this.AcceptContinuation key sessionId physicalId |> Result.map ignore)
+                            task {
+                                match! this.AcceptContinuation key sessionId physicalId with
+                                | Ok _ -> return Ok()
+                                | Error error -> return Error error
+                            })
             }
 
         member this.SendContinuation

@@ -64,7 +64,7 @@ module EnforcerContinuation =
           RecoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe
           Project: obj list -> ContinuationOutcome
           Stop: string -> ContinuationOutcome
-          RefreshMainContext: SessionId -> SessionId -> BloggerRequestContext option
+          RefreshMainContext: SessionId -> SessionId -> Task<BloggerRequestContext option>
           IsEmptyTextCycleFailure: string -> bool
           ParkedTransformLifetime: System.TimeSpan }
 
@@ -84,9 +84,9 @@ module EnforcerContinuation =
         task {
             let key = key ctx
 
-            let currentCtx =
+            let! currentCtx =
                 match ctx.Scope.TryPeekCurrentRequest key with
-                | Some c -> Some c
+                | Some c -> Task.FromResult(Some c)
                 | None -> EnforcerFrameRecovery.resolveCycleContext ctx.Scope ctx.Durable ctx.Owner ctx.BloggerSessionId
 
             // Repair injection requires LIVE InFlight authority only.
@@ -96,19 +96,23 @@ module EnforcerContinuation =
                 EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
 
             let rebuild () =
-                match currentCtx with
-                | Some c ->
-                    EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId c
-                    |> Option.defaultValue ctx.RawMessages
-                | None -> ctx.RawMessages
+                task {
+                    match currentCtx with
+                    | Some c ->
+                        let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId c
+                        return rebuilt |> Option.defaultValue ctx.RawMessages
+                    | None -> return ctx.RawMessages
+                }
 
-            let fatalEnd (reason: string) =
-                Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+            let fatalEnd (reason: string) : Task<ContinuationOutcome> =
+                task {
+                    Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
-                BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId currentCtx reason
+                    do! BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId currentCtx reason
 
-                ctx.Scope.ClearCurrentRequest key
-                ctx.Project ctx.RawMessages
+                    ctx.Scope.ClearCurrentRequest key
+                    return ctx.Project ctx.RawMessages
+                }
 
             /// A sealed main run has nowhere to deliver a repaired cycle; the runtime
             /// is force-sealed instead of repaired. Shared by both repair entries so
@@ -125,25 +129,33 @@ module EnforcerContinuation =
             /// No cursor movement here. Whether the observed terminal is a confirmed
             /// model failure (ENFORCER-065/068) or Host abort residue (LOOP-006) is the
             /// caller's evidence to read, and only the former may spend AABB.
-            let projectRepairInstruction (live: BloggerRequestContext) (reason: string) =
-                if mainSealedNow () then
-                    BloggerRuntimeHost.forceSealRuntime ctx.Scope key
-                    ctx.Project ctx.RawMessages
-                else
-                    let fresh =
-                        ctx.RefreshMainContext ctx.Owner ctx.BloggerSessionId
-                        |> Option.defaultValue live
+            let projectRepairInstruction
+                (live: BloggerRequestContext)
+                (reason: string)
+                : Task<ContinuationOutcome> =
+                task {
+                    if mainSealedNow () then
+                        BloggerRuntimeHost.forceSealRuntime ctx.Scope key
+                        return ctx.Project ctx.RawMessages
+                    else
+                        let! refreshed = ctx.RefreshMainContext ctx.Owner ctx.BloggerSessionId
+                        let fresh = refreshed |> Option.defaultValue live
 
-                    ctx.Scope.SetCurrentRequest(key, fresh)
+                        ctx.Scope.SetCurrentRequest(key, fresh)
 
-                    Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
-                    let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
 
-                    let rebuilt =
-                        EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId fresh
-                        |> Option.defaultValue ctx.RawMessages
+                        let! rebuilt =
+                            EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId fresh
 
-                    ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey)
+                        return
+                            ctx.Project(
+                                EnforcerRepair.withRepairInstruction
+                                    (rebuilt |> Option.defaultValue ctx.RawMessages)
+                                    requestKey
+                            )
+                }
 
             /// ENFORCER-068 AABB: record the confirmed failure on the primary cursor,
             /// then inject the repair. Used for: nudge hard-fail, second pure prose,
@@ -151,45 +163,50 @@ module EnforcerContinuation =
             ///
             /// NOT used for Host abort residue — an interrupted tool call is a cleanup
             /// abort, and LOOP-006 forbids cleanup aborts from spending AABB.
-            let aabbRepair (live: BloggerRequestContext) (reason: string) =
-                if mainSealedNow () then
-                    BloggerRuntimeHost.forceSealRuntime ctx.Scope key
-                    ctx.Project ctx.RawMessages
-                else
-                    // ENFORCER-062/067/068 bridge via ConfirmedFailurePort (rabbit §13.1):
-                    // injected adapter advances the primary cursor through the ONE
-                    // writer. RecoveryExhausted forbids the next automatic attempt —
-                    // the repair projection is then NOT injected. ContinueRecovery
-                    // covers Advanced / AlreadyRecorded / NoActiveRun (FALLBACK-001).
-                    let providerRun =
-                        match EnforcerCycleDecode.lastAssistantStep ctx.RawMessages with
-                        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
-                            ProviderRunIdentity.create messageId
-                        | _ -> ProviderRunIdentity.create "unknown-prose-run"
+            let aabbRepair (live: BloggerRequestContext) (reason: string) : Task<ContinuationOutcome> =
+                task {
+                    if mainSealedNow () then
+                        BloggerRuntimeHost.forceSealRuntime ctx.Scope key
+                        return ctx.Project ctx.RawMessages
+                    else
+                        // ENFORCER-062/067/068 bridge via ConfirmedFailurePort (rabbit §13.1):
+                        // injected adapter advances the primary cursor through the ONE
+                        // writer. RecoveryExhausted forbids the next automatic attempt —
+                        // the repair projection is then NOT injected. ContinueRecovery
+                        // covers Advanced / AlreadyRecorded / NoActiveRun (FALLBACK-001).
+                        let providerRun =
+                            match EnforcerCycleDecode.lastAssistantStep ctx.RawMessages with
+                            | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
+                                ProviderRunIdentity.create messageId
+                            | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
-                    let admission =
-                        match ctx.ConfirmedFailure with
-                        | None ->
-                            Diagnostic.emit
-                                "enforcer-aabb-bridge"
-                                [ "session_id", key; "result", "no confirmed failure port; " + reason ]
-
-                            None
-                        | Some record ->
-                            match record ctx.Owner providerRun reason with
-                            | Ok result -> Some result
-                            | Error err ->
+                        let! admission =
+                            match ctx.ConfirmedFailure with
+                            | None ->
                                 Diagnostic.emit
                                     "enforcer-aabb-bridge"
-                                    [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
+                                    [ "session_id", key; "result", "no confirmed failure port; " + reason ]
 
-                                None
+                                Task.FromResult None
+                            | Some record ->
+                                task {
+                                    match! record ctx.Owner providerRun reason with
+                                    | Ok result -> return Some result
+                                    | Error err ->
+                                        Diagnostic.emit
+                                            "enforcer-aabb-bridge"
+                                            [ "session_id", key
+                                              "result", "confirmedFailure port rejected: " + err ]
 
-                    match admission with
-                    | Some RecoveryAdmission.RecoveryExhausted ->
-                        Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", reason ]
-                        fatalEnd "blog aabb exhausted; auto-recovery budget spent"
-                    | _ -> projectRepairInstruction live reason
+                                        return None
+                                }
+
+                        match admission with
+                        | Some RecoveryAdmission.RecoveryExhausted ->
+                            Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", reason ]
+                            return! fatalEnd "blog aabb exhausted; auto-recovery budget spent"
+                        | _ -> return! projectRepairInstruction live reason
+                }
 
             /// ENFORCER-066: durable InteractionRepair. No AABB transcript refresh.
             /// repairNudge is injected from HostSessionNudge (compile-order port).
@@ -205,7 +222,7 @@ module EnforcerContinuation =
                             "enforcer-cycle-nudge-fail"
                             [ "session_id", key; "result", "no repair nudge port; " + reason ]
 
-                        return aabbRepair live ("nudge-no-port: " + reason)
+                        return! aabbRepair live ("nudge-no-port: " + reason)
                     | Some send ->
                         let! sent =
                             send
@@ -234,7 +251,7 @@ module EnforcerContinuation =
                             // ENFORCER-067 immediate failure → AABB.
                             Diagnostic.emit "enforcer-cycle-nudge-fail" [ "session_id", key; "result", err ]
 
-                            return aabbRepair live ("nudge-failed: " + err)
+                            return! aabbRepair live ("nudge-failed: " + err)
                 }
 
             if EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages then
@@ -251,8 +268,8 @@ module EnforcerContinuation =
                 | Some live ->
                     match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
                     | BloggerToolRecovery.AabbRepairConsumed ->
-                        return fatalEnd "blog tool interrupted; repair already consumed"
-                    | _ -> return projectRepairInstruction live "blog tool interrupted without completed call"
+                        return! fatalEnd "blog tool interrupted; repair already consumed"
+                    | _ -> return! projectRepairInstruction live "blog tool interrupted without completed call"
                 | None ->
                     // No live cycle: interrupted blog without authority is stop/abort residue,
                     // not a repair opportunity. Stop, never inject # Protocol repair.
@@ -263,13 +280,15 @@ module EnforcerContinuation =
                 match liveCtx with
                 | Some live ->
                     match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-                    | BloggerToolRecovery.AabbRepairConsumed -> return fatalEnd "blog tool error; aabb exhausted"
-                    | _ -> return aabbRepair live "blog tool error without completed call"
+                    | BloggerToolRecovery.AabbRepairConsumed -> return! fatalEnd "blog tool error; aabb exhausted"
+                    | _ -> return! aabbRepair live "blog tool error without completed call"
                 | None -> return ctx.Stop "unowned-errored-blog-without-CurrentRequest"
             elif EnforcerRepair.hasAnyBlogToolPart ctx.RawMessages then
-                return ctx.Project(rebuild ())
+                let! rebuilt = rebuild ()
+                return ctx.Project rebuilt
             elif not assistantCompleted then
-                return ctx.Project(rebuild ())
+                let! rebuilt = rebuild ()
+                return ctx.Project rebuilt
             else
                 // ENFORCER-060/064..068: completed assistant, zero blog parts → pure prose.
                 let terminalRun =
@@ -294,9 +313,9 @@ module EnforcerContinuation =
                         return ctx.Project ctx.RawMessages
                     | BloggerToolRecovery.InteractionNudgeIssued _ ->
                         // Semantic failure: nudge accepted, new terminal still pure prose → AABB.
-                        return aabbRepair live "nudge semantic failure; pure prose again (ENFORCER-067)"
+                        return! aabbRepair live "nudge semantic failure; pure prose again (ENFORCER-067)"
                     | BloggerToolRecovery.AabbRepairConsumed ->
-                        return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
+                        return! fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
         }
 
     /// Branch 2 — ENFORCER-044: merge/commit on completed blog tool parts when
@@ -345,8 +364,12 @@ module EnforcerContinuation =
                 |> Option.isSome
 
             let resumeWithContext live =
-                EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
-                |> Option.defaultValue ctx.RawMessages
+                task {
+                    let! rebuilt =
+                        EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
+
+                    return rebuilt |> Option.defaultValue ctx.RawMessages
+                }
 
             let mainBlocks () =
                 BloggerRuntimeHost.blocksNew (Some ctx.Durable) mainSessionId ctx.Scope key
@@ -354,37 +377,43 @@ module EnforcerContinuation =
             /// Catch-up drain: one ≤200 KiB window from durable coverage; None = caught up.
             /// Stale PendingOffer is discarded — context must recompute from coverage (COMPANION-008).
             /// Caught-up / sealed → StopPhysicalRun so Host does not loop on tool calls.
-            let resumeCatchUp (fallback: obj list) (caughtUpReason: string) : ContinuationOutcome =
-                if mainBlocks () then
-                    BloggerRuntimeHost.forceSealRuntime ctx.Scope key
-                    ctx.Stop "main-sealed-blocks-request"
-                else
-                    ctx.Scope.TryTakePendingOffer key |> ignore
+            let resumeCatchUp
+                (fallback: obj list)
+                (caughtUpReason: string)
+                : Task<ContinuationOutcome> =
+                task {
+                    if mainBlocks () then
+                        BloggerRuntimeHost.forceSealRuntime ctx.Scope key
+                        return ctx.Stop "main-sealed-blocks-request"
+                    else
+                        ctx.Scope.TryTakePendingOffer key |> ignore
 
-                    match ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
-                    | Some live ->
-                        if ctx.Scope.HasFlight key then
-                            ()
-                        else
-                            ctx.Scope.SetCurrentRequest(key, live)
+                        match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
+                        | Some live ->
+                            if ctx.Scope.HasFlight key then
+                                ()
+                            else
+                                ctx.Scope.SetCurrentRequest(key, live)
 
-                        ctx.Project(resumeWithContext live)
-                    | None ->
-                        // Caught up. Durable seal ends reactivation permanently.
-                        if
-                            AgentProjection.mainSealedForBlogger
-                                mainSessionId
-                                (AgentJournal.snapshot ctx.Durable).AgentProjections
-                        then
-                            BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope key
-                        else
-                            ctx.Scope.ClearCurrentRequest key
+                            let! rebuilt = resumeWithContext live
+                            return ctx.Project rebuilt
+                        | None ->
+                            // Caught up. Durable seal ends reactivation permanently.
+                            if
+                                AgentProjection.mainSealedForBlogger
+                                    mainSessionId
+                                    (AgentJournal.snapshot ctx.Durable).AgentProjections
+                            then
+                                BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope key
+                            else
+                                ctx.Scope.ClearCurrentRequest key
 
-                        ctx.Stop caughtUpReason
+                            return ctx.Stop caughtUpReason
+                }
 
             if alreadyEntry || alreadyReceipt then
                 // ENFORCER-154: same provider run already committed — drain remaining gap.
-                return resumeCatchUp ctx.RawMessages "idempotent-receipt-catch-up-complete"
+                return! resumeCatchUp ctx.RawMessages "idempotent-receipt-catch-up-complete"
             elif liveCtx.IsNone then
                 // No owned cycle. Unowned completed blog is protocol stop (not silent
                 // project): returning rawMessages alone lets Host tool-loop forever.
@@ -413,25 +442,29 @@ module EnforcerContinuation =
                 // DSL-MUTABLE: algorithm-scratch — mutable cycle-disposition accumulator
                 let mutable disposition = CycleDisposition.Working
 
-                let fatalEnd (reason: string) =
-                    Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+                let fatalEnd (reason: string) : Task<unit> =
+                    task {
+                        Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
-                    BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
+                        do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
 
-                    ctx.Scope.ClearCurrentRequest key
+                        ctx.Scope.ClearCurrentRequest key
+                    }
 
                 let unexpectedEnd (reason: string) = fatalEnd reason
 
                 /// KnownNotCommitted is recoverable: abandon open + Idle, then
                 /// resumeCatchUp re-chunks from projection.IngestedThroughSequence.
                 /// Must NOT Diagnostic.fatal — that SIGKILLs before catch-up runs.
-                let abandonStaleCycle (reason: string) =
-                    Diagnostic.emit "enforcer-cycle-stale" [ "session_id", key; "result", reason ]
+                let abandonStaleCycle (reason: string) : Task<unit> =
+                    task {
+                        Diagnostic.emit "enforcer-cycle-stale" [ "session_id", key; "result", reason ]
 
-                    BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
+                        do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
 
-                    ctx.Scope.ClearCurrentRequest key
-                    disposition <- CycleDisposition.AbandonThenCatchUp
+                        ctx.Scope.ClearCurrentRequest key
+                        disposition <- CycleDisposition.AbandonThenCatchUp
+                    }
 
                 // ENFORCER-153: the AABB budget is derived from the transcript
                 // (the injected repair message for the live request IS the spent
@@ -449,12 +482,11 @@ module EnforcerContinuation =
                     && not (EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages)
                     ->
                     // ENFORCER-061: empty text keeps one AABB repair budget (not pure-prose nudge).
-                    let fresh =
-                        ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
-                        |> Option.orElse liveCtx
+                    let! refreshed = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
+                    let fresh = refreshed |> Option.orElse liveCtx
 
                     match fresh with
-                    | None -> unexpectedEnd (reason + "; aabb-refresh-empty")
+                    | None -> do! unexpectedEnd (reason + "; aabb-refresh-empty")
                     | Some freshCtx ->
                         disposition <- CycleDisposition.InjectRepair freshCtx
                         ctx.Scope.SetCurrentRequest(key, freshCtx)
@@ -462,13 +494,13 @@ module EnforcerContinuation =
                         Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                 | Error reason ->
                     if ctx.IsEmptyTextCycleFailure reason && aabbConsumed () then
-                        unexpectedEnd "protocol-repair-exhausted"
+                        do! unexpectedEnd "protocol-repair-exhausted"
                     else
-                        unexpectedEnd reason
+                        do! unexpectedEnd reason
                 | Ok(merged, toolCallIds) ->
                     match liveCtx with
                     | Some(BloggerRequestContext.Squash squash) ->
-                        match
+                        match!
                             EnforcerCycleCommit.commitSquash
                                 ctx.Durable
                                 mainSessionId
@@ -480,7 +512,8 @@ module EnforcerContinuation =
                         | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                             disposition <- CycleDisposition.Committed None
                             ctx.Scope.ClearCurrentRequest key
-                        | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
+                        | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
+                            do! abandonStaleCycle reason
                         | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                             disposition <- CycleDisposition.CommitUnknown
 
@@ -498,13 +531,13 @@ module EnforcerContinuation =
                                 openReq.RequestId = main.RequestId && openReq.PromptKey.IsNone)
 
                         if tomlDigest <> main.DeltaDigest then
-                            unexpectedEnd "delta digest mismatch"
+                            do! unexpectedEnd "delta digest mismatch"
                         elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
-                            unexpectedEnd "coverage did not advance"
+                            do! unexpectedEnd "coverage did not advance"
                         elif openUnbound then
-                            unexpectedEnd "open request has no PromptKey binding"
+                            do! unexpectedEnd "open request has no PromptKey binding"
                         else
-                            match
+                            match!
                                 EnforcerCycleCommit.commitCycle
                                     ctx.Durable
                                     mainSessionId
@@ -528,12 +561,12 @@ module EnforcerContinuation =
 
                                 ctx.Scope.ClearCurrentRequest key
                             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
-                                abandonStaleCycle reason
+                                do! abandonStaleCycle reason
                             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                                 disposition <- CycleDisposition.CommitUnknown
 
                                 Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
-                    | None -> unexpectedEnd "missing CurrentRequest"
+                    | None -> do! unexpectedEnd "missing CurrentRequest"
 
                 match disposition with
                 | CycleDisposition.InjectRepair live ->
@@ -542,42 +575,48 @@ module EnforcerContinuation =
                     // ContinueRecovery covers Advanced / AlreadyRecorded / NoActiveRun.
                     let emptyReason = "blog empty text (ENFORCER-061)"
 
-                    let admission =
+                    let! admission =
                         match ctx.ConfirmedFailure with
                         | None ->
                             Diagnostic.emit
                                 "enforcer-aabb-bridge"
                                 [ "session_id", key; "result", "no confirmed failure port; " + emptyReason ]
 
-                            None
+                            Task.FromResult None
                         | Some record ->
-                            match record mainSessionId (ProviderRunIdentity.create messageId) emptyReason with
-                            | Ok result -> Some result
-                            | Error err ->
-                                Diagnostic.emit
-                                    "enforcer-aabb-bridge"
-                                    [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
+                            task {
+                                match! record mainSessionId (ProviderRunIdentity.create messageId) emptyReason with
+                                | Ok result -> return Some result
+                                | Error err ->
+                                    Diagnostic.emit
+                                        "enforcer-aabb-bridge"
+                                        [ "session_id", key
+                                          "result", "confirmedFailure port rejected: " + err ]
 
-                                None
+                                    return None
+                            }
 
                     match admission with
                     | Some RecoveryAdmission.RecoveryExhausted ->
                         Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", emptyReason ]
 
-                        fatalEnd "blog aabb exhausted; auto-recovery budget spent"
+                        do! fatalEnd "blog aabb exhausted; auto-recovery budget spent"
                         return failwith "unreachable: fatalEnd ends the cycle"
                     | _ ->
                         let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
-                        return ctx.Project(EnforcerRepair.withRepairInstruction (resumeWithContext live) requestKey)
+                        let! rebuilt = resumeWithContext live
+                        return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey)
                 | CycleDisposition.CommitUnknown -> return ctx.Project ctx.RawMessages
                 | CycleDisposition.AbandonThenCatchUp ->
                     // Stale staged coverage abandoned: rebuild next window from live
                     // IngestedThroughSequence. resumeCatchUp sets CurrentRequest +
                     // InFlight when material remains; None = true catch-up stop.
-                    return resumeCatchUp ctx.RawMessages "stale-cycle-catch-up-complete"
+                    return! resumeCatchUp ctx.RawMessages "stale-cycle-catch-up-complete"
                 | CycleDisposition.Working ->
                     match liveCtx with
-                    | Some live -> return ctx.Project(resumeWithContext live)
+                    | Some live ->
+                        let! rebuilt = resumeWithContext live
+                        return ctx.Project rebuilt
                     | None -> return ctx.Project ctx.RawMessages
                 | CycleDisposition.Committed afterSquashMain ->
                     if mainBlocks () then
@@ -589,19 +628,21 @@ module EnforcerContinuation =
                         // only — never prefer stale frozen context over re-chunk.
                         ctx.Scope.TryTakePendingOffer key |> ignore
 
-                        match ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId, afterSquashMain with
+                        let! refreshed = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
+
+                        match refreshed, afterSquashMain with
                         | Some live, _
                         | None, Some live ->
-                            let live =
-                                ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
-                                |> Option.defaultValue live
+                            let! refreshedAgain = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
+                            let live = refreshedAgain |> Option.defaultValue live
 
                             if ctx.Scope.HasFlight key then
                                 ()
                             else
                                 ctx.Scope.SetCurrentRequest(key, live)
 
-                            return ctx.Project(resumeWithContext live)
+                            let! rebuilt = resumeWithContext live
+                            return ctx.Project rebuilt
                         | None, None ->
                             // Caught up now. Durable seal closes DrainWindow permanently.
                             if
@@ -623,14 +664,15 @@ module EnforcerContinuation =
                                         return ctx.Stop "park-ended-main-sealed"
                                     else
                                         // Re-check gap: flight wake may have arrived after last refresh.
-                                        match ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
+                                        match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
                                         | Some live ->
                                             if ctx.Scope.HasFlight key then
                                                 ()
                                             else
                                                 ctx.Scope.SetCurrentRequest(key, live)
 
-                                            return ctx.Project(resumeWithContext live)
+                                            let! rebuilt = resumeWithContext live
+                                            return ctx.Project rebuilt
                                         | None ->
                                             // True catch-up after park lifetime: quiet stop (not fatal).
                                             // Never return [] — Host would blank messages → provider 400.
@@ -638,16 +680,18 @@ module EnforcerContinuation =
                                 else
                                     ctx.Scope.TryTakePendingOffer key |> ignore
 
-                                    match ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
+                                    match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
                                     | Some live ->
                                         if mainBlocks () then
                                             BloggerRuntimeHost.forceSealRuntime ctx.Scope key
                                             return ctx.Stop "park-resumed-main-sealed"
                                         else if ctx.Scope.HasFlight key then
-                                            return ctx.Project(resumeWithContext live)
+                                            let! rebuilt = resumeWithContext live
+                                            return ctx.Project rebuilt
                                         else
                                             ctx.Scope.SetCurrentRequest(key, live)
-                                            return ctx.Project(resumeWithContext live)
+                                            let! rebuilt = resumeWithContext live
+                                            return ctx.Project rebuilt
                                     | None -> return ctx.Project ctx.RawMessages
         }
 
@@ -664,10 +708,7 @@ module EnforcerContinuation =
         task {
             match journal, scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId) with
             | Some durable, Some ctx ->
-                return
-                    project (
-                        EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId ctx
-                        |> Option.defaultValue rawMessages
-                    )
+                let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId ctx
+                return project (rebuilt |> Option.defaultValue rawMessages)
             | _ -> return project rawMessages
         }

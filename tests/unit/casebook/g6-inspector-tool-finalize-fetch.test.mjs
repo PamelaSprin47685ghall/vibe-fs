@@ -128,7 +128,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   const messages = delegateMessages.get(delegateKey) ?? []
   messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
   delegateMessages.set(delegateKey, messages)
-  xTraceCapture.captureProjection(
+  await xTraceCapture.captureProjection(
     activeJournal,
     sessionId(delegateKey),
     xTraceCapture.semantic({ messages }),
@@ -222,7 +222,7 @@ const withHarness = async (fn) => {
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
 
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   activeJournal = opened.journal
 
@@ -359,7 +359,7 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, delegateId))
+    const fetched = resultOf(await fetchCase(store, raw, 10, delegateId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'Case exists after finalize')
     assert.equal(fetched.value.SessionId, delegateId)

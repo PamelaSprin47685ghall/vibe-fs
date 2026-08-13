@@ -72,8 +72,8 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
 
-const inject = (journal, session, raw, markerText = text) => {
-  const result = resultOf(tryInject(journal, session, markerText, toList(raw)))
+const inject = async (journal, session, raw, markerText = text) => {
+  const result = resultOf(await tryInject(journal, session, markerText, toList(raw)))
   assert.equal(result.ok, true, `HOST-013 transform must commit the pair: ${result.error ?? ''}`)
   return listItems(result.value)
 }
@@ -104,8 +104,8 @@ const toolNames = (messages) => messages.map((m) => m.parts[0]?.tool)
 const callIdOf = (messages, index) => messages[index].parts[0].callID
 
 /** Fresh durable journal in a temp dir. */
-const openJournal = (dir) => {
-  const opened = agentJournal.create({ directory: dir })
+const openJournal = async (dir) => {
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, JSON.stringify(opened))
   return opened
 }
@@ -120,7 +120,7 @@ const durablePairCount = (journal, session) => {
 
 // ── H13-01: the canonical multi-tool sequence ───────────────────────────────
 
-test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
+test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () => {
   const session = 'h13-01'
   const round1Real = [
     toolCall('c1', 'bash', 't1'),
@@ -130,7 +130,7 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
   ]
 
   // round 1: Req1 Req2 Resp1 Resp2 → FakePair1 (one completed Host row)
-  const round1Wire = inject(undefined, session, round1Real)
+  const round1Wire = await inject(undefined, session, round1Real)
   assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', 'auto-injected'])
   const call1 = stableCallId(session, 1n)
   assert.equal(round1Wire[4].parts[0].state.status, 'completed')
@@ -144,7 +144,7 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
     toolCall('c3', 'write', 't3'),
     toolResult('r3', 'write', 't3'),
   ]
-  const round2Wire = inject(undefined, session, round2Real)
+  const round2Wire = await inject(undefined, session, round2Real)
   assert.deepEqual(toolNames(round2Wire), [
     'bash', 'read', 'bash', 'read', 'auto-injected',
     'write', 'write', 'auto-injected',
@@ -158,16 +158,16 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
 
 // ── H13-02: history never relocates with the current placement ──────────────
 
-test('H13_02_historical_pair_never_relocates_to_current_batch', () => {
+test('H13_02_historical_pair_never_relocates_to_current_batch', async () => {
   const session = 'h13-02'
 
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
-  const wire1 = inject(undefined, session, round1)
+  const wire1 = await inject(undefined, session, round1)
   // Req1 Resp1 FakePair1
   assert.deepEqual(toolNames(wire1), ['bash', 'bash', 'auto-injected'])
 
   const round2 = [...wire1, toolCall('c2', 'read', 't2'), toolResult('r2', 'read', 't2')]
-  const wire2 = inject(undefined, session, round2)
+  const wire2 = await inject(undefined, session, round2)
   // Req1 Resp1 FakePair1 Req2 Resp2 FakePair2
   // A historyBlock implementation would move pair1 next to the current batch.
   assert.deepEqual(toolNames(wire2), [
@@ -179,18 +179,18 @@ test('H13_02_historical_pair_never_relocates_to_current_batch', () => {
 
 // ── H13-03: same placement re-entry appends nothing ─────────────────────────
 
-test('H13_03_same_placement_reentry_appends_no_pair', () => {
+test('H13_03_same_placement_reentry_appends_no_pair', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1303-'))
-  const opened = openJournal(dir)
+  const opened = await openJournal(dir)
   try {
     const session = 'h13-03'
     const raw = [userMsg('msg_1')]
 
-    const once = inject(opened.journal, session, raw)
+    const once = await inject(opened.journal, session, raw)
     assert.equal(once.length, 2)
     assert.equal(durablePairCount(opened.journal, session), 1)
 
-    const twice = inject(opened.journal, session, [...once])
+    const twice = await inject(opened.journal, session, [...once])
     assert.equal(twice.length, 2, 'same placement must replay, not append')
     assert.equal(pairMessages(twice).length, 1)
     assert.deepEqual(twice, once)
@@ -203,7 +203,7 @@ test('H13_03_same_placement_reentry_appends_no_pair', () => {
 
 // ── H13-04: restart replay is byte-identical ────────────────────────────────
 
-test('H13_04_restart_replay_is_byte_identical', () => {
+test('H13_04_restart_replay_is_byte_identical', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1304-'))
   const session = 'h13-04'
   const raw = [
@@ -212,22 +212,22 @@ test('H13_04_restart_replay_is_byte_identical', () => {
     userMsg('u1', 'steer'),
   ]
 
-  const before = openJournal(dir)
+  const before = await openJournal(dir)
   let wireBefore
   try {
-    wireBefore = inject(before.journal, session, raw)
+    wireBefore = await inject(before.journal, session, raw)
   } finally {
     before.dispose()
   }
 
   // New process: boot the persisted journal, fold it, open a fresh writer.
-  const boot = bootSnapshot.load(dir)
-  const after = agentJournal.createFromBoot({ directory: dir, boot })
+  const boot = await bootSnapshot.load(dir)
+  const after = await agentJournal.createFromBoot({ directory: dir, boot })
   assert.equal(after.ok, true, JSON.stringify(after))
   let wireAfter
   try {
     // The restarting process sees the persisted transcript including synthetics.
-    wireAfter = inject(after.journal, session, [...wireBefore])
+    wireAfter = await inject(after.journal, session, [...wireBefore])
   } finally {
     after.dispose()
   }
@@ -245,9 +245,9 @@ test('H13_04_restart_replay_is_byte_identical', () => {
 // AbortSession would kill the recovery slot. The durable fact stays; only
 // placeable pairs render. When the full transcript returns, anchors reappear.
 
-test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
+test('H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305-'))
-  const opened = openJournal(dir)
+  const opened = await openJournal(dir)
   try {
     const session = 'h13-05'
 
@@ -259,7 +259,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
       CallGap: transcriptGap.after(transcriptAddress.create('msg_7')),
       ResultGap: transcriptGap.after(transcriptAddress.create('msg_7')),
     })
-    const appended = agentJournal.appendAgent(
+    const appended = await agentJournal.appendAgent(
       stream.session(sessionId(session)),
       undefined,
       anchored,
@@ -273,7 +273,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
       parts: [{ type: 'text', text: '# Opening\ncovered work' }],
     }
     const cont = userMsg('u-continue', '# The previous attempt did not complete.')
-    const result = resultOf(tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
+    const result = resultOf(await tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
     assert.equal(result.ok, true, `missing-anchor pair must omit, not fail: ${result.error ?? ''}`)
     const wire = listItems(result.value)
     // Pair1 (after msg_7) must not reappear anywhere — no relocate.
@@ -301,9 +301,9 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
 
 // X-B regression: after a durable pair on the opening user, XWire drops that
 // user for the recovery continue. tryInject must still commit (not Abort).
-test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
+test('H13_05b_xwire_drop_leading_continue_still_commits', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305b-'))
-  const opened = openJournal(dir)
+  const opened = await openJournal(dir)
   try {
     const session = 'h13-05b'
     const user1 = userMsg('u1', 'X-B round 1')
@@ -314,12 +314,12 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
       parts: [{ type: 'text', text: '# Opening\nX-B round 1\n\n# Chronicle\nframe' }],
     }
 
-    const wire1 = inject(opened.journal, session, [user1])
+    const wire1 = await inject(opened.journal, session, [user1])
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     // DropLeading removes u1 (pair1's Before(u1) anchors).
     const result = resultOf(
-      tryInject(opened.journal, session, text, toList([synthPrefix, failAsst, cont])),
+      await tryInject(opened.journal, session, text, toList([synthPrefix, failAsst, cont])),
     )
     assert.equal(result.ok, true, `XWire continue must not fail closed: ${result.error ?? ''}`)
     const wire2 = listItems(result.value)
@@ -330,12 +330,12 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
       'pair1 anchors dropped with covered prefix — must not reappear',
     )
     // Full transcript (no drop) still replays pair1; pure u1 re-entry is byte-identical.
-    const restored = inject(opened.journal, session, [user1, failAsst, cont])
+    const restored = await inject(opened.journal, session, [user1, failAsst, cont])
     assert.ok(
       restored.some((m) => m.parts?.[0]?.callID === call1),
       'full transcript must re-place pair1 at its durable anchor',
     )
-    assertWireEqual(wire1, inject(opened.journal, session, [user1]), 'H13-05b same placement on u1 is pure replay')
+    assertWireEqual(wire1, await inject(opened.journal, session, [user1]), 'H13-05b same placement on u1 is pure replay')
   } finally {
     opened.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -344,15 +344,15 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
 
 // ── H13-06: prior tip only affects the new pair ─────────────────────────────
 
-test('H13_06_prior_tip_only_affects_the_new_pair', () => {
+test('H13_06_prior_tip_only_affects_the_new_pair', async () => {
   const session = 'h13-06'
 
-  const wire1 = inject(undefined, session, [userMsg('u1')], 'guideline')
+  const wire1 = await inject(undefined, session, [userMsg('u1')], 'guideline')
   const call1 = stableCallId(session, 1n)
   assert.equal(wire1[0].parts[0].callID, call1)
   assert.equal(wire1[0].parts[0].state.output, 'guideline')
 
-  const wire2 = inject(
+  const wire2 = await inject(
     undefined,
     session,
     [userMsg('u1'), assistantText('a1'), userMsg('u2')],
@@ -381,7 +381,7 @@ const mulberry32 = (seed) => {
   }
 }
 
-test('H13_08_n_round_property_prefix_law_holds', () => {
+test('H13_08_n_round_property_prefix_law_holds', async () => {
   const rand = mulberry32(0x1357)
   const session = 'h13-08'
   const rounds = 8
@@ -404,7 +404,7 @@ test('H13_08_n_round_property_prefix_law_holds', () => {
     }
     if (rand() < 0.35) fresh.push(userMsg(`u${n}`))
 
-    const wire = inject(undefined, session, [...history, ...fresh])
+    const wire = await inject(undefined, session, [...history, ...fresh])
 
     // One round can create at most one new pair; a round whose terminal shape
     // repeats an existing placement (HOST-013 §8 dedupe) creates none.

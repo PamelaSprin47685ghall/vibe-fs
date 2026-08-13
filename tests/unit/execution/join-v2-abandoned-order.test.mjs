@@ -36,12 +36,12 @@ const runtime = joinResultRenderer.stubRuntime()
 const parseWire = (text) => parseToml(text)
 const PARENT = sessionId('ses_parent')
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-drain-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
   }
@@ -63,8 +63,8 @@ const projectionLink = (handle, child, targetAgent, role, current) => {
     : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
 }
 
-const durableLink = (j, parentId, agentId, child, targetAgent, role) => {
-  const result = HandleControllerModule.HandleController_link(
+const durableLink = async (j, parentId, agentId, child, targetAgent, role) => {
+  const result = await HandleControllerModule.HandleController_link(
     j,
     parentId,
     agentId,
@@ -88,8 +88,8 @@ const link = (projection, agentId, child, targetAgent = 'fast-coder') => {
   return applied.value
 }
 
-const linkDurable = (j, agentId, child, targetAgent = 'fast-coder') => {
-  const linked = durableLink(
+const linkDurable = async (j, agentId, child, targetAgent = 'fast-coder') => {
+  const linked = await durableLink(
     j,
     PARENT,
     agentId,
@@ -143,12 +143,12 @@ test('EXEC_009_abandoned_and_completed_share_one_batch_natural_language', () => 
 
 // ── EXEC-009: durable mixed batch via production JoinDrain.drainFromJournal ──
 
-test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withhold', () => {
-  withJournal((j) => {
+test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withhold', async () => {
+  await withJournal(async (j) => {
     // Link order = CreationOrder. Reverse of agent-id dictionary order so
     // id-sort would put completed first; CreationOrder must put abandoned first.
-    linkDurable(j, 'z-completed', 'ses_z', 'zebra-agent') // CreationOrder 0
-    linkDurable(j, 'a-abandoned', 'ses_a', 'alpha-agent') // CreationOrder 1
+    await linkDurable(j, 'z-completed', 'ses_z', 'zebra-agent') // CreationOrder 0
+    await linkDurable(j, 'a-abandoned', 'ses_a', 'alpha-agent') // CreationOrder 1
 
     // Blob body must be HandleCompletionCodec wire (encodeOutcome), not bare LWR text.
     const sealed = agentCompletion.completedRun({
@@ -158,7 +158,7 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
       workRecord: 'work-record-z',
     })
     const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-    const completed = handleController.recordCompletion(
+    const completed = await handleController.recordCompletion(
       j,
       PARENT,
       'z-completed',
@@ -168,7 +168,7 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
     )
     assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 
-    const abandoned = handleController.recordAbandon(
+    const abandoned = await handleController.recordAbandon(
       j,
       PARENT,
       'a-abandoned',
@@ -181,7 +181,7 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
     assert.equal(handleProjection.joinable(before).length, 1)
     assert.equal(handleProjection.reportableAbandoned(before).length, 1)
 
-    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const drained = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(drained.ok, true, drained.ok ? '' : drained.error)
     assert.equal(drained.items.length, 2, 'both abandoned + completed in one batch')
 
@@ -220,7 +220,7 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
     assert.ok(!/\bstatus\s*=/.test(wire))
 
     // Each handle reported at most once: second drain empty; both retired.
-    const again = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const again = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(again.ok, true)
     assert.deepEqual(again.items, [])
 
@@ -234,10 +234,10 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
 
 // ── EXEC-009: HandleController.consume Abandoned → Retired, second = AlreadyRetired ─
 
-test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', () => {
-  withJournal((j) => {
-    linkDurable(j, 'h1', 'ses_c', 'fast-coder')
-    const abandoned = handleController.recordAbandon(
+test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', async () => {
+  await withJournal(async (j) => {
+    await linkDurable(j, 'h1', 'ses_c', 'fast-coder')
+    const abandoned = await handleController.recordAbandon(
       j,
       PARENT,
       'h1',
@@ -250,7 +250,7 @@ test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', ()
     assert.equal(handleProjection.reportableAbandoned(p).length, 1)
     assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(handleId.agent('h1'), p)), 'Abandoned')
 
-    const first = handleController.consume(j, PARENT, handleId.agent('h1'))
+    const first = await handleController.consume(j, PARENT, handleId.agent('h1'))
     assert.equal(first.ok, true, first.ok ? '' : first.error)
     assert.equal(handleProjection.lifecycleOf(first.record), 'Abandoned')
 
@@ -258,11 +258,11 @@ test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', ()
     assert.equal(handleProjection.isRetired(handleId.agent('h1'), p), true)
     assert.equal(handleProjection.reportableAbandoned(p).length, 0)
 
-    const second = handleController.consume(j, PARENT, handleId.agent('h1'))
+    const second = await handleController.consume(j, PARENT, handleId.agent('h1'))
     assert.deepEqual(second, { ok: false, error: 'AlreadyRetired' })
 
     // Drain after consume must not re-report the same abandoned handle.
-    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const drained = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(drained.ok, true)
     assert.deepEqual(drained.items, [])
   })

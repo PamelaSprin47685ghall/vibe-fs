@@ -45,7 +45,7 @@ const capturingPort = (captured) => ({
 test('PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-'))
   try {
-    const opened = agentJournal.create({ directory: base })
+    const opened = await agentJournal.create({ directory: base })
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const runtime = promptDispatcher.forJournal(opened.journal)

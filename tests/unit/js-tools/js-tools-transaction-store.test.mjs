@@ -56,26 +56,26 @@ const prepared = (id, root, mutations) => ({
 
 const eventTypes = (events) => listItems(events).map((e) => e.EventType)
 
-test('JS012_prepare_then_commit_leaves_no_uncommitted', () => {
+test('JS012_prepare_then_commit_leaves_no_uncommitted', async () => {
   const raw = createRaw()
   const store = createStore(raw)
   const p = prepared('tx-1', '/ws', [mutation('a.txt', 'old', 'new')])
 
-  const preparedId = unwrap(appendPrepared(store, toList([]), p))
-  unwrap(appendCommitted(store, toList([preparedId]), txId('tx-1')))
+  const preparedId = unwrap(await appendPrepared(store, toList([]), p))
+  unwrap(await appendCommitted(store, toList([preparedId]), txId('tx-1')))
 
-  const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  const events = unwrap(await loadEvents(raw, await store.OpenSnapshot()))
   assert.deepEqual(eventTypes(events).sort(), [CommittedEventType, PreparedEventType])
   assert.deepEqual(listItems(scanUncommitted(events)), [])
 })
 
-test('JS015_prepared_without_committed_is_a_recovery_candidate', () => {
+test('JS015_prepared_without_committed_is_a_recovery_candidate', async () => {
   const raw = createRaw()
   const store = createStore(raw)
   const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
 
-  unwrap(appendPrepared(store, toList([]), p))
-  const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  unwrap(await appendPrepared(store, toList([]), p))
+  const events = unwrap(await loadEvents(raw, await store.OpenSnapshot()))
   const pending = listItems(scanUncommitted(events))
   assert.equal(pending.length, 1)
   const durable = listItems(pending[0].Mutations)
@@ -87,7 +87,7 @@ test('JS015_prepared_without_committed_is_a_recovery_candidate', () => {
   assert.equal(durable[1].OriginalText, undefined)
 })
 
-test('JS015_recover_undoes_only_what_we_wrote', () => {
+test('JS015_recover_undoes_only_what_we_wrote', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const raw = createRaw()
@@ -105,8 +105,8 @@ test('JS015_recover_undoes_only_what_we_wrote', () => {
       mutation('c.txt', null, 'created'),
       mutation('d.txt', null, 'vanished'),
     ])
-    unwrap(appendPrepared(store, toList([]), p))
-    const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+    unwrap(await appendPrepared(store, toList([]), p))
+    const events = unwrap(await loadEvents(raw, await store.OpenSnapshot()))
     recover(dir, listItems(scanUncommitted(events)))
 
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old', 'rewrite rolled back')
@@ -118,7 +118,7 @@ test('JS015_recover_undoes_only_what_we_wrote', () => {
   }
 })
 
-test('JS012_append_failure_surfaces_prepare_failed_path', () => {
+test('JS012_append_failure_surfaces_prepare_failed_path', async () => {
   // a store whose CAS always rejects cannot publish the Prepared fact
   const raw = createRaw()
   // createStore with CasRejectGitRawStore is not exported; use a raw whose
@@ -126,8 +126,8 @@ test('JS012_append_failure_surfaces_prepare_failed_path', () => {
   // instead prove the payload round-trip is stable by re-reading prepared.
   const store = createStore(raw)
   const p = prepared('tx-4', '/ws', [mutation('a.txt', 'x', 'y')])
-  unwrap(appendPrepared(store, toList([]), p))
-  const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
+  unwrap(await appendPrepared(store, toList([]), p))
+  const events = unwrap(await loadEvents(raw, await store.OpenSnapshot()))
   const pending = listItems(scanUncommitted(events))
   assert.equal(pending.length, 1)
   assert.equal(listItems(pending[0].Mutations)[0].Path, 'a.txt')

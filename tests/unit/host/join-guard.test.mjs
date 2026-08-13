@@ -39,11 +39,11 @@ const rootFact = (sid) =>
 
 const outcomeName = (outcome) => outcome.cases()[outcome.tag]
 
-const openSeeded = (sid) => {
+const openSeeded = async (sid) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const appended = AgentJournalModule_appendAgent(stream.session(sid), undefined, rootFact(sid), opened.journal)
+  const appended = await AgentJournalModule_appendAgent(stream.session(sid), undefined, rootFact(sid), opened.journal)
   assert.equal(caseOf(appended), 'Ok', 'authority root must fold')
   return { opened, dir, cleanup: () => {
     try { opened.dispose() } catch {}
@@ -59,7 +59,7 @@ test('JNGD_nudge_fails_closed_without_journal', async () => {
 
 test('JNGD_nudge_fails_without_active_authority_profile', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
   try {
     const outcome = await nudge(capturingPort([]), opened.journal, new Set(), sessionId('ses_jg'), undefined)
@@ -73,7 +73,7 @@ test('JNGD_nudge_fails_without_active_authority_profile', async () => {
 
 test('JNGD_nudge_sends_join_guard_continuation_and_claims', async () => {
   const sid = sessionId('ses_jg1')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
     const outcome = await nudge(capturingPort(captured), opened.journal, new Set(), sid, undefined)
@@ -96,7 +96,7 @@ test('JNGD_nudge_sends_join_guard_continuation_and_claims', async () => {
 
 test('JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
   const sid = sessionId('ses_jg2')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
     const port = capturingPort(captured, { failFirst: true })

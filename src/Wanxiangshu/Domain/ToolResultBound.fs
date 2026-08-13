@@ -81,10 +81,10 @@ module ToolResultBound =
             let mutable start = text.Length
             // DSL-MUTABLE: algorithm-scratch — accumulated bytes so far
             let mutable acc = 0
-            // DSL-MUTABLE: algorithm-scratch — stop flag for the backward walk
-            let mutable stop = false
+            // DSL-MUTABLE: algorithm-scratch — running flag for the backward walk
+            let mutable running = true
 
-            while start > 0 && not stop do
+            while start > 0 && running do
                 // Step one scalar backward.
                 let prev =
                     if
@@ -99,7 +99,7 @@ module ToolResultBound =
                 let _, bytes = scalarAt text prev
 
                 if acc + bytes > maxBytes then
-                    stop <- true
+                    running <- false
                 else
                     acc <- acc + bytes
                     start <- prev
@@ -126,6 +126,7 @@ module ToolResultBound =
 
         while not stop do
             // Locate this segment's start: one past the previous '\n'.
+            // DSL-MUTABLE: algorithm-scratch — backward newline-scan cursor
             let mutable p = segEnd - 1
             while p >= 0 && text.[p] <> '\n' do
                 p <- p - 1
@@ -160,6 +161,7 @@ module ToolResultBound =
             let totalBytes = SyntheticToml.byteCount text
             // split('\n').length == newline count + 1 (trailing empty counts).
             let totalLines =
+                // DSL-MUTABLE: algorithm-scratch — newline-derived line counter
                 let mutable n = 1
                 for c in text do
                     if c = '\n' then n <- n + 1

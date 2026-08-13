@@ -693,7 +693,7 @@ test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const main = sessionId('ses-main-no-auto-injected')
     const blogger = sessionId('ses-blogger-no-auto-injected')
-    const linked = AgentJournalModule_appendAgent(
+    const linked = await AgentJournalModule_appendAgent(
       stream.session(main),
       undefined,
       agentFact('CompanionBloggerLinked', {
@@ -771,8 +771,8 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
 
 test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'inquiry-contract', 'fast-inquiry')
-    acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
+    await acceptAuthorityRoot(runtime, 'inquiry-contract', 'fast-inquiry')
+    await acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
 
     const inquiry = { sessionID: 'inquiry-contract', agent: 'fast-inquiry' }
     const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
@@ -794,7 +794,7 @@ test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', as
 })
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')
 
     // GLORY-002/031: a Manager must never create, reuse or nudge a Reviewer;
     // the Reviewer is Host-owned. Denied by durable role, before any prompt.
@@ -820,7 +820,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
 
 test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-contract', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-contract', 'fast-manager')
     const context = { sessionID: 'manager-contract', agent: 'fast-manager' }
 
     const unknown = await hooks.tool.fork.execute({ calling: 'wizard', name: 'Ada', charge: 'work' }, context)
@@ -835,7 +835,7 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
     runtime.recordFork('manager-contract', agentHandleForChild(runtime, 'manager-contract', createdIds[0]), createdIds[0])
 
     const joinResultP = hooks.tool.join.execute({}, context)
-    notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
+    await notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
     const joinText = await joinResultP
 
     assert.match(joinText, /# Ada has returned\./)
@@ -853,7 +853,7 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
 // OperatorAbort or tool abort controller as the primary stimulus.
 test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
     const context = { sessionID: 'manager-user-wake', agent: 'fast-manager' }
 
     const forkText = await hooks.tool.fork.execute({ calling: 'coder', name: 'Ada', charge: 'work' }, context)
@@ -916,7 +916,7 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
 
     // Resource safety: child was not cancelled by user_message interrupt.
     // Late terminal still claims the completion cell for a subsequent join.
-    notifyCompleted(runtime, createdIds[0], 'late session-wide A', 'late turn formal report')
+    await notifyCompleted(runtime, createdIds[0], 'late session-wide A', 'late turn formal report')
     const join2Text = await hooks.tool.join.execute({}, context)
     assert.match(join2Text, /# Ada has returned\./, `late join after user_message must harvest child: ${join2Text}`)
     assert.ok(!/\b(status|count|ordinal|kind|agent_id)\s*=/.test(join2Text))
@@ -926,7 +926,7 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
 
 test('EXEC_002_fork_reuse_by_byname_and_create_by_calling', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
     const context = { sessionID: 'manager-reuse', agent: 'fast-manager' }
 
     const createdText = await hooks.tool.fork.execute(
@@ -955,7 +955,7 @@ test('EXEC_002_fork_reuse_by_byname_and_create_by_calling', async () => {
       childPrompt?.body?.metadata?.wanxiangshu_prompt_key ??
       childPrompt?.body?.parts?.find((part) => part?.type === 'text')?.metadata?.wanxiangshu_prompt_key
     assert.equal(typeof promptKey, 'string', 'child prompt must carry PromptKey metadata')
-    acceptChildAgentOwnerRoot(runtime, childSessionId, promptKey)
+    await acceptChildAgentOwnerRoot(runtime, childSessionId, promptKey)
 
     // Busy reuse: continue by Byname. Internal handle remains wall-internal.
     const nudgedText = await hooks.tool.fork.execute({ name: 'Ada', charge: 'nudge: add one constraint' }, context)
@@ -1056,7 +1056,7 @@ test('EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port', async (
     // - the journal's RuntimeId matches the EventStore RuntimeStarted tip, and
     // - NotifyTerminal through the handed-over port is what join observed above
     //   (proven there by a join that only returns after the notification).
-    acceptAuthorityRoot(runtime, 'manager-fixture-probe', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-fixture-probe', 'fast-manager')
 
     assert.equal(typeof runtime.runtimeId, 'string')
     assert.ok(runtime.runtimeId.length > 0, 'fixture must expose runtimeId')
@@ -1079,7 +1079,7 @@ test('EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port', async (
 
 test('GLORY_034_suicide_tool_executes_synchronously', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-suicide-sync', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-suicide-sync', 'fast-manager')
     const context = { sessionID: 'manager-suicide-sync', agent: 'fast-manager' }
 
     // Pre-activation refusal is instruction-only (comment wire); parseToml strips comments.
@@ -1092,9 +1092,9 @@ test('GLORY_034_suicide_tool_executes_synchronously', async () => {
 
 test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-suicide-outstanding', 'fast-manager')
-    activateLife(runtime, 'manager-suicide-outstanding')
-    acceptFirstTodoWrite(runtime, 'manager-suicide-outstanding')
+    await acceptAuthorityRoot(runtime, 'manager-suicide-outstanding', 'fast-manager')
+    await activateLife(runtime, 'manager-suicide-outstanding')
+    await acceptFirstTodoWrite(runtime, 'manager-suicide-outstanding')
     const context = { sessionID: 'manager-suicide-outstanding', agent: 'fast-manager', callID: 'call_suicide_1', messageID: 'msg_1' }
 
     // Fork a child agent so there is an active child handle.
@@ -1121,9 +1121,9 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
     execFileSync('git', ['add', '-A'], { cwd: directory })
     execFileSync('git', ['commit', '--allow-empty', '-m', 'init'], { cwd: directory })
 
-    acceptAuthorityRoot(runtime, 'manager-finality-no-terminal', 'fast-manager')
-    activateLife(runtime, 'manager-finality-no-terminal')
-    acceptFirstTodoWrite(runtime, 'manager-finality-no-terminal')
+    await acceptAuthorityRoot(runtime, 'manager-finality-no-terminal', 'fast-manager')
+    await activateLife(runtime, 'manager-finality-no-terminal')
+    await acceptFirstTodoWrite(runtime, 'manager-finality-no-terminal')
     const context = {
       sessionID: 'manager-finality-no-terminal',
       agent: 'fast-manager',
@@ -1136,6 +1136,6 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
     assert.equal(outcome, '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n')
     // GLORY-055/057: infrastructure Undecided does not dispose an ungraduated
     // Reviewer session — the physical session stays available for the next request.
-    assert.equal(runtime.abortedIds.includes('host-child-1'), false, 'undecided finality must not dispose the ungraduated hidden reviewer')
+    assert.equal(runtime.abortedIds.includes(_createdIds[0]), false, 'undecided finality must not dispose the ungraduated hidden reviewer')
   }, { finalityReviewerTimeoutMs: 1 })
 })

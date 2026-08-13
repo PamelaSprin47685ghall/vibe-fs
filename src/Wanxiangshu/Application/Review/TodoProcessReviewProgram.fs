@@ -23,7 +23,7 @@ module TodoProcessReviewProgram =
 
     let private writeKey (writeId: TodoWriteId) = TodoWriteId.value writeId
 
-    let private writeBlob (journal: AgentJournal) (body: string) : Result<BlobWriteReceipt, string> =
+    let private writeBlob (journal: AgentJournal) (body: string) : Task<Result<BlobWriteReceipt, string>> =
         journal.WriteBlob body
 
     let private reviewerTrace (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
@@ -49,73 +49,80 @@ module TodoProcessReviewProgram =
 
     /// Append TodoReviewConcluded when VerdictKnown ∧ ProcessReviewLWR record-ready
     /// share this snapshot. Pending is a wait signal, not a provider-visible reject.
-    let tryConclude (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : ConcludeOutcome =
-        let snapshot = AgentJournal.snapshot journal
+    let tryConclude
+        (journal: AgentJournal)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        : Task<ConcludeOutcome> =
+        task {
+            let snapshot = AgentJournal.snapshot journal
 
-        match MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo with
-        | None -> ConcludeOutcome.Pending "life missing"
-        | Some life ->
-            match Map.tryFind (writeKey writeId) life.Checkpoints with
-            | Some { Concluded = Some _ } -> ConcludeOutcome.Concluded
-            | Some cp when cp.Accepted && cp.Assignment.IsSome ->
-                let assignment = Option.get cp.Assignment
+            match MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo with
+            | None -> return ConcludeOutcome.Pending "life missing"
+            | Some life ->
+                match Map.tryFind (writeKey writeId) life.Checkpoints with
+                | Some { Concluded = Some _ } -> return ConcludeOutcome.Concluded
+                | Some cp when cp.Accepted && cp.Assignment.IsSome ->
+                    let assignment = Option.get cp.Assignment
 
-                let guard =
-                    AgentProjection.tryFind assignment.ReviewerSessionId snapshot.AgentProjections
-                    |> Option.bind (fun session -> session.ReviewGuard)
+                    let guard =
+                        AgentProjection.tryFind assignment.ReviewerSessionId snapshot.AgentProjections
+                        |> Option.bind (fun session -> session.ReviewGuard)
 
-                match guard |> Option.bind processVerdict with
-                | None -> ConcludeOutcome.Pending "verdict unknown"
-                | Some verdict ->
-                    let trace = reviewerTrace snapshot assignment.ReviewerSessionId
-                    let endExclusive = { Sequence = XTraceProjection.head trace }
+                    match guard |> Option.bind processVerdict with
+                    | None -> return ConcludeOutcome.Pending "verdict unknown"
+                    | Some verdict ->
+                        let trace = reviewerTrace snapshot assignment.ReviewerSessionId
+                        let endExclusive = { Sequence = XTraceProjection.head trace }
 
-                    if endExclusive.Sequence <= assignment.ReviewWorkStartCursor.Sequence then
-                        ConcludeOutcome.Pending "process-review LWR range empty"
-                    else
-                        let range =
-                            { MagicTodoLwr.BoundedRange.StartInclusive = assignment.ReviewWorkStartCursor
-                              MagicTodoLwr.BoundedRange.EndExclusive = endExclusive }
+                        if endExclusive.Sequence <= assignment.ReviewWorkStartCursor.Sequence then
+                            return ConcludeOutcome.Pending "process-review LWR range empty"
+                        else
+                            let range =
+                                { MagicTodoLwr.BoundedRange.StartInclusive = assignment.ReviewWorkStartCursor
+                                  MagicTodoLwr.BoundedRange.EndExclusive = endExclusive }
 
-                        match
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded
-                                (Some journal)
-                                assignment.ReviewerSessionId
-                                range,
-                            judgeIdentity trace
-                        with
-                        | Some report, Some(providerRun, toolCallId) when not (String.IsNullOrWhiteSpace report) ->
-                            match writeBlob journal report with
-                            | Error reason -> ConcludeOutcome.Failed reason
-                            | Ok workRecord ->
-                                let concluded =
-                                    { ManagerLifeId = lifeId
-                                      TodoWriteId = writeId
-                                      TodoReviewId = assignment.TodoReviewId
-                                      DedicatedReviewerId = assignment.DedicatedReviewerId
-                                      ReviewerSessionId = assignment.ReviewerSessionId
-                                      Verdict = verdict
-                                      WorkRecordRef = workRecord.BlobRef
-                                      WorkRecordDigest = workRecord.BlobDigest
-                                      // Persisted wire compatibility only. CurrentObligations
-                                      // moved at TodoWriteAccepted and never rolls back on verdict.
-                                      SettledTodoRef = cp.ProposedTodoRef
-                                      SettledTodoDigest = cp.ProposedTodoDigest
-                                      ReviewerRecordFrontier = endExclusive
-                                      ProviderRunId = providerRun
-                                      ToolCallId = toolCallId }
+                            let! report =
+                                LifecycleWorkRecordProjection.lifecycleWorkRecordBounded
+                                    (Some journal)
+                                    assignment.ReviewerSessionId
+                                    range
 
-                                match
-                                    AgentJournal.appendMagicTodo
-                                        (StreamId.Session assignment.ReviewerSessionId)
-                                        (Some providerRun)
-                                        (MagicTodoFact.TodoReviewConcluded concluded)
-                                        journal
-                                with
-                                | Error failure -> ConcludeOutcome.Failed(JournalAppendFailure.describe failure)
-                                | Ok _ -> ConcludeOutcome.Concluded
-                        | _ -> ConcludeOutcome.Pending "process-review LWR not record-ready"
-            | _ -> ConcludeOutcome.Pending "assignment missing"
+                            match report, judgeIdentity trace with
+                            | Some report, Some(providerRun, toolCallId) when not (String.IsNullOrWhiteSpace report) ->
+                                match! writeBlob journal report with
+                                | Error reason -> return ConcludeOutcome.Failed reason
+                                | Ok workRecord ->
+                                    let concluded =
+                                        { ManagerLifeId = lifeId
+                                          TodoWriteId = writeId
+                                          TodoReviewId = assignment.TodoReviewId
+                                          DedicatedReviewerId = assignment.DedicatedReviewerId
+                                          ReviewerSessionId = assignment.ReviewerSessionId
+                                          Verdict = verdict
+                                          WorkRecordRef = workRecord.BlobRef
+                                          WorkRecordDigest = workRecord.BlobDigest
+                                          // Persisted wire compatibility only. CurrentObligations
+                                          // moved at TodoWriteAccepted and never rolls back on verdict.
+                                          SettledTodoRef = cp.ProposedTodoRef
+                                          SettledTodoDigest = cp.ProposedTodoDigest
+                                          ReviewerRecordFrontier = endExclusive
+                                          ProviderRunId = providerRun
+                                          ToolCallId = toolCallId }
+
+                                    match!
+                                        AgentJournal.appendMagicTodo
+                                            (StreamId.Session assignment.ReviewerSessionId)
+                                            (Some providerRun)
+                                            (MagicTodoFact.TodoReviewConcluded concluded)
+                                            journal
+                                    with
+                                    | Error failure ->
+                                        return ConcludeOutcome.Failed(JournalAppendFailure.describe failure)
+                                    | Ok _ -> return ConcludeOutcome.Concluded
+                            | _ -> return ConcludeOutcome.Pending "process-review LWR not record-ready"
+                | _ -> return ConcludeOutcome.Pending "assignment missing"
+        }
 
     [<RequireQualifiedAccess>]
     type ProducerPresence =
@@ -156,7 +163,7 @@ module TodoProcessReviewProgram =
         (writeId: TodoWriteId)
         : Task<Result<unit, string>> =
         task {
-            match tryConclude journal lifeId writeId with
+            match! tryConclude journal lifeId writeId with
             | ConcludeOutcome.Concluded -> return Ok()
             | ConcludeOutcome.Failed reason -> return Error reason
             | ConcludeOutcome.Pending _ ->

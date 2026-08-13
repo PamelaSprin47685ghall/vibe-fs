@@ -143,7 +143,7 @@ module FinalityTool =
         task {
             let providerRun = context.ProviderRunId.Value
 
-            match ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
+            match! ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
             | Error _ -> return refuse context Path.TryAgainLater
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
@@ -204,7 +204,7 @@ module FinalityTool =
 
                             match authorityKind with
                             | Some kind when kind <> PromptAuthority.RootAuthorityKind.HumanRoot ->
-                                ManagerLifeWorkflow.ensureMigrationLife journal sid |> ignore
+                                let! _ = ManagerLifeWorkflow.ensureMigrationLife journal sid
 
                                 effectiveLife <-
                                     AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
@@ -294,7 +294,7 @@ module FinalityTool =
                                         match treeOf scope sessionId with
                                         | None -> return refuse context Path.SeekEndWhenReady
                                         | Some tree ->
-                                            match journal.WriteBlob lastWords with
+                                            match! journal.WriteBlob lastWords with
                                             | Error _ -> return refuse context Path.SeekEndWhenReady
                                             | Ok blob ->
                                                 let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))

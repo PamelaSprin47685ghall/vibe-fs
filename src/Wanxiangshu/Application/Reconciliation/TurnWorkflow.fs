@@ -84,7 +84,7 @@ module TurnWorkflow =
             | ReconciledTurnDelivery.Observation ->
                 // Linked-child prompt authority is Application ownership: establish it
                 // once from durable linkage before bounded-context workflows consume the fact.
-                ChildPromptAuthority.ensureForLinkedChild journal turn |> ignore
+                let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
 
                 let observeOrdinary current =
                     OrdinaryTurnWorkflow.observe

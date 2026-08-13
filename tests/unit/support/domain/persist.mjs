@@ -395,9 +395,10 @@ export const agentJournal = {
 
 /** Opaque boot handle for createFromBoot call-site compatibility (store is authoritative). */
 export const bootSnapshot = {
-  load: (directory) => {
+  load: async (directory) => {
     const pair = eventStoreFor(directory)
-    const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+    const snapshot = await pair.store.OpenSnapshot()
+    const loaded = resultOf(await esLoadJournalEnvelopes(pair.raw, snapshot))
     if (!loaded.ok) {
       return { Envelopes: toList([]), Diagnostics: toList([String(loaded.error)]), Frontier: mapOf({}) }
     }

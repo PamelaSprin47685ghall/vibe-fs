@@ -40,7 +40,7 @@ type SyncDelegateRuntime
         /// (includeOpening=false). Injected from plugin wiring so Session does
         /// not depend on Finality compile order; range = the invocation's
         /// XTrace [StartInclusive, EndExclusive).
-        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> string option,
+        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> Task<string option>,
         /// Per-send model lookup from the Host-final agent inventory.
         /// `promptModel` remains a test override; production must not pass a
         /// process-wide model, or mixed Deep/Fast owners would collapse.
@@ -52,7 +52,7 @@ type SyncDelegateRuntime
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let boundPromptModel = promptModel
-    let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> None)
+    let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> Task.FromResult None)
     let modelFor (agent: string) =
         match boundPromptModel with
         | Some model -> Some model
@@ -96,7 +96,7 @@ type SyncDelegateRuntime
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).
-            XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
+            do! XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
@@ -229,20 +229,19 @@ type SyncDelegateRuntime
                         // Completion marker for ManagerLife/Reviewer. HandleTurn
                         // does not use Terminal to build the inspect payload;
                         // the bounded WorkRecord is the invocation's parts range.
-                        XTraceCapture.captureTerminal (Some journal) turn
+                        do! XTraceCapture.captureTerminal (Some journal) turn
 
                         // Exclusive range end = XTrace.head (one-past last part).
                         let endCursor = xTraceHead turn.SessionId
 
-                        let workRecord =
-                            call.Invocations
-                            |> List.tryHead
-                            |> Option.bind (fun inv -> inv.StartCursor)
-                            |> Option.bind (fun startCursor ->
+                        let! workRecord =
+                            match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
+                            | None -> Task.FromResult None
+                            | Some startCursor ->
                                 projectWorkRecord
                                     turn.SessionId
                                     { StartInclusive = { Sequence = startCursor }
-                                      EndExclusive = { Sequence = endCursor } })
+                                      EndExclusive = { Sequence = endCursor } }
 
                         match workRecord with
                         | Some record when not (String.IsNullOrWhiteSpace record) ->

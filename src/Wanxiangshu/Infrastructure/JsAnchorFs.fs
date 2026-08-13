@@ -79,7 +79,9 @@ module JsAnchorFs =
     /// index 落在 '\n' 上时，该换行属于当前行（line 不递增），与旧逐字扫描等价。
     let private lineColumn (offsets: int array) (index: int) : int * int =
         // 二分找最后一个 lineStart <= index
+        // DSL-MUTABLE: algorithm-scratch — binary-search lower bound
         let mutable lo = 0
+        // DSL-MUTABLE: algorithm-scratch — binary-search upper bound
         let mutable hi = offsets.Length - 1
 
         while lo < hi do

@@ -66,12 +66,12 @@ const mustErr = (result, label = 'result') => {
   return payloadOf(result)
 }
 
-const eventPaths = (raw, rootOid) =>
-  listItems(mustOk(GitRaw.GitRawStore_listEventBlobs(raw, rootOid))).map(([path]) => path).sort()
+const eventPaths = async (raw, rootOid) =>
+  listItems(mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, rootOid))).map(([path]) => path).sort()
 
 /** GitGatewaySyncRunner over a real client workspace (optional wrap for injection). */
 const gatewayRunner = (repoPath, wrap) => {
-  const base = (argsEnv) => {
+  const base = async (argsEnv) => {
     const args = listItems(Array.isArray(argsEnv) ? argsEnv[0] : argsEnv)
     const envOpt = Array.isArray(argsEnv) ? argsEnv[1] : undefined
     const overlay = {}
@@ -86,10 +86,10 @@ const gatewayRunner = (repoPath, wrap) => {
 
 const openProcessStore = (repoPath) => Process.ProcessGitRawStoreModule_create(repoPath)
 
-const withWorkspace = (clientNames, body) => {
+const withWorkspace = async (clientNames, body) => {
   const ws = createBareWorkspace(clientNames)
   try {
-    return body(ws)
+    return await body(ws)
   } finally {
     ws.cleanup()
   }
@@ -105,44 +105,44 @@ test('dumb_remote_helper_does_not_import_Domain_codecs', () => {
   assert.match(source, /STORE_REF\s*=\s*'refs\/wanxiang\/store'/)
 })
 
-test('ProcessGitRawStore_ref_CAS_against_real_git', () => {
-  withWorkspace(['cas'], (ws) => {
+test('ProcessGitRawStore_ref_CAS_against_real_git', async () => {
+  await withWorkspace(['cas'], async (ws) => {
     const raw = openProcessStore(ws.client('cas'))
-    const blob = raw.WriteBlob(Buffer.from('cas-blob\n'))
-    const tree = raw.WriteTree(toList([new Persist.TreeEntry('100644', 'blob', blob)]))
+    const blob = await raw.WriteBlob(Buffer.from('cas-blob\n'))
+    const tree = await raw.WriteTree(toList([new Persist.TreeEntry('100644', 'blob', blob)]))
 
-    assert.equal(raw.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, tree), true)
-    assert.equal(isSome(raw.ReadRef(Persist.StoreRef_canonical)), true)
-    assert.equal(gitOid(raw.ReadRef(Persist.StoreRef_canonical)), gitOid(tree))
+    assert.equal(await raw.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, tree), true)
+    assert.equal(isSome(await raw.ReadRef(Persist.StoreRef_canonical)), true)
+    assert.equal(gitOid(await raw.ReadRef(Persist.StoreRef_canonical)), gitOid(tree))
 
     // Absent expectation must fail once the ref exists.
-    assert.equal(raw.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, tree), false)
+    assert.equal(await raw.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, tree), false)
     // Wrong expected OID rejects.
-    assert.equal(raw.CompareAndSwapRef(Persist.StoreRef_canonical, blob, tree), false)
+    assert.equal(await raw.CompareAndSwapRef(Persist.StoreRef_canonical, blob, tree), false)
     // Correct expected OID succeeds (including no-op same tip).
-    assert.equal(raw.CompareAndSwapRef(Persist.StoreRef_canonical, tree, tree), true)
+    assert.equal(await raw.CompareAndSwapRef(Persist.StoreRef_canonical, tree, tree), true)
 
-    const nextBlob = raw.WriteBlob(Buffer.from('cas-blob-2\n'))
-    const nextTree = raw.WriteTree(toList([new Persist.TreeEntry('100644', 'blob', nextBlob)]))
-    assert.equal(raw.CompareAndSwapRef(Persist.StoreRef_canonical, tree, nextTree), true)
-    assert.equal(gitOid(raw.ReadRef(Persist.StoreRef_canonical)), gitOid(nextTree))
+    const nextBlob = await raw.WriteBlob(Buffer.from('cas-blob-2\n'))
+    const nextTree = await raw.WriteTree(toList([new Persist.TreeEntry('100644', 'blob', nextBlob)]))
+    assert.equal(await raw.CompareAndSwapRef(Persist.StoreRef_canonical, tree, nextTree), true)
+    assert.equal(gitOid(await raw.ReadRef(Persist.StoreRef_canonical)), gitOid(nextTree))
   })
 })
 
-test('object_upload_to_bare_remote_via_GitGateway_converge', () => {
-  withWorkspace(['uploader'], (ws) => {
+test('object_upload_to_bare_remote_via_GitGateway_converge', async () => {
+  await withWorkspace(['uploader'], async (ws) => {
     const raw = openProcessStore(ws.client('uploader'))
     const es = Store.EventStore_create(raw)
     const published = mustOk(
-      es.Append(
-        es.OpenSnapshot(),
+      await es.Append(
+        await es.OpenSnapshot(),
         toList([envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })]),
       ),
       'append',
     )
     const tip = snapshotOid(published)
 
-    mustOk(Gateway.GitGateway_convergeStore(raw, gatewayRunner(ws.client('uploader')), 8, 'origin'), 'upload converge')
+    mustOk(await Gateway.GitGateway_convergeStore(raw, gatewayRunner(ws.client('uploader')), 8, 'origin'), 'upload converge')
 
     assert.equal(readRemoteStoreOid(ws.bare), tip)
     assert.equal(remoteHasObject(ws.bare, tip), true)
@@ -150,19 +150,19 @@ test('object_upload_to_bare_remote_via_GitGateway_converge', () => {
   })
 })
 
-test('object_fetch_from_bare_remote_into_second_client', () => {
-  withWorkspace(['writer', 'reader'], (ws) => {
+test('object_fetch_from_bare_remote_into_second_client', async () => {
+  await withWorkspace(['writer', 'reader'], async (ws) => {
     const writerRaw = openProcessStore(ws.client('writer'))
     const writerEs = Store.EventStore_create(writerRaw)
     const published = mustOk(
-      writerEs.Append(
-        writerEs.OpenSnapshot(),
+      await writerEs.Append(
+        await writerEs.OpenSnapshot(),
         toList([envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })]),
       ),
       'writer append',
     )
     mustOk(
-      Gateway.GitGateway_convergeStore(writerRaw, gatewayRunner(ws.client('writer')), 8, 'origin'),
+      await Gateway.GitGateway_convergeStore(writerRaw, gatewayRunner(ws.client('writer')), 8, 'origin'),
       'writer upload',
     )
     const tip = snapshotOid(published)
@@ -170,45 +170,45 @@ test('object_fetch_from_bare_remote_into_second_client', () => {
 
     const readerRaw = openProcessStore(ws.client('reader'))
     const merged = mustOk(
-      Gateway.GitGateway_convergeStore(readerRaw, gatewayRunner(ws.client('reader')), 8, 'origin'),
+      await Gateway.GitGateway_convergeStore(readerRaw, gatewayRunner(ws.client('reader')), 8, 'origin'),
       'reader fetch/converge',
     )
     assert.equal(snapshotOid(merged), tip)
-    assert.deepEqual(eventPaths(readerRaw, merged.RootOid), [
+    assert.deepEqual(await eventPaths(readerRaw, merged.RootOid), [
       'events/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jsonl',
     ])
-    assert.equal(gitOid(readerRaw.ReadRef(Persist.StoreRef_remoteTracking('origin'))), tip)
+    assert.equal(gitOid(await readerRaw.ReadRef(Persist.StoreRef_remoteTracking('origin'))), tip)
   })
 })
 
-test('two_clients_merge_through_dumb_remote', () => {
-  withWorkspace(['a', 'b'], (ws) => {
+test('two_clients_merge_through_dumb_remote', async () => {
+  await withWorkspace(['a', 'b'], async (ws) => {
     const rawA = openProcessStore(ws.client('a'))
     const esA = Store.EventStore_create(rawA)
     mustOk(
-      esA.Append(
-        esA.OpenSnapshot(),
+      await esA.Append(
+        await esA.OpenSnapshot(),
         toList([envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { side: 'a' } })]),
       ),
       'A append',
     )
-    mustOk(Gateway.GitGateway_convergeStore(rawA, gatewayRunner(ws.client('a')), 8, 'origin'), 'A upload')
+    mustOk(await Gateway.GitGateway_convergeStore(rawA, gatewayRunner(ws.client('a')), 8, 'origin'), 'A upload')
 
     const rawB = openProcessStore(ws.client('b'))
     const esB = Store.EventStore_create(rawB)
     mustOk(
-      esB.Append(
-        esB.OpenSnapshot(),
+      await esB.Append(
+        await esB.OpenSnapshot(),
         toList([envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { side: 'b' } })]),
       ),
       'B append',
     )
     const merged = mustOk(
-      Gateway.GitGateway_convergeStore(rawB, gatewayRunner(ws.client('b')), 8, 'origin'),
+      await Gateway.GitGateway_convergeStore(rawB, gatewayRunner(ws.client('b')), 8, 'origin'),
       'B converge',
     )
 
-    assert.deepEqual(eventPaths(rawB, merged.RootOid), [
+    assert.deepEqual(await eventPaths(rawB, merged.RootOid), [
       'events/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jsonl',
       'events/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jsonl',
     ])
@@ -217,28 +217,29 @@ test('two_clients_merge_through_dumb_remote', () => {
   })
 })
 
-test('lease_rejection_refetches_and_bounded_retry_succeeds', () => {
-  withWorkspace(['seed', 'rival', 'local'], (ws) => {
+test('lease_rejection_refetches_and_bounded_retry_succeeds', async () => {
+  await withWorkspace(['seed', 'rival', 'local'], async (ws) => {
     const seedRaw = openProcessStore(ws.client('seed'))
     const seedEs = Store.EventStore_create(seedRaw)
-    const seedSnap = mustOk(
+    const seedBaseSnapshot = await seedEs.OpenSnapshot()
+    const seedSnap = mustOk(await
       seedEs.Append(
-        seedEs.OpenSnapshot(),
+        seedBaseSnapshot,
         toList([envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })]),
       ),
       'seed',
     )
-    mustOk(Gateway.GitGateway_convergeStore(seedRaw, gatewayRunner(ws.client('seed')), 8, 'origin'), 'seed upload')
+    mustOk(await Gateway.GitGateway_convergeStore(seedRaw, gatewayRunner(ws.client('seed')), 8, 'origin'), 'seed upload')
     const seedOid = snapshotOid(seedSnap)
     assert.equal(readRemoteStoreOid(ws.bare), seedOid)
 
     // Rival prepares a competing tip offline, then injects it during local's first push.
     const rivalRaw = openProcessStore(ws.client('rival'))
-    mustOk(Gateway.GitGateway_convergeStore(rivalRaw, gatewayRunner(ws.client('rival')), 8, 'origin'), 'rival fetch')
+    mustOk(await Gateway.GitGateway_convergeStore(rivalRaw, gatewayRunner(ws.client('rival')), 8, 'origin'), 'rival fetch')
     const rivalEs = Store.EventStore_create(rivalRaw)
-    const rivalSnap = mustOk(
+    const rivalSnap = mustOk(await
       rivalEs.Append(
-        rivalEs.OpenSnapshot(),
+        await rivalEs.OpenSnapshot(),
         toList([envelope({ id: 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr', payload: { n: 9 } })]),
       ),
       'rival append',
@@ -248,8 +249,8 @@ test('lease_rejection_refetches_and_bounded_retry_succeeds', () => {
     const localRaw = openProcessStore(ws.client('local'))
     const localEs = Store.EventStore_create(localRaw)
     mustOk(
-      localEs.Append(
-        localEs.OpenSnapshot(),
+      await localEs.Append(
+        await localEs.OpenSnapshot(),
         toList([envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })]),
       ),
       'local append',
@@ -257,7 +258,7 @@ test('lease_rejection_refetches_and_bounded_retry_succeeds', () => {
 
     let pushAttempts = 0
     let leaseRejections = 0
-    const wrap = (base) => (argsEnv) => {
+    const wrap = (base) => async (argsEnv) => {
       const args = listItems(Array.isArray(argsEnv) ? argsEnv[0] : argsEnv)
       if (args.includes('push')) {
         pushAttempts += 1
@@ -267,19 +268,19 @@ test('lease_rejection_refetches_and_bounded_retry_succeeds', () => {
           assert.equal(readRemoteStoreOid(ws.bare), rivalOid)
         }
       }
-      const result = base(argsEnv)
+      const result = await base(argsEnv)
       if (args.includes('push') && result[0] !== 0) leaseRejections += 1
       return result
     }
 
     const merged = mustOk(
-      Gateway.GitGateway_convergeStore(localRaw, gatewayRunner(ws.client('local'), wrap), 8, 'origin'),
+      await Gateway.GitGateway_convergeStore(localRaw, gatewayRunner(ws.client('local'), wrap), 8, 'origin'),
       'local retry converge',
     )
 
     assert.ok(pushAttempts >= 2, `expected retry push, got ${pushAttempts}`)
     assert.equal(leaseRejections, 1)
-    assert.deepEqual(eventPaths(localRaw, merged.RootOid), [
+    assert.deepEqual(await eventPaths(localRaw, merged.RootOid), [
       'events/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jsonl',
       'events/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jsonl',
       'events/rr/rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.jsonl',
@@ -289,32 +290,32 @@ test('lease_rejection_refetches_and_bounded_retry_succeeds', () => {
 })
 
 test('lease_rejection_bounded_retry_exhausted', () => {
-  withWorkspace(['seed', 'rival', 'local'], (ws) => {
+  return withWorkspace(['seed', 'rival', 'local'], async (ws) => {
     const seedRaw = openProcessStore(ws.client('seed'))
     const seedEs = Store.EventStore_create(seedRaw)
-    const seedSnap = mustOk(
+    const initialBaseSnapshot = await seedEs.OpenSnapshot()
+    const initialSnapPromise =
       seedEs.Append(
-        seedEs.OpenSnapshot(),
+        initialBaseSnapshot,
         toList([envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })]),
-      ),
-      'seed',
-    )
-    mustOk(Gateway.GitGateway_convergeStore(seedRaw, gatewayRunner(ws.client('seed')), 8, 'origin'), 'seed upload')
-    const seedOid = snapshotOid(seedSnap)
+      )
+    const initialSnap = mustOk(await initialSnapPromise, 'seed')
+    mustOk(await Gateway.GitGateway_convergeStore(seedRaw, gatewayRunner(ws.client('seed')), 8, 'origin'), 'seed upload')
+    const seedOid = snapshotOid(initialSnap)
 
     const rivalRaw = openProcessStore(ws.client('rival'))
-    mustOk(Gateway.GitGateway_convergeStore(rivalRaw, gatewayRunner(ws.client('rival')), 8, 'origin'), 'rival fetch')
+    mustOk(await Gateway.GitGateway_convergeStore(rivalRaw, gatewayRunner(ws.client('rival')), 8, 'origin'), 'rival fetch')
     const rivalEs = Store.EventStore_create(rivalRaw)
 
     // Pre-build a chain of rival tips so each push attempt sees a newer remote tip.
     const rivalTips = []
-    let base = rivalEs.OpenSnapshot()
+    let base = await rivalEs.OpenSnapshot()
     for (const id of [
       'r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1r1',
       'r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2',
       'r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3r3',
     ]) {
-      const snap = mustOk(rivalEs.Append(base, toList([envelope({ id, payload: { rival: id.slice(0, 2) } })])), id)
+      const snap = mustOk(await rivalEs.Append(base, toList([envelope({ id, payload: { rival: id.slice(0, 2) } })])), id)
       rivalTips.push(snapshotOid(snap))
       base = snap
     }
@@ -322,8 +323,8 @@ test('lease_rejection_bounded_retry_exhausted', () => {
     const localRaw = openProcessStore(ws.client('local'))
     const localEs = Store.EventStore_create(localRaw)
     mustOk(
-      localEs.Append(
-        localEs.OpenSnapshot(),
+      await localEs.Append(
+        await localEs.OpenSnapshot(),
         toList([envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })]),
       ),
       'local append',
@@ -331,7 +332,7 @@ test('lease_rejection_bounded_retry_exhausted', () => {
 
     let pushAttempts = 0
     let expectedOld = seedOid
-    const wrap = (baseRunner) => (argsEnv) => {
+    const wrap = (baseRunner) => async (argsEnv) => {
       const args = listItems(Array.isArray(argsEnv) ? argsEnv[0] : argsEnv)
       if (args.includes('push')) {
         const rivalOid = rivalTips[Math.min(pushAttempts, rivalTips.length - 1)]
@@ -340,10 +341,10 @@ test('lease_rejection_bounded_retry_exhausted', () => {
         expectedOld = rivalOid
         pushAttempts += 1
       }
-      return baseRunner(argsEnv)
+      return await baseRunner(argsEnv)
     }
 
-    const err = mustErr(
+    const err = mustErr(await
       Gateway.GitGateway_convergeStore(localRaw, gatewayRunner(ws.client('local'), wrap), 2, 'origin'),
       'exhausted',
     )

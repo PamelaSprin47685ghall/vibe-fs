@@ -23,7 +23,7 @@ const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 
 test('AGENT_017_mv_moves_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-mv-file', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-mv-file', 'fast-coder')
     const source = join(directory, 'alpha.txt')
     const destination = join(directory, 'beta.txt')
     writeFileSync(source, 'payload')
@@ -41,7 +41,7 @@ test('AGENT_017_mv_moves_a_file', async () => {
 
 test('AGENT_017_mv_renames_a_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-mv-dir', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-mv-dir', 'fast-coder')
     const source = join(directory, 'old-dir')
     const destination = join(directory, 'new-dir')
     mkdirSync(source)
@@ -60,7 +60,7 @@ test('AGENT_017_mv_renames_a_directory', async () => {
 
 test('AGENT_017_mv_missing_source_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-mv-missing', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-mv-missing', 'fast-coder')
     const text = await hooks.tool.mv.execute(
       { source: join(directory, 'nope.txt'), destination: join(directory, 'x.txt') },
       { sessionID: 'coder-mv-missing', agent: 'fast-coder' },
@@ -72,7 +72,7 @@ test('AGENT_017_mv_missing_source_returns_error', async () => {
 
 test('AGENT_018_rm_removes_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-rm-file', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-rm-file', 'fast-coder')
     const path = join(directory, 'trash.txt')
     writeFileSync(path, 'payload')
 
@@ -87,7 +87,7 @@ test('AGENT_018_rm_removes_a_file', async () => {
 
 test('AGENT_018_rm_removes_an_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-rm-empty-dir', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-rm-empty-dir', 'fast-coder')
     const path = join(directory, 'empty-dir')
     mkdirSync(path)
 
@@ -102,7 +102,7 @@ test('AGENT_018_rm_removes_an_empty_directory', async () => {
 
 test('AGENT_018_rm_refuses_a_non_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-rm-nonempty', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-rm-nonempty', 'fast-coder')
     const path = join(directory, 'non-empty-dir')
     mkdirSync(path)
     writeFileSync(join(path, 'inner.txt'), 'payload')
@@ -118,7 +118,7 @@ test('AGENT_018_rm_refuses_a_non_empty_directory', async () => {
 
 test('AGENT_018_rm_missing_path_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'coder-rm-missing', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-rm-missing', 'fast-coder')
     const text = await hooks.tool.rm.execute(
       { path: join(directory, 'nope.txt') },
       { sessionID: 'coder-rm-missing', agent: 'fast-coder' },
@@ -131,7 +131,7 @@ test('AGENT_018_rm_missing_path_returns_error', async () => {
 test('AGENT_016_mv_and_rm_are_denied_for_non_coder_roles', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     // Manager holds neither Move nor Remove (AGENT-006/016).
-    acceptAuthorityRoot(runtime, 'manager-mv-rm', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-mv-rm', 'fast-manager')
     const context = { sessionID: 'manager-mv-rm', agent: 'fast-manager' }
 
     const mvResult = await hooks.tool.mv.execute(

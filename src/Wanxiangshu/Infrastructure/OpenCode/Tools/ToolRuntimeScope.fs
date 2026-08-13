@@ -31,8 +31,8 @@ type ToolRuntimeScope
         verdictSessions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> Role -> string option -> unit) option,
-        parentWorkRecordFor: (string -> string option) option,
-        childWorkRecordFor: (string -> string option) option,
+        parentWorkRecordFor: (string -> Task<string option>) option,
+        childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?eventPort: IEventObservationPort,
@@ -47,8 +47,8 @@ type ToolRuntimeScope
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
-    let parentRecord = defaultArg parentWorkRecordFor (fun _ -> None)
-    let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
+    let parentRecord = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
+    let childRecord = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs
     // DSL-MUTABLE: resource — tool runtime dispose latch
@@ -161,7 +161,7 @@ type ToolRuntimeScope
                             | Some agent ->
                                 let runtime = PromptDispatcher.forJournal durable
 
-                                match
+                                match!
                                     runtime.AcceptHumanRoot
                                         sessionId
                                         (PhysicalUserMessageId.create user.Id)

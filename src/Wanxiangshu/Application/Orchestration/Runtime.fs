@@ -34,12 +34,14 @@ type Orchestrator
         IntegrationGate.lockPath (defaultArg lockRepoPath repoPath) (TargetRef.value targetRef)
 
     let appendFact stream fact =
-        match journalPort with
-        | None -> Ok()
-        | Some port ->
-            match port.AppendFact stream fact with
-            | Ok _ -> Ok()
-            | Error error -> Error error
+        task {
+            match journalPort with
+            | None -> return Ok()
+            | Some port ->
+                match! port.AppendFact stream fact with
+                | Ok _ -> return Ok()
+                | Error error -> return Error error
+        }
 
     let snapshot () =
         journalPort
@@ -94,7 +96,7 @@ type Orchestrator
                            WorktreeIdentity = identity
                            WorktreePath = path |}
 
-                match appendFact StreamId.Workspace requestFact with
+                match! appendFact StreamId.Workspace requestFact with
                 | Error error ->
                     return
                         Error(
@@ -120,7 +122,7 @@ type Orchestrator
                                    WorktreeIdentity = worktree.Identity
                                    WorktreePath = path |}
 
-                        match appendFact StreamId.Workspace createdFact with
+                        match! appendFact StreamId.Workspace createdFact with
                         | Error error ->
                             let! _ = worktree.Release()
 
@@ -165,7 +167,7 @@ type Orchestrator
                                            TargetRef = targetRef
                                            TargetBranchFrozen = TargetRef.value targetRef |}
 
-                                match appendFact StreamId.Workspace fact with
+                                match! appendFact StreamId.Workspace fact with
                                 | Error error ->
                                     let! _ = worktree.Release()
 

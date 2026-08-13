@@ -54,7 +54,7 @@ const rawMessages = (sessionId, messages, ids) => {
   return listItems(applied.value)
 }
 
-test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', () => {
+test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
   const durability = Durability.create(raw, store)
@@ -72,7 +72,7 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
     ]),
   )).value
 
-  const published = durability.PublishPrepared({
+  const published = await durability.PublishPrepared({
     OwnerSessionId: owner,
     DecisionId: id,
     TargetProviderRun: target,
@@ -83,10 +83,10 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   })
   assert.equal(caseOf(published), 'Published')
 
-  let projection = resultOf(durability.LoadProjection()).value
+  let projection = resultOf(await durability.LoadProjection()).value
   assert.equal(StrengthProjection.StrengthProjectionModule_isPromoted(id, projection), false)
   assert.equal(listItems(resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(
+    await Lifecycle.StrengthLifecycle_replayPlans(
       owner,
       (m) => m.id,
       toList([{ id: 'run-1' }]),
@@ -112,11 +112,11 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   }
   const promotion = Lifecycle.StrengthLifecycle_reconcileEvent(projection, consumed)
   assert.equal(caseOf(promotion), 'Promoted')
-  assert.equal(resultOf(durability.Append(promotion)).ok, true)
+  assert.equal(resultOf(await durability.Append(promotion)).ok, true)
 
   // Restart view: reconstruct only from the unified EventStore + payload closure.
   const restarted = Durability.create(raw, store)
-  projection = resultOf(restarted.LoadProjection()).value
+  projection = resultOf(await restarted.LoadProjection()).value
   assert.equal(StrengthProjection.StrengthProjectionModule_isPromoted(id, projection), true)
 
   const baseWire = [
@@ -126,7 +126,7 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   ]
   const rawBase = rawMessages('owner', baseWire, ['user-1', 'run-1', 'user-2'])
   const replayPlans = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
+    await Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
   )
   assert.equal(replayPlans.ok, true)
   const [plan] = listItems(replayPlans.value)
@@ -149,10 +149,10 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
     'user', 'assistant', 'tool', 'assistant', 'user',
   ])
 
-  assert.equal(resultOf(restarted.Append(Events.StrengthEvents_traced(id, 20n, 24n))).ok, true)
-  projection = resultOf(restarted.LoadProjection()).value
+  assert.equal(resultOf(await restarted.Append(Events.StrengthEvents_traced(id, 20n, 24n))).ok, true)
+  projection = resultOf(await restarted.LoadProjection()).value
   const tracedPlans = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
+    await Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
   ).value
   const [traced] = listItems(tracedPlans)
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(22n, traced), true)

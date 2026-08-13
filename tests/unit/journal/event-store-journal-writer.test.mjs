@@ -39,8 +39,8 @@ const mustOk = (result, label = 'result') => {
   return payloadOf(result)
 }
 
-const appendWriter = (writer, streamId, envelopeFact, run) => {
-  const result = EsWriter.EventStoreJournalWriter__Append(writer, streamId, run, envelopeFact)
+const appendWriter = async (writer, streamId, envelopeFact, run) => {
+  const result = await EsWriter.EventStoreJournalWriter__Append(writer, streamId, run, envelopeFact)
   return caseOf(result) === 'Committed'
     ? { committed: true, envelope: payloadOf(result) }
     : {
@@ -51,14 +51,14 @@ const appendWriter = (writer, streamId, envelopeFact, run) => {
       }
 }
 
-const createPair = (store, raw) => {
+const createPair = async (store, raw) => {
   const create =
     EsWriter.EventStoreJournalWriter_create_Z10F3E7A9 ??
     Object.entries(EsWriter)
       .find(([name]) => name.startsWith('EventStoreJournalWriter_create'))
       ?.[1]
   assert.equal(typeof create, 'function', 'EventStoreJournalWriter.create missing from dist')
-  const pair = create(runtimeId('rt_es'), 4242, utcOffset('2026-04-01T00:00:00Z'), store, raw ?? undefined)
+  const pair = await create(runtimeId('rt_es'), 4242, utcOffset('2026-04-01T00:00:00Z'), store, raw ?? undefined)
   return { writer: pair[0], init: pair[1] }
 }
 
@@ -76,39 +76,39 @@ const collectNdjson = (root) => {
   return hits
 }
 
-test('create_publishes_RuntimeStarted_under_refs_wanxiang_store', () => {
+test('create_publishes_RuntimeStarted_under_refs_wanxiang_store', async () => {
   const raw = GitRaw.GitRawStore_createInMemory()
   const store = Store.EventStore_create(raw)
-  const { writer, init } = createPair(store, raw)
+  const { writer, init } = await createPair(store, raw)
 
   assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
   assert.equal(caseOf(init.Stream), 'Workspace')
 
-  const published = raw.ReadRef(Persist.StoreRef_canonical)
+  const published = await raw.ReadRef(Persist.StoreRef_canonical)
   assert.equal(isSome(published), true)
-  assert.equal(Persist.GitObjectIdModule_value(published), snapshotOid(store.OpenSnapshot()))
+  assert.equal(Persist.GitObjectIdModule_value(published), snapshotOid(await store.OpenSnapshot()))
   assert.equal(EsWriter.EventStoreJournalWriter__get_IsPoisoned(writer), false)
 
   writer.Dispose()
 })
 
-test('append_advances_StoreSnapshot_and_writes_no_ndjson_or_blobs_dir', () => {
+test('append_advances_StoreSnapshot_and_writes_no_ndjson_or_blobs_dir', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-journal-'))
   try {
     const raw = GitRaw.GitRawStore_createInMemory()
     const store = Store.EventStore_create(raw)
-    const { writer, init } = createPair(store, raw)
+    const { writer, init } = await createPair(store, raw)
     const before = snapshotOid(EsWriter.EventStoreJournalWriter__get_StoreSnapshot(writer))
 
-    const appended = appendWriter(writer, stream.session(SESSION), CLOSED_FACT)
+    const appended = await appendWriter(writer, stream.session(SESSION), CLOSED_FACT)
     assert.equal(appended.committed, true, appended.reason)
     assert.equal(Number(idValue.localSeq(appended.envelope.LocalSeq)), 2)
 
     const after = snapshotOid(EsWriter.EventStoreJournalWriter__get_StoreSnapshot(writer))
     assert.notEqual(after, before)
-    assert.equal(Persist.GitObjectIdModule_value(raw.ReadRef(Persist.StoreRef_canonical)), after)
+    assert.equal(Persist.GitObjectIdModule_value(await raw.ReadRef(Persist.StoreRef_canonical)), after)
 
-    const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, store.OpenSnapshot().RootOid))
+    const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, (await store.OpenSnapshot()).RootOid))
     assert.ok(listItems(blobs).length >= 2, 'RuntimeStarted + append should both be in store')
 
     // Success path must not create NDJSON or a workspace blobs/ directory.
@@ -117,10 +117,10 @@ test('append_advances_StoreSnapshot_and_writes_no_ndjson_or_blobs_dir', () => {
     assert.equal(EsWriter.EventStoreJournalWriter__get_FilePath(writer), '')
 
     // BlobWriter uses Git ODB — still no blobs/ mkdir.
-    const receipt = mustOk(writer.BlobWriter.Write('large-body\n'), 'blob write')
+    const receipt = mustOk(await writer.BlobWriter.Write('large-body\n'), 'blob write')
     assert.match(idValue.blobRef(receipt.BlobRef), /^blobs\/[0-9a-f]{40}$/)
     assert.equal(existsSync(join(workspace, 'blobs')), false)
-    assert.equal(mustOk(writer.BlobWriter.Read(receipt.BlobRef), 'blob read'), 'large-body\n')
+    assert.equal(mustOk(await writer.BlobWriter.Read(receipt.BlobRef), 'blob read'), 'large-body\n')
 
     assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
     writer.Dispose()
@@ -129,7 +129,7 @@ test('append_advances_StoreSnapshot_and_writes_no_ndjson_or_blobs_dir', () => {
   }
 })
 
-test('append_failure_poisons_and_returns_CommitUnknown', () => {
+test('append_failure_poisons_and_returns_CommitUnknown', async () => {
   const raw = GitRaw.GitRawStore_createInMemory()
   const inner = Store.EventStore_create(raw)
   let appendCalls = 0
@@ -139,43 +139,43 @@ test('append_failure_poisons_and_returns_CommitUnknown', () => {
     Merge: (snapshots) => inner.Merge(snapshots),
     Publish: (candidate) => inner.Publish(candidate),
     Converge: (remote) => inner.Converge(remote),
-    Append: (baseSnapshot, events) => {
+    Append: async (baseSnapshot, events) => {
       appendCalls += 1
       if (appendCalls === 1) return inner.Append(baseSnapshot, events)
       return errorResult(Persist.AppendError.AppendRetryExhausted)
     },
   }
 
-  const { writer } = createPair(flaky, raw)
+  const { writer } = await createPair(flaky, raw)
   assert.equal(appendCalls, 1)
 
-  const result = EsWriter.EventStoreJournalWriter__Append(writer, stream.session(SESSION), undefined, CLOSED_FACT)
+  const result = await EsWriter.EventStoreJournalWriter__Append(writer, stream.session(SESSION), undefined, CLOSED_FACT)
   assert.equal(caseOf(result), 'CommitUnknown')
   assert.equal(caseOf(result.fields[1]), 'WriteFailed')
   assert.match(String(result.fields[1].fields[0]), /retry exhausted/i)
   assert.equal(EsWriter.EventStoreJournalWriter__get_IsPoisoned(writer), true)
 
-  const again = EsWriter.EventStoreJournalWriter__Append(writer, stream.session(SESSION), undefined, CLOSED_FACT)
+  const again = await EsWriter.EventStoreJournalWriter__Append(writer, stream.session(SESSION), undefined, CLOSED_FACT)
   assert.equal(caseOf(again), 'CommitUnknown')
   assert.match(String(again.fields[1].fields[0]), /poisoned or disposed/i)
 
   writer.Dispose()
 })
 
-test('createFromEventStore_folds_init_and_appendAgent_without_ndjson', () => {
+test('createFromEventStore_folds_init_and_appendAgent_without_ndjson', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-agent-journal-'))
   try {
     const raw = GitRaw.GitRawStore_createInMemory()
     const store = Store.EventStore_create(raw)
-    const { writer, init } = createPair(store, raw)
+    const { writer, init } = await createPair(store, raw)
 
     const journal = mustOk(
       AgentJournalMod.AgentJournalModule_createFromEventStore(writer, init),
       'createFromEventStore',
     )
 
-    const before = Persist.GitObjectIdModule_value(raw.ReadRef(Persist.StoreRef_canonical))
-    const append = AgentJournalMod.AgentJournalModule_appendAgent(
+    const before = Persist.GitObjectIdModule_value(await raw.ReadRef(Persist.StoreRef_canonical))
+    const append = await AgentJournalMod.AgentJournalModule_appendAgent(
       stream.session(SESSION),
       undefined,
       CLOSED_AGENT,
@@ -183,7 +183,7 @@ test('createFromEventStore_folds_init_and_appendAgent_without_ndjson', () => {
     )
     assert.equal(caseOf(append), 'Ok', payloadOf(append))
 
-    const after = Persist.GitObjectIdModule_value(raw.ReadRef(Persist.StoreRef_canonical))
+    const after = Persist.GitObjectIdModule_value(await raw.ReadRef(Persist.StoreRef_canonical))
     assert.notEqual(after, before)
     assert.deepEqual(collectNdjson(workspace), [])
     assert.equal(existsSync(join(workspace, 'blobs')), false)

@@ -226,6 +226,8 @@ module HostForkAgent =
                                         resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
                                     | _ -> Task.FromResult(Ok [])
 
+                                let! parentWorkRecord = this.ParentWorkRecordOf this.ParentId
+
                                 return
                                     requirementsResult
                                     |> Result.map (fun requirements ->
@@ -233,7 +235,7 @@ module HostForkAgent =
                                         ForkChildPayload.relay
                                             (forkInstructions this.ParentId)
                                             prompt
-                                            (this.ParentWorkRecordOf this.ParentId)
+                                            parentWorkRecord
                                             requirements
                                             payload)
                             }
@@ -280,7 +282,7 @@ module HostForkAgent =
                         match childResult with
                         | Error err -> return Error err
                         | Ok childId ->
-                            let linkageResult =
+                            let! linkageResult =
                                 HandleController.linkNamed
                                     this.Journal
                                     this.ParentId
@@ -290,7 +292,9 @@ module HostForkAgent =
                                     providerByname
                                     role
                                     handleOwnership
-                                |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
+
+                            let linkageResult =
+                                linkageResult |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
 
                             match linkageResult with
                             | Error err ->
@@ -313,7 +317,7 @@ module HostForkAgent =
 
                                 match result with
                                 | ForkResult.NotFound _ ->
-                                    this.FailRun(run, "Fork runtime is cancelled")
+                                    do! this.FailRun(run, "Fork runtime is cancelled")
                                     return Error "Fork runtime is cancelled"
                                 | _ ->
                                     this.MarkReady(run)
@@ -326,7 +330,7 @@ module HostForkAgent =
                                     // parent LWR recursively). Captured before
                                     // the first prompt is sent; idempotent.
                                     if isFirstPrompt then
-                                        XTraceCapture.captureOpening this.Journal childId prompt requirements
+                                        do! XTraceCapture.captureOpening this.Journal childId prompt requirements
 
                                     if deferSend && isFirstPrompt then
                                         this.DeferredFirstPrompts.[agentId] <-
@@ -348,7 +352,7 @@ module HostForkAgent =
                                         match sent with
                                         | Ok _ -> return Ok result
                                         | Error err ->
-                                            this.FailRun(run, err)
+                                            do! this.FailRun(run, err)
                                             return Error err
             }
 
@@ -402,7 +406,7 @@ module HostForkAgent =
 
                             // Re-open a joined (Retired) handle before the new send so
                             // the next completion has an Active cell to claim.
-                            match
+                            match!
                                 HandleController.linkNamed
                                     this.Journal
                                     this.ParentId
@@ -426,21 +430,26 @@ module HostForkAgent =
                                         | true, _ -> true
                                         | false, _ -> false)
 
-                                let enriched =
+                                let! enriched =
                                     if activeRun then
-                                        None
+                                        Task.FromResult None
                                     else
                                         match renderedPrompt with
-                                        | Some rendered -> Some rendered
+                                        | Some rendered -> Task.FromResult(Some rendered)
                                         | None ->
-                                            Some(
-                                                ForkChildPayload.relay
-                                                    (forkInstructions this.ParentId)
-                                                    prompt
-                                                    (this.ParentWorkRecordOf this.ParentId)
-                                                    []
-                                                    None
-                                            )
+                                            task {
+                                                let! parentWorkRecord = this.ParentWorkRecordOf this.ParentId
+
+                                                return
+                                                    Some(
+                                                        ForkChildPayload.relay
+                                                            (forkInstructions this.ParentId)
+                                                            prompt
+                                                            parentWorkRecord
+                                                            []
+                                                            None
+                                                    )
+                                            }
 
                                 return!
                                     HostForkChildDispatch.sendToExistingChild

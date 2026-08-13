@@ -99,7 +99,7 @@ module OneShotAgentTool =
                     let parentId = SessionId.create context.SessionId
                     let directory = scope.DirectoryFor context.SessionId
                     // EXEC-006: parent → child keeps Opening.
-                    let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
+                    let! parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
                     let fullPrompt =
                         ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord [] None
@@ -121,7 +121,7 @@ module OneShotAgentTool =
                         // ORIGINAL oneshot assignment (not the rendered relay
                         // envelope), matching HostForkAgent. PromptIngress skips
                         // Opening for AgentOwnerRoot; capture before send.
-                        XTraceCapture.captureOpening scope.Journal childId request.Prompt []
+                        do! XTraceCapture.captureOpening scope.Journal childId request.Prompt []
 
                         // Ok carries (formal text, optional WorkRecord); Error is the
                         // Result.Error channel (timeout sibling) — not SetException.
@@ -145,9 +145,11 @@ module OneShotAgentTool =
                             finish (fun () -> completion.SetException error)
 
                         let childWorkRecord () =
-                            match scope.ChildWorkRecordFor(SessionId.value childId) with
-                            | Some wr when not (String.IsNullOrWhiteSpace wr) -> Some wr
-                            | _ -> None
+                            task {
+                                match! scope.ChildWorkRecordFor(SessionId.value childId) with
+                                | Some wr when not (String.IsNullOrWhiteSpace wr) -> return Some wr
+                                | _ -> return None
+                            }
 
                         subscription <-
                             Some(
@@ -164,34 +166,38 @@ module OneShotAgentTool =
                                         // EXEC-028: Completed requires child LWR
                                         // (includeOpening=false); missing → Error.
                                         | TerminalOutcome.Completed terminal ->
-                                            match childWorkRecord () with
-                                            | Some wr -> succeed terminal.TurnFormalText (Some wr)
-                                            | None ->
-                                                // notifyCompleted / some hosts may fire
-                                                // TerminalOutcome without writing XTrace
-                                                // terminal first; includeOpening=false then
-                                                // yields empty LWR. Capture TerminalText
-                                                // then re-query ChildWorkRecordFor.
-                                                let providerRun =
-                                                    if isNull (box terminal.ProviderRun) then
-                                                        ProviderRunIdentity.create ""
-                                                    else
-                                                        terminal.ProviderRun
-
-                                                XTraceCapture.captureTerminalText
-                                                    scope.Journal
-                                                    childId
-                                                    terminal.TerminalText
-                                                    providerRun
-
-                                                match childWorkRecord () with
+                                            task {
+                                                match! childWorkRecord () with
                                                 | Some wr -> succeed terminal.TurnFormalText (Some wr)
                                                 | None ->
-                                                    finish (fun () ->
-                                                        completion.SetResult(
-                                                            Error
-                                                                "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
-                                                        ))
+                                                    // notifyCompleted / some hosts may fire
+                                                    // TerminalOutcome without writing XTrace
+                                                    // terminal first; includeOpening=false then
+                                                    // yields empty LWR. Capture TerminalText
+                                                    // then re-query ChildWorkRecordFor.
+                                                    let providerRun =
+                                                        if isNull (box terminal.ProviderRun) then
+                                                            ProviderRunIdentity.create ""
+                                                        else
+                                                            terminal.ProviderRun
+
+                                                    do!
+                                                        XTraceCapture.captureTerminalText
+                                                            scope.Journal
+                                                            childId
+                                                            terminal.TerminalText
+                                                            providerRun
+
+                                                    match! childWorkRecord () with
+                                                    | Some wr -> succeed terminal.TurnFormalText (Some wr)
+                                                    | None ->
+                                                        finish (fun () ->
+                                                            completion.SetResult(
+                                                                Error
+                                                                    "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
+                                                            ))
+                                            }
+                                            |> ignore
                                         | TerminalOutcome.Aborted reason ->
                                             fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
                                         | TerminalOutcome.Failed error ->

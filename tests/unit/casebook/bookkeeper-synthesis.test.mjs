@@ -75,7 +75,7 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
+    assert.equal(resultOf(await archive(store, raw, caseRec)).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
 
     setSessionPort(port)
@@ -83,13 +83,13 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
     assert.equal(refreshed.ok, false, 'transaction Error must not publish')
     assert.equal(String(refreshed.error).includes('injected synth failure'), true)
 
-    const fetched = resultOf(fetchCase(store, raw, 10, 's-err-1'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's-err-1'))
     assert.equal(fetched.value.A, FAIL_A, 'old Case remains')
     assert.equal(fetched.value.Q, 'Q keep')
     const obs = listItems(fetched.value.Observations)
     assert.equal(obs[0].fields[1], hash('hello'), 'observations not advanced')
 
-    const kinds = listItems(resultOf(loadEvents(raw, store.OpenSnapshot())).value).map((e) => caseOf(e))
+    const kinds = listItems(resultOf(await loadEvents(raw, await store.OpenSnapshot())).value).map((e) => caseOf(e))
     assert.equal(kinds.includes('CaseCaptured'), true)
     assert.equal(kinds.includes('CaseRefreshed'), false)
   } finally {
@@ -112,7 +112,7 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
+    assert.equal(resultOf(await archive(store, raw, caseRec)).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
 
     setSessionPort(port)
@@ -149,7 +149,7 @@ test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionIdKey))
+    const fetched = resultOf(await fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.Q, 'What owns PromptAuthority?')
@@ -165,7 +165,7 @@ test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
     assert.equal(second.ok, false, 'second finalize must be refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
-    const still = resultOf(fetchCase(store, raw, 10, sessionIdKey))
+    const still = resultOf(await fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(still.value.A, publishedA, 'original synthesized case retained')
   } finally {
     resetSessionPort()
@@ -194,7 +194,7 @@ test('CASE010_cleanup_never_synthesizes', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionIdKey))
+    const fetched = resultOf(await fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(fetched.value === undefined || fetched.value === null, true)
   } finally {
     resetSessionPort()

@@ -62,8 +62,8 @@ const streamSession = (sid) =>
   stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
 const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
 
-const seedHarness = (journal, { material = 0 } = {}) => {
-  const link = AgentJournalModule_appendAgent(
+const seedHarness = async (journal, { material = 0 } = {}) => {
+  const link = await AgentJournalModule_appendAgent(
     streamSession(MAIN),
     undefined,
     agentFact('CompanionBloggerLinked', {
@@ -74,7 +74,7 @@ const seedHarness = (journal, { material = 0 } = {}) => {
     journal,
   )
   assert.equal(caseOf(link), 'Ok')
-  const auth = AgentJournalModule_appendAgent(
+  const auth = await AgentJournalModule_appendAgent(
     streamSession(BLOG),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -97,7 +97,7 @@ const seedHarness = (journal, { material = 0 } = {}) => {
         { role: i % 2 === 0 ? 'user' : 'assistant', parts: [xTraceCapture.text(`turn-${i}`)] },
       )
     }
-    xTraceCapture.captureProjection(
+    await xTraceCapture.captureProjection(
       journal,
       sessionId(MAIN),
       xTraceCapture.semantic({ messages: turns }),
@@ -107,10 +107,10 @@ const seedHarness = (journal, { material = 0 } = {}) => {
 
 const withHarness = async (fn, { material = 0 } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-commit-branches-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   const journal = created.journal
-  seedHarness(journal, { material })
+  await seedHarness(journal, { material })
 
   const scope = parkedTransform.scope()
   // RecoveryStageProbe is a direct 4-arg call in the compiled dist (no closure).
@@ -189,8 +189,8 @@ const stopReason = (outcome) => {
 }
 
 /** Stage the next coverage window (from durable XTrace) as the live request. */
-const primeCycle = (scope, journal) => {
-  const ctx = tryRefreshMainContextFromJournal(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
+const primeCycle = async (scope, journal) => {
+  const ctx = await tryRefreshMainContextFromJournal(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
   assert.notEqual(ctx, undefined, 'material must yield a window')
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
   return ctx
@@ -218,7 +218,7 @@ test('ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
     // First window commits (ingest 0→3 when 3 XTrace turns exist).
-    primeCycle(scope, journal)
+    await primeCycle(scope, journal)
     const first = await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
     assert.equal(stopReason(first), 'park-ended-catch-up-complete')
     assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3)
@@ -252,7 +252,7 @@ test('ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
 
 test('ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession }) => {
-    primeCycle(scope, journal)
+    await primeCycle(scope, journal)
     await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
     assert.equal(Number(mainSession().Blog.Coverage.CoverableTurnCutoffExclusive), 3)
 
@@ -283,7 +283,7 @@ test('ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
 test('ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession, blogSession }) => {
-    primeCycle(scope, journal)
+    await primeCycle(scope, journal)
     await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
     const frames = listItems(mainSession().Blog.Frames)
     assert.equal(frames.length, 1)
@@ -332,7 +332,7 @@ test('ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
 test('ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
-    primeCycle(scope, journal)
+    await primeCycle(scope, journal)
     await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
     const frames = listItems(mainSession().Blog.Frames)
     const squash = bloggerRequestContext.squash({
@@ -379,7 +379,7 @@ test('ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () 
 
 // ── open request PromptKey binding (commit authority proof) ────────────────
 
-const materializeOpen = (journal, { requestId, promptKeyValue, kind = 'main' }) => {
+const materializeOpen = async (journal, { requestId, promptKeyValue, kind = 'main' }) => {
   const payload =
     kind === 'squash'
       ? JSON.stringify({
@@ -401,9 +401,9 @@ const materializeOpen = (journal, { requestId, promptKeyValue, kind = 'main' }) 
           frame_epoch: 0,
           observed_prefix_epoch: 0,
         })
-  const written = AgentJournal__WriteBlob_Z721C83C5(journal, payload)
+  const written = await AgentJournal__WriteBlob_Z721C83C5(journal, payload)
   assert.equal(written.tag, 0, JSON.stringify(written))
-  const res = AgentJournalModule_appendAgent(
+  const res = await AgentJournalModule_appendAgent(
     streamSession(MAIN),
     undefined,
     agentFact('BloggerRequestMaterialized', {
@@ -428,7 +428,7 @@ const materializeOpen = (journal, { requestId, promptKeyValue, kind = 'main' }) 
 test('ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession, fatals }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open' }))
-    materializeOpen(journal, { requestId: 'req-open' })
+    await materializeOpen(journal, { requestId: 'req-open' })
 
     const out = await run(blogStep('asst-1', 'c1', 'window one'))
     assert.equal(caseOf(out), 'ProjectMessages', 'unexpected end projects raw')
@@ -443,7 +443,7 @@ test('ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
 test('ENFORCER_open_bound_promptkey_commits_and_clears_open', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open-bound' }))
-    materializeOpen(journal, { requestId: 'req-open-bound', promptKeyValue: 'pk-1' })
+    await materializeOpen(journal, { requestId: 'req-open-bound', promptKeyValue: 'pk-1' })
 
     const out = await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
     assert.equal(stopReason(out), 'park-ended-catch-up-complete')
@@ -517,14 +517,14 @@ test('ENFORCER_park_resumed_without_material_projects_raw', async () => {
 test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
-      primeCycle(scope, journal)
+      await primeCycle(scope, journal)
       const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
       // Main session offers material while the transform is parked: the wake
       // resolves true and the re-chunk finds the new window.
       parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
         // Re-capture the seed turns plus two NEW turns (capture dedupes by
         // provenance, so only the fresh turns land in the XTrace).
-        xTraceCapture.captureProjection(
+        await xTraceCapture.captureProjection(
           journal,
           sessionId(MAIN),
           xTraceCapture.semantic({
@@ -557,7 +557,7 @@ test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
 test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
-      primeCycle(scope, journal)
+      await primeCycle(scope, journal)
       const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
       // A concurrent physical send re-armed the flight while parked: the
       // resumed transform must project the live view without re-binding.
@@ -591,10 +591,10 @@ test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
 test('ENFORCER_park_expired_with_fresh_material_drains', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
-      primeCycle(scope, journal)
+      await primeCycle(scope, journal)
       const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
       parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
-        xTraceCapture.captureProjection(
+        await xTraceCapture.captureProjection(
           journal,
           sessionId(MAIN),
           xTraceCapture.semantic({

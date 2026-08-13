@@ -46,14 +46,14 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
+    assert.equal(resultOf(await archive(store, raw, caseRec)).ok, true)
 
-    assert.equal(resultOf(needsRefresh(store, raw, 10, 's-mech-1', dir)).value, false)
+    assert.equal(resultOf(await needsRefresh(store, raw, 10, 's-mech-1', dir)).value, false)
     assert.equal(resultOf(await refreshStale(store, raw, dir, 's-mech-1')).value, false)
     assert.equal(createCalls.length, 0, 'fresh case must not open a Bookkeeper child')
 
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    assert.equal(resultOf(needsRefresh(store, raw, 10, 's-mech-1', dir)).value, true)
+    assert.equal(resultOf(await needsRefresh(store, raw, 10, 's-mech-1', dir)).value, true)
 
     setSessionPort(port)
     const refreshed = resultOf(await refreshStale(store, raw, dir, 's-mech-1'))
@@ -62,7 +62,7 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true, 'js-bookkeeper must be invoked')
 
-    const fetched = resultOf(fetchCase(store, raw, 10, 's-mech-1'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's-mech-1'))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.Q, 'Q keep')
@@ -73,9 +73,9 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
     assert.equal(obs.length, 1)
     assert.equal(obs[0].fields[1], hash('changed'), 'observation hash advanced to worktree')
 
-    assert.equal(resultOf(needsRefresh(store, raw, 10, 's-mech-1', dir)).value, false)
+    assert.equal(resultOf(await needsRefresh(store, raw, 10, 's-mech-1', dir)).value, false)
 
-    const events = listItems(resultOf(loadEvents(raw, store.OpenSnapshot())).value)
+    const events = listItems(resultOf(await loadEvents(raw, await store.OpenSnapshot())).value)
     const kinds = events.map((e) => caseOf(e))
     assert.equal(kinds.includes('CaseCaptured'), true)
     assert.equal(kinds.includes('CaseRefreshed'), true)
@@ -112,7 +112,7 @@ test('CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
       Observations: toList([fileRead('gone.txt', hash('x'))]),
       LastAccessOrder: 0,
     }
-    assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
+    assert.equal(resultOf(await archive(store, raw, caseRec)).ok, true)
     rmSync(join(dir, 'gone.txt'), { force: true })
 
     setSessionPort(port)
@@ -122,7 +122,7 @@ test('CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
 
-    const fetched = resultOf(fetchCase(store, raw, 10, 's-gone'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's-gone'))
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.A, 'A')
     assert.equal(fetched.value.A.includes('evidence:'), false)

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Session
 
+open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 
 /// rabbit §13.1 / S9.1: admission after a confirmed provider failure.
@@ -15,4 +16,4 @@ type RecoveryAdmission =
 ///
 /// Journal + auto-recovery budget are closed at the wiring site so Session hosts
 /// stay free of Application FallbackLedger details (dependency inversion).
-type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Result<RecoveryAdmission, string>
+type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<RecoveryAdmission, string>>

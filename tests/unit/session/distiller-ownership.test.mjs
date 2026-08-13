@@ -42,7 +42,7 @@ const fakeSessions = () => ({
 
 test('EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-dist-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     const scope = new ToolRuntimeScope(

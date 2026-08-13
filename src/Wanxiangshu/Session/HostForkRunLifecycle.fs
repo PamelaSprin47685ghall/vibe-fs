@@ -79,11 +79,11 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (evidence: TerminalEvidence)
         (agentOutcome: AgentCompletionOutcome)
-        =
+        : Task =
         match JoinableCompletion.tryFromProvenTerminal evidence with
         | Error _ ->
             // Fail closed: leave run Active / pending for a later proven terminal.
-            ()
+            Task.FromResult(())
         | Ok proof ->
             let claimed, subscriptionToDispose =
                 lock gate (fun () ->
@@ -104,22 +104,36 @@ module HostForkRunLifecycle =
                 let runId = "run-" + run.AgentId
                 let childId = run.ChildId
 
-                let finalOutcome =
-                    match journal with
-                    | None -> agentOutcome
-                    | Some _ ->
-                        match ChildRecoveryWorkflow.commitJoinable journal parentId proof with
-                        | Ok() -> agentOutcome
-                        | Error error ->
-                            AgentCompletion.failed
-                                run.AgentId
-                                runId
-                                (Some run.Role)
-                                (Some childId)
-                                "PERSIST"
-                                (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
+                // Terminal callbacks are synchronous Host notifications, so the
+                // durable claim continues as an explicit detached Task. The Task
+                // itself preserves the ordering: SetResult happens only after the
+                // HandleCompleted commit has resolved.
+                task {
+                    let! finalOutcome =
+                        match journal with
+                        | None -> Task.FromResult agentOutcome
+                        | Some _ ->
+                            task {
+                                match! ChildRecoveryWorkflow.commitJoinable journal parentId proof with
+                                | Ok() -> return agentOutcome
+                                | Error error ->
+                                    return
+                                        AgentCompletion.failed
+                                            run.AgentId
+                                            runId
+                                            (Some run.Role)
+                                            (Some childId)
+                                            "PERSIST"
+                                            (sprintf
+                                                "EXEC-009/PERSIST-002 HandleCompleted append failed: %s"
+                                                error)
+                            }
 
-                run.Source.SetResult finalOutcome
+                    run.Source.SetResult finalOutcome
+                }
+                :> Task
+            else
+                Task.FromResult(())
 
     let complete
         (gate: obj)
@@ -130,7 +144,7 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         (workRecord: string option)
-        =
+        : Task =
         // EXEC-006 / COMPANION-003: the completion's work record is the child's
         // final LifecycleWorkRecord only — Opening + frames + gap + terminal,
         // materialised by the same port as parent background. No TerminalText
@@ -144,14 +158,14 @@ module HostForkRunLifecycle =
         match outcome with
         | Aborted _ ->
             // Observation only. Keep pending run Active for a later proven terminal.
-            ()
+            Task.FromResult(())
         | Completed result when not result.IsValid ->
             // FALLBACK-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
             // not a proven failure. The subagent auto-retries and continues — its
             // reconcile loop repairs the missing final report (RepairOnce /
             // AbandonRoundProduct, never FailSlot). Concluding MISSING_FINAL_REPORT
             // here would fail the run before the last effort. Observation only.
-            ()
+            Task.FromResult(())
         | Completed result ->
             let agentOutcome =
                 AgentCompletion.completed
@@ -182,7 +196,7 @@ module HostForkRunLifecycle =
             // proven MISSING_FINAL_REPORT failure here concludes the run before the
             // last effort (the same reason the `Aborted` branch observes only).
             // Observation only — keep pending run Active for a later proven terminal.
-            ()
+            Task.FromResult(())
         | Failed error ->
             let code = if error = "cancelled" then "CANCELLED" else "ERROR"
 
@@ -206,7 +220,7 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordFor: SessionId -> string option)
+        (childWorkRecordFor: SessionId -> Task<string option>)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -225,13 +239,17 @@ module HostForkRunLifecycle =
         let terminalWorkRecord outcome =
             match outcome with
             | Completed _ -> childWorkRecordFor childId
-            | _ -> None
+            | _ -> Task.FromResult None
 
         let subscription =
             sessions.SubscribeTerminal(
                 childId,
                 (fun _ outcome ->
-                    complete gate pendingRuns journal parentId sessions run outcome (terminalWorkRecord outcome))
+                    task {
+                        let! workRecord = terminalWorkRecord outcome
+                        do! complete gate pendingRuns journal parentId sessions run outcome workRecord
+                    }
+                    |> ignore)
             )
 
         let disposeImmediately =

@@ -17,7 +17,10 @@ type IGitGateway =
     abstract Push: remote: string * refspec: string -> Task<Result<unit, GitError>>
     abstract ConvergeStore: remote: string -> Task<Result<StoreSnapshot, ConvergeError>>
 
-/// Sync git runner used by GitGateway transport (args after `git`, optional env overlay).
+/// Async git runner used by GitGateway transport (args after `git`, optional env overlay).
+type GitGatewayRunner = string list * Map<string, string> option -> Task<int * string * string>
+
+/// Sync runner retained only as a test/embedding adapter. Production transport never blocks on Task.
 type GitGatewaySyncRunner = string list * Map<string, string> option -> int * string * string
 
 [<RequireQualifiedAccess>]
@@ -42,13 +45,15 @@ module GitGateway =
     let private failureStdoutStderr stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
-    let private runOk (run: GitGatewaySyncRunner) (args: string list) (env: Map<string, string> option) =
-        let code, stdout, stderr = run (args, env)
+    let private runOk (run: GitGatewayRunner) (args: string list) (env: Map<string, string> option) =
+        task {
+            let! code, stdout, stderr = run (args, env)
 
-        if code = 0 then
-            Ok()
-        else
-            Error(GitError.Failed(code, failureStdoutStderr stdout stderr))
+            if code = 0 then
+                return Ok()
+            else
+                return Error(GitError.Failed(code, failureStdoutStderr stdout stderr))
+        }
 
     let private withSyncGuard (env: Map<string, string> option) : Map<string, string> option =
         let baseMap =
@@ -108,24 +113,26 @@ module GitGateway =
 
     /// Fetch remote canonical store into local remote-tracking ref (§14).
     /// Missing remote store ref is Ok (Absent) — first publish uses Absent lease.
-    let private fetchStoreRef (run: GitGatewaySyncRunner) (remote: string) : Result<unit, GitError> =
-        let tracking = StoreRef.remoteTracking remote
-        let refspec = sprintf "+%s:%s" StoreRef.canonical tracking
-        let code, stdout, stderr = run ([ "fetch"; remote; refspec ], withSyncGuard None)
+    let private fetchStoreRef (run: GitGatewayRunner) (remote: string) : Task<Result<unit, GitError>> =
+        task {
+            let tracking = StoreRef.remoteTracking remote
+            let refspec = sprintf "+%s:%s" StoreRef.canonical tracking
+            let! code, stdout, stderr = run ([ "fetch"; remote; refspec ], withSyncGuard None)
 
-        if code = 0 then
-            Ok()
-        elif isMissingRemoteRef (failureStdoutStderr stdout stderr) then
-            Ok()
-        else
-            Error(GitError.Failed(code, failureStdoutStderr stdout stderr))
+            if code = 0 then
+                return Ok()
+            elif isMissingRemoteRef (failureStdoutStderr stdout stderr) then
+                return Ok()
+            else
+                return Error(GitError.Failed(code, failureStdoutStderr stdout stderr))
+        }
 
     let private leasePush
-        (run: GitGatewaySyncRunner)
+        (run: GitGatewayRunner)
         (remote: string)
         (expectedRemote: GitObjectId option)
         (newOid: GitObjectId)
-        : Result<unit, GitError> =
+        : Task<Result<unit, GitError>> =
         let dest = sprintf "%s:%s" (GitObjectId.value newOid) StoreRef.canonical
 
         let leaseArg =
@@ -154,7 +161,7 @@ module GitGateway =
     /// Core bidirectional converge. When `skipFetch`, uses `observedRemote` and does not fetch (§14).
     let private convergeLoop
         (store: IGitRawStore)
-        (run: GitGatewaySyncRunner)
+        (run: GitGatewayRunner)
         (maxRetries: int)
         (remote: string)
         (skipFetch: bool)
@@ -176,7 +183,7 @@ module GitGateway =
                         let! casOk = store.CompareAndSwapRef(StoreRef.canonical, expectedLocal, newOid)
 
                         if casOk then
-                            match leasePush run remote leaseExpected newOid with
+                            match! leasePush run remote leaseExpected newOid with
                             | Ok() -> return Ok merged
                             | Error gitErr ->
                                 if retriesLeft <= 0 then
@@ -187,7 +194,7 @@ module GitGateway =
                                 elif skipFetch then
                                     return Error(asTransport gitErr)
                                 else
-                                    match fetchStoreRef run remote with
+                                    match! fetchStoreRef run remote with
                                     | Error e -> return Error(asTransport e)
                                     | Ok() ->
                                         let! refreshed, nextLease = observedOrEmpty store remote None
@@ -200,7 +207,7 @@ module GitGateway =
                         elif skipFetch then
                             return! loop remoteSnap leaseExpected (retriesLeft - 1)
                         else
-                            match fetchStoreRef run remote with
+                            match! fetchStoreRef run remote with
                             | Error e -> return Error(asTransport e)
                             | Ok() ->
                                 let! refreshed, nextLease = observedOrEmpty store remote None
@@ -211,7 +218,7 @@ module GitGateway =
 
     let convergeStore
         (store: IGitRawStore)
-        (run: GitGatewaySyncRunner)
+        (run: GitGatewayRunner)
         (maxRetries: int)
         (remote: string)
         : Task<Result<StoreSnapshot, ConvergeError>> =
@@ -223,7 +230,7 @@ module GitGateway =
                 syncActiveDepth.Value <- syncActiveDepth.Value + 1
 
                 try
-                    match fetchStoreRef run remote with
+                    match! fetchStoreRef run remote with
                     | Error e -> return Error(asTransport e)
                     | Ok() ->
                         let! observed, leaseExpected = observedOrEmpty store remote None
@@ -235,7 +242,7 @@ module GitGateway =
     /// Hook-facing helper: reuse already-observed remote-tracking snapshot; no nested fetch (§14).
     let convergeStoreWithObservedRemote
         (store: IGitRawStore)
-        (run: GitGatewaySyncRunner)
+        (run: GitGatewayRunner)
         (maxRetries: int)
         (remote: string)
         (observedRemote: StoreSnapshot)
@@ -256,10 +263,10 @@ module GitGateway =
                     syncActiveDepth.Value <- syncActiveDepth.Value - 1
         }
 
-    let createWithSyncRunner
+    let createWithRunner
         (store: IGitRawStore)
         (repoPath: string)
-        (run: GitGatewaySyncRunner)
+        (run: GitGatewayRunner)
         (maxRetries: int)
         : IGitGateway =
         ignore repoPath
@@ -269,7 +276,7 @@ module GitGateway =
         { new IGitGateway with
             member _.Fetch(remote) =
                 task {
-                    match fetchStoreRef run remote with
+                    match! fetchStoreRef run remote with
                     | Ok() -> return Ok()
                     | Error e -> return Error e
                 }
@@ -288,16 +295,33 @@ module GitGateway =
                     | Error(ConvergeError.Transport reason) -> return Error(GitError.Transport reason)
                     | Error other -> return Error(GitError.Transport(sprintf "%A" other))
                     | Ok _ ->
-                        match runOk run [ "push"; remote; refspec ] (withSyncGuard None) with
+                        match! runOk run [ "push"; remote; refspec ] (withSyncGuard None) with
                         | Ok() -> return Ok()
                         | Error e -> return Error e
                 }
 
             member _.ConvergeStore(remote) = converge remote }
 
-    /// Bind `IEventStore.Converge` to this gateway's sync ConvergeStore path.
-    let bindEventStore (store: IGitRawStore) (run: GitGatewaySyncRunner) (maxRetries: int) : IEventStore =
+    let createWithSyncRunner
+        (store: IGitRawStore)
+        (repoPath: string)
+        (run: GitGatewaySyncRunner)
+        (maxRetries: int)
+        : IGitGateway =
+        let asyncRun: GitGatewayRunner = fun argsAndEnv -> Task.FromResult(run argsAndEnv)
+        createWithRunner store repoPath asyncRun maxRetries
+
+    /// Bind `IEventStore.Converge` directly to the async gateway path.
+    let bindEventStore (store: IGitRawStore) (run: GitGatewayRunner) (maxRetries: int) : IEventStore =
         EventStore.createWithConverge store maxRetries (convergeStore store run maxRetries)
+
+    let bindEventStoreWithSyncRunner
+        (store: IGitRawStore)
+        (run: GitGatewaySyncRunner)
+        (maxRetries: int)
+        : IEventStore =
+        let asyncRun: GitGatewayRunner = fun argsAndEnv -> Task.FromResult(run argsAndEnv)
+        bindEventStore store asyncRun maxRetries
 
     let create
         (store: IGitRawStore)
@@ -305,9 +329,5 @@ module GitGateway =
         (runAsync: string * string list * Map<string, string> option -> Task<int * string * string>)
         (maxRetries: int)
         : IGitGateway =
-        let runSync: GitGatewaySyncRunner =
-            fun (args, env) ->
-                let t = runAsync (repoPath, args, env)
-                t.Result
-
-        createWithSyncRunner store repoPath runSync maxRetries
+        let run: GitGatewayRunner = fun (args, env) -> runAsync (repoPath, args, env)
+        createWithRunner store repoPath run maxRetries

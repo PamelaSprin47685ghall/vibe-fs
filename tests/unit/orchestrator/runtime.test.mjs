@@ -39,7 +39,7 @@ test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
       resumeManager: async () => orchestratorRuntime.ok(),
     },
     journal: {
-      append: () => {
+      append: async () => {
         appended.push('ManagerJobCreated')
         return orchestratorRuntime.ok({})
       },

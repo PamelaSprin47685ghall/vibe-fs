@@ -355,10 +355,10 @@ test('THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
 // G4R §12 + E2E conflict restart: durable ConflictDetected survives crash;
 // recovered projection still yields ResumeConflictResolution (not ManagerStarted).
 
-test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', () => {
+test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', async () => {
   const dir = `temporal-orch-conflict-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const vt1 = createVirtualClock()
-  const created1 = agentJournal.create({
+  const created1 = await agentJournal.create({
     directory: dir,
     runtime: 'rt_orch_1',
     pid: 4242,
@@ -374,16 +374,16 @@ test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', () => {
   }
 
   const streamA = stream.session(MANAGER_A)
-  const a1 = agentJournal.appendAgent(streamA, undefined, createAgentFact(JOB_A, MANAGER_A), world1.journal)
+  const a1 = await agentJournal.appendAgent(streamA, undefined, createAgentFact(JOB_A, MANAGER_A), world1.journal)
   assert.equal(a1.ok, true, a1.ok ? '' : JSON.stringify(a1.error))
-  const a2 = agentJournal.appendAgent(streamA, undefined, conflictAgentFact(JOB_A), world1.journal)
+  const a2 = await agentJournal.appendAgent(streamA, undefined, conflictAgentFact(JOB_A), world1.journal)
   assert.equal(a2.ok, true, a2.ok ? '' : JSON.stringify(a2.error))
 
   const before = agentJournal.snapshot(world1.journal)
   assert.equal(progressOf(before, JOB_A), 'ConflictPending')
   assert.equal(actionOf(before, JOB_A, 'h1'), 'ResumeConflictResolution')
 
-  const world2 = dropEphemeral(world1, { runtime: 'rt_orch_recovered', pid: 4243 })
+  const world2 = await dropEphemeral(world1, { runtime: 'rt_orch_recovered', pid: 4243 })
   const after = agentJournal.snapshot(world2.journal)
   assert.equal(progressOf(after, JOB_A), 'ConflictPending')
   assert.equal(actionOf(after, JOB_A, 'h1'), 'ResumeConflictResolution')
@@ -406,10 +406,10 @@ test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', () => {
 // Crash inside the CAS window (ORCH-005 restart-publish feedstock): durable
 // PublishClaimed survives; recovered recoveryAction still respects branch order.
 
-test('THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
+test('THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', async () => {
   const dir = `temporal-orch-claim-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const vt1 = createVirtualClock()
-  const created1 = agentJournal.create({
+  const created1 = await agentJournal.create({
     directory: dir,
     runtime: 'rt_orch_claim_1',
     pid: 4242,
@@ -426,15 +426,15 @@ test('THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
 
   const streamA = stream.session(MANAGER_A)
   assert.equal(
-    agentJournal.appendAgent(streamA, undefined, createAgentFact(JOB_A, MANAGER_A), world1.journal).ok,
+    (await agentJournal.appendAgent(streamA, undefined, createAgentFact(JOB_A, MANAGER_A), world1.journal)).ok,
     true,
   )
   assert.equal(
-    agentJournal.appendAgent(streamA, undefined, rebasedAgentFact(JOB_A), world1.journal).ok,
+    (await agentJournal.appendAgent(streamA, undefined, rebasedAgentFact(JOB_A), world1.journal)).ok,
     true,
   )
   assert.equal(
-    agentJournal.appendAgent(streamA, undefined, publishClaimedAgentFact(JOB_A), world1.journal).ok,
+    (await agentJournal.appendAgent(streamA, undefined, publishClaimedAgentFact(JOB_A), world1.journal)).ok,
     true,
   )
 
@@ -444,7 +444,7 @@ test('THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
   assert.equal(actionOf(before, JOB_A, 'h1'), 'AttemptPublish')
   assert.equal(actionOf(before, JOB_A, 'h9'), 'RebaseAndReviewAgain')
 
-  const world2 = dropEphemeral(world1, { runtime: 'rt_orch_claim_recovered', pid: 4243 })
+  const world2 = await dropEphemeral(world1, { runtime: 'rt_orch_claim_recovered', pid: 4243 })
   const after = agentJournal.snapshot(world2.journal)
   assert.equal(progressOf(after, JOB_A), 'PublishClaimed')
   assert.equal(actionOf(after, JOB_A, 'r1'), 'BackfillPublished')

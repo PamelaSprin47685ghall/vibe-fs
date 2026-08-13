@@ -70,15 +70,15 @@ const assertUntouched = (path, before) => {
 
 const openJournalFactory = (commonDir) => {
   const port = Workspace.bootPort(commonDir)
-  return (runtimeId, processId, startedAt) => {
-    const resumed = port.ResumeOrCreate(runtimeId, processId, startedAt)
+  return async (runtimeId, processId, startedAt) => {
+    const resumed = await port.ResumeOrCreate(runtimeId, processId, startedAt)
     if (caseOf(resumed) !== 'Ok') return resumed
     const triple = payloadOf(resumed)
     return AgentJournalMod.AgentJournalModule_createFromProjection(triple[0], triple[2])
   }
 }
 
-test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread', () => {
+test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-host-es-'))
   try {
     execFileSync('git', ['init', '--quiet', workspace])
@@ -87,7 +87,7 @@ test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread'
     const planted = plantStaleNdjson(runtimeDir)
 
     const journal = mustOk(
-      Shared.acquire(runtimeDir, process.pid, new Date(), openJournalFactory(commonDir)),
+      await Shared.acquire(runtimeDir, process.pid, new Date(), openJournalFactory(commonDir)),
       'SharedAgentJournal.acquire',
     )
 
@@ -99,7 +99,7 @@ test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread'
     assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(writer)), 1)
 
     const closed = mustOk(
-      AgentJournalMod.AgentJournalModule_appendAgent(stream.session(SESSION), undefined, CLOSED_AGENT, journal),
+      await AgentJournalMod.AgentJournalModule_appendAgent(stream.session(SESSION), undefined, CLOSED_AGENT, journal),
       'appendAgent',
     )
     assert.ok(fold.session(closed, 'ses_host_es'), 'EventStore-backed journal must accept append')
@@ -110,7 +110,7 @@ test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread'
     // Canonical store tip must exist under the git common-dir after boot+append.
     const rawPair = Workspace.acquire(commonDir)
     const store = rawPair[1]
-    const tip = store.OpenSnapshot()
+    const tip = await store.OpenSnapshot()
     assert.equal(typeof Persist.GitObjectIdModule_value(Persist.RootOidModule_value(tip.RootOid)), 'string')
 
     Shared.release(journal)
@@ -121,7 +121,7 @@ test('host_SharedAgentJournal_boots_EventStore_and_leaves_planted_ndjson_unread'
   }
 })
 
-test('host_SharedAgentJournal_cache_hit_does_not_reread_ndjson', () => {
+test('host_SharedAgentJournal_cache_hit_does_not_reread_ndjson', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-host-es-cache-'))
   try {
     execFileSync('git', ['init', '--quiet', workspace])
@@ -130,8 +130,8 @@ test('host_SharedAgentJournal_cache_hit_does_not_reread_ndjson', () => {
     const planted = plantStaleNdjson(runtimeDir)
     const openJournal = openJournalFactory(commonDir)
 
-    const first = mustOk(Shared.acquire(runtimeDir, process.pid, new Date(), openJournal), 'acquire first')
-    const second = mustOk(Shared.acquire(runtimeDir, process.pid, new Date(), openJournal), 'acquire second')
+    const first = mustOk(await Shared.acquire(runtimeDir, process.pid, new Date(), openJournal), 'acquire first')
+    const second = mustOk(await Shared.acquire(runtimeDir, process.pid, new Date(), openJournal), 'acquire second')
     assert.equal(first, second, 'cache hit must return the same AgentJournal instance')
 
     assertUntouched(planted.ndjsonPath, planted.before)

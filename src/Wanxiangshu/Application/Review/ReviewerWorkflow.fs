@@ -27,53 +27,55 @@ module ReviewerWorkflow =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (confirmedReviewerEmptyTextFallback: bool)
-        : unit =
-        // COMPANION-003: the terminal text is this turn's formal text plus
-        // host-visible reasoning — the XTrace terminal segment.
-        let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
+        : Task =
+        task {
+            // COMPANION-003: the terminal text is this turn's formal text plus
+            // host-visible reasoning — the XTrace terminal segment.
+            let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
-        let sessionWideText =
-            if not (String.IsNullOrWhiteSpace sessionWide) then
-                sessionWide
-            elif confirmedReviewerEmptyTextFallback then
-                // A confirmed double-PERFECT often ends on a tool-only frame.
-                // The witness is already Confirmed, so expose a minimal A rather
-                // than failing a review that actually succeeded.
-                "Review confirmed."
-            else
-                sessionWide
+            let sessionWideText =
+                if not (String.IsNullOrWhiteSpace sessionWide) then
+                    sessionWide
+                elif confirmedReviewerEmptyTextFallback then
+                    // A confirmed double-PERFECT often ends on a tool-only frame.
+                    // The witness is already Confirmed, so expose a minimal A rather
+                    // than failing a review that actually succeeded.
+                    "Review confirmed."
+                else
+                    sessionWide
 
-        // REVIEW-006: nothing is written here. Confirmation is a fact
-        // VerdictWorkflow already journalled from the seal evidence, so the
-        // completion path only reports the run.
-        // PROMPT-008: the Role comes from the reconciled turn, and there is no
-        // default.
-        match turn.Role with
-        | None ->
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
-            |> ignore
-        | Some role ->
-            let runResult: AgentRunResult =
-                { SessionId = turn.SessionId
-                  AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
-                  ProviderRun = turn.ProviderRun
-                  Role = AgentRoleIdentity.toRole role
-                  Directory = turn.Directory
-                  TerminalText = sessionWideText
-                  TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
-
-            // EXEC-006: `IsValid` is the single place that decides whether a
-            // completed run carries terminal output.
-            if runResult.IsValid then
-                // COMPANION-003: capture the XTrace terminal segment.
-                // Idempotent (PERSIST-010).
-                XTraceCapture.captureTerminal journal turn
-
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+            // REVIEW-006: nothing is written here. Confirmation is a fact
+            // VerdictWorkflow already journalled from the seal evidence, so the
+            // completion path only reports the run.
+            // PROMPT-008: the Role comes from the reconciled turn, and there is no
+            // default.
+            match turn.Role with
+            | None ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
                 |> ignore
-            else
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
-                |> ignore
+            | Some role ->
+                let runResult: AgentRunResult =
+                    { SessionId = turn.SessionId
+                      AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                      ProviderRun = turn.ProviderRun
+                      Role = AgentRoleIdentity.toRole role
+                      Directory = turn.Directory
+                      TerminalText = sessionWideText
+                      TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+
+                // EXEC-006: `IsValid` is the single place that decides whether a
+                // completed run carries terminal output.
+                if runResult.IsValid then
+                    // COMPANION-003: capture the XTrace terminal segment.
+                    // Idempotent (PERSIST-010).
+                    do! XTraceCapture.captureTerminal journal turn
+
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                    |> ignore
+                else
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
+                    |> ignore
+        }
 
     let private reportContinuationFailure
         (eventPort: IEventObservationPort)
@@ -100,7 +102,6 @@ module ReviewerWorkflow =
         | ReviewerEvidence.Need.CompleteConfirmed ->
             // Confirmed dual-PERFECT often ends tool-only; expose the minimal A.
             completeReviewer eventPort journal turn true
-            AsyncSupport.completedTask ()
         | ReviewerEvidence.Need.EnsurePerfectConfirmed ->
             task {
                 let! outcome =
@@ -129,4 +130,3 @@ module ReviewerWorkflow =
             :> Task
         | ReviewerEvidence.Need.CompleteRevision ->
             completeReviewer eventPort journal turn false
-            AsyncSupport.completedTask ()

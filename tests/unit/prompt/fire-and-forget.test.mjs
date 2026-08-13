@@ -31,7 +31,7 @@ const capturingPort = (captured) => ({
 test('PROMPT_007_detached_claims_and_persists_without_physical_accepted', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-'))
   try {
-    const opened = agentJournal.create({ directory: base })
+    const opened = await agentJournal.create({ directory: base })
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const runtime = promptDispatcher.forJournal(opened.journal)
@@ -63,7 +63,7 @@ test('PROMPT_007_detached_claims_and_persists_without_physical_accepted', async 
 test('PROMPT_007_detached_continuation_same_claim_path', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007c-'))
   try {
-    const opened = agentJournal.create({ directory: base })
+    const opened = await agentJournal.create({ directory: base })
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const runtime = promptDispatcher.forJournal(opened.journal)

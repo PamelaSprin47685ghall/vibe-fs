@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
@@ -75,23 +76,29 @@ module EnforcerTipGuidance =
             |> Option.defaultValue false
 
     /// Record that Full tip guidance was injected for this Main session (restart-safe).
-    let private recordFullTipDelivered (journal: AgentJournal) (mainSessionId: SessionId) (tipName: string) : unit =
+    let private recordFullTipDelivered
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (tipName: string)
+        : Task<unit> =
         let fact =
             HostFact.TipGuidanceDelivered
                 {| SessionId = mainSessionId
                    TipName = tipName
                    Presentation = TipPresentation.Full |}
 
-        match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
-        | Ok _ -> ()
-        | Error failure ->
-            // Delivery still proceeds with computed Full text; durability failure is
-            // visible via diagnostic so a later Identity-only cannot silently strand.
-            Diagnostic.emit
-                "tip-guidance-delivery-append-failed"
-                [ "session_id", SessionId.value mainSessionId
-                  "tip", tipName
-                  "result", JournalAppendFailure.describe failure ]
+        task {
+            match! AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
+            | Ok _ -> ()
+            | Error failure ->
+                // Delivery still proceeds with computed Full text; durability failure is
+                // visible via diagnostic so a later Identity-only cannot silently strand.
+                Diagnostic.emit
+                    "tip-guidance-delivery-append-failed"
+                    [ "session_id", SessionId.value mainSessionId
+                      "tip", tipName
+                      "result", JournalAppendFailure.describe failure ]
+        }
 
     /// Resolve Main tip guidance for the auto-injected marker tip half.
     ///
@@ -101,46 +108,58 @@ module EnforcerTipGuidance =
     ///
     /// `mainOrBloggerSession` may be the Main session id (SpikePlugin) or the Blogger
     /// satellite id; owner is resolved through SessionAssociation.
-    let resolveTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : TipGuidance option =
-        match tryOwnerMainSession journal mainOrBloggerSession with
-        | None -> None
-        | Some mainSessionId ->
-            match latestOwnerTipField journal mainSessionId with
-            | None -> None
-            | Some field ->
-                let lang =
-                    SessionProviderLanguage.tryGet mainSessionId
-                    |> Option.defaultValue ProviderLanguage.English
+    let resolveTipGuidance
+        (journal: AgentJournal)
+        (mainOrBloggerSession: SessionId)
+        : Task<TipGuidance option> =
+        task {
+            match tryOwnerMainSession journal mainOrBloggerSession with
+            | None -> return None
+            | Some mainSessionId ->
+                match latestOwnerTipField journal mainSessionId with
+                | None -> return None
+                | Some field ->
+                    let lang =
+                        SessionProviderLanguage.tryGet mainSessionId
+                        |> Option.defaultValue ProviderLanguage.English
 
-                match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
-                | None -> None
-                | Some rule ->
-                    let tipName =
-                        if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
-                            rule.Name.Trim()
+                    match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
+                    | None -> return None
+                    | Some rule ->
+                        let tipName =
+                            if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
+                                rule.Name.Trim()
+                            else
+                                field.Trim()
+
+                        if tipName.Length = 0 then
+                            return None
+                        elif hasFullTipDelivered journal mainSessionId tipName then
+                            let guidance: TipGuidance =
+                                { TipName = tipName
+                                  Presentation = TipPresentation.IdentityOnly
+                                  Text = tipIdentityText tipName }
+
+                            return Some guidance
                         else
-                            field.Trim()
+                            let text = tipFullText lang tipName rule.MainText
+                            do! recordFullTipDelivered journal mainSessionId tipName
 
-                    if tipName.Length = 0 then
-                        None
-                    elif hasFullTipDelivered journal mainSessionId tipName then
-                        Some
-                            { TipName = tipName
-                              Presentation = TipPresentation.IdentityOnly
-                              Text = tipIdentityText tipName }
-                    else
-                        let text = tipFullText lang tipName rule.MainText
-                        recordFullTipDelivered journal mainSessionId tipName
+                            let guidance: TipGuidance =
+                                { TipName = tipName
+                                  Presentation = TipPresentation.Full
+                                  Text = text }
 
-                        Some
-                            { TipName = tipName
-                              Presentation = TipPresentation.Full
-                              Text = text }
+                            return Some guidance
+        }
 
     /// Latest tip guidance text for Main marker (Full or Identity). None when no tip.
-    let latestTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : string option =
-        resolveTipGuidance journal mainOrBloggerSession |> Option.map (fun g -> g.Text)
+    let latestTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : Task<string option> =
+        task {
+            let! guidance = resolveTipGuidance journal mainOrBloggerSession
+            return guidance |> Option.map (fun g -> g.Text)
+        }
 
     /// Backward-compatible alias: same as latestTipGuidance (Full/Identity, not Nudge-only).
-    let latestTipNudge (journal: AgentJournal) (mainOrBloggerSession: SessionId) : string option =
+    let latestTipNudge (journal: AgentJournal) (mainOrBloggerSession: SessionId) : Task<string option> =
         latestTipGuidance journal mainOrBloggerSession

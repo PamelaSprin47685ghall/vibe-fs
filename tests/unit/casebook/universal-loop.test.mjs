@@ -59,13 +59,13 @@ test('G6_G_universal_loop_archive_finalize_fetch', async () => {
       Observations: toList([fileRead('a.txt', contentHash('hello'))]),
       LastAccessOrder: 0,
     }
-    const r1 = resultOf(archive(store, raw, c1))
+    const r1 = resultOf(await archive(store, raw, c1))
     assert.equal(r1.ok, true)
     // same scope second finalize must be refused
-    const second = resultOf(finalize(store, raw, c1))
+    const second = resultOf(await finalize(store, raw, c1))
     assert.equal(second.ok, false)
     // final fetch should still see first case
-    const fetched = resultOf(fetch(store, raw, 10, 'reuse-scope-1'))
+    const fetched = resultOf(await fetch(store, raw, 10, 'reuse-scope-1'))
     assert.equal(fetched.value.A, 'A1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -93,7 +93,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetch(store, raw, 10, sessionId))
+    const fetched = resultOf(await fetch(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.Q, 'Who owns PromptAuthority?')
@@ -108,7 +108,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
 
     // CancelSession-style cleanup never writes (draft already taken by finalize)
     cleanupInspector(sessionId)
-    const still = resultOf(fetch(store, raw, 10, sessionId))
+    const still = resultOf(await fetch(store, raw, 10, sessionId))
     assert.equal(still.value.A, publishedA, 'cleanup must not delete published case')
 
     // worktree drift → Bookkeeper synthesizes again and advances obs
@@ -116,7 +116,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
     const mech = resultOf(await refreshStale(store, raw, dir, sessionId))
     assert.equal(mech.ok, true)
     assert.equal(mech.value, true)
-    const after = resultOf(fetch(store, raw, 10, sessionId))
+    const after = resultOf(await fetch(store, raw, 10, sessionId))
     assert.equal(after.value.Q, CANONICAL_Q)
     assert.equal(after.value.A.includes('evidence:'), false)
     assert.equal(createCalls.length, 2, 'one Bookkeeper child per finalize and refresh')
@@ -128,7 +128,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
   }
 })
 
-test('G6_G_cancel_session_cleanup_no_publication', () => {
+test('G6_G_cancel_session_cleanup_no_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-cancel-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
@@ -144,7 +144,7 @@ test('G6_G_cancel_session_cleanup_no_publication', () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetch(store, raw, 10, sessionId))
+    const fetched = resultOf(await fetch(store, raw, 10, sessionId))
     assert.equal(fetched.value === undefined || fetched.value === null, true)
   } finally {
     setEnabled(undefined)

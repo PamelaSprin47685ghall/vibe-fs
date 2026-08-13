@@ -100,25 +100,24 @@ module OrdinaryTurnWorkflow =
                     error
                     (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
             | ReconcileProgram.TurnCompleted ->
-                let joinOutstanding =
-                    TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
+                task {
+                    let joinOutstanding =
+                        TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
 
-                let wasAborted, terminalValid =
-                    if joinOutstanding then
-                        let aborted = abortedSessions.Contains sessionKey
+                    let! wasAborted, terminalValid =
+                        if joinOutstanding then
+                            let aborted = abortedSessions.Contains sessionKey
+                            abortedSessions.Remove sessionKey |> ignore
+                            Task.FromResult(aborted, false)
+                        else
+                            completeAgent ()
 
-                        abortedSessions.Remove sessionKey |> ignore
-                        aborted, false
-                    else
-                        completeAgent ()
+                    if terminalValid then
+                        AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
 
-                if terminalValid then
-                    AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
-
-                if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                    AsyncSupport.completedTask ()
-                elif joinOutstanding then
-                    task {
+                    if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+                        return ()
+                    elif joinOutstanding then
                         match!
                             HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
                         with
@@ -126,7 +125,7 @@ module OrdinaryTurnWorkflow =
                             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
                             |> ignore
                         | _ -> ()
-                    }
-                    :> Task
-                else
-                    AsyncSupport.completedTask ()
+                    else
+                        ()
+                }
+                :> Task

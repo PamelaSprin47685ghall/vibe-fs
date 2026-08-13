@@ -70,7 +70,7 @@ const mustOk = (result, label = 'result') => {
 
 const openProcessStore = (repoPath) => Process.ProcessGitRawStoreModule_create(repoPath)
 
-const gatewayRunner = (repoPath) => (argsEnv) => {
+const gatewayRunner = (repoPath) => async (argsEnv) => {
   const args = listItems(Array.isArray(argsEnv) ? argsEnv[0] : argsEnv)
   const envOpt = Array.isArray(argsEnv) ? argsEnv[1] : undefined
   const overlay = {}
@@ -132,19 +132,21 @@ const assertUntouched = (label, path, before) => {
   assert.equal(readFileSync(path, 'utf8'), POISON, `${label} content must remain unparsed poison`)
 }
 
-const eventPaths = (raw, rootOid) =>
-  listItems(mustOk(GitRaw.GitRawStore_listEventBlobs(raw, rootOid))).map(([path]) => path).sort()
+const eventPaths = async (raw, rootOid) =>
+  listItems(mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, rootOid))).map(([path]) => path).sort()
 
-const eventBlobTexts = (raw, rootOid) =>
-  listItems(mustOk(GitRaw.GitRawStore_listEventBlobs(raw, rootOid))).map(([, oid]) => {
-    const bytes = raw.ReadObject(oid)
+const eventBlobTexts = async (raw, rootOid) => {
+  const blobs = listItems(mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, rootOid)))
+  return await Promise.all(blobs.map(async ([, oid]) => {
+    const bytes = await raw.ReadObject(oid)
     return Buffer.from(bytes).toString('utf8')
-  })
+  }))
+}
 
-const withWorkspace = (clientNames, body) => {
+const withWorkspace = async (clientNames, body) => {
   const ws = createBareWorkspace(clientNames)
   try {
-    return body(ws)
+    return await body(ws)
   } finally {
     ws.cleanup()
   }
@@ -161,20 +163,20 @@ test('leave_unread_helper_surface_does_not_import_Boot_or_Writer', () => {
   assert.match(source, /dist\/Domain\/EventStore\.js/)
 })
 
-test('EventStore_open_append_leaves_stale_ndjson_and_blobs_unread', () => {
-  withWorkspace(['local'], (ws) => {
+test('EventStore_open_append_leaves_stale_ndjson_and_blobs_unread', async () => {
+  await withWorkspace(['local'], async (ws) => {
     const repo = ws.client('local')
     const planted = plantStaleLegacyRuntime(repo)
 
     const raw = openProcessStore(repo)
     const es = Store.EventStore_create(raw)
 
-    const snap = es.OpenSnapshot()
+    const snap = await es.OpenSnapshot()
     assert.equal(typeof snapshotOid(snap), 'string')
     assert.equal(snapshotOid(snap).length, 40)
 
     const published = mustOk(
-      es.Append(
+      await es.Append(
         snap,
         toList([
           envelope({
@@ -186,12 +188,12 @@ test('EventStore_open_append_leaves_stale_ndjson_and_blobs_unread', () => {
       'append',
     )
 
-    assert.equal(isSome(raw.ReadRef(Persist.StoreRef_canonical)), true)
-    assert.deepEqual(eventPaths(raw, published.RootOid), [
+    assert.equal(isSome(await raw.ReadRef(Persist.StoreRef_canonical)), true)
+    assert.deepEqual(await eventPaths(raw, published.RootOid), [
       'events/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jsonl',
     ])
 
-    for (const text of eventBlobTexts(raw, published.RootOid)) {
+    for (const text of await eventBlobTexts(raw, published.RootOid)) {
       assert.doesNotMatch(text, /LEAVE_UNREAD_POISON_SENTINEL/)
     }
 
@@ -200,16 +202,16 @@ test('EventStore_open_append_leaves_stale_ndjson_and_blobs_unread', () => {
   })
 })
 
-test('EventStore_local_converge_leaves_stale_legacy_runtime_unread', () => {
-  withWorkspace(['writer'], (ws) => {
+test('EventStore_local_converge_leaves_stale_legacy_runtime_unread', async () => {
+  await withWorkspace(['writer'], async (ws) => {
     const repo = ws.client('writer')
     const planted = plantStaleLegacyRuntime(repo)
 
     const raw = openProcessStore(repo)
     const es = Store.EventStore_create(raw)
     const published = mustOk(
-      es.Append(
-        es.OpenSnapshot(),
+      await es.Append(
+        await es.OpenSnapshot(),
         toList([
           envelope({
             id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -223,13 +225,13 @@ test('EventStore_local_converge_leaves_stale_legacy_runtime_unread', () => {
 
     // Local-only converge against the bare origin (no second client): upload path
     // still must not open abandoned Journal/Blob fixtures.
-    mustOk(Gateway.GitGateway_convergeStore(raw, gatewayRunner(repo), 8, 'origin'), 'local converge')
+    mustOk(await Gateway.GitGateway_convergeStore(raw, gatewayRunner(repo), 8, 'origin'), 'local converge')
     assert.equal(readRemoteStoreOid(ws.bare), tip)
 
-    assert.deepEqual(eventPaths(raw, published.RootOid), [
+    assert.deepEqual(await eventPaths(raw, published.RootOid), [
       'events/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jsonl',
     ])
-    for (const text of eventBlobTexts(raw, published.RootOid)) {
+    for (const text of await eventBlobTexts(raw, published.RootOid)) {
       assert.doesNotMatch(text, /LEAVE_UNREAD_POISON_SENTINEL/)
     }
 
@@ -238,8 +240,8 @@ test('EventStore_local_converge_leaves_stale_legacy_runtime_unread', () => {
   })
 })
 
-test('planted_legacy_layout_matches_RuntimePath_convention', () => {
-  withWorkspace(['layout'], (ws) => {
+test('planted_legacy_layout_matches_RuntimePath_convention', async () => {
+  await withWorkspace(['layout'], async (ws) => {
     const repo = ws.client('layout')
     const planted = plantStaleLegacyRuntime(repo)
     const common = gitCommonDir(repo)

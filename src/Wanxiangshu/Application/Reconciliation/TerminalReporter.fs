@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
@@ -21,19 +22,19 @@ module TerminalReporter =
         (journal: AgentJournal option)
         (abortedSessions: HashSet<string>)
         (turn: ReconciledTurn)
-        =
-        let sessionKey = SessionId.value turn.SessionId
-        let wasAborted = abortedSessions.Contains sessionKey
-        abortedSessions.Remove sessionKey |> ignore
-        let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
+        : Task<bool * bool> =
+        task {
+            let sessionKey = SessionId.value turn.SessionId
+            let wasAborted = abortedSessions.Contains sessionKey
+            abortedSessions.Remove sessionKey |> ignore
+            let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
 
-        let terminalValid =
             match turn.Role with
             | None ->
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
                 |> ignore
 
-                false
+                return wasAborted, false
             | Some role ->
                 let runResult: AgentRunResult =
                     { SessionId = turn.SessionId
@@ -45,18 +46,17 @@ module TerminalReporter =
                       TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
                 if runResult.IsValid then
-                    XTraceCapture.captureTerminal journal turn
+                    do! XTraceCapture.captureTerminal journal turn
 
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
 
-                    true
+                    return wasAborted, true
                 else
                     eventPort.NotifyTerminal
                         turn.SessionId
                         (TerminalOutcome.Failed "completed with empty terminal output")
                     |> ignore
 
-                    false
-
-        wasAborted, terminalValid
+                    return wasAborted, false
+        }

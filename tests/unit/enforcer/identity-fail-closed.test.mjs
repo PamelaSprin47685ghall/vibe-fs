@@ -54,8 +54,8 @@ const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('
 const digestForToml = (toml) => sha256Hex(toml)
 
 /** Seed AgentOwnerRoot so the commit/abandon path stays on contract. */
-const seedBloggerAuthority = (journal) => {
-  const root = AgentJournalModule_appendAgent(
+const seedBloggerAuthority = async (journal) => {
+  const root = await AgentJournalModule_appendAgent(
     streamSession(BLOG),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -81,13 +81,13 @@ const seedBloggerAuthority = (journal) => {
  */
 const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-identity-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   const journal = created.journal
   const main = sessionId(MAIN)
   const blog = sessionId(BLOG)
 
-  const link = AgentJournalModule_appendAgent(
+  const link = await AgentJournalModule_appendAgent(
     streamSession(main),
     undefined,
     agentFact('CompanionBloggerLinked', {
@@ -98,7 +98,7 @@ const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
     journal,
   )
   assert.equal(caseOf(link), 'Ok')
-  seedBloggerAuthority(journal)
+  await seedBloggerAuthority(journal)
 
   const scope = parkedTransform.scope()
   const toml = 'work'

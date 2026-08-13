@@ -92,20 +92,27 @@ module HostForkRestart =
         }
 
     /// Clean-break: retired handle whose last cell was a legacy abort → replacement once.
-    let private migrateRetiredIfFalseAbort (journal: AgentJournal) (parentId: SessionId) (record: HandleRecord) : unit =
-        match record.LastCompletion with
-        | None -> ()
-        | Some cell ->
-            match cell.CompletionRef, cell.CompletionDigest with
-            | Some blobRef, Some blobDigest ->
-                match journal.Writer.BlobWriter.Read blobRef with
-                | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
-                    match HandleCompletionCodec.decodeBody body with
-                    | LegacyFalseAbort _ ->
-                        ignore (JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest)
+    let private migrateRetiredIfFalseAbort
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        : Task<unit> =
+        task {
+            match record.LastCompletion with
+            | None -> ()
+            | Some cell ->
+                match cell.CompletionRef, cell.CompletionDigest with
+                | Some blobRef, Some blobDigest ->
+                    match! journal.Writer.BlobWriter.Read blobRef with
+                    | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
+                        match HandleCompletionCodec.decodeBody body with
+                        | LegacyFalseAbort _ ->
+                            let! _ = JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
+                            ()
+                        | _ -> ()
                     | _ -> ()
                 | _ -> ()
-            | _ -> ()
+        }
 
     let private recoveredHandle (agentHandle: AgentHandleId) (child: SessionId) (kind: string) : RecoveredHandle =
         { Handle = agentHandle
@@ -184,7 +191,7 @@ module HostForkRestart =
                 | HandleLifecycle.Abandoned _, None
                 | _, None -> ()
                 | HandleLifecycle.Retired, Some agentHandle ->
-                    migrateRetiredIfFalseAbort journal parentId record
+                    do! migrateRetiredIfFalseAbort journal parentId record
                     recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
                 | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
                     let agentId = AgentHandleId.value agentHandle
@@ -195,7 +202,7 @@ module HostForkRestart =
                     runtime.Restore(agentId, role, record.TargetAgent)
                     runtime.BindChildSession(agentId, record.ChildSessionId)
 
-                    match HandleCompletionCodec.tryReadBody journal record with
+                    match! HandleCompletionCodec.tryReadBody journal record with
                     | Ok(Some body, Some blobRef, Some blobDigest) ->
                         match HandleCompletionCodec.decodeBody body with
                         | Current decoded ->
@@ -207,7 +214,7 @@ module HostForkRestart =
                             runtime.PulseAgentHandle agentHandle
                             recovered.Add(recoveredHandle agentHandle record.ChildSessionId "terminal")
                         | LegacyFalseAbort _ ->
-                            match
+                            match!
                                 AgentJournal.appendAgent
                                     (StreamId.Session parentId)
                                     None

@@ -108,7 +108,7 @@ module ProviderRecoveryWorkflow =
             match journal with
             | None -> fail error
             | Some durable ->
-                match
+                match!
                     FallbackLedger.recordConfirmedFailure
                         durable
                         AgentPairCursor.DefaultAutoRecoveryBudget

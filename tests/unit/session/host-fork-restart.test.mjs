@@ -38,7 +38,7 @@ const CHILD = sessionId('ses_child_1')
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-restart-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     return await fn(created.journal)
@@ -48,8 +48,8 @@ const withJournal = async (fn) => {
 }
 
 /** Production link entry with explicit ownership (the domain.mjs facade bind is stale). */
-const linkDurable = (j, agentId, child, targetAgent = 'fast-coder', ownership = HandleOwnership.DurableParentHandle) => {
-  const result = HandleController_link(
+const linkDurable = async (j, agentId, child, targetAgent = 'fast-coder', ownership = HandleOwnership.DurableParentHandle) => {
+  const result = await HandleController_link(
     j,
     PARENT,
     agentId,
@@ -62,7 +62,7 @@ const linkDurable = (j, agentId, child, targetAgent = 'fast-coder', ownership = 
 }
 
 /** Durable Terminal completion with a blob (Current wire). */
-const completeTerminal = (j, agentId, child) => {
+const completeTerminal = async (j, agentId, child) => {
   const sealed = agentCompletion.completedRun({
     runId: `run-${agentId}`,
     agentId,
@@ -70,7 +70,7 @@ const completeTerminal = (j, agentId, child) => {
     workRecord: 'work-record',
   })
   const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-  const completed = handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, child)
+  const completed = await handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, child)
   assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 }
 
@@ -102,8 +102,8 @@ test('HFR_restart_empty_journal_yields_no_linked_handles', async () => {
 
 test('HFR_restart_abandoned_handle_recovered_abandoned', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'ab1', CHILD, 'abandon-agent')
-    const abandoned = handleController.recordAbandon(j, PARENT, 'ab1', 'DeadlineExceeded')
+    await linkDurable(j, 'ab1', CHILD, 'abandon-agent')
+    const abandoned = await handleController.recordAbandon(j, PARENT, 'ab1', 'DeadlineExceeded')
     assert.equal(abandoned.ok, true, abandoned.ok ? '' : abandoned.error)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
@@ -117,13 +117,13 @@ test('HFR_restart_abandoned_handle_recovered_abandoned', async () => {
 
 test('HFR_restart_retired_handle_recovered_retired', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'rt1', CHILD, 'retire-agent')
-    completeTerminal(j, 'rt1', CHILD)
+    await linkDurable(j, 'rt1', CHILD, 'retire-agent')
+    await completeTerminal(j, 'rt1', CHILD)
     // Retire via the production CAS consume path.
     const projection = agentJournal.handleProjection(j, PARENT)
     const record = handleProjection.tryFind(handleId.agent('rt1'), projection)
     assert.ok(record, 'handle must be joinable')
-    const consumed = handleController.consume(j, PARENT, handleId.agent('rt1'))
+    const consumed = await handleController.consume(j, PARENT, handleId.agent('rt1'))
     assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
@@ -136,7 +136,7 @@ test('HFR_restart_retired_handle_recovered_retired', async () => {
 
 test('HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'hidden1', CHILD, 'fast-reviewer', HandleOwnership.HostOwnedHidden)
+    await linkDurable(j, 'hidden1', CHILD, 'fast-reviewer', HandleOwnership.HostOwnedHidden)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     assert.equal(caseOf(result), 'NoLinkedHandles', 'host-owned handles must not re-enter the parent runtime')
@@ -147,8 +147,8 @@ test('HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
 
 test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'term1', CHILD, 'deep-coder')
-    completeTerminal(j, 'term1', CHILD)
+    await linkDurable(j, 'term1', CHILD, 'deep-coder')
+    await completeTerminal(j, 'term1', CHILD)
 
     const live = runtimeAndChildren()
     const result = await walk(j, live, undefined, () => 'dir-term1')
@@ -169,7 +169,7 @@ test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () =>
 
 test('HFR_restart_active_handle_recovers_active', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'act1', CHILD, 'fast-coder')
+    await linkDurable(j, 'act1', CHILD, 'fast-coder')
 
     const live = runtimeAndChildren()
     const result = await walk(j, live)
@@ -186,7 +186,7 @@ test('HFR_restart_active_handle_recovers_active', async () => {
 
 test('HFR_restart_active_with_terminal_snapshot_recovered_terminal', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'snap1', CHILD, 'fast-coder')
+    await linkDurable(j, 'snap1', CHILD, 'fast-coder')
 
     // Snapshot port shows a finished assistant turn followed by a user message:
     // ChildRecoveryWorkflow proves terminality from the transcript and commits
@@ -211,11 +211,11 @@ test('HFR_restart_active_with_terminal_snapshot_recovered_terminal', async () =>
 
 test('HFR_restart_multiple_children_recovered_in_link_order', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'a-first', sessionId('ses_a'), 'alpha')
-    linkDurable(j, 'b-second', sessionId('ses_b'), 'beta')
-    linkDurable(j, 'c-third', sessionId('ses_c'), 'gamma')
-    completeTerminal(j, 'b-second', sessionId('ses_b'))
-    handleController.recordAbandon(j, PARENT, 'c-third', 'ParentCancelled')
+    await linkDurable(j, 'a-first', sessionId('ses_a'), 'alpha')
+    await linkDurable(j, 'b-second', sessionId('ses_b'), 'beta')
+    await linkDurable(j, 'c-third', sessionId('ses_c'), 'gamma')
+    await completeTerminal(j, 'b-second', sessionId('ses_b'))
+    await handleController.recordAbandon(j, PARENT, 'c-third', 'ParentCancelled')
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     const recovered = recoveredOf(result)
@@ -244,15 +244,15 @@ const INVALID_BODY = JSON.stringify({
   run_id: 'run-invalid',
 })
 
-const recordBlob = (j, agentId, body) => {
-  const recorded = handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, CHILD)
+const recordBlob = async (j, agentId, body) => {
+  const recorded = await handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, CHILD)
   assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
 }
 
 test('HFR_restart_legacy_false_abort_waits_with_rejection_fact', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'legacy1', CHILD, 'fast-coder')
-    recordBlob(j, 'legacy1', LEGACY_ABORT_BODY('legacy1'))
+    await linkDurable(j, 'legacy1', CHILD, 'fast-coder')
+    await recordBlob(j, 'legacy1', LEGACY_ABORT_BODY('legacy1'))
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     assert.equal(caseOf(result), 'HandlesWaiting')
@@ -270,9 +270,9 @@ test('HFR_restart_legacy_false_abort_waits_with_rejection_fact', async () => {
 
 test('HFR_restart_retired_legacy_false_abort_migrates_replacement_once', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'legacy2', CHILD, 'fast-coder')
-    recordBlob(j, 'legacy2', LEGACY_ABORT_BODY('legacy2'))
-    const consumed = handleController.consume(j, PARENT, handleId.agent('legacy2'))
+    await linkDurable(j, 'legacy2', CHILD, 'fast-coder')
+    await recordBlob(j, 'legacy2', LEGACY_ABORT_BODY('legacy2'))
+    const consumed = await handleController.consume(j, PARENT, handleId.agent('legacy2'))
     assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
@@ -300,8 +300,8 @@ test('HFR_restart_retired_legacy_false_abort_migrates_replacement_once', async (
 
 test('HFR_restart_invalid_completion_blob_waits', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'bad1', CHILD, 'fast-coder')
-    recordBlob(j, 'bad1', INVALID_BODY)
+    await linkDurable(j, 'bad1', CHILD, 'fast-coder')
+    await recordBlob(j, 'bad1', INVALID_BODY)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     assert.equal(caseOf(result), 'HandlesWaiting')
@@ -317,7 +317,7 @@ test('HFR_restart_invalid_completion_blob_waits', async () => {
 
 test('HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', async () => {
   await withJournal(async (j) => {
-    linkDurable(j, 'unreadable1', CHILD, 'fast-coder')
+    await linkDurable(j, 'unreadable1', CHILD, 'fast-coder')
     const snapshot = reconcileSupervisor.createSnapshot([{ ok: false, error: 'transcript vanished' }])
 
     const result = await restoreLinkedChildrenWithoutRuntime(snapshot, j, PARENT)
@@ -330,11 +330,11 @@ test('HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', 
 
 test('HFR_restart_recovery_commit_failure_blocks', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-restart-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true)
   const j = created.journal
   try {
-    linkDurable(j, 'blocked1', CHILD, 'fast-coder')
+    await linkDurable(j, 'blocked1', CHILD, 'fast-coder')
     // A terminal snapshot proves the child finished; the commit then fails
     // against a journal whose writer is gone → hard block, not a silent wait.
     created.dispose()

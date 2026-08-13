@@ -162,7 +162,7 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
 
     const storeModule = await import('../../../dist/Infrastructure/JsToolsTransactionStore.js')
-    const events = resultOf(storeModule.loadEvents(raw, store.OpenSnapshot()))
+    const events = resultOf(await storeModule.loadEvents(raw, await store.OpenSnapshot()))
     assert.equal(events.ok, true)
     assert.deepEqual(listItems(events.value).map((e) => e.EventType).sort(), ['JsTransactionCommitted', 'JsTransactionPrepared'])
     assert.deepEqual(listItems(storeModule.scanUncommitted(events.value)), [], 'no uncommitted after commit fact')

@@ -99,9 +99,9 @@ const fakeSessions = (behaviour = {}) => {
 }
 
 /** { scope, runtime, sessions, journal, cleanup } — real runtime, fake host. */
-const liveScope = (behaviour = {}) => {
+const liveScope = async (behaviour = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-forktool-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
 
   const sessions = fakeSessions(behaviour)
@@ -192,7 +192,7 @@ test('FORK_name_without_calling_is_continuation_only', async () => {
 })
 
 test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   live.scope.disposed = true
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Ada', 'do work', { calling: 'coder' })
@@ -218,7 +218,7 @@ test('FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
 
 test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const text = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
 
@@ -232,7 +232,7 @@ test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
 })
 
 test('FORK_create_session_failure_surfaces_only_public_consequence', async () => {
-  const live = liveScope({ createError: 'host refused the fork' })
+  const live = await liveScope({ createError: 'host refused the fork' })
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
   assert.match(result, /The charge could not be placed/)
@@ -241,7 +241,7 @@ test('FORK_create_session_failure_surfaces_only_public_consequence', async () =>
 })
 
 test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Nobody Here', 'do work')
   assert.match(result, /No continuing person is known by that name/)
@@ -252,7 +252,7 @@ test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
 // ── reuse path: create by calling, continue by Byname ───────────────────────
 
 test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
   const createdText = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
@@ -267,7 +267,7 @@ test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
 })
 
 test('FORK_engineer_continuation_keeps_deep_coder', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
   assert.match(await runManager(spec, 'Ada', 'implement the feature', { calling: 'engineer' }), /Ada carries/)
@@ -291,7 +291,7 @@ test('FORK_engineer_continuation_keeps_deep_coder', async () => {
 })
 
 test('FORK_same_byname_cannot_be_reborn_with_a_new_calling', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
   assert.match(await runManager(spec, 'Ada', 'first charge', { calling: 'coder' }), /Ada carries/)
@@ -344,9 +344,9 @@ const fakeManagerPort = (calls) => ({
 })
 
 /** Real OrchestratorHost + seeded real engine; journal is a real AgentJournal. */
-const liveOrchestrator = () => {
+const liveOrchestrator = async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-orchtool-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
 
   const managerCalls = []
@@ -356,8 +356,8 @@ const liveOrchestrator = () => {
     '/repo',
     targetRef('main'),
     {
-      AppendFact: (streamId, factValue) => {
-        const appended = agentJournal.appendAgent(streamId, undefined, factValue, opened.journal)
+      AppendFact: async (streamId, factValue) => {
+        const appended = await agentJournal.appendAgent(streamId, undefined, factValue, opened.journal)
         return appended.ok ? { tag: 0, fields: [appended.value] } : { tag: 1, fields: ['append failed'] }
       },
       Snapshot: () => agentJournal.snapshot(opened.journal),
@@ -376,8 +376,8 @@ const liveOrchestrator = () => {
     () => {},
     '/repo',
     '',
-    () => undefined,
-    () => undefined,
+    async () => undefined,
+    async () => undefined,
   )
   const host = new OrchestratorHost(deps, makeSessionId('ses_fork'))
   host.engineInstance = engine
@@ -399,7 +399,7 @@ const liveOrchestrator = () => {
 }
 
 test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byname', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
   const text = await spec.Execute(
@@ -423,7 +423,7 @@ test('FORK_orchestrator_rejects_unknown_calling_without_binding_names', async ()
 })
 
 test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
   const forkedText = await spec.Execute(
@@ -438,7 +438,7 @@ test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
 })
 
 test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
   const result = await spec.Execute(makeArgs({ name: 'Unknown Road', charge: 'nobody home' }), context())
   assert.match(result, /No continuing road is known by that name/)
@@ -458,7 +458,7 @@ test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', 
 })
 
 test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', async () => {
-  const live = liveOrchestrator()
+  const live = await liveOrchestrator()
   live.engine.git.IsDirty = async () => true
   const spec = orchestratorSpec(factory, live.scope)
   const result = await spec.Execute(
@@ -480,7 +480,7 @@ test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', 
 })
 
 test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
-  const live = liveScope()
+  const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Web Road', 'browse', { calling: 'navigator', keywords: 'repository clue' })
   assert.match(result, /only available when fork targets Coder, Inspector, or DevOps/)

@@ -31,8 +31,8 @@ const capturingPort = (sends) => ({
   },
 })
 
-const seedDeepRoot = (journal, sid) => {
-  const result = agentJournal.appendAgent(
+const seedDeepRoot = async (journal, sid) => {
+  const result = await agentJournal.appendAgent(
     stream.session(sid),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -50,8 +50,8 @@ const seedDeepRoot = (journal, sid) => {
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
 }
 
-const advanceToPeer = (journal, sid) => {
-  const first = agentJournal.appendAgent(
+const advanceToPeer = async (journal, sid) => {
+  const first = await agentJournal.appendAgent(
     stream.session(sid),
     providerRun('asst-fail-1'),
     agentFact('FallbackCursorAdvanced', {
@@ -68,7 +68,7 @@ const advanceToPeer = (journal, sid) => {
   )
   assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
 
-  const second = agentJournal.appendAgent(
+  const second = await agentJournal.appendAgent(
     stream.session(sid),
     providerRun('asst-fail-2'),
     agentFact('FallbackCursorAdvanced', {
@@ -88,12 +88,12 @@ const advanceToPeer = (journal, sid) => {
 
 const withChild = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-busy-nudge-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   try {
     const parent = sessionId('ses_parent')
     const child = sessionId('ses_child')
-    seedDeepRoot(opened.journal, child)
+    await seedDeepRoot(opened.journal, child)
     await fn({ journal: opened.journal, parent, child })
   } finally {
     opened.dispose()
@@ -103,7 +103,7 @@ const withChild = async (fn) => {
 
 test('BUSY_NUDGE_keeps_deep_handle_when_fallback_cursor_is_on_fast_peer', async () => {
   await withChild(async ({ journal, parent, child }) => {
-    advanceToPeer(journal, child)
+    await advanceToPeer(journal, child)
     const sends = []
     const sent = resultOf(
       await send(
@@ -126,7 +126,7 @@ test('BUSY_NUDGE_keeps_deep_handle_when_fallback_cursor_is_on_fast_peer', async 
 
 test('BUSY_NUDGE_empty_agent_keeps_selected_deep_not_peer', async () => {
   await withChild(async ({ journal, parent, child }) => {
-    advanceToPeer(journal, child)
+    await advanceToPeer(journal, child)
     const sends = []
     const sent = resultOf(
       await send(capturingPort(sends), parent, journal, child, roles.of('Coder'), '', undefined, 'please continue'),

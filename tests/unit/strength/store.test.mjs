@@ -52,11 +52,11 @@ test('STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () 
   assert.deepEqual(listItems(decoded.value.fields[0].MaterialPayloads).map(DomainStore.PayloadRefModule_value), ['oid-a'])
 })
 
-test('STRENGTH_006_same_decision_different_prepared_material_is_store_identity_collision', () => {
+test('STRENGTH_006_same_decision_different_prepared_material_is_store_identity_collision', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
-  const firstRef = StrengthStore.storePayload(raw, new TextEncoder().encode('first'))
-  const secondRef = StrengthStore.storePayload(raw, new TextEncoder().encode('second'))
+  const firstRef = await StrengthStore.storePayload(raw, new TextEncoder().encode('first'))
+  const secondRef = await StrengthStore.storePayload(raw, new TextEncoder().encode('second'))
 
   const first = Events.StrengthEvents_prepared(
     session('owner'), decision('d1'), run('run-1'), session('replica'),
@@ -67,42 +67,42 @@ test('STRENGTH_006_same_decision_different_prepared_material_is_store_identity_c
     StrengthBudget.K1, 'anchor-a', 'frame-b', 6, toList([secondRef]),
   )
 
-  assert.equal(resultOf(StrengthStore.append(store, H, first)).ok, true)
-  const rejected = resultOf(StrengthStore.append(store, H, conflict))
+  assert.equal(resultOf(await StrengthStore.append(store, H, first)).ok, true)
+  const rejected = resultOf(await StrengthStore.append(store, H, conflict))
   assert.equal(rejected.ok, false)
   assert.equal(caseOf(rejected.error), 'StorageInvalid')
   assert.equal(caseOf(rejected.error.fields[0]), 'IdentityCollision')
 })
 
-test('STRENGTH_007_promotion_without_prepared_is_store_missing_parent', () => {
+test('STRENGTH_007_promotion_without_prepared_is_store_missing_parent', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
-  const frameRef = StrengthStore.storePayload(raw, new TextEncoder().encode('frame'))
+  const frameRef = await StrengthStore.storePayload(raw, new TextEncoder().encode('frame'))
   const promotion = Events.StrengthEvents_promoted(
     session('owner'), decision('d1'), run('run-1'), 'frame-a', toList([frameRef]),
   )
 
-  const rejected = resultOf(StrengthStore.append(store, H, promotion))
+  const rejected = resultOf(await StrengthStore.append(store, H, promotion))
   assert.equal(rejected.ok, false)
   assert.equal(caseOf(rejected.error), 'StorageInvalid')
   assert.equal(caseOf(rejected.error.fields[0]), 'MissingParent')
 })
 
-test('STRENGTH_006_payload_bytes_use_the_unified_raw_object_store', () => {
+test('STRENGTH_006_payload_bytes_use_the_unified_raw_object_store', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const bytes = new Uint8Array([1, 2, 3, 4])
-  const first = StrengthStore.storePayload(raw, bytes)
-  const second = StrengthStore.storePayload(raw, bytes)
+  const first = await StrengthStore.storePayload(raw, bytes)
+  const second = await StrengthStore.storePayload(raw, bytes)
   assert.equal(DomainStore.PayloadRefModule_value(first), DomainStore.PayloadRefModule_value(second))
 
-  const loaded = StrengthStore.tryReadPayload(raw, first)
+  const loaded = await StrengthStore.tryReadPayload(raw, first)
   assert.deepEqual([...loaded], [...bytes])
 })
 
-test('STRENGTH_006_007_008_eventstore_roundtrip_rebuilds_projection', () => {
+test('STRENGTH_006_007_008_eventstore_roundtrip_rebuilds_projection', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
-  const frameRef = StrengthStore.storePayload(raw, new TextEncoder().encode('frame-material'))
+  const frameRef = await StrengthStore.storePayload(raw, new TextEncoder().encode('frame-material'))
   const p = Events.StrengthEvents_prepared(
     session('owner'), decision('d1'), run('run-1'), session('replica'),
     StrengthBudget.K1, 'anchor-a', 'frame-a', 14, toList([frameRef]),
@@ -110,14 +110,14 @@ test('STRENGTH_006_007_008_eventstore_roundtrip_rebuilds_projection', () => {
   const m = Events.StrengthEvents_promoted(session('owner'), decision('d1'), run('run-1'), 'frame-a', toList([frameRef]))
   const t = Events.StrengthEvents_traced(decision('d1'), 10n, 12n)
 
-  let appended = resultOf(StrengthStore.append(store, H, p))
+  let appended = resultOf(await StrengthStore.append(store, H, p))
   assert.equal(appended.ok, true)
-  appended = resultOf(StrengthStore.append(store, H, m))
+  appended = resultOf(await StrengthStore.append(store, H, m))
   assert.equal(appended.ok, true)
-  appended = resultOf(StrengthStore.append(store, H, t))
+  appended = resultOf(await StrengthStore.append(store, H, t))
   assert.equal(appended.ok, true)
 
-  const projection = resultOf(StrengthStore.loadProjection(raw, appended.value))
+  const projection = resultOf(await StrengthStore.loadProjection(raw, appended.value))
   assert.equal(projection.ok, true)
   assert.equal(StrengthStore.isPromoted(decision('d1'), projection.value), true)
   const range = StrengthStore.tryTraceRange(decision('d1'), projection.value)

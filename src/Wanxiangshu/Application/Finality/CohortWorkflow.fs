@@ -188,19 +188,20 @@ module CohortWorkflow =
                         | Error error -> return Error error
                         | Ok prepared ->
                             if existingMember.IsNone then
-                                FinalityJournal.appendLifecycle
-                                    journal
-                                    (ManagerLifecycleFact.FinalityReviewerEnlisted
-                                        {| SessionId = managerSessionId
-                                           LifeId = life.LifeId
-                                           RequestId = request.RequestId
-                                           ReviewerSessionId = prepared.ReviewerSessionId
-                                           ReviewerOrdinal = slot.ReviewerOrdinal
-                                           BarrierId = barrierId
-                                           GitTreeHash = request.GitTreeHash
-                                           IsNewReviewer = prepared.IsNew |})
+                                do!
+                                    FinalityJournal.appendLifecycle
+                                        journal
+                                        (ManagerLifecycleFact.FinalityReviewerEnlisted
+                                            {| SessionId = managerSessionId
+                                               LifeId = life.LifeId
+                                               RequestId = request.RequestId
+                                               ReviewerSessionId = prepared.ReviewerSessionId
+                                               ReviewerOrdinal = slot.ReviewerOrdinal
+                                               BarrierId = barrierId
+                                               GitTreeHash = request.GitTreeHash
+                                               IsNewReviewer = prepared.IsNew |})
 
-                            match
+                            match!
                                 ReviewBarrier.openBarrier
                                     (Some journal)
                                     managerSessionId

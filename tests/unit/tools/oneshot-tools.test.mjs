@@ -108,9 +108,9 @@ const waitForPrompt = async (sessions) => {
 
 /** { scope, sessions, journal, cleanup } — real journal + fake host.
  *  `childWorkRecord` / `parentWorkRecord` may be a string or `(sessionId) => string|undefined`. */
-const liveScope = ({ sessions = fakeSessions(), parentWorkRecord, childWorkRecord, directories } = {}) => {
+const liveScope = async ({ sessions = fakeSessions(), parentWorkRecord, childWorkRecord, directories } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-oneshot-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
 
   const scope = new ToolRuntimeScope(
@@ -124,14 +124,12 @@ const liveScope = ({ sessions = fakeSessions(), parentWorkRecord, childWorkRecor
     directories ?? new Map(),
     undefined,
     parentWorkRecord
-      ? typeof parentWorkRecord === 'function'
-        ? parentWorkRecord
-        : () => parentWorkRecord
+      ? async (sessionId) =>
+          typeof parentWorkRecord === 'function' ? await parentWorkRecord(sessionId) : parentWorkRecord
       : undefined,
     childWorkRecord
-      ? typeof childWorkRecord === 'function'
-        ? childWorkRecord
-        : () => childWorkRecord
+      ? async (sessionId) =>
+          typeof childWorkRecord === 'function' ? await childWorkRecord(sessionId) : childWorkRecord
       : undefined,
     undefined,
     undefined,
@@ -193,7 +191,7 @@ test('ONESHOT_missing_prompt_is_refused_before_spawn', async () => {
 })
 
 test('ONESHOT_create_session_failure_surfaces_host_error', async () => {
-  const live = liveScope({ sessions: fakeSessions({ createError: 'host refused' }) })
+  const live = await liveScope({ sessions: fakeSessions({ createError: 'host refused' }) })
   try {
     const settled = resultOf(await runOneShot(live.scope, context(), 'fast-coder', 'work'))
     assert.equal(settled.ok, false)
@@ -207,7 +205,7 @@ test('ONESHOT_create_session_failure_surfaces_host_error', async () => {
 
 test('ONESHOT_success_reports_outcome_and_disposes_the_child', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions, childWorkRecord: SAMPLE_LWR })
+  const live = await liveScope({ sessions, childWorkRecord: SAMPLE_LWR })
 
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'implement it')
@@ -241,7 +239,7 @@ test('ONESHOT_completed_without_lifecycle_work_record_fails_closed', async () =>
   // EXEC-028: Completed with formal text but missing LWR must not soft-omit to
   // formal-only Ok — surface as Result.Error.
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const live = await liveScope({ sessions })
 
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'work')
@@ -261,7 +259,7 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
   // Stubbed childWorkRecord strings cannot catch that production break.
   const sessions = fakeSessions()
   let journal
-  const live = liveScope({
+  const live = await liveScope({
     sessions,
     childWorkRecord: (sid) => lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, sessionId(sid), false),
   })
@@ -272,7 +270,7 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
     await waitForPrompt(sessions)
     // Immediate openingEnd skips the first XTrace part (the user charge).
     // The assistant answer must be a later part or Recent work is empty.
-    xTraceCapture.captureProjection(
+    await xTraceCapture.captureProjection(
       journal,
       sessionId('child-1'),
       xTraceCapture.semantic({
@@ -303,7 +301,7 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
 test('ONESHOT_parent_work_record_lands_in_the_digest_field', async () => {
   const sessions = fakeSessions()
   const parentBody = 'the parent background record'
-  const live = liveScope({ sessions, parentWorkRecord: parentBody, childWorkRecord: 'child LWR body' })
+  const live = await liveScope({ sessions, parentWorkRecord: parentBody, childWorkRecord: 'child LWR body' })
 
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'work')
@@ -320,7 +318,7 @@ test('ONESHOT_parent_work_record_lands_in_the_digest_field', async () => {
 
 test('ONESHOT_child_inherits_the_parent_directory', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({
+  const live = await liveScope({
     sessions,
     childWorkRecord: SAMPLE_LWR,
     directories: new Map([['ses-call', '/tmp']]),
@@ -357,7 +355,7 @@ test('ONESHOT_send_failure_is_reported_as_output_not_thrown', async () => {
 
 test('ONESHOT_aborted_terminal_surfaces_an_error', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const live = await liveScope({ sessions })
 
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'work')
@@ -372,7 +370,7 @@ test('ONESHOT_aborted_terminal_surfaces_an_error', async () => {
 
 test('ONESHOT_failed_terminal_surfaces_an_error', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const live = await liveScope({ sessions })
 
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'work')
@@ -387,7 +385,7 @@ test('ONESHOT_failed_terminal_surfaces_an_error', async () => {
 
 test('ONESHOT_parent_abort_completes_as_cancelled_and_aborts_the_child', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const live = await liveScope({ sessions })
 
   try {
     let cancelParent

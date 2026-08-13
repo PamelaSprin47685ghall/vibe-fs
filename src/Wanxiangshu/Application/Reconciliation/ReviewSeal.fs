@@ -105,24 +105,26 @@ module ReviewSeal =
         (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        : Result<unit, SealBindFailure> =
-        let key = SessionId.value sessionId
+        : Task<Result<unit, SealBindFailure>> =
+        task {
+            let key = SessionId.value sessionId
 
-        match pendingSeals.TryGetValue key with
-        | false, _ -> Error NoPendingSeal
-        | true, pending ->
-            let fact =
-                ReviewFact.ProviderInputSealed
-                    {| SessionId = pending.SessionId
-                       ProviderRun = providerRun
-                       PhysicalUserMessageId = pending.PhysicalUserMessageId
-                       SealDigest = pending.SealDigest
-                       CanonicalVersion = pending.CanonicalVersion
-                       IncludedToolResultDigests = pending.IncludedToolResultDigests |}
+            match pendingSeals.TryGetValue key with
+            | false, _ -> return Error NoPendingSeal
+            | true, pending ->
+                let fact =
+                    ReviewFact.ProviderInputSealed
+                        {| SessionId = pending.SessionId
+                           ProviderRun = providerRun
+                           PhysicalUserMessageId = pending.PhysicalUserMessageId
+                           SealDigest = pending.SealDigest
+                           CanonicalVersion = pending.CanonicalVersion
+                           IncludedToolResultDigests = pending.IncludedToolResultDigests |}
 
-            match AgentJournal.appendAgent (StreamId.Session pending.SessionId) (Some providerRun) fact journal with
-            | Ok _ -> Ok()
-            | Error failure -> Error(AppendFailed(JournalAppendFailure.describe failure))
+                match! AgentJournal.appendAgent (StreamId.Session pending.SessionId) (Some providerRun) fact journal with
+                | Ok _ -> return Ok()
+                | Error failure -> return Error(AppendFailed(JournalAppendFailure.describe failure))
+        }
 
     /// Seal at the `messages.transform` boundary.
     ///

@@ -120,7 +120,7 @@ const fallbackState = (journal, session) => {
 
 const withHarness = async (selectedAgent, fn) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-assistance-'))
-  const opened = agentJournal.create({ directory, runtime: `rt_${selectedAgent}` })
+  const opened = await agentJournal.create({ directory, runtime: `rt_${selectedAgent}` })
   assert.equal(opened.ok, true, opened.ok ? '' : opened.error)
   const journal = opened.journal
   const dispatcher = forJournal(journal)
@@ -128,10 +128,10 @@ const withHarness = async (selectedAgent, fn) => {
   const root = 'msg_root'
   providerLanguage.clearAllForTests()
   assert.equal(providerLanguage.bindOnce(sessionId(owner), providerLanguage.simplifiedChinese).ok, true)
-  const accepted = Runtime__AcceptHumanRoot(dispatcher, sessionId(owner), physicalUser(root), selectedAgent)
+  const accepted = await Runtime__AcceptHumanRoot(dispatcher, sessionId(owner), physicalUser(root), selectedAgent)
   assert.equal(accepted.tag, 0, accepted.fields?.[0])
 
-  captureOpening(journal, sessionId(owner), `original ${selectedAgent} charge`, toList([]))
+  await captureOpening(journal, sessionId(owner), `original ${selectedAgent} charge`, toList([]))
 
   let seq = 0
   const sends = []

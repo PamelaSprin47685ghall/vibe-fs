@@ -65,7 +65,7 @@ let activeJournal
 
 const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-ce-'))
-  const opened = agentJournal.create({ directory: base })
+  const opened = await agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   activeJournal = opened.journal
 

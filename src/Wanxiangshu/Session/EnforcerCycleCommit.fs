@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -40,133 +41,147 @@ module EnforcerCycleCommit =
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.MergedCycle)
         (declared: BloggerMainRequestContext option)
-        : CycleCommitOutcome =
-        let projections = AgentJournal.snapshot journal
+        : Task<CycleCommitOutcome> =
+        task {
+            let projections = AgentJournal.snapshot journal
 
-        let already =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun session -> session.Enforcement)
-            |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
-            |> Option.flatten
+            let already =
+                projections.AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun session -> session.Enforcement)
+                |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
+                |> Option.flatten
 
-        // CommitUnknown reconcile: receipt already present → treat as KnownCommitted.
-        match already with
-        | Some _ -> CycleCommitOutcome.KnownCommitted
-        | None ->
-            match declared with
-            | None -> CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
-            | Some coverage ->
-                // PERSIST-010 precheck (writer-side CAS): fold rejects IngestCursorMismatch
-                // only AFTER the line is durable, which poisons the journal. Staged
-                // PreviousIngestedThroughSequence is frozen at materialization; concurrent
-                // commit / crash-resume may advance coverage first. Refuse before append so
-                // failure is KnownNotCommitted (recoverable abandon), never FactRejected.
-                let liveBlog =
-                    projections.AgentProjections.Sessions
-                    |> Map.tryFind mainSessionId
-                    |> Option.bind (fun session -> session.Blog)
-                    |> Option.defaultValue BlogProjection.empty
+            // CommitUnknown reconcile: receipt already present → treat as KnownCommitted.
+            match already with
+            | Some _ -> return CycleCommitOutcome.KnownCommitted
+            | None ->
+                match declared with
+                | None ->
+                    return
+                        CycleCommitOutcome.KnownNotCommitted
+                            "blog cycle has no staged coverage context (ENFORCER-045)"
+                | Some coverage ->
+                    // PERSIST-010 precheck (writer-side CAS): fold rejects IngestCursorMismatch
+                    // only AFTER the line is durable, which poisons the journal. Staged
+                    // PreviousIngestedThroughSequence is frozen at materialization; concurrent
+                    // commit / crash-resume may advance coverage first. Refuse before append so
+                    // failure is KnownNotCommitted (recoverable abandon), never FactRejected.
+                    let liveBlog =
+                        projections.AgentProjections.Sessions
+                        |> Map.tryFind mainSessionId
+                        |> Option.bind (fun session -> session.Blog)
+                        |> Option.defaultValue BlogProjection.empty
 
-                let liveIngest = liveBlog.Coverage.IngestedThroughSequence
-                let liveCutoff = liveBlog.Coverage.CoverableTurnCutoffExclusive
-                let liveFrameEpoch = liveBlog.FrameEpochId
+                    let liveIngest = liveBlog.Coverage.IngestedThroughSequence
+                    let liveCutoff = liveBlog.Coverage.CoverableTurnCutoffExclusive
+                    let liveFrameEpoch = liveBlog.FrameEpochId
 
-                if coverage.PreviousIngestedThroughSequence <> liveIngest then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged previous ingest cursor %d disagrees with projection %d (PERSIST-010 precheck)"
-                            coverage.PreviousIngestedThroughSequence
-                            liveIngest
-                    )
-                elif coverage.PreviousCoverableTurnCutoffExclusive <> liveCutoff then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged previous coverable cutoff %d disagrees with projection %d (PERSIST-010 precheck)"
-                            coverage.PreviousCoverableTurnCutoffExclusive
-                            liveCutoff
-                    )
-                elif coverage.FrameEpochId <> liveFrameEpoch then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged frame epoch %d disagrees with projection %d (PERSIST-010 precheck)"
-                            (FrameEpochId.value coverage.FrameEpochId)
-                            (FrameEpochId.value liveFrameEpoch)
-                    )
-                elif coverage.NextIngestedThroughSequence <= coverage.PreviousIngestedThroughSequence then
-                    CycleCommitOutcome.KnownNotCommitted "coverage did not advance"
-                else
-                    // C5: use epoch frozen at request materialization, never live PrefixEpoch.
-                    let epoch = coverage.ObservedPrefixEpochId
+                    if coverage.PreviousIngestedThroughSequence <> liveIngest then
+                        return
+                            CycleCommitOutcome.KnownNotCommitted(
+                                sprintf
+                                    "staged previous ingest cursor %d disagrees with projection %d (PERSIST-010 precheck)"
+                                    coverage.PreviousIngestedThroughSequence
+                                    liveIngest
+                            )
+                    elif coverage.PreviousCoverableTurnCutoffExclusive <> liveCutoff then
+                        return
+                            CycleCommitOutcome.KnownNotCommitted(
+                                sprintf
+                                    "staged previous coverable cutoff %d disagrees with projection %d (PERSIST-010 precheck)"
+                                    coverage.PreviousCoverableTurnCutoffExclusive
+                                    liveCutoff
+                            )
+                    elif coverage.FrameEpochId <> liveFrameEpoch then
+                        return
+                            CycleCommitOutcome.KnownNotCommitted(
+                                sprintf
+                                    "staged frame epoch %d disagrees with projection %d (PERSIST-010 precheck)"
+                                    (FrameEpochId.value coverage.FrameEpochId)
+                                    (FrameEpochId.value liveFrameEpoch)
+                            )
+                    elif coverage.NextIngestedThroughSequence <= coverage.PreviousIngestedThroughSequence then
+                        return CycleCommitOutcome.KnownNotCommitted "coverage did not advance"
+                    else
+                        // C5: use epoch frozen at request materialization, never live PrefixEpoch.
+                        let epoch = coverage.ObservedPrefixEpochId
 
-                    match journal.WriteBlob merged.MergedText with
-                    | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                    | Ok textBlob ->
-                        // ENFORCER-045 tip v2: TipRuleId + FieldNameAtCommit on the fact;
-                        // no score-vector blob (ENFORCER-072).
-                        let writeEvidence () =
-                            match merged.MergedEvidence with
-                            | "" -> Ok None
-                            | evidence -> journal.WriteBlob evidence |> Result.map Some
+                        match! journal.WriteBlob merged.MergedText with
+                        | Error error -> return CycleCommitOutcome.KnownNotCommitted error
+                        | Ok textBlob ->
+                            // ENFORCER-045 tip v2: TipRuleId + FieldNameAtCommit on the fact;
+                            // no score-vector blob (ENFORCER-072).
+                            let! evidenceResult =
+                                match merged.MergedEvidence with
+                                | "" -> Task.FromResult(Ok None)
+                                | evidence ->
+                                    task {
+                                        match! journal.WriteBlob evidence with
+                                        | Ok blob -> return Ok(Some blob)
+                                        | Error error -> return Error error
+                                    }
 
-                        match writeEvidence () with
-                        | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                        | Ok evidenceRef ->
-                            // Re-read after blobs: only coverage-advancing facts race us;
-                            // refuse still-stale staged cursor without writing the fact.
-                            let latestBlog =
-                                AgentJournal.snapshot journal
-                                |> fun snap -> snap.AgentProjections.Sessions
-                                |> Map.tryFind mainSessionId
-                                |> Option.bind (fun session -> session.Blog)
-                                |> Option.defaultValue BlogProjection.empty
+                            match evidenceResult with
+                            | Error error -> return CycleCommitOutcome.KnownNotCommitted error
+                            | Ok evidenceRef ->
+                                // Re-read after blobs: only coverage-advancing facts race us;
+                                // refuse still-stale staged cursor without writing the fact.
+                                let latestBlog =
+                                    AgentJournal.snapshot journal
+                                    |> fun snap -> snap.AgentProjections.Sessions
+                                    |> Map.tryFind mainSessionId
+                                    |> Option.bind (fun session -> session.Blog)
+                                    |> Option.defaultValue BlogProjection.empty
 
-                            if
-                                coverage.PreviousIngestedThroughSequence
-                                <> latestBlog.Coverage.IngestedThroughSequence
-                                || coverage.PreviousCoverableTurnCutoffExclusive
-                                   <> latestBlog.Coverage.CoverableTurnCutoffExclusive
-                                || coverage.FrameEpochId <> latestBlog.FrameEpochId
-                            then
-                                CycleCommitOutcome.KnownNotCommitted(
-                                    sprintf
-                                        "staged previous ingest cursor %d disagrees with projection %d after blob write (PERSIST-010 precheck)"
-                                        coverage.PreviousIngestedThroughSequence
-                                        latestBlog.Coverage.IngestedThroughSequence
-                                )
-                            else
-                                let tip = merged.CanonicalTip
+                                if
+                                    coverage.PreviousIngestedThroughSequence
+                                    <> latestBlog.Coverage.IngestedThroughSequence
+                                    || coverage.PreviousCoverableTurnCutoffExclusive
+                                       <> latestBlog.Coverage.CoverableTurnCutoffExclusive
+                                    || coverage.FrameEpochId <> latestBlog.FrameEpochId
+                                then
+                                    return
+                                        CycleCommitOutcome.KnownNotCommitted(
+                                            sprintf
+                                                "staged previous ingest cursor %d disagrees with projection %d after blob write (PERSIST-010 precheck)"
+                                                coverage.PreviousIngestedThroughSequence
+                                                latestBlog.Coverage.IngestedThroughSequence
+                                        )
+                                else
+                                    let tip = merged.CanonicalTip
 
-                                let fact =
-                                    ContextFact.BlogObservationCommitted
-                                        {| SessionId = mainSessionId
-                                           BloggerSessionId = bloggerSessionId
-                                           RequestId = coverage.RequestId
-                                           FrameEpochId = coverage.FrameEpochId
-                                           PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
-                                           NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
-                                           PreviousCoverableTurnCutoffExclusive =
-                                            coverage.PreviousCoverableTurnCutoffExclusive
-                                           NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
-                                           NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
-                                           TextRef = textBlob.BlobRef
-                                           TextDigest = textBlob.BlobDigest
-                                           ProviderRun = providerRun
-                                           ToolCallIds = toolCallIds
-                                           TipRuleId = tip.RuleId
-                                           FieldNameAtCommit = Some tip.FieldName
-                                           EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
-                                           ObservedPrefixEpochId = epoch |}
+                                    let fact =
+                                        ContextFact.BlogObservationCommitted
+                                            {| SessionId = mainSessionId
+                                               BloggerSessionId = bloggerSessionId
+                                               RequestId = coverage.RequestId
+                                               FrameEpochId = coverage.FrameEpochId
+                                               PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
+                                               NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
+                                               PreviousCoverableTurnCutoffExclusive =
+                                                coverage.PreviousCoverableTurnCutoffExclusive
+                                               NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
+                                               NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
+                                               TextRef = textBlob.BlobRef
+                                               TextDigest = textBlob.BlobDigest
+                                               ProviderRun = providerRun
+                                               ToolCallIds = toolCallIds
+                                               TipRuleId = tip.RuleId
+                                               FieldNameAtCommit = Some tip.FieldName
+                                               EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
+                                               ObservedPrefixEpochId = epoch |}
 
-                                match
-                                    AgentJournal.appendAgent
-                                        (StreamId.Session mainSessionId)
-                                        (Some providerRun)
-                                        fact
-                                        journal
-                                with
-                                | Error failure -> classifyAppendFailure failure
-                                | Ok _ -> CycleCommitOutcome.KnownCommitted
+                                    match!
+                                        AgentJournal.appendAgent
+                                            (StreamId.Session mainSessionId)
+                                            (Some providerRun)
+                                            fact
+                                            journal
+                                    with
+                                    | Error failure -> return classifyAppendFailure failure
+                                    | Ok _ -> return CycleCommitOutcome.KnownCommitted
+        }
 
     /// CTX-012: single production constructor path for BlogObservationsSquashed from tool loop.
     let commitSquash
@@ -176,68 +191,78 @@ module EnforcerCycleCommit =
         (providerRun: ProviderRunIdentity)
         (squash: BloggerSquashRequestContext)
         (squashText: string)
-        : CycleCommitOutcome =
-        let projections = AgentJournal.snapshot journal
+        : Task<CycleCommitOutcome> =
+        task {
+            let projections = AgentJournal.snapshot journal
 
-        // CommitUnknown reconcile via unified receipt.
-        let alreadyReceipt =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun s -> s.BloggerCycles)
-            |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
+            // CommitUnknown reconcile via unified receipt.
+            let alreadyReceipt =
+                projections.AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun s -> s.BloggerCycles)
+                |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
 
-        match alreadyReceipt with
-        | Some _ -> CycleCommitOutcome.KnownCommitted
-        | None ->
-            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
+            match alreadyReceipt with
+            | Some _ -> return CycleCommitOutcome.KnownCommitted
             | None ->
-                CycleCommitOutcome.KnownNotCommitted
-                    "BlogObservationsSquashed requires an existing work session projection"
-            | Some session ->
-                match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
-                | Some linked when linked = bloggerSessionId ->
-                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-                    let k = squash.CoveredFrameCount
-
-                    if k < 1 || k > List.length blog.Frames then
-                        CycleCommitOutcome.KnownNotCommitted(
-                            sprintf "BlogObservationsSquashed covers %d frames but %d exist" k (List.length blog.Frames)
-                        )
-                    elif blog.FrameEpochId <> squash.FrameEpochId then
-                        CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame epoch mismatch"
-                    else
-                        let selected = List.truncate k (BlogProjection.frames blog)
-                        let digests = selected |> List.map (fun f -> f.Digest)
-
-                        if digests <> squash.FrameDigests then
-                            CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame digests mismatch"
-                        else
-                            match journal.WriteBlob squashText with
-                            | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                            | Ok blob ->
-                                let fact =
-                                    ContextFact.BlogObservationsSquashed
-                                        {| SessionId = mainSessionId
-                                           BloggerSessionId = bloggerSessionId
-                                           RequestId = squash.RequestId
-                                           PreviousFrameEpochId = blog.FrameEpochId
-                                           NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
-                                           CoveredFrameCount = k
-                                           TextRef = blob.BlobRef
-                                           TextDigest = blob.BlobDigest
-                                           ProviderRun = providerRun |}
-
-                                match
-                                    AgentJournal.appendAgent
-                                        (StreamId.Session mainSessionId)
-                                        (Some providerRun)
-                                        fact
-                                        journal
-                                with
-                                | Error failure -> classifyAppendFailure failure
-                                | Ok _ -> CycleCommitOutcome.KnownCommitted
-                | Some _ ->
-                    CycleCommitOutcome.KnownNotCommitted "Squash completion belongs to a different Blogger session"
+                match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
                 | None ->
-                    CycleCommitOutcome.KnownNotCommitted
-                        "BlogObservationsSquashed requires a durably linked Blogger session"
+                    return
+                        CycleCommitOutcome.KnownNotCommitted
+                            "BlogObservationsSquashed requires an existing work session projection"
+                | Some session ->
+                    match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
+                    | Some linked when linked = bloggerSessionId ->
+                        let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+                        let k = squash.CoveredFrameCount
+
+                        if k < 1 || k > List.length blog.Frames then
+                            return
+                                CycleCommitOutcome.KnownNotCommitted(
+                                    sprintf
+                                        "BlogObservationsSquashed covers %d frames but %d exist"
+                                        k
+                                        (List.length blog.Frames)
+                                )
+                        elif blog.FrameEpochId <> squash.FrameEpochId then
+                            return CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame epoch mismatch"
+                        else
+                            let selected = List.truncate k (BlogProjection.frames blog)
+                            let digests = selected |> List.map (fun f -> f.Digest)
+
+                            if digests <> squash.FrameDigests then
+                                return CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame digests mismatch"
+                            else
+                                match! journal.WriteBlob squashText with
+                                | Error error -> return CycleCommitOutcome.KnownNotCommitted error
+                                | Ok blob ->
+                                    let fact =
+                                        ContextFact.BlogObservationsSquashed
+                                            {| SessionId = mainSessionId
+                                               BloggerSessionId = bloggerSessionId
+                                               RequestId = squash.RequestId
+                                               PreviousFrameEpochId = blog.FrameEpochId
+                                               NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
+                                               CoveredFrameCount = k
+                                               TextRef = blob.BlobRef
+                                               TextDigest = blob.BlobDigest
+                                               ProviderRun = providerRun |}
+
+                                    match!
+                                        AgentJournal.appendAgent
+                                            (StreamId.Session mainSessionId)
+                                            (Some providerRun)
+                                            fact
+                                            journal
+                                    with
+                                    | Error failure -> return classifyAppendFailure failure
+                                    | Ok _ -> return CycleCommitOutcome.KnownCommitted
+                    | Some _ ->
+                        return
+                            CycleCommitOutcome.KnownNotCommitted
+                                "Squash completion belongs to a different Blogger session"
+                    | None ->
+                        return
+                            CycleCommitOutcome.KnownNotCommitted
+                                "BlogObservationsSquashed requires a durably linked Blogger session"
+        }

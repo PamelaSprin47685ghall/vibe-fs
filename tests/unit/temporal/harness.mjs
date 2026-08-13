@@ -61,9 +61,9 @@ export const createVirtualClock = () => timerPort.createVirtual()
 // Re-export the production helpers so temporal tests never invent their own
 // journal shape.
 
-export const createDurableWorld = (opts = {}) => {
+export const createDurableWorld = async (opts = {}) => {
   const vt = createVirtualClock()
-  const created = agentJournal.create({
+  const created = await agentJournal.create({
     directory: opts.directory,
     runtime: opts.runtime ?? 'rt_temporal',
     pid: opts.pid ?? 4242,
@@ -240,7 +240,7 @@ export class DeterministicEventQueue {
 //   world2 := recover(F)
 //   → no duplicate publish, no retired handle resurrected, etc.
 
-export const dropEphemeral = (world, opts = {}) => {
+export const dropEphemeral = async (world, opts = {}) => {
   const directory = world.directory
   if (typeof directory !== 'string' || directory.length === 0) {
     throw new Error('dropEphemeral requires a world with a `directory` (durable store key)')
@@ -257,7 +257,7 @@ export const dropEphemeral = (world, opts = {}) => {
   }
 
   const vt2 = createVirtualClock()
-  const resumed = agentJournal.createFromBoot({
+  const resumed = await agentJournal.createFromBoot({
     directory,
     runtime: opts.runtime ?? 'rt_temporal_recovered',
     pid: opts.pid ?? 4243,
@@ -380,7 +380,7 @@ export const DurableTraceEvents = {
  * vt; appends go through production AgentJournal.appendAgent.
  * The caller observes the durable snapshot via agentJournal.snapshot(world.journal).
  */
-export const runTrace = (world, events) => {
+export const runTrace = async (world, events) => {
   let last = { ok: true }
   for (const ev of events) {
     if (ev.kind === 'advanceClock') {
@@ -388,7 +388,7 @@ export const runTrace = (world, events) => {
       continue
     }
     if (ev.kind === 'appendAgentFact') {
-      const result = agentJournal.appendAgent(ev.stream, ev.run ?? undefined, ev.fact, world.journal)
+      const result = await agentJournal.appendAgent(ev.stream, ev.run ?? undefined, ev.fact, world.journal)
       last = result
       // Do not throw on AlreadyObserved / absorbed rejections: the fold
       // absorbs them, and the durable append path returns Ok regardless of

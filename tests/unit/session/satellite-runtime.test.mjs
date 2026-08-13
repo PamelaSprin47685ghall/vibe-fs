@@ -16,7 +16,7 @@ import {
 import { OpenCodeChildInfo } from '../../../dist/Infrastructure/OpenCode/Host/OpenCodePort.js'
 import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
 import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList } from '../support/domain.mjs'
 import {
   FSharpResult$2_Error$ as error,
   FSharpResult$2_Ok as ok,
@@ -39,13 +39,13 @@ const spec = ({ restored, linked = [] } = {}) =>
     restored === undefined ? undefined : sessionId(restored),
     (owner, satellite, agent) => {
       linked.push([owner.fields[0], satellite.fields[0], agent])
-      return ok(undefined)
+      return (async () => ok(undefined))()
     },
-    () => ok(undefined),
+    async () => ok(undefined),
   )
 
 const host = (children, created = []) => ({
-  ListChildren: async () => ok(ofArray(children)),
+  ListChildren: async () => ok(toList(children)),
   CreateChildSession: async () => {
     const id = sessionId(`created-${created.length + 1}`)
     created.push(id.fields[0])

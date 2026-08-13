@@ -34,15 +34,16 @@ module RevisionWorkflow =
         (barrierId: ReviewBarrierId)
         : Task<FinalityOutcome> =
         task {
-            FinalityJournal.appendLifecycle
-                journal
-                (ManagerLifecycleFact.FinalityUndecided
-                    {| SessionId = managerSessionId
-                       LifeId = lifeId
-                       RequestId = requestId
-                       ReviewerSessionId = reviewerSessionId
-                       BarrierId = barrierId
-                       GitTreeHash = requestTree |})
+            do!
+                FinalityJournal.appendLifecycle
+                    journal
+                    (ManagerLifecycleFact.FinalityUndecided
+                        {| SessionId = managerSessionId
+                           LifeId = lifeId
+                           RequestId = requestId
+                           ReviewerSessionId = reviewerSessionId
+                           BarrierId = barrierId
+                           GitTreeHash = requestTree |})
 
             return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
         }
@@ -56,7 +57,7 @@ module RevisionWorkflow =
             match! RecordWorkflow.awaitCanonicalWorkRecord journal rejectingReviewer barrierId with
             | Error reason -> return Error reason
             | Ok workRecord ->
-                match journal.WriteBlob workRecord with
+                match! journal.WriteBlob workRecord with
                 | Error reason -> return Error reason
                 | Ok blob -> return Ok(workRecord, blob)
         }
@@ -71,20 +72,23 @@ module RevisionWorkflow =
         (requestTree: GitTreeHash)
         (workRecord: string)
         (blob: BlobWriteReceipt)
-        =
-        FinalityJournal.appendLifecycle
-            journal
-            (ManagerLifecycleFact.FinalityRejected
-                {| SessionId = managerSessionId
-                   LifeId = lifeId
-                   RequestId = requestId
-                   RejectingReviewerSessionId = rejectingReviewer
-                   BarrierId = barrierId
-                   GitTreeHash = requestTree
-                   WorkRecordRef = blob.BlobRef
-                   WorkRecordDigest = blob.BlobDigest |})
+        : Task<FinalityOutcome> =
+        task {
+            do!
+                FinalityJournal.appendLifecycle
+                    journal
+                    (ManagerLifecycleFact.FinalityRejected
+                        {| SessionId = managerSessionId
+                           LifeId = lifeId
+                           RequestId = requestId
+                           RejectingReviewerSessionId = rejectingReviewer
+                           BarrierId = barrierId
+                           GitTreeHash = requestTree
+                           WorkRecordRef = blob.BlobRef
+                           WorkRecordDigest = blob.BlobDigest |})
 
-        FinalityOutcome.Rejected(rejectedPrompt managerSessionId workRecord)
+            return FinalityOutcome.Rejected(rejectedPrompt managerSessionId workRecord)
+        }
 
     let private awaitDurableSiblingRecords
         (journal: AgentJournal)
@@ -97,10 +101,13 @@ module RevisionWorkflow =
                 else
                     let snapshot, revision = AgentJournal.snapshotWithRevision journal
 
-                    let states =
-                        siblings
-                        |> List.map (fun (sid, barrierId) ->
-                            sid, barrierId, RecordWorkflow.readiness journal snapshot sid barrierId true)
+                    let states = ResizeArray<SessionId * ReviewBarrierId * RecordReadiness>()
+
+                    for sid, barrierId in siblings do
+                        let! state = RecordWorkflow.readiness journal snapshot sid barrierId true
+                        states.Add(sid, barrierId, state)
+
+                    let states = states |> Seq.toList
 
                     match
                         states
@@ -146,50 +153,56 @@ module RevisionWorkflow =
         (requestId: FinalityRequestId)
         (requestTree: GitTreeHash)
         (records: (SessionId * ReviewBarrierId * string) list)
-        : Result<(SessionId * string) list, string> =
-        let existingSteers =
-            tryActiveFinality (AgentJournal.snapshot journal) managerSessionId requestId
-            |> Option.map (fun active -> active.SiblingSteers)
-            |> Option.defaultValue Map.empty
+        : Task<Result<(SessionId * string) list, string>> =
+        task {
+            let existingSteers =
+                tryActiveFinality (AgentJournal.snapshot journal) managerSessionId requestId
+                |> Option.map (fun active -> active.SiblingSteers)
+                |> Option.defaultValue Map.empty
 
-        let preparedResult =
-            records
-            |> List.fold
-                (fun acc (reviewerSessionId, barrierId, workRecord) ->
-                    match acc with
-                    | Error reason -> Error reason
-                    | Ok prepared ->
-                        match Map.tryFind reviewerSessionId existingSteers with
-                        | Some evidence ->
-                            match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
-                            | Ok text -> Ok(prepared @ [ reviewerSessionId, barrierId, text, None ])
-                            | Error reason -> Error reason
-                        | None ->
-                            match journal.WriteBlob workRecord with
-                            | Error reason -> Error reason
-                            | Ok blob -> Ok(prepared @ [ reviewerSessionId, barrierId, workRecord, Some blob ]))
-                (Ok [])
+            let prepared = ResizeArray<SessionId * ReviewBarrierId * string * BlobWriteReceipt option>()
+            // DSL-MUTABLE: algorithm-scratch — first preparation failure while preserving input order
+            let mutable failure: string option = None
 
-        match preparedResult with
-        | Error reason -> Error reason
-        | Ok prepared ->
-            for reviewerSessionId, barrierId, _, blobOpt in prepared do
-                match blobOpt with
-                | None -> ()
-                | Some blob ->
-                    FinalityJournal.appendLifecycle
-                        journal
-                        (ManagerLifecycleFact.FinalitySiblingSteered
-                            {| SessionId = managerSessionId
-                               LifeId = lifeId
-                               RequestId = requestId
-                               ReviewerSessionId = reviewerSessionId
-                               BarrierId = barrierId
-                               GitTreeHash = requestTree
-                               WorkRecordRef = blob.BlobRef
-                               WorkRecordDigest = blob.BlobDigest |})
+            for reviewerSessionId, barrierId, workRecord in records do
+                if failure.IsNone then
+                    match Map.tryFind reviewerSessionId existingSteers with
+                    | Some evidence ->
+                        match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
+                        | Ok text -> prepared.Add(reviewerSessionId, barrierId, text, None)
+                        | Error reason -> failure <- Some reason
+                    | None ->
+                        match! journal.WriteBlob workRecord with
+                        | Error reason -> failure <- Some reason
+                        | Ok blob -> prepared.Add(reviewerSessionId, barrierId, workRecord, Some blob)
 
-            Ok(prepared |> List.map (fun (sid, _, text, _) -> sid, text))
+            match failure with
+            | Some reason -> return Error reason
+            | None ->
+                for reviewerSessionId, barrierId, _, blobOpt in prepared do
+                    match blobOpt with
+                    | None -> ()
+                    | Some blob ->
+                        do!
+                            FinalityJournal.appendLifecycle
+                                journal
+                                (ManagerLifecycleFact.FinalitySiblingSteered
+                                    {| SessionId = managerSessionId
+                                       LifeId = lifeId
+                                       RequestId = requestId
+                                       ReviewerSessionId = reviewerSessionId
+                                       BarrierId = barrierId
+                                       GitTreeHash = requestTree
+                                       WorkRecordRef = blob.BlobRef
+                                       WorkRecordDigest = blob.BlobDigest |})
+
+                return
+                    Ok(
+                        prepared
+                        |> Seq.map (fun (sid, _, text, _) -> sid, text)
+                        |> Seq.toList
+                    )
+        }
 
     let private sendSiblingSteers
         (reviewerPort: FinalityReviewerPort)
@@ -232,7 +245,7 @@ module RevisionWorkflow =
                             rejectingReviewer
                             barrierId
                 | Ok(workRecord, primaryBlob) ->
-                    match commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
+                    match! commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
                     | Error _ ->
                         return!
                             concludeUndecided
@@ -244,7 +257,7 @@ module RevisionWorkflow =
                                 rejectingReviewer
                                 barrierId
                     | Ok prepared ->
-                        let outcome =
+                        let! outcome =
                             sealRejected
                                 journal
                                 managerSessionId
@@ -276,13 +289,15 @@ module RevisionWorkflow =
             with
             | None -> ()
             | Some evidence ->
-                let workRecordOpt =
-                    match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
-                    | Ok workRecord -> Some workRecord
-                    | Error _ ->
-                        match RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true with
-                        | RecordReadiness.Ready record -> Some record
-                        | _ -> None
+                let! workRecordOpt =
+                    task {
+                        match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
+                        | Ok workRecord -> return Some workRecord
+                        | Error _ ->
+                            match! RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true with
+                            | RecordReadiness.Ready record -> return Some record
+                            | _ -> return None
+                    }
 
                 let prompt =
                     match workRecordOpt with

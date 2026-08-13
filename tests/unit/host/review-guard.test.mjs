@@ -41,11 +41,11 @@ const rootFact = (sid, agent = 'reviewer') =>
 
 const outcomeName = (outcome) => outcome.cases()[outcome.tag]
 
-const openSeeded = (sid, agent = 'reviewer') => {
+const openSeeded = async (sid, agent = 'reviewer') => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const appended = AgentJournalModule_appendAgent(stream.session(sid), undefined, rootFact(sid, agent), opened.journal)
+  const appended = await AgentJournalModule_appendAgent(stream.session(sid), undefined, rootFact(sid, agent), opened.journal)
   assert.equal(caseOf(appended), 'Ok', 'authority root must fold')
   return { opened, cleanup: () => {
     try { opened.dispose() } catch {}
@@ -61,7 +61,7 @@ test('RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
 
 test('RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
   try {
     const outcome = await nudgeReviewer(capturingPort([]), opened.journal, new Set(), sessionId('ses_rv'), logicalRunId('run_1'))
@@ -75,7 +75,7 @@ test('RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
 
 test('RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
   const sid = sessionId('ses_rv1')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
     const first = await nudgeReviewer(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_1'))
@@ -94,7 +94,7 @@ test('RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
 
 test('RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', async () => {
   const sid = sessionId('ses_rv2')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
     const first = await requestPerfectConfirmation(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_2'))
@@ -113,7 +113,7 @@ test('RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', asyn
 
 test('RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', async () => {
   const sid = sessionId('ses_rv3')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   const worktree = mkdtempSync(join(tmpdir(), 'wxs-rvgd-wt-'))
   SessionDirectories.set('ses_rv3', worktree)
   try {
@@ -130,7 +130,7 @@ test('RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', asy
 
 test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
   const sid = sessionId('ses_rv4')
-  const { opened, cleanup } = openSeeded(sid)
+  const { opened, cleanup } = await openSeeded(sid)
   const worktree = mkdtempSync(join(tmpdir(), 'wxs-rvgd-wt-'))
   writeFileSync(join(worktree, 'AGENTS.md'), 'instructions')
   SessionDirectories.set('ses_rv4', worktree)
@@ -148,10 +148,10 @@ test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
 
 test('RVGD_openBarrier_is_the_shared_review_barrier_writer', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
   try {
-    const barrier = openBarrier(opened.journal, sessionId('ses_mgr'), sessionId('ses_rv5'), reviewBarrierId('bar_1'), gitTreeHash('tree_1'))
+    const barrier = await openBarrier(opened.journal, sessionId('ses_mgr'), sessionId('ses_rv5'), reviewBarrierId('bar_1'), gitTreeHash('tree_1'))
     assert.equal(barrier.tag, 0, `barrier must open: ${JSON.stringify(barrier)}`)
   } finally {
     opened.dispose()

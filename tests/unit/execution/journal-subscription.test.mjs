@@ -17,7 +17,7 @@ import {
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jrev-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     await fn(created.journal)
@@ -26,7 +26,7 @@ const withJournal = async (fn) => {
   }
 }
 
-const appendHandleLinked = (journal, parent = 'ses_p', child = 'ses_c', agent = 'h1') => {
+const appendHandleLinked = async (journal, parent = 'ses_p', child = 'ses_c', agent = 'h1') => {
   const fact = agentFact('HandleLinked', {
     ParentSessionId: sessionId(parent),
     ChildSessionId: sessionId(child),
@@ -42,7 +42,7 @@ test('EXEC_journal_revision_advances_only_on_successful_fold', async () => {
     const before = journalRevision.value(agentJournal.revision(journal))
     assert.ok(before >= 1, 'create folds RuntimeStarted → revision ≥ 1')
 
-    const linked = appendHandleLinked(journal)
+    const linked = await appendHandleLinked(journal)
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const after = journalRevision.value(agentJournal.revision(journal))
@@ -53,7 +53,7 @@ test('EXEC_journal_revision_advances_only_on_successful_fold', async () => {
 test('EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
   await withJournal(async (journal) => {
     const from = agentJournal.revision(journal)
-    const linked = appendHandleLinked(journal)
+    const linked = await appendHandleLinked(journal)
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const started = Date.now()
@@ -72,8 +72,8 @@ test('EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
     const pending = agentJournal.awaitChangeFrom(from, journal)
 
     // Append after waiter is registered (next macrotask).
-    setTimeout(() => {
-      const linked = appendHandleLinked(journal, 'ses_p2', 'ses_c2', 'h2')
+    setTimeout(async () => {
+      const linked = await appendHandleLinked(journal, 'ses_p2', 'ses_c2', 'h2')
       assert.equal(linked.ok, true, JSON.stringify(linked.error))
     }, 30)
 

@@ -55,8 +55,8 @@ const RUN_ID = 'run-legacy-abort'
 
 /** Production HandleController.link takes Ownership (GREEN-7); the domain.mjs
  *  facade bind is stale, so tests call the dist entry directly. */
-const durableLink = (j, parentId, agentId, child, targetAgent, role) => {
-  const result = HandleControllerModule.HandleController_link(
+const durableLink = async (j, parentId, agentId, child, targetAgent, role) => {
+  const result = await HandleControllerModule.HandleController_link(
     j,
     parentId,
     agentId,
@@ -69,7 +69,7 @@ const durableLink = (j, parentId, agentId, child, targetAgent, role) => {
 }
 
 /** Plant historical false terminal: blob status=aborted + HandleCompleted(SendFailure). */
-const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
+const plantLegacyFalseAbort = async (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
   const body = handleCompletionCodec.legacyAbortedBody({
     runId: RUN_ID,
     code: 'CANCELLED',
@@ -78,11 +78,11 @@ const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = 
   })
   assert.match(body, /"status"\s*:\s*"aborted"/)
 
-  const written = agentJournal.writeBlob(body, journal)
+  const written = await agentJournal.writeBlob(body, journal)
   assert.equal(written.ok, true, written.ok ? '' : written.error)
   const receipt = written.value
 
-  const linked = durableLink(
+  const linked = await durableLink(
     journal,
     PARENT,
     agentId,
@@ -93,7 +93,7 @@ const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = 
   assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
   // Bypass JoinableCompletion: historical SendFailure cell → aborted blob.
-  const completed = agentJournal.appendAgent(
+  const completed = await agentJournal.appendAgent(
     stream.session(PARENT),
     undefined,
     agentFact('HandleCompleted', {
@@ -157,19 +157,19 @@ test('P0_CLEAN_BREAK_tryFromDurableCompleted_refuses_send_failure_aborted_body',
 
 // ── 1b. Real journal blob + restart fold + JoinDrain ─────────────────────────
 
-test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_return_aborted', () => {
+test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_return_aborted', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-restart-'))
-  const created = agentJournal.create({ directory: dir, runtime: 'rt_pre' })
+  const created = await agentJournal.create({ directory: dir, runtime: 'rt_pre' })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 
-  plantLegacyFalseAbort(created.journal)
+  await plantLegacyFalseAbort(created.journal)
 
   // Pre-restart: legacy abort blob is not a RunCompletion (decode → LegacyFalseAbort).
   {
     const projection = agentJournal.handleProjection(created.journal, PARENT)
     assert.equal(lifecycleOf(projection), 'CompletedAwaitingJoin')
     const record = handleProjection.tryFind(HANDLE, projection)
-    const decoded = handleCompletionCodec.tryRead(created.journal, record, AGENT_ID)
+    const decoded = await handleCompletionCodec.tryRead(created.journal, record, AGENT_ID)
     assert.equal(decoded.ok, false, 'legacy abort must not materialise RunCompletion')
     const body = handleCompletionCodec.legacyAbortedBody({
       runId: RUN_ID,
@@ -182,8 +182,8 @@ test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_retur
 
   created.dispose()
 
-  const boot = bootSnapshot.load(dir)
-  const restarted = agentJournal.createFromBoot({
+  const boot = await bootSnapshot.load(dir)
+  const restarted = await agentJournal.createFromBoot({
     directory: dir,
     boot,
     runtime: 'rt_post',
@@ -198,7 +198,7 @@ test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_retur
     assert.equal(handleProjection.isRetired(HANDLE, before), false)
 
     // Production JoinDrain path (JoinTool / HostForkRuntime durable drain).
-    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const drained = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(drained.ok, true, drained.ok ? '' : drained.error)
 
     // RED: current code returns status=aborted and CAS-retires the handle.
@@ -240,16 +240,16 @@ test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_retur
 
 // ── 2. Already-Retired migration ─────────────────────────────────────────────
 
-test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
+test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-retired-'))
-  const created = agentJournal.create({ directory: dir, runtime: 'rt_pre' })
+  const created = await agentJournal.create({ directory: dir, runtime: 'rt_pre' })
   assert.equal(created.ok, true)
 
-  plantLegacyFalseAbort(created.journal)
+  await plantLegacyFalseAbort(created.journal)
 
   // Historical path: parent already retired under old code (force tombstone; do not
   // use new JoinDrain which rejects without retiring).
-  const forcedRetire = agentJournal.appendAgent(
+  const forcedRetire = await agentJournal.appendAgent(
     stream.session(PARENT),
     undefined,
     agentFact('HandleRetired', { ParentSessionId: PARENT, Handle: HANDLE }),
@@ -262,14 +262,14 @@ test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
   )
   created.dispose()
 
-  const boot = bootSnapshot.load(dir)
-  const restarted = agentJournal.createFromBoot({ directory: dir, boot, runtime: 'rt_post' })
+  const boot = await bootSnapshot.load(dir)
+  const restarted = await agentJournal.createFromBoot({ directory: dir, boot, runtime: 'rt_post' })
   assert.equal(restarted.ok, true, restarted.ok ? '' : JSON.stringify(restarted.error))
 
   try {
     const j = restarted.journal
     // Trigger clean-break reconcile (retired LegacyFalseAbort → replacement).
-    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const drained = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(drained.ok, true, drained.ok ? '' : drained.error)
     assert.equal(
       drained.items.filter((i) => i.status === 'aborted').length,
@@ -303,15 +303,15 @@ test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
     )
 
     // Repeat recovery: same replacement set (no second mint).
-    const boot2 = bootSnapshot.load(dir)
-    const again = agentJournal.createFromBoot({
+    const boot2 = await bootSnapshot.load(dir)
+    const again = await agentJournal.createFromBoot({
       directory: dir,
       boot: boot2,
       runtime: 'rt_post2',
     })
     assert.equal(again.ok, true)
     try {
-      const drained2 = joinDrain.drainFromJournal(again.journal, PARENT, maxJoinBatch)
+      const drained2 = await joinDrain.drainFromJournal(again.journal, PARENT, maxJoinBatch)
       assert.equal(drained2.ok, true)
       const after2 = agentJournal.handleProjection(again.journal, PARENT)
       const againIds = [
@@ -333,14 +333,14 @@ test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
 
 // ── 3. Delayed recovery race (unit shape; full E2E later) ────────────────────
 
-test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', () => {
+test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-race-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true)
 
   try {
     const j = created.journal
-    const linked = durableLink(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
+    const linked = await durableLink(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
     // Host Aborted observation while recovery still incomplete → never Joinable.
@@ -357,7 +357,7 @@ test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_ter
     )
 
     // Before true terminal: drain empty, HandleRetired=0, no aborted item.
-    const early = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const early = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(early.ok, true)
     assert.deepEqual(early.items, [])
     assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), false)
@@ -370,10 +370,10 @@ test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_ter
       workRecord: 'real work done',
     })
     const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-    const recorded = handleController.recordCompletion(j, PARENT, AGENT_ID, 'Terminal', body, CHILD)
+    const recorded = await handleController.recordCompletion(j, PARENT, AGENT_ID, 'Terminal', body, CHILD)
     assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
 
-    const finalDrain = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    const finalDrain = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
     assert.equal(finalDrain.ok, true)
     assert.equal(finalDrain.items.length, 1)
     assert.equal(finalDrain.items[0].status, 'completed')

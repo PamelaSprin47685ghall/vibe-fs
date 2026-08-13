@@ -27,23 +27,30 @@ module XWire =
     let private isCompanionSession (journal: AgentJournal) (sessionId: SessionId) =
         SessionAssociationProjection.isCompanion sessionId (AgentJournal.snapshot journal).AgentProjections.Associations
 
-    let private readFrameBodies (journal: AgentJournal) (frames: BlogFrame list) : Result<string list, string> =
+    let private readFrameBodies
+        (journal: AgentJournal)
+        (frames: BlogFrame list)
+        : Task<Result<string list, string>> =
         let rec loop remaining collected =
-            match remaining with
-            | [] -> Ok(List.rev collected)
-            | frame :: tail ->
-                journal.Writer.BlobWriter.Read frame.TextRef
-                |> Result.bind (fun text ->
-                    if HostDigest.sha256Hex text = BlobDigest.value frame.Digest then
-                        loop tail (text :: collected)
-                    else
-                        Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest)))
+            task {
+                match remaining with
+                | [] -> return Ok(List.rev collected)
+                | frame :: tail ->
+                    match! journal.Writer.BlobWriter.Read frame.TextRef with
+                    | Error reason -> return Error reason
+                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
+                        return! loop tail (text :: collected)
+                    | Ok _ ->
+                        return Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest))
+            }
 
         loop frames []
 
-    let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Result<string, string> =
-        readFrameBodies journal frames
-        |> Result.map (fun bodies -> String.concat "\n\n" bodies)
+    let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string, string>> =
+        task {
+            let! bodies = readFrameBodies journal frames
+            return bodies |> Result.map (fun values -> String.concat "\n\n" values)
+        }
 
     let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
         rawMessages
@@ -58,29 +65,32 @@ module XWire =
         (journal: AgentJournal)
         (state: SessionAgentProjection)
         (frames: BlogFrame list)
-        : Result<string, string> =
-        match readFrameBodies journal frames with
-        | Error reason -> Error reason
-        | Ok frameBodies ->
-            let opening =
-                state.XTrace
-                |> Option.bind (fun trace -> trace.Opening)
-                |> Option.defaultValue
-                    { AssignmentText = ""
-                      AuthoritativeRequirements = []
-                      ConstitutiveBody = "" }
+        : Task<Result<string, string>> =
+        task {
+            match! readFrameBodies journal frames with
+            | Error reason -> return Error reason
+            | Ok frameBodies ->
+                let opening =
+                    state.XTrace
+                    |> Option.bind (fun trace -> trace.Opening)
+                    |> Option.defaultValue
+                        { AssignmentText = ""
+                          AuthoritativeRequirements = []
+                          ConstitutiveBody = "" }
 
-            // Opening + frames only. Gap/terminal are live X material and must not
-            // enter a frozen replacement (COMPANION-009).
-            // COMPANION-009: FrozenRecordPrefix is same-session X memory, not a
-            // parent/child hand-off. Opening stays (includeOpening=true).
-            Ok(
-                LifecycleWorkRecord.render
-                    true
-                    { Opening = opening
-                      Frames = frameBodies
-                      Gap = [] }
-            )
+                // Opening + frames only. Gap/terminal are live X material and must not
+                // enter a frozen replacement (COMPANION-009).
+                // COMPANION-009: FrozenRecordPrefix is same-session X memory, not a
+                // parent/child hand-off. Opening stays (includeOpening=true).
+                return
+                    Ok(
+                        LifecycleWorkRecord.render
+                            true
+                            { Opening = opening
+                              Frames = frameBodies
+                              Gap = [] }
+                    )
+        }
 
     let private candidate
         (journal: AgentJournal)
@@ -88,28 +98,31 @@ module XWire =
         (snapshot: ProjectionSnapshot)
         (state: SessionAgentProjection)
         (requestCutoff: int)
-        : Result<PrefixProbe, NoCandidateReason> =
-        let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-        let blog = state.Blog |> Option.defaultValue BlogProjection.empty
-        let frames = BlogProjection.coverableFrames blog
+        : Task<Result<PrefixProbe, NoCandidateReason>> =
+        task {
+            let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+            let blog = state.Blog |> Option.defaultValue BlogProjection.empty
+            let frames = BlogProjection.coverableFrames blog
 
-        match materializeFrozenRecordPrefix journal state frames with
-        | Error reason -> raise (InvalidOperationException reason)
-        | Ok frozenRecordPrefix ->
-            match journal.WriteBlob frozenRecordPrefix with
-            | Error reason -> raise (InvalidOperationException reason)
-            | Ok blob ->
-                PrefixProbeSelection.select
-                    HostDigest.sha256Hex
-                    sessionId
-                    prefix.EpochId
-                    snapshot.CommittedPrefix
-                    blog.Coverage.CoverableTurnCutoffExclusive
-                    blog.Coverage.CoveredPrefixDigest
-                    requestCutoff
-                    blob.BlobRef
-                    blob.BlobDigest
-                    (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
+            match! materializeFrozenRecordPrefix journal state frames with
+            | Error reason -> return raise (InvalidOperationException reason)
+            | Ok frozenRecordPrefix ->
+                match! journal.WriteBlob frozenRecordPrefix with
+                | Error reason -> return raise (InvalidOperationException reason)
+                | Ok blob ->
+                    return
+                        PrefixProbeSelection.select
+                            HostDigest.sha256Hex
+                            sessionId
+                            prefix.EpochId
+                            snapshot.CommittedPrefix
+                            blog.Coverage.CoverableTurnCutoffExclusive
+                            blog.Coverage.CoveredPrefixDigest
+                            requestCutoff
+                            blob.BlobRef
+                            blob.BlobDigest
+                            (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
+        }
 
     let private applyStrengthReplicaPlan
         (snapshotPort: ISessionSnapshotPort)
@@ -261,8 +274,13 @@ module XWire =
                                             fallback.Cursor.Offset
                                             (BlogProjection.hasCoverage blog)
 
-                                    let selectProbe () =
-                                        candidate durable sessionId snapshot state cutoff
+                                    let! candidateResult =
+                                        if mayRecover then
+                                            candidate durable sessionId snapshot state cutoff
+                                        else
+                                            Task.FromResult(Error NoCandidateReason.NoCoverage)
+
+                                    let selectProbe () = candidateResult
 
                                     let plan =
                                         AttemptPlanner.plan
@@ -280,17 +298,19 @@ module XWire =
                                     // this choice need" — the adapter reads, never guesses
                                     // (CTX-010: reading the COMMITTED blob for a probe attempt
                                     // would inject the old prefix under the candidate's id).
-                                    let frozenRecordPrefixBody =
+                                    let! frozenRecordPrefixBody =
                                         match
                                             XPrefixProjection.requiredBlob
                                                 plan.Profile.ProjectionChoice
                                                 snapshot.CommittedPrefix
                                         with
-                                        | None -> ""
+                                        | None -> Task.FromResult ""
                                         | Some blobRef ->
-                                            match durable.Writer.BlobWriter.Read blobRef with
-                                            | Ok body -> body
-                                            | Error reason -> raise (InvalidOperationException reason)
+                                            task {
+                                                match! durable.Writer.BlobWriter.Read blobRef with
+                                                | Ok body -> return body
+                                                | Error reason -> return raise (InvalidOperationException reason)
+                                            }
 
                                     let memoryPreamble =
                                         ProviderProse.render
@@ -355,7 +375,7 @@ module XWire =
             | _ -> return ()
         }
 
-    let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : unit =
+    let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
         match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
         | Some durable, Some plan ->
             // Keep the plan across provisional / unknown rereads of the SAME
@@ -365,37 +385,48 @@ module XWire =
             // (measured: FallbackCursorAdvanced without PrefixRebaseCommitted).
             match turn.Outcome with
             | ReconcileProgram.TurnCompleted ->
-                match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
-                | Some probe ->
-                    let projections = AgentJournal.snapshot durable
+                task {
+                    match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
+                    | Some probe ->
+                        let projections = AgentJournal.snapshot durable
 
-                    let epoch =
-                        AgentProjection.tryFind turn.SessionId projections.AgentProjections
-                        |> Option.bind (fun state -> state.PrefixEpoch)
-                        |> Option.defaultValue PrefixEpochProjection.empty
+                        let epoch =
+                            AgentProjection.tryFind turn.SessionId projections.AgentProjections
+                            |> Option.bind (fun state -> state.PrefixEpoch)
+                            |> Option.defaultValue PrefixEpochProjection.empty
 
-                    let fact =
-                        ContextFact.PrefixRebaseCommitted
-                            {| SessionId = turn.SessionId
-                               PreviousEpochId = probe.BasedOnEpochId
-                               NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
-                               FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
-                               FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
-                               CutoffExclusive = probe.Candidate.CutoffExclusive
-                               CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
-                               SealRoot = probe.Candidate.SealRoot
-                               SyntheticMessageId = probe.Candidate.SyntheticMessageId
-                               ProbeId = probe.ProbeId
-                               SolvingProviderRun = turn.ProviderRun |}
+                        let fact =
+                            ContextFact.PrefixRebaseCommitted
+                                {| SessionId = turn.SessionId
+                                   PreviousEpochId = probe.BasedOnEpochId
+                                   NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
+                                   FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
+                                   FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
+                                   CutoffExclusive = probe.Candidate.CutoffExclusive
+                                   CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
+                                   SealRoot = probe.Candidate.SealRoot
+                                   SyntheticMessageId = probe.Candidate.SyntheticMessageId
+                                   ProbeId = probe.ProbeId
+                                   SolvingProviderRun = turn.ProviderRun |}
 
-                    if epoch.EpochId = probe.BasedOnEpochId then
-                        AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
-                        |> ignore
-                | None -> ()
+                        if epoch.EpochId = probe.BasedOnEpochId then
+                            let! _ =
+                                AgentJournal.appendAgent
+                                    (StreamId.Session turn.SessionId)
+                                    (Some turn.ProviderRun)
+                                    fact
+                                    durable
 
-                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+                            ()
+                    | None -> ()
+
+                    scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+                }
+                :> Task
             | ReconcileProgram.TurnFailed _
-            | ReconcileProgram.TurnAborted _ -> scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+            | ReconcileProgram.TurnAborted _ ->
+                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+                Task.FromResult(())
             | ReconcileProgram.TurnNeedsContinuation _
-            | ReconcileProgram.TurnInProgress -> ()
-        | _ -> ()
+            | ReconcileProgram.TurnInProgress -> Task.FromResult(())
+        | _ -> Task.FromResult(())

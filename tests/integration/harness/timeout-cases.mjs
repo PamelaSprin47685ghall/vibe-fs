@@ -397,10 +397,10 @@ async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
     `import { openGateFactStore } from ${JSON.stringify(gateFactsUrl)};\n` +
       `const gate = openGateFactStore(${JSON.stringify(workDir)});\n` +
       `let appended = 0;\n` +
-      `const iv = setInterval(() => {\n` +
+      `const iv = setInterval(async () => {\n` +
       `  appended += 1;\n` +
       `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
-      `  gate.appendNamedFact(fact, appended);\n` +
+      `  await gate.appendNamedFact(fact, appended);\n` +
       `  if (appended === 7) clearInterval(iv);\n` +
       `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
       factBarrierScript(workDir, 'Published', 'gate-wait-fact-renew-on').replace(

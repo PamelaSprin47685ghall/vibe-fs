@@ -54,7 +54,11 @@ module BloggerCrashRecovery =
                 |> Map.toList
                 |> List.map (fun (_, openReq) -> mainSessionId, openReq))
 
-    let private abandon (journal: AgentJournal) (openReq: OpenBloggerRequest) (reason: string) : unit =
+    let private abandon
+        (journal: AgentJournal)
+        (openReq: OpenBloggerRequest)
+        (reason: string)
+        : Task =
         BloggerAbandon.byRequestId journal openReq.RequestId openReq.MainSessionId openReq.BloggerSessionId reason
 
     /// <summary>Pure decision for window A/B/C given Host tool-call presence and
@@ -98,7 +102,7 @@ module BloggerCrashRecovery =
     let private tryReloadMainContext
         (journal: AgentJournal)
         (openReq: OpenBloggerRequest)
-        : BloggerRequestContext option =
+        : Task<BloggerRequestContext option> =
         EnforcerFrameRecovery.tryReloadRequestContext journal openReq
 
     /// Startup pass: walk open materializations + receipts.
@@ -154,7 +158,7 @@ module BloggerCrashRecovery =
                             match! snapshot.GetMessages openReq.BloggerSessionId with
                             | Error reason ->
                                 // Cold crash: Host session unreadable → abandon window A.
-                                abandon durable openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
+                                do! abandon durable openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
 
                                 restoreRuntime host openReq.BloggerSessionId None
                                 results.Add(WindowOutcome.AbandonedUnsent openReq.RequestId)
@@ -170,7 +174,7 @@ module BloggerCrashRecovery =
                                                | MessagePart.ToolResult(_, _) -> true
                                                | _ -> false))
 
-                                match tryReloadMainContext durable openReq with
+                                match! tryReloadMainContext durable openReq with
                                 | None ->
                                     results.Add(
                                         WindowOutcome.Unreadable(openReq.BloggerSessionId, "context blob unreadable")

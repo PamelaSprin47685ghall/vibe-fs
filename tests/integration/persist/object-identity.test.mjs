@@ -22,14 +22,14 @@ const Odb = await import('../../../dist/Infrastructure/Persist/GitObjectDatabase
 const oidText = (oid) => Persist.GitObjectIdModule_value(oid)
 const gitObjectId = (text) => Persist.GitObjectIdModule_create(text)
 
-const withRepo = (fn) => {
+const withRepo = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'odb-identity-'))
   try {
     execFileSync('git', ['init', '--quiet', dir], { encoding: 'utf8' })
     const git = (args, options = {}) =>
       execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', ...options }).trim()
     const objects = git(['rev-parse', '--git-path', 'objects'])
-    fn({ dir, git, objects: objects.startsWith('/') ? objects : join(dir, objects) })
+    await fn({ dir, git, objects: objects.startsWith('/') ? objects : join(dir, objects) })
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -44,10 +44,10 @@ const BODIES = [
   Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n'),
 ]
 
-test('ODB blob oid equals git hash-object, and git can read the object', () => {
-  withRepo(({ git, objects, dir }) => {
+test('ODB blob oid equals git hash-object, and git can read the object', async () => {
+  await withRepo(async ({ git, objects, dir }) => {
     for (const body of BODIES) {
-      const ours = Odb.writeBlob(objects, Buffer.from(body, 'utf8'))
+      const ours = await Odb.writeBlob(objects, Buffer.from(body, 'utf8'))
 
       const input = join(dir, 'input.bin')
       writeFileSync(input, body)
@@ -64,14 +64,14 @@ test('ODB blob oid equals git hash-object, and git can read the object', () => {
   })
 })
 
-test('ODB tree oid equals git mktree, including nested trees and name ordering', () => {
-  withRepo(({ git, objects }) => {
-    const blobA = Odb.writeBlob(objects, Buffer.from('A\n', 'utf8'))
-    const blobB = Odb.writeBlob(objects, Buffer.from('B\n', 'utf8'))
+test('ODB tree oid equals git mktree, including nested trees and name ordering', async () => {
+  await withRepo(async ({ git, objects }) => {
+    const blobA = await Odb.writeBlob(objects, Buffer.from('A\n', 'utf8'))
+    const blobB = await Odb.writeBlob(objects, Buffer.from('B\n', 'utf8'))
 
     const entry = (mode, name, oid) => new Persist.TreeEntry(mode, name, gitObjectId(oid))
     const leaf = [entry('100644', 'b.jsonl', blobB), entry('100644', 'a.jsonl', blobA)]
-    const leafOid = Odb.writeTree(objects, toList(leaf))
+    const leafOid = await Odb.writeTree(objects, toList(leaf))
 
     // `mktree` reads the same records from stdin; sorting is ours to get right.
     const mktree = (rows) =>
@@ -91,7 +91,7 @@ test('ODB tree oid equals git mktree, including nested trees and name ordering',
       entry('040000', 'events', leafOid),
       entry('100644', 'events.meta', blobA),
     ]
-    const nestedOid = Odb.writeTree(objects, toList(nested))
+    const nestedOid = await Odb.writeTree(objects, toList(nested))
     assert.equal(
       nestedOid,
       mktree([`040000 tree ${leafOid}\tevents`, `100644 blob ${blobA}\tevents.meta`]),
@@ -108,65 +108,65 @@ test('ODB tree oid equals git mktree, including nested trees and name ordering',
   })
 })
 
-test('ODB reads back its own trees; a packed object is reported absent, not guessed', () => {
-  withRepo(({ git, objects }) => {
-    const blob = Odb.writeBlob(objects, Buffer.from('payload\n', 'utf8'))
+test('ODB reads back its own trees; a packed object is reported absent, not guessed', async () => {
+  await withRepo(async ({ git, objects }) => {
+    const blob = await Odb.writeBlob(objects, Buffer.from('payload\n', 'utf8'))
     const entry = new Persist.TreeEntry('100644', 'x.jsonl', gitObjectId(blob))
-    const treeOid = Odb.writeTree(objects, toList([entry]))
+    const treeOid = await Odb.writeTree(objects, toList([entry]))
 
-    const read = Odb.tryReadTree(objects, treeOid)
+    const read = await Odb.tryReadTree(objects, treeOid)
     assert.equal(isSome(read), true, 'loose tree must be readable in-process')
     const entries = listItems(read)
     assert.equal(entries.length, 1)
     assert.equal(entries[0].Name, 'x.jsonl')
     assert.equal(oidText(entries[0].Oid), blob)
 
-    const body = Odb.tryReadObject(objects, blob)
+    const body = await Odb.tryReadObject(objects, blob)
     assert.equal(isSome(body), true, 'loose blob must be readable in-process')
     assert.equal(Buffer.from(body).toString('utf8'), 'payload\n')
 
     // Absent is None — never a fabricated empty object; the store falls back to the CLI.
-    assert.equal(Odb.tryReadObject(objects, '0'.repeat(40)), undefined)
+    assert.equal(await Odb.tryReadObject(objects, '0'.repeat(40)), undefined)
     assert.equal(git(['cat-file', '-t', treeOid]), 'tree')
   })
 })
 
-test('ODB ref write is git-visible, and CAS refuses a stale expectation or a held lock', () => {
-  withRepo(({ git, objects, dir }) => {
+test('ODB ref write is git-visible, and CAS refuses a stale expectation or a held lock', async () => {
+  await withRepo(async ({ git, objects, dir }) => {
     const ref = 'refs/wanxiang/store'
     const gitDir = join(dir, '.git')
-    const first = Odb.writeTree(objects, toList([]))
-    const second = Odb.writeBlob(objects, Buffer.from('second\n', 'utf8'))
+    const first = await Odb.writeTree(objects, toList([]))
+    const second = await Odb.writeBlob(objects, Buffer.from('second\n', 'utf8'))
 
     // Absent → create. Expectation is "no ref", spelled as None.
-    assert.equal(Odb.compareAndSwapRef(gitDir, ref, undefined, first), true, 'create must succeed')
+    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, undefined, first), true, 'create must succeed')
     assert.equal(git(['rev-parse', '--verify', ref]), first, 'git must resolve the ref we wrote')
-    assert.equal(Odb.tryReadRef(gitDir, ref), first, 'our reader must agree with git')
+    assert.equal(await Odb.tryReadRef(gitDir, ref), first, 'our reader must agree with git')
 
     // Stale expectation → refused, ref unchanged. This is the lease that makes concurrent
     // appends safe; a silent overwrite here would lose an event.
-    assert.equal(Odb.compareAndSwapRef(gitDir, ref, second, second), false, 'stale CAS must refuse')
+    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, second, second), false, 'stale CAS must refuse')
     assert.equal(git(['rev-parse', '--verify', ref]), first, 'refused CAS must not move the ref')
 
     // Current expectation → swap, and git sees the new value.
-    assert.equal(Odb.compareAndSwapRef(gitDir, ref, first, second), true, 'matching CAS must swap')
+    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, first, second), true, 'matching CAS must swap')
     assert.equal(git(['rev-parse', '--verify', ref]), second)
 
     // A lock held by anyone else (git itself uses the same path) → refused, not overwritten.
     writeFileSync(join(gitDir, ref + '.lock'), '')
-    assert.equal(Odb.compareAndSwapRef(gitDir, ref, second, first), false, 'held lock must refuse')
+    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, second, first), false, 'held lock must refuse')
     assert.equal(git(['rev-parse', '--verify', ref]), second, 'a refused CAS leaves the ref alone')
   })
 })
 
-test('ODB ref reader resolves a packed ref after git pack-refs', () => {
-  withRepo(({ git, objects, dir }) => {
+test('ODB ref reader resolves a packed ref after git pack-refs', async () => {
+  await withRepo(async ({ git, objects, dir }) => {
     const ref = 'refs/wanxiang/store'
     const gitDir = join(dir, '.git')
-    const oid = Odb.writeBlob(objects, Buffer.from('packed\n', 'utf8'))
-    assert.equal(Odb.compareAndSwapRef(gitDir, ref, undefined, oid), true)
+    const oid = await Odb.writeBlob(objects, Buffer.from('packed\n', 'utf8'))
+    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, undefined, oid), true)
 
     git(['pack-refs', '--all'])
-    assert.equal(Odb.tryReadRef(gitDir, ref), oid, 'a packed ref must still resolve')
+    assert.equal(await Odb.tryReadRef(gitDir, ref), oid, 'a packed ref must still resolve')
   })
 })

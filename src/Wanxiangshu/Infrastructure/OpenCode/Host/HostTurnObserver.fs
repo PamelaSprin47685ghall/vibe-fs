@@ -39,11 +39,11 @@ module HostTurnObserver =
                 // Clear the competing process-local cause so it cannot leak into
                 // the next attempt as a phantom loop-kill.
                 scope.LoopSensor.ClearArmed turn.SessionId
-                XWire.reconcileAttempt journal scope turn
+                do! XWire.reconcileAttempt journal scope turn
                 return ()
             | AssistanceTurnDisposition.ClaimedButUnresolved ->
                 scope.LoopSensor.ClearArmed turn.SessionId
-                XWire.reconcileAttempt journal scope turn
+                do! XWire.reconcileAttempt journal scope turn
 
                 eventPort.NotifyTerminal
                     turn.SessionId
@@ -68,7 +68,7 @@ module HostTurnObserver =
                 // only reconcile the request plan for cleanup; family recovery,
                 // owner fallback, Companion, Review and ordinary TurnWorkflow
                 // must never observe them.
-                XWire.reconcileAttempt journal scope turn
+                do! XWire.reconcileAttempt journal scope turn
                 return ()
             else
                 // STRENGTH-010: only primary (non-Replica) turns feed the
@@ -133,7 +133,7 @@ module HostTurnObserver =
                     | ReconcileProgram.TurnInProgress -> ()
 
 
-                    XWire.reconcileAttempt journal scope turn
+                    do! XWire.reconcileAttempt journal scope turn
                     TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
                     // Sole Application turn entry (rabbit §6.5 / §18): Host no longer

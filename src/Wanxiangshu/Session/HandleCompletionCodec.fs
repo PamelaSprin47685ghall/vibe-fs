@@ -262,44 +262,48 @@ module HandleCompletionCodec =
         (record: HandleRecord)
         (agentId: string)
         (completedAt: DateTimeOffset)
-        : Result<RunCompletion option, string> =
-        match record.Lifecycle with
-        | HandleLifecycle.CompletedAwaitingJoin completion ->
-            match completion.CompletionRef, completion.CompletionDigest with
-            | None, None -> Ok None
-            | Some blobRef, Some expectedDigest ->
-                match journal.Writer.BlobWriter.Read blobRef with
-                | Error err -> Error err
-                | Ok body ->
-                    if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                        Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
-                    else
-                        tryDecode record agentId body completedAt |> Result.map Some
-            | Some _, None
-            | None, Some _ -> Error "completion blob ref/digest pair is incomplete"
-        | HandleLifecycle.Active
-        | HandleLifecycle.Abandoned _
-        | HandleLifecycle.Retired -> Ok None
+        : System.Threading.Tasks.Task<Result<RunCompletion option, string>> =
+        task {
+            match record.Lifecycle with
+            | HandleLifecycle.CompletedAwaitingJoin completion ->
+                match completion.CompletionRef, completion.CompletionDigest with
+                | None, None -> return Ok None
+                | Some blobRef, Some expectedDigest ->
+                    match! journal.Writer.BlobWriter.Read blobRef with
+                    | Error err -> return Error err
+                    | Ok body ->
+                        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
+                            return Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
+                        else
+                            return tryDecode record agentId body completedAt |> Result.map Some
+                | Some _, None
+                | None, Some _ -> return Error "completion blob ref/digest pair is incomplete"
+            | HandleLifecycle.Active
+            | HandleLifecycle.Abandoned _
+            | HandleLifecycle.Retired -> return Ok None
+        }
 
     /// Read raw blob body for decode-first JoinDrain path.
     let tryReadBody
         (journal: AgentJournal)
         (record: HandleRecord)
-        : Result<string option * BlobRef option * BlobDigest option, string> =
-        match record.Lifecycle with
-        | HandleLifecycle.CompletedAwaitingJoin completion ->
-            match completion.CompletionRef, completion.CompletionDigest with
-            | None, None -> Ok(None, None, None)
-            | Some blobRef, Some expectedDigest ->
-                match journal.Writer.BlobWriter.Read blobRef with
-                | Error err -> Error err
-                | Ok body ->
-                    if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                        Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
-                    else
-                        Ok(Some body, Some blobRef, Some expectedDigest)
-            | Some _, None
-            | None, Some _ -> Error "completion blob ref/digest pair is incomplete"
-        | HandleLifecycle.Active
-        | HandleLifecycle.Abandoned _
-        | HandleLifecycle.Retired -> Ok(None, None, None)
+        : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
+        task {
+            match record.Lifecycle with
+            | HandleLifecycle.CompletedAwaitingJoin completion ->
+                match completion.CompletionRef, completion.CompletionDigest with
+                | None, None -> return Ok(None, None, None)
+                | Some blobRef, Some expectedDigest ->
+                    match! journal.Writer.BlobWriter.Read blobRef with
+                    | Error err -> return Error err
+                    | Ok body ->
+                        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
+                            return Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
+                        else
+                            return Ok(Some body, Some blobRef, Some expectedDigest)
+                | Some _, None
+                | None, Some _ -> return Error "completion blob ref/digest pair is incomplete"
+            | HandleLifecycle.Active
+            | HandleLifecycle.Abandoned _
+            | HandleLifecycle.Retired -> return Ok(None, None, None)
+        }

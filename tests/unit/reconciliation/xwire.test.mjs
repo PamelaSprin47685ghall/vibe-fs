@@ -44,12 +44,12 @@ import { buildTurn } from '../../../dist/Application/Reconciliation/CompletedTur
 const SESSION = 'ses_x'
 const session = sessionId(SESSION)
 
-const liveJournal = () => {
+const liveJournal = async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-xwire-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
-  const append = (factValue, run = undefined) => {
-    const result = agentJournal.appendAgent(
+  const append = async (factValue, run = undefined) => {
+    const result = await agentJournal.appendAgent(
       stream.session(session),
       run === undefined ? undefined : providerRun(run),
       factValue,
@@ -70,8 +70,8 @@ const liveJournal = () => {
   }
 }
 
-const seedAuthority = (append) => {
-  append(
+const seedAuthority = async (append) => {
+  await append(
     agentFact('AuthorityRootAccepted', {
       SessionId: session,
       LogicalRunId: logicalRunId('run-1'),
@@ -85,8 +85,8 @@ const seedAuthority = (append) => {
   )
 }
 
-const seedFallbackCursor = (append) => {
-  append(
+const seedFallbackCursor = async (append) => {
+  await append(
     agentFact('FallbackCursorAdvanced', {
       SessionId: session,
       LogicalRunId: logicalRunId('run-1'),
@@ -101,10 +101,10 @@ const seedFallbackCursor = (append) => {
 }
 
 /** Blog frame whose TextRef points at a REAL blob in the journal. */
-const seedBlogFrame = (append, writeBlob, { body = 'frame body', cutoff = 2, digest } = {}) => {
-  const written = agentJournal.writeBlob(body, writeBlob)
+const seedBlogFrame = async (append, writeBlob, { body = 'frame body', cutoff = 2, digest } = {}) => {
+  const written = await agentJournal.writeBlob(body, writeBlob)
   assert.equal(written.ok, true, written.ok ? '' : JSON.stringify(written.error))
-  append(
+  await append(
     agentFact('BlogObservationCommitted', {
       SessionId: session,
       BloggerSessionId: sessionId('ses_blogger'),
@@ -168,23 +168,23 @@ test('XWIRE_no_journal_is_a_noop', async () => {
 })
 
 test('XWIRE_no_session_id_in_output_is_a_noop', async () => {
-  const live = liveJournal()
+  const live = await liveJournal()
   const scope = makeScope(live.journal)
   await applyTransform(snapshotPort(), live.journal, scope, { messages: [{ info: {}, parts: [] }] })
   live.cleanup()
 })
 
 test('XWIRE_unarmed_session_is_a_noop', async () => {
-  const live = liveJournal()
-  seedAuthority(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
   const scope = makeScope(live.journal)
   await applyTransform(snapshotPort(), live.journal, scope, transformOutput())
   live.cleanup()
 })
 
 test('XWIRE_missing_physical_user_message_throws', async () => {
-  const live = liveJournal()
-  seedAuthority(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   const output = { messages: [{ info: { id: 'asst-9', role: 'assistant', sessionID: SESSION }, parts: [] }] }
@@ -193,8 +193,8 @@ test('XWIRE_missing_physical_user_message_throws', async () => {
 })
 
 test('XWIRE_missing_snapshot_port_throws', async () => {
-  const live = liveJournal()
-  seedAuthority(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   await assert.rejects(() => applyTransform(undefined, live.journal, scope, transformOutput()), /public session snapshot/)
@@ -202,8 +202,8 @@ test('XWIRE_missing_snapshot_port_throws', async () => {
 })
 
 test('XWIRE_snapshot_error_throws', async () => {
-  const live = liveJournal()
-  seedAuthority(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   await assert.rejects(
@@ -214,8 +214,8 @@ test('XWIRE_snapshot_error_throws', async () => {
 })
 
 test('XWIRE_unbindable_run_throws', async () => {
-  const live = liveJournal()
-  seedAuthority(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   // The assistant answers a different user message: no bindable run after user-1.
@@ -227,7 +227,7 @@ test('XWIRE_unbindable_run_throws', async () => {
 })
 
 test('XWIRE_missing_projections_throws', async () => {
-  const live = liveJournal()
+  const live = await liveJournal()
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   await assert.rejects(
@@ -239,20 +239,20 @@ test('XWIRE_missing_projections_throws', async () => {
 
 // ── the probe path: full journal, real blobs, arming consumed ───────────────
 
-const armedProbeSetup = ({ cutoff = 2, digest } = {}) => {
-  const live = liveJournal()
-  seedAuthority(live.append)
-  seedFallbackCursor(live.append)
+const armedProbeSetup = async ({ cutoff = 2, digest } = {}) => {
+  const live = await liveJournal()
+  await seedAuthority(live.append)
+  await seedFallbackCursor(live.append)
   const output = transformOutput()
   const resolvedDigest = digest ?? cutoffDigestOf(output.messages, 1)
-  seedBlogFrame(live.append, live.journal, { cutoff, digest: resolvedDigest })
+  await seedBlogFrame(live.append, live.journal, { cutoff, digest: resolvedDigest })
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
   return { live, scope, output, resolvedDigest }
 }
 
 test('XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', async () => {
-  const { live, scope, output } = armedProbeSetup()
+  const { live, scope, output } = await armedProbeSetup()
 
   await applyTransform(snapshotPort(), live.journal, scope, output)
 
@@ -273,11 +273,11 @@ test('XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', async () =
 test('XWIRE_no_material_spends_slot_without_probe', async () => {
   // CTX-011: coverage not ahead of the request start → no candidate → the
   // armed slot must survive so a later main can still probe.
-  const live = liveJournal()
-  seedAuthority(live.append)
-  seedFallbackCursor(live.append)
+  const live = await liveJournal()
+  await seedAuthority(live.append)
+  await seedFallbackCursor(live.append)
   const output = transformOutput()
-  seedBlogFrame(live.append, live.journal, { cutoff: 2, digest: cutoffDigestOf(output.messages, 1) })
+  await seedBlogFrame(live.append, live.journal, { cutoff: 2, digest: cutoffDigestOf(output.messages, 1) })
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
 
@@ -298,7 +298,7 @@ test('XWIRE_no_material_spends_slot_without_probe', async () => {
 })
 
 test('XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
-  const { live, scope } = armedProbeSetup({ cutoff: 2 })
+  const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 
   await applyTransform(snapshotPort(), live.journal, scope, output)
@@ -315,7 +315,7 @@ test('XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
     '/repo/dir',
   )
 
-  reconcileAttempt(live.journal, scope, completedTurn)
+  await reconcileAttempt(live.journal, scope, completedTurn)
 
   const prefix = agentJournal.snapshot(live.journal).AgentProjections.Sessions.get(session).PrefixEpoch
   assert.equal(idValue.prefixEpoch(prefix.EpochId), 1n, 'epoch advanced by the promotion')
@@ -325,7 +325,7 @@ test('XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
 })
 
 test('XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
-  const { live, scope } = armedProbeSetup({ cutoff: 2 })
+  const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 
   await applyTransform(snapshotPort(), live.journal, scope, output)
@@ -338,7 +338,7 @@ test('XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
     undefined,
     '/repo/dir',
   )
-  reconcileAttempt(live.journal, scope, failedTurn)
+  await reconcileAttempt(live.journal, scope, failedTurn)
 
   const sessionState = agentJournal.snapshot(live.journal).AgentProjections.Sessions.get(session)
   assert.equal(sessionState.PrefixEpoch, undefined, 'no promotion from a failed attempt')
@@ -347,7 +347,7 @@ test('XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
 })
 
 test('XWIRE_unknown_reread_keeps_the_plan', async () => {
-  const { live, scope } = armedProbeSetup({ cutoff: 2 })
+  const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 
   await applyTransform(snapshotPort(), live.journal, scope, output)
@@ -360,7 +360,7 @@ test('XWIRE_unknown_reread_keeps_the_plan', async () => {
     undefined,
     '/repo/dir',
   )
-  reconcileAttempt(live.journal, scope, unknownTurn)
+  await reconcileAttempt(live.journal, scope, unknownTurn)
 
   assert.ok(PluginRuntimeScope__TryAttemptPlan(scope, session, providerRun('asst-9')), 'a provisional reread must keep the plan')
   live.cleanup()

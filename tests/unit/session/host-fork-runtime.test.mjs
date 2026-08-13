@@ -79,9 +79,9 @@ const fakeSessions = () => {
 }
 
 /** Real runtime over a real journal with a fake session host. */
-const live = (behaviour = {}) => {
+const live = async (behaviour = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hfrt-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
   const sessions = fakeSessions()
   const runtime = new HostForkRuntime(PARENT, sessions, opened.journal)
@@ -98,8 +98,8 @@ const live = (behaviour = {}) => {
   }
 }
 
-const link = (j, agentId, child, agent = 'fast-coder', role = Role.Coder) => {
-  const result = HandleController_link(j, PARENT, agentId, child, agent, role, HandleOwnership.DurableParentHandle)
+const link = async (j, agentId, child, agent = 'fast-coder', role = Role.Coder) => {
+  const result = await HandleController_link(j, PARENT, agentId, child, agent, role, HandleOwnership.DurableParentHandle)
   assert.equal(result.tag, 0, result.tag === 1 ? result.fields[0] : '')
 }
 
@@ -126,7 +126,7 @@ const batchItems = (batch) => [batch.fields[0], ...listItems(batch.fields[1])]
 // ── InstallRun / FailRun / MarkReady ─────────────────────────────────────────
 
 test('HFRT_install_run_registers_pending_run_and_child', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const run = installRun(liveCtx.runtime, 'ag1', sessionId('ses_c1'), Role.Coder)
 
   assert.equal(run.AgentId, 'ag1')
@@ -143,7 +143,7 @@ test('HFRT_install_run_registers_pending_run_and_child', async () => {
 })
 
 test('HFRT_mark_ready_is_noop_and_run_stays_pending', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const run = installRun(liveCtx.runtime, 'ag2', sessionId('ses_c2'), Role.Coder)
   markReady(liveCtx.runtime, run)
   assert.equal(pendingRunCount(liveCtx.runtime), 1, 'MarkReady must not settle the run')
@@ -152,8 +152,8 @@ test('HFRT_mark_ready_is_noop_and_run_stays_pending', async () => {
 })
 
 test('HFRT_fail_run_writes_durable_failure_and_settles_source', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'ag3', sessionId('ses_c3'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag3', sessionId('ses_c3'))
   const run = installRun(liveCtx.runtime, 'ag3', sessionId('ses_c3'), Role.Coder)
   failRun(liveCtx.runtime, run, 'boom')
 
@@ -178,8 +178,8 @@ test('HFRT_fail_run_writes_durable_failure_and_settles_source', async () => {
 })
 
 test('HFRT_fail_run_cancelled_code_is_CANCELLED', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'ag4', sessionId('ses_c4'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag4', sessionId('ses_c4'))
   const run = installRun(liveCtx.runtime, 'ag4', sessionId('ses_c4'), Role.Coder)
   failRun(liveCtx.runtime, run, 'cancelled')
   const outcome = await run.Source.get_Task()
@@ -188,17 +188,17 @@ test('HFRT_fail_run_cancelled_code_is_CANCELLED', async () => {
 })
 
 test('HFRT_is_retired_handle_reflects_durable_projection', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'ag5', sessionId('ses_c5'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag5', sessionId('ses_c5'))
   assert.equal(isRetiredHandle(liveCtx.runtime, 'ag5'), false)
 
   // Retire the handle through the projection CAS path.
   const { handleController, handleCompletionCodec, agentCompletion } = await import('../support/domain.mjs')
   const sealed = agentCompletion.completedRun({ runId: 'run-ag5', agentId: 'ag5', agentName: 'fast-coder', workRecord: 'w' })
   const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-  const recorded = handleController.recordCompletion(liveCtx.journal, PARENT, 'ag5', 'Terminal', body, sessionId('ses_c5'))
+  const recorded = await handleController.recordCompletion(liveCtx.journal, PARENT, 'ag5', 'Terminal', body, sessionId('ses_c5'))
   assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
-  const consumed = handleController.consume(liveCtx.journal, PARENT, await import('../support/domain.mjs').then((m) => m.handleId.agent('ag5')))
+  const consumed = await handleController.consume(liveCtx.journal, PARENT, await import('../support/domain.mjs').then((m) => m.handleId.agent('ag5')))
   assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
   assert.equal(isRetiredHandle(liveCtx.runtime, 'ag5'), true)
   liveCtx.cleanup()
@@ -207,8 +207,8 @@ test('HFRT_is_retired_handle_reflects_durable_projection', async () => {
 // ── CancelAgent ──────────────────────────────────────────────────────────────
 
 test('HFRT_cancel_agent_fails_pending_run_and_aborts_child', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'ag6', sessionId('ses_c6'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag6', sessionId('ses_c6'))
   const run = installRun(liveCtx.runtime, 'ag6', sessionId('ses_c6'), Role.Coder)
   adoptChild(liveCtx.runtime, 'ag6', sessionId('ses_c6'))
   const source = run.Source.get_Task()
@@ -227,8 +227,8 @@ test('HFRT_cancel_agent_fails_pending_run_and_aborts_child', async () => {
 })
 
 test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', async () => {
-  const liveCtx = live()
-  link(liveCtx.journal, 'ag7', sessionId('ses_c7'))
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag7', sessionId('ses_c7'))
   const run = installRun(liveCtx.runtime, 'ag7', sessionId('ses_c7'), Role.Coder)
   adoptChild(liveCtx.runtime, 'ag7', sessionId('ses_c7'))
   failRun(liveCtx.runtime, run, 'already done')
@@ -244,7 +244,7 @@ test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', asyn
 // ── Join / JoinAvailable ─────────────────────────────────────────────────────
 
 test('HFRT_join_available_without_work_is_nothing_to_join', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await joinAvailable(liveCtx.runtime, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NothingToJoin')
@@ -252,7 +252,7 @@ test('HFRT_join_available_without_work_is_nothing_to_join', async () => {
 })
 
 test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   installRun(liveCtx.runtime, 'ag8', sessionId('ses_c8'), Role.Coder)
 
   const result = await joinAvailable(liveCtx.runtime, 5, Promise.resolve('DeadlineExpired'))
@@ -263,7 +263,7 @@ test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
 })
 
 test('HFRT_join_single_times_out_when_no_completion_arrives', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   installRun(liveCtx.runtime, 'ag9', sessionId('ses_c9'), Role.Coder)
 
   const result = await joinAny(liveCtx.runtime, [30])
@@ -273,7 +273,7 @@ test('HFRT_join_single_times_out_when_no_completion_arrives', async () => {
 })
 
 test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   cancelRuntime(liveCtx.runtime)
   assert.equal(runtimeIsCancelled(liveCtx.runtime), true)
   const result = await joinAny(liveCtx.runtime, [10])
@@ -285,7 +285,7 @@ test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
 // ── validatePermit branches (via JoinWithPermit / JoinAvailableWithPermit) ───
 
 test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await joinWithPermit(liveCtx.runtime, permit, [])
   assert.equal(result.tag, 1)
@@ -296,7 +296,7 @@ test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
 })
 
 test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
   const result = await joinWithPermit(liveCtx.runtime, permit, [])
@@ -307,7 +307,7 @@ test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
 })
 
 test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const sequence = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   // A member the family no longer has: recovery closed over something that has since vanished,
   // which is the only thing that may invalidate a permit.
@@ -320,7 +320,7 @@ test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => 
 })
 
 test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const permit = validPermit(liveCtx.journal)
 
   // A grandchild appearing mid-join grows the closure. It was created live, so it needed no
@@ -339,7 +339,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
 })
 
 test('HFRT_join_with_valid_permit_passes_validation', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const permit = validPermit(liveCtx.journal)
   const result = await joinWithPermit(liveCtx.runtime, permit, [10])
   assert.equal(result.tag, 1)
@@ -350,7 +350,7 @@ test('HFRT_join_with_valid_permit_passes_validation', async () => {
 // ── AwaitAgent ───────────────────────────────────────────────────────────────
 
 test('HFRT_await_agent_unknown_id_is_error', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await awaitAgent(liveCtx.runtime, 'ghost', [])
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'Unknown agent id: ghost')
@@ -358,7 +358,7 @@ test('HFRT_await_agent_unknown_id_is_error', async () => {
 })
 
 test('HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9', [])
   assert.equal(result.tag, 1)

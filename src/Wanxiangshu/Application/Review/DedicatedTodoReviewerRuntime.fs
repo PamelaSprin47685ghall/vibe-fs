@@ -88,43 +88,52 @@ module DedicatedTodoReviewerRuntime =
         (journal: AgentJournal)
         (blobRef: BlobRef)
         (expected: BlobDigest)
-        : Result<ObligationList, string> =
-        match journal.Writer.BlobWriter.Read blobRef with
-        | Error reason -> Error reason
-        | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expected -> Error "obligation blob digest mismatch"
-        | Ok body -> MagicTodoObligationCodec.tryDecode body
+        : Task<Result<ObligationList, string>> =
+        task {
+            match! journal.Writer.BlobWriter.Read blobRef with
+            | Error reason -> return Error reason
+            | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expected ->
+                return Error "obligation blob digest mismatch"
+            | Ok body -> return MagicTodoObligationCodec.tryDecode body
+        }
 
-    let private openingRaw (journal: AgentJournal) (life: LifeProjection) =
-        match journal.Writer.BlobWriter.Read life.OpeningTextRef with
-        | Ok body when HostDigest.sha256Hex body = BlobDigest.value life.OpeningTextDigest -> body
-        | _ -> ""
+    let private openingRaw (journal: AgentJournal) (life: LifeProjection) : Task<string> =
+        task {
+            match! journal.Writer.BlobWriter.Read life.OpeningTextRef with
+            | Ok body when HostDigest.sha256Hex body = BlobDigest.value life.OpeningTextDigest -> return body
+            | _ -> return ""
+        }
 
     let private managerCheckpointLwr
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (life: LifeProjection)
         (reviewFrontier: XTraceCursor)
-        =
-        let snapshot = AgentJournal.snapshot journal
+        : Task<string> =
+        task {
+            let snapshot = AgentJournal.snapshot journal
 
-        let xTrace =
-            AgentProjection.tryFind managerSessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.XTrace)
-            |> Option.defaultValue XTraceProjection.empty
+            let xTrace =
+                AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.XTrace)
+                |> Option.defaultValue XTraceProjection.empty
 
-        let start =
-            ManagerOpeningFloor.workRecordStart
-                life
-                (MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo)
-                xTrace
-            |> Option.defaultValue life.OpeningCursor
+            let start =
+                ManagerOpeningFloor.workRecordStart
+                    life
+                    (MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo)
+                    xTrace
+                |> Option.defaultValue life.OpeningCursor
 
-        let range =
-            { MagicTodoLwr.BoundedRange.StartInclusive = start
-              MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
+            let range =
+                { MagicTodoLwr.BoundedRange.StartInclusive = start
+                  MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
 
-        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
-        |> Option.defaultValue ""
+            let! record =
+                LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
+
+            return record |> Option.defaultValue ""
+        }
 
     let private captureManagerSnapshot
         (snapshot: ISessionSnapshotPort option)
@@ -137,7 +146,7 @@ module DedicatedTodoReviewerRuntime =
             task {
                 match! port.GetMessages managerSessionId with
                 | Error reason -> return Error("snapshot unavailable: " + reason)
-                | Ok messages -> return XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
+                | Ok messages -> return! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
             }
 
     let private treeHash (gitTree: GitTreePort option) (reviewId: TodoReviewId) =
@@ -197,17 +206,21 @@ module DedicatedTodoReviewerRuntime =
         (prepared: TodoWritePrepared)
         (enlisted: DedicatedTodoReviewerEnlisted)
         (reviewWorkStart: XTraceCursor)
-        =
-        let assigned =
-            MagicTodoAfter.planEnsureReview HostDigest.sha256Hex prepared enlisted reviewWorkStart
+        : Task<Result<unit, string>> =
+        task {
+            let assigned =
+                MagicTodoAfter.planEnsureReview HostDigest.sha256Hex prepared enlisted reviewWorkStart
 
-        AgentJournal.appendMagicTodo
-            (StreamId.Session managerSessionId)
-            None
-            (MagicTodoFact.TodoProcessReviewAssigned assigned)
-            journal
-        |> Result.mapError JournalAppendFailure.describe
-        |> Result.map ignore
+            match!
+                AgentJournal.appendMagicTodo
+                    (StreamId.Session managerSessionId)
+                    None
+                    (MagicTodoFact.TodoProcessReviewAssigned assigned)
+                    journal
+            with
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+            | Ok _ -> return Ok()
+        }
 
     let ensureReview
         (timerPort: ITimerPort)
@@ -277,7 +290,7 @@ module DedicatedTodoReviewerRuntime =
                                                   DedicatedReviewerId = dedicatedId
                                                   ReviewerSessionId = childId }
 
-                                            match
+                                            match!
                                                 AgentJournal.appendMagicTodo
                                                     (StreamId.Session managerSessionId)
                                                     None
@@ -293,7 +306,7 @@ module DedicatedTodoReviewerRuntime =
                         | Ok enlisted ->
                             match checkpoint.Assignment with
                             | Some _ ->
-                                match TodoProcessReviewProgram.tryConclude journal lifeId writeId with
+                                match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
                                 | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
                                 | _ -> return Ok()
                             | None ->
@@ -313,7 +326,7 @@ module DedicatedTodoReviewerRuntime =
 
                                 let reviewId = MagicTodo.todoReviewId HostDigest.sha256Hex lifeId writeId
 
-                                match
+                                match!
                                     ReviewBarrier.openBarrier
                                         (Some journal)
                                         managerSessionId
@@ -323,27 +336,34 @@ module DedicatedTodoReviewerRuntime =
                                 with
                                 | Error reason -> return Error reason
                                 | Ok() ->
-                                    match
-                                        readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest,
+                                    let! oldItemsResult =
+                                        readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
+
+                                    let! proposedResult =
                                         readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
-                                    with
+
+                                    match oldItemsResult, proposedResult with
                                     | Error reason, _
                                     | _, Error reason -> return Error reason
                                     | Ok oldItems, Ok proposed ->
                                         match! captureManagerSnapshot snapshot journal managerSessionId with
                                         | Error reason -> return Error reason
                                         | Ok() ->
+                                            let! opening = openingRaw journal managerLife
+
+                                            let! checkpointLwr =
+                                                managerCheckpointLwr
+                                                    journal
+                                                    managerSessionId
+                                                    managerLife
+                                                    checkpoint.ReviewFrontier
+
                                             let request: ProcessReviewRequest =
                                                 { TodoReviewId = reviewId
                                                   TodoWriteId = writeId
                                                   ManagerLifeId = lifeId
-                                                  OpeningRaw = openingRaw journal managerLife
-                                                  ManagerCheckpointLwr =
-                                                    managerCheckpointLwr
-                                                        journal
-                                                        managerSessionId
-                                                        managerLife
-                                                        checkpoint.ReviewFrontier
+                                                  OpeningRaw = opening
+                                                  ManagerCheckpointLwr = checkpointLwr
                                                   OldTodo = oldItems
                                                   ProposedTodo = proposed }
 
@@ -425,7 +445,7 @@ module DedicatedTodoReviewerRuntime =
                                                 match reviewWorkStart with
                                                 | Error reason -> return Error reason
                                                 | Ok reviewWorkStart ->
-                                                    match
+                                                    match!
                                                         appendAssigned
                                                             journal
                                                             managerSessionId
@@ -435,7 +455,7 @@ module DedicatedTodoReviewerRuntime =
                                                     with
                                                     | Error reason -> return Error reason
                                                     | Ok() ->
-                                                        match
+                                                        match!
                                                             TodoProcessReviewProgram.tryConclude journal lifeId writeId
                                                         with
                                                         | TodoProcessReviewProgram.ConcludeOutcome.Failed reason ->
@@ -457,7 +477,7 @@ module DedicatedTodoReviewerRuntime =
             match! ensureReview timerPort sessions snapshot gitTree journal managerSessionId lifeId writeId with
             | Error reason -> return Error reason
             | Ok() ->
-                match TodoProcessReviewProgram.tryConclude journal lifeId writeId with
+                match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
                 | TodoProcessReviewProgram.ConcludeOutcome.Concluded -> return Ok()
                 | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
                 | TodoProcessReviewProgram.ConcludeOutcome.Pending _ ->

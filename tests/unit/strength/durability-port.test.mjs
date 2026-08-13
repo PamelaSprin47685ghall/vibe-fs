@@ -28,13 +28,13 @@ const frame = () => resultOf(Frame.StrengthFrame_tryBuild(
   toList([batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])]),
 )).value
 
-test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', () => {
+test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
   const durability = Durability.create(raw, store)
   const bundle = frame()
 
-  const published = durability.PublishPrepared({
+  const published = await durability.PublishPrepared({
     OwnerSessionId: session('owner'),
     DecisionId: decision('d1'),
     TargetProviderRun: run('run-1'),
@@ -45,13 +45,13 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   })
   assert.equal(caseOf(published), 'Published')
 
-  let projection = resultOf(durability.LoadProjection())
+  let projection = resultOf(await durability.LoadProjection())
   assert.equal(projection.ok, true)
   const view = Projection.StrengthProjectionModule_tryCandidate(decision('d1'), projection.value)
   assert.equal(view.Prepared.FrameDigest, bundle.Digest)
   assert.equal([...view.Prepared.MaterialPayloads].length, 1)
 
-  const loaded = resultOf(durability.LoadFrameBundle(view.Prepared))
+  const loaded = resultOf(await durability.LoadFrameBundle(view.Prepared))
   assert.equal(loaded.ok, true)
   assert.equal(loaded.value.Digest, bundle.Digest)
   assert.equal(loaded.value.ByteLength, bundle.ByteLength)
@@ -59,10 +59,10 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   const promotion = Events.StrengthEvents_promoted(
     session('owner'), decision('d1'), run('run-1'), bundle.Digest, view.Prepared.MaterialPayloads,
   )
-  assert.equal(resultOf(durability.Append(promotion)).ok, true)
-  assert.equal(resultOf(durability.Append(Events.StrengthEvents_traced(decision('d1'), 5n, 7n))).ok, true)
+  assert.equal(resultOf(await durability.Append(promotion)).ok, true)
+  assert.equal(resultOf(await durability.Append(Events.StrengthEvents_traced(decision('d1'), 5n, 7n))).ok, true)
 
-  projection = resultOf(durability.LoadProjection())
+  projection = resultOf(await durability.LoadProjection())
   assert.equal(projection.ok, true)
   assert.equal(Projection.StrengthProjectionModule_isPromoted(decision('d1'), projection.value), true)
   const range = Projection.StrengthProjectionModule_tryTraceRange(decision('d1'), projection.value)
@@ -70,13 +70,13 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   assert.equal(range.EndExclusive, 7n)
 })
 
-test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', () => {
+test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
   const raw = Raw.GitRawStore_createInMemory()
   const store = PersistStore.EventStore_create(raw)
   const durability = Durability.create(raw, store)
   const first = frame()
 
-  assert.equal(caseOf(durability.PublishPrepared({
+  assert.equal(caseOf(await durability.PublishPrepared({
     OwnerSessionId: session('owner'),
     DecisionId: decision('d1'),
     TargetProviderRun: run('run-1'),
@@ -92,7 +92,7 @@ test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', () =>
     toList([batch(1, [exchange('grep', '{"pattern":"x"}', 'a:1:x')])]),
   )).value
 
-  const conflict = durability.PublishPrepared({
+  const conflict = await durability.PublishPrepared({
     OwnerSessionId: session('owner'),
     DecisionId: decision('d1'),
     TargetProviderRun: run('run-1'),

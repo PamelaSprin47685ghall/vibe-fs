@@ -36,19 +36,19 @@ const main = sessionId('ses-nudge-main')
 const blogger = sessionId('ses-nudge-blogger')
 const journalStream = (id) => stream.session(id)
 
-const append = (journal, id, value, run) => {
-  const result = AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
+const append = async (journal, id, value, run) => {
+  const result = await AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
   assert.equal(caseOf(result), 'Ok')
 }
 
-const seed = ({ withAssociation = true, withTip = true } = {}) => {
+const seed = async ({ withAssociation = true, withTip = true } = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-latest-tip-'))
-  const created = agentJournal.create({ directory })
+  const created = await agentJournal.create({ directory })
   assert.equal(created.ok, true)
   const journal = created.journal
 
   if (withAssociation) {
-    append(journal, main, agentFact('CompanionBloggerLinked', {
+    await append(journal, main, agentFact('CompanionBloggerLinked', {
       SessionId: main,
       BloggerSessionId: blogger,
       BloggerAgent: 'fast-blogger',
@@ -57,7 +57,7 @@ const seed = ({ withAssociation = true, withTip = true } = {}) => {
 
   if (withTip) {
     const field = 'primitive-obsession'
-    append(journal, main, agentFact('BlogObservationCommitted', {
+    await append(journal, main, agentFact('BlogObservationCommitted', {
       SessionId: main,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId('req-nudge-1'),
@@ -87,34 +87,34 @@ const seed = ({ withAssociation = true, withTip = true } = {}) => {
   }
 }
 
-test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', () => {
-  const fixture = seed()
+test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async () => {
+  const fixture = await seed()
   try {
-    const result = latestTipNudge(fixture.journal, blogger)
+    const result = await latestTipNudge(fixture.journal, blogger)
     assert.ok(typeof result === 'string' && result.length > 0, 'expected tip guidance text')
     assert.match(result, /tip = "primitive-obsession"/)
     assert.match(result, /Create a distinct (domain )?type/)
     // Second call for same tip must be identity-only (durable Full delivery recorded).
-    const again = latestTipNudge(fixture.journal, blogger)
+    const again = await latestTipNudge(fixture.journal, blogger)
     assert.equal(again, 'tip: primitive-obsession')
   } finally {
     fixture.dispose()
   }
 })
 
-test('ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', () => {
-  const fixture = seed({ withTip: false })
+test('ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
+  const fixture = await seed({ withTip: false })
   try {
-    assert.equal(latestTipNudge(fixture.journal, blogger), undefined)
+    assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
   } finally {
     fixture.dispose()
   }
 })
 
-test('ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', () => {
-  const fixture = seed({ withAssociation: false })
+test('ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
+  const fixture = await seed({ withAssociation: false })
   try {
-    assert.equal(latestTipNudge(fixture.journal, blogger), undefined)
+    assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
   } finally {
     fixture.dispose()
   }
@@ -129,15 +129,15 @@ const markerOutput = (messages) => {
   return result?.parts?.[0]?.state?.output
 }
 
-test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', () => {
-  const result = resultOf(tryInject(undefined, 'ses-auto-injected', guideline, anchor))
+test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
+  const result = resultOf(await tryInject(undefined, 'ses-auto-injected', guideline, anchor))
   assert.equal(result.ok, true, result.error ?? '')
   assert.equal(markerOutput(result.value), guideline)
 })
 
-test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', () => {
+test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const result = resultOf(tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor))
+  const result = resultOf(await tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor))
   assert.equal(result.ok, true, result.error ?? '')
   assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
 })

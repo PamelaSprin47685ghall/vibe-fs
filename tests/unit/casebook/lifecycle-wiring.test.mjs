@@ -47,8 +47,8 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-const envelopeTypes = (raw, store) => {
-  const events = resultOf(loadEvents(raw, store.OpenSnapshot()))
+const envelopeTypes = async (raw, store) => {
+  const events = resultOf(await loadEvents(raw, await store.OpenSnapshot()))
   assert.equal(events.ok, true, `loadEvents ok, got ${JSON.stringify(events.error)}`)
   return listItems(events.value).map((e) => caseOf(e))
 }
@@ -70,7 +70,7 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () =
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionId))
+    const fetched = resultOf(await fetchCase(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'case present after finalize')
     assert.equal(fetched.value.Q, CANONICAL_Q)
@@ -89,7 +89,7 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () =
     assert.equal(second.ok, false, 'second finalize must be refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
-    const still = resultOf(fetchCase(store, raw, 10, sessionId))
+    const still = resultOf(await fetchCase(store, raw, 10, sessionId))
     assert.equal(still.value.A, publishedA, 'original synthesized case retained')
   } finally {
     resetSessionPort()
@@ -113,17 +113,17 @@ test('lifecycle_cleanupInspector_never_writes_eventstore', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const types = envelopeTypes(raw, store)
+    const types = await envelopeTypes(raw, store)
     assert.equal(types.length, 0, 'cleanup must not append Casebook events')
 
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionId))
+    const fetched = resultOf(await fetchCase(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value === undefined || fetched.value === null, true, 'no case after cleanup')
 
     // A later finalize after cleanup alone (no re-seed) is a no-op Ok.
     const after = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(after.ok, true)
-    assert.equal(envelopeTypes(raw, store).length, 0)
+    assert.equal((await envelopeTypes(raw, store)).length, 0)
   } finally {
     setEnabled(undefined)
     cleanup()
@@ -141,7 +141,7 @@ test('lifecycle_missing_answer_is_noop_finalize', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    assert.equal(envelopeTypes(raw, store).length, 0)
+    assert.equal((await envelopeTypes(raw, store)).length, 0)
   } finally {
     setEnabled(undefined)
     cleanup()
@@ -163,17 +163,17 @@ test('lifecycle_touchAccess_and_touchCaseAccess_append_accessed', async () => {
     const [raw, store] = acquire(common)
 
     // Direct workflow helper (in-memory-compatible path).
-    const touched = resultOf(touchCaseAccess(store, raw, sessionId))
+    const touched = resultOf(await touchCaseAccess(store, raw, sessionId))
     assert.equal(touched.ok, true, `touchCaseAccess ok, got ${JSON.stringify(touched.error)}`)
 
     // Host-side helper (acquires WorkspaceEventStore for workspace).
-    touchAccess(dir, sessionId)
+    await touchAccess(dir, sessionId)
 
-    const types = envelopeTypes(raw, store)
+    const types = await envelopeTypes(raw, store)
     assert.equal(types.includes('CaseCaptured'), true)
     assert.equal(types.filter((t) => t === 'CaseAccessed').length >= 1, true)
 
-    const cases = project(10, resultOf(loadEvents(raw, store.OpenSnapshot())).value)
+    const cases = project(10, resultOf(await loadEvents(raw, await store.OpenSnapshot())).value)
     assert.equal(mapEntries(cases).some(([k]) => k === sessionId), true)
   } finally {
     resetSessionPort()
@@ -196,7 +196,7 @@ test('lifecycle_disabled_marker_skips_publication', async () => {
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    assert.equal(envelopeTypes(raw, store).length, 0)
+    assert.equal((await envelopeTypes(raw, store)).length, 0)
   } finally {
     setEnabled(undefined)
     rmSync(dir, { recursive: true, force: true })

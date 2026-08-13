@@ -60,12 +60,12 @@ const views = (projection) => ({
   active: handleProjection.activeHandles(projection).map((r) => handleProjection.read(r).handle).sort(),
 })
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
   }
@@ -143,12 +143,12 @@ test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
   assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(HANDLE, reopened.value)), 'Active')
 })
 
-test('EXEC_009_recordAbandon_CAS_first_wins', () => {
-  withJournal((j) => {
-    const linked = handleController.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
+test('EXEC_009_recordAbandon_CAS_first_wins', async () => {
+  await withJournal(async (j) => {
+    const linked = await handleController.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
-    const first = handleController.recordAbandon(
+    const first = await handleController.recordAbandon(
       j,
       PARENT,
       'h1',
@@ -157,7 +157,7 @@ test('EXEC_009_recordAbandon_CAS_first_wins', () => {
     )
     assert.equal(first.ok, true, first.ok ? '' : first.error)
 
-    const second = handleController.recordAbandon(
+    const second = await handleController.recordAbandon(
       j,
       PARENT,
       'h1',

@@ -45,27 +45,27 @@ const rootFact = (sid, canonicalRole, kind = 'HumanRoot') =>
     SelectedTier: 'fast',
   })
 
-const withJournal = (facts, fn) => {
+const withJournal = async (facts, fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-tpol-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   const journal = opened.journal
   try {
     for (const [sid, inner] of facts) {
-      const res = AgentJournalModule_appendAgent(stream.session(sid), undefined, inner, journal)
+      const res = await AgentJournalModule_appendAgent(stream.session(sid), undefined, inner, journal)
       assert.equal(caseOf(res), 'Ok', 'fact must fold')
     }
-    fn(journal)
+    await fn(journal)
   } finally {
     try { opened.dispose() } catch {}
     rmSync(dir, { recursive: true, force: true })
   }
 }
 
-test('TPOL_sessionDead_false_without_journal_or_on_fresh_journal', () => {
+test('TPOL_sessionDead_false_without_journal_or_on_fresh_journal', async () => {
   assert.equal(sessionDead(null, MAIN), false)
   assert.equal(sessionDead(undefined, MAIN), false)
-  withJournal([], (journal) => {
+  await withJournal([], async (journal) => {
     assert.equal(sessionDead(journal, MAIN), false)
   })
 })
@@ -78,8 +78,8 @@ test('TPOL_roleName_lowercases_roles_and_handles_none', () => {
   assert.equal(roleName(undefined), undefined)
 })
 
-test('TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', () => {
-  withJournal([[MAIN, linkFact()]], (journal) => {
+test('TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', async () => {
+  await withJournal([[MAIN, linkFact()]], async (journal) => {
     const record = tryLinkedChild(journal, 'ses_child')
     assert.ok(record, 'linked child must be findable')
     assert.equal(record.TargetAgent, 'fast-coder')
@@ -100,16 +100,16 @@ test('TPOL_isTopLevelManager_without_journal_uses_parent_map_only', () => {
   assert.equal(isTopLevelManager(new Map([['ses_x', 'ses_p']]), null, 'ses_x'), false)
 })
 
-test('TPOL_isTopLevelManager_linked_child_without_authority_is_not_top_level', () => {
-  withJournal([[MAIN, linkFact()]], (journal) => {
+test('TPOL_isTopLevelManager_linked_child_without_authority_is_not_top_level', async () => {
+  await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_child'), false, 'linked child is not top level')
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_other'), true, 'unknown session without parent is top level')
     assert.equal(isTopLevelManager(new Map([['ses_other', 'ses_main']]), journal, 'ses_other'), false)
   })
 })
 
-test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parented', () => {
-  withJournal([[MAIN, rootFact(MAIN, 'manager')]], (journal) => {
+test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parented', async () => {
+  await withJournal([[MAIN, rootFact(MAIN, 'manager')]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_main'), true)
     assert.equal(
       isTopLevelManager(new Map([['ses_main', 'ses_par']]), journal, 'ses_main'),
@@ -119,10 +119,10 @@ test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parent
   })
 
   // Orchestrator parent (its own canonical role is Orchestrator) suppresses.
-  withJournal([
+  await withJournal([
     [MAIN, rootFact(MAIN, 'manager')],
     [sessionId('ses_par'), rootFact(sessionId('ses_par'), 'orchestrator', 'AgentOwnerRoot')],
-  ], (journal) => {
+  ], async (journal) => {
     assert.equal(
       isTopLevelManager(new Map([['ses_main', 'ses_par']]), journal, 'ses_main'),
       false,
@@ -131,20 +131,20 @@ test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parent
   })
 })
 
-test('TPOL_isTopLevelManager_non_manager_run_is_never_top_level', () => {
-  withJournal([[MAIN, rootFact(MAIN, 'coder')]], (journal) => {
+test('TPOL_isTopLevelManager_non_manager_run_is_never_top_level', async () => {
+  await withJournal([[MAIN, rootFact(MAIN, 'coder')]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_main'), false)
   })
 })
 
-test('TPOL_mainSealedForBlogger_false_without_journal_or_unlinked_main', () => {
+test('TPOL_mainSealedForBlogger_false_without_journal_or_unlinked_main', async () => {
   assert.equal(mainSealedForBlogger(null, MAIN), false)
-  withJournal([], (journal) => {
+  await withJournal([], async (journal) => {
     assert.equal(mainSealedForBlogger(journal, MAIN), false)
   })
 })
 
-test('TPOL_mainSealedForBlogger_retired_handle_seals_main', () => {
+test('TPOL_mainSealedForBlogger_retired_handle_seals_main', async () => {
   const completed = agentFact('HandleCompleted', {
     ParentSessionId: MAIN,
     Handle: handleId.agent('h1'),
@@ -153,36 +153,36 @@ test('TPOL_mainSealedForBlogger_retired_handle_seals_main', () => {
     CompletionDigest: undefined,
   })
   const retired = agentFact('HandleRetired', { ParentSessionId: MAIN, Handle: handleId.agent('h1') })
-  withJournal([
+  await withJournal([
     [MAIN, linkFact()],
     [MAIN, completed],
     [MAIN, retired],
-  ], (journal) => {
+  ], async (journal) => {
     assert.equal(mainSealedForBlogger(journal, CHILD), true, 'retired handle must seal the child main for Blogger')
     assert.equal(mainSealedForBlogger(journal, OTHER), false)
     assert.equal(mainSealedForBlogger(journal, MAIN), false, 'parent session itself is not the main')
   })
 })
 
-test('TPOL_outstandingBackground_manager_has_listable_handles', () => {
-  withJournal([[MAIN, linkFact()]], (journal) => {
+test('TPOL_outstandingBackground_manager_has_listable_handles', async () => {
+  await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.Manager, MAIN), true)
     assert.equal(outstandingBackground(journal, () => false, Role.Manager, OTHER), false)
   })
   assert.equal(outstandingBackground(null, () => false, Role.Manager, MAIN), false)
 })
 
-test('TPOL_outstandingBackground_devops_checks_durable_then_live_pty', () => {
-  withJournal([[MAIN, linkFact()]], (journal) => {
+test('TPOL_outstandingBackground_devops_checks_durable_then_live_pty', async () => {
+  await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.DevOps, MAIN), true, 'durable handle counts')
   })
-  withJournal([], (journal) => {
+  await withJournal([], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.DevOps, MAIN), false)
     assert.equal(outstandingBackground(journal, () => true, Role.DevOps, MAIN), true, 'live pty probe counts')
   })
 })
 
-test('TPOL_outstandingBackground_orchestrator_active_jobs', () => {
+test('TPOL_outstandingBackground_orchestrator_active_jobs', async () => {
   const created = agentFact('ManagerJobCreated', {
     ManagerJobId: managerJobId('job_1'),
     ManagerSessionId: CHILD,
@@ -194,15 +194,15 @@ test('TPOL_outstandingBackground_orchestrator_active_jobs', () => {
   })
   // Orchestrator projection is session-agnostic: any active job answers true
   // for any session key.
-  withJournal([[sessionId('ses_orch'), created]], (journal) => {
+  await withJournal([[sessionId('ses_orch'), created]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.Orchestrator, sessionId('ses_orch')), true)
     assert.equal(outstandingBackground(journal, () => false, Role.Orchestrator, OTHER), true, 'active jobs are global')
   })
   assert.equal(outstandingBackground(null, () => false, Role.Orchestrator, MAIN), false)
 })
 
-test('TPOL_outstandingBackground_other_roles_never_outstanding', () => {
-  withJournal([[MAIN, linkFact()]], (journal) => {
+test('TPOL_outstandingBackground_other_roles_never_outstanding', async () => {
+  await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => true, Role.Coder, MAIN), false)
     assert.equal(outstandingBackground(journal, () => true, null, MAIN), false)
     assert.equal(outstandingBackground(null, () => true, null, MAIN), false)

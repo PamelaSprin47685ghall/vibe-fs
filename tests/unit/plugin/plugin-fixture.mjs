@@ -96,7 +96,7 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
     session: {
       create: async (args) => {
         counter += 1
-        const id = `host-child-${counter}`
+        const id = `host-child-${counter}-${Math.random().toString(16).slice(2)}`
         createdIds.push(id)
         childSessions.push({
           id,
@@ -251,13 +251,13 @@ export const withExecutablePlugin = async (body, options = {}) => {
       const runtimePath = forWorkspace(directory)
       const port = bootPort(gitCommonDir(directory))
       // Fable uncurries openJournal to (runtimeId, processId, startedAt) => Result.
-      const openJournal = (runtimeId, processId, startedAt) => {
-        const resumed = port.ResumeOrCreate(runtimeId, processId, startedAt)
+      const openJournal = async (runtimeId, processId, startedAt) => {
+        const resumed = await port.ResumeOrCreate(runtimeId, processId, startedAt)
         if (resumed.tag !== 0) return resumed
         const [writer, , projection] = resumed.fields[0]
         return AgentJournalModule_createFromProjection(writer, projection)
       }
-      const journalResult = acquireJournal(runtimePath, process.pid, new Date(), openJournal)
+      const journalResult = await acquireJournal(runtimePath, process.pid, new Date(), openJournal)
       // Fable Result: tag 0 is Ok, and `fields` is the fields ARRAY — the
       // journal itself is fields[0].
       if (journalResult.tag !== 0) throw new Error(`journal acquire rejected: ${journalResult.fields?.[0]?.Reason}`)
@@ -272,6 +272,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
         messages,
         abortedIds,
         pushHostMessage: client.__pushHostMessage,
+        pendingTerminalRecords: new Set(),
       }
       // EXEC-004's completion cell is claimed by `HostForkRuntime.Complete`
       // (Session/HostForkRuntime.fs:121-145), which lives behind the private
@@ -323,11 +324,14 @@ export const withExecutablePlugin = async (body, options = {}) => {
             if (proof.tag !== 0) {
               throw new Error(`JoinableCompletion(${agentId}) rejected: ${proof.fields?.[0]}`)
             }
-            const recorded = recordCompletion(runtime.journal, SessionIdModule_create(parentSessionId), proof.fields[0])
-            if (recorded.tag !== 0) {
-              throw new Error(`HandleCompleted(${agentId}) rejected: ${recorded.fields?.[0]}`)
-            }
-            byChild.delete(sessionId)
+            const recording = recordCompletion(runtime.journal, SessionIdModule_create(parentSessionId), proof.fields[0]).then((recorded) => {
+              if (recorded.tag !== 0) {
+                throw new Error(`HandleCompleted(${agentId}) rejected: ${recorded.fields?.[0]}`)
+              }
+              byChild.delete(sessionId)
+            })
+            runtime.pendingTerminalRecords.add(recording)
+            recording.finally(() => runtime.pendingTerminalRecords.delete(recording))
           }
         }
       })
@@ -337,10 +341,17 @@ export const withExecutablePlugin = async (body, options = {}) => {
       }
       await body(hooks, directory, createdIds, runtime)
     } finally {
-      // Release the fixture's extra journal reference before the plugin releases
-      // its owning reference and closes the writer.
-      if (runtime !== undefined) releaseJournal(runtime.journal)
+      // Keep the fixture's extra journal reference alive while plugin disposal
+      // drains detached HostFork cancellation. AbortSession is sequenced after
+      // durable handle abandonment, so observing every created child aborted is
+      // a deterministic teardown barrier before releasing the last writer ref.
       await hooks.dispose()
+      if (runtime !== undefined) {
+        for (let attempt = 0; attempt < 100 && !createdIds.every((id) => abortedIds.includes(id)); attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+        releaseJournal(runtime.journal)
+      }
     }
   } finally {
     rmSync(directory, { recursive: true, force: true })
@@ -386,8 +397,8 @@ export const withRestartablePlugin = async (body) => {
 }
 
 /** AGENT-007 layer one: a durable HumanRoot names the session's managed agent. */
-export const acceptAuthorityRoot = (runtime, sessionId, agent) => {
-  const result = Runtime__AcceptHumanRoot(
+export const acceptAuthorityRoot = async (runtime, sessionId, agent) => {
+  const result = await Runtime__AcceptHumanRoot(
     forJournal(runtime.journal),
     SessionIdModule_create(sessionId),
     PhysicalUserMessageIdModule_create(`root-${sessionId}`),
@@ -405,8 +416,8 @@ export const acceptAuthorityRoot = (runtime, sessionId, agent) => {
  * The agent comes from the pending claim (PromptDispatcher.fs:147-151), not from
  * a separate argument.
  */
-export const acceptChildAgentOwnerRoot = (runtime, childSessionId, promptKey) => {
-  const result = Runtime__AcceptAgentOwnerRoot(
+export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptKey) => {
+  const result = await Runtime__AcceptAgentOwnerRoot(
     forJournal(runtime.journal),
     PromptKeyModule_create(promptKey),
     SessionIdModule_create(childSessionId),
@@ -419,11 +430,11 @@ export const acceptChildAgentOwnerRoot = (runtime, childSessionId, promptKey) =>
   }
 }
 
-export const activateLife = (runtime, sessionId) => {
+export const activateLife = async (runtime, sessionId) => {
   const sid = SessionIdModule_create(sessionId)
   const lifeId = ManagerLifeIdModule_create(`life-${sessionId}`)
   const stream = new StreamId(1, [sid])
-  AgentJournalModule_appendManagerLifecycle(
+  await AgentJournalModule_appendManagerLifecycle(
     stream,
     new ManagerLifecycleFact(0, [{
       LifeId: lifeId,
@@ -435,7 +446,7 @@ export const activateLife = (runtime, sessionId) => {
     }]),
     runtime.journal,
   )
-  AgentJournalModule_appendManagerLifecycle(
+  await AgentJournalModule_appendManagerLifecycle(
     stream,
     new ManagerLifecycleFact(1, [{
       ActivationPromptKey: PromptKeyModule_create(''),
@@ -451,7 +462,7 @@ export const activateLife = (runtime, sessionId) => {
  * GLORY-037 / TODO-010: first unblessed suicide requires ≥1 TodoWriteAccepted.
  * `activateLife` only opens the Life; T1 is a separate Magic Todo fact pair.
  */
-export const acceptFirstTodoWrite = (runtime, sessionId) => {
+export const acceptFirstTodoWrite = async (runtime, sessionId) => {
   const sid = SessionIdModule_create(sessionId)
   const lifeId = ManagerLifeIdModule_create(`life-${sessionId}`)
   const stream = new StreamId(1, [sid])
@@ -472,7 +483,7 @@ export const acceptFirstTodoWrite = (runtime, sessionId) => {
     new XTraceCursor(0n),
     'magic-todo.v1',
   )
-  const preparedResult = AgentJournalModule_appendMagicTodo(
+  const preparedResult = await AgentJournalModule_appendMagicTodo(
     stream,
     undefined,
     new MagicTodoFact(0, [prepared]),
@@ -491,7 +502,7 @@ export const acceptFirstTodoWrite = (runtime, sessionId) => {
     PhysicalSuccessEvidence.LiveAfterSuccess,
     'magic-todo.v1',
   )
-  const acceptedResult = AgentJournalModule_appendMagicTodo(
+  const acceptedResult = await AgentJournalModule_appendMagicTodo(
     stream,
     undefined,
     new MagicTodoFact(1, [accepted]),
@@ -518,7 +529,7 @@ export const acceptFirstTodoWrite = (runtime, sessionId) => {
  * TurnFormalText. `Role.Coder` is Fable union case tag 2 (Kernel/Roles.fs);
  * the runner pins it so a Role-order edit fails loudly instead of mislabeling.
  */
-export const notifyCompleted = (runtime, childSessionId, sessionWideText, turnFormalText, roleCaseTag = 2) => {
+export const notifyCompleted = async (runtime, childSessionId, sessionWideText, turnFormalText, roleCaseTag = 2) => {
   runtime.terminalPort.NotifyTerminal(
     SessionIdModule_create(childSessionId),
     // Fable union: case tag 0 is `Completed`, and `fields` is the fields ARRAY —
@@ -538,6 +549,7 @@ export const notifyCompleted = (runtime, childSessionId, sessionWideText, turnFo
       ],
     ),
   )
+  await Promise.all([...runtime.pendingTerminalRecords])
 }
 
 /**

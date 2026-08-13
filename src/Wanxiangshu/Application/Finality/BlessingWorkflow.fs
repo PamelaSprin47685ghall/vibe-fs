@@ -64,18 +64,19 @@ module BlessingWorkflow =
 
                     let material = logs |> List.map snd |> String.concat "\n\n"
 
-                    match journal.WriteBlob material with
+                    match! journal.WriteBlob material with
                     | Error _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
                     | Ok blob ->
-                        FinalityJournal.appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.FinalityBlessed
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   GitTreeHash = requestTree
-                                   WorkRecordBundleRef = blob.BlobRef
-                                   WorkRecordBundleDigest = blob.BlobDigest |})
+                        do!
+                            FinalityJournal.appendLifecycle
+                                journal
+                                (ManagerLifecycleFact.FinalityBlessed
+                                    {| SessionId = managerSessionId
+                                       LifeId = lifeId
+                                       RequestId = requestId
+                                       GitTreeHash = requestTree
+                                       WorkRecordBundleRef = blob.BlobRef
+                                       WorkRecordBundleDigest = blob.BlobDigest |})
 
                         members
                         |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)

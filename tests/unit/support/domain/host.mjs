@@ -322,9 +322,9 @@ export const handleController = (() => {
   // recordCompletion facade still accepts (agentId, kind, body) for tests; it
   // mints JoinableCompletion via Domain TerminalEvidence (no raw Aborted path).
   return {
-    link: (journal, parentId, agentId, childSessionId, targetAgent, role, ownership = handleOwnership.durableParentHandle()) =>
-      resultOf(m.link(journal, parentId, agentId, childSessionId, targetAgent, role, ownership)),
-    recordCompletion: (journal, parentId, agentId, kind, body, childSessionId) => {
+    link: async (journal, parentId, agentId, childSessionId, targetAgent, role, ownership = handleOwnership.durableParentHandle()) =>
+      resultOf(await m.link(journal, parentId, agentId, childSessionId, targetAgent, role, ownership)),
+    recordCompletion: async (journal, parentId, agentId, kind, body, childSessionId) => {
       const kindName = typeof kind === 'string' ? kind : caseOf(kind)
       const content = body === undefined || body === null ? '' : String(body)
       if (content === '') return { ok: false, error: 'proven terminal body must be non-empty' }
@@ -345,11 +345,11 @@ export const handleController = (() => {
       }
       const proof = resultOf(tryFromProvenTerminal(evidence))
       if (!proof.ok) return proof
-      return resultOf(m.recordCompletion(journal, parentId, proof.value))
+      return resultOf(await m.recordCompletion(journal, parentId, proof.value))
     },
-    recordAbandon: (journal, parentId, agentId, reason, abandonedAt) =>
+    recordAbandon: async (journal, parentId, agentId, reason, abandonedAt) =>
       resultOf(
-        m.recordAbandon(
+        await m.recordAbandon(
           journal,
           parentId,
           agentId,
@@ -357,9 +357,9 @@ export const handleController = (() => {
           abandonedAt,
         ),
       ),
-    retire: (journal, parentId, agentId) => resultOf(m.retire(journal, parentId, agentId)),
-    consume: (journal, parentId, handle) => {
-      const value = resultOf(m.consume(journal, parentId, handle))
+    retire: async (journal, parentId, agentId) => resultOf(await m.retire(journal, parentId, agentId)),
+    consume: async (journal, parentId, handle) => {
+      const value = resultOf(await m.consume(journal, parentId, handle))
       return value.ok ? { ok: true, record: value.value } : { ok: false, error: caseOf(value.error) }
     },
   }
@@ -379,8 +379,8 @@ export const handleCompletionCodec = (() => {
     encodeOutcome: (runId, outcome) => m.encodeOutcome(runId, outcome),
     tryDecode: (record, agentId, json, completedAt = utcOffset('2024-01-01T00:00:00.000Z')) =>
       resultOf(m.tryDecode(record, agentId, json, completedAt)),
-    tryRead: (journal, record, agentId, completedAt = utcOffset('2024-01-01T00:00:00.000Z')) => {
-      const value = resultOf(m.tryRead(journal, record, agentId, completedAt))
+    tryRead: async (journal, record, agentId, completedAt = utcOffset('2024-01-01T00:00:00.000Z')) => {
+      const value = resultOf(await m.tryRead(journal, record, agentId, completedAt))
       return value.ok ? { ok: true, value: unwrapOption(value.value) } : { ok: false, error: value.error }
     },
     tryReadBody: (journal, record) => resultOf(m.tryReadBody(journal, record)),
@@ -800,9 +800,9 @@ export const fallbackController = (() => {
      * LOOP-006 bridge half: after LoopKillArmed is observed, the completion path
      * records one confirmed failure. Tests drive that single writer directly.
      */
-    recordConfirmedFailure: (journal, budget, session, run, reason) => {
+    recordConfirmedFailure: async (journal, budget, session, run, reason) => {
       const result = resultOf(
-        recordConfirmedFailure(journal, budget, sessionId(session), providerRun(run), reason),
+        await recordConfirmedFailure(journal, budget, sessionId(session), providerRun(run), reason),
       )
       if (!result.ok) return result
       let outcome = caseOf(result.value)

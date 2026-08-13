@@ -55,7 +55,7 @@ test('CASE004_fetch_uses_shelfmark_and_natural_fresh_refreshed_no_case_consequen
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
+    assert.equal(resultOf(await archive(store, raw, caseRec)).ok, true)
 
     const tool = await buildTool(dir, store, raw)
     assert.equal(tool.Name, 'fetch')
@@ -107,7 +107,7 @@ test('CASE009_fetch_never_writes_the_subject', async () => {
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    resultOf(archive(store, raw, caseRec))
+    resultOf(await archive(store, raw, caseRec))
     const tool = await buildTool(dir, store, raw)
     await tool.Execute(hostArgs({ shelfmark: shelfmarkFor('s1', 'Q') }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'hello')
@@ -129,7 +129,7 @@ test('CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
     }
-    resultOf(archive(store, raw, caseRec))
+    resultOf(await archive(store, raw, caseRec))
     const tool = await buildTool(dir, store, raw)
     const shelfmark = shelfmarkFor('s1', 'Q')
 

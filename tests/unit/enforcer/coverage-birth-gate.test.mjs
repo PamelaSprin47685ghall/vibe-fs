@@ -26,12 +26,12 @@ const { XTraceProjection_empty, XTraceProjection_semanticCursorFor, XTraceProjec
 )
 const { PrefixEpochIdModule_initial } = await import('../../../dist/Kernel/Identity.js')
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'coverage-birth-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -43,14 +43,14 @@ const BLOG = sessionId('ses-blog')
 
 const semantic = (messages) => xTraceCapture.semantic({ messages })
 
-test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () => {
-  withJournal((journal) => {
+test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', async () => {
+  await withJournal(async (journal) => {
     // Two turns captured → sequences 1,2. Coverage already at head (2).
     const messages = [
       { role: 'user', parts: [xTraceCapture.text('task')] },
       { role: 'assistant', parts: [xTraceCapture.text('work')] },
     ]
-    const xTrace = xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
+    const xTrace = await xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
     assert.equal(listItems(xTraceParts(xTrace)).length, 2)
     const headSeq = Number(listItems(xTraceParts(xTrace)).at(-1).Cursor.Sequence)
     assert.equal(headSeq, 2)
@@ -96,10 +96,10 @@ test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () =>
   })
 })
 
-test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () => {
-  withJournal((journal) => {
+test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', async () => {
+  await withJournal(async (journal) => {
     const messages = [{ role: 'user', parts: [xTraceCapture.text('only')] }]
-    const xTrace = xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
+    const xTrace = await xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
     assert.equal(listItems(xTraceParts(xTrace)).length, 1)
 
     const blog = blogProjection.empty
@@ -160,13 +160,13 @@ test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () => {
   })
 })
 
-test('ENFORCER_045_mainContext_accepts_strict_advance', () => {
-  withJournal((journal) => {
+test('ENFORCER_045_mainContext_accepts_strict_advance', async () => {
+  await withJournal(async (journal) => {
     const messages = [
       { role: 'user', parts: [xTraceCapture.text('task')] },
       { role: 'assistant', parts: [xTraceCapture.text('work')] },
     ]
-    const xTrace = xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
+    const xTrace = await xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
     const projection = semantic(messages)
     const blog = blogProjection.empty
     const ingestCursor = XTraceProjection_semanticCursorFor(0n, xTrace)

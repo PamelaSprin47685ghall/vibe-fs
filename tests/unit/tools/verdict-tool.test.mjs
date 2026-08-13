@@ -70,7 +70,7 @@ test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
 
 test('JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext())
 
@@ -82,7 +82,7 @@ test('JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
 
 test('JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = await hooks.tool.judge.execute({}, hostContext())
 
@@ -104,7 +104,7 @@ test('JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
 
 test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = await hooks.tool.judge.execute(
       { verdict: 'REVISE' },
@@ -118,7 +118,7 @@ test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
 
 test('JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = await hooks.tool.judge.execute(
       { verdict: 'REVISE' },

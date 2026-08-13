@@ -202,10 +202,13 @@ module XTraceCapture =
                 let recorded =
                     existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
+                // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
                 let mutable cursor = XTraceProjection.headSequence existing
+                // DSL-MUTABLE: algorithm-scratch — semantic turn ordinal within this capture batch
                 let mutable turnIndex = 0
 
                 for message in messages do
+                    // DSL-MUTABLE: algorithm-scratch — semantic part ordinal within the current turn
                     let mutable partIndex = 0
 
                     for source in message.Parts do
@@ -282,12 +285,16 @@ module XTraceCapture =
                     let recorded =
                         existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
+                    // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
                     let mutable cursor = XTraceProjection.headSequence existing
+                    // DSL-MUTABLE: algorithm-scratch — first capture failure while preserving source order
                     let mutable failure: string option = None
+                    // DSL-MUTABLE: algorithm-scratch — semantic turn ordinal within this stable capture batch
                     let mutable turnIndex = 0
 
                     for messageId, message in List.zip messageIds messages do
                         if Option.isNone failure then
+                            // DSL-MUTABLE: algorithm-scratch — semantic part ordinal within the current stable turn
                             let mutable partIndex = 0
 
                             for source in message.Parts do
@@ -381,7 +388,7 @@ module XTraceCapture =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (projection: ProviderSemanticProjection)
-        : XTraceProjectionState option =
+        : Task<XTraceProjectionState option> =
         projection.Messages
         |> List.map (fun message ->
             { Role = message.Role
@@ -400,7 +407,7 @@ module XTraceCapture =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (messages: ProviderWireCapture.CapturedWireMessage list)
-        : XTraceProjectionState option =
+        : Task<XTraceProjectionState option> =
         messages
         |> List.map (fun message ->
             { Role = message.Role
@@ -424,7 +431,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (messageIds: string list)
         (projection: ProviderSemanticProjection)
-        : Result<XTraceProjectionState option, string> =
+        : Task<Result<XTraceProjectionState option, string>> =
         projection.Messages
         |> List.map (fun message ->
             { Role = message.Role
@@ -442,7 +449,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (messageIds: string list)
         (messages: ProviderWireCapture.CapturedWireMessage list)
-        : Result<XTraceProjectionState option, string> =
+        : Task<Result<XTraceProjectionState option, string>> =
         messages
         |> List.map (fun message ->
             { Role = message.Role

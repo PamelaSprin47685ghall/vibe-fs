@@ -94,110 +94,116 @@ module BloggerCoordinator =
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         (promptKey: PromptKey option)
-        : Result<unit, string> =
-        let requestId = BloggerRequestContext.requestId ctx
-        let mainSessionId = BloggerRequestContext.mainSessionId ctx
-        let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
-        let epoch = BloggerRequestContext.observedPrefixEpoch ctx
-        let frameEpoch = BloggerRequestContext.frameEpochId ctx
+        : Task<Result<unit, string>> =
+        task {
+            let requestId = BloggerRequestContext.requestId ctx
+            let mainSessionId = BloggerRequestContext.mainSessionId ctx
+            let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
+            let epoch = BloggerRequestContext.observedPrefixEpoch ctx
+            let frameEpoch = BloggerRequestContext.frameEpochId ctx
 
-        let kind, prevSeq, nextSeq, selectedDigests, contextPayload =
-            match ctx with
-            | BloggerRequestContext.Main main ->
-                "main",
-                main.PreviousIngestedThroughSequence,
-                main.NextIngestedThroughSequence,
-                [],
-                createObj
-                    [ "kind", box "main"
-                      "toml", box main.Toml
-                      "delta_digest", box (BlobDigest.value main.DeltaDigest)
-                      "prev_ingest", box main.PreviousIngestedThroughSequence
-                      "next_ingest", box main.NextIngestedThroughSequence
-                      "prev_cutoff", box main.PreviousCoverableTurnCutoffExclusive
-                      "next_cutoff", box main.NextCoverableTurnCutoffExclusive
-                      "next_prefix_digest", box main.NextCoveredPrefixDigest
-                      "frame_epoch", box (FrameEpochId.value main.FrameEpochId)
-                      "observed_prefix_epoch", box (PrefixEpochId.value main.ObservedPrefixEpochId) ]
-            | BloggerRequestContext.Squash squash ->
-                "squash",
-                0L,
-                0L,
-                squash.FrameDigests,
-                createObj
-                    [ "kind", box "squash"
-                      "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
-                      "covered_frame_count", box squash.CoveredFrameCount
-                      "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
-                      "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
+            let kind, prevSeq, nextSeq, selectedDigests, contextPayload =
+                match ctx with
+                | BloggerRequestContext.Main main ->
+                    "main",
+                    main.PreviousIngestedThroughSequence,
+                    main.NextIngestedThroughSequence,
+                    [],
+                    createObj
+                        [ "kind", box "main"
+                          "toml", box main.Toml
+                          "delta_digest", box (BlobDigest.value main.DeltaDigest)
+                          "prev_ingest", box main.PreviousIngestedThroughSequence
+                          "next_ingest", box main.NextIngestedThroughSequence
+                          "prev_cutoff", box main.PreviousCoverableTurnCutoffExclusive
+                          "next_cutoff", box main.NextCoverableTurnCutoffExclusive
+                          "next_prefix_digest", box main.NextCoveredPrefixDigest
+                          "frame_epoch", box (FrameEpochId.value main.FrameEpochId)
+                          "observed_prefix_epoch", box (PrefixEpochId.value main.ObservedPrefixEpochId) ]
+                | BloggerRequestContext.Squash squash ->
+                    "squash",
+                    0L,
+                    0L,
+                    squash.FrameDigests,
+                    createObj
+                        [ "kind", box "squash"
+                          "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
+                          "covered_frame_count", box squash.CoveredFrameCount
+                          "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
+                          "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
 
-        // One open request per Blogger. Restart / re-offer with a new RequestId
-        // must supersede a stale open slot (fold rejects two opens on one session).
-        // PromptKey fill-in reuses the existing open context blob/digest.
-        let projections = AgentJournal.snapshot journal
+            // One open request per Blogger. Restart / re-offer with a new RequestId
+            // must supersede a stale open slot (fold rejects two opens on one session).
+            // PromptKey fill-in reuses the existing open context blob/digest.
+            let projections = AgentJournal.snapshot journal
 
-        let existingOpen =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun s -> s.BloggerCycles)
-            |> Option.bind (fun cycles -> Map.tryFind requestId cycles.OpenByRequestId)
+            let existingOpen =
+                projections.AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun s -> s.BloggerCycles)
+                |> Option.bind (fun cycles -> Map.tryFind requestId cycles.OpenByRequestId)
 
-        let staleOpen =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun s -> s.BloggerCycles)
-            |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+            let staleOpen =
+                projections.AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun s -> s.BloggerCycles)
+                |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
-        match staleOpen with
-        | Some openReq when openReq.RequestId <> requestId ->
-            BloggerAbandon.byRequestId
-                journal
-                openReq.RequestId
-                mainSessionId
-                bloggerSessionId
-                "superseded-by-new-materialize"
+            match staleOpen with
+            | Some openReq when openReq.RequestId <> requestId ->
+                do!
+                    BloggerAbandon.byRequestId
+                        journal
+                        openReq.RequestId
+                        mainSessionId
+                        bloggerSessionId
+                        "superseded-by-new-materialize"
+            | _ -> ()
 
-            Ok()
-        | _ -> Ok()
-        |> function
-            | Error e -> Error e
-            | Ok() ->
-                let writeContext () =
-                    match existingOpen with
-                    | Some openReq when openReq.PromptKey.IsNone && promptKey.IsSome ->
-                        // Fill-in: keep the frozen pre-send blob/digest.
-                        Ok(openReq.ContextRef, openReq.ContextDigest)
-                    | Some openReq when openReq.PromptKey = promptKey -> Ok(openReq.ContextRef, openReq.ContextDigest)
-                    | _ ->
-                        match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
-                        | Error error -> Error error
-                        | Ok blob -> Ok(blob.BlobRef, blob.BlobDigest)
+            let! contextResult =
+                match existingOpen with
+                | Some openReq when openReq.PromptKey.IsNone && promptKey.IsSome ->
+                    // Fill-in: keep the frozen pre-send blob/digest.
+                    Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
+                | Some openReq when openReq.PromptKey = promptKey ->
+                    Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
+                | _ ->
+                    task {
+                        match! journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
+                        | Error error -> return Error error
+                        | Ok blob -> return Ok(blob.BlobRef, blob.BlobDigest)
+                    }
 
-                match writeContext () with
-                | Error error -> Error error
-                | Ok(contextRef, contextDigest) ->
-                    let fact =
-                        ContextFact.BloggerRequestMaterialized
-                            {| RequestId = requestId
-                               MainSessionId = mainSessionId
-                               BloggerSessionId = bloggerSessionId
-                               RequestKind = kind
-                               ContextRef = contextRef
-                               ContextDigest = contextDigest
-                               ObservedPrefixEpochId = epoch
-                               PreviousIngestedThroughSequence = prevSeq
-                               NextIngestedThroughSequence = nextSeq
-                               FrameEpochId = frameEpoch
-                               SelectedFrameDigests = selectedDigests
-                               PromptKey = promptKey |}
+            match contextResult with
+            | Error error -> return Error error
+            | Ok(contextRef, contextDigest) ->
+                let fact =
+                    ContextFact.BloggerRequestMaterialized
+                        {| RequestId = requestId
+                           MainSessionId = mainSessionId
+                           BloggerSessionId = bloggerSessionId
+                           RequestKind = kind
+                           ContextRef = contextRef
+                           ContextDigest = contextDigest
+                           ObservedPrefixEpochId = epoch
+                           PreviousIngestedThroughSequence = prevSeq
+                           NextIngestedThroughSequence = nextSeq
+                           FrameEpochId = frameEpoch
+                           SelectedFrameDigests = selectedDigests
+                           PromptKey = promptKey |}
 
-                    match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
-                    | Error failure -> Error(JournalAppendFailure.describe failure)
-                    | Ok _ -> Ok()
+                match! AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
+                | Error failure -> return Error(JournalAppendFailure.describe failure)
+                | Ok _ -> return Ok()
+        }
 
-    let private abandonRequest (journal: AgentJournal option) (ctx: BloggerRequestContext) (reason: string) : unit =
+    let private abandonRequest
+        (journal: AgentJournal option)
+        (ctx: BloggerRequestContext)
+        (reason: string)
+        : Task =
         match journal with
-        | None -> ()
+        | None -> Task.FromResult(()) :> Task
         | Some j ->
             BloggerAbandon.openRequest
                 j
@@ -232,13 +238,13 @@ module BloggerCoordinator =
                     return DecisionEffect.Sealed
                 else
                     // Pre-send: freeze semantic context with PromptKey=None.
-                    match materializeRequest j ctx None with
+                    match! materializeRequest j ctx None with
                     | Error reason -> return DecisionEffect.MaterializeFailed reason
                     | Ok() ->
                         // Re-check after materialize: main may complete during blob write.
                         // DrainWindow.Open still allows send until next seal cycle ends.
                         if blocksNew (Some j) mainId scope key then
-                            abandonRequest journal ctx "main-sealed-before-send"
+                            do! abandonRequest journal ctx "main-sealed-before-send"
                             forceSealRuntime scope key
                             return DecisionEffect.Sealed
                         else
@@ -252,9 +258,9 @@ module BloggerCoordinator =
                                 // can prove this RequestId owns the assistant parent.
                                 // Detached accept may still leave parent unresolved until
                                 // PhysicalAccepted; binding the key itself is durable now.
-                                match materializeRequest j ctx (Some promptKey) with
+                                match! materializeRequest j ctx (Some promptKey) with
                                 | Error reason ->
-                                    abandonRequest journal ctx reason
+                                    do! abandonRequest journal ctx reason
                                     scope.ClearCurrentRequest key
                                     host.InvalidateBloggerCache()
                                     return DecisionEffect.StartFailed reason
@@ -263,7 +269,7 @@ module BloggerCoordinator =
                                     | BloggerRequestContext.Squash _ -> return DecisionEffect.StartedSquash
                                     | BloggerRequestContext.Main _ -> return DecisionEffect.Started
                             | Error reason ->
-                                abandonRequest journal ctx reason
+                                do! abandonRequest journal ctx reason
                                 scope.ClearCurrentRequest key
                                 host.InvalidateBloggerCache()
                                 return DecisionEffect.StartFailed reason

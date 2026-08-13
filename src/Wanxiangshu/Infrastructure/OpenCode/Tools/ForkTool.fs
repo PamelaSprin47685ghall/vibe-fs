@@ -204,11 +204,13 @@ module ForkTool =
 
     let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
         task {
+            let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
+
             let basePrompt =
                 ForkChildPayload.relay
                     (forkInstructions runtime.ParentId)
                     request.Charge
-                    (runtime.ParentWorkRecordOf runtime.ParentId)
+                    parentWorkRecord
                     []
                     None
 

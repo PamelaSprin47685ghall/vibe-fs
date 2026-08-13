@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
@@ -16,5 +17,5 @@ type OrchestratorHostDeps =
       OnRunStarted: SessionId -> Role -> string option -> unit
       RepoPath: string
       TargetBranch: string
-      ParentWorkRecordFor: SessionId -> string option
-      ChildWorkRecordFor: SessionId -> string option }
+      ParentWorkRecordFor: SessionId -> Task<string option>
+      ChildWorkRecordFor: SessionId -> Task<string option> }

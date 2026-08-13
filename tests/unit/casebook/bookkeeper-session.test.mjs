@@ -118,7 +118,7 @@ test('CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal(
       resultOf(
-        archive(store, raw, {
+        await archive(store, raw, {
           SessionId: 's-session-refresh',
           Q: 'Q keep',
           A: 'A keep',
@@ -138,7 +138,7 @@ test('CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
     assert.equal(programCalls.length >= 1, true, 'js-bookkeeper must reshape Q and A in one program')
     assert.equal(prompts.some((text) => String(text).includes('CaseRefresh')), true)
 
-    const fetched = resultOf(fetchCase(store, raw, 10, 's-session-refresh'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's-session-refresh'))
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.Q, 'Q keep')
     assert.equal(fetched.value.A, CANONICAL_A)
@@ -175,7 +175,7 @@ test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', asy
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionIdKey))
+    const fetched = resultOf(await fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(fetched.value.Q, CANONICAL_Q)
     assert.notEqual(fetched.value.Q, 'Where do Case facts live?')
     assert.equal(fetched.value.A, CANONICAL_A)
@@ -204,7 +204,7 @@ test('CASE006_missing_session_port_keeps_old_case', async () => {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal(
       resultOf(
-        archive(store, raw, {
+        await archive(store, raw, {
           SessionId: 's-noport',
           Q: 'Q keep',
           A: 'A keep',
@@ -220,7 +220,7 @@ test('CASE006_missing_session_port_keeps_old_case', async () => {
     assert.equal(refreshed.ok, false)
     assert.equal(String(refreshed.error).includes('session port'), true)
 
-    const fetched = resultOf(fetchCase(store, raw, 10, 's-noport'))
+    const fetched = resultOf(await fetchCase(store, raw, 10, 's-noport'))
     assert.equal(fetched.value.Q, 'Q keep')
     assert.equal(fetched.value.A, 'A keep')
   } finally {

@@ -29,8 +29,8 @@ const {
   SessionQuiescenceGate__ObserveIdle_Z31B28506: observeIdle,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js')
 
-const seedRoot = (journal, sid) => {
-  const result = agentJournal.appendAgent(
+const seedRoot = async (journal, sid) => {
+  const result = await agentJournal.appendAgent(
     stream.session(sid),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -62,12 +62,12 @@ const capturingPort = (sends) => ({
 
 test('HOST_004_idle_manager_continuation_consumes_one_permit_and_claims_once', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'idle-authority-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 
   try {
     const sid = sessionId('ses-idle-authority')
-    seedRoot(created.journal, sid)
+    await seedRoot(created.journal, sid)
 
     const gate = new SessionQuiescenceGate()
     beginAttempt(gate, sid)

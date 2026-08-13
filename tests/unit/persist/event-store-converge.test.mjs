@@ -50,13 +50,13 @@ const argvOf = (argsEnv) => {
   return listItems(args)
 }
 
-const setRef = (raw, name, oid) => {
-  const current = raw.ReadRef(name)
+const setRef = async (raw, name, oid) => {
+  const current = await raw.ReadRef(name)
   if (isSome(current) && Persist.GitObjectIdModule_value(current) === Persist.GitObjectIdModule_value(oid)) {
     return
   }
   const expected = isSome(current) ? current : undefined
-  assert.equal(raw.CompareAndSwapRef(name, expected, oid), true, `CAS ${name}`)
+  assert.equal(await raw.CompareAndSwapRef(name, expected, oid), true, `CAS ${name}`)
 }
 
 test('StoreRef_remoteTracking_helper', () => {
@@ -71,36 +71,36 @@ test('SyncActiveEnv_constant', () => {
   assert.equal(Gateway.GitGateway_SyncActiveEnv, 'WANXIANG_GIT_SYNC_ACTIVE')
 })
 
-test('Converge_unbound_transport', () => {
+test('Converge_unbound_transport', async () => {
   const es = Store.EventStore_create(createRaw())
-  const err = mustErr(es.Converge('origin'))
+  const err = mustErr(await es.Converge('origin'))
   assert.equal(caseOf(err), 'Transport')
   assert.match(payloadOf(err), /no GitGateway bound/)
 })
 
-test('ConvergeStoreWithObservedRemote_skips_fetch_and_merges', () => {
+test('ConvergeStoreWithObservedRemote_skips_fetch_and_merges', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const localSnap = mustOk(
-    seed.Append(
-      seed.OpenSnapshot(),
+    await seed.Append(
+      await seed.OpenSnapshot(),
       toList([envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })]),
     ),
   )
   const remoteSnap = mustOk(
-    seed.Append(
+    await seed.Append(
       localSnap,
       toList([envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })]),
     ),
   )
 
   // Diverge: canonical back to local-only; remote-tracking holds full tip.
-  setRef(raw, Persist.StoreRef_canonical, rootOid(localSnap))
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(remoteSnap))
+  await setRef(raw, Persist.StoreRef_canonical, rootOid(localSnap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(remoteSnap))
 
   let fetchCount = 0
   let pushCount = 0
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('fetch')) {
       fetchCount += 1
@@ -114,25 +114,25 @@ test('ConvergeStoreWithObservedRemote_skips_fetch_and_merges', () => {
   }
 
   const merged = mustOk(
-    Gateway.GitGateway_convergeStoreWithObservedRemote(raw, run, 8, 'origin', remoteSnap),
+    await Gateway.GitGateway_convergeStoreWithObservedRemote(raw, run, 8, 'origin', remoteSnap),
     'observed converge',
   )
   assert.equal(fetchCount, 0)
   assert.equal(pushCount, 1)
-  const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, merged.RootOid))
+  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, merged.RootOid))
   assert.equal(listItems(blobs).length, 2)
 })
 
-test('ConvergeStore_lease_reject_retries_then_ok', () => {
+test('ConvergeStore_lease_reject_retries_then_ok', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const snap = mustOk(
-    seed.Append(seed.OpenSnapshot(), toList([envelope({ id: 'cccccccccccccccccccccccccccccccccccccccc' })])),
+    await seed.Append(await seed.OpenSnapshot(), toList([envelope({ id: 'cccccccccccccccccccccccccccccccccccccccc' })])),
   )
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
 
   let pushAttempts = 0
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('push')) {
       pushAttempts += 1
@@ -143,55 +143,55 @@ test('ConvergeStore_lease_reject_retries_then_ok', () => {
     return [0, '', '']
   }
 
-  mustOk(Gateway.GitGateway_convergeStore(raw, run, 8, 'origin'), 'retry converge')
+  mustOk(await Gateway.GitGateway_convergeStore(raw, run, 8, 'origin'), 'retry converge')
   assert.ok(pushAttempts >= 2)
 })
 
-test('ConvergeStore_retry_exhausted', () => {
+test('ConvergeStore_retry_exhausted', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const snap = mustOk(
-    seed.Append(seed.OpenSnapshot(), toList([envelope({ id: 'dddddddddddddddddddddddddddddddddddddddd' })])),
+    await seed.Append(await seed.OpenSnapshot(), toList([envelope({ id: 'dddddddddddddddddddddddddddddddddddddddd' })])),
   )
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
 
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('push')) return [1, '', 'rejected']
     return [0, '', '']
   }
 
-  const err = mustErr(Gateway.GitGateway_convergeStore(raw, run, 2, 'origin'))
+  const err = mustErr(await Gateway.GitGateway_convergeStore(raw, run, 2, 'origin'))
   assert.equal(caseOf(err), 'ConvergeRetryExhausted')
 })
 
-test('ConvergeStore_cas_rejected_when_maxRetries_zero', () => {
+test('ConvergeStore_cas_rejected_when_maxRetries_zero', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const snap = mustOk(
-    seed.Append(seed.OpenSnapshot(), toList([envelope({ id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })])),
+    await seed.Append(await seed.OpenSnapshot(), toList([envelope({ id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' })])),
   )
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
 
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('push')) return [1, '', 'rejected']
     return [0, '', '']
   }
 
-  const err = mustErr(Gateway.GitGateway_convergeStore(raw, run, 0, 'origin'))
+  const err = mustErr(await Gateway.GitGateway_convergeStore(raw, run, 0, 'origin'))
   assert.equal(caseOf(err), 'ConvergeCasRejected')
 })
 
-test('EventStore_createWithConverge_delegates_to_gateway', () => {
+test('EventStore_createWithConverge_delegates_to_gateway', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const snap = mustOk(
-    seed.Append(seed.OpenSnapshot(), toList([envelope({ id: 'ffffffffffffffffffffffffffffffffffffffff' })])),
+    await seed.Append(await seed.OpenSnapshot(), toList([envelope({ id: 'ffffffffffffffffffffffffffffffffffffffff' })])),
   )
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
 
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('fetch')) throw new Error('observed path must not fetch')
     return [0, '', '']
@@ -201,26 +201,45 @@ test('EventStore_createWithConverge_delegates_to_gateway', () => {
     Gateway.GitGateway_convergeStoreWithObservedRemote(raw, run, 8, remote, snap),
   )
 
-  const out = mustOk(es.Converge('origin'))
+  const out = mustOk(await es.Converge('origin'))
   assert.equal(snapshotOid(out), snapshotOid(snap))
 })
 
-test('GitGateway_bindEventStore_wires_Converge', () => {
+test('GitGateway_create_awaits_async_runner_without_sync_blocking', async () => {
+  const raw = createRaw()
+  let observedRepo = null
+  let fetchCalls = 0
+
+  const runAsync = async (repoArgsEnv) => {
+    await Promise.resolve()
+    observedRepo = repoArgsEnv[0]
+    const argv = listItems(repoArgsEnv[1])
+    if (argv.includes('fetch')) fetchCalls += 1
+    return [0, '', '']
+  }
+
+  const gateway = Gateway.GitGateway_create(raw, '/tmp/wanxiang-async-gateway', runAsync, 2)
+  mustOk(await gateway.Fetch('origin'), 'async fetch')
+  assert.equal(observedRepo, '/tmp/wanxiang-async-gateway')
+  assert.equal(fetchCalls, 1)
+})
+
+test('GitGateway_bindEventStore_wires_Converge', async () => {
   const raw = createRaw()
   const seed = Store.EventStore_create(raw)
   const snap = mustOk(
-    seed.Append(seed.OpenSnapshot(), toList([envelope({ id: '1212121212121212121212121212121212121212' })])),
+    await seed.Append(await seed.OpenSnapshot(), toList([envelope({ id: '1212121212121212121212121212121212121212' })])),
   )
-  setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
+  await setRef(raw, Persist.StoreRef_remoteTracking('origin'), rootOid(snap))
 
-  const run = (argsEnv) => {
+  const run = async (argsEnv) => {
     const argv = argvOf(argsEnv)
     if (argv.includes('push')) return [0, '', '']
     return [0, '', '']
   }
 
   const es = Gateway.GitGateway_bindEventStore(raw, run, 8)
-  const out = mustOk(es.Converge('origin'))
+  const out = mustOk(await es.Converge('origin'))
   assert.equal(typeof snapshotOid(out), 'string')
   assert.equal(snapshotOid(out).length, 40)
 })

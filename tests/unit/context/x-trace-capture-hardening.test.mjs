@@ -36,12 +36,12 @@ const appendAgent = async (...args) => {
   return appendAgentFn(...args)
 }
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -51,8 +51,8 @@ const withJournal = (fn) => {
 const SEM = sessionId('ses_cap')
 const streamSession = (sid) => stream.session(sid)
 
-test('COMPANION_007_capture_projection_is_idempotent_across_transforms', () => {
-  withJournal((journal) => {
+test('COMPANION_007_capture_projection_is_idempotent_across_transforms', async () => {
+  await withJournal(async (journal) => {
     const projection = xTraceCapture.semantic({
       messages: [
         { role: 'user', parts: [xTraceCapture.text('task one')] },
@@ -61,20 +61,20 @@ test('COMPANION_007_capture_projection_is_idempotent_across_transforms', () => {
     })
 
     // 第一轮 transform：全部 parts 进入 XTrace。
-    const first = xTraceCapture.captureProjection(journal, SEM, projection)
+    const first = await xTraceCapture.captureProjection(journal, SEM, projection)
     assert.equal(listItems(first.Parts).length, 3)
 
     // 第二轮 transform（同一 projection 原样重放）：不得重复 append。
     // 这是曾修复的 blocking：recorded 集合与 fold 存储的 provenance
     // 命名空间不一致时，每轮都会把 3 个 part 重新写入。
-    const second = xTraceCapture.captureProjection(journal, SEM, projection)
+    const second = await xTraceCapture.captureProjection(journal, SEM, projection)
     assert.equal(listItems(second.Parts).length, 3, 're-observing the same projection must not duplicate the trace')
   })
 })
 
-test('COMPANION_007_capture_projection_appends_only_new_turns', () => {
-  withJournal((journal) => {
-    const first = xTraceCapture.captureProjection(
+test('COMPANION_007_capture_projection_appends_only_new_turns', async () => {
+  await withJournal(async (journal) => {
+    const first = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('task')] }] }),
@@ -82,7 +82,7 @@ test('COMPANION_007_capture_projection_appends_only_new_turns', () => {
     assert.equal(listItems(first.Parts).length, 1)
 
     // 第二轮多了 assistant turn：只 append 新的，旧 user part 不动。
-    const second = xTraceCapture.captureProjection(
+    const second = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -102,9 +102,9 @@ test('COMPANION_007_capture_projection_appends_only_new_turns', () => {
   })
 })
 
-test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
-  withJournal((journal) => {
-    xTraceCapture.captureProjection(
+test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', async () => {
+  await withJournal(async (journal) => {
+    await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -115,7 +115,7 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
       }),
     )
 
-    const updated = xTraceCapture.captureProjection(
+    const updated = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('task')] }] }),
@@ -136,11 +136,11 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
   // Pre-reanchor turns reuse Host indices after ContextReanchored. Provenance
   // must open g:1 so turn:0/part:0 appends instead of colliding with g:0.
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     const journal = created.journal
-    const first = xTraceCapture.captureProjection(
+    const first = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -170,7 +170,7 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
     assert.equal(caseOf(reanchor), 'Ok', 'ContextReanchored must fold')
 
     // Host renumbered: same turn indices, new content after compaction.
-    const second = xTraceCapture.captureProjection(
+    const second = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -202,30 +202,30 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
   }
 })
 
-test('COMPANION_003_capture_opening_takes_authoritative_requirements', () => {
-  withJournal((journal) => {
-    xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
+test('COMPANION_003_capture_opening_takes_authoritative_requirements', async () => {
+  await withJournal(async (journal) => {
+    await xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
 
-    const again = xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
+    const again = await xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
     // 幂等：同一 opening 重放不报错、不覆盖。
     assert.equal(again, undefined)
   })
 })
 
-test('COMPANION_003_opening_capture_is_idempotent_for_the_same_text', () => {
-  withJournal((journal) => {
-    xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+test('COMPANION_003_opening_capture_is_idempotent_for_the_same_text', async () => {
+  await withJournal(async (journal) => {
+    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
     // 同文本重放无害（PERSIST-010 幂等语义）。
-    xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
   })
 })
 
-test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => {
-  withJournal((journal) => {
+test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', async () => {
+  await withJournal(async (journal) => {
     // A human session: the opening is captured at ingress, and the first
     // transform captures the SAME text again as XTrace part turn:0/part:0.
-    xTraceCapture.captureOpening(journal, SEM, 'first task', [])
-    xTraceCapture.captureProjection(
+    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+    await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -236,7 +236,7 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
       }),
     )
 
-    const parentBound = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
+    const parentBound = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
     assert.equal(typeof parentBound, 'string')
     // parent → child: Opening once; gap must not re-render the same text.
     assert.equal(parentBound.split('first task').length - 1, 1, 'opening appears exactly once for parent→child')
@@ -244,7 +244,7 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
     assert.ok(!parentBound.includes('Opening task'), 'old Opening task heading is gone')
     assert.ok(parentBound.includes('assistant: work a'), 'the tail must carry the work after the opening')
 
-    const joinBound = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    const joinBound = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
     assert.equal(typeof joinBound, 'string')
     assert.ok(!joinBound.includes('Opening\nfirst task'), 'child→parent join omits Opening')
     assert.ok(!joinBound.includes('Opening task'), 'old Opening task heading is gone')
@@ -254,10 +254,10 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
 })
 
 
-test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', () => {
-  withJournal((journal) => {
-    xTraceCapture.captureOpening(journal, SEM, 'consult independently', [])
-    const before = xTraceCapture.captureProjection(
+test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', async () => {
+  await withJournal(async (journal) => {
+    await xTraceCapture.captureOpening(journal, SEM, 'consult independently', [])
+    const before = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
@@ -265,9 +265,9 @@ test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_a
     const beforeCount = listItems(before.Parts).length
 
     const terminal = 'Independent NEEDHELP perspective: preserve the original charge.'
-    xTraceCapture.captureTerminalText(journal, SEM, terminal, providerRun('msg_terminal_only'))
+    await xTraceCapture.captureTerminalText(journal, SEM, terminal, providerRun('msg_terminal_only'))
 
-    const after = xTraceCapture.captureProjection(
+    const after = await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
@@ -278,7 +278,7 @@ test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_a
       'terminal fallback is a read-time LWR projection, not a durable XTracePartAppended',
     )
 
-    const record = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    const record = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
     assert.equal(typeof record, 'string')
     assert.match(record, /Recent work/)
     assert.match(record, /Independent NEEDHELP perspective/)
@@ -286,10 +286,10 @@ test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_a
   })
 })
 
-test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', () => {
-  withJournal((journal) => {
-    xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
-    xTraceCapture.captureProjection(
+test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', async () => {
+  await withJournal(async (journal) => {
+    await xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
+    await xTraceCapture.captureProjection(
       journal,
       SEM,
       xTraceCapture.semantic({
@@ -300,9 +300,9 @@ test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', () => {
       }),
     )
     const words = 'the last words to the user'
-    const written = agentJournal.writeBlob(words, journal)
+    const written = await agentJournal.writeBlob(words, journal)
     assert.equal(written.ok, true, written.ok ? '' : written.error)
-    xTraceCapture.captureLastWords(
+    await xTraceCapture.captureLastWords(
       journal,
       SEM,
       written.value.BlobRef,
@@ -310,7 +310,7 @@ test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', () => {
       providerRun('run_last_words'),
     )
 
-    const record = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
+    const record = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
     assert.equal(typeof record, 'string')
     assert.match(record, /Recent work/)
     assert.match(record, /did the work/)

@@ -52,28 +52,34 @@ module FinalityWorkflow =
                         |> Option.bind (fun life -> life.ActiveFinality)
                         |> Option.filter (fun request -> request.RequestId = requestId)
 
-                    let requestOpt =
+                    let! requestOpt =
                         match lifeOpt, existingRequest with
-                        | _, Some request -> Some request
+                        | _, Some request -> Task.FromResult(Some request)
                         | Some _, None ->
-                            FinalityJournal.appendLifecycle
-                                durable
-                                (ManagerLifecycleFact.FinalityRequested
-                                    {| SessionId = managerSessionId
-                                       LifeId = lifeId
-                                       RequestId = requestId
-                                       GitTreeHash = requestTree
-                                       LastWordsRef = lastWordsRef
-                                       LastWordsDigest = lastWordsDigest
-                                       ProviderRun = providerRun
-                                       ToolCallId = toolCallId |})
+                            task {
+                                do!
+                                    FinalityJournal.appendLifecycle
+                                        durable
+                                        (ManagerLifecycleFact.FinalityRequested
+                                            {| SessionId = managerSessionId
+                                               LifeId = lifeId
+                                               RequestId = requestId
+                                               GitTreeHash = requestTree
+                                               LastWordsRef = lastWordsRef
+                                               LastWordsDigest = lastWordsDigest
+                                               ProviderRun = providerRun
+                                               ToolCallId = toolCallId |})
 
-                            AgentProjection.tryFind managerSessionId (AgentJournal.snapshot durable).AgentProjections
-                            |> Option.bind (fun session -> session.ManagerLife)
-                            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                            |> Option.bind (fun life -> life.ActiveFinality)
-                            |> Option.filter (fun request -> request.RequestId = requestId)
-                        | None, None -> None
+                                return
+                                    AgentProjection.tryFind
+                                        managerSessionId
+                                        (AgentJournal.snapshot durable).AgentProjections
+                                    |> Option.bind (fun session -> session.ManagerLife)
+                                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                                    |> Option.bind (fun life -> life.ActiveFinality)
+                                    |> Option.filter (fun request -> request.RequestId = requestId)
+                            }
+                        | None, None -> Task.FromResult None
 
                     match lifeOpt, requestOpt with
                     | Some life, Some request ->

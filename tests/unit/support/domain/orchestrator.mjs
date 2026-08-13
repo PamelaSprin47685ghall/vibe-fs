@@ -95,8 +95,8 @@ export const joinDrain = (() => {
      * Journal-backed production drain (merge → sort → CAS consume).
      * Returns { ok:true, items } or { ok:false, error }.
      */
-    drainFromJournal: (journal, parentId, maxCount, completedAt = utcOffset('2024-01-01T00:00:00.000Z')) => {
-      const value = resultOf(m.drainFromJournal(journal, parentId, maxCount, completedAt))
+    drainFromJournal: async (journal, parentId, maxCount, completedAt = utcOffset('2024-01-01T00:00:00.000Z')) => {
+      const value = resultOf(await m.drainFromJournal(journal, parentId, maxCount, completedAt))
       if (!value.ok) {
         return {
           ok: false,

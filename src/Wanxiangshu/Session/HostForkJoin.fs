@@ -29,55 +29,55 @@ module HostForkJoin =
     let private tryDrainAvailable
         (runtime: HostForkRuntime)
         (maxCount: int)
-        : Result<JoinWaitOutcome<JoinItem>, ForkError> option =
-        let cap = min maxCount JoinBatch.Max
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError> option> =
+        task {
+            let cap = min maxCount JoinBatch.Max
 
-        if cap <= 0 then
-            None
-        else
-            // Clear agent wakes — they never carry payload (GREEN-5).
-            ignore (runtime.Runtime.DrainAgentWakes JoinBatch.Max)
+            if cap <= 0 then
+                return None
+            else
+                // Clear agent wakes — they never carry payload (GREEN-5).
+                ignore (runtime.Runtime.DrainAgentWakes JoinBatch.Max)
 
-            match runtime.Journal with
-            | None ->
-                // Agent join requires Journal. Pure PTY join may proceed without it.
-                let hasActiveAgents =
-                    runtime.Runtime.ActiveRunCount > 0
-                    || lock runtime.Gate (fun () -> runtime.PendingRuns.Count > 0)
-                    || runtime.Runtime.PendingCompletionCount > runtime.Runtime.PendingPtyCount
+                match runtime.Journal with
+                | None ->
+                    let hasActiveAgents =
+                        runtime.Runtime.ActiveRunCount > 0
+                        || lock runtime.Gate (fun () -> runtime.PendingRuns.Count > 0)
+                        || runtime.Runtime.PendingCompletionCount > runtime.Runtime.PendingPtyCount
 
-                if hasActiveAgents then
-                    Some(
-                        Error(
-                            ForkError.NotFound
-                                "agent join requires journal; journal=None is fail-closed for agent handles"
-                        )
-                    )
-                else
-                    let ptyBatch =
-                        runtime.Runtime.DrainPtyCompletions cap |> List.map JoinItem.ofPtyJoinItem
+                    if hasActiveAgents then
+                        return
+                            Some(
+                                Error(
+                                    ForkError.NotFound
+                                        "agent join requires journal; journal=None is fail-closed for agent handles"
+                                )
+                            )
+                    else
+                        let ptyBatch =
+                            runtime.Runtime.DrainPtyCompletions cap |> List.map JoinItem.ofPtyJoinItem
 
-                    match NonEmptyBatch.tryOfList ptyBatch with
-                    | Some batch -> Some(Ok(ResultsAvailable batch))
-                    | None -> None
-            | Some durable ->
-                match JoinDrain.drainFromJournal durable runtime.ParentId cap (runtime.Clock.UtcNow()) with
-                | Error e -> Some(Error e)
-                | Ok durableBatch ->
-                    // PTY channel only (EXEC-015). Leftover stays queued for next join.
-                    let remaining = cap - List.length durableBatch
+                        match NonEmptyBatch.tryOfList ptyBatch with
+                        | Some batch -> return Some(Ok(ResultsAvailable batch))
+                        | None -> return None
+                | Some durable ->
+                    match! JoinDrain.drainFromJournal durable runtime.ParentId cap (runtime.Clock.UtcNow()) with
+                    | Error e -> return Some(Error e)
+                    | Ok durableBatch ->
+                        let remaining = cap - List.length durableBatch
+                        let agentItems = durableBatch |> List.map JoinItem.ofAgentRunCompletion
 
-                    let agentItems = durableBatch |> List.map JoinItem.ofAgentRunCompletion
+                        let ptyItems =
+                            if remaining <= 0 then
+                                []
+                            else
+                                runtime.Runtime.DrainPtyCompletions remaining |> List.map JoinItem.ofPtyJoinItem
 
-                    let ptyItems =
-                        if remaining <= 0 then
-                            []
-                        else
-                            runtime.Runtime.DrainPtyCompletions remaining |> List.map JoinItem.ofPtyJoinItem
-
-                    match NonEmptyBatch.tryOfList (agentItems @ ptyItems) with
-                    | Some batch -> Some(Ok(ResultsAvailable batch))
-                    | None -> None
+                        match NonEmptyBatch.tryOfList (agentItems @ ptyItems) with
+                        | Some batch -> return Some(Ok(ResultsAvailable batch))
+                        | None -> return None
+        }
 
     /// Permit gate shared by JoinWithPermit / JoinAvailableWithPermit / AwaitAgentWithPermit.
     let private validatePermit (runtime: HostForkRuntime) (permit: FamilyRecoveryPermit) : Result<unit, ForkError> =
@@ -165,7 +165,7 @@ module HostForkJoin =
         /// PulseWake after race so a losing WaitForWake waiter never piles up.
         let rec loop () : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
             task {
-                match tryDrainAvailable runtime cap with
+                match! tryDrainAvailable runtime cap with
                 | Some result -> return result
                 | None ->
                     if runtime.Runtime.IsCancelled then
@@ -177,7 +177,7 @@ module HostForkJoin =
                         | Some durable ->
                             let _, fromRev = durable.SnapshotWithRevision
 
-                            match tryDrainAvailable runtime cap with
+                            match! tryDrainAvailable runtime cap with
                             | Some result -> return result
                             | None ->
                                 // Tagged race arms without nested task{} (dsl-ownership).
@@ -201,7 +201,7 @@ module HostForkJoin =
 
                                 runtime.Runtime.PulseWake()
 
-                                match tryDrainAvailable runtime cap with
+                                match! tryDrainAvailable runtime cap with
                                 | Some result -> return result
                                 | None ->
                                     let kind: int = emitJsExpr winner "$0.kind"
@@ -221,7 +221,7 @@ module HostForkJoin =
                         | None ->
                             let! signal = runtime.Runtime.WaitForSignal interrupt
 
-                            match tryDrainAvailable runtime cap with
+                            match! tryDrainAvailable runtime cap with
                             | Some result -> return result
                             | None ->
                                 match signal with
@@ -305,7 +305,7 @@ module HostForkJoin =
                 | Error e -> return Error e
                 | Ok(Interrupted _) ->
                     // Deadline interrupt under legacy Join API → TimedOut after final drain.
-                    match tryDrainAvailable runtime 1 with
+                    match! tryDrainAvailable runtime 1 with
                     | Some(Ok(ResultsAvailable batch)) -> return Ok(headAsRunCompletion batch)
                     | Some(Error e) -> return Error e
                     | Some(Ok(Interrupted _))
@@ -384,7 +384,10 @@ module HostForkJoin =
                 run, child)
 
         match pending with
-        | Some run -> runtime.FailRun(run, "cancelled")
+        | Some run ->
+            // IDistillationRuntime.CancelAgent is synchronous; durable completion
+            // continues on the returned Task while the physical abort starts below.
+            runtime.FailRun(run, "cancelled") |> ignore
         | None -> ()
 
         match childId with

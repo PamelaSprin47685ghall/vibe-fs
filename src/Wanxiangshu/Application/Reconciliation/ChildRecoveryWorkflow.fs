@@ -53,41 +53,43 @@ module ChildRecoveryWorkflow =
             not (String.IsNullOrWhiteSpace(textOfParts assistant.Parts))
         | _ -> false
 
-    let private readDurableEvidence (ports: Ports) : DurableHandleEvidence =
-        match ports.Journal with
-        | None -> DurableHandleEvidence.Unknown
-        | Some journal ->
-            let projection = AgentJournal.handleProjection journal ports.ParentId
+    let private readDurableEvidence (ports: Ports) : Task<DurableHandleEvidence> =
+        task {
+            match ports.Journal with
+            | None -> return DurableHandleEvidence.Unknown
+            | Some journal ->
+                let projection = AgentJournal.handleProjection journal ports.ParentId
 
-            match HandleProjection.tryFind ports.Handle projection with
-            | None -> DurableHandleEvidence.Unknown
-            | Some record ->
-                match record.Lifecycle with
-                | HandleLifecycle.Active -> DurableHandleEvidence.Active
-                | HandleLifecycle.Retired -> DurableHandleEvidence.Retired
-                | HandleLifecycle.Abandoned reason -> DurableHandleEvidence.Abandoned reason
-                | HandleLifecycle.CompletedAwaitingJoin cell ->
-                    match HandleCompletionCodec.tryReadBody journal record with
-                    | Ok(Some body, _, _) ->
-                        match HandleCompletionCodec.decodeBody body with
-                        | Current decoded ->
-                            let proof =
-                                JoinableCompletion.fromDecoded
-                                    ports.AgentId
-                                    ports.Handle
-                                    ports.ChildSession
-                                    decoded
-                                    body
+                match HandleProjection.tryFind ports.Handle projection with
+                | None -> return DurableHandleEvidence.Unknown
+                | Some record ->
+                    match record.Lifecycle with
+                    | HandleLifecycle.Active -> return DurableHandleEvidence.Active
+                    | HandleLifecycle.Retired -> return DurableHandleEvidence.Retired
+                    | HandleLifecycle.Abandoned reason -> return DurableHandleEvidence.Abandoned reason
+                    | HandleLifecycle.CompletedAwaitingJoin cell ->
+                        match! HandleCompletionCodec.tryReadBody journal record with
+                        | Ok(Some body, _, _) ->
+                            match HandleCompletionCodec.decodeBody body with
+                            | Current decoded ->
+                                let proof =
+                                    JoinableCompletion.fromDecoded
+                                        ports.AgentId
+                                        ports.Handle
+                                        ports.ChildSession
+                                        decoded
+                                        body
 
-                            DurableHandleEvidence.CompletedAwaitingJoin proof
-                        | LegacyFalseAbort _ -> DurableHandleEvidence.Active
-                        | Invalid _ -> DurableHandleEvidence.Unknown
-                    | Ok(None, _, _) ->
-                        match cell.Kind with
-                        | HandleCompletionKind.Cancelled -> DurableHandleEvidence.Active
-                        | HandleCompletionKind.Terminal
-                        | HandleCompletionKind.SendFailure -> DurableHandleEvidence.Active
-                    | Error _ -> DurableHandleEvidence.Unknown
+                                return DurableHandleEvidence.CompletedAwaitingJoin proof
+                            | LegacyFalseAbort _ -> return DurableHandleEvidence.Active
+                            | Invalid _ -> return DurableHandleEvidence.Unknown
+                        | Ok(None, _, _) ->
+                            match cell.Kind with
+                            | HandleCompletionKind.Cancelled -> return DurableHandleEvidence.Active
+                            | HandleCompletionKind.Terminal
+                            | HandleCompletionKind.SendFailure -> return DurableHandleEvidence.Active
+                        | Error _ -> return DurableHandleEvidence.Unknown
+        }
 
     let private readSnapshotEvidence (ports: Ports) : Task<ChildSnapshotEvidence> =
         task {
@@ -139,10 +141,14 @@ module ChildRecoveryWorkflow =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (proof: JoinableCompletion)
-        : Result<unit, string> =
+        : Task<Result<unit, string>> =
         HandleController.recordCompletion journal parentId proof
 
-    let private commitAbandon (ports: Ports) (handle: HandleId) (reason: HandleAbandonReason) : Result<unit, string> =
+    let private commitAbandon
+        (ports: Ports)
+        (handle: HandleId)
+        (reason: HandleAbandonReason)
+        : Task<Result<unit, string>> =
         let agentId =
             match HandleId.tryAgent handle with
             | Some id -> AgentHandleId.value id
@@ -154,19 +160,19 @@ module ChildRecoveryWorkflow =
     /// GREEN-4: ChildRecoveryResult (RecoveredActive ≠ RecoveryIncomplete).
     let resolveAndCommit (ports: Ports) : Task<Result<ChildRecoveryResult, string>> =
         task {
-            let durable = readDurableEvidence ports
+            let! durable = readDurableEvidence ports
             let! snapshot = readSnapshotEvidence ports
             let resolution = resolveChild durable snapshot ports.Observations
 
             match resolution with
             | ChildResolution.RecoveredTerminal proof ->
-                match commitJoinable ports.Journal ports.ParentId proof with
+                match! commitJoinable ports.Journal ports.ParentId proof with
                 | Error reason -> return Error reason
                 | Ok() ->
                     pulseAfterCommit ports
                     return Ok(ChildRecoveryResult.RecoveredTerminal proof)
             | ChildResolution.RecoveredAbandoned reason ->
-                match commitAbandon ports ports.Handle reason with
+                match! commitAbandon ports ports.Handle reason with
                 | Error err -> return Error err
                 | Ok() ->
                     return

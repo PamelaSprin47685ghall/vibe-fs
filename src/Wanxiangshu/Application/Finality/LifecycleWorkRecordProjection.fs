@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Finality
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
@@ -23,17 +24,24 @@ open Wanxiangshu.Kernel.Identity
 module LifecycleWorkRecordProjection =
 
     /// Resolve Y-compressed Chronicle frames from blobs, oldest first.
-    let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : string list =
-        frames
-        |> List.choose (fun frame ->
-            match durable.Writer.BlobWriter.Read frame.TextRef with
-            | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
-            | _ -> None)
+    let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : Task<string list> =
+        task {
+            let resolved = ResizeArray<string>()
 
-    let private tryReadPartBody (durable: AgentJournal) (part: XTracePartRef) : string option =
-        match durable.Writer.BlobWriter.Read part.TextRef with
-        | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> Some body
-        | _ -> None
+            for frame in frames do
+                match! durable.Writer.BlobWriter.Read frame.TextRef with
+                | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> resolved.Add text
+                | _ -> ()
+
+            return resolved |> Seq.toList
+        }
+
+    let private tryReadPartBody (durable: AgentJournal) (part: XTracePartRef) : Task<string option> =
+        task {
+            match! durable.Writer.BlobWriter.Read part.TextRef with
+            | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> return Some body
+            | _ -> return None
+        }
 
     /// Full-lifecycle LWR fallback for Host-owned completion paths that consume a
     /// terminal before messages.transform has captured that final assistant turn.
@@ -45,47 +53,58 @@ module LifecycleWorkRecordProjection =
         (durable: AgentJournal)
         (xTrace: XTraceProjectionState)
         (trace: XTraceItem list)
-        : XTraceItem list =
-        match xTrace.Terminal with
-        | None -> trace
-        | Some(terminalRef, terminalDigest) ->
-            match durable.Writer.BlobWriter.Read terminalRef with
-            | Error _ -> trace
-            | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest -> trace
-            | Ok terminalText when String.IsNullOrWhiteSpace terminalText -> trace
-            | Ok terminalText ->
-                let ordered = XTraceProjection.parts xTrace
+        : Task<XTraceItem list> =
+        task {
+            match xTrace.Terminal with
+            | None -> return trace
+            | Some(terminalRef, terminalDigest) ->
+                match! durable.Writer.BlobWriter.Read terminalRef with
+                | Error _ -> return trace
+                | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest ->
+                    return trace
+                | Ok terminalText when String.IsNullOrWhiteSpace terminalText -> return trace
+                | Ok terminalText ->
+                    let ordered = XTraceProjection.parts xTrace
 
-                let latestNaturalAssistant =
-                    ordered
-                    |> List.filter (fun part ->
-                        part.Role = "assistant"
-                        && (part.Kind = "text" || part.Kind = "reasoning"))
-                    |> List.tryLast
-
-                let alreadyCaptured =
-                    latestNaturalAssistant
-                    |> Option.exists (fun latest ->
-                        let latestGeneration = latest.Generation
-
+                    let latestNaturalAssistant =
                         ordered
                         |> List.filter (fun part ->
                             part.Role = "assistant"
-                            && part.Turn = latest.Turn
-                            && part.Generation = latestGeneration
                             && (part.Kind = "text" || part.Kind = "reasoning"))
-                        |> List.choose (tryReadPartBody durable)
-                        |> String.concat "\n\n"
-                        |> (=) terminalText)
+                        |> List.tryLast
 
-                if alreadyCaptured then
-                    trace
-                else
-                    trace
-                    @ [ { Cursor = { Sequence = XTraceProjection.head xTrace }
-                          Provenance = "terminal-projection-fallback"
-                          Role = "assistant"
-                          Part = SemanticText terminalText } ]
+                    let! alreadyCaptured =
+                        match latestNaturalAssistant with
+                        | None -> Task.FromResult false
+                        | Some latest ->
+                            task {
+                                let latestGeneration = latest.Generation
+                                let bodies = ResizeArray<string>()
+
+                                for part in ordered do
+                                    if
+                                        part.Role = "assistant"
+                                        && part.Turn = latest.Turn
+                                        && part.Generation = latestGeneration
+                                        && (part.Kind = "text" || part.Kind = "reasoning")
+                                    then
+                                        match! tryReadPartBody durable part with
+                                        | Some body -> bodies.Add body
+                                        | None -> ()
+
+                                return (bodies |> Seq.toList |> String.concat "\n\n") = terminalText
+                            }
+
+                    if alreadyCaptured then
+                        return trace
+                    else
+                        return
+                            trace
+                            @ [ { Cursor = { Sequence = XTraceProjection.head xTrace }
+                                  Provenance = "terminal-projection-fallback"
+                                  Role = "assistant"
+                                  Part = SemanticText terminalText } ]
+        }
 
     /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
     let private framesOverlappingRange (range: MagicTodoLwr.BoundedRange) (frames: BlogFrame list) =
@@ -96,33 +115,39 @@ module LifecycleWorkRecordProjection =
 
     /// Resolve XTrace part bodies into semantic items (single mapper; a part
     /// that fails its digest check is dropped, matching the canonical path).
-    let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : XTraceItem list =
-        XTraceProjection.parts xTrace
-        |> List.choose (fun part ->
-            durable.Writer.BlobWriter.Read part.TextRef
-            |> Result.toOption
-            |> Option.bind (fun body ->
-                let semantic =
-                    match part.Kind with
-                    | "text" -> Some(SemanticText body)
-                    | "reasoning" -> Some(SemanticReasoning body)
-                    | "tool_call" -> part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
-                    | "tool_result" -> Some(SemanticToolResult body)
-                    // COMPANION-003: omission markers are semantic parts of
-                    // the XTrace; dropping them would make LWR gap/parent
-                    // background lose media presence the model already saw.
-                    | "media_omitted" ->
-                        let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+    let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : Task<XTraceItem list> =
+        task {
+            let resolved = ResizeArray<XTraceItem>()
 
-                        Some(SemanticMedia(mediaType, ""))
-                    | _ -> None
+            for part in XTraceProjection.parts xTrace do
+                match! durable.Writer.BlobWriter.Read part.TextRef with
+                | Error _ -> ()
+                | Ok body ->
+                    let semantic =
+                        match part.Kind with
+                        | "text" -> Some(SemanticText body)
+                        | "reasoning" -> Some(SemanticReasoning body)
+                        | "tool_call" -> part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
+                        | "tool_result" -> Some(SemanticToolResult body)
+                        // COMPANION-003: omission markers are semantic parts of
+                        // the XTrace; dropping them would make LWR gap/parent
+                        // background lose media presence the model already saw.
+                        | "media_omitted" ->
+                            let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+                            Some(SemanticMedia(mediaType, ""))
+                        | _ -> None
 
-                semantic
-                |> Option.map (fun partValue ->
-                    { Cursor = part.Cursor
-                      Provenance = part.Provenance
-                      Role = part.Role
-                      Part = partValue })))
+                    match semantic with
+                    | Some partValue ->
+                        resolved.Add
+                            { Cursor = part.Cursor
+                              Provenance = part.Provenance
+                              Role = part.Role
+                              Part = partValue }
+                    | None -> ()
+
+            return resolved |> Seq.toList
+        }
 
     let lifecycleWorkRecordFromSnapshot
         (durable: AgentJournal)
@@ -130,63 +155,74 @@ module LifecycleWorkRecordProjection =
         (sessionId: SessionId)
         (includeOpening: bool)
         (coverageOverride: RecordCoverage option)
-        : string option =
-        match AgentProjection.tryFind sessionId snapshot.AgentProjections with
-        | None -> None
-        | Some session ->
-            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+        : Task<string option> =
+        task {
+            match AgentProjection.tryFind sessionId snapshot.AgentProjections with
+            | None -> return None
+            | Some session ->
+                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            let frames = resolveFrames durable (BlogProjection.frames blog)
+                let! frames = resolveFrames durable (BlogProjection.frames blog)
+                let! rawTrace = resolveTrace durable xTrace
+                let! trace = withTerminalFallback durable xTrace rawTrace
 
-            let trace = resolveTrace durable xTrace |> withTerminalFallback durable xTrace
+                match xTrace.Opening with
+                | None -> return None
+                | Some opening ->
+                    let coverage =
+                        match coverageOverride with
+                        | Some forced -> forced
+                        | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
-            match xTrace.Opening with
-            | None -> None
-            | Some opening ->
-                let coverage =
-                    match coverageOverride with
-                    | Some forced -> forced
-                    | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+                    let life =
+                        session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
-                let life =
-                    session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                    // TODO-001 / COMPANION-014: OpeningBoundary = WorkRecordStart when
+                    // Post-T1; else Immediate exclusive end after first XTrace part.
+                    let openingEnd =
+                        match
+                            life
+                            |> Option.bind (fun current ->
+                                ManagerOpeningFloor.workRecordStart
+                                    current
+                                    (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
+                                    xTrace)
+                        with
+                        | Some boundary -> boundary
+                        | None ->
+                            match trace with
+                            | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
+                            | [] -> XTrace.originCursor
 
-                // TODO-001 / COMPANION-014: OpeningBoundary = WorkRecordStart when
-                // Post-T1; else Immediate exclusive end after first XTrace part.
-                let openingEnd =
-                    match
-                        life
-                        |> Option.bind (fun current ->
-                            ManagerOpeningFloor.workRecordStart
-                                current
-                                (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
-                                xTrace)
-                    with
-                    | Some boundary -> boundary
-                    | None ->
+                    // Constitutive Opening interval after InitialCharge through Boundary
+                    // (BlindPlan T1 call/result ∈ OpeningMaterial; not Recent).
+                    let constitutiveItems =
                         match trace with
-                        | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
-                        | [] -> XTrace.originCursor
+                        | first :: _ -> XTrace.sliceBetween { Sequence = first.Cursor.Sequence + 1L } openingEnd trace
+                        | [] -> []
 
-                // Constitutive Opening interval after InitialCharge through Boundary
-                // (BlindPlan T1 call/result ∈ OpeningMaterial; not Recent).
-                let constitutiveItems =
-                    match trace with
-                    | first :: _ -> XTrace.sliceBetween { Sequence = first.Cursor.Sequence + 1L } openingEnd trace
-                    | [] -> []
+                    let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
 
-                let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
-
-                Some(LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd includeOpening)
+                    return
+                        Some(
+                            LifecycleWorkRecord.materialize
+                                openingMaterial
+                                frames
+                                trace
+                                coverage
+                                openingEnd
+                                includeOpening
+                        )
+        }
 
     let lifecycleWorkRecord
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (includeOpening: bool)
-        : string option =
+        : Task<string option> =
         match journal with
-        | None -> None
+        | None -> Task.FromResult None
         | Some durable ->
             lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening None
 
@@ -200,56 +236,59 @@ module LifecycleWorkRecordProjection =
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
         (range: MagicTodoLwr.BoundedRange)
-        : string option =
-        match AgentProjection.tryFind sessionId snapshot.AgentProjections with
-        | None -> None
-        | Some session ->
-            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+        : Task<string option> =
+        task {
+            match AgentProjection.tryFind sessionId snapshot.AgentProjections with
+            | None -> return None
+            | Some session ->
+                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this invocation.
-            let frames =
-                BlogProjection.frames blog
-                |> framesOverlappingRange range
-                |> resolveFrames durable
+                // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this invocation.
+                let! frames =
+                    BlogProjection.frames blog
+                    |> framesOverlappingRange range
+                    |> resolveFrames durable
 
-            // Recent-work TRACE sliced to the invocation's range so prior
-            // invocations never appear.
-            let trace =
-                resolveTrace durable xTrace
-                |> XTrace.sliceBetween range.StartInclusive range.EndExclusive
+                // Recent-work TRACE sliced to the invocation's range so prior
+                // invocations never appear.
+                let! resolvedTrace = resolveTrace durable xTrace
+                let trace = XTrace.sliceBetween range.StartInclusive range.EndExclusive resolvedTrace
 
-            match xTrace.Opening with
-            | None -> None
-            | Some opening ->
-                let coverage =
-                    { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+                match xTrace.Opening with
+                | None -> return None
+                | Some opening ->
+                    let coverage =
+                        { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
-                // Gap start inside the bounded window: max(coverage, range start),
-                // so an older coverage never pulls a prior invocation into view.
-                let coverageClamped =
-                    if coverage.IngestedThrough.Sequence < range.StartInclusive.Sequence then
-                        { IngestedThrough = range.StartInclusive }
-                    elif coverage.IngestedThrough.Sequence > range.EndExclusive.Sequence then
-                        { IngestedThrough = range.EndExclusive }
-                    else
-                        coverage
+                    // Gap start inside the bounded window: max(coverage, range start),
+                    // so an older coverage never pulls a prior invocation into view.
+                    let coverageClamped =
+                        if coverage.IngestedThrough.Sequence < range.StartInclusive.Sequence then
+                            { IngestedThrough = range.StartInclusive }
+                        elif coverage.IngestedThrough.Sequence > range.EndExclusive.Sequence then
+                            { IngestedThrough = range.EndExclusive }
+                        else
+                            coverage
 
-                Some(
-                    LifecycleWorkRecord.materialize
-                        opening
-                        frames
-                        trace
-                        coverageClamped
-                        range.StartInclusive
-                        (* includeOpening = *) false
-                )
+                    return
+                        Some(
+                            LifecycleWorkRecord.materialize
+                                opening
+                                frames
+                                trace
+                                coverageClamped
+                                range.StartInclusive
+                                (* includeOpening = *) false
+                        )
+        }
 
     let lifecycleWorkRecordBounded
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (range: MagicTodoLwr.BoundedRange)
-        : string option =
+        : Task<string option> =
         match journal with
-        | None -> None
-        | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
+        | None -> Task.FromResult None
+        | Some durable ->
+            lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range

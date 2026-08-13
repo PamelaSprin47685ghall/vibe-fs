@@ -45,13 +45,13 @@ const main = sessionId('ses-tip-delivery-main')
 const blogger = sessionId('ses-tip-delivery-blogger')
 const journalStream = (id) => stream.session(id)
 
-const append = (journal, id, value, run) => {
-  const result = AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
+const append = async (journal, id, value, run) => {
+  const result = await AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
   assert.equal(caseOf(result), 'Ok', `append failed: ${JSON.stringify(result)}`)
 }
 
-const seedOwnerWithTip = (journal, { tip = 'primitive-obsession', runSuffix = '1' } = {}) => {
-  append(
+const seedOwnerWithTip = async (journal, { tip = 'primitive-obsession', runSuffix = '1' } = {}) => {
+  await append(
     journal,
     main,
     agentFact('CompanionBloggerLinked', {
@@ -61,7 +61,7 @@ const seedOwnerWithTip = (journal, { tip = 'primitive-obsession', runSuffix = '1
     }),
   )
 
-  append(
+  await append(
     journal,
     main,
     agentFact('BlogObservationCommitted', {
@@ -87,12 +87,12 @@ const seedOwnerWithTip = (journal, { tip = 'primitive-obsession', runSuffix = '1
   )
 }
 
-const withJournal = (fn) => {
+const withJournal = async (fn) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-tip-guidance-'))
-  const created = agentJournal.create({ directory })
+  const created = await agentJournal.create({ directory })
   assert.equal(created.ok, true)
   try {
-    return fn(created.journal)
+    return await fn(created.journal)
   } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })
@@ -117,10 +117,10 @@ const presentationOf = (guidance) => {
 
 const textOf = (guidance) => guidance?.Text ?? guidance?.text
 
-test('ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', () => {
-  withJournal((journal) => {
-    seedOwnerWithTip(journal)
-    const guidance = resolveTipGuidance(journal, main)
+test('ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    const guidance = await resolveTipGuidance(journal, main)
     assert.ok(guidance, 'expected tip guidance')
     assert.equal(presentationOf(guidance), 'Full')
     const text = textOf(guidance)
@@ -133,14 +133,14 @@ test('ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', () => {
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', () => {
-  withJournal((journal) => {
-    seedOwnerWithTip(journal)
-    const first = resolveTipGuidance(journal, main)
+test('ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    const first = await resolveTipGuidance(journal, main)
     assert.equal(presentationOf(first), 'Full')
     const firstText = textOf(first)
 
-    const second = resolveTipGuidance(journal, main)
+    const second = await resolveTipGuidance(journal, main)
     assert.ok(second, 'expected repeat guidance')
     assert.equal(presentationOf(second), 'IdentityOnly')
     const secondText = textOf(second)
@@ -154,32 +154,32 @@ test('ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', () =>
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', () => {
-  withJournal((journal) => {
-    seedOwnerWithTip(journal)
-    const viaResolve = textOf(resolveTipGuidance(journal, main))
+test('ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    const viaResolve = textOf(await resolveTipGuidance(journal, main))
     // second call after Full already recorded
-    const viaLatest = latestTipGuidance(journal, main)
-    const viaAlias = latestTipNudge(journal, main)
+    const viaLatest = await latestTipGuidance(journal, main)
+    const viaAlias = await latestTipNudge(journal, main)
     assert.equal(viaLatest, 'tip: primitive-obsession')
     assert.equal(viaAlias, viaLatest)
     assert.ok(viaResolve.includes('primitive-obsession'))
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', () => {
-  withJournal((journal) => {
-    seedOwnerWithTip(journal)
-    const viaBlogger = resolveTipGuidance(journal, blogger)
+test('ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    const viaBlogger = await resolveTipGuidance(journal, blogger)
     assert.ok(viaBlogger, 'blogger id must resolve to owner tip')
     assert.equal(presentationOf(viaBlogger), 'Full')
     assert.match(textOf(viaBlogger), /tip = "primitive-obsession"/)
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', () => {
-  withJournal((journal) => {
-    append(
+test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
+  await withJournal(async (journal) => {
+    await append(
       journal,
       main,
       agentFact('CompanionBloggerLinked', {
@@ -188,19 +188,19 @@ test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', () => {
         BloggerAgent: 'fast-blogger',
       }),
     )
-    assert.equal(resolveTipGuidance(journal, main), undefined)
-    assert.equal(latestTipGuidance(journal, main), undefined)
+    assert.equal(await resolveTipGuidance(journal, main), undefined)
+    assert.equal(await latestTipGuidance(journal, main), undefined)
   })
 })
 
-test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', () => {
+test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
   providerLanguage.clearAllForTests()
   try {
     const bound = providerLanguage.bindOnce(main, providerLanguage.simplifiedChinese)
     assert.equal(bound.ok, true)
-    withJournal((journal) => {
-      seedOwnerWithTip(journal, { runSuffix: '7' })
-      const guidance = resolveTipGuidance(journal, main)
+    await withJournal(async (journal) => {
+      await seedOwnerWithTip(journal, { runSuffix: '7' })
+      const guidance = await resolveTipGuidance(journal, main)
       assert.equal(presentationOf(guidance), 'Full')
       const text = textOf(guidance)
       assert.match(text, /# Enforcer Tip（规则提示）/)
@@ -213,15 +213,15 @@ test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', 
   }
 })
 
-test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', () => {
-  withJournal((journal) => {
-    seedOwnerWithTip(journal)
-    const first = resolveTipGuidance(journal, main)
+test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    const first = await resolveTipGuidance(journal, main)
     assert.equal(presentationOf(first), 'Full')
-    assert.equal(presentationOf(resolveTipGuidance(journal, main)), 'IdentityOnly')
+    assert.equal(presentationOf(await resolveTipGuidance(journal, main)), 'IdentityOnly')
 
     // HOST-006: compaction reanchor voids FullDeliveredTips with Blog/Prefix.
-    append(
+    await append(
       journal,
       main,
       agentFact('ContextReanchored', {
@@ -233,7 +233,7 @@ test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_aga
       providerRun('run-compaction-tip'),
     )
 
-    const after = resolveTipGuidance(journal, main)
+    const after = await resolveTipGuidance(journal, main)
     assert.ok(after, 'post-reanchor must still resolve tip')
     assert.equal(presentationOf(after), 'Full', 'reanchor must re-emit Full main.md')
     assert.match(textOf(after), /tip = "primitive-obsession"/)

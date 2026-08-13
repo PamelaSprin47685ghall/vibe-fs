@@ -49,9 +49,9 @@ const fakePtyPort = (behaviour = {}) => {
   return port
 }
 
-const live = (behaviour = {}) => {
+const live = async (behaviour = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hfpty-'))
-  const opened = agentJournal.create({ directory: dir })
+  const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
   const port = fakePtyPort(behaviour)
   const sessions = {
@@ -84,7 +84,7 @@ const okId = (result) => {
 // ── ForkPty ──────────────────────────────────────────────────────────────────
 
 test('HFP_fork_pty_blank_command_is_refused', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await forkPty(liveCtx.runtime, '   ', AGENT)
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'PTY command is required')
@@ -93,7 +93,7 @@ test('HFP_fork_pty_blank_command_is_refused', async () => {
 })
 
 test('HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await forkPty(liveCtx.runtime, 'ls -la', AGENT)
   const id = okId(result)
   const idValue = ptyIdValue(id)
@@ -119,7 +119,7 @@ test('HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
 })
 
 test('HFP_fork_pty_port_exception_untracks_and_errors', async () => {
-  const liveCtx = live({ forkError: 'pty spawn exploded' })
+  const liveCtx = await live({ forkError: 'pty spawn exploded' })
   const result = await forkPty(liveCtx.runtime, 'ls', AGENT)
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'pty spawn exploded')
@@ -130,14 +130,14 @@ test('HFP_fork_pty_port_exception_untracks_and_errors', async () => {
 })
 
 test('HFP_try_pty_unknown_string_id_is_none', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   assert.equal(tryPty(liveCtx.runtime, 'no-such-pty'), undefined)
   liveCtx.cleanup()
 })
 
 test('HFP_try_pty_owned_but_unknown_to_port_is_none', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = ptyIdValue(okId(await forkPty(liveCtx.runtime, 'ls', AGENT)))
   // Forget the pty on the port side (simulated backend loss): owned by the
   // runtime but Unknown to the port, so resolution must fail closed.
@@ -150,7 +150,7 @@ test('HFP_try_pty_owned_but_unknown_to_port_is_none', async () => {
 // ── SendPty ──────────────────────────────────────────────────────────────────
 
 test('HFP_send_pty_unowned_id_is_unknown', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const result = await sendPty(liveCtx.runtime, ptyIdOf('foreign'), 'echo hi', undefined)
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'Unknown PTY id: foreign')
@@ -158,7 +158,7 @@ test('HFP_send_pty_unowned_id_is_unknown', async () => {
 })
 
 test('HFP_send_pty_owned_but_missing_on_port_is_unknown', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   // Simulated backend loss: pty no longer Exists on the port.
   liveCtx.port.active.clear()
@@ -170,7 +170,7 @@ test('HFP_send_pty_owned_but_missing_on_port_is_unknown', async () => {
 })
 
 test('HFP_send_pty_signal_forwards_signal_command', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, undefined, PtySignal.Interrupt)
   assert.equal(result.tag, 0)
@@ -185,7 +185,7 @@ test('HFP_send_pty_signal_forwards_signal_command', async () => {
 })
 
 test('HFP_send_pty_write_forwards_write_command', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, 'echo hi', undefined)
   assert.equal(result.tag, 0)
@@ -197,7 +197,7 @@ test('HFP_send_pty_write_forwards_write_command', async () => {
 })
 
 test('HFP_send_pty_read_with_empty_prompt', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
 
   // Read parks on the port's read waiter; the backend resolves it with output.
@@ -215,7 +215,7 @@ test('HFP_send_pty_read_with_empty_prompt', async () => {
 })
 
 test('HFP_send_pty_port_error_propagates', async () => {
-  const liveCtx = live({ sendError: 'pty session ended' })
+  const liveCtx = await live({ sendError: 'pty session ended' })
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, 'echo hi', undefined)
   assert.equal(result.tag, 1)
@@ -226,7 +226,7 @@ test('HFP_send_pty_port_error_propagates', async () => {
 // ── low-level tracking ───────────────────────────────────────────────────────
 
 test('HFP_track_untrack_pty_run_round_trip', async () => {
-  const liveCtx = live()
+  const liveCtx = await live()
   const id = ptyIdOf('tracked-1')
   trackPtyRun(liveCtx.runtime, id)
   registerPtySnapshot(liveCtx.runtime, id, 'watch -n1 date')

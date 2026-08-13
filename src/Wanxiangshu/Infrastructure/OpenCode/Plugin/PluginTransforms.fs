@@ -136,14 +136,19 @@ module PluginTransforms =
                     // Reawakening narrative on the provider-facing transcript.
                     // Idempotent by (session, message, source) and by the Life
                     // projection itself; durable Opening stays the raw text.
-                    match ManagerNarrativeTransform.tryTransform journal (Some sessionId) traceState rawMessages with
+                    match! ManagerNarrativeTransform.tryTransform journal (Some sessionId) traceState rawMessages with
                     | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
                     | None -> ()
 
                     // GLORY-021: once the Activation continuation has been
                     // physically accepted, fix the compression floor at the
                     // XTrace head (just after the Activation prompt).
-                    ManagerNarrativeTransform.applyAcceptedActivation journal (Some sessionId) traceState rawMessages
+                    do!
+                        ManagerNarrativeTransform.applyAcceptedActivation
+                            journal
+                            (Some sessionId)
+                            traceState
+                            rawMessages
                 | None -> ()
 
                 do!
@@ -195,17 +200,23 @@ module PluginTransforms =
                                 // ledger + budget into the Session-facing admission capability.
                                 let confirmedFailure: ConfirmedFailurePort =
                                     fun targetSessionId providerRun reason ->
-                                        FallbackLedger.admitConfirmedFailure
-                                            durable
-                                            AgentPairCursor.DefaultAutoRecoveryBudget
-                                            targetSessionId
-                                            providerRun
-                                            reason
-                                        |> Result.map (function
-                                            | Wanxiangshu.Recovery.RecoveryAdmission.ContinueRecovery ->
-                                                Wanxiangshu.Session.RecoveryAdmission.ContinueRecovery
-                                            | Wanxiangshu.Recovery.RecoveryAdmission.RecoveryExhausted ->
-                                                Wanxiangshu.Session.RecoveryAdmission.RecoveryExhausted)
+                                        task {
+                                            let! outcome =
+                                                FallbackLedger.admitConfirmedFailure
+                                                    durable
+                                                    AgentPairCursor.DefaultAutoRecoveryBudget
+                                                    targetSessionId
+                                                    providerRun
+                                                    reason
+
+                                            return
+                                                outcome
+                                                |> Result.map (function
+                                                    | Wanxiangshu.Recovery.RecoveryAdmission.ContinueRecovery ->
+                                                        Wanxiangshu.Session.RecoveryAdmission.ContinueRecovery
+                                                    | Wanxiangshu.Recovery.RecoveryAdmission.RecoveryExhausted ->
+                                                        Wanxiangshu.Session.RecoveryAdmission.RecoveryExhausted)
+                                        }
 
                                 // ENFORCER-153: the recovery stage probe derives
                                 // nudge/AABB state from durable claim + transcript.
@@ -296,16 +307,18 @@ module PluginTransforms =
 
                         ProviderProse.render lang ProjectionConstants.PairProgrammingGuidelinePath Map.empty
 
-                    let markerText =
+                    let! markerText =
                         match journal, projectionSessionIdOpt with
                         | Some durable, Some sessionId ->
-                            // Main session id: resolveTipGuidance maps owner via association.
-                            match EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId) with
-                            | Some guidance -> guidance + "\n\n" + guideline
-                            | None -> guideline
-                        | _ -> guideline
+                            task {
+                                // Main session id: resolveTipGuidance maps owner via association.
+                                match! EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId) with
+                                | Some guidance -> return guidance + "\n\n" + guideline
+                                | None -> return guideline
+                            }
+                        | _ -> Task.FromResult guideline
 
-                    match
+                    match!
                         PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
                     with
                     | Ok newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages

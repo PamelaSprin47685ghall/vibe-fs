@@ -292,13 +292,22 @@ const triggeredHooks = (hooks) =>
     ([name, value]) => typeof value === 'function' && name !== 'event' && name !== 'dispose',
   )
 
-test('CHAT_PARAMS_pins_deep_request_model_over_host_fast_default', async () => {
+test('CHAT_PARAMS_observes_user_binding_without_rewriting_host_output', async () => {
   await withPlugin(async (hooks) => {
     await hooks.config(hostFinalConfig())
     const output = { model: { providerID: 'provider', modelID: 'fast-coder-model' } }
-    await hooks['chat.params']({ sessionID: SESSION, agent: 'deep-coder' }, output)
+    await hooks['chat.params'](
+      {
+        sessionID: SESSION,
+        message: {
+          agent: 'deep-coder',
+          model: { providerID: 'provider', modelID: 'deep-coder-model' },
+        },
+      },
+      output,
+    )
     assert.equal(output.model.providerID, 'provider')
-    assert.equal(output.model.modelID, 'deep-coder-model')
+    assert.equal(output.model.modelID, 'fast-coder-model', 'chat.params is observation-only')
   })
 })
 

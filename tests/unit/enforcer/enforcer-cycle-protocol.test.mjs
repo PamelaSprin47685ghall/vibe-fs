@@ -95,8 +95,8 @@ const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('
 const digestForToml = (toml) => sha256Hex(toml)
 
 /** Seed AgentOwnerRoot so HostSessionNudge.tryActiveProfile succeeds. */
-const seedBloggerAuthority = (journal) => {
-  const root = AgentJournalModule_appendAgent(
+const seedBloggerAuthority = async (journal) => {
+  const root = await AgentJournalModule_appendAgent(
     streamSession(BLOG),
     undefined,
     agentFact('AuthorityRootAccepted', {
@@ -130,13 +130,13 @@ const capturingPort = (captured, { fail = false } = {}) => ({
 
 const withHarness = async (fn, { portMode = 'ok' } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-cycle-'))
-  const created = agentJournal.create({ directory: dir })
+  const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   const journal = created.journal
   const main = sessionId(MAIN)
   const blog = sessionId(BLOG)
 
-  const link = AgentJournalModule_appendAgent(
+  const link = await AgentJournalModule_appendAgent(
     streamSession(main),
     undefined,
     agentFact('CompanionBloggerLinked', {
@@ -147,7 +147,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
     journal,
   )
   assert.equal(caseOf(link), 'Ok')
-  seedBloggerAuthority(journal)
+  await seedBloggerAuthority(journal)
 
   const scope = parkedTransform.scope()
   const toml = 'work'
@@ -616,7 +616,7 @@ test('ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send',
     // Pre-claim InteractionRepair for asst-preclaim (same shape as SendInteractionRepair).
     const terminal = providerRun('asst-preclaim')
     const digest = authority.repairPayloadDigest(terminal, 'blogger-missing-tool')
-    const claimed = AgentJournalModule_appendAgent(
+    const claimed = await AgentJournalModule_appendAgent(
       streamSession(BLOG),
       undefined,
       agentFact('PluginPromptClaimed', {
@@ -988,7 +988,7 @@ test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', 
 
 test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
   await withHarness(async ({ journal, scope, blog, main, ctx }) => {
-    const live = resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
+    const live = await resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
     assert.ok(live)
     assert.equal(caseOf(live), 'Main')
     assert.equal(bloggerRequestContext.toml(live), bloggerRequestContext.toml(ctx))
@@ -996,7 +996,7 @@ test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
     // Clear InFlight without open materialization → None (not a silent invent).
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(hasFlight(scope), false)
-    const missing = resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
+    const missing = await resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
     assert.equal(missing, undefined)
   })
 })
@@ -1021,7 +1021,7 @@ test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', asyn
     // drives the same bridge this way) — a raw appendAgent root differs in the
     // serialized SessionId shape the fold keys on.
     const runtime = promptDispatcher.forJournal(journal)
-    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
     assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0] ?? JSON.stringify(accepted)}`)
 
     // Empty-text repair path → the bridge records the confirmed failure on the
@@ -1058,7 +1058,7 @@ test('ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
     async ({ journal, scope, fatals, run, main }) => {
       // FALLBACK-001: an accepted primary root creates the primary cursor.
       const runtime = promptDispatcher.forJournal(journal)
-      const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+      const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
       assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
 
       // No session port → interactionNudge falls back to aabbRepair (the
@@ -1083,7 +1083,7 @@ test('LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async
   await withHarness(async ({ journal, fatals, run, main }) => {
     // FALLBACK-001: an accepted primary root creates the primary cursor (Fork0).
     const runtime = promptDispatcher.forJournal(journal)
-    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
     assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
 
     // Host abort cleanup (processor.ts:589) stamps status=error + interrupted=true on
@@ -1105,7 +1105,7 @@ test('LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async
 test('ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once', async () => {
   await withHarness(async ({ journal, fatals, run, main }) => {
     const runtime = promptDispatcher.forJournal(journal)
-    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
     assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
 
     // status=error without `interrupted` is ENFORCER-065 ToolExecutionError: a real

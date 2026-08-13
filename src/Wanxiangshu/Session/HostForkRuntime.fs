@@ -29,8 +29,8 @@ type HostForkRuntime
         ?ptyPort: PtyPort,
         ?directoryFor: string -> string option,
         ?onRunStarted: SessionId -> Role -> string option -> unit,
-        ?parentWorkRecordFor: SessionId -> string option,
-        ?childWorkRecordFor: SessionId -> string option,
+        ?parentWorkRecordFor: SessionId -> Task<string option>,
+        ?childWorkRecordFor: SessionId -> Task<string option>,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
         /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
@@ -77,8 +77,8 @@ type HostForkRuntime
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
     let childCreatedDir = defaultArg onChildCreatedDir (fun _ _ _ -> ())
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
-    let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> None)
-    let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> None)
+    let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
+    let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
@@ -206,16 +206,18 @@ type HostForkRuntime
             || HandleProjection.isAbandoned handle projection)
 
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
-        let workRecord =
-            match outcome with
-            | TerminalOutcome.Completed _ -> childWorkRecordOf run.ChildId
-            | _ -> None
+        // Terminal delivery is a synchronous Host callback. Fetch the canonical
+        // child WorkRecord asynchronously, then hand the materialized value to the
+        // lifecycle completion path in-order.
+        task {
+            let! workRecord =
+                match outcome with
+                | TerminalOutcome.Completed _ -> childWorkRecordOf run.ChildId
+                | _ -> Task.FromResult None
 
-        // EXEC-009's durable completion is written by `HostForkRunLifecycle.complete`
-        // (which now takes the journal), so this path only delivers the mailbox
-        // result. The single-assignment fold absorbs the cancel-path completion
-        // that `HandleController.cancelChildren` writes first.
-        HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
+            do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
+        }
+        |> ignore
 
     member this.InstallRun(agentId: string, childId: SessionId, role: Role) =
         let run =
@@ -238,9 +240,8 @@ type HostForkRuntime
         HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error
 
     member this.MarkReady(run: PendingHostRun) =
-        let workRecord = childWorkRecordOf run.ChildId
-
-        HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run workRecord
+        // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
+        HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
 
     member this.Cancel() : unit =
         Async.StartImmediate(

@@ -429,29 +429,29 @@ export const xTraceCapture = (() => {
      * Returns the updated XTrace projection state (or `undefined` without a
      * journal).
      */
-    captureProjection: (journal, sessionIdValue, semanticProjection) => {
-      const result = m.captureProjection(journal, sessionIdValue, semanticProjection)
+    captureProjection: async (journal, sessionIdValue, semanticProjection) => {
+      const result = await m.captureProjection(journal, sessionIdValue, semanticProjection)
       return isNone(result) ? undefined : result
     },
 
-    captureMessageView: (journal, sessionIdValue, capturedMessages) => {
-      const result = m.captureMessageView(journal, sessionIdValue, toList(capturedMessages))
+    captureMessageView: async (journal, sessionIdValue, capturedMessages) => {
+      const result = await m.captureMessageView(journal, sessionIdValue, toList(capturedMessages))
       return isNone(result) ? undefined : result
     },
 
-    captureSessionMessages: (journal, sessionIdValue, messages) =>
-      resultOf(m.captureSessionMessages(journal, sessionIdValue, toList(messages))),
+    captureSessionMessages: async (journal, sessionIdValue, messages) =>
+      resultOf(await m.captureSessionMessages(journal, sessionIdValue, toList(messages))),
 
     /** COMPANION-003: capture the opening; requirements are a JS array. */
-    captureOpening: (journal, sessionIdValue, text, requirements = []) =>
+    captureOpening: async (journal, sessionIdValue, text, requirements = []) =>
       m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
 
     /** Durable terminal bytes; full LWR may project them when the final assistant turn was consumed before transform capture. */
-    captureTerminalText: (journal, sessionIdValue, text, providerRunValue) =>
+    captureTerminalText: async (journal, sessionIdValue, text, providerRunValue) =>
       m.captureTerminalText(journal, sessionIdValue, text, providerRunValue),
 
     /** last_words as a normal assistant part so LWR Recent work contains them. */
-    captureLastWords: (journal, sessionIdValue, textRef, textDigest, providerRunValue) =>
+    captureLastWords: async (journal, sessionIdValue, textRef, textDigest, providerRunValue) =>
       m.captureLastWords(journal, sessionIdValue, textRef, textDigest, providerRunValue),
   }
 })()
@@ -463,13 +463,13 @@ export const lifecycleWorkRecordProjection = (() => {
     'lifecycleWorkRecordBounded',
   ])
   return {
-    lifecycleWorkRecord: (journal, sessionIdValue, includeOpening = true) => {
-      const result = m.lifecycleWorkRecord(journal, sessionIdValue, includeOpening)
+    lifecycleWorkRecord: async (journal, sessionIdValue, includeOpening = true) => {
+      const result = await m.lifecycleWorkRecord(journal, sessionIdValue, includeOpening)
       return isNone(result) ? undefined : result
     },
     /** EXEC-031: per-invocation bounded LWR. `range` = { StartInclusive, EndExclusive } with `Sequence` number. */
-    lifecycleWorkRecordBounded: (journal, sessionIdValue, range) => {
-      const result = m.lifecycleWorkRecordBounded(journal, sessionIdValue, {
+    lifecycleWorkRecordBounded: async (journal, sessionIdValue, range) => {
+      const result = await m.lifecycleWorkRecordBounded(journal, sessionIdValue, {
         StartInclusive: { Sequence: BigInt(range.StartInclusive.Sequence) },
         EndExclusive: { Sequence: BigInt(range.EndExclusive.Sequence) },
       })
@@ -1397,10 +1397,10 @@ export const magicTodoMembrane = (() => {
   const m = bind(MagicTodoMembraneModule, 'MagicTodoMembrane', ['prepare', 'accept'])
 
   return {
-    prepare: (journal, sessionIdValue, locality, inputDigest, obligations) =>
-      resultOf(m.prepare(journal, sessionIdValue, locality, inputDigest, toList(obligations))),
-    accept: (journal, bridge, physicalEvidence, inputDigest, outputDigest) =>
-      resultOf(m.accept(journal, bridge, physicalEvidence, inputDigest, outputDigest)),
+    prepare: async (journal, sessionIdValue, locality, inputDigest, obligations) =>
+      resultOf(await m.prepare(journal, sessionIdValue, locality, inputDigest, toList(obligations))),
+    accept: async (journal, bridge, physicalEvidence, inputDigest, outputDigest) =>
+      resultOf(await m.accept(journal, bridge, physicalEvidence, inputDigest, outputDigest)),
   }
 })()
 

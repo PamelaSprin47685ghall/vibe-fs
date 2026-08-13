@@ -79,7 +79,7 @@ const fakeJournal = (handles, childBlogs = [], blobs = new Map()) => ({
   gate: { Enter: () => ({ Exit: () => {} }) },
   writer: {
     BlobWriter: {
-      Read: (ref) => {
+      Read: async (ref) => {
         const key = idValue.blobRef(ref)
         return blobs.has(key) ? { tag: 0, fields: [blobs.get(key)] } : { tag: 1, fields: ['missing'] }
       },

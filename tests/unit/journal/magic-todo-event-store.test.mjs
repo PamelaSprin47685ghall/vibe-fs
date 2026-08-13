@@ -33,22 +33,22 @@ const mustOk = (result, label) => {
   return payloadOf(result)
 }
 
-const createWriter = (store, raw, runtime = 'rt_magic_todo') => {
+const createWriter = async (store, raw, runtime = 'rt_magic_todo') => {
   const create = resolveExport(EsWriter, 'EventStoreJournalWriter_create')
-  const pair = create(runtimeId(runtime), 4242, utcOffset('2026-08-11T00:00:00Z'), store, raw)
+  const pair = await create(runtimeId(runtime), 4242, utcOffset('2026-08-11T00:00:00Z'), store, raw)
   return { writer: pair[0], init: pair[1] }
 }
 
-const resumeWriter = (store, raw) => {
+const resumeWriter = async (store, raw) => {
   const resume = resolveExport(EsWriter, 'EventStoreJournalWriter_resumeOrCreate')
-  const result = resume(runtimeId('rt_magic_todo_recovery'), 4243, utcOffset('2026-08-11T00:01:00Z'), store, raw)
+  const result = await resume(runtimeId('rt_magic_todo_recovery'), 4243, utcOffset('2026-08-11T00:01:00Z'), store, raw)
   return mustOk(result, 'resumeOrCreate')
 }
 
-test('TODO-012 persists typed prepared identity through AgentJournal and EventStore boot', () => {
+test('TODO-012 persists typed prepared identity through AgentJournal and EventStore boot', async () => {
   const raw = GitRaw.GitRawStore_createInMemory()
   const store = Store.EventStore_create(raw)
-  const { writer, init } = createWriter(store, raw)
+  const { writer, init } = await createWriter(store, raw)
   const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init), 'createFromEventStore')
   const managerSession = sessionId('ses_magic_todo_manager')
   const life = managerLifeId('life_magic_todo')
@@ -70,7 +70,7 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
   )
 
   try {
-    const appended = AgentJournal.AgentJournalModule_appendMagicTodo(
+    const appended = await AgentJournal.AgentJournalModule_appendMagicTodo(
       stream.session(managerSession),
       providerRun('assistant-message-id'),
       magicTodoJournal.MagicTodoFact('TodoWritePrepared', [prepared]),
@@ -90,7 +90,7 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
       'magic-todo.v1',
     )
     const acceptedReceipt = mustOk(
-      AgentJournal.AgentJournalModule_appendMagicTodo(
+      await AgentJournal.AgentJournalModule_appendMagicTodo(
         stream.session(managerSession),
         providerRun('assistant-message-id'),
         magicTodoJournal.MagicTodoFact('TodoWriteAccepted', [accepted]),
@@ -108,7 +108,7 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
     journal.Dispose()
   }
 
-  const resumed = resumeWriter(store, raw)
+  const resumed = await resumeWriter(store, raw)
   try {
     const recovered = resumed[2].AgentProjections.MagicTodo.ByLife.get('life_magic_todo')
     assert.ok(recovered, 'Magic Todo prepared fact must survive EventStore boot')

@@ -40,6 +40,7 @@ type AssistanceHost
     let consultationAgent = ManagedAgentCatalog.nameOf AgentTier.Deep Role.Inquiry
     let claimGate = obj ()
     let claimedOwnerAttempts = HashSet<string>()
+    let droppedOwners = HashSet<string>()
 
     let assistanceLines (sessionId: SessionId) (path: string) =
         ProviderProse.instructionLines (ProviderProse.languageOf sessionId) path Map.empty
@@ -84,7 +85,12 @@ type AssistanceHost
             claimedOwnerAttempts
             |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
             |> Seq.toArray
-            |> Array.iter (fun key -> claimedOwnerAttempts.Remove key |> ignore))
+            |> Array.iter (fun key -> claimedOwnerAttempts.Remove key |> ignore)
+
+            droppedOwners.Add(SessionId.value sessionId) |> ignore)
+
+    let isOwnerDropped (sessionId: SessionId) =
+        lock claimGate (fun () -> droppedOwners.Contains(SessionId.value sessionId))
 
     let currentProjection () =
         journal |> Option.map AgentJournal.snapshot
@@ -163,8 +169,11 @@ type AssistanceHost
         |> Option.bind (fun record -> tryDecodeRecord record |> Option.map (fun decoded -> record, decoded))
 
     let ownerStillOnRun owner logicalRun =
-        activeProfile owner
-        |> Option.filter (fun profile -> profile.LogicalRunId = logicalRun)
+        if isOwnerDropped owner then
+            None
+        else
+            activeProfile owner
+            |> Option.filter (fun profile -> profile.LogicalRunId = logicalRun)
 
     let hasAdviceClaim owner logicalRun =
         match currentProjection (), ownerStillOnRun owner logicalRun with
@@ -232,16 +241,18 @@ type AssistanceHost
                         PromptDispatcher.AwaitMode.Detached
         }
 
-    let consumeCompleted owner (record: HandleRecord) =
-        match journal with
-        | None -> ()
-        | Some durable ->
-            match HandleController.consume durable owner record.Handle with
-            | Ok _
-            | Error HandleConsumeRejection.AlreadyRetired -> ()
-            | Error _ -> ()
+    let consumeCompleted owner (record: HandleRecord) : Task =
+        task {
+            match journal with
+            | None -> ()
+            | Some durable ->
+                match! HandleController.consume durable owner record.Handle with
+                | Ok _
+                | Error HandleConsumeRejection.AlreadyRetired -> ()
+                | Error _ -> ()
+        }
 
-    let recordTerminal owner agentId childId (record: HandleRecord) succeeded body =
+    let recordTerminal owner agentId childId (record: HandleRecord) succeeded body : Task<Result<unit, string>> =
         match record.Lifecycle with
         | HandleLifecycle.Active ->
             let evidence =
@@ -251,17 +262,17 @@ type AssistanceHost
                     TerminalEvidence.failed agentId record.Handle childId body
 
             match JoinableCompletion.tryFromProvenTerminal evidence with
-            | Error error -> Error error
+            | Error error -> Task.FromResult(Error error)
             | Ok proof -> ChildRecoveryWorkflow.commitJoinable journal owner proof
-        | HandleLifecycle.CompletedAwaitingJoin _ -> Ok()
-        | HandleLifecycle.Retired -> Ok()
-        | HandleLifecycle.Abandoned _ -> Error "consultation handle is abandoned"
+        | HandleLifecycle.CompletedAwaitingJoin _ -> Task.FromResult(Ok())
+        | HandleLifecycle.Retired -> Task.FromResult(Ok())
+        | HandleLifecycle.Abandoned _ -> Task.FromResult(Error "consultation handle is abandoned")
 
     let deliverAdvice owner logicalRun requester childId (record: HandleRecord) providerPrompt directory =
         task {
             if hasAdviceClaim owner logicalRun then
                 match record.Lifecycle with
-                | HandleLifecycle.CompletedAwaitingJoin _ -> consumeCompleted owner record
+                | HandleLifecycle.CompletedAwaitingJoin _ -> do! consumeCompleted owner record
                 | _ -> ()
 
                 return AssistanceTurnDisposition.Handled
@@ -277,7 +288,7 @@ type AssistanceHost
                 with
                 | Ok _ ->
                     match record.Lifecycle with
-                    | HandleLifecycle.CompletedAwaitingJoin _ -> consumeCompleted owner record
+                    | HandleLifecycle.CompletedAwaitingJoin _ -> do! consumeCompleted owner record
                     | _ -> ()
 
                     return AssistanceTurnDisposition.Handled
@@ -293,7 +304,7 @@ type AssistanceHost
 
     let sendConsultationRoot owner logicalRun requester childId directory =
         task {
-            match parentRecord owner with
+            match! parentRecord owner with
             | None -> return Error "canonical parent LifecycleWorkRecord unavailable"
             | Some commissionerRecord ->
                 let assignment = consultationAssignment owner
@@ -308,7 +319,7 @@ type AssistanceHost
                 let providerPrompt =
                     ForkChildPayload.relay forkProse assignment (Some commissionerRecord) [] None
 
-                XTraceCapture.captureOpening journal childId assignment []
+                do! XTraceCapture.captureOpening journal childId assignment []
 
                 let dispatcher = journal |> Option.map PromptDispatcher.forJournal
 
@@ -365,7 +376,7 @@ type AssistanceHost
                 match record.Lifecycle with
                 | HandleLifecycle.Active -> return AssistanceTurnDisposition.Handled
                 | HandleLifecycle.CompletedAwaitingJoin _ ->
-                    match childRecordText record.ChildSessionId with
+                    match! childRecordText record.ChildSessionId with
                     | Some childWorkRecord when not (String.IsNullOrWhiteSpace childWorkRecord) ->
                         return!
                             deliverAdvice
@@ -397,7 +408,7 @@ type AssistanceHost
                     | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | None when ownerHasActiveConsultation owner -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | None ->
-                match parentRecord owner with
+                match! parentRecord owner with
                 | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
                 | Some _ ->
                     let agentId = encodeHandleId owner logicalRun requester
@@ -419,7 +430,7 @@ type AssistanceHost
 
                         return AssistanceTurnDisposition.ClaimedButUnresolved
                     | Ok childId ->
-                        match
+                        match!
                             HandleController.link
                                 journal
                                 owner
@@ -554,18 +565,17 @@ type AssistanceHost
                     // terminal segment first so the child LWR includes this
                     // completed turn's advice, not only its opening Chronicle
                     // or older XTrace material.
-                    XTraceCapture.captureTerminal journal turn
+                    do! XTraceCapture.captureTerminal journal turn
 
-                    let body =
-                        childRecordText turn.SessionId
-                        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                    let! body = childRecordText turn.SessionId
+                    let body = body |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
                     match body with
                     | None ->
                         let failure =
                             consultationFailedPrompt owner "canonical child LifecycleWorkRecord unavailable"
 
-                        match recordTerminal owner agentId turn.SessionId record false failure with
+                        match! recordTerminal owner agentId turn.SessionId record false failure with
                         | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
                         | Ok() ->
                             let refreshed =
@@ -574,7 +584,7 @@ type AssistanceHost
                             return!
                                 deliverAdvice owner logicalRun requester turn.SessionId refreshed failure turn.Directory
                     | Some childWorkRecord ->
-                        match recordTerminal owner agentId turn.SessionId record true childWorkRecord with
+                        match! recordTerminal owner agentId turn.SessionId record true childWorkRecord with
                         | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
                         | Ok() ->
                             let refreshed =
@@ -593,7 +603,7 @@ type AssistanceHost
                 | ReconcileProgram.TurnFailed error ->
                     let failure = consultationFailedPrompt owner error
 
-                    match recordTerminal owner agentId turn.SessionId record false failure with
+                    match! recordTerminal owner agentId turn.SessionId record false failure with
                     | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
                     | Ok() ->
                         let refreshed =
@@ -618,7 +628,7 @@ type AssistanceHost
                     let failure = consultationFailedPrompt owner failureReason
 
                     if recursive then
-                        match recordTerminal owner agentId turn.SessionId record false failure with
+                        match! recordTerminal owner agentId turn.SessionId record false failure with
                         | Ok() -> ()
                         | Error _ -> ()
 
@@ -666,7 +676,7 @@ type AssistanceHost
                         | Some _, HandleLifecycle.Retired
                         | Some _, HandleLifecycle.Abandoned _ -> ()
                         | Some _, HandleLifecycle.CompletedAwaitingJoin _ ->
-                            match childRecordText childId with
+                            match! childRecordText childId with
                             | Some childWorkRecord when not (String.IsNullOrWhiteSpace childWorkRecord) ->
                                 let! _ =
                                     deliverAdvice
@@ -696,25 +706,32 @@ type AssistanceHost
         sensor.DropSession sessionId
         dropOwnerClaims sessionId
 
-        match currentProjection () with
-        | None -> ()
-        | Some snapshot ->
-            snapshot.AgentProjections.HandleByChildSession
-            |> Map.iter (fun childId record ->
-                match tryDecodeRecord record with
-                | Some(agentId, owner, _, _) when owner = sessionId ->
-                    match record.Lifecycle with
-                    | HandleLifecycle.Active
-                    | HandleLifecycle.CompletedAwaitingJoin _ ->
-                        sessions.AbortSession childId |> ignore
+        // The Host deletion/cancel callback is synchronous. Keep the physical abort
+        // synchronous, then continue the durable hidden-handle cleanup in one explicit
+        // detached Task rather than implicitly discarding each journal Task.
+        task {
+            match currentProjection () with
+            | None -> ()
+            | Some snapshot ->
+                for KeyValue(childId, record) in snapshot.AgentProjections.HandleByChildSession do
+                    match tryDecodeRecord record with
+                    | Some(agentId, owner, _, _) when owner = sessionId ->
+                        match record.Lifecycle with
+                        | HandleLifecycle.Active
+                        | HandleLifecycle.CompletedAwaitingJoin _ ->
+                            sessions.AbortSession childId |> ignore
 
-                        HandleController.recordAbandon
-                            journal
-                            owner
-                            agentId
-                            HandleAbandonReason.ParentCancelled
-                            (clockPort.UtcNow())
-                        |> ignore
-                    | HandleLifecycle.Abandoned _
-                    | HandleLifecycle.Retired -> ()
-                | _ -> ())
+                            let! _ =
+                                HandleController.recordAbandon
+                                    journal
+                                    owner
+                                    agentId
+                                    HandleAbandonReason.ParentCancelled
+                                    (clockPort.UtcNow())
+
+                            ()
+                        | HandleLifecycle.Abandoned _
+                        | HandleLifecycle.Retired -> ()
+                    | _ -> ()
+        }
+        |> ignore

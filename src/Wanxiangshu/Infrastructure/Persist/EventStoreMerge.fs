@@ -108,6 +108,7 @@ module EventStoreMerge =
                                 return! mergeGroups rest
                             | many ->
                                 let childTrees = ResizeArray<TreeEntry list>()
+                                // DSL-MUTABLE: algorithm-scratch — missing-child short-circuit while scanning merge inputs
                                 let mutable missing = false
 
                                 for oid in many do

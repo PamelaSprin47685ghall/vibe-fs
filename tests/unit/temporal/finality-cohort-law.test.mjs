@@ -188,8 +188,8 @@ const membersView = (request) =>
 const standingOf = (life, reviewer) =>
   mapEntries(life.EnlistedReviewers).find(([sid]) => idValue.session(sid) === idValue.session(reviewer))?.[1]
 
-const appendLifecycle = (journal, lifecycleFact) => {
-  const result = AgentJournalModule_appendManagerLifecycle(
+const appendLifecycle = async (journal, lifecycleFact) => {
+  const result = await AgentJournalModule_appendManagerLifecycle(
     stream.session(MGR),
     payloadOf(lifecycleFact),
     journal,
@@ -366,11 +366,11 @@ test('THEOREM_finality_blessed_exactly_once_second_completion_rejected', () => {
 
 // ── Theorem 4: dropEphemeral preserves durable finality; no second completion
 
-test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', () => {
+test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', async () => {
   // G4R §12: world1 → durable FinalityBlessed F; DROP EPHEMERAL; world2 := recover(F)
   // → same Resolution/Members; re-append Blessed is refused (no second completion).
   const dir = uniqueDirectory('bless')
-  const world1 = createDurableWorld({ directory: dir, runtime: 'rt_finality_1', pid: 5101 })
+  const world1 = await createDurableWorld({ directory: dir, runtime: 'rt_finality_1', pid: 5101 })
 
   for (const lifecycleFact of [
     lifeOpened(),
@@ -382,7 +382,7 @@ test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', 
     enlist(REQ2, NEW, 1, BAR2, true),
     finalityBlessed(REQ2),
   ]) {
-    appendLifecycle(world1.journal, lifecycleFact)
+    await appendLifecycle(world1.journal, lifecycleFact)
   }
 
   const before = currentLife(agentJournal.snapshot(world1.journal))
@@ -393,7 +393,7 @@ test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', 
   ])
   assert.equal(mapEntries(before.EnlistedReviewers).length, 2)
 
-  const world2 = dropEphemeral(world1, { runtime: 'rt_finality_recovered', pid: 5102 })
+  const world2 = await dropEphemeral(world1, { runtime: 'rt_finality_recovered', pid: 5102 })
   const after = currentLife(agentJournal.snapshot(world2.journal))
   assert.equal(caseOf(after.ActiveFinality.Resolution), 'Blessed')
   assert.deepEqual(membersView(after.ActiveFinality), beforeMembers)
@@ -402,7 +402,7 @@ test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', 
   assert.equal(mapEntries(after.EnlistedReviewers).length, 2)
 
   // Resume must not accept a second Blessed completion for the same request.
-  const duplicate = AgentJournalModule_appendManagerLifecycle(
+  const duplicate = await AgentJournalModule_appendManagerLifecycle(
     stream.session(MGR),
     payloadOf(finalityBlessed(REQ2)),
     world2.journal,
@@ -425,12 +425,12 @@ test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', 
   world2.dispose()
 })
 
-test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', () => {
+test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', async () => {
   // Open request (not yet terminal): crash/resume must keep ActiveFinality Open
   // and the same EnlistedReviewers so rosterOf after resume still yields
   // ungraduated history + exactly one new — no re-enlist / no duplicate Members.
   const dir = uniqueDirectory('open')
-  const world1 = createDurableWorld({ directory: dir, runtime: 'rt_finality_open_1', pid: 5201 })
+  const world1 = await createDurableWorld({ directory: dir, runtime: 'rt_finality_open_1', pid: 5201 })
 
   for (const lifecycleFact of [
     lifeOpened(),
@@ -440,7 +440,7 @@ test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', () => {
     finalityRejected(REQ1, HIST_A, BAR1),
     finalityRequested(REQ2, 'run-2', 'call-2'),
   ]) {
-    appendLifecycle(world1.journal, lifecycleFact)
+    await appendLifecycle(world1.journal, lifecycleFact)
   }
 
   const beforeSnap = agentJournal.snapshot(world1.journal)
@@ -454,7 +454,7 @@ test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', () => {
     { agentId: 'finality-new-req-2', session: null, ordinal: 1, isNew: true },
   ])
 
-  const world2 = dropEphemeral(world1, { runtime: 'rt_finality_open_recovered', pid: 5202 })
+  const world2 = await dropEphemeral(world1, { runtime: 'rt_finality_open_recovered', pid: 5202 })
   const afterSnap = agentJournal.snapshot(world2.journal)
   const afterLife = currentLife(afterSnap)
   assert.equal(caseOf(afterLife.ActiveFinality.Resolution), 'Open')
@@ -466,12 +466,12 @@ test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', () => {
   )
 
   // Enlist the new reviewer once after resume; replay must not double Members.
-  appendLifecycle(world2.journal, enlist(REQ2, NEW, 1, BAR2, true))
+  await appendLifecycle(world2.journal, enlist(REQ2, NEW, 1, BAR2, true))
   const enlistedLife = currentLife(agentJournal.snapshot(world2.journal))
   assert.deepEqual(membersView(enlistedLife.ActiveFinality), [
     { session: 'ses-new', ordinal: 1, barrier: 'bar-2', isNew: true },
   ])
-  appendLifecycle(world2.journal, enlist(REQ2, NEW, 1, BAR2, true))
+  await appendLifecycle(world2.journal, enlist(REQ2, NEW, 1, BAR2, true))
   assert.deepEqual(
     membersView(currentLife(agentJournal.snapshot(world2.journal)).ActiveFinality),
     [{ session: 'ses-new', ordinal: 1, barrier: 'bar-2', isNew: true }],

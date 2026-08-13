@@ -8,7 +8,6 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import {
   HostToolPartIdModule_create as hostToolPartId,
   ToolCallIdModule_create as toolCallId,
@@ -43,6 +42,7 @@ import {
   physicalUser,
   promptDispatcher,
   providerRun,
+  toList,
   reconcileSupervisor,
   resultOf,
   roles,
@@ -171,7 +171,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
 const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   SessionPersona_clearAllForTests()
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-tools-'))
-  const opened = agentJournal.create({ directory: base })
+  const opened = await agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
   activeJournal = opened.journal
 
@@ -223,7 +223,7 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   )
 
   const snapshot = snapshotMessages
-    ? { GetMessages: async () => okResult(ofArray(snapshotMessages)) }
+    ? { GetMessages: async () => okResult(toList(snapshotMessages)) }
     : undefined
 
   const scope = new ToolRuntimeScope(
