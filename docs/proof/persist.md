@@ -34,9 +34,10 @@
 | 查询 O(1) 积分，不扫全史 | PERSIST-008 |
 | payload closure：先 blob 后 event；dangling / 缺 closure fail closed；Strength frame/predictor material 只经 envelope payload_refs，无 feature-owned blob/NDJSON | PERSIST-007、STRENGTH-006/017 |
 | AgentJournal 成功路径无 `.ndjson`、无磁盘 `blobs/` 目录 | PERSIST-006、007 |
+| 启动加载 O(|events|) 树遍历，不经 MergeSpec oracle；路径 EventId 与 envelope 不一致 fail-closed | PERSIST-004 |
 | Requested-only 先核对领域物理证据；禁止盲重试；Accepted 不折回 | PERSIST-009 |
 
-代表：`tests/unit/journal/event-store-journal-writer.test.mjs`、`event-store-journal-boot.test.mjs`、`workspace-event-store-host.test.mjs`；orchestrator worktree effect unit。
+代表：`tests/unit/journal/event-store-journal-writer.test.mjs`、`event-store-journal-boot.test.mjs`、`workspace-event-store-host.test.mjs`、`tests/unit/persist/event-store-merge.test.mjs`（`loadEventEnvelopes`）；orchestrator worktree effect unit。
 
 ## 上下文事实 fold
 

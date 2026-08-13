@@ -132,23 +132,26 @@ type EventStoreJournalWriter
 
     /// Load journal envelopes from a store snapshot (W1-boot).
     /// Non-journal EventTypes (Job*, etc.) are skipped; decode failures fail closed.
+    ///
+    /// Walks `events/` linearly via GitRawStore.loadEventEnvelopes. Must not
+    /// go through EventStoreMergeSpec — that module is the contract-test
+    /// set-union oracle, and its previous list-append decoder was O(|history|²).
     static member loadJournalEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<Envelope list, string> =
-        match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-        | Error(MergeError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
+        match GitRawStore.loadEventEnvelopes raw snapshot.RootOid with
+        | Error detail -> Error(sprintf "storage invalid: %A" detail)
         | Ok events ->
-            let journalEvents =
-                events
-                |> List.filter (fun e -> e.EventType = EventStoreJournalCodec.JournalEnvelopeEventType)
-
             let rec decodeAll remaining acc =
                 match remaining with
                 | [] -> Ok(List.rev acc)
                 | head :: tail ->
-                    match EventStoreJournalCodec.tryDecode head with
-                    | Error err -> Error err
-                    | Ok env -> decodeAll tail (env :: acc)
+                    if head.EventType <> EventStoreJournalCodec.JournalEnvelopeEventType then
+                        decodeAll tail acc
+                    else
+                        match EventStoreJournalCodec.tryDecode head with
+                        | Error err -> Error err
+                        | Ok env -> decodeAll tail (env :: acc)
 
-            match decodeAll journalEvents [] with
+            match decodeAll events [] with
             | Error err -> Error err
             | Ok envelopes -> Ok(List.sortWith Envelope.compareSortKey envelopes)
 

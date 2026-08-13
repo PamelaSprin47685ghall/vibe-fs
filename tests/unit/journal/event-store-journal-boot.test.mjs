@@ -247,3 +247,39 @@ test('resumeOrCreate_skips_non_journal_Job_events', () => {
 
   resumed.writer.Dispose()
 })
+
+test('resumeOrCreate_replays_many_prior_journal_envelopes', () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-journal-boot-many-'))
+  try {
+    const raw = GitRaw.GitRawStore_createInMemory()
+    const store = Store.EventStore_create(raw)
+    const { writer } = createPair(store, raw)
+
+    const count = 40
+    for (let i = 0; i < count; i++) {
+      const id = `ses_es_boot_many_${String(i).padStart(2, '0')}`
+      const sid = sessionId(id)
+      const closed = fact('CompanionBloggerClosed', { SessionId: sid })
+      const appended = appendWriter(writer, stream.session(sid), closed)
+      assert.equal(appended.committed, true, appended.reason)
+    }
+    writer.Dispose()
+
+    const resumed = resumeTriple(store, raw, { runtime: 'rt_es_boot_many', pid: 9001 })
+    for (let i = 0; i < count; i++) {
+      const id = `ses_es_boot_many_${String(i).padStart(2, '0')}`
+      assert.ok(fold.session(resumed.projection, id), `projection should contain ${id}`)
+    }
+
+    const snapshot = store.OpenSnapshot()
+    const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, snapshot.RootOid))
+    assert.equal(listItems(blobs).length, count + 2, 'prior RuntimeStarted + 40 facts + resume RuntimeStarted')
+
+    const loaded = mustOk(GitRaw.GitRawStore_loadEventEnvelopes(raw, snapshot.RootOid))
+    assert.equal(listItems(loaded).length, count + 2)
+
+    resumed.writer.Dispose()
+  } finally {
+    rmSync(workspace, { recursive: true, force: true })
+  }
+})

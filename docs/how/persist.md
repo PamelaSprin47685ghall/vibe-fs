@@ -116,6 +116,8 @@ accepted 证据 = 链接事实：`HandleLinked` / `CompanionBloggerLinked`。
 | `WorkspaceEventStore` | common-dir → `ProcessGitRawStore` + `IEventStore` |
 | `IJournalEventStoreBoot` | `ResumeOrCreate` 不点名 `IEventStore` token，避免 dual-write 同文件桥 |
 
+W1-boot `EventStoreJournalWriter.loadJournalEnvelopes` 走 `GitRawStore.loadEventEnvelopes`：一次 `events/` 树遍历 + 每 blob 一次读取，O(|events|)。禁止经 `EventStoreMergeSpec`（set-union oracle，仅合同测试）。非 JournalEnvelope 事件解码后跳过，不参与 AgentJournal fold。
+
 同一生产模块不得同时写 EventStore **与** Journal NDJSON 路径（`unified-store-gate` `dual-write`）。  
 已删除：生产 `Boot.fs`、NDJSON `JournalWriter`、目录 `BlobWriter`、`AgentJournal.createFromBoot` / directory `create`。
 

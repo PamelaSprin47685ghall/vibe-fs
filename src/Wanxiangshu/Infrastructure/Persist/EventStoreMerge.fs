@@ -3,6 +3,7 @@ namespace Wanxiangshu.Infrastructure.Persist
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open System.Collections.Generic
 open Wanxiangshu.Kernel.Identity
 
 /// Specification oracle (§10.6): append-only set union + identity dedupe.
@@ -19,37 +20,24 @@ module EventStoreMergeSpec =
         | Error err -> Error(asMergeError err)
 
     /// Load every event blob under each snapshot, then apply mergeEvents.
+    /// Uses GitRawStore.loadEventEnvelopes (linear) rather than decoding with
+    /// `list @ [envelope]`, which was O(|events|²) on the boot path.
     let merge (store: IGitRawStore) (MergeInput snapshots) : Result<EventEnvelope list, MergeError> =
-        let rec loadAll remaining (acc: EventEnvelope list) =
+        let acc = ResizeArray<EventEnvelope>()
+
+        let rec loadAll remaining =
             match remaining with
-            | [] -> mergeEvents acc
+            | [] -> mergeEvents (Seq.toList acc)
             | snapshot :: rest ->
-                match GitRawStore.listEventBlobs store snapshot.RootOid with
+                match GitRawStore.loadEventEnvelopes store snapshot.RootOid with
                 | Error err -> Error(asMergeError err)
-                | Ok blobs ->
-                    let rec decodeBlobs pending decoded =
-                        match pending with
-                        | [] -> loadAll rest (acc @ decoded)
-                        | (path, oid) :: tail ->
-                            match store.ReadObject oid with
-                            | None ->
-                                Error(
-                                    asMergeError (
-                                        StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path)
-                                    )
-                                )
-                            | Some bytes ->
-                                match CanonicalEventCodec.tryDecodeUtf8 bytes with
-                                | Error err -> Error(asMergeError err)
-                                | Ok envelope ->
-                                    match EventIdShard.tryParseEventId path with
-                                    | Some pathId when pathId <> envelope.EventId ->
-                                        Error(asMergeError (StorageInvalid.NonCanonical "event path EventId mismatch"))
-                                    | _ -> decodeBlobs tail (decoded @ [ envelope ])
+                | Ok envelopes ->
+                    for envelope in envelopes do
+                        acc.Add envelope
 
-                    decodeBlobs blobs []
+                    loadAll rest
 
-        loadAll snapshots []
+        loadAll snapshots
 
 /// Production K-way merge: structural tree union by EventId path (§10.6).
 /// Only reads blob bytes when the same path has differing OIDs.

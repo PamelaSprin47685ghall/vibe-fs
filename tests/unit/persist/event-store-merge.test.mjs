@@ -237,3 +237,19 @@ test('merge_production_matches_materialize_of_union', () => {
   const direct = materialize(store, [a, b])
   assert.equal(snapshotOid(merged), snapshotOid(direct))
 })
+
+test('loadEventEnvelopes_reads_every_blob_across_shards', () => {
+  const store = createStore()
+  const events = [
+    envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } }),
+    envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } }),
+    envelope({ id: 'caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 3 } }),
+  ]
+  const snapshot = materialize(store, events)
+  const loaded = mustOk(GitRaw.GitRawStore_loadEventEnvelopes(store, snapshot.RootOid), 'loadEventEnvelopes')
+  assert.deepEqual(eventIdsOf(loaded), [
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    'caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  ])
+})

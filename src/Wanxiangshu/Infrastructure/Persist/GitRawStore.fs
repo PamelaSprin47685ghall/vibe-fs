@@ -375,18 +375,24 @@ module GitRawStore =
                 Ok { RootOid = RootOid.create rootOid }
 
     /// Walk events/ recursively → (relativePath * blobOid) pairs.
+    ///
+    /// Linear in blob count. The previous `list @ nested` fold copied the
+    /// accumulating prefix at every file and directory, so listing a snapshot
+    /// was O(|events|²). Boot, converge validate, and feature loaders all
+    /// walk this tree; keep the walk O(|events|).
     let listEventBlobs (store: IGitRawStore) (root: RootOid) : Result<(string * GitObjectId) list, StorageInvalid> =
-        let rec walk (dirOid: GitObjectId) (prefix: string) : Result<(string * GitObjectId) list, StorageInvalid> =
+        let rec walk
+            (dirOid: GitObjectId)
+            (prefix: string)
+            (acc: ResizeArray<string * GitObjectId>)
+            : Result<unit, StorageInvalid> =
             match store.ReadTree dirOid with
             | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" prefix))
             | Some entries ->
-                let folder
-                    (acc: Result<(string * GitObjectId) list, StorageInvalid>)
-                    (entry: TreeEntry)
-                    : Result<(string * GitObjectId) list, StorageInvalid> =
-                    match acc with
-                    | Error e -> Error e
-                    | Ok collected ->
+                let rec loop remaining =
+                    match remaining with
+                    | [] -> Ok()
+                    | entry :: rest ->
                         let path =
                             if prefix = "" then
                                 entry.Name
@@ -394,13 +400,14 @@ module GitRawStore =
                                 prefix + "/" + entry.Name
 
                         if StoreTree.isTreeMode entry.Mode then
-                            match walk entry.Oid path with
+                            match walk entry.Oid path acc with
                             | Error e -> Error e
-                            | Ok nested -> Ok(collected @ nested)
+                            | Ok() -> loop rest
                         else
-                            Ok(collected @ [ path, entry.Oid ])
+                            acc.Add((path, entry.Oid))
+                            loop rest
 
-                List.fold folder (Ok []) entries
+                loop entries
 
         match store.ReadTree(RootOid.value root) with
         | None -> Error(StorageInvalid.MalformedEnvelope "missing store root tree")
@@ -410,7 +417,39 @@ module GitRawStore =
                 |> List.tryFind (fun e -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
             with
             | None -> Ok []
-            | Some eventsEntry -> walk eventsEntry.Oid StoreTree.EventsDir
+            | Some eventsEntry ->
+                let acc = ResizeArray<string * GitObjectId>()
+
+                match walk eventsEntry.Oid StoreTree.EventsDir acc with
+                | Error e -> Error e
+                | Ok() -> Ok(Seq.toList acc)
+
+    /// Decode every event blob under a snapshot root.
+    ///
+    /// Production loaders (journal boot, feature adapters, converge validate)
+    /// must use this walk — O(|events|) tree + blob reads — not
+    /// EventStoreMergeSpec, which is the contract-test set-union oracle.
+    let loadEventEnvelopes (store: IGitRawStore) (root: RootOid) : Result<EventEnvelope list, StorageInvalid> =
+        match listEventBlobs store root with
+        | Error err -> Error err
+        | Ok blobs ->
+            let rec decode remaining acc =
+                match remaining with
+                | [] -> Ok(List.rev acc)
+                | (path, oid) :: tail ->
+                    match store.ReadObject oid with
+                    | None ->
+                        Error(StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path))
+                    | Some bytes ->
+                        match CanonicalEventCodec.tryDecodeUtf8 bytes with
+                        | Error err -> Error err
+                        | Ok envelope ->
+                            match EventIdShard.tryParseEventId path with
+                            | Some pathId when pathId <> envelope.EventId ->
+                                Error(StorageInvalid.NonCanonical "event path EventId mismatch")
+                            | _ -> decode tail (envelope :: acc)
+
+            decode blobs []
 
     let listPayloadNames (store: IGitRawStore) (root: RootOid) : Result<string list, StorageInvalid> =
         match store.ReadTree(RootOid.value root) with
