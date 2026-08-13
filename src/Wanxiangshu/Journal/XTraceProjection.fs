@@ -22,8 +22,9 @@ type XTraceProjectionState =
         /// human-sized; fold materialises the LWR Opening section without a
         /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
         Opening: OpeningMaterial option
-        /// Semantic parts, strictly ordered by cursor. `Kind` is one of
-        /// text / reasoning / tool_call / tool_result / media.
+        /// Semantic parts. Stored newest-first so replay cons is O(1);
+        /// `XTraceProjection.parts` restores oldest-first cursor order.
+        /// `Kind` is one of text / reasoning / tool_call / tool_result / media.
         Parts: XTracePartRef list
         /// The terminal output blob reference. Text resolved at read boundary.
         Terminal: (BlobRef * BlobDigest) option
@@ -69,17 +70,20 @@ module XTraceProjection =
           Parts = []
           Terminal = None }
 
+    /// Oldest-first cursor order. The stored field is newest-first.
+    let parts (state: XTraceProjectionState) : XTracePartRef list = List.rev state.Parts
+
     let headSequence (state: XTraceProjectionState) : int64 =
-        match List.tryLast state.Parts with
-        | Some part -> part.Cursor.Sequence
-        | None -> 0L
+        match state.Parts with
+        | part :: _ -> part.Cursor.Sequence
+        | [] -> 0L
 
     /// One-past last part (XTrace.head semantics). Empty projection is 0.
     /// Distinct from headSequence, which is the last assigned part (or 0).
     let head (state: XTraceProjectionState) : int64 =
-        match List.tryLast state.Parts with
-        | Some part -> part.Cursor.Sequence + 1L
-        | None -> 0L
+        match state.Parts with
+        | part :: _ -> part.Cursor.Sequence + 1L
+        | [] -> 0L
 
     /// COMPANION-003: capture the opening task verbatim. Idempotent: replaying
     /// the same text changes nothing; a DIFFERENT text is refused (PERSIST-010).
@@ -129,19 +133,19 @@ module XTraceProjection =
             Ok
                 { state with
                     Parts =
-                        state.Parts
-                        @ [ { Cursor = { Sequence = cursorSequence }
-                              Provenance = provenance
-                              Role = role
-                              Turn = turn
-                              PartIndex = partIndex
-                              Kind = kind
-                              ToolName = toolName
-                              ProviderRun = providerRun
-                              ToolCallId = toolCallId
-                              HostToolPartId = hostToolPartId
-                              TextRef = textRef
-                              TextDigest = textDigest } ] }
+                        { Cursor = { Sequence = cursorSequence }
+                          Provenance = provenance
+                          Role = role
+                          Turn = turn
+                          PartIndex = partIndex
+                          Kind = kind
+                          ToolName = toolName
+                          ProviderRun = providerRun
+                          ToolCallId = toolCallId
+                          HostToolPartId = hostToolPartId
+                          TextRef = textRef
+                          TextDigest = textDigest }
+                        :: state.Parts }
 
     /// COMPANION-003 / EXEC-009: capture the terminal output reference.
     /// Idempotent replay (same ref+digest) is a no-op; a different ref
@@ -194,9 +198,10 @@ module XTraceProjection =
     /// absolute Sequence, but their Turn labels are never mixed with post-reanchor ones.
     let semanticCursorFor (sequence: int64) (state: XTraceProjectionState) : SemanticCursor =
         let searchable =
-            let current = currentGenerationParts state.Parts
+            let ordered = parts state
+            let current = currentGenerationParts ordered
 
-            if List.isEmpty current then state.Parts else current
+            if List.isEmpty current then ordered else current
 
         match searchable |> List.tryFind (fun part -> part.Cursor.Sequence > sequence) with
         | Some part ->

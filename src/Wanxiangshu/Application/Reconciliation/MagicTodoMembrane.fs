@@ -459,6 +459,11 @@ module MagicTodoHostHooks =
                         | Some value -> value
                         | None -> invalidOp "Magic Todo requires the full session snapshot port"
 
+                    let reviews =
+                        match processReview with
+                        | Some value -> value
+                        | None -> invalidOp "Magic Todo requires the process review runtime"
+
                     let sessionText = requiredText input "sessionID"
                     let callText = requiredText input "callID"
                     let sessionId = SessionId.create sessionText
@@ -524,10 +529,10 @@ module MagicTodoHostHooks =
                                                             |> Option.bind MagicTodoProjection.pendingReviewObligation
                                                             |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
 
-                                                    match pending, processReview with
-                                                    | Some(lifeId, writeId), Some port ->
+                                                    match pending with
+                                                    | Some(lifeId, writeId) ->
                                                         match!
-                                                            port.AwaitConsumableReview
+                                                            reviews.AwaitConsumableReview
                                                                 durable
                                                                 sessionId
                                                                 lifeId
@@ -540,14 +545,7 @@ module MagicTodoHostHooks =
                                                             | Ok value -> return Ok value
                                                             | Error "lag-1-retry" -> return! admitAfterLag1 ()
                                                             | Error reason -> return Error reason
-                                                    | Some _, None ->
-                                                        // HOST-021 / REVIEW-017/018: no ProcessReviewPort means
-                                                        // no producer of TodoReviewConcluded. Waiting on Journal
-                                                        // would hang forever. Fail closed; do not awaitChangeFrom.
-                                                        return
-                                                            Error
-                                                                "process review runtime unavailable while ConsumableReview outstanding"
-                                                    | None, _ ->
+                                                    | None ->
                                                         match admitNow () with
                                                         | Ok value -> return Ok value
                                                         | Error "lag-1-retry" ->
@@ -603,9 +601,7 @@ module MagicTodoHostHooks =
 
                                 if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
                                     match processReview with
-                                    | None ->
-                                        invalidOp
-                                            "Magic Todo process review runtime unavailable (HOST-021 ensureReview)"
+                                    | None -> () // before fail-closes this configuration before Prepared/Accepted
                                     | Some port ->
                                         match!
                                             port.EnsureReview
@@ -615,7 +611,13 @@ module MagicTodoHostHooks =
                                                 prepared.Prepared.TodoWriteId
                                         with
                                         | Error reason ->
-                                            invalidOp ("Magic Todo ensureReview failed: " + reason)
+                                            // Accepted is already durable. A hidden reviewer startup failure
+                                            // cannot retroactively turn this todowrite into a provider-visible
+                                            // failure; Rk remains outstanding and every later reentry ensures it.
+                                            Diagnostic.emit
+                                                "magic-todo-review-ensure-deferred"
+                                                [ "session_id", SessionId.value prepared.ManagerSessionId
+                                                  "result", reason ]
                                         | Ok() -> ()
                         finally
                             bridges.Remove key |> ignore

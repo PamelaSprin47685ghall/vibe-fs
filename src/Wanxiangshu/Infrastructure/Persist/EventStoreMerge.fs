@@ -67,17 +67,19 @@ module EventStoreMerge =
 
         let acc = ResizeArray<TreeEntry>()
 
-        let rec mergeGroups (remaining: (string * TreeEntry list) list) =
+        let rec mergeGroups
+            (remaining: (string * TreeEntry list) list)
+            : Result<TreeEntry list, MergeError> =
             match remaining with
             | [] -> Ok(Seq.toList acc)
-            | (name, group) :: rest ->
+            | (name, entries: TreeEntry list) :: rest ->
                 let path = if pathPrefix = "" then name else pathPrefix + "/" + name
 
-                let normalized =
-                    group
-                    |> List.map (fun (entry: TreeEntry) ->
-                        { entry with
-                            Mode = StoreTree.normalizeMode entry.Mode })
+                let normalize (entry: TreeEntry) : TreeEntry =
+                    { entry with
+                        Mode = StoreTree.normalizeMode entry.Mode }
+
+                let normalized = entries |> List.map normalize
 
                 let modes = normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
 

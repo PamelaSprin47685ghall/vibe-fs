@@ -16,7 +16,10 @@ type PairProgrammingGuideline =
       ResultGap: TranscriptGap }
 
 type GuidelineProjectionState =
-    { Pairs: PairProgrammingGuideline list }
+    { /// Stored newest-first so replay cons is O(1). `pairs` restores oldest-first.
+      Pairs: PairProgrammingGuideline list
+      CallIds: Set<string>
+      Placements: Set<string> }
 
 [<RequireQualifiedAccess>]
 type GuidelineFoldRejection =
@@ -29,15 +32,26 @@ type GuidelineFoldRejection =
 
 module GuidelineProjection =
 
-    let empty: GuidelineProjectionState = { Pairs = [] }
+    let empty: GuidelineProjectionState =
+        { Pairs = []
+          CallIds = Set.empty
+          Placements = Set.empty }
 
-    let pairs (state: GuidelineProjectionState) : PairProgrammingGuideline list = state.Pairs
+    let pairs (state: GuidelineProjectionState) : PairProgrammingGuideline list = List.rev state.Pairs
+
+    let private gapKey (gap: TranscriptGap) =
+        match gap with
+        | TranscriptGap.Start -> "s"
+        | TranscriptGap.Before addr -> "b:" + TranscriptMessageAddress.value addr
+        | TranscriptGap.After addr -> "a:" + TranscriptMessageAddress.value addr
+
+    let private placementKey callGap resultGap = gapKey callGap + "|" + gapKey resultGap
 
     let nextOrdinal (state: GuidelineProjectionState) : int64 =
-        // Pairs append at the end (oldest → newest). Successor is last.Ordinal + 1.
+        // Pairs are stored newest-first. Successor is newest.Ordinal + 1.
         match state.Pairs with
         | [] -> 1L
-        | pairs -> (List.last pairs).Ordinal + 1L
+        | newest :: _ -> newest.Ordinal + 1L
 
     let apply
         (ordinal: int64)
@@ -49,24 +63,23 @@ module GuidelineProjection =
         : Result<GuidelineProjectionState, GuidelineFoldRejection> =
         let expected = nextOrdinal state
 
+        let callKey = ToolCallId.value callId
+        let placeKey = placementKey callGap resultGap
+
         if ordinal <> expected then
             Error(GuidelineFoldRejection.NonSequentialOrdinal(expected, ordinal))
-        elif
-            state.Pairs
-            |> List.exists (fun pair -> ToolCallId.value pair.CallId = ToolCallId.value callId)
-        then
-            Error(GuidelineFoldRejection.DuplicateCallId(ToolCallId.value callId))
-        elif
-            state.Pairs
-            |> List.exists (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
-        then
+        elif Set.contains callKey state.CallIds then
+            Error(GuidelineFoldRejection.DuplicateCallId callKey)
+        elif Set.contains placeKey state.Placements then
             Error(GuidelineFoldRejection.DuplicatePlacement(callGap, resultGap))
         else
             Ok
                 { Pairs =
-                    state.Pairs
-                    @ [ { Ordinal = ordinal
-                          CallId = callId
-                          MarkerText = markerText
-                          CallGap = callGap
-                          ResultGap = resultGap } ] }
+                    { Ordinal = ordinal
+                      CallId = callId
+                      MarkerText = markerText
+                      CallGap = callGap
+                      ResultGap = resultGap }
+                    :: state.Pairs
+                  CallIds = Set.add callKey state.CallIds
+                  Placements = Set.add placeKey state.Placements }

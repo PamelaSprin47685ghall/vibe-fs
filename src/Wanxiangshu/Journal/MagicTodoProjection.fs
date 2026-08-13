@@ -43,8 +43,10 @@ module MagicTodoProjection =
             /// Canonical provider account: the latest Accepted checkpoint's Submitted account.
             /// None means a normal new Life before T1 (or no legacy seed).
             CurrentObligationsRef: (BlobRef * BlobDigest) option
-            /// Accepted chain in order (lag-1 desired cutoff source).
+            /// Accepted chain, stored newest-first so replay cons is O(1).
+            /// `acceptedOrder` restores oldest-first (lag-1 desired cutoff source).
             AcceptedOrder: TodoWriteId list
+            AcceptedIds: Set<string>
             Checkpoints: Map<string, CheckpointRecord>
             Dedicated: DedicatedReviewerState option
             /// Blob list bodies live in the blob store; projection keeps their locator and ids.
@@ -96,9 +98,12 @@ module MagicTodoProjection =
     let private putLife (life: LifeMagicTodoState) (state: MagicTodoProjectionState) =
         { ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
 
+    /// Oldest-first accepted chain. The stored field is newest-first.
+    let acceptedOrder (life: LifeMagicTodoState) : TodoWriteId list = List.rev life.AcceptedOrder
+
     /// Pending process-review obligation: Accepted ∧ ¬Concluded.
     let pendingReviewObligation (life: LifeMagicTodoState) : CheckpointRecord option =
-        life.AcceptedOrder
+        acceptedOrder life
         |> List.tryFind (fun writeId ->
             match Map.tryFind (writeKey writeId) life.Checkpoints with
             | Some cp when cp.Accepted && cp.Concluded.IsNone -> true
@@ -107,9 +112,9 @@ module MagicTodoProjection =
 
     /// Next todowrite / suicide may consume only when Concluded exists for latest Accepted.
     let consumablePreviousReview (life: LifeMagicTodoState) : TodoReviewConcluded option =
-        match life.AcceptedOrder |> List.tryLast with
-        | None -> None
-        | Some writeId ->
+        match life.AcceptedOrder with
+        | [] -> None
+        | writeId :: _ ->
             match Map.tryFind (writeKey writeId) life.Checkpoints with
             | Some { Concluded = Some concluded } -> Some concluded
             | Some { Accepted = true; Concluded = None } -> None
@@ -141,7 +146,9 @@ module MagicTodoProjection =
 
     /// Desired lag-1 cutoff from Accepted chain (no Requested fact).
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
-        MagicTodo.desiredLag1Cutoff life.AcceptedOrder
+        match life.AcceptedOrder with
+        | _ :: lag1 :: _ -> Some lag1
+        | _ -> None
 
     let foldPrepared
         (preparedFactRef: EventId)

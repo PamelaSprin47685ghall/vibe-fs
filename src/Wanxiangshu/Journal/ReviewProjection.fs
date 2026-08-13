@@ -80,7 +80,9 @@ type ReviewRequirementInput =
       AuthorityRootUserMessageId: AuthorityRootUserMessageId }
 
 type ReviewRequirementProjection =
-    { HumanPromptInputs: ReviewRequirementInput list
+    { /// Stored newest-first so replay cons is O(1). `inputs` restores oldest-first.
+      HumanPromptInputs: ReviewRequirementInput list
+      InputKeys: Set<string>
       LastConfirmedProviderRun: ProviderRunIdentity option }
 
 /// Why a verdict or witness was not applied.
@@ -309,22 +311,32 @@ module ReviewRequirementProjection =
 
     let empty =
         { HumanPromptInputs = []
+          InputKeys = Set.empty
           LastConfirmedProviderRun = None }
+
+    let private inputKey (sourceSessionId: SessionId) (authorityRoot: AuthorityRootUserMessageId) =
+        SessionId.value sourceSessionId + "\x1f" + AuthorityRootUserMessageId.value authorityRoot
+
+    /// Oldest-first. The stored field is newest-first.
+    let inputs (current: ReviewRequirementProjection) = List.rev current.HumanPromptInputs
 
     let addRequirement
         (sourceSessionId: SessionId)
         (authorityRoot: AuthorityRootUserMessageId)
         (current: ReviewRequirementProjection)
         =
-        let input =
-            { SourceSessionId = sourceSessionId
-              AuthorityRootUserMessageId = authorityRoot }
+        let key = inputKey sourceSessionId authorityRoot
 
-        if List.contains input current.HumanPromptInputs then
+        if Set.contains key current.InputKeys then
             current
         else
+            let input =
+                { SourceSessionId = sourceSessionId
+                  AuthorityRootUserMessageId = authorityRoot }
+
             { current with
-                HumanPromptInputs = current.HumanPromptInputs @ [ input ] }
+                HumanPromptInputs = input :: current.HumanPromptInputs
+                InputKeys = Set.add key current.InputKeys }
 
     /// A confirmed review clears the requirements it covered.
     let clearOnConfirmation (providerRun: ProviderRunIdentity) (current: ReviewRequirementProjection) =
@@ -332,4 +344,5 @@ module ReviewRequirementProjection =
             current
         else
             { HumanPromptInputs = []
+              InputKeys = Set.empty
               LastConfirmedProviderRun = Some providerRun }

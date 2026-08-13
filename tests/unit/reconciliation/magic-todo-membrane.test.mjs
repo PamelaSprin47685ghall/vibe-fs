@@ -69,6 +69,11 @@ const locality = ({ call, inputCanonical, state = new SnapshotToolPartState(0, [
   )
 }
 
+const reviewRuntimeStub = {
+  EnsureReview: () => Promise.resolve(),
+  AwaitConsumableReview: () => Promise.resolve(),
+}
+
 const withJournal = (body) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-membrane-'))
   const created = agentJournal.create({ directory, runtime: 'rt_magic_todo_membrane' })

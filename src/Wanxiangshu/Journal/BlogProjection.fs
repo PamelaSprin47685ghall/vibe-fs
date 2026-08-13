@@ -67,7 +67,8 @@ type BlogCoverage =
 
 /// The Companion's durable state: the frame sequence and what it covers.
 ///
-/// `Frames` is oldest-first. PERSIST-008: every question this answers
+/// `Frames` is stored newest-first so replay cons is O(1). `BlogProjection.frames`
+/// restores oldest-first. PERSIST-008: every question this answers
 /// (`frame count`, `current coverage`, `EffectiveFrames`) reads this record, never the
 /// journal history, and never the Blogger's physical transcript (PERSIST-010).
 type BlogProjectionState =
@@ -113,6 +114,9 @@ module BlogProjection =
 
     let frameCount (state: BlogProjectionState) = List.length state.Frames
 
+    /// Oldest-first. The stored field is newest-first.
+    let frames (state: BlogProjectionState) = List.rev state.Frames
+
     /// CTX-011: the frames a probe may build FrozenRecordPrefix from.
     ///
     /// Derived from `CoverableFrameCount` rather than stored as a second blob. The
@@ -120,7 +124,7 @@ module BlogProjection =
     /// equivalent because the frame list is append-only within an epoch, and it cannot
     /// drift from the frames the way a separate materialised copy can.
     let coverableFrames (state: BlogProjectionState) =
-        state.Frames |> List.truncate state.Coverage.CoverableFrameCount
+        frames state |> List.truncate state.Coverage.CoverableFrameCount
 
     /// CTX-012: how many of the oldest frames the next squash takes.
     ///
@@ -163,11 +167,11 @@ module BlogProjection =
                     CoveredFromSequence = previousIngestSequence
                     CoveredThroughSequence = nextIngestSequence }
 
-            let frames = state.Frames @ [ storedFrame ]
+            let nextFrames = storedFrame :: state.Frames
 
             Ok
                 { state with
-                    Frames = frames
+                    Frames = nextFrames
                     Coverage =
                         { IngestedThroughSequence = nextIngestSequence
                           CoverableTurnCutoffExclusive = nextCutoff
@@ -178,7 +182,7 @@ module BlogProjection =
                           // let a probe summarise a turn that is also still raw.
                           CoverableFrameCount =
                             if nextCutoff > previousCutoff then
-                                List.length frames
+                                List.length nextFrames
                             else
                                 state.Coverage.CoverableFrameCount } }
 
@@ -223,7 +227,8 @@ module BlogProjection =
 
             let nextCoverable = if coverable = 0 then 0 else max 1 (coverable - count + 1)
 
-            let replaced = List.truncate count state.Frames
+            let oldestFirst = frames state
+            let replaced = List.truncate count oldestFirst
 
             // Squash unions replaced frames' coverage (min from, max through).
             // A merged interval can span two invocations; overlap decides
@@ -236,7 +241,7 @@ module BlogProjection =
             Ok
                 { state with
                     FrameEpochId = nextEpoch
-                    Frames = storedFrame :: List.skip count state.Frames
+                    Frames = List.rev (storedFrame :: List.skip count oldestFirst)
                     Coverage =
                         { state.Coverage with
                             CoverableFrameCount = nextCoverable } }
