@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Infrastructure
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
@@ -33,15 +34,19 @@ module CasebookWorkflow =
 
     /// Archive one Inspector result as InspectorCaseCaptured (linear parent).
     /// Q is the verbatim initial prompt, A the verbatim ToolResult body.
-    let archiveInspectorResult (store: IEventStore) (raw: IGitRawStore) (case: Case) : Result<unit, string> =
-        match CasebookStore.loadEnvelopes raw (store.OpenSnapshot()) with
-        | Error err -> Error err
-        | Ok envelopes ->
-            let parents = CasebookStore.headOf envelopes |> Option.toList
+    let archiveInspectorResult (store: IEventStore) (raw: IGitRawStore) (case: Case) : Task<Result<unit, string>> =
+        task {
+            let! snapshot = store.OpenSnapshot()
 
-            match CasebookStore.appendCaptured store parents case with
-            | Ok _ -> Ok()
-            | Error err -> Error err
+            match! CasebookStore.loadEnvelopes raw snapshot with
+            | Error err -> return Error err
+            | Ok envelopes ->
+                let parents = CasebookStore.headOf envelopes |> Option.toList
+
+                match! CasebookStore.appendCaptured store parents case with
+                | Ok _ -> return Ok()
+                | Error err -> return Error err
+        }
 
     /// Fetch one Case by session id (CASE-004).
     let fetchCase
@@ -49,12 +54,16 @@ module CasebookWorkflow =
         (raw: IGitRawStore)
         (capacity: int)
         (sessionId: string)
-        : Result<Case option, string> =
-        match CasebookStore.loadEvents raw (store.OpenSnapshot()) with
-        | Error err -> Error err
-        | Ok events ->
-            let cases = CasebookStore.project capacity events
-            Ok(Map.tryFind sessionId cases)
+        : Task<Result<Case option, string>> =
+        task {
+            let! snapshot = store.OpenSnapshot()
+
+            match! CasebookStore.loadEvents raw snapshot with
+            | Error err -> return Error err
+            | Ok events ->
+                let cases = CasebookStore.project capacity events
+                return Ok(Map.tryFind sessionId cases)
+        }
 
     /// CASE-004/005: freshness is a hint, never a proof — exact normalized
     /// equality of stored vs replayed observations.
@@ -72,15 +81,19 @@ module CasebookWorkflow =
         (q: string)
         (a: string)
         (observations: Observation list)
-        : Result<unit, string> =
-        match CasebookStore.loadEnvelopes raw (store.OpenSnapshot()) with
-        | Error err -> Error err
-        | Ok envelopes ->
-            let parents = CasebookStore.headOf envelopes |> Option.toList
+        : Task<Result<unit, string>> =
+        task {
+            let! snapshot = store.OpenSnapshot()
 
-            match CasebookStore.appendRefreshed store parents sessionId q a observations with
-            | Ok _ -> Ok()
-            | Error err -> Error err
+            match! CasebookStore.loadEnvelopes raw snapshot with
+            | Error err -> return Error err
+            | Ok envelopes ->
+                let parents = CasebookStore.headOf envelopes |> Option.toList
+
+                match! CasebookStore.appendRefreshed store parents sessionId q a observations with
+                | Ok _ -> return Ok()
+                | Error err -> return Error err
+        }
 
     /// CASE-006: the full refresh decision — fetch the Case, replay against
     /// the current worktree, and report whether a Bookkeeper revision is
@@ -91,16 +104,18 @@ module CasebookWorkflow =
         (capacity: int)
         (sessionId: string)
         (root: string)
-        : Result<bool, string> =
-        match fetchCase store raw capacity sessionId with
-        | Error err -> Error err
-        | Ok None -> Ok false
-        | Ok(Some case) ->
-            let replayed = CasebookReplay.replayAll root case.Observations
+        : Task<Result<bool, string>> =
+        task {
+            match! fetchCase store raw capacity sessionId with
+            | Error err -> return Error err
+            | Ok None -> return Ok false
+            | Ok(Some case) ->
+                let replayed = CasebookReplay.replayAll root case.Observations
 
-            match checkFreshness case replayed with
-            | ReplayResult.Fresh -> Ok false
-            | ReplayResult.Stale -> Ok true
+                match checkFreshness case replayed with
+                | ReplayResult.Fresh -> return Ok false
+                | ReplayResult.Stale -> return Ok true
+        }
 
     /// ponytail: drain+archive wiring — single helper for Inspector terminal; full SessionDeleted wiring if throughput matters
     let drainCollectorAndArchive
@@ -110,7 +125,7 @@ module CasebookWorkflow =
         (sessionId: string)
         (q: string)
         (a: string)
-        : Result<unit, string> =
+        : Task<Result<unit, string>> =
         let observations = collector.Drain sessionId
 
         let case: Case =
@@ -126,19 +141,25 @@ module CasebookWorkflow =
     /// at most once (ReuseScope close → freeze draft → one finalize). A second
     /// finalize for the same session id is refused; unexpected SessionDeleted
     /// must not reconstruct a pending finalize (the caller just cleans up).
-    let finalizeCase (store: IEventStore) (raw: IGitRawStore) (case: Case) : Result<unit, string> =
-        match fetchCase store raw 0 case.SessionId with
-        | Error err -> Error err
-        | Ok(Some _) -> Error(sprintf "case already finalized for scope %s" case.SessionId)
-        | Ok None -> archiveInspectorResult store raw case
+    let finalizeCase (store: IEventStore) (raw: IGitRawStore) (case: Case) : Task<Result<unit, string>> =
+        task {
+            match! fetchCase store raw 0 case.SessionId with
+            | Error err -> return Error err
+            | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.SessionId)
+            | Ok None -> return! archiveInspectorResult store raw case
+        }
 
     /// CASE-007: append InspectorCaseAccessed with the current stream head as parent.
-    let touchCaseAccess (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : Result<unit, string> =
-        match CasebookStore.loadEnvelopes raw (store.OpenSnapshot()) with
-        | Error err -> Error err
-        | Ok envelopes ->
-            let parents = CasebookStore.headOf envelopes |> Option.toList
+    let touchCaseAccess (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : Task<Result<unit, string>> =
+        task {
+            let! snapshot = store.OpenSnapshot()
 
-            match CasebookStore.appendAccessed store parents sessionId with
-            | Ok _ -> Ok()
-            | Error err -> Error err
+            match! CasebookStore.loadEnvelopes raw snapshot with
+            | Error err -> return Error err
+            | Ok envelopes ->
+                let parents = CasebookStore.headOf envelopes |> Option.toList
+
+                match! CasebookStore.appendAccessed store parents sessionId with
+                | Ok _ -> return Ok()
+                | Error err -> return Error err
+        }

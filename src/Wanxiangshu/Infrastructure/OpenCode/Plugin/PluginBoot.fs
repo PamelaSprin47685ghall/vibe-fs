@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
@@ -23,14 +24,17 @@ module PluginBoot =
           GitTreePort: Wanxiangshu.Review.GitTreePort option
           FamilyParent: SessionId -> SessionId option }
 
-    let create (input: obj) : Boot =
+    let create (input: obj) : Task<Boot> =
+        task {
         // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
         RuntimeResources.install (RuntimeResources.load ())
 
         let portOpt = OpenCodePort.create input
 
+        let! journalResult = PluginHost.createJournal input
+
         let journal =
-            match PluginHost.createJournal input with
+            match journalResult with
             | Ok value -> value
             | Error err -> raise (InvalidOperationException err)
 
@@ -59,11 +63,13 @@ module PluginBoot =
             | Some port -> Some port
             | None -> workspaceDirectory |> Option.map GitTree.create
 
-        { Input = input
-          PortOpt = portOpt
-          Journal = journal
-          Scope = scope
-          StrengthFailClosed = strengthFailClosed
-          WorkspaceDirectory = workspaceDirectory
-          GitTreePort = gitTreePort
-          FamilyParent = familyParent }
+        return
+            { Input = input
+              PortOpt = portOpt
+              Journal = journal
+              Scope = scope
+              StrengthFailClosed = strengthFailClosed
+              WorkspaceDirectory = workspaceDirectory
+              GitTreePort = gitTreePort
+              FamilyParent = familyParent }
+        }

@@ -97,29 +97,33 @@ module StrengthSpeculate =
         (rawMessages: obj list)
         (projection: StrengthProjection)
         (output: obj)
-        : Result<bool, string> =
-        match StrengthProjection.tryDecisionForTarget target projection with
-        | None -> Ok false
-        | Some decisionId ->
-            match StrengthProjection.tryCandidate decisionId projection with
-            | None -> Error "Strength target index points to a missing Candidate"
-            | Some view when view.Prepared.OwnerSessionId <> owner ->
-                Error "Strength target index belongs to a different owner Session"
-            | Some view when view.Promoted || view.Abandoned -> Ok true
-            | Some view ->
-                let anchorDigest =
-                    ProviderWireCapture.decodeMessageView rawMessages
-                    |> ProviderProjection.toSemantic
-                    |> ProviderProjection.renderSemantic
-                    |> HostDigest.sha256Hex
+        : Task<Result<bool, string>> =
+        task {
+            match StrengthProjection.tryDecisionForTarget target projection with
+            | None -> return Ok false
+            | Some decisionId ->
+                match StrengthProjection.tryCandidate decisionId projection with
+                | None -> return Error "Strength target index points to a missing Candidate"
+                | Some view when view.Prepared.OwnerSessionId <> owner ->
+                    return Error "Strength target index belongs to a different owner Session"
+                | Some view when view.Promoted || view.Abandoned -> return Ok true
+                | Some view ->
+                    let anchorDigest =
+                        ProviderWireCapture.decodeMessageView rawMessages
+                        |> ProviderProjection.toSemantic
+                        |> ProviderProjection.renderSemantic
+                        |> HostDigest.sha256Hex
 
-                if anchorDigest <> view.Prepared.AnchorDigest then
-                    Error "Strength Prepared recovery anchor digest changed before target consumption"
-                else
-                    durability.LoadFrameBundle view.Prepared
-                    |> Result.bind (fun bundle ->
-                        renderCandidate owner target view.Prepared.DecisionId bundle output
-                        |> Result.map (fun () -> true))
+                    if anchorDigest <> view.Prepared.AnchorDigest then
+                        return Error "Strength Prepared recovery anchor digest changed before target consumption"
+                    else
+                        match! durability.LoadFrameBundle view.Prepared with
+                        | Error error -> return Error error
+                        | Ok bundle ->
+                            return
+                                renderCandidate owner target view.Prepared.DecisionId bundle output
+                                |> Result.map (fun () -> true)
+        }
 
     let tryApply
         (snapshotPort: ISessionSnapshotPort option)
@@ -164,7 +168,7 @@ module StrengthSpeculate =
                                 | Some authority ->
                                     let settings = StrengthSettings.load ()
 
-                                    match durability.LoadProjection() with
+                                    match! durability.LoadProjection() with
                                     | Error error ->
                                         let reason = "Strength opportunity cannot prove EventStore health: " + error
                                         scope.Strength.TripStrengthFuse reason
@@ -172,7 +176,7 @@ module StrengthSpeculate =
                                     | Ok durableStrength ->
                                         // Recovery is independent of rollout state: once Prepared is
                                         // durable, only its bound target may consume the same bytes.
-                                        match
+                                        match!
                                             recoverPrepared durability owner target rawMessages durableStrength output
                                         with
                                         | Error error ->
@@ -431,8 +435,7 @@ module StrengthSpeculate =
 
                                                                         return ()
                                                                     | Ok bundle ->
-                                                                        match
-                                                                            durability.PublishPrepared
+                                                                        match! durability.PublishPrepared
                                                                                 { OwnerSessionId = owner
                                                                                   DecisionId = id
                                                                                   TargetProviderRun = target

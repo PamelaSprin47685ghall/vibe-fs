@@ -52,12 +52,10 @@ module FetchTool =
     let private answerResult (consequence: string) (answer: string) =
         ToolHostCodec.tomlObjectWithInstructions [ consequence ] [ "answer", ToolHostCodec.TString answer ]
 
-    let private fresh language workspaceRoot sessionId answer =
-        CasebookLifecycle.touchAccess workspaceRoot sessionId
+    let private fresh language answer =
         answerResult (prose language Path.Fresh) answer
 
-    let private refreshed language workspaceRoot sessionId answer =
-        CasebookLifecycle.touchAccess workspaceRoot sessionId
+    let private refreshed language answer =
         answerResult (prose language Path.Refreshed) answer
 
     let private stale language answer =
@@ -77,7 +75,7 @@ module FetchTool =
         (shelfmark: string)
         : System.Threading.Tasks.Task<string> =
         task {
-            match CasebookIndex.resolve store raw 256 shelfmark with
+            match! CasebookIndex.resolve store raw 256 shelfmark with
             | Error _ -> return unavailable language
             | Ok None -> return noCase language
             | Ok(Some case) ->
@@ -85,18 +83,22 @@ module FetchTool =
                 let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
 
                 match CasebookWorkflow.checkFreshness case replayed with
-                | ReplayResult.Fresh -> return fresh language workspaceRoot sessionId case.A
+                | ReplayResult.Fresh ->
+                    do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                    return fresh language case.A
                 | ReplayResult.Stale ->
                     match! CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
                     | Ok true ->
-                        match CasebookWorkflow.fetchCase store raw 256 sessionId with
+                        match! CasebookWorkflow.fetchCase store raw 256 sessionId with
                         | Error _
                         | Ok None -> return stale language case.A
                         | Ok(Some updated) ->
                             let again = CasebookReplay.replayAll workspaceRoot updated.Observations
 
                             match CasebookWorkflow.checkFreshness updated again with
-                            | ReplayResult.Fresh -> return refreshed language workspaceRoot sessionId updated.A
+                            | ReplayResult.Fresh ->
+                                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                                return refreshed language updated.A
                             | ReplayResult.Stale -> return stale language updated.A
                     | Ok false
                     | Error _ -> return stale language case.A

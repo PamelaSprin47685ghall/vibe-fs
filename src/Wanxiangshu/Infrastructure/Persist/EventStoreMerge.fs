@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 
 /// Specification oracle (§10.6): append-only set union + identity dedupe.
@@ -22,22 +23,26 @@ module EventStoreMergeSpec =
     /// Load every event blob under each snapshot, then apply mergeEvents.
     /// Uses GitRawStore.loadEventEnvelopes (linear) rather than decoding with
     /// `list @ [envelope]`, which was O(|events|²) on the boot path.
-    let merge (store: IGitRawStore) (MergeInput snapshots) : Result<EventEnvelope list, MergeError> =
-        let acc = ResizeArray<EventEnvelope>()
+    let merge (store: IGitRawStore) (MergeInput snapshots) : Task<Result<EventEnvelope list, MergeError>> =
+        task {
+            let acc = ResizeArray<EventEnvelope>()
 
-        let rec loadAll remaining =
-            match remaining with
-            | [] -> mergeEvents (Seq.toList acc)
-            | snapshot :: rest ->
-                match GitRawStore.loadEventEnvelopes store snapshot.RootOid with
-                | Error err -> Error(asMergeError err)
-                | Ok envelopes ->
-                    for envelope in envelopes do
-                        acc.Add envelope
+            let rec loadAll remaining =
+                task {
+                    match remaining with
+                    | [] -> return mergeEvents (Seq.toList acc)
+                    | snapshot :: rest ->
+                        match! GitRawStore.loadEventEnvelopes store snapshot.RootOid with
+                        | Error err -> return Error(asMergeError err)
+                        | Ok envelopes ->
+                            for envelope in envelopes do
+                                acc.Add envelope
 
-                    loadAll rest
+                            return! loadAll rest
+                }
 
-        loadAll snapshots
+            return! loadAll snapshots
+        }
 
 /// Production K-way merge: structural tree union by EventId path (§10.6).
 /// Only reads blob bytes when the same path has differing OIDs.
@@ -58,126 +63,162 @@ module EventStoreMerge =
         (store: IGitRawStore)
         (pathPrefix: string)
         (sources: TreeEntry list list)
-        : Result<TreeEntry list, MergeError> =
-        let byName =
-            sources
-            |> List.collect id
-            |> List.groupBy (fun (entry: TreeEntry) -> entry.Name)
-            |> List.sortBy fst
+        : Task<Result<TreeEntry list, MergeError>> =
+        task {
+            let byName =
+                sources
+                |> List.collect id
+                |> List.groupBy (fun (entry: TreeEntry) -> entry.Name)
+                |> List.sortBy fst
 
-        let acc = ResizeArray<TreeEntry>()
+            let acc = ResizeArray<TreeEntry>()
 
-        let rec mergeGroups
-            (remaining: (string * TreeEntry list) list)
-            : Result<TreeEntry list, MergeError> =
-            match remaining with
-            | [] -> Ok(Seq.toList acc)
-            | (name, entries: TreeEntry list) :: rest ->
-                let path = if pathPrefix = "" then name else pathPrefix + "/" + name
+            let rec mergeGroups
+                (remaining: (string * TreeEntry list) list)
+                : Task<Result<TreeEntry list, MergeError>> =
+                task {
+                    match remaining with
+                    | [] -> return Ok(Seq.toList acc)
+                    | (name, entries: TreeEntry list) :: rest ->
+                        let path = if pathPrefix = "" then name else pathPrefix + "/" + name
 
-                let normalize (entry: TreeEntry) : TreeEntry =
-                    { entry with
-                        Mode = StoreTree.normalizeMode entry.Mode }
+                        let normalize (entry: TreeEntry) : TreeEntry =
+                            { entry with
+                                Mode = StoreTree.normalizeMode entry.Mode }
 
-                let normalized = entries |> List.map normalize
+                        let normalized = entries |> List.map normalize
 
-                let modes = normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
+                        let modes = normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
 
-                match modes with
-                | [ mode ] when StoreTree.isTreeMode mode ->
-                    let childOids =
-                        normalized |> List.map (fun (entry: TreeEntry) -> entry.Oid) |> List.distinctBy GitObjectId.value
+                        match modes with
+                        | [ mode ] when StoreTree.isTreeMode mode ->
+                            let childOids =
+                                normalized
+                                |> List.map (fun (entry: TreeEntry) -> entry.Oid)
+                                |> List.distinctBy GitObjectId.value
 
-                    match childOids with
-                    | [ oid ] ->
-                        acc.Add(
-                            { Mode = StoreTree.TreeMode
-                              Name = name
-                              Oid = oid }
-                        )
-
-                        mergeGroups rest
-                    | many ->
-                        let childTrees = many |> List.choose (fun oid -> store.ReadTree oid)
-
-                        if childTrees.Length <> many.Length then
-                            Error(asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" path)))
-                        else
-                            match mergeEntryLists store path childTrees with
-                            | Error e -> Error e
-                            | Ok mergedChildren ->
-                                let oid = store.WriteTree mergedChildren
-
+                            match childOids with
+                            | [ oid ] ->
                                 acc.Add(
                                     { Mode = StoreTree.TreeMode
                                       Name = name
                                       Oid = oid }
                                 )
 
-                                mergeGroups rest
-                | [ mode ] ->
-                    let oids =
-                        normalized
-                        |> List.map (fun (entry: TreeEntry) -> entry.Oid)
-                        |> List.distinctBy GitObjectId.value
-                        |> List.sortWith GitObjectId.compare
+                                return! mergeGroups rest
+                            | many ->
+                                let childTrees = ResizeArray<TreeEntry list>()
+                                let mutable missing = false
 
-                    match oids with
-                    | [ oid ] ->
-                        acc.Add({ Mode = mode; Name = name; Oid = oid })
-                        mergeGroups rest
-                    | many ->
-                        let bodies = many |> List.map (fun oid -> oid, store.ReadObject oid)
+                                for oid in many do
+                                    if not missing then
+                                        match! store.ReadTree oid with
+                                        | None -> missing <- true
+                                        | Some tree -> childTrees.Add tree
 
-                        if bodies |> List.exists (fun (_, body) -> Option.isNone body) then
-                            Error(asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing blob at %s" path)))
-                        else
-                            let contents = bodies |> List.map (fun (oid, body) -> oid, Option.get body)
+                                if missing then
+                                    return
+                                        Error(
+                                            asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" path))
+                                        )
+                                else
+                                    match! mergeEntryLists store path (Seq.toList childTrees) with
+                                    | Error e -> return Error e
+                                    | Ok mergedChildren ->
+                                        let! oid = store.WriteTree mergedChildren
 
-                            let firstBytes = contents |> List.head |> snd
+                                        acc.Add(
+                                            { Mode = StoreTree.TreeMode
+                                              Name = name
+                                              Oid = oid }
+                                        )
 
-                            if contents |> List.forall (fun (_, bytes) -> bytesEqual firstBytes bytes) then
-                                let oid = contents |> List.head |> fst
+                                        return! mergeGroups rest
+                        | [ mode ] ->
+                            let oids =
+                                normalized
+                                |> List.map (fun (entry: TreeEntry) -> entry.Oid)
+                                |> List.distinctBy GitObjectId.value
+                                |> List.sortWith GitObjectId.compare
 
+                            match oids with
+                            | [ oid ] ->
                                 acc.Add({ Mode = mode; Name = name; Oid = oid })
-                                mergeGroups rest
-                            elif path.StartsWith(StoreTree.EventsDir + "/") then
-                                Error(collisionAt path)
-                            else
-                                Error(
-                                    asMergeError (
-                                        StorageInvalid.NonCanonical(sprintf "payload path conflict at %s" path)
-                                    )
-                                )
-                | _ -> Error(asMergeError (StorageInvalid.NonCanonical(sprintf "mixed modes at %s" path)))
+                                return! mergeGroups rest
+                            | many ->
+                                let bodies = ResizeArray<GitObjectId * byte[] option>()
 
-        mergeGroups byName
+                                for oid in many do
+                                    let! body = store.ReadObject oid
+                                    bodies.Add((oid, body))
 
-    let private readRootEntries (store: IGitRawStore) (snapshot: StoreSnapshot) : Result<TreeEntry list, MergeError> =
-        match store.ReadTree(RootOid.value snapshot.RootOid) with
-        | None -> Error(asMergeError (StorageInvalid.MalformedEnvelope "missing store root tree"))
-        | Some entries -> Ok entries
+                                let bodyList = Seq.toList bodies
+
+                                if bodyList |> List.exists (fun (_, body) -> Option.isNone body) then
+                                    return
+                                        Error(
+                                            asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing blob at %s" path))
+                                        )
+                                else
+                                    let contents = bodyList |> List.map (fun (oid, body) -> oid, Option.get body)
+
+                                    let firstBytes = contents |> List.head |> snd
+
+                                    if contents |> List.forall (fun (_, bytes) -> bytesEqual firstBytes bytes) then
+                                        let oid = contents |> List.head |> fst
+
+                                        acc.Add({ Mode = mode; Name = name; Oid = oid })
+                                        return! mergeGroups rest
+                                    elif path.StartsWith(StoreTree.EventsDir + "/") then
+                                        return Error(collisionAt path)
+                                    else
+                                        return
+                                            Error(
+                                                asMergeError (
+                                                    StorageInvalid.NonCanonical(sprintf "payload path conflict at %s" path)
+                                                )
+                                            )
+                        | _ ->
+                            return Error(asMergeError (StorageInvalid.NonCanonical(sprintf "mixed modes at %s" path)))
+                }
+
+            return! mergeGroups byName
+        }
+
+    let private readRootEntries
+        (store: IGitRawStore)
+        (snapshot: StoreSnapshot)
+        : Task<Result<TreeEntry list, MergeError>> =
+        task {
+            match! store.ReadTree(RootOid.value snapshot.RootOid) with
+            | None -> return Error(asMergeError (StorageInvalid.MalformedEnvelope "missing store root tree"))
+            | Some entries -> return Ok entries
+        }
 
     /// Structural K-way merge → new StoreSnapshot (same object DB).
-    let merge (store: IGitRawStore) (MergeInput snapshots) : Result<StoreSnapshot, MergeError> =
-        match snapshots with
-        | [] ->
-            match GitRawStore.materializeSnapshot store [] with
-            | Ok snapshot -> Ok snapshot
-            | Error err -> Error(asMergeError err)
-        | only :: [] -> Ok only
-        | many ->
-            let rec load remaining (acc: TreeEntry list list) =
-                match remaining with
-                | [] ->
-                    match mergeEntryLists store "" (List.rev acc) with
-                    | Error e -> Error e
-                    | Ok mergedRootEntries ->
-                        let rootOid = store.WriteTree mergedRootEntries
-                        Ok { RootOid = RootOid.create rootOid }
-                | head :: tail ->
-                    match readRootEntries store head with
-                    | Error e -> Error e
-                    | Ok entries -> load tail (entries :: acc)
+    let merge (store: IGitRawStore) (MergeInput snapshots) : Task<Result<StoreSnapshot, MergeError>> =
+        task {
+            match snapshots with
+            | [] ->
+                match! GitRawStore.materializeSnapshot store [] with
+                | Ok snapshot -> return Ok snapshot
+                | Error err -> return Error(asMergeError err)
+            | only :: [] -> return Ok only
+            | many ->
+                let rec load remaining (acc: TreeEntry list list) =
+                    task {
+                        match remaining with
+                        | [] ->
+                            match! mergeEntryLists store "" (List.rev acc) with
+                            | Error e -> return Error e
+                            | Ok mergedRootEntries ->
+                                let! rootOid = store.WriteTree mergedRootEntries
+                                return Ok { RootOid = RootOid.create rootOid }
+                        | head :: tail ->
+                            match! readRootEntries store head with
+                            | Error e -> return Error e
+                            | Ok entries -> return! load tail (entries :: acc)
+                    }
 
-            load many []
+                return! load many []
+        }

@@ -3,15 +3,14 @@ namespace Wanxiangshu.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 
-/// Observe external root binding; compatibility-pin parented managed sessions.
+/// Observe real user binding and reject provider-side drift.
 ///
-/// PROMPT-006 binding authority lives at InjectedSessionPort.SendPrompt. For a
-/// user-facing root this hook records the Host-resolved agent/model only when the
-/// request did not originate from our own SendPrompt. Older Host builds that still
-/// honor output.model also get the frozen child agent's model as an extra guard.
+/// `input.message.agent/model` is the request binding. Top-level `input.agent/model`
+/// may describe title/compaction and is never user authority. Internal sends install
+/// a scoped expected binding before Host dispatch; parented sessions fall back to
+/// their frozen base binding. Any mismatch aborts the provider run.
 module ChatParamsHook =
 
     let private nonEmpty (value: string) =
@@ -22,15 +21,6 @@ module ChatParamsHook =
             None
         else
             nonEmpty (string (source?(name)))
-
-    let private agentOf (source: obj) =
-        match readString source "agent" with
-        | Some agent -> Some agent
-        | None ->
-            if isNull source || isNull source?message then
-                None
-            else
-                readString source?message "agent"
 
     let private sessionIdOf (source: obj) =
         readString source "sessionID"
@@ -76,47 +66,17 @@ module ChatParamsHook =
             | Some agent, Some model -> Some(agent, model)
             | _ -> None
 
-    let private managedChildAgent (sessionId: SessionId option) =
-        match sessionId with
-        | None -> None
-        | Some sid ->
-            match
-                SessionExecutionBinding.tryParent sid,
-                SessionExecutionBinding.tryAgent sid
-            with
-            | Some _, Some agent -> nonEmpty agent
-            | _ -> None
-
-    let create
-        (_journal: AgentJournal option)
-        (inventoryOf: unit -> ManagedAgentConfig.ManagedAgentInventory)
-        : obj =
-        box (fun (inputObj: obj) (outputObj: obj) ->
-            if isNull outputObj then
-                ()
-            else
-                match sessionIdOf inputObj |> Option.orElseWith (fun () -> sessionIdOf outputObj) with
+    let create () : obj =
+        box (fun (inputObj: obj) (_outputObj: obj) ->
+            match sessionIdOf inputObj with
+            | None -> ()
+            | Some sessionId ->
+                match userMessageBinding inputObj with
+                | None when SessionExecutionBinding.requiresProviderBindingProof sessionId ->
+                    invalidOp "PROMPT-006: chat.params input.message has no agent/model binding"
                 | None -> ()
-                | Some sessionId ->
-                    match managedChildAgent (Some sessionId) with
-                    | None ->
-                        userMessageBinding inputObj
-                        |> Option.iter (fun (agent, model) ->
-                            SessionExecutionBinding.observeUserFacing sessionId agent model)
-                    | Some agent ->
-                        let current =
-                            currentModel outputObj
-                            |> Option.orElseWith (fun () -> currentModel inputObj)
-
-                        let inventory = inventoryOf ()
-
-                        match ManagedAgentConfig.tryOpencodeModel inventory agent current with
-                        | Some model -> outputObj?model <- box model
-                        | None ->
-                            // Bare model ids cannot invent a provider (tryOpencodeModel).
-                            // Still pin the bound id as a string for older Host builds;
-                            // current Host ignores this field and SendPrompt remains law.
-                            match Map.tryFind (agent.Trim()) inventory.Bindings with
-                            | Some binding when not (String.IsNullOrWhiteSpace binding.Model) ->
-                                outputObj?model <- box (binding.Model.Trim())
-                            | _ -> ())
+                | Some(agent, model) ->
+                    match SessionExecutionBinding.validateObservedProvider sessionId agent model with
+                    | Error error -> invalidOp error
+                    | Ok true -> ()
+                    | Ok false -> SessionExecutionBinding.observeUserFacing sessionId agent model)

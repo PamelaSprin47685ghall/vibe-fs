@@ -11,25 +11,30 @@ open Wanxiangshu.Session
 
 module FinalityJournal =
 
-    let appendLifecycle (journal: AgentJournal) (fact: ManagerLifecycleFact) =
-        let sessionId =
-            match fact with
-            | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
-            | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
-            | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
+    let appendLifecycle (journal: AgentJournal) (fact: ManagerLifecycleFact) : Task =
+        task {
+            let sessionId =
+                match fact with
+                | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
+                | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
+                | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
 
-        AgentJournal.appendManagerLifecycle (StreamId.Session sessionId) fact journal
-        |> Result.mapError (fun failure ->
-            InvalidOperationException(sprintf "Finality append failed: %s" (JournalAppendFailure.describe failure)))
-        |> function
-            | Ok _ -> ()
-            | Error error -> raise error
+            match! AgentJournal.appendManagerLifecycle (StreamId.Session sessionId) fact journal with
+            | Ok _ -> return ()
+            | Error failure ->
+                return
+                    raise (
+                        InvalidOperationException(
+                            sprintf "Finality append failed: %s" (JournalAppendFailure.describe failure)
+                        )
+                    )
+        }
 
 [<RequireQualifiedAccess>]
 type RecordReadiness =

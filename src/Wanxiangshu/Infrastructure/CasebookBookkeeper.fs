@@ -19,11 +19,11 @@ module CasebookBookkeeper =
         (sessionId: string)
         : Task<Result<bool, string>> =
         task {
-            match CasebookWorkflow.needsRefresh store raw 256 sessionId root with
+            match! CasebookWorkflow.needsRefresh store raw 256 sessionId root with
             | Error err -> return Error err
             | Ok false -> return Ok false
             | Ok true ->
-                match CasebookWorkflow.fetchCase store raw 256 sessionId with
+                match! CasebookWorkflow.fetchCase store raw 256 sessionId with
                 | Error err -> return Error err
                 | Ok None -> return Ok false
                 | Ok(Some case) ->
@@ -46,10 +46,10 @@ module CasebookBookkeeper =
                         | ReplayResult.Stale ->
                             return Error "casebook synthesis unstable: worktree changed during bookkeeper transaction"
                         | ReplayResult.Fresh ->
-                            match CasebookWorkflow.refreshCase store raw sessionId q' a' freeze with
+                            match! CasebookWorkflow.refreshCase store raw sessionId q' a' freeze with
                             | Ok() ->
                                 CasebookIndex.invalidate ()
-                                CasebookIndex.refresh store raw 256 |> ignore
+                                let! _ = CasebookIndex.refresh store raw 256
                                 return Ok true
                             | Error err -> return Error err
         }

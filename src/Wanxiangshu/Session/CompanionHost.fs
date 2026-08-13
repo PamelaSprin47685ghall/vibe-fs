@@ -63,17 +63,23 @@ type CompanionHost
                                   RestoredSessionId = restoredBloggerIdOpt |> Option.map SessionId.create
                                   Link =
                                     fun owner id agent ->
-                                        let result =
-                                            durable
-                                            |> Option.map (fun port -> port.LinkBlogger(owner, id, agent))
-                                            |> Option.defaultValue (Ok())
-
-                                        result |> Result.map (fun () -> companion.RecordBloggerLinked id)
+                                        task {
+                                            match durable with
+                                            | None ->
+                                                companion.RecordBloggerLinked id
+                                                return Ok()
+                                            | Some port ->
+                                                match! port.LinkBlogger(owner, id, agent) with
+                                                | Ok() ->
+                                                    companion.RecordBloggerLinked id
+                                                    return Ok()
+                                                | Error error -> return Error error
+                                        }
                                   Close =
                                     fun owner ->
-                                        durable
-                                        |> Option.map (fun port -> port.CloseBlogger owner)
-                                        |> Option.defaultValue (Ok()) }
+                                        match durable with
+                                        | None -> Task.FromResult(Ok())
+                                        | Some port -> port.CloseBlogger owner }
 
                             match! runtime.Ensure(primaryId, spec) with
                             | Error error ->
@@ -113,11 +119,12 @@ type CompanionHost
                                         bloggerCreateFailed <- false
                                         bloggerCreated id
 
-                                        durable
-                                        |> Option.iter (fun port ->
-                                            port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) |> ignore)
-
-                                        companion.RecordBloggerLinked id
+                                        match durable with
+                                        | None -> companion.RecordBloggerLinked id
+                                        | Some port ->
+                                            match! port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) with
+                                            | Ok() -> companion.RecordBloggerLinked id
+                                            | Error error -> raise (InvalidOperationException error)
 
                                         return id
                                     | Error error -> return raise (InvalidOperationException error)
@@ -239,12 +246,12 @@ type CompanionHost
                           Title = bloggerEffectiveAgent
                           Directory = bloggerDirectory
                           RestoredSessionId = Some childId
-                          Link = fun _ _ _ -> Ok()
+                          Link = fun _ _ _ -> Task.FromResult(Ok())
                           Close =
                             fun owner ->
-                                durable
-                                |> Option.map (fun port -> port.CloseBlogger owner)
-                                |> Option.defaultValue (Ok()) }
+                                match durable with
+                                | None -> Task.FromResult(Ok())
+                                | Some port -> port.CloseBlogger owner }
 
                     match! runtime.Retire(primaryId, spec) with
                     | Ok() -> ()
@@ -256,7 +263,12 @@ type CompanionHost
                     | Ok() -> ()
                     | Error error -> raise (InvalidOperationException error)
 
-                    durable |> Option.iter (fun port -> port.CloseBlogger primaryId |> ignore)
+                    match durable with
+                    | None -> ()
+                    | Some port ->
+                        match! port.CloseBlogger primaryId with
+                        | Ok() -> ()
+                        | Error error -> raise (InvalidOperationException error)
 
                 companion.RecordBloggerClosed()
             | None -> ()

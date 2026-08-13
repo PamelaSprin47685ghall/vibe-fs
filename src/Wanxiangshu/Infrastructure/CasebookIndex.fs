@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Infrastructure
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.OpenCode
@@ -82,9 +83,13 @@ module CasebookIndex =
         resolvedEntries cases |> List.map (fun entry -> entry.Public)
 
     let private project (store: IEventStore) (raw: IGitRawStore) (capacity: int) =
-        match CasebookStore.loadEvents raw (store.OpenSnapshot()) with
-        | Error error -> Error error
-        | Ok events -> Ok(CasebookStore.project capacity events)
+        task {
+            let! snapshot = store.OpenSnapshot()
+
+            match! CasebookStore.loadEvents raw snapshot with
+            | Error error -> return Error error
+            | Ok events -> return Ok(CasebookStore.project capacity events)
+        }
 
     /// Resolve a public shelfmark to its internal Case without exposing the
     /// durable session key. The generated shelfmark is collision-free for the
@@ -94,41 +99,52 @@ module CasebookIndex =
         (raw: IGitRawStore)
         (capacity: int)
         (shelfmark: string)
-        : Result<Case option, string> =
-        project store raw capacity
-        |> Result.map (fun cases ->
-            resolvedEntries cases
-            |> List.tryFind (fun entry -> entry.Public.Shelfmark = shelfmark)
-            |> Option.map (fun entry -> entry.Case))
+        : Task<Result<Case option, string>> =
+        task {
+            match! project store raw capacity with
+            | Error error -> return Error error
+            | Ok cases ->
+                return
+                    Ok(
+                        resolvedEntries cases
+                        |> List.tryFind (fun entry -> entry.Public.Shelfmark = shelfmark)
+                        |> Option.map (fun entry -> entry.Case)
+                    )
+        }
 
     /// Rebuild from the unified EventStore projection. Epoch advances when the
     /// provider-visible index changes or an explicit invalidation occurred.
-    let refresh (store: IEventStore) (raw: IGitRawStore) (capacity: int) : Snapshot =
-        lock gate (fun () ->
-            match project store raw capacity with
-            | Error _ ->
-                match frozen with
-                | Some snapshot -> snapshot
-                | None -> { Epoch = 0L; Cases = [] }
-            | Ok cases ->
-                let entries = publicEntries cases
+    let refresh (store: IEventStore) (raw: IGitRawStore) (capacity: int) : Task<Snapshot> =
+        task {
+            let! projected = project store raw capacity
 
-                let previousEpoch =
-                    frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
+            return
+                lock gate (fun () ->
+                    match projected with
+                    | Error _ ->
+                        match frozen with
+                        | Some snapshot -> snapshot
+                        | None -> { Epoch = 0L; Cases = [] }
+                    | Ok cases ->
+                        let entries = publicEntries cases
 
-                let visibleChanged =
-                    match frozen with
-                    | None -> true
-                    | Some snapshot -> snapshot.Cases <> entries
+                        let previousEpoch =
+                            frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
 
-                let epoch =
-                    if dirty || visibleChanged then
-                        previousEpoch + 1L
-                    else
-                        previousEpoch
+                        let visibleChanged =
+                            match frozen with
+                            | None -> true
+                            | Some snapshot -> snapshot.Cases <> entries
 
-                dirty <- false
+                        let epoch =
+                            if dirty || visibleChanged then
+                                previousEpoch + 1L
+                            else
+                                previousEpoch
 
-                let snapshot = { Epoch = epoch; Cases = entries }
-                frozen <- Some snapshot
-                snapshot)
+                        dirty <- false
+
+                        let snapshot = { Epoch = epoch; Cases = entries }
+                        frozen <- Some snapshot
+                        snapshot)
+        }

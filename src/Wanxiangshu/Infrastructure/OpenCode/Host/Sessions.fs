@@ -157,7 +157,7 @@ type InjectedSessionPort
                             // chat.params runs inside the Host send. Mark this interval so
                             // its root-session observer cannot mistake our own continuation
                             // or typed override for a new external user choice.
-                            SessionExecutionBinding.beginInternalSend sessionId
+                            SessionExecutionBinding.beginInternalSend sessionId sendOptions
 
                             try
                                 // Pass the outcome through unchanged. This layer knows less

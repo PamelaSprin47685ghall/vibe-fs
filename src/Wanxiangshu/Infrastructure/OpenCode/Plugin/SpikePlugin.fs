@@ -12,7 +12,7 @@ module SpikePlugin =
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
-            let boot = PluginBoot.create input
+            let! boot = PluginBoot.create input
             let! host = PluginHostWiring.create boot
             PluginSessionWiring.attach boot host
             PluginRecoveryWiring.attach boot host

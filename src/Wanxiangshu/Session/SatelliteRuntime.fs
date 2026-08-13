@@ -25,8 +25,8 @@ type SatelliteSpec =
       Title: string
       Directory: string option
       RestoredSessionId: SessionId option
-      Link: SessionId -> SessionId -> string -> Result<unit, string>
-      Close: SessionId -> Result<unit, string> }
+      Link: SessionId -> SessionId -> string -> Task<Result<unit, string>>
+      Close: SessionId -> Task<Result<unit, string>> }
 
 type SatelliteRuntime(sessions: ISessionHostPort) =
     let gate = obj ()
@@ -134,7 +134,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
                     | Ok lease ->
                         // The reverse association must exist before the first prompt so
                         // transforms can prove that this child is a leaf satellite.
-                        match spec.Link owner lease.SessionId spec.Agent with
+                        match! spec.Link owner lease.SessionId spec.Agent with
                         | Ok() -> return Ok lease
                         | Error error ->
                             let! _ = sessions.AbortSession lease.SessionId
@@ -168,7 +168,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
 
             match flight with
             | None ->
-                match spec.Close owner with
+                match! spec.Close owner with
                 | Ok() -> return Ok()
                 | Error error -> return Error error
             | Some pending ->
@@ -180,7 +180,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
                     match! sessions.AbortSession lease.SessionId with
                     | Error error -> return Error error
                     | Ok() ->
-                        match spec.Close owner with
+                        match! spec.Close owner with
                         | Error error -> return Error error
                         | Ok() ->
                             this.Invalidate(owner, spec.Kind)

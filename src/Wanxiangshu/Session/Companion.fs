@@ -24,16 +24,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     // DSL-MUTABLE: resource — one-shot recovery material waiter
     let mutable recoveryWaiter: TaskCompletionSource<unit> option = None
 
-    let restoredMemory =
-        match initialMemory with
-        | Some memory -> Some memory
-        | None ->
-            match durable, sessionId with
-            | Some port, Some sid ->
-                match port.Load sid with
-                | Ok memory -> memory
-                | Error error -> raise (InvalidOperationException error)
-            | _ -> None
+    let restoredMemory = initialMemory
 
     // DSL-MUTABLE: resource — in-memory blog projection mirror (durable-backed)
     let mutable blogProjection: BlogProjectionState =

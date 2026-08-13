@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 
 /// Host-facing EventStore journal boot port.
@@ -10,4 +11,4 @@ open Wanxiangshu.Kernel.Identity
 /// without tripping the unified-store dual-write gate.
 type IJournalEventStoreBoot =
     abstract ResumeOrCreate:
-        RuntimeId * int * DateTimeOffset -> Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>
+        RuntimeId * int * DateTimeOffset -> Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>>

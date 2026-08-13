@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
@@ -49,9 +50,9 @@ module StrengthLifecycle =
         (ownerSessionId: SessionId)
         (messageIdOf: 'message -> string option)
         (messages: 'message list)
-        (loadBundle: StrengthCandidatePrepared -> Result<StrengthFrameBundle, string>)
+        (loadBundle: StrengthCandidatePrepared -> Task<Result<StrengthFrameBundle, string>>)
         (projection: StrengthProjection)
-        : Result<StrengthReplayPlan list, string> =
+        : Task<Result<StrengthReplayPlan list, string>> =
         let candidates =
             projection.ByDecision
             |> Map.toList
@@ -63,36 +64,41 @@ module StrengthLifecycle =
             |> List.sortBy (fun view -> StrengthDecisionId.value view.Prepared.DecisionId)
 
         let rec loop (remaining: StrengthCandidateView list) (acc: StrengthReplayPlan list) =
-            match remaining with
-            | [] -> Ok(List.rev acc)
-            | view :: tail ->
-                let target = ProviderRunIdentity.value view.Prepared.TargetProviderRun
+            task {
+                match remaining with
+                | [] -> return Ok(List.rev acc)
+                | view :: tail ->
+                    let target = ProviderRunIdentity.value view.Prepared.TargetProviderRun
 
-                match messages |> List.tryFindIndex (fun message -> messageIdOf message = Some target) with
-                | None ->
-                    Error(
-                        sprintf
-                            "Promoted Strength target anchor is absent: decision=%s target=%s"
-                            (StrengthDecisionId.value view.Prepared.DecisionId)
-                            target
-                    )
-                | Some beforeIndex ->
-                    match loadBundle view.Prepared with
-                    | Error error -> Error error
-                    | Ok bundle when bundle.Digest <> view.Prepared.FrameDigest ->
-                        Error(
-                            sprintf
-                                "Promoted Strength payload digest mismatch: decision=%s"
-                                (StrengthDecisionId.value view.Prepared.DecisionId)
-                        )
-                    | Ok bundle ->
-                        loop
-                            tail
-                            ({ Prepared = view.Prepared
-                               Bundle = bundle
-                               BeforeMessageIndex = beforeIndex
-                               ExistingTraceRange = view.TraceRange }
-                             :: acc)
+                    match messages |> List.tryFindIndex (fun message -> messageIdOf message = Some target) with
+                    | None ->
+                        return
+                            Error(
+                                sprintf
+                                    "Promoted Strength target anchor is absent: decision=%s target=%s"
+                                    (StrengthDecisionId.value view.Prepared.DecisionId)
+                                    target
+                            )
+                    | Some beforeIndex ->
+                        match! loadBundle view.Prepared with
+                        | Error error -> return Error error
+                        | Ok bundle when bundle.Digest <> view.Prepared.FrameDigest ->
+                            return
+                                Error(
+                                    sprintf
+                                        "Promoted Strength payload digest mismatch: decision=%s"
+                                        (StrengthDecisionId.value view.Prepared.DecisionId)
+                                )
+                        | Ok bundle ->
+                            return!
+                                loop
+                                    tail
+                                    ({ Prepared = view.Prepared
+                                       Bundle = bundle
+                                       BeforeMessageIndex = beforeIndex
+                                       ExistingTraceRange = view.TraceRange }
+                                     :: acc)
+            }
 
         loop candidates []
 

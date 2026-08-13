@@ -48,11 +48,11 @@ module PluginTransforms =
                 |> Option.iter (fun sessionId ->
                     scope.Sessions.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
 
-                let strengthReplayPlans =
+                let! strengthReplayPlans =
                     match projectionSessionIdOpt with
                     | Some sessionId ->
                         StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailClosed sessionId outObj
-                    | None -> []
+                    | None -> Task.FromResult []
 
                 // COMPANION-003/007: keep the XTrace in step with the
                 // provider-visible semantic projection at the transform
@@ -101,22 +101,29 @@ module PluginTransforms =
                         else
                             None
 
-                    let traceState =
+                    let! traceState =
                         match stableMessageIds with
                         | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
-                            match
-                                XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages
-                            with
-                            | Ok state -> state
-                            | Error error -> strengthFailClosed error
+                            task {
+                                match!
+                                    XTraceCapture.captureMessageViewStable
+                                        journal
+                                        sessionIdentity
+                                        ids
+                                        capturedMessages
+                                with
+                                | Ok state -> return state
+                                | Error error -> return strengthFailClosed error
+                            }
                         | _ -> XTraceCapture.captureMessageView journal sessionIdentity capturedMessages
 
-                    StrengthReplay.commitTracedAfterCapture
-                        journal
-                        strengthDurability
-                        strengthFailClosed
-                        traceState
-                        strengthReplayPlans
+                    do!
+                        StrengthReplay.commitTracedAfterCapture
+                            journal
+                            strengthDurability
+                            strengthFailClosed
+                            traceState
+                            strengthReplayPlans
 
                     traceState
                     |> Option.iter (fun updated ->

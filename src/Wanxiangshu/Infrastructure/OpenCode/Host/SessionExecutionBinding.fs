@@ -5,11 +5,15 @@ open System.Collections.Generic
 open Wanxiangshu.Kernel.Identity
 
 module SessionExecutionBinding =
+    type private ExpectedBinding =
+        { Agent: string
+          Model: OpencodeModel }
+
     let private gate = obj ()
     let private parents = Dictionary<string, string>()
     let private agents = Dictionary<string, string>()
     let private models = Dictionary<string, OpencodeModel>()
-    let private internalSends = Dictionary<string, int>()
+    let private internalBindings = Dictionary<string, ExpectedBinding list>()
 
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         lock gate (fun () ->
@@ -58,21 +62,24 @@ module SessionExecutionBinding =
             let key = SessionId.value sessionId
             if not (models.ContainsKey key) then models.[key] <- model)
 
-    let beginInternalSend (sessionId: SessionId) =
-        lock gate (fun () ->
-            let key = SessionId.value sessionId
-            let count =
-                match internalSends.TryGetValue key with
-                | true, value -> value
-                | false, _ -> 0
-            internalSends.[key] <- count + 1)
+    let beginInternalSend (sessionId: SessionId) (opts: OpenCodePromptOptions) =
+        match opts.Agent, opts.Model with
+        | Some agent, Some model when not (String.IsNullOrWhiteSpace agent) ->
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                let previous =
+                    match internalBindings.TryGetValue key with
+                    | true, value -> value
+                    | false, _ -> []
+                internalBindings.[key] <- { Agent = agent.Trim(); Model = model } :: previous)
+        | _ -> invalidOp "PROMPT-006: internal send has no concrete agent/model binding"
 
     let endInternalSend (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-            match internalSends.TryGetValue key with
-            | true, count when count > 1 -> internalSends.[key] <- count - 1
-            | true, _ -> internalSends.Remove key |> ignore
+            match internalBindings.TryGetValue key with
+            | true, _ :: remaining when not (List.isEmpty remaining) -> internalBindings.[key] <- remaining
+            | true, _ -> internalBindings.Remove key |> ignore
             | false, _ -> ())
 
     let observeUserFacing (sessionId: SessionId) (agent: string) (model: OpencodeModel) =
@@ -80,7 +87,7 @@ module SessionExecutionBinding =
             let key = SessionId.value sessionId
 
             if
-                not (internalSends.ContainsKey key)
+                not (internalBindings.ContainsKey key)
                 && not (parents.ContainsKey key)
                 && not (String.IsNullOrWhiteSpace agent)
             then
@@ -93,7 +100,7 @@ module SessionExecutionBinding =
             parents.Remove key |> ignore
             agents.Remove key |> ignore
             models.Remove key |> ignore
-            internalSends.Remove key |> ignore)
+            internalBindings.Remove key |> ignore)
 
     let private nonEmpty (value: string) =
         if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
@@ -104,6 +111,40 @@ module SessionExecutionBinding =
         left.providerID = right.providerID
         && left.modelID = right.modelID
         && left.variant = right.variant
+
+    let requiresProviderBindingProof (sessionId: SessionId) =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+            internalBindings.ContainsKey key || parents.ContainsKey key)
+
+    let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            let expected =
+                match internalBindings.TryGetValue key with
+                | true, current :: _ -> Ok(Some current)
+                | _ when parents.ContainsKey key ->
+                    match agents.TryGetValue key, models.TryGetValue key with
+                    | (true, baseAgent), (true, baseModel) -> Ok(Some { Agent = baseAgent; Model = baseModel })
+                    | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
+                | _ -> Ok None
+
+            expected
+            |> Result.bind (function
+                | None -> Ok false
+                | Some binding when binding.Agent <> agent.Trim() ->
+                    Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" binding.Agent agent)
+                | Some binding when not (sameModel binding.Model model) ->
+                    Error(
+                        sprintf
+                            "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
+                            binding.Model.providerID
+                            binding.Model.modelID
+                            model.providerID
+                            model.modelID
+                    )
+                | Some _ -> Ok true))
 
     let private normalizeOverride (opts: OpenCodePromptOptions) =
         match opts.Agent |> Option.bind nonEmpty with
@@ -148,12 +189,11 @@ module SessionExecutionBinding =
                 | _ -> Ok { opts with Agent = Some baseAgent; Model = Some model }
 
     let normalizeManagedPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
-        match opts.BindingIntent with
-        | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
-        | SessionBindingIntent.Preserve ->
-            match tryAgent sessionId |> Option.bind nonEmpty with
-            | None -> Error "PROMPT-006: parented session has no frozen agent binding"
-            | Some baseAgent ->
+        match tryAgent sessionId |> Option.bind nonEmpty with
+        | None -> Error "PROMPT-006: parented session has no frozen agent binding"
+        | Some baseAgent ->
+            match opts.BindingIntent with
+            | SessionBindingIntent.Preserve ->
                 let model =
                     tryModel sessionId
                     |> Option.orElseWith (fun () -> configuredModel baseAgent)
@@ -163,11 +203,17 @@ module SessionExecutionBinding =
                 |> Result.map (fun normalized ->
                     model |> Option.iter (rememberModel sessionId)
                     normalized)
+            | SessionBindingIntent.ExplicitExecutionOverride ->
+                match tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent) with
+                | None -> Error "PROMPT-006: parented session has no provable base model binding"
+                | Some baseModel ->
+                    rememberModel sessionId baseModel
+                    normalizeOverride opts
 
     let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
-        match opts.BindingIntent with
-        | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
-        | SessionBindingIntent.Preserve ->
-            match tryAgent sessionId, tryModel sessionId with
-            | Some baseAgent, Some baseModel -> preserveBinding "user-facing session" baseAgent (Some baseModel) opts
-            | _ -> Error "PROMPT-006: user-facing session has no observed user binding"
+        match tryAgent sessionId, tryModel sessionId with
+        | Some baseAgent, Some baseModel ->
+            match opts.BindingIntent with
+            | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some baseModel) opts
+            | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
+        | _ -> Error "PROMPT-006: user-facing session has no observed user binding"

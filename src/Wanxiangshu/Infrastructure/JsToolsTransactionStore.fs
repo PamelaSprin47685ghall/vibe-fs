@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Infrastructure
 
+open System.Threading.Tasks
 open Thoth.Json
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
@@ -63,53 +64,64 @@ module JsToolsTransactionStore =
         (store: IEventStore)
         (parents: EventId list)
         (prepared: JsTransactionPrepared)
-        : Result<EventId, string> =
-        let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+        : Task<Result<EventId, string>> =
+        task {
+            let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
 
-        let envelope =
-            EventEnvelope.normalize
-                { EventId = eventId
-                  StreamId = EventStreamId.create TransactionStream
-                  EventType = PreparedEventType
-                  Parents = parents
-                  Payload = payload (encodePrepared prepared)
-                  PayloadRefs = [] }
+            let envelope =
+                EventEnvelope.normalize
+                    { EventId = eventId
+                      StreamId = EventStreamId.create TransactionStream
+                      EventType = PreparedEventType
+                      Parents = parents
+                      Payload = payload (encodePrepared prepared)
+                      PayloadRefs = [] }
 
-        match store.Append(store.OpenSnapshot(), [ envelope ]) with
-        | Ok _ -> Ok eventId
-        | Error err -> Error(sprintf "JsTransactionPrepared append failed: %A" err)
+            let! snapshot = store.OpenSnapshot()
+
+            match! store.Append(snapshot, [ envelope ]) with
+            | Ok _ -> return Ok eventId
+            | Error err -> return Error(sprintf "JsTransactionPrepared append failed: %A" err)
+        }
 
     /// Append the Committed fact for a prepared transaction.
     let appendCommitted
         (store: IEventStore)
         (parents: EventId list)
         (transactionId: JsTransactionId)
-        : Result<EventId, string> =
-        let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+        : Task<Result<EventId, string>> =
+        task {
+            let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
 
-        let envelope =
-            EventEnvelope.normalize
-                { EventId = eventId
-                  StreamId = EventStreamId.create TransactionStream
-                  EventType = CommittedEventType
-                  Parents = parents
-                  Payload = payload (encodeCommitted { TransactionId = transactionId })
-                  PayloadRefs = [] }
+            let envelope =
+                EventEnvelope.normalize
+                    { EventId = eventId
+                      StreamId = EventStreamId.create TransactionStream
+                      EventType = CommittedEventType
+                      Parents = parents
+                      Payload = payload (encodeCommitted { TransactionId = transactionId })
+                      PayloadRefs = [] }
 
-        match store.Append(store.OpenSnapshot(), [ envelope ]) with
-        | Ok _ -> Ok eventId
-        | Error err -> Error(sprintf "JsTransactionCommitted append failed: %A" err)
+            let! snapshot = store.OpenSnapshot()
+
+            match! store.Append(snapshot, [ envelope ]) with
+            | Ok _ -> return Ok eventId
+            | Error err -> return Error(sprintf "JsTransactionCommitted append failed: %A" err)
+        }
 
     // ---- load / scan ------------------------------------------------------
 
     /// All transaction-stream events from a snapshot, in causal order.
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<EventEnvelope list, string> =
-        match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-        | Error(MergeError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
-        | Ok events ->
-            events
-            |> List.filter (fun e -> e.EventType = PreparedEventType || e.EventType = CommittedEventType)
-            |> Ok
+    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
+        task {
+            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
+            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
+            | Ok events ->
+                return
+                    events
+                    |> List.filter (fun e -> e.EventType = PreparedEventType || e.EventType = CommittedEventType)
+                    |> Ok
+        }
 
     /// The stream head EventId (last event on the transaction stream), for
     /// linear-parent appends.

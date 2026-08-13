@@ -208,14 +208,16 @@ module JsToolWorkflow =
 
                                 return Succeeded(value, written, created)
                         | Some(eventStore, raw) ->
-                            let snapshot = eventStore.OpenSnapshot()
+                            let! snapshot = eventStore.OpenSnapshot()
 
-                            let head =
-                                match JsToolsTransactionStore.loadEvents raw snapshot with
-                                | Ok events -> JsToolsTransactionStore.streamHead events
-                                | Error _ -> None
+                            let! head =
+                                task {
+                                    match! JsToolsTransactionStore.loadEvents raw snapshot with
+                                    | Ok events -> return JsToolsTransactionStore.streamHead events
+                                    | Error _ -> return None
+                                }
 
-                            match JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
+                            match! JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
                             | Error _ -> return Failed JsFailure.TransactionPrepareFailed
                             | Ok preparedEventId ->
                                 // 4. commit: all-or-nothing
@@ -224,7 +226,7 @@ module JsToolWorkflow =
                                 | Ok() ->
                                     // 5. the commit fact (JS-012): its absence after
                                     // Prepared is what recovery uses to undo
-                                    match
+                                    match!
                                         JsToolsTransactionStore.appendCommitted
                                             eventStore
                                             [ preparedEventId ]

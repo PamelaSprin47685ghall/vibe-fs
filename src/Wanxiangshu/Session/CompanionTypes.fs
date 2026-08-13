@@ -44,12 +44,12 @@ type CompanionMemory =
 /// single owner. A recovery slot either has a candidate or does not, so there is no
 /// enable flag left to persist.
 type ICompanionDurablePort =
-    abstract Load: SessionId -> Result<CompanionMemory option, string>
+    abstract Load: SessionId -> Task<Result<CompanionMemory option, string>>
 
     /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a
     /// `"blogger"` target string: the previous shape recorded an EXEC-009 handle
     /// link and then recovered Y by searching for the literal target `"blogger"`,
     /// which is agent-string matching standing in for an identity.
-    abstract LinkBlogger: SessionId * SessionId * string -> Result<unit, string>
+    abstract LinkBlogger: SessionId * SessionId * string -> Task<Result<unit, string>>
 
-    abstract CloseBlogger: SessionId -> Result<unit, string>
+    abstract CloseBlogger: SessionId -> Task<Result<unit, string>>

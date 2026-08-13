@@ -2,6 +2,7 @@ namespace Wanxiangshu.Journal
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
@@ -16,7 +17,8 @@ module SharedAgentJournal =
 
     /// DSL-state-combination: physical — shared journal owner refcount resource
     type private SharedJournal =
-        { Journal: AgentJournal
+        { Ready: Task<Result<AgentJournal, FoldRejection>>
+          mutable Instance: AgentJournal option
           mutable RefCount: int }
 
     let private gate = obj ()
@@ -35,20 +37,44 @@ module SharedAgentJournal =
         (directory: string)
         (processId: int)
         (startedAt: DateTimeOffset)
-        (openJournal: RuntimeId -> int -> DateTimeOffset -> Result<AgentJournal, FoldRejection>)
-        : Result<AgentJournal, FoldRejection> =
-        lock gate (fun () ->
-            match shared.TryGetValue directory with
-            | true, entry ->
-                entry.RefCount <- entry.RefCount + 1
-                Ok entry.Journal
-            | false, _ ->
-                let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
+        (openJournal: RuntimeId -> int -> DateTimeOffset -> Task<Result<AgentJournal, FoldRejection>>)
+        : Task<Result<AgentJournal, FoldRejection>> =
+        let ready =
+            lock gate (fun () ->
+                match shared.TryGetValue directory with
+                | true, entry ->
+                    entry.RefCount <- entry.RefCount + 1
+                    entry.Ready
+                | false, _ ->
+                    let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
+                    let opening = openJournal runtimeId processId startedAt
 
-                openJournal runtimeId processId startedAt
-                |> Result.map (fun journal ->
-                    shared.[directory] <- { Journal = journal; RefCount = 1 }
-                    journal))
+                    shared.[directory] <-
+                        { Ready = opening
+                          Instance = None
+                          RefCount = 1 }
+
+                    opening)
+
+        task {
+            match! ready with
+            | Ok journal ->
+                lock gate (fun () ->
+                    match shared.TryGetValue directory with
+                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) ->
+                        entry.Instance <- Some journal
+                    | _ -> ())
+
+                return Ok journal
+            | Error err ->
+                lock gate (fun () ->
+                    match shared.TryGetValue directory with
+                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) ->
+                        shared.Remove directory |> ignore
+                    | _ -> ())
+
+                return Error err
+        }
 
     let release (journal: AgentJournal option) =
         match journal with
@@ -56,11 +82,13 @@ module SharedAgentJournal =
         | Some target ->
             lock gate (fun () ->
                 for KeyValue(directory, entry) in shared |> Seq.toList do
-                    if obj.ReferenceEquals(entry.Journal, target) then
+                    match entry.Instance with
+                    | Some instance when obj.ReferenceEquals(instance, target) ->
                         let remaining = entry.RefCount - 1
 
                         if remaining <= 0 then
                             shared.Remove directory |> ignore
-                            (entry.Journal :> IDisposable).Dispose()
+                            (target :> IDisposable).Dispose()
                         else
-                            entry.RefCount <- remaining)
+                            entry.RefCount <- remaining
+                    | _ -> ())

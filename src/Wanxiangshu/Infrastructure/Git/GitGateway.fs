@@ -58,35 +58,45 @@ module GitGateway =
 
         Some(baseMap |> Map.add SyncActiveEnv "1")
 
-    let private readSnapshot (store: IGitRawStore) (refName: string) : StoreSnapshot option =
-        store.ReadRef refName
-        |> Option.map (fun oid -> { RootOid = RootOid.create oid })
+    let private readSnapshot (store: IGitRawStore) (refName: string) : Task<StoreSnapshot option> =
+        task {
+            let! oid = store.ReadRef refName
+            return oid |> Option.map (fun value -> { RootOid = RootOid.create value })
+        }
 
-    let private emptySnapshot (store: IGitRawStore) : StoreSnapshot =
-        match GitRawStore.materializeSnapshot store [] with
-        | Ok snapshot -> snapshot
-        | Error err -> failwith (sprintf "empty store materialization failed: %A" err)
+    let private emptySnapshot (store: IGitRawStore) : Task<StoreSnapshot> =
+        task {
+            match! GitRawStore.materializeSnapshot store [] with
+            | Ok snapshot -> return snapshot
+            | Error err -> return failwith (sprintf "empty store materialization failed: %A" err)
+        }
 
-    let private localSnapshot (store: IGitRawStore) : StoreSnapshot =
-        match readSnapshot store StoreRef.canonical with
-        | Some snapshot -> snapshot
-        | None -> emptySnapshot store
+    let private localSnapshot (store: IGitRawStore) : Task<StoreSnapshot> =
+        task {
+            match! readSnapshot store StoreRef.canonical with
+            | Some snapshot -> return snapshot
+            | None -> return! emptySnapshot store
+        }
 
-    let private validateMerged (store: IGitRawStore) (snapshot: StoreSnapshot) : Result<unit, ConvergeError> =
-        match EventStoreMergeSpec.merge store (MergeInput.ofList [ snapshot ]) with
-        | Error(MergeError.StorageInvalid err) -> Error(ConvergeError.StorageInvalid err)
-        | Ok events ->
-            match EventStoreFold.validate events with
-            | Error(FoldError.StorageInvalid err) -> Error(ConvergeError.StorageInvalid err)
-            | Ok() ->
-                match PayloadClosure.validatePresent store (PayloadClosure.ofEvents events) with
-                | Error err -> Error(ConvergeError.StorageInvalid err)
-                | Ok() -> Ok()
+    let private validateMerged (store: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<unit, ConvergeError>> =
+        task {
+            match! EventStoreMergeSpec.merge store (MergeInput.ofList [ snapshot ]) with
+            | Error(MergeError.StorageInvalid err) -> return Error(ConvergeError.StorageInvalid err)
+            | Ok events ->
+                match EventStoreFold.validate events with
+                | Error(FoldError.StorageInvalid err) -> return Error(ConvergeError.StorageInvalid err)
+                | Ok() ->
+                    match! PayloadClosure.validatePresent store (PayloadClosure.ofEvents events) with
+                    | Error err -> return Error(ConvergeError.StorageInvalid err)
+                    | Ok() -> return Ok()
+        }
 
-    let private expectedOldFor (store: IGitRawStore) (baseSnapshot: StoreSnapshot) : GitObjectId option =
-        match store.ReadRef StoreRef.canonical with
-        | None -> None
-        | Some _ -> Some(RootOid.value baseSnapshot.RootOid)
+    let private expectedOldFor (store: IGitRawStore) (baseSnapshot: StoreSnapshot) : Task<GitObjectId option> =
+        task {
+            match! store.ReadRef StoreRef.canonical with
+            | None -> return None
+            | Some _ -> return Some(RootOid.value baseSnapshot.RootOid)
+        }
 
     let private isMissingRemoteRef (stderr: string) =
         let text = stderr.ToLowerInvariant()
@@ -129,13 +139,17 @@ module GitGateway =
         (store: IGitRawStore)
         (remote: string)
         (fallback: StoreSnapshot option)
-        : StoreSnapshot * GitObjectId option =
-        match store.ReadRef(StoreRef.remoteTracking remote) with
-        | Some oid -> { RootOid = RootOid.create oid }, Some oid
-        | None ->
-            match fallback with
-            | Some snap -> snap, Some(RootOid.value snap.RootOid)
-            | None -> emptySnapshot store, None
+        : Task<StoreSnapshot * GitObjectId option> =
+        task {
+            match! store.ReadRef(StoreRef.remoteTracking remote) with
+            | Some oid -> return { RootOid = RootOid.create oid }, Some oid
+            | None ->
+                match fallback with
+                | Some snap -> return snap, Some(RootOid.value snap.RootOid)
+                | None ->
+                    let! empty = emptySnapshot store
+                    return empty, None
+        }
 
     /// Core bidirectional converge. When `skipFetch`, uses `observedRemote` and does not fetch (§14).
     let private convergeLoop
@@ -146,53 +160,52 @@ module GitGateway =
         (skipFetch: bool)
         (initialObserved: StoreSnapshot)
         (initialLeaseExpected: GitObjectId option)
-        : Result<StoreSnapshot, ConvergeError> =
+        : Task<Result<StoreSnapshot, ConvergeError>> =
         let rec loop (remoteSnap: StoreSnapshot) (leaseExpected: GitObjectId option) (retriesLeft: int) =
-            let local = localSnapshot store
+            task {
+                let! local = localSnapshot store
 
-            match EventStoreMerge.merge store (MergeInput.ofList [ local; remoteSnap ]) with
-            | Error(MergeError.StorageInvalid err) -> Error(ConvergeError.StorageInvalid err)
-            | Ok merged ->
-                match validateMerged store merged with
-                | Error e -> Error e
-                | Ok() ->
-                    let expectedLocal = expectedOldFor store local
-                    let newOid = RootOid.value merged.RootOid
+                match! EventStoreMerge.merge store (MergeInput.ofList [ local; remoteSnap ]) with
+                | Error(MergeError.StorageInvalid err) -> return Error(ConvergeError.StorageInvalid err)
+                | Ok merged ->
+                    match! validateMerged store merged with
+                    | Error e -> return Error e
+                    | Ok() ->
+                        let! expectedLocal = expectedOldFor store local
+                        let newOid = RootOid.value merged.RootOid
+                        let! casOk = store.CompareAndSwapRef(StoreRef.canonical, expectedLocal, newOid)
 
-                    let casOk = store.CompareAndSwapRef(StoreRef.canonical, expectedLocal, newOid)
-
-                    if casOk then
-                        match leasePush run remote leaseExpected newOid with
-                        | Ok() -> Ok merged
-                        | Error gitErr ->
-                            if retriesLeft <= 0 then
-                                if maxRetries <= 0 then
-                                    Error ConvergeError.ConvergeCasRejected
+                        if casOk then
+                            match leasePush run remote leaseExpected newOid with
+                            | Ok() -> return Ok merged
+                            | Error gitErr ->
+                                if retriesLeft <= 0 then
+                                    if maxRetries <= 0 then
+                                        return Error ConvergeError.ConvergeCasRejected
+                                    else
+                                        return Error ConvergeError.ConvergeRetryExhausted
+                                elif skipFetch then
+                                    return Error(asTransport gitErr)
                                 else
-                                    Error ConvergeError.ConvergeRetryExhausted
-                            elif skipFetch then
-                                // Observed-remote path: do not fetch; surface transport / retry.
-                                Error(asTransport gitErr)
+                                    match fetchStoreRef run remote with
+                                    | Error e -> return Error(asTransport e)
+                                    | Ok() ->
+                                        let! refreshed, nextLease = observedOrEmpty store remote None
+                                        return! loop refreshed nextLease (retriesLeft - 1)
+                        elif retriesLeft <= 0 then
+                            if maxRetries <= 0 then
+                                return Error ConvergeError.ConvergeCasRejected
                             else
-                                match fetchStoreRef run remote with
-                                | Error e -> Error(asTransport e)
-                                | Ok() ->
-                                    let refreshed, nextLease = observedOrEmpty store remote None
-                                    loop refreshed nextLease (retriesLeft - 1)
-                    elif retriesLeft <= 0 then
-                        if maxRetries <= 0 then
-                            Error ConvergeError.ConvergeCasRejected
+                                return Error ConvergeError.ConvergeRetryExhausted
+                        elif skipFetch then
+                            return! loop remoteSnap leaseExpected (retriesLeft - 1)
                         else
-                            Error ConvergeError.ConvergeRetryExhausted
-                    elif skipFetch then
-                        // Local lost CAS without fetch: retry against same observed remote + fresh local.
-                        loop remoteSnap leaseExpected (retriesLeft - 1)
-                    else
-                        match fetchStoreRef run remote with
-                        | Error e -> Error(asTransport e)
-                        | Ok() ->
-                            let refreshed, nextLease = observedOrEmpty store remote None
-                            loop refreshed nextLease (retriesLeft - 1)
+                            match fetchStoreRef run remote with
+                            | Error e -> return Error(asTransport e)
+                            | Ok() ->
+                                let! refreshed, nextLease = observedOrEmpty store remote None
+                                return! loop refreshed nextLease (retriesLeft - 1)
+            }
 
         loop initialObserved initialLeaseExpected maxRetries
 
@@ -201,20 +214,23 @@ module GitGateway =
         (run: GitGatewaySyncRunner)
         (maxRetries: int)
         (remote: string)
-        : Result<StoreSnapshot, ConvergeError> =
-        if syncActiveDepth.Value > 0 then
-            Ok(localSnapshot store)
-        else
-            syncActiveDepth.Value <- syncActiveDepth.Value + 1
+        : Task<Result<StoreSnapshot, ConvergeError>> =
+        task {
+            if syncActiveDepth.Value > 0 then
+                let! local = localSnapshot store
+                return Ok local
+            else
+                syncActiveDepth.Value <- syncActiveDepth.Value + 1
 
-            try
-                match fetchStoreRef run remote with
-                | Error e -> Error(asTransport e)
-                | Ok() ->
-                    let observed, leaseExpected = observedOrEmpty store remote None
-                    convergeLoop store run maxRetries remote false observed leaseExpected
-            finally
-                syncActiveDepth.Value <- syncActiveDepth.Value - 1
+                try
+                    match fetchStoreRef run remote with
+                    | Error e -> return Error(asTransport e)
+                    | Ok() ->
+                        let! observed, leaseExpected = observedOrEmpty store remote None
+                        return! convergeLoop store run maxRetries remote false observed leaseExpected
+                finally
+                    syncActiveDepth.Value <- syncActiveDepth.Value - 1
+        }
 
     /// Hook-facing helper: reuse already-observed remote-tracking snapshot; no nested fetch (§14).
     let convergeStoreWithObservedRemote
@@ -223,19 +239,22 @@ module GitGateway =
         (maxRetries: int)
         (remote: string)
         (observedRemote: StoreSnapshot)
-        : Result<StoreSnapshot, ConvergeError> =
-        if syncActiveDepth.Value > 0 then
-            Ok(localSnapshot store)
-        else
-            syncActiveDepth.Value <- syncActiveDepth.Value + 1
+        : Task<Result<StoreSnapshot, ConvergeError>> =
+        task {
+            if syncActiveDepth.Value > 0 then
+                let! local = localSnapshot store
+                return Ok local
+            else
+                syncActiveDepth.Value <- syncActiveDepth.Value + 1
 
-            try
-                // Lease expectation comes from remote-tracking when present (hook path).
-                // Absent tracking ⇒ Absent lease (first remote publication).
-                let leaseExpected = store.ReadRef(StoreRef.remoteTracking remote)
-                convergeLoop store run maxRetries remote true observedRemote leaseExpected
-            finally
-                syncActiveDepth.Value <- syncActiveDepth.Value - 1
+                try
+                    // Lease expectation comes from remote-tracking when present (hook path).
+                    // Absent tracking ⇒ Absent lease (first remote publication).
+                    let! leaseExpected = store.ReadRef(StoreRef.remoteTracking remote)
+                    return! convergeLoop store run maxRetries remote true observedRemote leaseExpected
+                finally
+                    syncActiveDepth.Value <- syncActiveDepth.Value - 1
+        }
 
     let createWithSyncRunner
         (store: IGitRawStore)
@@ -245,8 +264,7 @@ module GitGateway =
         : IGitGateway =
         ignore repoPath
 
-        let converge remote =
-            convergeStore store run maxRetries remote
+        let converge remote = convergeStore store run maxRetries remote
 
         { new IGitGateway with
             member _.Fetch(remote) =
@@ -258,7 +276,7 @@ module GitGateway =
 
             member _.Pull(remote) =
                 task {
-                    match converge remote with
+                    match! converge remote with
                     | Ok _ -> return Ok()
                     | Error(ConvergeError.Transport reason) -> return Error(GitError.Transport reason)
                     | Error other -> return Error(GitError.Transport(sprintf "%A" other))
@@ -266,7 +284,7 @@ module GitGateway =
 
             member _.Push(remote, refspec) =
                 task {
-                    match converge remote with
+                    match! converge remote with
                     | Error(ConvergeError.Transport reason) -> return Error(GitError.Transport reason)
                     | Error other -> return Error(GitError.Transport(sprintf "%A" other))
                     | Ok _ ->
@@ -275,7 +293,7 @@ module GitGateway =
                         | Error e -> return Error e
                 }
 
-            member _.ConvergeStore(remote) = task { return converge remote } }
+            member _.ConvergeStore(remote) = converge remote }
 
     /// Bind `IEventStore.Converge` to this gateway's sync ConvergeStore path.
     let bindEventStore (store: IGitRawStore) (run: GitGatewaySyncRunner) (maxRetries: int) : IEventStore =

@@ -15,8 +15,8 @@ type BlobWriteReceipt =
       BlobDigest: BlobDigest }
 
 type IBlobWriter =
-    abstract Write: string -> Result<BlobWriteReceipt, string>
-    abstract Read: BlobRef -> Result<string, string>
+    abstract Write: string -> Task<Result<BlobWriteReceipt, string>>
+    abstract Read: BlobRef -> Task<Result<string, string>>
 
 /// Shared writer surface for EventStore-backed journals.
 /// EventStore implementation lives in EventStoreJournalWriter.fs so this file
@@ -28,7 +28,7 @@ type IJournalWriter =
     abstract LocalSeq: int64
     abstract LastCommittedLocalSeq: int64
     abstract IsPoisoned: bool
-    abstract Append: StreamId -> ProviderRunIdentity option -> Fact -> CommitResult<Envelope>
+    abstract Append: StreamId -> ProviderRunIdentity option -> Fact -> Task<CommitResult<Envelope>>
     /// Release durable resources (fd / latches). Prefer over IDisposable on the
     /// interface so Fable does not collide with System.IDisposable.Dispose.
     abstract Release: unit -> unit

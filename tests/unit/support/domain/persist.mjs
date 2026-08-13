@@ -95,8 +95,8 @@ const writerHandle = (writer) => ({
   path: typeof esGetFilePath === 'function' ? esGetFilePath(writer) : writer.FilePath,
 
   /** PERSIST-002: `{ committed: true, envelope }` or `{ committed: false, ... }`. */
-  append: (streamId, envelopeFact, run) => {
-    const result = esAppend(writer, streamId, run === undefined ? undefined : providerRun(run), envelopeFact)
+  append: async (streamId, envelopeFact, run) => {
+    const result = await esAppend(writer, streamId, run === undefined ? undefined : providerRun(run), envelopeFact)
     return caseOf(result) === 'Committed'
       ? { committed: true, envelope: payloadOf(result) }
       : {
@@ -132,8 +132,8 @@ export const journalStore = () => {
     raw: pair.raw,
     store: pair.store,
 
-    open: ({ runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
-      const [writer, initEnvelope] = esWriterCreate(
+    open: async ({ runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
+      const [writer, initEnvelope] = await esWriterCreate(
         runtimeId(runtime),
         pid,
         utcOffset(startedAt),
@@ -151,8 +151,8 @@ export const journalStore = () => {
     }),
 
     /** Serialized journal envelopes at the store tip (not NDJSON lines). */
-    lines: () => {
-      const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+    lines: async () => {
+      const loaded = resultOf(await esLoadJournalEnvelopes(pair.raw, await pair.store.OpenSnapshot()))
       if (!loaded.ok) throw new Error(`journalStore.lines load failed: ${loaded.error}`)
       return listItems(loaded.value).map((env) => EnvelopeModule.EnvelopeModule_serialize(env))
     },
@@ -165,8 +165,8 @@ export const journalStore = () => {
     files: () => (existsSync(directory) ? readdirSync(directory).sort() : []),
 
     /** `{ envelopes, diagnostics, frontier }` from the EventStore tip. */
-    boot: () => {
-      const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+    boot: async () => {
+      const loaded = resultOf(await esLoadJournalEnvelopes(pair.raw, await pair.store.OpenSnapshot()))
       if (!loaded.ok) {
         return { envelopes: [], diagnostics: [String(loaded.error)], frontier: {} }
       }
@@ -245,9 +245,9 @@ const rawStoreOf = (journal) => {
 }
 
 export const agentJournal = {
-  create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
+  create: async ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
     const pair = registerEventStore(directory, freshEventStorePair())
-    const [writer, initEnvelope] = esWriterCreate(
+    const [writer, initEnvelope] = await esWriterCreate(
       runtimeId(runtime),
       pid,
       utcOffset(startedAt),
@@ -263,7 +263,7 @@ export const agentJournal = {
    * Restart: resumeOrCreate on the EventStore registered for `directory`.
    * `boot` is accepted for call-site compatibility but ignored (store is source of truth).
    */
-  createFromBoot: ({
+  createFromBoot: async ({
     directory,
     boot: _boot,
     runtime = 'rt_restart',
@@ -272,7 +272,7 @@ export const agentJournal = {
   } = {}) => {
     const pair = eventStoreFor(directory)
     const resumed = resultOf(
-      esWriterResume(runtimeId(runtime), pid, utcOffset(startedAt), pair.store, pair.raw),
+      await esWriterResume(runtimeId(runtime), pid, utcOffset(startedAt), pair.store, pair.raw),
     )
     if (!resumed.ok) return resumed
     const [writer, _init, projection] = resumed.value
@@ -281,12 +281,12 @@ export const agentJournal = {
       ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
       : result
   },
-  appendAgent: (streamId, providerRun, agentFactValue, journal) =>
-    resultOf(AgentJournalCreate.appendAgent(streamId, providerRun, agentFactValue, journal)),
-  appendMagicTodo: (streamId, providerRun, magicTodoFactValue, journal) =>
-    resultOf(AgentJournalCreate.appendMagicTodo(streamId, providerRun, magicTodoFactValue, journal)),
-  appendManagerLifecycle: (streamId, lifecycleFactValue, journal) =>
-    resultOf(AgentJournalCreate.appendManagerLifecycle(streamId, lifecycleFactValue, journal)),
+  appendAgent: async (streamId, providerRun, agentFactValue, journal) =>
+    resultOf(await AgentJournalCreate.appendAgent(streamId, providerRun, agentFactValue, journal)),
+  appendMagicTodo: async (streamId, providerRun, magicTodoFactValue, journal) =>
+    resultOf(await AgentJournalCreate.appendMagicTodo(streamId, providerRun, magicTodoFactValue, journal)),
+  appendManagerLifecycle: async (streamId, lifecycleFactValue, journal) =>
+    resultOf(await AgentJournalCreate.appendManagerLifecycle(streamId, lifecycleFactValue, journal)),
   snapshot: (journal) => AgentJournalCreate.snapshot(journal),
   /** Module-level revision (AgentJournal.revision). */
   revision: (journal) => AgentJournalCreate.revision(journal),
@@ -295,8 +295,8 @@ export const agentJournal = {
   awaitChangeFrom: (fromRevision, journal) => AgentJournalCreate.awaitChangeFrom(fromRevision, journal),
   handleProjection: (journal, parentId) => AgentJournalCreate.handleProjection(journal, parentId),
   /** Blob write receipt: { BlobRef, BlobDigest } after Ok. */
-  writeBlob: (content, journal) => resultOf(AgentJournalCreate.writeBlob(content, journal)),
-  readBlob: (journal, ref) => resultOf(durableJournal.blobWriter(journal).Read(ref)),
+  writeBlob: async (content, journal) => resultOf(await AgentJournalCreate.writeBlob(content, journal)),
+  readBlob: async (journal, ref) => resultOf(await durableJournal.blobWriter(journal).Read(ref)),
   /**
    * Test-only: delete a blob from the journal's InMemoryGitRawStore so
    * BlobWriter.Read fails closed (EventStore bodies are not RuntimePath files).
@@ -334,7 +334,7 @@ export const agentJournal = {
         : { tag: 0, fields: [bytes] },
     )
   },
-  persistedEnvelopes: (durable) => {
+  persistedEnvelopes: async (durable) => {
     const writer = durableJournal.writer(durable)
     const blobWriter = durableJournal.blobWriter(durable)
     const raw = blobWriter?.raw
@@ -343,7 +343,7 @@ export const agentJournal = {
     }
     const snapshot =
       typeof esGetStoreSnapshot === 'function' ? esGetStoreSnapshot(writer) : writer.baseSnapshot
-    const loaded = resultOf(esLoadJournalEnvelopes(raw, snapshot))
+    const loaded = resultOf(await esLoadJournalEnvelopes(raw, snapshot))
     if (!loaded.ok) {
       throw new Error(`persistedEnvelopes EventStore load failed: ${loaded.error}`)
     }

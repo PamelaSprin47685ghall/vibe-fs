@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel.Identity
@@ -10,34 +11,42 @@ module StrengthDurability =
 
     let create (raw: IGitRawStore) (store: IEventStore) : StrengthDurabilityPort =
         let loadProjection () =
-            StrengthStore.loadProjection raw (store.OpenSnapshot())
+            task {
+                let! snapshot = store.OpenSnapshot()
+                return! StrengthStore.loadProjection raw snapshot
+            }
 
         let loadFrameBundle = StrengthStore.loadFrameBundle raw HostDigest.sha256Hex
 
         let publishPrepared request =
-            let payload = StrengthStore.encodeFrameBundlePayload request.Bundle
+            task {
+                let payload = StrengthStore.encodeFrameBundlePayload request.Bundle
 
-            let buildPrepared refs =
-                StrengthEvents.prepared
-                    request.OwnerSessionId
-                    request.DecisionId
-                    request.TargetProviderRun
-                    request.ReplicaSessionId
-                    request.Budget
-                    request.AnchorDigest
-                    request.Bundle.Digest
-                    request.Bundle.ByteLength
-                    refs
+                let buildPrepared refs =
+                    StrengthEvents.prepared
+                        request.OwnerSessionId
+                        request.DecisionId
+                        request.TargetProviderRun
+                        request.ReplicaSessionId
+                        request.Budget
+                        request.AnchorDigest
+                        request.Bundle.Digest
+                        request.Bundle.ByteLength
+                        refs
 
-            match StrengthStore.publishWithPayloads store HostDigest.sha256Hex [ payload ] buildPrepared with
-            | Ok _ -> StrengthPreparedPublish.Published
-            | Error(PublishError.StorageInvalid error) -> StrengthPreparedPublish.StorageInvalid(sprintf "%A" error)
-            | Error error -> StrengthPreparedPublish.Rejected(sprintf "%A" error)
+                match! StrengthStore.publishWithPayloads store HostDigest.sha256Hex [ payload ] buildPrepared with
+                | Ok _ -> return StrengthPreparedPublish.Published
+                | Error(PublishError.StorageInvalid error) ->
+                    return StrengthPreparedPublish.StorageInvalid(sprintf "%A" error)
+                | Error error -> return StrengthPreparedPublish.Rejected(sprintf "%A" error)
+            }
 
         let append event =
-            StrengthStore.append store HostDigest.sha256Hex event
-            |> Result.map (fun _ -> ())
-            |> Result.mapError (sprintf "%A")
+            task {
+                match! StrengthStore.append store HostDigest.sha256Hex event with
+                | Ok _ -> return Ok()
+                | Error err -> return Error(sprintf "%A" err)
+            }
 
         { LoadProjection = loadProjection
           LoadFrameBundle = loadFrameBundle

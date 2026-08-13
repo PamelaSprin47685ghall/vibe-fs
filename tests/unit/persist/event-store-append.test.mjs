@@ -45,40 +45,40 @@ const mustErr = (result, label = 'result') => {
 const createRaw = () => GitRaw.GitRawStore_createInMemory()
 const createStore = (raw = createRaw()) => Store.EventStore_create(raw)
 
-test('OpenSnapshot_Absent_returns_empty_root_without_publishing_ref', () => {
+test('OpenSnapshot_Absent_returns_empty_root_without_publishing_ref', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const snap = es.OpenSnapshot()
+  const snap = await es.OpenSnapshot()
   assert.equal(typeof snapshotOid(snap), 'string')
   assert.equal(snapshotOid(snap).length, 40)
-  assert.equal(isSome(raw.ReadRef(Persist.StoreRef_canonical)), false)
+  assert.equal(isSome(await raw.ReadRef(Persist.StoreRef_canonical)), false)
 })
 
-test('Append_Absent_CAS_publishes_canonical_ref', () => {
+test('Append_Absent_CAS_publishes_canonical_ref', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
-  const published = mustOk(es.Append(base, toList([a])), 'Append')
-  const current = raw.ReadRef(Persist.StoreRef_canonical)
+  const published = mustOk(await es.Append(base, toList([a])), 'Append')
+  const current = await raw.ReadRef(Persist.StoreRef_canonical)
   assert.equal(isSome(current), true)
   assert.equal(Persist.GitObjectIdModule_value(current), snapshotOid(published))
 
-  const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, published.RootOid))
+  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, published.RootOid))
   assert.equal(listItems(blobs).length, 1)
 })
 
-test('Append_CAS_conflict_retries_on_fresh_root', () => {
+test('Append_CAS_conflict_retries_on_fresh_root', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })
   const b = envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })
 
-  mustOk(es.Append(base, toList([a])), 'first Append')
+  mustOk(await es.Append(base, toList([a])), 'first Append')
   // Stale base: second writer must refresh + rebuild (§9 bounded retry).
-  const merged = mustOk(es.Append(base, toList([b])), 'stale Append')
-  const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, merged.RootOid))
+  const merged = mustOk(await es.Append(base, toList([b])), 'stale Append')
+  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, merged.RootOid))
   const ids = listItems(blobs)
     .map(([path]) => path.split('/').pop().replace(/\.jsonl$/, ''))
     .sort()
@@ -88,102 +88,102 @@ test('Append_CAS_conflict_retries_on_fresh_root', () => {
   ])
 })
 
-test('Append_idempotent_when_EventIds_already_committed', () => {
+test('Append_idempotent_when_EventIds_already_committed', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
-  const first = mustOk(es.Append(base, toList([a])))
-  const second = mustOk(es.Append(first, toList([a])))
+  const first = mustOk(await es.Append(base, toList([a])))
+  const second = mustOk(await es.Append(first, toList([a])))
   assert.equal(snapshotOid(first), snapshotOid(second))
 })
 
-test('Append_retry_exhausted_when_CAS_always_rejects', () => {
+test('Append_retry_exhausted_when_CAS_always_rejects', async () => {
   const raw = createRaw()
   const es = Store.EventStore_createRejectingCas(raw, 2)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
-  const err = mustErr(es.Append(base, toList([a])))
+  const err = mustErr(await es.Append(base, toList([a])))
   assert.equal(caseOf(err), 'AppendRetryExhausted')
 })
 
-test('Append_CAS_rejected_when_maxRetries_zero', () => {
+test('Append_CAS_rejected_when_maxRetries_zero', async () => {
   const raw = createRaw()
   const es = Store.EventStore_createRejectingCas(raw, 0)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
-  const err = mustErr(es.Append(base, toList([a])))
+  const err = mustErr(await es.Append(base, toList([a])))
   assert.equal(caseOf(err), 'AppendCasRejected')
 })
 
-test('Publish_writes_payloads_then_CAS_appends', () => {
+test('Publish_writes_payloads_then_CAS_appends', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const body = new TextEncoder().encode('large-payload\n')
-  const payloadOid = raw.WriteBlob(body)
+  const payloadOid = await raw.WriteBlob(body)
   const payloadHex = Persist.GitObjectIdModule_value(payloadOid)
   const event = envelope({
     id: 'cccccccccccccccccccccccccccccccccccccccc',
     payloadRefs: [payloadHex],
   })
   const candidate = new Persist.AppendCandidate(base, toList([event]), toList([[payloadOid, body]]))
-  const published = mustOk(es.Publish(candidate), 'Publish')
-  const names = mustOk(GitRaw.GitRawStore_listPayloadNames(raw, published.RootOid))
+  const published = mustOk(await es.Publish(candidate), 'Publish')
+  const names = mustOk(await GitRaw.GitRawStore_listPayloadNames(raw, published.RootOid))
   assert.deepEqual(listItems(names), [payloadHex])
 })
 
-test('Publish_IncompletePayloadClosure_when_payload_missing', () => {
+test('Publish_IncompletePayloadClosure_when_payload_missing', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const missing = 'ffffffffffffffffffffffffffffffffffffffff'
   const event = envelope({
     id: 'dddddddddddddddddddddddddddddddddddddddd',
     payloadRefs: [missing],
   })
   const candidate = new Persist.AppendCandidate(base, toList([event]), toList([]))
-  const err = mustErr(es.Publish(candidate))
+  const err = mustErr(await es.Publish(candidate))
   assert.equal(caseOf(err), 'IncompletePayloadClosure')
 })
 
-test('Merge_delegates_to_structural_EventStoreMerge', () => {
+test('Merge_delegates_to_structural_EventStoreMerge', async () => {
   const raw = createRaw()
   const es = createStore(raw)
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
   const b = envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })
-  const SA = mustOk(GitRaw.GitRawStore_materializeSnapshot(raw, toList([a])))
-  const SB = mustOk(GitRaw.GitRawStore_materializeSnapshot(raw, toList([b])))
-  const merged = mustOk(es.Merge(toList([SA, SB])))
-  const direct = mustOk(GitRaw.GitRawStore_materializeSnapshot(raw, toList([a, b])))
+  const SA = mustOk(await GitRaw.GitRawStore_materializeSnapshot(raw, toList([a])))
+  const SB = mustOk(await GitRaw.GitRawStore_materializeSnapshot(raw, toList([b])))
+  const merged = mustOk(await es.Merge(toList([SA, SB])))
+  const direct = mustOk(await GitRaw.GitRawStore_materializeSnapshot(raw, toList([a, b])))
   assert.equal(snapshotOid(merged), snapshotOid(direct))
 })
 
-test('Refresh_observes_published_root', () => {
+test('Refresh_observes_published_root', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' })
-  const published = mustOk(es.Append(base, toList([a])))
-  const refreshed = es.Refresh()
+  const published = mustOk(await es.Append(base, toList([a])))
+  const refreshed = await es.Refresh()
   assert.equal(snapshotOid(refreshed), snapshotOid(published))
 })
 
-test('Converge_unbound_without_gateway', () => {
+test('Converge_unbound_without_gateway', async () => {
   const es = createStore()
-  const err = mustErr(es.Converge('origin'))
+  const err = mustErr(await es.Converge('origin'))
   assert.equal(caseOf(err), 'Transport')
   assert.match(payloadOf(err), /no GitGateway bound/)
 })
 
-test('Append_identity_collision_fail_closed', () => {
+test('Append_identity_collision_fail_closed', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const left = envelope({ id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', payload: { status: 'open' } })
-  mustOk(es.Append(base, toList([left])))
+  mustOk(await es.Append(base, toList([left])))
   const right = envelope({ id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', payload: { status: 'closed' } })
-  const err = mustErr(es.Append(es.Refresh(), toList([right])))
+  const err = mustErr(await es.Append(await es.Refresh(), toList([right])))
   assert.equal(caseOf(err), 'StorageInvalid')
   assert.equal(caseOf(payloadOf(err)), 'IdentityCollision')
 })
@@ -226,14 +226,14 @@ const countingRaw = (inner) => {
   }
 }
 
-const seedLinearHistory = (es, count) => {
-  let snap = es.OpenSnapshot()
+const seedLinearHistory = async (es, count) => {
+  let snap = await es.OpenSnapshot()
   let prev = null
   for (let i = 0; i < count; i += 1) {
     const id = hexId(i + 1)
     const parents = prev ? [prev] : []
     snap = mustOk(
-      es.Append(
+      await es.Append(
         snap,
         toList([
           envelope({
@@ -250,60 +250,60 @@ const seedLinearHistory = (es, count) => {
   return { snap, tipId: prev }
 }
 
-test('Append_missing_parent_fail_closed_without_history_reload', () => {
+test('Append_missing_parent_fail_closed_without_history_reload', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const orphan = envelope({
     id: hexId(9),
     parents: [hexId(8)],
   })
-  const err = mustErr(es.Append(base, toList([orphan])))
+  const err = mustErr(await es.Append(base, toList([orphan])))
   assert.equal(caseOf(err), 'StorageInvalid')
   assert.equal(caseOf(payloadOf(err)), 'MissingParent')
 })
 
-test('Append_batch_cycle_fail_closed', () => {
+test('Append_batch_cycle_fail_closed', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const a = envelope({ id: hexId(0xa), parents: [hexId(0xb)] })
   const b = envelope({ id: hexId(0xb), parents: [hexId(0xa)] })
-  const err = mustErr(es.Append(base, toList([a, b])))
+  const err = mustErr(await es.Append(base, toList([a, b])))
   assert.equal(caseOf(err), 'StorageInvalid')
   assert.equal(caseOf(payloadOf(err)), 'CyclicParents')
 })
 
-test('Append_unknown_event_type_fail_closed', () => {
+test('Append_unknown_event_type_fail_closed', async () => {
   const raw = createRaw()
   const es = createStore(raw)
-  const base = es.OpenSnapshot()
+  const base = await es.OpenSnapshot()
   const bad = envelope({ id: hexId(0xc), eventType: 'TotallyUnknownEventType' })
-  const err = mustErr(es.Append(base, toList([bad])))
+  const err = mustErr(await es.Append(base, toList([bad])))
   assert.equal(caseOf(err), 'StorageInvalid')
   assert.equal(caseOf(payloadOf(err)), 'UnknownEventType')
 })
 
-test('Append_incremental_validation_object_traffic_does_not_scale_with_history', () => {
+test('Append_incremental_validation_object_traffic_does_not_scale_with_history', async () => {
   // Structural gate: after large history, one new append must not ReadObject every
   // prior event blob (old validateAppendSet/loadAllEvents). Tip lookups + delta
   // materialize/merge only — ReadObject stays near-constant vs history size.
-  const measureTailAppend = (historySize) => {
+  const measureTailAppend = async (historySize) => {
     const raw = countingRaw(createRaw())
     const es = createStore(raw)
-    const { tipId } = seedLinearHistory(es, historySize)
+    const { tipId } = await seedLinearHistory(es, historySize)
     raw.reset()
     const next = envelope({
       id: hexId(historySize + 1),
       parents: [tipId],
       payload: { n: historySize + 1 },
     })
-    mustOk(es.Append(es.Refresh(), toList([next])), `tail append @${historySize}`)
+    mustOk(await es.Append(await es.Refresh(), toList([next])), `tail append @${historySize}`)
     return { ...raw.counts }
   }
 
-  const small = measureTailAppend(8)
-  const large = measureTailAppend(64)
+  const small = await measureTailAppend(8)
+  const large = await measureTailAppend(64)
 
   // Old O(n) path decoded ≥ historySize event blobs on validate alone.
   assert.ok(
@@ -331,14 +331,14 @@ test('Append_incremental_validation_object_traffic_does_not_scale_with_history',
   )
 })
 
-test('Append_parent_in_tip_accepted_without_reloading_siblings', () => {
+test('Append_parent_in_tip_accepted_without_reloading_siblings', async () => {
   const raw = countingRaw(createRaw())
   const es = createStore(raw)
-  const { tipId } = seedLinearHistory(es, 20)
+  const { tipId } = await seedLinearHistory(es, 20)
   raw.reset()
   const child = envelope({ id: hexId(100), parents: [tipId], payload: { branch: true } })
-  const published = mustOk(es.Append(es.Refresh(), toList([child])))
-  const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, published.RootOid))
+  const published = mustOk(await es.Append(await es.Refresh(), toList([child])))
+  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, published.RootOid))
   assert.equal(listItems(blobs).length, 21)
   assert.ok(raw.counts.readObject < 20, `must not decode full history; got readObject=${raw.counts.readObject}`)
 })

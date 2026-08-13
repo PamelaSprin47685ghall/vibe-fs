@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
@@ -26,17 +27,19 @@ module ReviewBarrier =
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
-        : Result<unit, string> =
-        match journal with
-        | None -> Error "Review barrier requires an AgentJournal"
-        | Some durable ->
-            let fact =
-                ReviewFact.ReviewBarrierStarted
-                    {| ReviewerSessionId = reviewerSessionId
-                       ManagerSessionId = managerSessionId
-                       BarrierId = barrierId
-                       GitTreeHash = tree |}
+        : Task<Result<unit, string>> =
+        task {
+            match journal with
+            | None -> return Error "Review barrier requires an AgentJournal"
+            | Some durable ->
+                let fact =
+                    ReviewFact.ReviewBarrierStarted
+                        {| ReviewerSessionId = reviewerSessionId
+                           ManagerSessionId = managerSessionId
+                           BarrierId = barrierId
+                           GitTreeHash = tree |}
 
-            match AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
-            | Ok _ -> Ok()
-            | Error failure -> Error(JournalAppendFailure.describe failure)
+                match! AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
+                | Ok _ -> return Ok()
+                | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }

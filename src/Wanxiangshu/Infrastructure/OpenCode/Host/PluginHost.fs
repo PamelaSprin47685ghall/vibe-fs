@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
@@ -29,22 +30,28 @@ module PluginHost =
     /// (mid-file corruption, pre-0.5.0 schema), and PERSIST-005 forbids guessing:
     /// swallowing it into `None` would start the plugin with an empty projection and
     /// then append new facts on top of a history it never read.
-    let createJournal (input: obj) : Result<AgentJournal option, string> =
-        match workspaceDirectory input with
-        | None -> Ok None
-        | Some workspace ->
-            let commonDir = RuntimePath.gitCommonDir workspace
-            let runtimeDir = RuntimePath.forWorkspace workspace
-            let port = WorkspaceEventStore.bootPort commonDir
+    let createJournal (input: obj) : Task<Result<AgentJournal option, string>> =
+        task {
+            match workspaceDirectory input with
+            | None -> return Ok None
+            | Some workspace ->
+                let commonDir = RuntimePath.gitCommonDir workspace
+                let runtimeDir = RuntimePath.forWorkspace workspace
+                let port = WorkspaceEventStore.bootPort commonDir
 
-            let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
-                port.ResumeOrCreate(runtimeId, processId, startedAt)
-                |> Result.bind (fun (writer, _, projection) -> AgentJournal.createFromProjection writer projection)
+                let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
+                    task {
+                        match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
+                        | Error err -> return Error err
+                        | Ok(writer, _, projection) ->
+                            return AgentJournal.createFromProjection writer projection
+                    }
 
-            match SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
-            | Ok journal -> Ok(Some journal)
-            | Error rejection ->
-                Error(sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact)
+                match! SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
+                | Ok journal -> return Ok(Some journal)
+                | Error rejection ->
+                    return Error(sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact)
+        }
 
 
     let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =

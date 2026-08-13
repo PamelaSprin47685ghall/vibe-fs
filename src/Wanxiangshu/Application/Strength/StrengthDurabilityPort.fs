@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
@@ -22,7 +23,7 @@ type StrengthPreparedRequest =
 /// The port contains no storage identity. Persist owns EventStore, payload closure,
 /// append outcomes and material codecs; callers only ask domain-level questions.
 type StrengthDurabilityPort =
-    { LoadProjection: unit -> Result<StrengthProjection, string>
-      LoadFrameBundle: StrengthCandidatePrepared -> Result<StrengthFrameBundle, string>
-      PublishPrepared: StrengthPreparedRequest -> StrengthPreparedPublish
-      Append: StrengthEvent -> Result<unit, string> }
+    { LoadProjection: unit -> Task<Result<StrengthProjection, string>>
+      LoadFrameBundle: StrengthCandidatePrepared -> Task<Result<StrengthFrameBundle, string>>
+      PublishPrepared: StrengthPreparedRequest -> Task<StrengthPreparedPublish>
+      Append: StrengthEvent -> Task<Result<unit, string>> }

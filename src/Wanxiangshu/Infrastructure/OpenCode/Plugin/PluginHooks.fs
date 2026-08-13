@@ -32,9 +32,7 @@ module PluginHooks =
             let snapshotOpt = host.SnapshotOpt
             let gitTreePort = host.GitTreePort
             let eventPort = host.EventPort
-            let chatParams =
-                ChatParamsHook.create journal (fun () ->
-                    defaultArg scope.Strength.ManagedAgentInventory { Bindings = Map.empty })
+            let chatParams = ChatParamsHook.create ()
             let systemTransform = ProviderSystemTransform.create journal
 
             // CASE-003: typed capture at the tool boundary — shared

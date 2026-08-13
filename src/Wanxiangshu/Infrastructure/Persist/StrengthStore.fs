@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
 open System.Text
+open System.Threading.Tasks
 open Thoth.Json
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
@@ -232,39 +233,47 @@ module StrengthStore =
     /// Write raw bytes into the unified object database. The object may exist
     /// before publication; it becomes durable semantic closure only once an
     /// EventEnvelope PayloadRef reaches refs/wanxiang/store.
-    let storePayload (raw: IGitRawStore) (content: byte[]) : PayloadRef =
-        raw.WriteBlob content |> GitObjectId.value |> PayloadRef.create
+    let storePayload (raw: IGitRawStore) (content: byte[]) : Task<PayloadRef> =
+        task {
+            let! oid = raw.WriteBlob content
+            return oid |> GitObjectId.value |> PayloadRef.create
+        }
 
-    let tryReadPayload (raw: IGitRawStore) (payloadRef: PayloadRef) : byte[] option =
+    let tryReadPayload (raw: IGitRawStore) (payloadRef: PayloadRef) : Task<byte[] option> =
         raw.ReadObject(GitObjectId.create (PayloadRef.value payloadRef))
 
     let loadFrameBundle
         (raw: IGitRawStore)
         (sha256: string -> string)
         (prepared: StrengthCandidatePrepared)
-        : Result<StrengthFrameBundle, string> =
-        match prepared.MaterialPayloads with
-        | [ payloadRef ] ->
-            match tryReadPayload raw payloadRef with
-            | None -> Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
-            | Some bytes ->
-                match decodeFrameBundlePayload sha256 bytes with
-                | Error error -> Error error
-                | Ok bundle when bundle.Digest <> prepared.FrameDigest ->
-                    Error "Strength Prepared frame digest does not match payload"
-                | Ok bundle when bundle.ByteLength <> prepared.ByteLength ->
-                    Error "Strength Prepared byte length does not match payload"
-                | Ok bundle -> Ok bundle
-        | [] -> Error "Strength Prepared has no frame payload"
-        | _ -> Error "Strength Prepared has ambiguous frame payload closure"
+        : Task<Result<StrengthFrameBundle, string>> =
+        task {
+            match prepared.MaterialPayloads with
+            | [ payloadRef ] ->
+                match! tryReadPayload raw payloadRef with
+                | None -> return Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
+                | Some bytes ->
+                    match decodeFrameBundlePayload sha256 bytes with
+                    | Error error -> return Error error
+                    | Ok bundle when bundle.Digest <> prepared.FrameDigest ->
+                        return Error "Strength Prepared frame digest does not match payload"
+                    | Ok bundle when bundle.ByteLength <> prepared.ByteLength ->
+                        return Error "Strength Prepared byte length does not match payload"
+                    | Ok bundle -> return Ok bundle
+            | [] -> return Error "Strength Prepared has no frame payload"
+            | _ -> return Error "Strength Prepared has ambiguous frame payload closure"
+        }
 
     let append
         (store: IEventStore)
         (sha256: string -> string)
         (event: StrengthEvent)
-        : Result<StoreSnapshot, AppendError> =
-        let envelope = toEnvelope sha256 event
-        store.Append(store.OpenSnapshot(), [ envelope ])
+        : Task<Result<StoreSnapshot, AppendError>> =
+        task {
+            let envelope = toEnvelope sha256 event
+            let! snapshot = store.OpenSnapshot()
+            return! store.Append(snapshot, [ envelope ])
+        }
 
     /// PERSIST-002/007 + STRENGTH-006: construct opaque payload refs from bytes
     /// without pre-writing them, then publish the complete payload closure and its
@@ -275,7 +284,7 @@ module StrengthStore =
         (sha256: string -> string)
         (contents: byte[] list)
         (buildEvent: PayloadRef list -> StrengthEvent)
-        : Result<StoreSnapshot * StrengthEvent, PublishError> =
+        : Task<Result<StoreSnapshot * StrengthEvent, PublishError>> =
         let preparedPayloads = contents |> List.map GitRawStore.preparePayload
 
         let payloadRefs =
@@ -286,56 +295,69 @@ module StrengthStore =
         let event = buildEvent payloadRefs
         let envelope = toEnvelope sha256 event
 
-        let candidate =
-            { BaseSnapshot = store.OpenSnapshot()
-              NewEvents = [ envelope ]
-              NewPayloads = preparedPayloads }
+        task {
+            let! baseSnapshot = store.OpenSnapshot()
 
-        store.Publish candidate |> Result.map (fun snapshot -> snapshot, event)
+            let candidate =
+                { BaseSnapshot = baseSnapshot
+                  NewEvents = [ envelope ]
+                  NewPayloads = preparedPayloads }
 
-    let private loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<EventEnvelope list, string> =
-        match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-        | Error(MergeError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
-        | Ok events ->
-            events
-            |> List.filter (fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType)
-            |> Ok
+            match! store.Publish candidate with
+            | Ok snapshot -> return Ok(snapshot, event)
+            | Error err -> return Error err
+        }
 
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<StrengthEvent list, string> =
-        match loadEnvelopes raw snapshot with
-        | Error error -> Error error
-        | Ok [] -> Ok []
-        | Ok envelopes ->
-            match EventStoreFold.fold envelopes with
-            | Error(FoldError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
-            | Ok genericProjection when not (List.isEmpty genericProjection.Conflicts) ->
-                Error(sprintf "strength stream conflict: %A" genericProjection.Conflicts)
-            | Ok genericProjection ->
-                let byId =
-                    envelopes
-                    |> List.map (fun envelope -> EventId.value envelope.EventId, envelope)
-                    |> Map.ofList
+    let private loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
+        task {
+            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
+            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
+            | Ok events ->
+                return
+                    events
+                    |> List.filter (fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType)
+                    |> Ok
+        }
 
-                let rec decode remaining acc =
-                    match remaining with
-                    | [] -> Ok(List.rev acc)
-                    | eventId :: tail ->
-                        match Map.tryFind (EventId.value eventId) byId with
-                        | None -> Error(sprintf "Strength fold order missing event: %s" (EventId.value eventId))
-                        | Some envelope ->
-                            match tryDecodeEnvelope envelope with
-                            | Error error -> Error error
-                            | Ok event -> decode tail (event :: acc)
+    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<StrengthEvent list, string>> =
+        task {
+            match! loadEnvelopes raw snapshot with
+            | Error error -> return Error error
+            | Ok [] -> return Ok []
+            | Ok envelopes ->
+                match EventStoreFold.fold envelopes with
+                | Error(FoldError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
+                | Ok genericProjection when not (List.isEmpty genericProjection.Conflicts) ->
+                    return Error(sprintf "strength stream conflict: %A" genericProjection.Conflicts)
+                | Ok genericProjection ->
+                    let byId =
+                        envelopes
+                        |> List.map (fun envelope -> EventId.value envelope.EventId, envelope)
+                        |> Map.ofList
 
-                decode genericProjection.FoldOrder []
+                    let rec decode remaining acc =
+                        match remaining with
+                        | [] -> Ok(List.rev acc)
+                        | eventId :: tail ->
+                            match Map.tryFind (EventId.value eventId) byId with
+                            | None -> Error(sprintf "Strength fold order missing event: %s" (EventId.value eventId))
+                            | Some envelope ->
+                                match tryDecodeEnvelope envelope with
+                                | Error error -> Error error
+                                | Ok event -> decode tail (event :: acc)
 
-    let loadProjection (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<StrengthProjection, string> =
-        match loadEvents raw snapshot with
-        | Error error -> Error error
-        | Ok events ->
-            match StrengthProjection.fold events with
-            | Ok projection -> Ok projection
-            | Error conflict -> Error(sprintf "strength projection conflict: %A" conflict)
+                    return decode genericProjection.FoldOrder []
+        }
+
+    let loadProjection (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<StrengthProjection, string>> =
+        task {
+            match! loadEvents raw snapshot with
+            | Error error -> return Error error
+            | Ok events ->
+                match StrengthProjection.fold events with
+                | Ok projection -> return Ok projection
+                | Error conflict -> return Error(sprintf "strength projection conflict: %A" conflict)
+        }
 
     /// Small facades keep callers on the durable adapter rather than reaching
     /// through to a separately rebuilt in-memory registry.

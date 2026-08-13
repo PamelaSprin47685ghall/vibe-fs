@@ -107,22 +107,24 @@ type ManagerPort =
     }
 
 type OrchestratorJournalPort =
-    { AppendFact: StreamId -> AgentFact -> Result<ProjectionSet, string>
+    { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>
       Snapshot: unit -> ProjectionSet }
 
 module OrchestratorJournalPort =
     let fromAgentJournal (journal: AgentJournal) : OrchestratorJournalPort =
         { AppendFact =
             fun stream fact ->
-                match AgentJournal.appendAgent stream None fact journal with
-                | Ok projection -> Ok projection
-                | Error failure -> Error(JournalAppendFailure.describe failure)
+                task {
+                    match! AgentJournal.appendAgent stream None fact journal with
+                    | Ok projection -> return Ok projection
+                    | Error failure -> return Error(JournalAppendFailure.describe failure)
+                }
           Snapshot = fun () -> AgentJournal.snapshot journal }
 
 type OrchestratorProgramDeps =
     { Git: GitPort
       Manager: ManagerPort
-      AppendFact: StreamId -> AgentFact -> Result<unit, string>
+      AppendFact: StreamId -> AgentFact -> Task<Result<unit, string>>
       Snapshot: unit -> ProjectionSet
       GatePath: string }
 

@@ -87,7 +87,7 @@ module HostTurnObserver =
                 match strengthDurability with
                 | None -> ()
                 | Some durability ->
-                    match durability.LoadProjection() with
+                    match! durability.LoadProjection() with
                     | Error error ->
                         let reason = "Strength promotion projection failed: " + error
                         scope.Strength.TripStrengthFuse reason
@@ -96,7 +96,7 @@ module HostTurnObserver =
                         match StrengthLifecycle.reconcileEvent projection turn with
                         | None -> ()
                         | Some event ->
-                            match durability.Append event with
+                            match! durability.Append event with
                             | Ok() -> ()
                             | Error error ->
                                 let reason = "Strength promotion commit failed closed: " + error

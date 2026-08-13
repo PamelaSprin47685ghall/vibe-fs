@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Infrastructure
 
+open System.Threading.Tasks
 open Thoth.Json
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
@@ -94,23 +95,27 @@ module CasebookStore =
         (parents: EventId list)
         (eventType: string)
         (payload: JsonValue)
-        : Result<EventId, string> =
-        let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+        : Task<Result<EventId, string>> =
+        task {
+            let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
 
-        let envelope =
-            EventEnvelope.normalize
-                { EventId = eventId
-                  StreamId = EventStreamId.create CasebookStream
-                  EventType = eventType
-                  Parents = parents
-                  Payload = payload
-                  PayloadRefs = [] }
+            let envelope =
+                EventEnvelope.normalize
+                    { EventId = eventId
+                      StreamId = EventStreamId.create CasebookStream
+                      EventType = eventType
+                      Parents = parents
+                      Payload = payload
+                      PayloadRefs = [] }
 
-        match store.Append(store.OpenSnapshot(), [ envelope ]) with
-        | Ok _ -> Ok eventId
-        | Error err -> Error(sprintf "%s append failed: %A" eventType err)
+            let! snapshot = store.OpenSnapshot()
 
-    let appendCaptured (store: IEventStore) (parents: EventId list) (case: Case) : Result<EventId, string> =
+            match! store.Append(snapshot, [ envelope ]) with
+            | Ok _ -> return Ok eventId
+            | Error err -> return Error(sprintf "%s append failed: %A" eventType err)
+        }
+
+    let appendCaptured (store: IEventStore) (parents: EventId list) (case: Case) : Task<Result<EventId, string>> =
         appendEvent store parents CapturedEventType (encodeCase case)
 
     let appendRefreshed
@@ -120,7 +125,7 @@ module CasebookStore =
         (q: string)
         (a: string)
         (observations: Observation list)
-        : Result<EventId, string> =
+        : Task<Result<EventId, string>> =
         let payload =
             Encode.object
                 [ "session_id", Encode.string sessionId
@@ -130,10 +135,10 @@ module CasebookStore =
 
         appendEvent store parents RefreshedEventType payload
 
-    let appendAccessed (store: IEventStore) (parents: EventId list) (sessionId: string) : Result<EventId, string> =
+    let appendAccessed (store: IEventStore) (parents: EventId list) (sessionId: string) : Task<Result<EventId, string>> =
         appendEvent store parents AccessedEventType (Encode.object [ "session_id", Encode.string sessionId ])
 
-    let appendEvicted (store: IEventStore) (parents: EventId list) (sessionId: string) : Result<EventId, string> =
+    let appendEvicted (store: IEventStore) (parents: EventId list) (sessionId: string) : Task<Result<EventId, string>> =
         appendEvent store parents EvictedEventType (Encode.object [ "session_id", Encode.string sessionId ])
 
     // ---- load / project ---------------------------------------------------
@@ -164,66 +169,71 @@ module CasebookStore =
         |> snd
         |> List.rev
 
-    let loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<EventEnvelope list, string> =
-        match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-        | Error(MergeError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
-        | Ok events ->
-            events
-            |> List.filter (fun e ->
-                e.EventType = "InspectorCaseCaptured"
-                || e.EventType = "InspectorCaseRefreshed"
-                || e.EventType = "InspectorCaseAccessed"
-                || e.EventType = "InspectorCaseEvicted")
-            |> Ok
+    let loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
+        task {
+            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
+            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
+            | Ok events ->
+                return
+                    events
+                    |> List.filter (fun e ->
+                        e.EventType = "InspectorCaseCaptured"
+                        || e.EventType = "InspectorCaseRefreshed"
+                        || e.EventType = "InspectorCaseAccessed"
+                        || e.EventType = "InspectorCaseEvicted")
+                    |> Ok
+        }
 
     let headOf (envelopes: EventEnvelope list) : EventId option =
         envelopes |> List.tryLast |> Option.map (fun e -> e.EventId)
 
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<CasebookEvent list, string> =
-        match loadEnvelopes raw snapshot with
-        | Error err -> Error err
-        | Ok envelopes ->
-            let ordered = topoSort envelopes
+    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<CasebookEvent list, string>> =
+        task {
+            match! loadEnvelopes raw snapshot with
+            | Error err -> return Error err
+            | Ok envelopes ->
+                let ordered = topoSort envelopes
 
-            let decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
-                let decoder =
-                    Decode.object (fun get ->
-                        (get.Required.Field "session_id" Decode.string,
-                         get.Required.Field "q" Decode.string,
-                         get.Required.Field "a" Decode.string,
-                         get.Required.Field "observations" (Decode.list decodeObservation)))
+                let decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
+                    let decoder =
+                        Decode.object (fun get ->
+                            (get.Required.Field "session_id" Decode.string,
+                             get.Required.Field "q" Decode.string,
+                             get.Required.Field "a" Decode.string,
+                             get.Required.Field "observations" (Decode.list decodeObservation)))
 
-                match Decode.fromValue "$" decoder payload with
-                | Ok(sessionId, q, a, observations) -> Ok(CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
-                | Error err -> Error err
+                    match Decode.fromValue "$" decoder payload with
+                    | Ok(sessionId, q, a, observations) -> Ok(CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
+                    | Error err -> Error err
 
-            let rec decodeAll
-                (remaining: EventEnvelope list)
-                (acc: CasebookEvent list)
-                : Result<CasebookEvent list, string> =
-                match remaining with
-                | [] -> Ok(List.rev acc)
-                | head :: tail ->
-                    match head.EventType with
-                    | "InspectorCaseCaptured" ->
-                        match Decode.fromValue "$" decodeCase head.Payload with
-                        | Ok case -> decodeAll tail (CasebookEvent.CaseCaptured case :: acc)
-                        | Error err -> Error err
-                    | "InspectorCaseRefreshed" ->
-                        match decodeRefreshed head.Payload with
-                        | Ok event -> decodeAll tail (event :: acc)
-                        | Error err -> Error err
-                    | "InspectorCaseAccessed" ->
-                        match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
-                        | Ok sessionId -> decodeAll tail (CasebookEvent.CaseAccessed sessionId :: acc)
-                        | Error err -> Error err
-                    | "InspectorCaseEvicted" ->
-                        match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
-                        | Ok sessionId -> decodeAll tail (CasebookEvent.CaseEvicted sessionId :: acc)
-                        | Error err -> Error err
-                    | _ -> decodeAll tail acc
+                let rec decodeAll
+                    (remaining: EventEnvelope list)
+                    (acc: CasebookEvent list)
+                    : Result<CasebookEvent list, string> =
+                    match remaining with
+                    | [] -> Ok(List.rev acc)
+                    | head :: tail ->
+                        match head.EventType with
+                        | "InspectorCaseCaptured" ->
+                            match Decode.fromValue "$" decodeCase head.Payload with
+                            | Ok case -> decodeAll tail (CasebookEvent.CaseCaptured case :: acc)
+                            | Error err -> Error err
+                        | "InspectorCaseRefreshed" ->
+                            match decodeRefreshed head.Payload with
+                            | Ok event -> decodeAll tail (event :: acc)
+                            | Error err -> Error err
+                        | "InspectorCaseAccessed" ->
+                            match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
+                            | Ok sessionId -> decodeAll tail (CasebookEvent.CaseAccessed sessionId :: acc)
+                            | Error err -> Error err
+                        | "InspectorCaseEvicted" ->
+                            match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
+                            | Ok sessionId -> decodeAll tail (CasebookEvent.CaseEvicted sessionId :: acc)
+                            | Error err -> Error err
+                        | _ -> decodeAll tail acc
 
-            decodeAll ordered []
+                return decodeAll ordered []
+        }
 
     /// The stream head EventId — use loadEnvelopes + headOf instead (this
     /// function drops EventIds by design).

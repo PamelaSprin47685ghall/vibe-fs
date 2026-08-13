@@ -34,9 +34,11 @@ module OrchestratorProgram =
         OrchestratorVerdict.IntegrationFailed(job.JobId, details)
 
     let private append (deps: OrchestratorProgramDeps) (job: ManagerJob) fact =
-        match deps.AppendFact StreamId.Workspace fact with
-        | Ok() -> Ok()
-        | Error error -> Error(failed job error)
+        task {
+            match! deps.AppendFact StreamId.Workspace fact with
+            | Ok() -> return Ok()
+            | Error error -> return Error(failed job error)
+        }
 
     /// REVIEW-008: one barrier per review round, never reused.
     ///
@@ -186,7 +188,7 @@ module OrchestratorProgram =
                            TargetRef = job.TargetRef
                            ExpectedHead = current |}
 
-                match append deps job claim with
+                match! append deps job claim with
                 | Error verdict -> return Error verdict
                 | Ok() ->
                     match! deps.Git.FfMerge job.Worktree.Path job.TargetRef current with
@@ -199,7 +201,7 @@ module OrchestratorProgram =
                                    CandidateCommit = landed
                                    ResultingTargetHead = landed |}
 
-                        match append deps job published with
+                        match! append deps job published with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             do! deps.Manager.TerminateChildren job.JobId

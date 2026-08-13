@@ -83,7 +83,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
-    member _.WriteBlob(content: string) : Result<BlobWriteReceipt, string> = writer.BlobWriter.Write content
+    member _.WriteBlob(content: string) : Task<Result<BlobWriteReceipt, string>> = writer.BlobWriter.Write content
 
     /// PERSIST-003: a poisoned writer or a rejected fact both mean this journal
     /// may no longer be appended to.
@@ -155,8 +155,12 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
-        : Result<ProjectionSet, JournalAppendFailure> =
-        this.AppendEnvelope stream providerRun (Fact.Agent fact) |> Result.map fst
+        : Task<Result<ProjectionSet, JournalAppendFailure>> =
+        task {
+            match! this.AppendEnvelope stream providerRun (Fact.Agent fact) with
+            | Ok(updated, _) -> return Ok updated
+            | Error err -> return Error err
+        }
 
     /// Append a Magic Todo fact and return its durable envelope identity.
     ///
@@ -166,75 +170,83 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: MagicTodoFact)
-        : Result<MagicTodoAppendReceipt, JournalAppendFailure> =
-        fact
-        |> MagicTodoFactCodec.encode
-        |> Fact.MagicTodo
-        |> this.AppendEnvelope stream providerRun
-        |> Result.map (fun (updated, envelope) ->
-            { EventId = envelope.EventId
-              Projection = updated })
+        : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
+        task {
+            match! this.AppendEnvelope stream providerRun (fact |> MagicTodoFactCodec.encode |> Fact.MagicTodo) with
+            | Ok(updated, envelope) ->
+                return
+                    Ok
+                        { EventId = envelope.EventId
+                          Projection = updated }
+            | Error err -> return Error err
+        }
 
     /// GLORY-010: append one Manager lifecycle fact. Envelope `ProviderRun` is
     /// `None` — the payload carries its own run identities (FinalityRequested).
     member this.AppendManagerLifecycle
         (stream: StreamId)
         (fact: ManagerLifecycleFact)
-        : Result<ProjectionSet, JournalAppendFailure> =
-        this.AppendEnvelope stream None (Fact.ManagerLifecycle fact) |> Result.map fst
+        : Task<Result<ProjectionSet, JournalAppendFailure>> =
+        task {
+            match! this.AppendEnvelope stream None (Fact.ManagerLifecycle fact) with
+            | Ok(updated, _) -> return Ok updated
+            | Error err -> return Error err
+        }
 
     member private _.AppendEnvelope
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
-        : Result<ProjectionSet * Envelope, JournalAppendFailure> =
-        // DSL-MUTABLE: buffer — waiters to notify after lock release
-        let mutable notify: (TaskCompletionSource<JournalChange> * JournalChange) list = []
+        : Task<Result<ProjectionSet * Envelope, JournalAppendFailure>> =
+        task {
+            let! result, notify =
+                task {
+                    match lock gate (fun () -> rejected) with
+                    | Some(eventId, rejection) ->
+                        return Error(FactRejected(eventId, rejection)), []
+                    | None ->
+                        match! writer.Append stream providerRun fact with
+                        | CommitUnknown(eventId, failure) ->
+                            return Error(WriteUnknown(eventId, failure)), []
+                        | Committed envelope ->
+                            return
+                                lock gate (fun () ->
+                                    match Fold.foldEnvelope projection envelope with
+                                    | Ok updated ->
+                                        projection <- updated
+                                        revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
 
-        let result =
-            lock gate (fun () ->
-                match rejected with
-                | Some(eventId, rejection) -> Error(FactRejected(eventId, rejection))
-                | None ->
-                    match writer.Append stream providerRun fact with
-                    | CommitUnknown(eventId, failure) -> Error(WriteUnknown(eventId, failure))
-                    | Committed envelope ->
-                        match Fold.foldEnvelope projection envelope with
-                        | Ok updated ->
-                            projection <- updated
-                            revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
+                                        let change =
+                                            { Revision = revision
+                                              Envelope = envelope }
 
-                            let change =
-                                { Revision = revision
-                                  Envelope = envelope }
+                                        lastChange <- Some change
 
-                            lastChange <- Some change
+                                        let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
+                                        let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
 
-                            let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
-                            let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
+                                        for subRev, tcs in waiters do
+                                            if JournalRevision.isAfter revision subRev then
+                                                ready.Add(tcs, change)
+                                            else
+                                                kept.Add(subRev, tcs)
 
-                            for subRev, tcs in waiters do
-                                if JournalRevision.isAfter revision subRev then
-                                    ready.Add(tcs, change)
-                                else
-                                    kept.Add(subRev, tcs)
+                                        waiters.Clear()
 
-                            waiters.Clear()
+                                        for item in kept do
+                                            waiters.Add item
 
-                            for item in kept do
-                                waiters.Add item
+                                        Ok(updated, envelope), List.ofSeq ready
+                                    | Error rejection ->
+                                        rejected <- Some(envelope.EventId, rejection)
+                                        Error(FactRejected(envelope.EventId, rejection)), [])
+                }
 
-                            notify <- List.ofSeq ready
-                            Ok(updated, envelope)
-                        | Error rejection ->
-                            rejected <- Some(envelope.EventId, rejection)
-                            Error(FactRejected(envelope.EventId, rejection)))
+            for tcs, change in notify do
+                AsyncSupport.trySetResult tcs change |> ignore
 
-        // Fire outside the gate: listeners must not run under the journal lock.
-        for tcs, change in notify do
-            AsyncSupport.trySetResult tcs change |> ignore
-
-        result
+            return result
+        }
 
     interface IDisposable with
         member _.Dispose() = writer.Release()
@@ -264,7 +276,7 @@ module AgentJournal =
         (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
         (journal: AgentJournal)
-        : Result<ProjectionSet, JournalAppendFailure> =
+        : Task<Result<ProjectionSet, JournalAppendFailure>> =
         journal.AppendAgent stream providerRun fact
 
     let appendMagicTodo
@@ -272,7 +284,7 @@ module AgentJournal =
         (providerRun: ProviderRunIdentity option)
         (fact: MagicTodoFact)
         (journal: AgentJournal)
-        : Result<MagicTodoAppendReceipt, JournalAppendFailure> =
+        : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
         journal.AppendMagicTodo stream providerRun fact
 
     /// GLORY-010: append one Manager lifecycle fact.
@@ -280,7 +292,7 @@ module AgentJournal =
         (stream: StreamId)
         (fact: ManagerLifecycleFact)
         (journal: AgentJournal)
-        : Result<ProjectionSet, JournalAppendFailure> =
+        : Task<Result<ProjectionSet, JournalAppendFailure>> =
         journal.AppendManagerLifecycle stream fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
@@ -305,7 +317,7 @@ module AgentJournal =
 
     let runtimeId (journal: AgentJournal) : RuntimeId = journal.RuntimeId
 
-    let writeBlob (content: string) (journal: AgentJournal) : Result<BlobWriteReceipt, string> =
+    let writeBlob (content: string) (journal: AgentJournal) : Task<Result<BlobWriteReceipt, string>> =
         journal.WriteBlob content
 
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned

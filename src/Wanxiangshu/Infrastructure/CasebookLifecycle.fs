@@ -94,10 +94,10 @@ module CasebookLifecycle =
                                       Observations = observations
                                       LastAccessOrder = 0L }
 
-                                match CasebookWorkflow.finalizeCase store raw case with
+                                match! CasebookWorkflow.finalizeCase store raw case with
                                 | Ok() ->
                                     CasebookIndex.invalidate ()
-                                    CasebookIndex.refresh store raw 256 |> ignore
+                                    let! _ = CasebookIndex.refresh store raw 256
                                     return Ok()
                                 | Error err -> return Error err
                         with ex ->
@@ -106,18 +106,21 @@ module CasebookLifecycle =
         }
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
-    let touchAccess (workspaceRoot: string) (sessionId: string) : unit =
-        if not (CasebookFeature.isEnabled workspaceRoot) then
-            ()
-        else
-            try
-                let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                let raw, store = WorkspaceEventStore.acquire commonDir
+    let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =
+        task {
+            if not (CasebookFeature.isEnabled workspaceRoot) then
+                return ()
+            else
+                try
+                    let commonDir = RuntimePath.gitCommonDir workspaceRoot
+                    let raw, store = WorkspaceEventStore.acquire commonDir
 
-                match CasebookWorkflow.touchCaseAccess store raw sessionId with
-                | Ok() ->
-                    CasebookIndex.invalidate ()
-                    CasebookIndex.refresh store raw 256 |> ignore
-                | Error _ -> ()
-            with _ ->
-                ()
+                    match! CasebookWorkflow.touchCaseAccess store raw sessionId with
+                    | Ok() ->
+                        CasebookIndex.invalidate ()
+                        let! _ = CasebookIndex.refresh store raw 256
+                        return ()
+                    | Error _ -> return ()
+                with _ ->
+                    return ()
+        }

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
@@ -51,10 +52,12 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (providerRun: ProviderRunIdentity option)
             (fact: AgentFact)
-            : Result<unit, string> =
-            AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal
-            |> Result.map (fun _ -> ())
-            |> Result.mapError (fun failure -> JournalAppendFailure.describe failure)
+            : Task<Result<unit, string>> =
+            task {
+                match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal with
+                | Ok _ -> return Ok()
+                | Error failure -> return Error(JournalAppendFailure.describe failure)
+            }
 
         /// PROMPT-004: an Authority Root takes effect.
         ///
@@ -66,7 +69,7 @@ module PromptDispatcher =
         /// REVIEW-007's review requirement is not written here. The fold derives
         /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
         /// without its requirement appearing with it.
-        member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Result<unit, string> =
+        member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Task<Result<unit, string>> =
             PersonaBinding.ensureFromAuthority profile |> ignore
 
             PromptFact.AuthorityRootAccepted
@@ -90,18 +93,26 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
             (explicitAgent: string option)
-            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
             match explicitAgent with
-            | None -> Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)"
+            | None -> Task.FromResult(Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)")
             | Some agent ->
-                PromptAuthorityRun.createAuthorityRoot
-                    HostDigest.sha256Hex
-                    this.RuntimeId
-                    sessionId
-                    PromptAuthority.RootAuthorityKind.HumanRoot
-                    physicalMessageId
-                    agent
-                |> Result.bind (fun profile -> this.RegisterAuthority profile |> Result.map (fun () -> profile))
+                match
+                    PromptAuthorityRun.createAuthorityRoot
+                        HostDigest.sha256Hex
+                        this.RuntimeId
+                        sessionId
+                        PromptAuthority.RootAuthorityKind.HumanRoot
+                        physicalMessageId
+                        agent
+                with
+                | Error error -> Task.FromResult(Error error)
+                | Ok profile ->
+                    task {
+                        match! this.RegisterAuthority profile with
+                        | Error error -> return Error error
+                        | Ok() -> return Ok profile
+                    }
 
         /// PROMPT-005 `Abandoned`.
         ///
@@ -113,7 +124,7 @@ module PromptDispatcher =
             (key: PromptKey)
             (sessionId: SessionId)
             (reason: PromptAbandonReason)
-            : Result<unit, string> =
+            : Task<Result<unit, string>> =
             PromptFact.PluginPromptAbandoned
                 {| PromptKey = key
                    SessionId = sessionId
@@ -131,28 +142,38 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
             (agent: string)
-            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-            PromptAuthorityRun.createAuthorityRoot
-                HostDigest.sha256Hex
-                this.RuntimeId
-                sessionId
-                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                physicalMessageId
-                agent
-            |> Result.bind (fun profile ->
-                PromptFact.PluginPromptPhysicalAccepted
-                    {| PromptKey = key
-                       SessionId = sessionId
-                       PhysicalUserMessageId = physicalMessageId |}
-                |> this.Persist sessionId None
-                |> Result.bind (fun () -> this.RegisterAuthority profile)
-                |> Result.map (fun () -> profile))
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
+            match
+                PromptAuthorityRun.createAuthorityRoot
+                    HostDigest.sha256Hex
+                    this.RuntimeId
+                    sessionId
+                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                    physicalMessageId
+                    agent
+            with
+            | Error error -> Task.FromResult(Error error)
+            | Ok profile ->
+                task {
+                    match!
+                        PromptFact.PluginPromptPhysicalAccepted
+                            {| PromptKey = key
+                               SessionId = sessionId
+                               PhysicalUserMessageId = physicalMessageId |}
+                        |> this.Persist sessionId None
+                    with
+                    | Error error -> return Error error
+                    | Ok() ->
+                        match! this.RegisterAuthority profile with
+                        | Error error -> return Error error
+                        | Ok() -> return Ok profile
+                }
 
         member this.AcceptAgentOwnerRoot
             (key: PromptKey)
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
-            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
             let projection = this.ProjectionFor sessionId
 
             match Map.tryFind key projection.PendingClaims with
@@ -161,15 +182,16 @@ module PromptDispatcher =
                 | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot,
                   Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
                 | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot, None ->
-                    Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
-                | _ -> Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key))
+                    Task.FromResult(
+                        Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
+                    )
+                | _ ->
+                    Task.FromResult(Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key)))
             | None ->
-                // Re-delivery of a message whose claim already resolved. Idempotent
-                // only when the run it created is still the active one; otherwise
-                // this is an unknown key and must fail closed (PROMPT-005).
                 match projection.ActiveLogicalRun with
-                | Some profile -> Ok profile
-                | None -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key))
+                | Some profile -> Task.FromResult(Ok profile)
+                | None ->
+                    Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
 
         /// PROMPT-003: a continuation reached physical acceptance. Returns the
         /// kind it was claimed as, read before the fact is written because writing
@@ -178,18 +200,23 @@ module PromptDispatcher =
             (key: PromptKey)
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
-            : Result<PromptAuthority.ContinuationKind option, string> =
-            let kind =
-                match Map.tryFind key (this.ProjectionFor sessionId).PendingClaims with
-                | Some { Origin = PromptAuthority.PromptOrigin.Continuation c } -> Some c
-                | _ -> None
+            : Task<Result<PromptAuthority.ContinuationKind option, string>> =
+            task {
+                let kind =
+                    match Map.tryFind key (this.ProjectionFor sessionId).PendingClaims with
+                    | Some { Origin = PromptAuthority.PromptOrigin.Continuation c } -> Some c
+                    | _ -> None
 
-            PromptFact.PluginPromptPhysicalAccepted
-                {| PromptKey = key
-                   SessionId = sessionId
-                   PhysicalUserMessageId = physicalMessageId |}
-            |> this.Persist sessionId None
-            |> Result.map (fun () -> kind)
+                match!
+                    PromptFact.PluginPromptPhysicalAccepted
+                        {| PromptKey = key
+                           SessionId = sessionId
+                           PhysicalUserMessageId = physicalMessageId |}
+                    |> this.Persist sessionId None
+                with
+                | Error error -> return Error error
+                | Ok() -> return Ok kind
+            }
 
         /// The run a continuation would extend.
         ///
