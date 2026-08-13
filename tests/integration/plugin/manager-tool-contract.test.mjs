@@ -993,6 +993,10 @@ test('EXEC_002_fork_tool_description_states_calling_create_and_byname_reuse', as
     const description = hooks.tool.fork?.description
     assert.equal(typeof description, 'string', 'fork tool must expose description')
     assert.match(description, /calling \+ name \+ charge|same name/i)
+    assert.match(description, /navigator \(Fast Browser\)/)
+    assert.match(description, /researcher \(Deep Browser\)/)
+    assert.match(description, /public web only/)
+    assert.match(description, /never from local files or the repository/)
     assert.doesNotMatch(description, /fast-|deep-|handle/i)
     const commission = hooks.tool.commission?.description
     assert.equal(typeof commission, 'string')

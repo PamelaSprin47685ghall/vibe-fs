@@ -112,6 +112,8 @@ Blogger、Distiller、Bookkeeper（含 `fast-bookkeeper` / `deep-bookkeeper`）�
 
 不可 fork：reviewer、blogger、distiller、bookkeeper。
 
+`fork` 工具描述必须写明：`navigator`（Fast Browser）与 `researcher`（Deep Browser）只从 public web 建立事实，不得用于本地文件或仓库。描述不得出现 `fast-` / `deep-` 机器名。
+
 ## AGENT-010：fast/deep 权限一致
 
 ```text

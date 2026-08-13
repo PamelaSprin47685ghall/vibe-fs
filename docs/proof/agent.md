@@ -56,6 +56,7 @@
 | Inquiry = inspect + Sphinx MCP | AGENT-025、AGENT-030 |
 | Distiller 无工具且不可见 | AGENT-006、AGENT-008 |
 | Browser stealth-browser MCP | AGENT-026 |
+| `fork` 描述：`navigator`/`researcher` 仅 public web，排除本地文件与仓库 | AGENT-009 |
 | 内部 Semble MCP | AGENT-027 |
 
 ## Gate A — Tool Referential Integrity
@@ -74,6 +75,7 @@
 | config 注入 | `configureFromHostConfig` 写入 `mcp.stealth-browser-mcp`；不删其它 MCP | AGENT-026 |
 | 启动判定 | disabled / fixture / test / uvx ref 四分支确定性 | AGENT-026 |
 | 不进 ToolRegistry / js-* | plugin `tool` 注册表无 stealth-browser 名；js-browser 仍仅 fs 投影 | AGENT-026、JS-001 |
+| fork 描述约束 Browser 仅 web | `navigator`（Fast Browser）与 `researcher`（Deep Browser）声明 public web only，排除本地文件/仓库；不含 `fast-`/`deep-` → `tests/integration/plugin/manager-tool-contract.test.mjs` | AGENT-009 |
 
 ## Sphinx MCP
 
