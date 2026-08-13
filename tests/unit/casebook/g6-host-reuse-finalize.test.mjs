@@ -96,14 +96,16 @@ const completionTurn = (delegateKey, role) =>
   )
 
 let activeJournal
+const delegateMessages = new Map()
 
 const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_turn') => {
+  const messages = delegateMessages.get(delegateKey) ?? []
+  messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
+  delegateMessages.set(delegateKey, messages)
   xTraceCapture.captureProjection(
     activeJournal,
     sessionId(delegateKey),
-    xTraceCapture.semantic({
-      messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
-    }),
+    xTraceCapture.semantic({ messages }),
   )
   const handled = await handleTurn(
     runtime,

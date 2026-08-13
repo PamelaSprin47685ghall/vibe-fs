@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url'
 import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
 

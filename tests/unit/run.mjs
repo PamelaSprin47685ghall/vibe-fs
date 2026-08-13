@@ -26,6 +26,8 @@ import { UNIT_VERDICT_SILENCE_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 import { walk } from '../../scripts/lib/walk.mjs'
 
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 const TESTS_ROOT = 'tests/unit'
 const EVAL_ROOT = 'tests/eval'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'

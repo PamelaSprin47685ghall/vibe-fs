@@ -19,6 +19,7 @@ import {
   roles,
   sessionId,
   toList,
+  xTraceCapture,
 } from '../support/domain.mjs'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import {
@@ -263,6 +264,17 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.equal(sends[0].agent, 'deep-inquiry')
     assert.match(sends[0].text, /如何解决这个 agent 的当前困难？/)
     assert.match(sends[0].text, /original deep-coder charge/, 'Commissioner LWR must carry parent opening')
+
+    xTraceCapture.captureProjection(
+      journal,
+      sessionId('ses_consult_1'),
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text(sends[0].text)] },
+          { role: 'assistant', parts: [xTraceCapture.text('independent perspective')] },
+        ],
+      }),
+    )
 
     const childDone = completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_done', 'Inquiry')
     const returned = await handleTurn(host, childDone)

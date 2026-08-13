@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
 import { OpencodeModel } from '../../../dist/Infrastructure/OpenCode/Codec/OpencodeTypes.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
@@ -101,6 +102,7 @@ const openaiToolsFromDispatcher = (options) => {
 let activeJournal
 
 const withHarness = async (fn, options = {}) => {
+  SessionPersona_clearAllForTests()
   const { tier = 'Fast', promptModelFor } = options
   const promptModel = Object.prototype.hasOwnProperty.call(options, 'promptModel')
     ? options.promptModel
@@ -207,6 +209,7 @@ const withHarness = async (fn, options = {}) => {
       xtraceMessages,
     })
   } finally {
+    SessionPersona_clearAllForTests()
     disposeRuntime(runtime)
     opened.dispose()
     rmSync(base, { recursive: true, force: true })
