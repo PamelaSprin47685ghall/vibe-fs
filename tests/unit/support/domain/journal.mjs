@@ -351,10 +351,12 @@ export const blogProjection = (() => {
     hasCoverage: (state) => m.hasCoverage(state),
     frameEpochOf: (state) => idValue.frameEpoch(state.FrameEpochId),
 
-    frame: ({ kind, digest, ref }) => ({
+    frame: ({ kind, digest, ref, coveredFrom = 0, coveredThrough = 0 }) => ({
       Kind: buildKind(kind, []),
       Digest: blobDigest(digest),
       TextRef: blobRef(ref),
+      CoveredFromSequence: BigInt(coveredFrom),
+      CoveredThroughSequence: BigInt(coveredThrough),
     }),
 
     frameKinds: (state) => listItems(state.Frames).map((f) => caseOf(f.Kind)),

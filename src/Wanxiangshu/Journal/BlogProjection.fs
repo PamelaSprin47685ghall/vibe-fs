@@ -17,9 +17,17 @@ type BlogFrameKind =
     | Squash
 
 type BlogFrame =
-    { Kind: BlogFrameKind
-      Digest: BlobDigest
-      TextRef: BlobRef }
+    {
+        Kind: BlogFrameKind
+        Digest: BlobDigest
+        TextRef: BlobRef
+        /// Exclusive start of this frame's RecordCoverage interval
+        /// (`BlogObservationCommitted.PreviousIngestedThroughSequence`).
+        CoveredFromSequence: int64
+        /// Inclusive end of this frame's RecordCoverage interval
+        /// (`BlogObservationCommitted.NextIngestedThroughSequence`).
+        CoveredThroughSequence: int64
+    }
 
 /// CTX-011: the two positions plus the proof that ties the second one to X.
 ///
@@ -105,6 +113,14 @@ module BlogProjection =
 
     let frameCount (state: BlogProjectionState) = List.length state.Frames
 
+    /// COMPANION-015: Y frames whose coverage `(CoveredFrom, CoveredThrough]`
+    /// overlaps invocation `[startInclusive, endExclusive)`.
+    let overlapping (startInclusive: int64) (endExclusive: int64) (frames: BlogFrame list) =
+        frames
+        |> List.filter (fun frame ->
+            frame.CoveredFromSequence < endExclusive
+            && frame.CoveredThroughSequence >= startInclusive)
+
     /// CTX-011: the frames a probe may build FrozenRecordPrefix from.
     ///
     /// Derived from `CoverableFrameCount` rather than stored as a second blob. The
@@ -150,7 +166,12 @@ module BlogProjection =
         elif nextCutoff < previousCutoff then
             Error BlogFoldRejection.CoverageRetreated
         else
-            let frames = state.Frames @ [ frame ]
+            let storedFrame =
+                { frame with
+                    CoveredFromSequence = previousIngestSequence
+                    CoveredThroughSequence = nextIngestSequence }
+
+            let frames = state.Frames @ [ storedFrame ]
 
             Ok
                 { state with
@@ -210,10 +231,17 @@ module BlogProjection =
 
             let nextCoverable = if coverable = 0 then 0 else max 1 (coverable - count + 1)
 
+            let replaced = List.truncate count state.Frames
+
+            let storedFrame =
+                { frame with
+                    CoveredFromSequence = replaced |> List.map (fun item -> item.CoveredFromSequence) |> List.min
+                    CoveredThroughSequence = replaced |> List.map (fun item -> item.CoveredThroughSequence) |> List.max }
+
             Ok
                 { state with
                     FrameEpochId = nextEpoch
-                    Frames = frame :: List.skip count state.Frames
+                    Frames = storedFrame :: List.skip count state.Frames
                     Coverage =
                         { state.Coverage with
                             CoverableFrameCount = nextCoverable } }

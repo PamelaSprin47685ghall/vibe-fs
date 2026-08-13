@@ -23,8 +23,8 @@ open Wanxiangshu.Kernel.Identity
 module LifecycleWorkRecordProjection =
 
     /// Resolve Y-compressed Chronicle frames from blobs, oldest first.
-    let private resolveFrames (durable: AgentJournal) (blog: BlogProjectionState) : string list =
-        blog.Frames
+    let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : string list =
+        frames
         |> List.choose (fun frame ->
             match durable.Writer.BlobWriter.Read frame.TextRef with
             | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
@@ -74,7 +74,7 @@ module LifecycleWorkRecordProjection =
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            let frames = resolveFrames durable blog
+            let frames = resolveFrames durable blog.Frames
 
             let trace = resolveTrace durable xTrace
 
@@ -115,16 +115,7 @@ module LifecycleWorkRecordProjection =
 
                 let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
 
-                Some(
-                    LifecycleWorkRecord.materialize
-                        openingMaterial
-                        frames
-                        trace
-                        coverage
-                        openingEnd
-                        []
-                        includeOpening
-                )
+                Some(LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd [] includeOpening)
 
     let lifecycleWorkRecordFromSnapshot
         (durable: AgentJournal)
@@ -145,9 +136,9 @@ module LifecycleWorkRecordProjection =
             lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening
 
     /// EXEC-031: per-invocation bounded LWR for reusable SyncDelegate children
-    /// (includeOpening=false). Chronicle frames + Recent-work TRACE are sliced to
-    /// the invocation's XTrace range, including the last part. Reuses
-    /// LifecycleWorkRecord.materialize — no second renderer.
+    /// (includeOpening=false). Chronicle frames (interval overlap) + Recent-work
+    /// TRACE are sliced to the invocation's XTrace range, including the last part.
+    /// Reuses LifecycleWorkRecord.materialize — no second renderer.
     /// A full-lifecycle projection here would leak prior invocations on a reused child.
     let lifecycleWorkRecordBoundedFromSnapshot
         (durable: AgentJournal)
@@ -161,11 +152,18 @@ module LifecycleWorkRecordProjection =
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            let frames = resolveFrames durable blog
+            // COMPANION-015 ④/⑩: Chronicle is Y frames whose coverage interval
+            // overlaps this invocation. Prior-invocation frames must not leak.
+            let frames =
+                blog.Frames
+                |> BlogProjection.overlapping range.StartInclusive.Sequence range.EndExclusive.Sequence
+                |> resolveFrames durable
 
             // Recent-work TRACE sliced to the invocation's range so prior
             // invocations never appear.
-            let trace = resolveTrace durable xTrace |> XTrace.sliceBetween range.StartInclusive range.EndExclusive
+            let trace =
+                resolveTrace durable xTrace
+                |> XTrace.sliceBetween range.StartInclusive range.EndExclusive
 
             match xTrace.Opening with
             | None -> None
@@ -201,5 +199,4 @@ module LifecycleWorkRecordProjection =
         : string option =
         match journal with
         | None -> None
-        | Some durable ->
-            lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
+        | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range

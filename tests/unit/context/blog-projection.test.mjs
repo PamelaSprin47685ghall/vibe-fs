@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { blogProjection as blog } from '../support/domain.mjs'
+import { blogProjection as blog, listItems } from '../support/domain.mjs'
 
 const entryFrame = (n) => blog.frame({ kind: 'Entry', digest: `sha-entry-${n}`, ref: `blob-entry-${n}` })
 const squashFrame = (n) => blog.frame({ kind: 'Squash', digest: `sha-squash-${n}`, ref: `blob-squash-${n}` })
@@ -69,6 +69,10 @@ test('COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   // The cutoff advanced, so the frame it produced is coverable: a probe may build
   // FrozenRecordPrefix from it.
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Entry'])
+
+  const [stamped] = listItems(result.value.Frames)
+  assert.equal(stamped.CoveredFromSequence, 0n)
+  assert.equal(stamped.CoveredThroughSequence, 1n)
 })
 
 test('CTX_011_entry_that_consumed_nothing_is_refused', () => {
@@ -189,6 +193,10 @@ test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alo
   // subtracting 2 would drop the newest covered frame out of the probe's reach.
   assert.equal(after.coverableFrames, 3)
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Squash', 'Entry', 'Entry'])
+
+  const [merged] = listItems(result.value.Frames)
+  assert.equal(merged.CoveredFromSequence, 0n)
+  assert.equal(merged.CoveredThroughSequence, 2n, 'squash unions the replaced frames\' coverage interval')
 })
 
 test('CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {

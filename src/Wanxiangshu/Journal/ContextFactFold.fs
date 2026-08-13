@@ -126,7 +126,9 @@ module ContextFactFold =
                         payload.NextCoveredPrefixDigest
                         { Kind = BlogFrameKind.Entry
                           Digest = payload.TextDigest
-                          TextRef = payload.TextRef })
+                          TextRef = payload.TextRef
+                          CoveredFromSequence = 0L
+                          CoveredThroughSequence = 0L })
                     updated
                 |> blogOutcome "BlogObservationCommitted"
 
@@ -161,7 +163,9 @@ module ContextFactFold =
                         payload.CoveredFrameCount
                         { Kind = BlogFrameKind.Squash
                           Digest = payload.TextDigest
-                          TextRef = payload.TextRef })
+                          TextRef = payload.TextRef
+                          CoveredFromSequence = 0L
+                          CoveredThroughSequence = 0L })
                     updated
                 |> blogOutcome "BlogObservationsSquashed"
 
