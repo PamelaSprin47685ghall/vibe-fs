@@ -30,6 +30,63 @@ module LifecycleWorkRecordProjection =
             | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
             | _ -> None)
 
+    let private tryReadPartBody (durable: AgentJournal) (part: XTracePartRef) : string option =
+        match durable.Writer.BlobWriter.Read part.TextRef with
+        | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> Some body
+        | _ -> None
+
+    /// Full-lifecycle LWR fallback for Host-owned completion paths that consume a
+    /// terminal before messages.transform has captured that final assistant turn.
+    /// TerminalOutputCaptured is already durable; project it into Recent work only
+    /// when the latest assistant turn's natural-language parts do not already
+    /// reconstruct the exact same terminal bytes. No new XTrace fact/cursor is
+    /// written, so normal captured turns remain unchanged and event counts do not grow.
+    let private withTerminalFallback
+        (durable: AgentJournal)
+        (xTrace: XTraceProjectionState)
+        (trace: XTraceItem list)
+        : XTraceItem list =
+        match xTrace.Terminal with
+        | None -> trace
+        | Some(terminalRef, terminalDigest) ->
+            match durable.Writer.BlobWriter.Read terminalRef with
+            | Error _ -> trace
+            | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest -> trace
+            | Ok terminalText when String.IsNullOrWhiteSpace terminalText -> trace
+            | Ok terminalText ->
+                let ordered = XTraceProjection.parts xTrace
+
+                let latestNaturalAssistant =
+                    ordered
+                    |> List.filter (fun part ->
+                        part.Role = "assistant"
+                        && (part.Kind = "text" || part.Kind = "reasoning"))
+                    |> List.tryLast
+
+                let alreadyCaptured =
+                    latestNaturalAssistant
+                    |> Option.exists (fun latest ->
+                        let latestGeneration = XTraceProjection.provenanceGeneration latest.Provenance
+
+                        ordered
+                        |> List.filter (fun part ->
+                            part.Role = "assistant"
+                            && part.Turn = latest.Turn
+                            && XTraceProjection.provenanceGeneration part.Provenance = latestGeneration
+                            && (part.Kind = "text" || part.Kind = "reasoning"))
+                        |> List.choose (tryReadPartBody durable)
+                        |> String.concat "\n\n"
+                        |> (=) terminalText)
+
+                if alreadyCaptured then
+                    trace
+                else
+                    trace
+                    @ [ { Cursor = { Sequence = XTraceProjection.head xTrace }
+                          Provenance = "terminal-projection-fallback"
+                          Role = "assistant"
+                          Part = SemanticText terminalText } ]
+
     /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
     let private framesOverlappingRange (range: MagicTodoLwr.BoundedRange) (frames: BlogFrame list) =
         frames
@@ -82,7 +139,7 @@ module LifecycleWorkRecordProjection =
 
             let frames = resolveFrames durable (BlogProjection.frames blog)
 
-            let trace = resolveTrace durable xTrace
+            let trace = resolveTrace durable xTrace |> withTerminalFallback durable xTrace
 
             match xTrace.Opening with
             | None -> None

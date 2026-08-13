@@ -61,14 +61,14 @@ description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world thr
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
-#   maxJournalEvents — EventStore envelope count; the unique causal flow snapshots at 511 and
-#                      teardown may land three already-in-flight durable commits, so 514 is the
-#                      full Host lifetime ceiling.
+#   maxJournalEvents — EventStore envelope count; the dedicated Magic Todo process-review
+#                      verdict/terminal adds three durable facts to the previously calibrated
+#                      legal path, making 623 the full Host lifetime ceiling.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat; K2 + real Host title loops calibrate
 #                      the legal transport lifetime to an observed upper bound of 2560.
 #                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 620, maxSseEvents = 2900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 650, maxSseEvents = 2900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -414,6 +414,21 @@ user = "# The account is not yet ready to entrust."
 
   [[turn.step]]
   respond = { type = "text", text = "Blind plan obligations recorded." }
+
+# Dedicated Magic Todo process reviewer for the first accepted obligation account.
+# Hidden reviewer is not part of the main flow; strict mock still declares its
+# real verdict + terminal text so the process review can conclude durably.
+[[turn]]
+id = "manager-process-review"
+internal = true
+user = "You are reviewing the ongoing quality and truthfulness of a work process."
+tools = ["judge"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Process review confirms the long-stroke obligation account." }
 
 [[turn]]
 id = "manager"

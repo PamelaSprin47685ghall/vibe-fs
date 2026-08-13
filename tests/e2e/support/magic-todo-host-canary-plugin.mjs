@@ -76,11 +76,10 @@ const argsCarryObligations = (args) =>
     && typeof row.work === 'string'
     && legacyProviderFields.every((field) => !hasOwn(row, field)));
 
-const argsAreV1Compatibility = (args) =>
-  !hasOwn(args, 'obligations')
-  && Array.isArray(args?.todos)
-  && args.todos.length > 0
-  && args.todos.every((row) =>
+const todosAreV1Compatibility = (todos) =>
+  Array.isArray(todos)
+  && todos.length > 0
+  && todos.every((row) =>
     row
     && typeof row === 'object'
     && typeof row.content === 'string'
@@ -88,6 +87,11 @@ const argsAreV1Compatibility = (args) =>
     && typeof row.priority === 'string'
     && !hasOwn(row, 'id')
     && !hasOwn(row, 'kind'));
+
+const argsCarryCompatibilityView = (args) =>
+  argsCarryObligations(args)
+  && todosAreV1Compatibility(args?.todos)
+  && Object.prototype.propertyIsEnumerable.call(args, 'todos') === false;
 
 const taggedValue = (value) =>
   Array.isArray(value) && value.length >= 2 ? value.at(-1) : value;
@@ -416,11 +420,19 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!argsCarryObligations(before.preBeforeArgs)) {
     throw new Error('HOST_CANARY_A: pre-before args must carry only provider obligations{name,work}');
   }
-  if (!argsAreV1Compatibility(before.postBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: post-before args must be the Host V1 compatibility sink');
+  if (
+    !argsCarryObligations(before.postBeforeArgs)
+    || !todosAreV1Compatibility(before.postBeforeTodos)
+    || before.compatibilityViewIsHidden !== true
+  ) {
+    throw new Error('HOST_CANARY_A: post-before must preserve provider obligations and expose the non-enumerable Host V1 compatibility view');
   }
-  if (!argsAreV1Compatibility(after.executorArgs)) {
-    throw new Error('HOST_CANARY_A: executor args must stay on the V1 compatibility sink');
+  if (
+    !argsCarryObligations(after.executorArgs)
+    || !todosAreV1Compatibility(after.executorTodos)
+    || after.executorCompatibilityViewIsHidden !== true
+  ) {
+    throw new Error('HOST_CANARY_A: executor must receive provider obligations plus the non-enumerable V1 compatibility view');
   }
   if (before.durableInput == null) {
     throw new Error('HOST_CANARY_A: durable ToolPart.input missing during before');
@@ -507,7 +519,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
     canaries: {
       A: {
         durableInputEqualsPreBefore: before.durableInputEqualsPreBefore,
-        executorV1: argsAreV1Compatibility(after.executorArgs),
+        executorV1: todosAreV1Compatibility(after.executorTodos),
         preBeforeObligations: argsCarryObligations(before.preBeforeArgs),
       },
       E: {
@@ -615,13 +627,15 @@ export default {
           callID,
           preBeforeArgs,
           postBeforeArgs: structuredClone(args),
+          postBeforeTodos: structuredClone(args?.todos ?? null),
+          compatibilityViewIsHidden: argsCarryCompatibilityView(args),
           argsIdentityUnchanged: hookOutput?.args === argsRef,
           locatePre,
           locatePost,
           durableInput,
           durableInputEqualsPreBefore: deepStable(durableInput) === deepStable(preBeforeArgs),
           preBeforeCarriesObligations: argsCarryObligations(preBeforeArgs),
-          postBeforeIsV1: argsAreV1Compatibility(args),
+          postBeforeIsV1: argsCarryCompatibilityView(args),
           snapshotError,
           observedAt: Date.now(),
         };
@@ -662,6 +676,8 @@ export default {
           originalTitle,
           enrichedOutput: hookOutput?.output ?? null,
           executorArgs: structuredClone(hookInput.args),
+          executorTodos: structuredClone(hookInput.args?.todos ?? null),
+          executorCompatibilityViewIsHidden: argsCarryCompatibilityView(hookInput.args),
           locateDuringAfter,
           toolPartStatusDuringAfter: locateDuringAfter?.match?.status ?? null,
           durableCompletedDuringAfter: locateDuringAfter?.match?.status === 'completed',

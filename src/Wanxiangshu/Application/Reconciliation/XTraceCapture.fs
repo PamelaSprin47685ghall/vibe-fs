@@ -94,65 +94,6 @@ module XTraceCapture =
                        ProviderRun = None |}
                 |> appendFact durable sessionId None
 
-    /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
-    /// Provenance must carry the reanchor generation or post-compaction turns
-    /// collide with pre-compaction `turn:0/part:0` and never append — RecordCoverage
-    /// then maps a Host cursor onto a dead numbering and stages Next≤Prev.
-    let private captureGeneration (journal: AgentJournal) (sessionId: SessionId) : int =
-        AgentJournal.snapshot journal
-        |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
-        |> Option.bind (fun session -> session.PrefixEpoch)
-        |> Option.map (fun epoch -> Set.count epoch.ReanchoredRuns)
-        |> Option.defaultValue 0
-
-    /// A completed turn can be consumed before the ordinary transform/capture path
-    /// sees its final assistant text (NeedHelp, reviewer, oneshot, sync delegate).
-    /// LWR Recent work is XTrace-part based, so TerminalOutputCaptured alone is not
-    /// sufficient. Add one fallback assistant part only when this ProviderRun has
-    /// no natural-language part already, preserving idempotency and avoiding a
-    /// duplicate when normal capture won the race.
-    let private ensureTerminalRecentWork
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (textRef: BlobRef)
-        (textDigest: BlobDigest)
-        =
-        let existing = xTraceOf journal sessionId
-
-        let naturalLanguageAlreadyCaptured =
-            existing.Parts
-            |> List.exists (fun part ->
-                part.ProviderRun = Some providerRun
-                && part.Role = "assistant"
-                && (part.Kind = "text" || part.Kind = "reasoning"))
-
-        if not naturalLanguageAlreadyCaptured then
-            let generation = captureGeneration journal sessionId
-            let provenance = sprintf "g:%d/terminal:%s" generation (ProviderRunIdentity.value providerRun)
-            let cursor = XTraceProjection.headSequence existing + 1L
-
-            let turn =
-                match existing.Parts with
-                | latest :: _ -> latest.Turn + 1
-                | [] -> 0
-
-            CompanionFact.XTracePartAppended
-                {| SessionId = sessionId
-                   CursorSequence = cursor
-                   Role = "assistant"
-                   Turn = turn
-                   PartIndex = 0
-                   Kind = "text"
-                   ToolName = None
-                   TextRef = textRef
-                   TextDigest = textDigest
-                   Provenance = provenance
-                   ProviderRun = Some providerRun
-                   ToolCallId = None
-                   HostToolPartId = None |}
-            |> appendFact journal sessionId (Some providerRun)
-
     /// COMPANION-003 / EXEC-009: capture terminal text into XTrace.
     /// Same durability as `captureTerminal`; used when the caller already holds
     /// `AgentRunResult.TerminalText` (e.g. oneshot Completed before journal write).
@@ -169,31 +110,25 @@ module XTraceCapture =
             if not (String.IsNullOrWhiteSpace text) then
                 let existing = xTraceOf durable sessionId
 
-                let terminalBlob =
-                    match existing.Terminal with
-                    | Some(textRef, digest) when HostDigest.sha256Hex text = BlobDigest.value digest ->
-                        Some(textRef, digest)
-                    | _ ->
-                        match durable.WriteBlob text with
-                        | Error error ->
-                            // PERSIST-003: the terminal segment is non-retryable (the
-                            // final output never passes a transform again), so a blob
-                            // it cannot prove committed must fail closed rather than
-                            // silently produce an LWR missing its completed-turn evidence.
-                            raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
-                        | Ok blob ->
-                            CompanionFact.TerminalOutputCaptured
-                                {| SessionId = sessionId
-                                   TextRef = blob.BlobRef
-                                   TextDigest = blob.BlobDigest
-                                   ProviderRun = providerRun |}
-                            |> appendFact durable sessionId (Some providerRun)
+                let isReplay =
+                    existing.Terminal
+                    |> Option.exists (fun (_, digest) -> HostDigest.sha256Hex text = BlobDigest.value digest)
 
-                            Some(blob.BlobRef, blob.BlobDigest)
-
-                terminalBlob
-                |> Option.iter (fun (textRef, textDigest) ->
-                    ensureTerminalRecentWork durable sessionId providerRun textRef textDigest)
+                if not isReplay then
+                    match durable.WriteBlob text with
+                    | Error error ->
+                        // PERSIST-003: the terminal segment is non-retryable (the
+                        // final output never passes a transform again), so a blob
+                        // it cannot prove committed must fail closed rather than
+                        // silently produce an LWR missing its Final output.
+                        raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
+                    | Ok blob ->
+                        CompanionFact.TerminalOutputCaptured
+                            {| SessionId = sessionId
+                               TextRef = blob.BlobRef
+                               TextDigest = blob.BlobDigest
+                               ProviderRun = providerRun |}
+                        |> appendFact durable sessionId (Some providerRun)
 
     /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
     /// XTrace's last segment. Idempotent replay (same text) is a no-op;
@@ -206,6 +141,17 @@ module XTraceCapture =
         // AgentRunResult.TerminalText.
         let text = CompletedTurnClassifier.partsSessionText turn.Parts
         captureTerminalText journal turn.SessionId text turn.ProviderRun
+
+    /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
+    /// Provenance must carry the reanchor generation or post-compaction turns
+    /// collide with pre-compaction `turn:0/part:0` and never append — RecordCoverage
+    /// then maps a Host cursor onto a dead numbering and stages Next≤Prev.
+    let private captureGeneration (journal: AgentJournal) (sessionId: SessionId) : int =
+        AgentJournal.snapshot journal
+        |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.PrefixEpoch)
+        |> Option.map (fun epoch -> Set.count epoch.ReanchoredRuns)
+        |> Option.defaultValue 0
 
     /// COMPANION-003 / COMPANION-007: synchronise the XTrace with the provider's
     /// semantic projection at the transform boundary.

@@ -254,6 +254,38 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
 })
 
 
+test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', () => {
+  withJournal((journal) => {
+    xTraceCapture.captureOpening(journal, SEM, 'consult independently', [])
+    const before = xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
+    )
+    const beforeCount = listItems(before.Parts).length
+
+    const terminal = 'Independent NEEDHELP perspective: preserve the original charge.'
+    xTraceCapture.captureTerminalText(journal, SEM, terminal, providerRun('msg_terminal_only'))
+
+    const after = xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
+    )
+    assert.equal(
+      listItems(after.Parts).length,
+      beforeCount,
+      'terminal fallback is a read-time LWR projection, not a durable XTracePartAppended',
+    )
+
+    const record = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    assert.equal(typeof record, 'string')
+    assert.match(record, /Recent work/)
+    assert.match(record, /Independent NEEDHELP perspective/)
+    assert.equal(record.includes('Opening\nconsult independently'), false)
+  })
+})
+
 test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', () => {
   withJournal((journal) => {
     xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
