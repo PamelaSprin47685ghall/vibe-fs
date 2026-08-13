@@ -115,7 +115,7 @@ Manager 看到 REVISE 后，用后续 `todowrite` 写出新的完整 account；�
 
 禁止恢复旧 `settled/proposed/semanticMerge` 三态、status min-merge、reviewer 决定 Current 的写权或「preview 尚未生效」文案。`BaseObligations` 只用于 replay identity 与 reviewer 对照，不是待恢复的旧 current。
 
-Tool result 可呈现上一 ConsumableReview 的 verdict + canonical ProcessReviewLWR，并呈现本次 accepted 后的 CurrentObligations；不得声称 reviewer 批准后才生效。
+Provider result 遵循 GrandRewrite 的自然 surface：普通 accepted 成功只需 `# Keep working.`（或等价空成功）；上一 ConsumableReview=PERFECT 静默；上一 ConsumableReview=REVISE 才返回 `# An earlier account of the work left something unresolved.` + canonical ProcessReviewLWR。不得回显 `settled/proposed/preview/status` DTO，也不得声称 reviewer 批准后 account 才生效。T1 额外包裹 TODO-015 revelation。
 
 ## TODO-006：评审节拍与 ConsumableReview
 

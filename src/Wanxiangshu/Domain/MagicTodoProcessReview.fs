@@ -36,9 +36,9 @@ module MagicTodoProcessReview =
               req.OpeningRaw
               "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
               req.ManagerCheckpointLwr
-              "=== OLD TODO LIST (Ck) ==="
+              "=== PRIOR CURRENT OBLIGATIONS ==="
               MagicTodoSurface.renderObligationListWire req.OldTodo
-              "=== PROPOSED TODO LIST (Pk) ==="
+              "=== ACCEPTED OBLIGATION ACCOUNT UNDER REVIEW ==="
               MagicTodoSurface.renderObligationListWire req.ProposedTodo ]
 
     /// ensureReview obligation predicate (HOST-021 / TODO-006):

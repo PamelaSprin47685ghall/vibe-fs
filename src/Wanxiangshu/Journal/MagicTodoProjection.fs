@@ -9,9 +9,8 @@ open Wanxiangshu.Kernel.Identity
 /// MagicTodoProjection — canonical todo list + lag-1 obligations from facts.
 ///
 /// Protocol SSOT #3. No TodoStage / HasPendingReview bool: pending review is
-/// `Accepted exists ∧ matching Concluded missing`. Settlement applies only when
-/// ConsumableReview (TodoReviewConcluded) is consumed by the next prepare /
-/// suicide drain.
+/// `Accepted exists ∧ matching Concluded missing`. Accepted immediately owns
+/// CurrentObligations; Concluded only closes the lag-1 review obligation.
 module MagicTodoProjection =
 
     type CheckpointRecord =
@@ -143,14 +142,6 @@ module MagicTodoProjection =
     /// Desired lag-1 cutoff from Accepted chain (no Requested fact).
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
         MagicTodo.desiredLag1Cutoff life.AcceptedOrder
-
-    let materializeCurrentObligations
-        (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
-        (life: LifeMagicTodoState)
-        : MagicTodoList =
-        match life.CurrentObligationsRef with
-        | Some(blobRef, digest) -> decodeList blobRef digest
-        | None -> []
 
     let foldPrepared
         (preparedFactRef: EventId)

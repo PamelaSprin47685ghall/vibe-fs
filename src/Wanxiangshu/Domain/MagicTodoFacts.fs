@@ -32,7 +32,7 @@ module MagicTodoFacts =
             BaseTodoDigest: BlobDigest
             ProposedTodoRef: BlobRef
             ProposedTodoDigest: BlobDigest
-            /// Digest of the tagged provider arguments before normalization.
+            /// Digest of canonical `{obligations:[{name,work}]}` provider arguments.
             ProviderInputDigest: string
             /// Exclusive frontier immediately before this tool-call in the Life.
             ReviewFrontier: XTraceCursor
@@ -78,6 +78,9 @@ module MagicTodoFacts =
           Verdict: ProcessReviewVerdict
           WorkRecordRef: BlobRef
           WorkRecordDigest: BlobDigest
+          /// Legacy persisted-wire compatibility echo. New v2 writers copy the
+          /// reviewed checkpoint's ProposedTodo locator here; projection ignores
+          /// these fields as CurrentObligations writers (TODO-005).
           SettledTodoRef: BlobRef
           SettledTodoDigest: BlobDigest
           ReviewerRecordFrontier: XTraceCursor
