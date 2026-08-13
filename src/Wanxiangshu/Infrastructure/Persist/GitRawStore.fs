@@ -389,7 +389,7 @@ module GitRawStore =
             match store.ReadTree dirOid with
             | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" prefix))
             | Some entries ->
-                let rec loop remaining =
+                let rec loop (remaining: TreeEntry list) =
                     match remaining with
                     | [] -> Ok()
                     | entry :: rest ->
@@ -414,7 +414,7 @@ module GitRawStore =
         | Some rootEntries ->
             match
                 rootEntries
-                |> List.tryFind (fun e -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
+                |> List.tryFind (fun (e: TreeEntry) -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
             with
             | None -> Ok []
             | Some eventsEntry ->
@@ -438,8 +438,7 @@ module GitRawStore =
                 | [] -> Ok(List.rev acc)
                 | (path, oid) :: tail ->
                     match store.ReadObject oid with
-                    | None ->
-                        Error(StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path))
+                    | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path))
                     | Some bytes ->
                         match CanonicalEventCodec.tryDecodeUtf8 bytes with
                         | Error err -> Error err
