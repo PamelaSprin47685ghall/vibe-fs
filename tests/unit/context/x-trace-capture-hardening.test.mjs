@@ -92,7 +92,7 @@ test('COMPANION_007_capture_projection_appends_only_new_turns', () => {
         ],
       }),
     )
-    const parts = listItems(second.Parts)
+    const parts = listItems(second.Parts).reverse()
     assert.equal(parts.length, 2)
     assert.deepEqual(
       parts.map((part) => part.Provenance),
@@ -124,7 +124,7 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
     // 幂等检查依赖 recorded 集合与持久化 provenance 同命名空间：
     // 若 fold 重写 provenance（如曾按 ProviderRun 生成 "transform"），
     // 二次捕获会全部重 append——此处断言持久化值即 writer 传入值。
-    const parts = listItems(updated.Parts)
+    const parts = listItems(updated.Parts).reverse()
     assert.deepEqual(
       parts.map((part) => part.Provenance),
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
@@ -152,7 +152,7 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
     )
     assert.equal(listItems(first.Parts).length, 2)
     assert.deepEqual(
-      listItems(first.Parts).map((part) => part.Provenance),
+      listItems(first.Parts).reverse().map((part) => part.Provenance),
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
     )
 
@@ -180,7 +180,7 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
         ],
       }),
     )
-    const parts = listItems(second.Parts)
+    const parts = listItems(second.Parts).reverse()
     assert.equal(parts.length, 4, 'reanchor generation must append, not collide')
     assert.deepEqual(
       parts.map((part) => part.Provenance),

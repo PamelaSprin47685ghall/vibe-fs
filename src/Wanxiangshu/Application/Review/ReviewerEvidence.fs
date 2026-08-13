@@ -107,7 +107,7 @@ module ReviewerEvidence =
     let classifyNeed journal reviewerKey =
         let reviewerId = SessionId.create reviewerKey
 
-        let processReviewPending =
+        let processReviewEvidence =
             match journal with
             | None -> None
             | Some durable ->
@@ -115,7 +115,7 @@ module ReviewerEvidence =
                     reviewerId
                     (AgentJournal.snapshot durable).AgentProjections.MagicTodo
 
-        match processReviewPending, guard journal reviewerKey with
+        match processReviewEvidence, guard journal reviewerKey with
         | Some _, None -> Need.EnsureVerdictSubmitted
         | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttemptKeys ->
             Need.EnsureVerdictSubmitted

@@ -122,6 +122,7 @@ module EventStoreFold =
                     indegree.[id] <- indegree.[id] + 1
 
         let queued = HashSet<string>()
+        // DSL-MUTABLE: algorithm-scratch — Kahn frontier shrinks/grows within this pure fold call.
         let mutable ready = Set.empty<string>
 
         for KeyValue(id, deg) in indegree do

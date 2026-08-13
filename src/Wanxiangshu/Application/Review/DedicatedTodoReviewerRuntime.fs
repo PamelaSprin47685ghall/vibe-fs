@@ -15,7 +15,6 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Resources
 open Wanxiangshu.Review
-open Wanxiangshu.Process
 open Wanxiangshu.Session
 
 /// HOST-021 / TODO-006/008 / REVIEW-013..017: Host-owned dedicated process reviewer.
@@ -42,9 +41,8 @@ module DedicatedTodoReviewerRuntime =
     /// Assignment delivery is a local Journal fold, not reviewer runtime.
     let AssignmentHeadDeadlineMs = 2000
 
-    let private timerPort: ITimerPort = PtyTiming.nodeTimerPort ()
-
     let private waitHeadAdvanced
+        (timerPort: ITimerPort)
         (journal: AgentJournal)
         (reviewerSessionId: SessionId)
         (fromHead: int64)
@@ -212,6 +210,7 @@ module DedicatedTodoReviewerRuntime =
         |> Result.map ignore
 
     let ensureReview
+        (timerPort: ITimerPort)
         (sessions: ISessionHostPort)
         (snapshot: ISessionSnapshotPort option)
         (gitTree: GitTreePort option)
@@ -421,7 +420,7 @@ module DedicatedTodoReviewerRuntime =
                                                     | MagicTodoAfter.AssignmentDelivery.AwaitHead when beforeHead > 0L ->
                                                         Task.FromResult(Ok { Sequence = beforeHead })
                                                     | _ ->
-                                                        waitHeadAdvanced journal enlisted.ReviewerSessionId beforeHead
+                                                        waitHeadAdvanced timerPort journal enlisted.ReviewerSessionId beforeHead
 
                                                 match reviewWorkStart with
                                                 | Error reason -> return Error reason
@@ -445,6 +444,7 @@ module DedicatedTodoReviewerRuntime =
         }
 
     let awaitConsumableReview
+        (timerPort: ITimerPort)
         (sessions: ISessionHostPort)
         (snapshot: ISessionSnapshotPort option)
         (gitTree: GitTreePort option)
@@ -454,7 +454,7 @@ module DedicatedTodoReviewerRuntime =
         (writeId: TodoWriteId)
         : Task<Result<unit, string>> =
         task {
-            match! ensureReview sessions snapshot gitTree journal managerSessionId lifeId writeId with
+            match! ensureReview timerPort sessions snapshot gitTree journal managerSessionId lifeId writeId with
             | Error reason -> return Error reason
             | Ok() ->
                 match TodoProcessReviewProgram.tryConclude journal lifeId writeId with
@@ -467,9 +467,10 @@ module DedicatedTodoReviewerRuntime =
         }
 
     let port
+        (timerPort: ITimerPort)
         (sessions: ISessionHostPort)
         (snapshot: ISessionSnapshotPort option)
         (gitTree: GitTreePort option)
         : ProcessReviewPort =
-        { EnsureReview = ensureReview sessions snapshot gitTree
-          AwaitConsumableReview = awaitConsumableReview sessions snapshot gitTree }
+        { EnsureReview = ensureReview timerPort sessions snapshot gitTree
+          AwaitConsumableReview = awaitConsumableReview timerPort sessions snapshot gitTree }

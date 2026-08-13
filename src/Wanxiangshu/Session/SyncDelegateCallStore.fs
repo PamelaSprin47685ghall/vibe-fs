@@ -17,6 +17,7 @@ type internal SyncDelegateCall =
       Answer: TaskCompletionSource<Result<string, string>> }
 
 /// A single caller's pending invocation to a sync delegate.
+/// DSL-state-combination: physical — StartCursor is a process-local resource coordinate fixed after the delegate session exists.
 and internal SyncDelegateInvocation =
     { Owner: SessionId
       OwnerScope: ReuseScopeId

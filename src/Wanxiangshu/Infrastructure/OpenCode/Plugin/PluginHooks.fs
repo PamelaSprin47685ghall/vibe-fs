@@ -13,6 +13,7 @@ open Wanxiangshu.Infrastructure
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
 open Wanxiangshu.Session
 open PluginHostInterop
 
@@ -53,7 +54,7 @@ module PluginHooks =
                 MagicTodoHostHooks.create
                     journal
                     snapshotOpt
-                    (Some(DedicatedTodoReviewerRuntime.port sessionPort snapshotOpt gitTreePort))
+                    (Some(DedicatedTodoReviewerRuntime.port (PtyTiming.nodeTimerPort ()) sessionPort snapshotOpt gitTreePort))
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput
