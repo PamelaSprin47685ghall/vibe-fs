@@ -87,7 +87,7 @@ LLM-visible join：**禁止** `status` / `count` / `ordinal` / `kind` / `agent` 
 |------|----------|
 | `commission` | Orchestrator：`calling?` + `name` + `charge`；新路或按 Byname 续做；成功仅 `# <Byname> has taken your charge.`；禁止 `job_id` / worktree / `reused`（EXEC-029） |
 | `fork` | Manager：使命内 witness；Byname 承接；禁止 agent_id / role / tier / worktree（EXEC-002） |
-| `horizon` | 在场名册（Byname / TerminalName）；自然语言；无 id / status（EXEC-005） |
+| `horizon` | pull-only：一次调用读取一次 journal snapshot；列在场 Byname / TerminalName，并对每个 parent-visible child 从同 snapshot 的 `BlogProjection.frames` 取最后一帧，读 blob + 校验 digest 后展示正文；无 frame / latest 不可读分别给自然语言后果。禁止轮询、timer、subscription、`AwaitChangeFrom`、旧 frame fallback；无 id / status（EXEC-005） |
 | `inspect` | SyncDelegate → Inspector；普通 completion → bounded WorkRecord（EXEC-031） |
 | `establish-behavior` / `repair-behavior` | SyncDelegate → Coder；同 WorkRecord 路径；无 `tdd` / `return` |
 | `judge` | Reviewer typed verdict enum；结果不 echo verdict |

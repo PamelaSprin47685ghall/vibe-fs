@@ -32,7 +32,7 @@ Provider 面只投影后果与 WorkRecord，不投影 `job_id`/`worktree`/`agent
 
 **Delegate tier：owner 确定性绑定 vs 每轮自选 Agent。** 拒模型每轮选 fast/deep：否则 `(OwnerReuseScopeId, role)` 无法对应唯一 dedicated Session，prefix/context 复用崩溃。`fast→fast`、`deep→deep`（EXEC-026）。Binding 属机器；Persona 不随 binding 变。
 
-**朝向工具：list DTO vs horizon。** 拒 `agent_id/session_id/status/...` 列表：那是调试面冒充世界。选自然语言「谁还在远方」。
+**朝向工具：list DTO / 后台监视 vs horizon。** 拒 `agent_id/session_id/status/...` 列表：那是调试面冒充世界。也拒 timer、轮询、订阅式后台监视：朝向是调用者需要时主动看的 measurement，不应制造隐藏观察流。选一次性自然语言 snapshot：「谁还在远方」+ 每个可见 subagent 最新一条 durable 工作记录；内部来源是最新 `BlogFrame`。最新记录不可读时不得退回旧记录冒充最新。
 
 **同步取证工具名：inspector vs inspect。** 拒名词工具：People=nouns，Tools=verbs；且与 office 名撞车会诱导「工具=角色」。
 

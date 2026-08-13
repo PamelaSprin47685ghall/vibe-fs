@@ -72,7 +72,10 @@ Inquiry / Coder / DevOps 的 dedicated `inspect` / `establish-behavior` / `repai
 
 ## EXEC-005：Horizon 语义
 
-`horizon()` 朝向当前在场名册（Byname / TerminalName 等）：谁还在远方、谁已归来、终端是否仍开。  
+`horizon()` 是 pull-only snapshot：调用者需要朝向时主动看一次；不得 timer 轮询、后台订阅、`AwaitChangeFrom` watcher 或自动刷新。每次调用只观察一个当前 journal snapshot。
+
+返回当前在场名册（Byname / TerminalName 等）：谁还在远方、谁已归来、终端是否仍开。对每个 parent-visible subagent，同时显示该 child session 在这个 snapshot 中最新一条 durable 工作记录；内部来源是最新 `BlogFrame`。若尚无 frame，以自然语言说明尚无工作记录。若最新 frame 的 blob 缺失或 digest 无效，不得退回更旧 frame 冒充“最新”，而应以自然语言说明最新工作记录当前不可读。Terminal 没有工作记录。
+
 不是可创建 Agent 菜单。无 `status` / `id` / `kind` / `ordinal` 等状态机词汇。
 
 ## EXEC-006：Child Run 生命周期

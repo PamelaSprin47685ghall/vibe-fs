@@ -24,7 +24,7 @@ Distiller child 的 durable handle = `HandleOwnership.HostOwnedHidden`（GLORY-0
 | 终端四动词 + `run` + `join` / `horizon` | DevOps | 删除 `fork-pty`；`run` ≠ Distiller office |
 | `inspect` / `establish-behavior` / `repair-behavior` | SyncDelegate callers | 见 EXEC-026/031；无独立 `return` |
 
-`horizon` 只读在场名册（Byname / TerminalName）；禁止 id / status DTO 穿过 provider（EXEC-005/030）。
+`horizon` 只读在场名册（Byname / TerminalName）+ 每个 parent-visible child session 最新 durable 工作记录（来源：最新 `BlogFrame` 正文）；handle 与 child `BlogProjection` 必须来自同一个 journal snapshot。它不拥有 watcher、timer、subscription 或 refresh loop；latest blob 缺失/digest 无效时 fail closed，不回退旧 frame。禁止 id / status DTO 穿过 provider（EXEC-005/030）。
 
 ## JoinAttempt 中断所有权
 

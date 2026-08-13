@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
@@ -43,6 +44,15 @@ module HorizonTool =
         [<Literal>]
         let CannotBeSeen = "tool/horizon/cannot-be-seen"
 
+        [<Literal>]
+        let LatestWork = "tool/horizon/latest-work"
+
+        [<Literal>]
+        let NoWorkYet = "tool/horizon/no-work-yet"
+
+        [<Literal>]
+        let LatestWorkUnavailable = "tool/horizon/latest-work-unavailable"
+
     let private lang (ctx: HostToolContext) =
         if String.IsNullOrWhiteSpace ctx.SessionId then
             ProviderLanguageBinding.readGlobalPreference ()
@@ -52,16 +62,18 @@ module HorizonTool =
     let private labeled language path label =
         ProviderProse.render language path (Map [ "label", label ])
 
+    let private labelForHandle language (handle: HandleRecord) =
+        if not (String.IsNullOrWhiteSpace handle.Byname) then
+            handle.Byname.Trim()
+        elif not (String.IsNullOrWhiteSpace handle.TargetAgent) then
+            match ManagedAgent.tryParse handle.TargetAgent with
+            | Some managed -> managed.Name
+            | None -> handle.TargetAgent.Trim()
+        else
+            ProviderProse.render language Path.Someone Map.empty
+
     let private lineForHandle language (handle: HandleRecord) (runtimeRecord: AgentRecord option) : string =
-        let label =
-            if not (String.IsNullOrWhiteSpace handle.Byname) then
-                handle.Byname.Trim()
-            elif not (String.IsNullOrWhiteSpace handle.TargetAgent) then
-                match ManagedAgent.tryParse handle.TargetAgent with
-                | Some managed -> managed.Name
-                | None -> handle.TargetAgent.Trim()
-            else
-                ProviderProse.render language Path.Someone Map.empty
+        let label = labelForHandle language handle
 
         match handle.Lifecycle with
         | HandleLifecycle.CompletedAwaitingJoin _ -> labeled language Path.Returned label
@@ -71,6 +83,27 @@ module HorizonTool =
             | _ -> labeled language Path.StillAway label
         | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> labeled language Path.DidNotReturn label
+
+    let private workRecordForHandle
+        language
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (handle: HandleRecord)
+        : string =
+        let label = labelForHandle language handle
+
+        let latestFrame =
+            AgentProjection.tryFind handle.ChildSessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.Blog)
+            |> Option.bind (BlogProjection.frames >> List.tryLast)
+
+        match latestFrame with
+        | None -> labeled language Path.NoWorkYet label
+        | Some frame ->
+            match journal.Writer.BlobWriter.Read frame.TextRef with
+            | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
+                ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ])
+            | _ -> labeled language Path.LatestWorkUnavailable label
 
     let private lineForPty language (record: PtyRecord) : string =
         let label =
@@ -95,21 +128,27 @@ module HorizonTool =
                 | Error _ -> return unavailable language Path.CannotBeSeen
                 | Ok runtime ->
                     let agents, ptys = runtime.List()
+                    let snapshot = AgentJournal.snapshot journal
+                    let parentSessionId = SessionId.create context.SessionId
 
                     let durableHandles =
-                        AgentJournal.handleProjection journal (SessionId.create context.SessionId)
+                        AgentProjection.tryFind parentSessionId snapshot.AgentProjections
+                        |> Option.bind (fun session -> session.Handles)
+                        |> Option.defaultValue HandleProjection.empty
 
                     let runtimeByAgentId =
                         agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
 
                     let agentLines =
                         HandleProjection.listable durableHandles
-                        |> List.choose (fun handle ->
+                        |> List.collect (fun handle ->
                             match HandleId.tryAgent handle.Handle with
                             | Some handleId ->
                                 let agentId = AgentHandleId.value handleId
-                                Some(lineForHandle language handle (Map.tryFind agentId runtimeByAgentId))
-                            | None -> None)
+
+                                [ lineForHandle language handle (Map.tryFind agentId runtimeByAgentId)
+                                  workRecordForHandle language journal snapshot handle ]
+                            | None -> [])
 
                     let ptyLines =
                         ptys
