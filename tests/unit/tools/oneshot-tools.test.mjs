@@ -19,6 +19,7 @@ import {
   resultOf,
   sessionId,
   lifecycleWorkRecordProjection,
+  xTraceCapture,
 } from '../support/domain.mjs'
 
 const { HostToolContext, ToolHostCodec_digest: digest } = await import(
@@ -171,8 +172,6 @@ const SAMPLE_LWR = [
   'historic frame content',
   'Recent work',
   'gap content',
-  'Closing report',
-  'terminal body',
 ].join('\n')
 
 // ── early refusal (no spawn) ─────────────────────────────────────────────────
@@ -271,6 +270,18 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
   try {
     const pending = runOneShot(live.scope, context(), 'fast-coder', 'implement it')
     await waitForPrompt(sessions)
+    // Immediate openingEnd skips the first XTrace part (the user charge).
+    // The assistant answer must be a later part or Recent work is empty.
+    xTraceCapture.captureProjection(
+      journal,
+      sessionId('child-1'),
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('implement it')] },
+          { role: 'assistant', parts: [xTraceCapture.text('the formal report')] },
+        ],
+      }),
+    )
     sessions.fireTerminal(completedTerminal('the formal report'))
 
     const settled = resultOf(await pending)
@@ -278,7 +289,9 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
     const outcome = settled.value
     assert.equal(outcome.Output, 'the formal report')
     assert.ok(outcome.WorkRecord, 'LWR must materialize from the journal')
-    assert.match(outcome.WorkRecord, /Closing report|Chronicle/)
+    assert.match(outcome.WorkRecord, /Recent work/)
+    assert.match(outcome.WorkRecord, /the formal report/)
+    assert.doesNotMatch(outcome.WorkRecord, /Closing report/)
     assert.doesNotMatch(outcome.WorkRecord, /# # /)
     assert.doesNotMatch(outcome.WorkRecord, /Opening task/)
     assert.doesNotMatch(outcome.WorkRecord, /Work log|Uncompressed tail|Final output/)

@@ -30,18 +30,18 @@ Y → 不再递归
 
 ```text
 WorkRecord(invocation) =
-    Opening
+    Opening?          // includeOpening 控制是否渲染
   + Chronicle
-  + Recent work
-  + Closing report
+  + Recent work       // 含最后一条助手文本
 ```
 
 | 段 | 含义 |
 |----|------|
 | Opening | 交托关闭前的完整语义区间（preserved XTrace；见 COMPANION-014） |
 | Chronicle | 已由 Y 沉淀的工作叙事 |
-| Recent work | Y 尚未覆盖、仍由 X 直接承担的最近工作（表示边界，非「对读者是否新近」） |
-| Closing report | 本次 invocation 的 terminal 正式陈述；散文 claim，非固定字段 schema |
+| Recent work | Y 尚未覆盖、仍由 X 直接承担的最近工作（表示边界，非「对读者是否新近」）；含本次 invocation 最后一条助手文本 |
+
+**删除**独立 `Closing report` 段。Terminal 是私有完成标记，不是 LWR 段。正式陈述 = Recent work 中最后一条助手文本（散文 claim，非固定字段 schema；ARCH-015）。
 
 ```text
 OpeningMaterial
@@ -53,11 +53,10 @@ OpeningBoundary
 
 LWR(X) = OpeningMaterial?
        + Chronicle（全部有效 Y frame）
-       + Recent work（RawGapFromX，未覆盖 suffix，经 LWR 投影）
-       + Closing report（TerminalOutputRaw）
+       + Recent work（RawGapFromX，未覆盖 suffix，经 LWR 投影；含最后一条助手文本）
 ```
 
-Opening 永不送 Y 压缩；Closing 不复经 transform。  
+Opening 永不送 Y 压缩。最后一条助手文本是普通 Recent work 段，可被后续 Y 覆盖。  
 删除 `OpeningPromptRaw = { AssignmentText; AuthoritativeRequirements }` 拼接重建。  
 LWR **硬禁止** raw tool call/result 与 call/result linkage（BlindPlan T1 commitment call/result 属 Opening constitutive material，见 COMPANION-014，不属 incidental tool）。  
 父 LWR 是 child 输入 context，**不**作 child Seed / Opening 复制。  
@@ -164,6 +163,7 @@ after Opening（WorkRecordStart）才进入 ordinary Chronicle / Recent / Y mach
 ```
 
 Sync 与 Async 只差等待时机，不差表示：`inspect` / `fork`+`join` 均物化同一 WorkRecord 协议。  
-SyncDelegate：每次 call 自有 `InvocationStartCursor..InvocationEndCursor`；reusable session memory 可留存，但 caller 只见当前 range；`includeOpening=false`（不回 charge echo）。
+SyncDelegate：每次 call 自有 `InvocationStartCursor..InvocationEndCursor`；reusable session memory 可留存，但 caller 只见当前 range；`includeOpening=false`（不回 charge echo）。  
+`inspect` 答案就是该 bounded WorkRecord 本身，不是额外 `answer` 字段；最后一条助手文本在 Recent work。
 
-Closing report = prose claim：约束诚实，不约束骨架。禁止 universal fixed report schema（`### Summary` / files/tests/…）。machine-semantic 结构只留协议真需处。
+WorkRecord 陈述 = prose claim：约束诚实，不约束骨架。禁止 universal fixed report schema（`### Summary` / files/tests/…）。machine-semantic 结构只留协议真需处。

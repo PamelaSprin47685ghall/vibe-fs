@@ -49,6 +49,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  xTraceCapture,
 } from '../support/domain.mjs'
 
 const SYNC_RETURN_COMPLETION = 'Sync delegate answer returned to caller.'
@@ -97,9 +98,12 @@ const openaiToolsFromDispatcher = (options) => {
     .map(([name]) => ({ type: 'function', function: { name } }))
 }
 
+let activeJournal
+
 const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
   const opened = agentJournal.create({ directory: base })
+  activeJournal = opened.journal
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
 
   const dispatcher = promptDispatcher.forJournal(opened.journal)
@@ -186,6 +190,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   )
 
   try {
+    const xtraceMessages = new Map()
     await fn({
       runtime,
       dispatcher,
@@ -194,6 +199,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
       captures,
       ready,
       appendAssistantFromReturn,
+      xtraceMessages,
     })
   } finally {
     disposeRuntime(runtime)
@@ -202,8 +208,16 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   }
 }
 
-const settlePendingInvoke = async (runtime, { appendAssistantFromReturn }, delegateKey, role, answer, runId) => {
+const settlePendingInvoke = async (runtime, { appendAssistantFromReturn, xtraceMessages }, delegateKey, role, answer, runId) => {
   appendAssistantFromReturn(delegateKey, answer)
+  const messages = xtraceMessages.get(delegateKey) ?? []
+  messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
+  xtraceMessages.set(delegateKey, messages)
+  xTraceCapture.captureProjection(
+    activeJournal,
+    sessionId(delegateKey),
+    xTraceCapture.semantic({ messages }),
+  )
   const handled = await handleTurn(
     runtime,
     new ReconciledTurn(

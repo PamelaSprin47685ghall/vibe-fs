@@ -75,7 +75,7 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 
 ## Join / WorkRecord wire（与 ARCH-010）
 
-LLM-visible join：**禁止** `status` / `count` / `ordinal` / `kind` / `agent` / `code` / `message` 等通用 DTO。后果用自然语言 + entry-local WorkRecord / LWR（`includeOpening=false`）；禁止字段式 `work_record` DTO。agent 完成项前 entry-local LWR 注释（四标题见 GLORY-025）。详见 synthetic-toml 与 EXEC-004。
+LLM-visible join：**禁止** `status` / `count` / `ordinal` / `kind` / `agent` / `code` / `message` 等通用 DTO。后果用自然语言 + entry-local WorkRecord / LWR（`includeOpening=false`）；禁止字段式 `work_record` DTO。agent 完成项前 entry-local LWR 注释（三标题见 GLORY-025）。详见 synthetic-toml 与 EXEC-004。
 
 中断 wire（EXEC-017）：本地 operator abort / user message / DevOps deadline 均以自然语言后果表达；`interrupted` 不是 `ForkError` / `failed` / `aborted`。DevOps 超时走 `JoinInterruptReason.DeadlineExpired`（自然语言），不走 `ForkError.TimedOut` DTO。
 
@@ -136,7 +136,7 @@ return project workRecord to caller
 ```text
 ordinary Assistant completion
 → Host 物化 bounded WorkRecord（当前 invocation range）
-→ caller 收到投影（答案在 Closing report，无额外 answer 字段）
+→ caller 收到投影（答案就是 bounded WorkRecord；最后一条助手文本在 Recent work；无额外 answer 字段）
 ```
 
 成功路径不 `AbortSession` / 不 dispose dedicated Session；abort 只保留给失败、取消与 ReuseScope

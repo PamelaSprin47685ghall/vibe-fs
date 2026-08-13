@@ -200,6 +200,16 @@ module ManagerLifeWorkflow =
                             journal
                         |> ignore
 
+                    // last_words must appear in the completed Life's LWR Recent
+                    // work as a normal assistant part (Closing report is gone).
+                    if not (String.IsNullOrWhiteSpace lastWords) then
+                        XTraceCapture.captureLastWords
+                            (Some journal)
+                            sessionId
+                            blob.BlobRef
+                            blob.BlobDigest
+                            providerRun
+
                     let authorityRoot =
                         PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
                         |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)

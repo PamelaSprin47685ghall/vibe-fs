@@ -77,17 +77,18 @@ XTrace.forWorkRecordRecent:
 Opening always raw：never Blogger / never Y / never prefix-replaced；survives compaction / reanchor / recovery。  
 after Opening（WorkRecordStart）→ ordinary Chronicle / Recent / Y machinery。
 
-### WorkRecord 四段
+### WorkRecord 三段
 
 ```text
 materializeLWR(range, includeOpening):
   Opening        = if includeOpening then OpeningMaterial else omit
   Chronicle      = effective Y frames in range（BlogEntryCommitted）
-  Recent work    = RawGapFromX（未覆盖 suffix；剔 raw tool）
-  Closing report = TerminalOutputRaw（prose claim；无 universal fixed schema）
-  headings       = Opening / Chronicle / Recent work / Closing report
+  Recent work    = RawGapFromX（未覆盖 suffix；剔 raw tool；含最后一条助手文本）
+  headings       = Opening / Chronicle / Recent work
+  // 无 Closing report。Terminal 是私有完成标记，不渲染。
   // 旧标题 Opening task / Work log / Uncompressed tail / Final output 已删、无 alias
   // # 仅由 SyntheticToml.comment 在 wire 注入
+  // inspect 答案 = bounded record 本身
 ```
 
 禁止第二套 work-record renderer（TODO-008）。process / Finality 一律 request-range bounded。

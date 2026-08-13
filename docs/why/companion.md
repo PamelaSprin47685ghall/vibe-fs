@@ -6,7 +6,7 @@ LWR 自包含跨 Session hand-off；父 LWR 不作 child Seed，防止多代 for
 
 RecordCoverage 与 PrefixCoverage 分型，避免「Y 还没覆盖完就声称可替换 X 前缀」。同 epoch 前缀字节稳定，是 KV-cache 与 ReviewSeal 的共同前提；epoch 切换必须由已提交事实驱动，不能由 token 估算驱动。
 
-Universal WorkRecord 四段 `Opening / Chronicle / Recent work / Closing report` 是跨边界唯一通信语言。Opening = 交托关闭前的语义区间（preserved XTrace），不是可重拼 blob；Closing report = 散文 claim，不是固定 schema。
+Universal WorkRecord 三段 `Opening? / Chronicle / Recent work` 是跨边界唯一通信语言。Opening = 交托关闭前的语义区间（preserved XTrace），不是可重拼 blob。正式陈述 = Recent work 中最后一条助手文本（散文 claim，不是固定 schema；无独立 Closing report 段）。
 
 ## 备选与被拒
 
@@ -24,6 +24,6 @@ Universal WorkRecord 四段 `Opening / Chronicle / Recent work / Closing report`
 
 **Opening 压缩：永不压缩 vs 纳入 Blogger/Y/prefix-replace。** 拒压缩：旅程可缩短，章程不可缩短。Opening always raw；Blogger/Y 只从 `WorkRecordStart`（Opening exclusive end）起算。
 
-**WorkRecord 标题：`Opening / Chronicle / Recent work / Closing report` vs `Opening task / Work log / Uncompressed tail / Final output`。** 拒旧标题：把压缩边界说成「未压缩尾巴」、把 claim 说成「Final output」，诱导实现者再造固定报告 DTO。Chronicle/Recent = 表示边界（Y coverage），不是「对读者是否新近」。
+**WorkRecord 标题：`Opening / Chronicle / Recent work` vs `Opening task / Work log / Uncompressed tail / Final output` 与已删 `Closing report`。** 拒旧标题：把压缩边界说成「未压缩尾巴」、把 claim 说成「Final output」，诱导实现者再造固定报告 DTO。拒第四段 Closing：答案已是 Recent work 最后一条助手文本；独立 Closing 是第二通道。Chronicle/Recent = 表示边界（Y coverage），不是「对读者是否新近」。
 
-**Closing report：散文 vs 固定字段 schema。** 拒 universal schema（result/files/tests/risks/blockers）：约束诚实，不约束骨架。角色可自然提及事实；不得把提及义务写成格式。machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`）。
+**陈述：散文 vs 固定字段 schema。** 拒 universal schema（result/files/tests/risks/blockers）：约束诚实，不约束骨架。角色可自然提及事实；不得把提及义务写成格式。machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`）。

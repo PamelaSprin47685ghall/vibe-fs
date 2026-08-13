@@ -33,7 +33,7 @@ Manager BlindPlan：Pre-T1 = Planning Table（替他人规划）；第一次 acc
 拒 Host 表当 canonical：无稳定 id、整表 DELETE+INSERT、无法承载 reviewing/merge（TODO-007）。sink 可显示 working Pk，但 REVISE 消费后必须 reconcile；repair 不作 checkpoint。
 
 **证据：bounded LWR + coverage 分型 vs 纯 Y / session head / 第二 renderer。**  
-拒纯 Y：frontier 前合法 RawGap 会丢证据。拒 session head：串台历史污染单次 Rk/Finality。拒第二 renderer：双源漂移（TODO-008）。Prefix 只认 PrefixCoverage 可证 Y；LWR 只认 RecordCoverage。四段标题固定为 `Opening / Chronicle / Recent work / Closing report`；Closing = prose claim，拒固定报告 schema。
+拒纯 Y：frontier 前合法 RawGap 会丢证据。拒 session head：串台历史污染单次 Rk/Finality。拒第二 renderer：双源漂移（TODO-008）。Prefix 只认 PrefixCoverage 可证 Y；LWR 只认 RecordCoverage。三段标题固定为 `Opening / Chronicle / Recent work`；正式陈述 = Recent work 最后一条助手文本（散文 claim），拒固定报告 schema 与独立 Closing 段。
 
 **Dedicated：首次 enlist + ordinary graduate + process 留到 LifeCompleted vs 永不 graduate / 每轮强制回流。**  
 拒永不 graduate 特例：破坏既有 Finality 毕业语义。拒 Blessing 即释放 process session：后续 checkpoint/二次 suicide 无人可审（TODO-008/010）。process PERFECT 不计 terminal dual-PERFECT。

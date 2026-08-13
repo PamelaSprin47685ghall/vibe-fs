@@ -59,10 +59,27 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
+let activeJournal
+const transcripts = new Map()
+
+const captureLastAssistant = (delegateKey, answer) => {
+  const key = String(delegateKey)
+  const messages = transcripts.get(key) ?? []
+  messages.push({ role: 'assistant', parts: [xTraceCapture.text(answer)] })
+  transcripts.set(key, messages)
+  xTraceCapture.captureProjection(
+    activeJournal,
+    sessionId(delegateKey),
+    xTraceCapture.semantic({ messages }),
+  )
+}
+
 const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  activeJournal = opened.journal
+  transcripts.clear()
 
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []
@@ -111,7 +128,7 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
     undefined,
     // EXEC-031: per-invocation bounded WorkRecord via the real journal
     // projector. Session-mechanics tests must assert the answer flows through
-    // the bounded record's Closing report — never re-encode partsText.
+    // Recent work as last assistant text — never re-encode partsText.
     project
       ? (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range)
       : undefined,
@@ -142,6 +159,7 @@ const waitFor = async (predicate, message, ms = 2000) => {
 }
 
 const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_return') => {
+  captureLastAssistant(delegateKey, answer)
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
@@ -162,7 +180,8 @@ test('EXEC_026_sync_delegate_concurrent_invokes_are_coalesced_into_single_prompt
     const secondDone = resultOf(await second)
     assert.equal(firstDone.ok, true, firstDone.error)
     assert.match(firstDone.value, /combined answer/)
-    assert.match(firstDone.value, /Closing report/)
+    assert.match(firstDone.value, /Recent work/)
+    assert.doesNotMatch(firstDone.value, /Closing report/)
     assert.equal(secondDone.ok, true, secondDone.error)
     assert.match(secondDone.value, /combined answer/)
   })
@@ -264,7 +283,8 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     const q1Done = resultOf(await q1)
     assert.equal(q1Done.ok, true, q1Done.error)
     assert.match(q1Done.value, /answer Q1/)
-    assert.match(q1Done.value, /Closing report/)
+    assert.match(q1Done.value, /Recent work/)
+    assert.doesNotMatch(q1Done.value, /Closing report/)
 
     const q2 = invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q2')
     await waitFor(() => prompts.length === 2, 'Q2 send missing')
@@ -274,8 +294,7 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     assert.equal(prompts[1].session, delegateId)
     assert.equal(prompts[1].text, 'Q2')
 
-    const handled = await handleTurn(runtime, completionTurn(delegateId, inspector, answers[1], 'asst_q2'), undefined)
-    assert.equal(handled, true)
+    await settlePendingInvoke(runtime, delegateId, inspector, answers[1], 'asst_q2')
     const q2Done = resultOf(await q2)
     assert.equal(q2Done.ok, true, q2Done.error)
     assert.match(q2Done.value, /answer Q2/)
@@ -376,7 +395,7 @@ test('G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () =
 // EXEC-031: a Completed turn without a bounded WorkRecord fails closed — the
 // last-message fallback must not count as success (residual OneShot analog).
 test('EXEC_031_completed_without_bounded_work_record_fails_closed', async () => {
-  await withHarness(async ({ runtime, createCalls }) => {
+  await withHarness(async ({ runtime, createCalls, prompts }) => {
     const owner = 'ses_owner_failclosed'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect without projector')
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
@@ -389,27 +408,17 @@ test('EXEC_031_completed_without_bounded_work_record_fails_closed', async () => 
   }, { project: false })
 })
 
-// EXEC-031: a Completed turn's success payload is the bounded WorkRecord, not the
-// raw last message. Recent work holds this invocation's XTrace parts, the answer
-// lives in the Closing report, and Opening is not echoed back (includeOpening=false).
-// The Chronicle heading (frames) is a render-level property owned by the domain
-// materialize/render tests; this SyncDelegate boundary proves the bounded slice
-// and the Closing report flow through the runtime.
-test('EXEC_031_bounded_work_record_answers_in_closing_report_not_raw_message', async () => {
-  await withHarness(async ({ runtime, createCalls, journal }) => {
+test('EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts, journal }) => {
     const owner = 'ses_owner_bounded'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect module')
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
     const delegateId = createCalls[0].child
 
     // Append this invocation's trace parts to the delegate session (Recent work).
-    xTraceCapture.captureProjection(
-      journal,
-      delegateId,
-      xTraceCapture.semantic({
-        messages: [{ role: 'assistant', parts: [xTraceCapture.text('inspector working body')] }],
-      }),
-    )
+    // captureProjection syncs a full semantic transcript; isolated single-message
+    // calls collide on g:0/turn:0/part:0 and drop later parts.
+    captureLastAssistant(delegateId, 'inspector working body')
 
     await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'formal inspector answer', 'asst_bounded')
     const done = resultOf(await pending)
@@ -417,9 +426,22 @@ test('EXEC_031_bounded_work_record_answers_in_closing_report_not_raw_message', a
 
     assert.match(done.value, /Recent work/)
     assert.match(done.value, /inspector working body/)
-    assert.match(done.value, /Closing report/)
     assert.match(done.value, /formal inspector answer/)
+    assert.doesNotMatch(done.value, /Closing report/)
     assert.doesNotMatch(done.value, /^Opening\n/m, 'includeOpening=false must not echo the charge')
     assert.doesNotMatch(done.value, /# # /)
+
+    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect again')
+    await waitFor(() => prompts.length === 2, 'second inspect did not send')
+    assert.equal(createCalls.length, 1, 'GetOrCreate must reuse the same child')
+    await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'second inspect last part', 'asst_bounded2')
+    const secondDone = resultOf(await second)
+    assert.equal(secondDone.ok, true, secondDone.error)
+    assert.match(secondDone.value, /Recent work/)
+    assert.match(secondDone.value, /second inspect last part/)
+    assert.doesNotMatch(secondDone.value, /formal inspector answer/, 'reuse must not leak the previous invocation last part')
+    assert.doesNotMatch(secondDone.value, /inspector working body/, 'reuse must not leak the previous invocation body')
+    assert.doesNotMatch(secondDone.value, /Closing report/)
+    assert.doesNotMatch(secondDone.value, /^Opening\n/m)
   })
 })

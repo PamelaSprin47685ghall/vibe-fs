@@ -184,12 +184,13 @@ The machine guards the boundary. The participant chooses what is worth spending 
 
 禁止把 `status` / `code` / `error` DTO、SessionId / AgentId / RunId、cursor / offset、已删 spool 的 `spool_path` 等机器态塞进 provider surface。
 
-## ARCH-015：Closing report = prose，不是 schema
+## ARCH-015：WorkRecord 陈述是散文，不是 schema
 
-> **Closing Report is prose, not a schema.**
+> **Work Record claims are prose, not a schema.**
 
+LWR **无** `Closing report` 段。本次 invocation 的正式陈述是 Recent work 中最后一条助手文本。  
 约束内容的诚实，不约束文章的骨架。  
-Closing report 如实陈述什么重要；**无** universal 固定字段义务（如 result / files / tests / risks / blockers）。  
+如实陈述什么重要；**无** universal 固定字段义务（如 result / files / tests / risks / blockers）。  
 角色可在自然需要时提及这些事实——提及 ≠ 格式义务。  
 machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、`root_requirement`）。  
 禁止再造 per-role fixed report DTO（`### Summary` / `### Files Changed` / …）。

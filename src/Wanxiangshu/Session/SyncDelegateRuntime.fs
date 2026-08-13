@@ -76,7 +76,7 @@ type SyncDelegateRuntime
         AgentJournal.snapshot journal
         |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map XTraceProjection.headSequence
+        |> Option.map XTraceProjection.head
         |> Option.defaultValue 0L
 
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
@@ -90,9 +90,10 @@ type SyncDelegateRuntime
             // a reused child keeps its first invocation's Opening (PERSIST-010).
             XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
 
-            // EXEC-031: snapshot the child's XTrace head at send. This is the
-            // per-invocation range start; the exclusive end is captured at
-            // completion after the terminal. All coalesced invocations in this
+            // EXEC-031: snapshot the child's XTrace head (one-past last part,
+            // 0 when empty) at send. This is the inclusive start of the
+            // per-invocation range; the exclusive end is the same head
+            // captured at completion. All coalesced invocations in this
             // call share the same head and thus the same bounded record.
             let startCursor = xTraceHead call.Delegate
 
@@ -188,18 +189,12 @@ type SyncDelegateRuntime
                 | Some call ->
                     match turn.Outcome with
                     | ReconcileProgram.TurnCompleted ->
-                        // EXEC-031 / COMPANION-015: persist this turn's terminal
-                        // segment BEFORE projecting, mirroring AssistanceHost.
-                        // HandleTurn claims the turn and returns true, so
-                        // TurnWorkflow never reaches TerminalReporter; without this
-                        // the child XTrace would carry no Closing report. applyTerminal
-                        // overwrites per work unit, so a reused child gets a fresh
-                        // Closing for each invocation.
+                        // Completion marker for ManagerLife/Reviewer. HandleTurn
+                        // does not use Terminal to build the inspect payload;
+                        // the bounded WorkRecord is the invocation's parts range.
                         XTraceCapture.captureTerminal (Some journal) turn
 
-                        // Exclusive range end = the child's XTrace head after the
-                        // terminal (terminal lives outside Parts, so head is the
-                        // parts frontier this invocation advanced to).
+                        // Exclusive range end = XTrace.head (one-past last part).
                         let endCursor = xTraceHead turn.SessionId
 
                         let workRecord =

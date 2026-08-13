@@ -90,7 +90,7 @@
 - ManagerCheckpointLWR 不越 ReviewFrontier；并发 post-Tk 工作不漏进 Rk；ProcessReviewLWR 排除 assignment prompt 与 R(k-1) history；dedicated reviewer head 不作 report；includeOpening=false；Rk 可在 Y 落后时启动（TODO-008）
 - ReviewWorkStartCursor = assignment authority 落地后 exclusive end（TODO-006/008）
 - Manager-facing LWR safety-seal，无 regex wash（TODO-013）
-- 四段标题仅 Opening / Chronicle / Recent work / Closing report（COMPANION-003；TODO-001）
+- 三段标题仅 Opening / Chronicle / Recent work（COMPANION-003；TODO-001）
 
 ### Dedicated / Finality
 
@@ -186,7 +186,7 @@ Change Completed **当且仅当**下列全部成立（括号内主导条款 + �
 20. process/Finality LWR 非 session head（TODO-008；unit+static）
 21. desired 自 Accepted；seal 前 PrefixEpoch TodoCheckpoint；失败不回滚（TODO-009；e2e S9+unit）
 22. 只换 proven Y；RawGap 不进 prefix；无第二 epoch SSOT（TODO-008/009/012；static+property）
-23. OpeningMaterial raw byte-stable；LWR 不重复 Opening；四段新标题（TODO-001/008/015；property）
+23. OpeningMaterial raw byte-stable；LWR 不重复 Opening；三段标题（TODO-001/008/015；property）
 24. Prepared+success 可恢复 Accepted；mismatch/fail 永不（TODO-004/012；unit）
 25. first unblessed 至少一 Accepted；drain；process REVISE 不进 Finality（TODO-010；e2e S10）
 26. 无机械 terminal-todo gate（TODO-010；static+e2e）

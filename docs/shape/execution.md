@@ -92,7 +92,7 @@ pending text；无 flight / 错误 owner / 物化失败均 fail closed。
    completion 后不 retire / 不 dispose。
 3. **Tier**：owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；
    模型不可每轮选择 target Agent。
-4. **单次完成**：callee 普通 completion 即结束本次 invocation；答案在 WorkRecord Closing report，
+4. **单次完成**：callee 普通 completion 即结束本次 invocation；答案就是 bounded WorkRecord（最后一条助手文本在 Recent work），
    无第二 await、无 `answer` 字段（EXEC-031）。
 5. **Prompt split**：`SyncDelegatePromptRequest = { Charge; ProviderPrompt }`。generic workflow 只把 `ProviderPrompt` 交给 SendPrompt，把 `Charge` 交给 Opening/Casebook prompt hook；prompt preparation callback 在 single-flight admission 后执行（EXEC-032）。
 6. **Lifetime**：Dedicated Session lifetime = OwnerReuseScope lifetime；graceful ReuseScope close 才

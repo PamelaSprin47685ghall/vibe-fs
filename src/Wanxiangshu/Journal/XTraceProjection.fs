@@ -74,6 +74,13 @@ module XTraceProjection =
         | Some part -> part.Cursor.Sequence
         | None -> 0L
 
+    /// One-past last part (XTrace.head semantics). Empty projection is 0.
+    /// Distinct from headSequence, which is the last assigned part (or 0).
+    let head (state: XTraceProjectionState) : int64 =
+        match List.tryLast state.Parts with
+        | Some part -> part.Cursor.Sequence + 1L
+        | None -> 0L
+
     /// COMPANION-003: capture the opening task verbatim. Idempotent: replaying
     /// the same text changes nothing; a DIFFERENT text is refused (PERSIST-010).
     let applyOpening
@@ -139,8 +146,7 @@ module XTraceProjection =
     /// COMPANION-003 / EXEC-009: capture the terminal output reference.
     /// Idempotent replay (same ref+digest) is a no-op; a different ref
     /// overwrites — subagent reuse produces a new terminal per work unit
-    /// on the same child session, and the LWR's Closing report segment must
-    /// reflect the latest terminal, not the first.
+    /// on the same child session (private completion marker, not an LWR section).
     let applyTerminal
         (textRef: BlobRef)
         (textDigest: BlobDigest)

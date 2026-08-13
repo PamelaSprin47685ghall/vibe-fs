@@ -38,7 +38,7 @@
 | Chronicle | COMPANION-003：WorkRecord 段；Y 已沉淀的工作叙事 |
 | Circuit Breaker | FALLBACK-005：达到有限正整数自动恢复预算时熔断；默认预算 12 |
 | Clean Gate | ORCH-002：工作区 dirty 拒绝用户消息 |
-| Closing report | COMPANION-003 / ARCH-015：WorkRecord 末段 prose claim；非固定字段 schema |
+| Closing report | （历史）已删除 LWR 段；现行 claim = Recent work 中最后一条助手文本（COMPANION-003 / ARCH-015） |
 | `commission` | EXEC-029 / AGENT-015：Orchestrator 委托独立 Manager 之路；旧名 `fork-manager` 非法 |
 | commissioner_record | COMPANION-003：commissioner 历史以 canonical WorkRecord 段落渲染；旧名 `parent_work_record` 非法 |
 | CommitmentContract | GLORY-074 / TODO-015：BlindPlan 关闭 Opening 的承诺合同（Manager = T1 `todowrite`） |
@@ -143,7 +143,7 @@
 | LegacyTodoSeedAdopted | TODO-011：仅升级瞬间 legacy open Life 的一次 seed；正常新 Life 不从 Host TodoTable adopt |
 | `list` | （历史）非法旧名，无 alias；现行 `horizon`（EXEC-005） |
 | MaxJoinBatch | EXEC-018 定义的单次 join 批次上限 |
-| LifecycleWorkRecord | COMPANION-003 / COMPANION-015：跨 Session 工作记录；段 = Opening / Chronicle / Recent work / Closing report；raw tool 禁止；`includeOpening` 父→子 true、子→父 false |
+| LifecycleWorkRecord | COMPANION-003 / COMPANION-015：跨 Session 工作记录；段 = Opening? / Chronicle / Recent work（含最后一条助手文本）；无 Closing report；raw tool 禁止；`includeOpening` 父→子 true、子→父 false |
 | Logical Run | PROMPT-002：一个 Authority Root 引发的完整对话序列 |
 | LoopDetector | LOOP-005：滑动 4-gram + 慢指数核 + 代码先验，O(1)/字符 |
 | LoopKillArmed | LOOP-006：进程内局部强杀标记，崩溃丢失 |
@@ -291,7 +291,7 @@
 | 术语 | 指向 |
 |------|------|
 | Witness | REVIEW-006：双 PERFECT 的自包含证据 |
-| WorkRecord | COMPANION-003 / COMPANION-015：跨 Session 唯一工作记录协议；Opening + Chronicle + Recent work + Closing report |
+| WorkRecord | COMPANION-003 / COMPANION-015：跨 Session 唯一工作记录协议；Opening? + Chronicle + Recent work；inspect 答案 = bounded record |
 | WorkRecordStart | TODO-001 / CTX-016 / GLORY-074：Opening exclusive end；BlindPlan 下含 T1 commitment call/result；纯推导 floor，非 Stage |
 | WorkSession | HOST-008：SessionExecutionClass.Work（Root 或 Attached Sync*）；Root 恰好一个 Companion |
 | Worktree | ORCH-003：一个 Job 一个 worktree |

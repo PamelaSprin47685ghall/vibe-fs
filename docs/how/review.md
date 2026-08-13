@@ -181,7 +181,7 @@ loop:
        // 不 append 空壳 Concluded，不伪 REVISE
 ```
 
-LWR 四标题：`Opening / Chronicle / Recent work / Closing report`（COMPANION-003；过程/终末 `includeOpening=false`）。
+LWR 三标题：`Opening / Chronicle / Recent work`（COMPANION-003；过程/终末 `includeOpening=false`）。
 
 禁止 timer/sleep/re-probe 轮询；禁止用 raw terminal 文本写入 `WorkRecordRef`（TODO-012）。
 

@@ -50,6 +50,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  xTraceCapture,
 } from '../support/domain.mjs'
 import {
   BookkeeperRuntime_setSessionPort as setSessionPort,
@@ -120,7 +121,16 @@ const completionTurn = (delegateKey, role) =>
     undefined,
   )
 
+let activeJournal
+
 const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_turn') => {
+  xTraceCapture.captureProjection(
+    activeJournal,
+    sessionId(delegateKey),
+    xTraceCapture.semantic({
+      messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
+    }),
+  )
   const handled = await handleTurn(
     runtime,
     new ReconciledTurn(
@@ -212,6 +222,7 @@ const withHarness = async (fn) => {
 
   const opened = agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  activeJournal = opened.journal
 
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []

@@ -20,7 +20,7 @@
 | BlindPlan T1 commitment + entrustment revelation | TODO-015（first `TodoWriteAccepted` → canonical T1 result） | 交托只经 conversation tool result；禁止 system prompt / Persona / Role Law 切换（PROMPT-014；GLORY-075） |
 | Pre-T1 / T1 / Post-T1 冻结文案 | TODO-015 分段 owner（Planning Table / T1 revelation / Living Mission / idle） | SURFACE-004；不得并入全局 pair guideline 或 Role Law |
 | `MagicTodoManagerGuideline` | TODO-013（Manager-only fragment） | 禁止并入 `host/pair-programming-guideline` |
-| Process-review 工作证据 | 既有 canonical LWR + `RecordCoverage` | 四段标题 COMPANION-003；禁止第二 renderer / session-head LWR（TODO-008、TODO-012） |
+| Process-review 工作证据 | 既有 canonical LWR + `RecordCoverage` | 三段标题 COMPANION-003；禁止第二 renderer / session-head LWR（TODO-008、TODO-012） |
 | Lag-1 prefix 可替换性 | 既有 `PrefixCoverage` + `PrefixRebaseCommitted`（`EvidenceKind=TodoCheckpoint`）→ `ActivePrefixEpoch` | 禁止 todo-only 第二套 ActivePrefixEpoch；禁止 RawGap 做 prefix replacement（TODO-008/009/012） |
 | Desired lag-1 cutoff 事实源 | Accepted checkpoint 链纯推导 | 禁止 `NeedRebase` Stage；Accepted **不**直接 commit epoch（TODO-006/009/012） |
 | Dedicated process reviewer 逻辑身份 | `DedicatedTodoReviewerEnlisted`（+ proven-loss `Replaced`） | 每 Life 一个 logical id；物理 retention ≠ Finality graduate（TODO-008、TODO-010） |
@@ -95,7 +95,7 @@ provider todowrite(obligations)
 ## 与邻域关系
 
 - **GLORY**：OpeningPolicy/BlindPlan 定义在 GLORY-074；删除 Activation 业务路径（TODO-001）；`suicide` 前序接 TODO-010 drain；Dedicated Finality enlist/graduate 见 TODO-010；Manager 面泄漏边界收窄为 TODO-013（GLORY-030/SURFACE-005 例外 = process report 词面，非 reviewer 编排）。System prompt 稳定 = GLORY-075 / PROMPT-014。
-- **COMPANION**：OpeningMaterial / 四段标题 / constitutive T1 call+result 属 COMPANION-014/015；Todo 只推导 `WorkRecordStart`，不拥有 Opening 重建权。
+- **COMPANION**：OpeningMaterial / 三段标题 / constitutive T1 call+result 属 COMPANION-014/015；Todo 只推导 `WorkRecordStart`，不拥有 Opening 重建权。
 - **REVIEW**：`VerdictKnown` 复用 Reviewer 域（TODO-006）；process review 一次 verdict，不进 dual-PERFECT witness 代数；Finality cohort 规则不因 Magic Todo 发明永不 graduate（TODO-010）。
 - **CONTEXT / PERSIST / ARCH-004**：lag-1 cold boundary 仅经既有 PrefixEpoch（TODO-009）；transform 只 render，不另造 epoch owner。coverage 分型 TODO-008。
 - **HOST**：membrane canary、tool 身份、pair-programming 通用 marker、`SessionProviderLanguage` 绑定仍 HOST-*；MagicTodoManagerGuideline / BlindPlan 文案为 Manager-only（TODO-013/015），不得并入全局 pair 正文 owner。admission/V2 门禁语义 TODO-004。

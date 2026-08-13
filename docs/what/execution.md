@@ -177,7 +177,7 @@ caller 发起同步委派
 - Reusable session 记忆可跨调用保留；每次 caller **只**看见当前 invocation range。  
 - `Charge` 是 semantic assignment、Opening/Casebook Q；`ProviderPrompt` 是实际发给 provider 的字节。没有 warm-start 时两者字节相同；有 AGENT-032 keywords 时只 enrich `ProviderPrompt`。禁止解析 rendered TOML 反推出 Charge。  
 - 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。  
-- 答案在 WorkRecord 的 Closing report，不是额外 `answer` 字段。
+- 答案就是 bounded WorkRecord 本身，不是额外 `answer` 字段；最后一条助手文本在 Recent work（无 Closing report 段）。
 
 ## EXEC-032：RepositoryWarmStart invocation timing
 

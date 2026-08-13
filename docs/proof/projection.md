@@ -54,6 +54,6 @@ Canonical Renderer 落 wire 前过 Horizon filter（`how/projection.md`）。本
 | 禁止穿过 horizon | SessionId / AgentId / RunId / ToolCallId / Journal EventId / cursor / offset；status/code/error DTO；phase/ordinal/kind 机器态；spool_path；settled/proposed/reviewing/semanticMerge | ARCH-014、ARCH-016 Gate B |
 | 允许的最小观测 | consequences + WorkRecord；obligations `[{name, work}]`；`exit_code` / `verdict` 参数；`root_requirement` / `commissioner_record` prose | ARCH-015、EXEC-* |
 | MagicTodoProjection 只读 obligations 真值 | 禁止 Host TodoTable sink 枚举冒充 CurrentObligations | PROJ-009、TODO-007 |
-| LWR 四标题 | Opening / Chronicle / Recent work / Closing report；旧 Opening task / Work log / Uncompressed tail / Final output 非法 | COMPANION-003、§18 |
+| LWR 三标题 | Opening / Chronicle / Recent work；旧 Opening task / Work log / Uncompressed tail / Final output / Closing report 非法 | COMPANION-003、§18 |
 
 代表：`scripts/checks/provider-leak-gate.mjs` + `tests/unit/verify/provider-leak-gate.test.mjs`（code phase）；既有 `tests/unit/context/projection-algebra.test.mjs`、join/LWR wire 套件须改断言词表，不得再靠旧 substring inventory。

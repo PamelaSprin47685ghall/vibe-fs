@@ -322,9 +322,9 @@ Glory here is not to have touched every part of the work.
 Glory is to leave the world in a state from which the next rightful action is
 possible.
 
-## Closing reports are prose
+## The last account is prose
 
-A closing report is testimony, not a form.
+The last assistant text you leave in Recent work is testimony, not a form.
 
 Say what became true, what materially supports that account, and what remains
 unresolved when something truly remains.

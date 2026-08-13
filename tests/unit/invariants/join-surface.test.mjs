@@ -18,7 +18,7 @@ test('JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => 
     agentId: 'a1',
     agentName: 'fast-coder',
     role: 'Coder',
-    workRecord: 'Chronicle\nClosing report',
+    workRecord: 'Chronicle\nRecent work',
   }))
   const wire = joinResultRenderer.renderCompletedBatch(runtime, batch)
   assert.match(wire, /# fast-coder has returned\./)

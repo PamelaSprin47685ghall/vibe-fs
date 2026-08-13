@@ -252,3 +252,37 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
     assert.ok(joinBound.includes('assistant: work a'), 'work tail still returns')
   })
 })
+
+
+test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', () => {
+  withJournal((journal) => {
+    xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
+    xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('finish the life')] },
+          { role: 'assistant', parts: [xTraceCapture.text('did the work')] },
+        ],
+      }),
+    )
+    const words = 'the last words to the user'
+    const written = agentJournal.writeBlob(words, journal)
+    assert.equal(written.ok, true, written.ok ? '' : written.error)
+    xTraceCapture.captureLastWords(
+      journal,
+      SEM,
+      written.value.BlobRef,
+      written.value.BlobDigest,
+      providerRun('run_last_words'),
+    )
+
+    const record = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
+    assert.equal(typeof record, 'string')
+    assert.match(record, /Recent work/)
+    assert.match(record, /did the work/)
+    assert.match(record, /the last words to the user/)
+    assert.equal(record.includes('Closing report'), false)
+  })
+})

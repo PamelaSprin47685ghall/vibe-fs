@@ -1,8 +1,9 @@
 // COMPANION-003 / EXEC-006 / EXEC-008 — LifecycleWorkRecord 物化。
 //
-// LWR = Opening + Chronicle + Recent work + Closing report。
-// 覆盖：byte-exact opening/terminal、gap 从 max(ingestedThrough, openingEnd) 起、
-// 无 Y 时同一算法、空段省略、determinism、child opening 排除 parent envelope。
+// LWR = Opening? + Chronicle + Recent work。Closing report 已删除。
+// 覆盖：byte-exact opening、最后一条助手文本在 Recent work、gap 从
+// max(ingestedThrough, openingEnd) 起、无 Y 时同一算法、空段省略、determinism、
+// child opening 排除 parent envelope。
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -63,15 +64,28 @@ test('LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path', () => {
   assert.equal(rendered.split('\ntask\n').length - 1, 1)
 })
 
-test('LWR_terminal_output_is_byte_exact_and_not_in_a_separate_field', () => {
+test('LWR_last_assistant_text_is_in_recent_work_not_a_closing_report', () => {
+  const trace = [
+    xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
+    xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') }),
+  ]
+
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
+
+  assert.match(rendered, /Recent work\nassistant: Final summary with detail/)
+  assert.equal(rendered.includes('Closing report'), false)
+  assert.equal(rendered.includes('Final output'), false)
+  assert.equal(rendered.includes('final_text'), false)
+})
+
+test('LWR_terminal_items_argument_does_not_render', () => {
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
   const terminal = [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') })]
 
   const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, terminal, OPENING_END)
 
-  assert.match(rendered, /Closing report\nFinal summary with detail/)
-  assert.equal(rendered.includes('Final output'), false)
-  assert.equal(rendered.includes('final_text'), false)
+  assert.equal(rendered.includes('Closing report'), false)
+  assert.equal(rendered.includes('Final summary with detail'), false)
 })
 
 test('LWR_materialization_is_deterministic', () => {
@@ -156,19 +170,21 @@ test('LWR_gap_excludes_raw_tool_call_and_result_but_keeps_text_and_reasoning', (
   assert.equal(rendered.includes('FILE_CONTENTS_'), false)
 })
 
-test('LWR_terminal_excludes_raw_tool_parts', () => {
-  const terminal = [
+test('LWR_recent_work_excludes_raw_tool_parts_and_keeps_last_assistant_text', () => {
+  const trace = [
+    xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.toolCall('bash', '{"command":"cat huge.log"}') }),
     xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.toolResult('LOG_LINE\n'.repeat(50)) }),
     xTrace.item({ sequence: 3, role: 'assistant', part: xTrace.text('Final summary with detail') }),
     xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.reasoning('closing thought') }),
   ]
-  const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, terminal, OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
 
-  assert.match(rendered, /Closing report\nFinal summary with detail/)
+  assert.match(rendered, /Recent work/)
+  assert.match(rendered, /Final summary with detail/)
   assert.match(rendered, /closing thought/)
+  assert.equal(rendered.includes('Closing report'), false)
   assert.equal(rendered.includes('[tool call]'), false)
   assert.equal(rendered.includes('[tool result]'), false)
   assert.equal(rendered.includes('huge.log'), false)
@@ -198,9 +214,9 @@ test('LWR_child_to_parent_omits_opening', () => {
   const rendered = lifecycleWorkRecord.materialize(
     opening('assigned task'),
     ['did work'],
-    [],
-    { Sequence: 0 },
     [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary') })],
+    { Sequence: 0 },
+    [],
     OPENING_END,
     false,
   )
@@ -208,5 +224,7 @@ test('LWR_child_to_parent_omits_opening', () => {
   assert.equal(rendered.startsWith('Opening\n'), false)
   assert.equal(rendered.includes('assigned task'), false)
   assert.match(rendered, /Chronicle\ndid work/)
-  assert.match(rendered, /Closing report\nFinal summary/)
+  assert.match(rendered, /Recent work/)
+  assert.match(rendered, /Final summary/)
+  assert.equal(rendered.includes('Closing report'), false)
 })

@@ -18,7 +18,7 @@ Opening 仍永久 raw；Blogger floor 由结构性 `WorkRecordStart` 承担，�
 
 ## 为什么失败反馈是完整 canonical LWR 而不是结构化 findings
 
-被拒方案：结构化 `FinalityFinding` schema，或任何 per-role fixed Closing report（`### Summary` / `### Files Changed` / …）。拒绝理由：Reviewer 已拥有完整工作记录；再抽结构化 issue 丢失推理关系、引入第二事实源、需要 parser、产生摘要漂移、让 Host 替 Reviewer 解释（GLORY-004/049/050；TODO-008）。Closing report = prose claim，不是 verdict，也不是固定字段义务——约束诚实，不约束骨架。完整 LWR（Y frames + raw gap + terminal，不含 Opening；request-range bounded）在证据完整性上无损，且复用现有 materializer。
+被拒方案：结构化 `FinalityFinding` schema，或任何 per-role fixed report（`### Summary` / `### Files Changed` / …）。拒绝理由：Reviewer 已拥有完整工作记录；再抽结构化 issue 丢失推理关系、引入第二事实源、需要 parser、产生摘要漂移、让 Host 替 Reviewer 解释（GLORY-004/049/050；TODO-008）。WorkRecord 陈述 = prose claim，不是 verdict，也不是固定字段义务——约束诚实，不约束骨架。完整 LWR（Y frames + raw gap，不含 Opening；request-range bounded；最后一条助手文本在 Recent work）在证据完整性上无损，且复用现有 materializer。
 
 ## 为什么失败 nudge 必须组合鼓励与精确证据
 

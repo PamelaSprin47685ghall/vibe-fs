@@ -14,7 +14,7 @@
 | 权限/Transport | system prompt 未误迁；human raw 未包装；provider/tool 原生 binding 未改 |
 | Blogger | data-only body 与 optional header 分离；chunk 字节合同；join LWR wire 形状 |
 | Join / fork / commission | `commissioner_record`（旧 `parent_work_record` 非法）；`root_requirement`（旧 `original_user_requirement` 非法）；无 status/count/ordinal/kind/agent DTO plane |
-| WorkRecord 标题 | Opening / Chronicle / Recent work / Closing report；旧四标题非法 |
+| WorkRecord 标题 | Opening / Chronicle / Recent work；旧四标题与 Closing report 非法 |
 | Tool result bound | pass-through 与 marker+tail 均满足 2000 行 / 51200 UTF-8 bytes；不切断 surrogate pair（ARCH-012）；`js-bookkeeper` 等同服从 Horizon |
 | DevOps budget 字段 | provider 面 `deadline_seconds` / `output_budget_bytes`；旧 `estimated_running_secs`×3 / `estimated_output_bytes`×3 / `estimated_mem_usage` 非法 |
 

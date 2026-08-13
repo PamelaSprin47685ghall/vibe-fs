@@ -312,6 +312,49 @@ module XTraceCapture =
                 | Some error -> Error error
                 | None -> Ok(Some(xTraceOf durable sessionId))
 
+    /// Write last_words as a normal assistant text part so a completed Life's
+    /// LWR Recent work contains them. Dedicated provenance avoids colliding
+    /// with g:N/turn:M/part:P capture. Caller supplies an already-written blob.
+    let captureLastWords
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (textRef: BlobRef)
+        (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        =
+        match journal with
+        | None -> ()
+        | Some durable ->
+            let existing = xTraceOf durable sessionId
+            let generation = captureGeneration durable sessionId
+            let provenance = sprintf "g:%d/last_words" generation
+            let recorded =
+                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+            if not (Set.contains provenance recorded) then
+                let cursor = XTraceProjection.headSequence existing + 1L
+
+                let turn, partIndex =
+                    match List.tryLast existing.Parts with
+                    | Some last -> last.Turn + 1, 0
+                    | None -> 0, 0
+
+                CompanionFact.XTracePartAppended
+                    {| SessionId = sessionId
+                       CursorSequence = cursor
+                       Role = "assistant"
+                       Turn = turn
+                       PartIndex = partIndex
+                       Kind = "text"
+                       ToolName = None
+                       TextRef = textRef
+                       TextDigest = textDigest
+                       Provenance = provenance
+                       ProviderRun = Some providerRun
+                       ToolCallId = None
+                       HostToolPartId = None |}
+                |> appendFact durable sessionId (Some providerRun)
+
     let captureProjection
         (journal: AgentJournal option)
         (sessionId: SessionId)

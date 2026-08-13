@@ -36,8 +36,7 @@ type OpeningMaterial =
 /// ```text
 /// LWR(X) = OpeningMaterial?          // includeOpening 控制是否渲染
 ///        + Chronicle（Y frames）
-///        + Recent work（RawGapFromX，经 forWorkRecord）
-///        + Closing report（TerminalOutputRaw）
+///        + Recent work（RawGapFromX，经 forWorkRecord；含最后一条助手文本）
 /// ```
 ///
 /// 跨 Session 方向不同（EXEC-006 / EXEC-008）：
@@ -62,10 +61,11 @@ module LifecycleWorkRecord =
             heading + "\n" + body
 
     /// 稳定 Markdown 渲染。空段整段省略。
-    /// 段标题为纯文本（Opening / Chronicle / Recent work / Closing report）；`# `
+    /// 段标题为纯文本（Opening / Chronicle / Recent work）；`# `
     /// 仅由 `SyntheticToml.comment` 在 wire 注入，避免 `# # Chronicle`。
     /// `includeOpening=false` 时省略 Opening（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
+    /// `Terminal` 保留在记录类型上但不渲染（完成标记，不是 LWR 段）。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
         let openingBody =
             if not includeOpening then
@@ -97,22 +97,22 @@ module LifecycleWorkRecord =
         let sections =
             [ section "Opening" openingBody
               section "Chronicle" framesText
-              section "Recent work" gapText
-              section "Closing report" (record.Terminal |> Option.defaultValue "") ]
+              section "Recent work" gapText ]
             |> List.filter (fun text -> text <> "")
 
         String.concat "\n\n" sections
 
-    /// 确定性物化。gap/terminal 经 `forWorkRecord`；Opening constitutive 经 `forOpening`。
+    /// 确定性物化。gap 经 `forWorkRecord`；Opening constitutive 经 `forOpening`。
     /// `includeOpening`：父→子 true，子→父 false（EXEC-006）。
     /// `openingEnd` = WorkRecordStart / OpeningBoundary（exclusive）。
+    /// `terminalItems` 不再识别或排除；不从 Terminal 合成 Closing。
     let materialize
         (opening: OpeningMaterial)
         (frames: string list)
         (trace: XTraceItem list)
         (coverage: RecordCoverage)
         (openingEnd: XTraceCursor)
-        (terminalItems: XTraceItem list)
+        (_terminalItems: XTraceItem list)
         (includeOpening: bool)
         : string =
         let gapStart =
@@ -120,32 +120,14 @@ module LifecycleWorkRecord =
 
         let gap =
             XTrace.sliceFrom gapStart trace
-            |> List.filter (fun item ->
-                terminalItems
-                |> List.forall (fun terminal -> terminal.Cursor.Sequence <> item.Cursor.Sequence))
             |> XTrace.forWorkRecord
-
-        let terminalForLwr = terminalItems |> XTrace.forWorkRecord
-
-        let terminalText =
-            terminalForLwr
-            |> List.map (fun item ->
-                match item.Part with
-                | SemanticText text -> text
-                | SemanticReasoning text -> text
-                | _ -> XTrace.renderItem item)
-            |> String.concat "\n"
 
         render
             includeOpening
             { Opening = opening
               Frames = frames
               Gap = gap
-              Terminal =
-                if List.isEmpty terminalForLwr then
-                    None
-                else
-                    Some terminalText }
+              Terminal = None }
 
     /// Build OpeningMaterial with constitutive BlindPlan body from an XTrace slice.
     let withConstitutive (opening: OpeningMaterial) (constitutiveItems: XTraceItem list) : OpeningMaterial =

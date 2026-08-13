@@ -11,7 +11,7 @@
 | Opening（原 20.1） | 原始 `[X]` durable byte-identical；XTrace 不含非法 synthetic activation 资格材料；重复 transform 不重复注入；非 Manager 不注入；continuation/compaction 不注入；`WorkRecordStart` 由 Opening cursor 纯推导（TODO-001） |
 | BlindPlan Opening 永不压缩（GLORY-017/074） | Pre-T1 Opening 区间（含 T1 commitment call/result）不进 Y / 不进 Blogger normal request；压缩候选跨 floor 须切开；删除 Activation 后 Opening 仍受保护 |
 | T1 属 Opening（GLORY-074） | first accepted `todowrite` call+result = constitutive Opening material；T1 后 `WorkRecordStart = OpeningBoundary`；system prompt 字节不因 T1 改变（GLORY-075） |
-| LWR 四段（GLORY-025） | 仅 `Opening` / `Chronicle` / `Recent work` / `Closing report`；旧标题 `Opening task`/`Work log`/`Uncompressed tail`/`Final output` 缺席；`# ` 仅 `SyntheticToml.comment` 注入 |
+| LWR 三段（GLORY-025） | 仅 `Opening` / `Chronicle` / `Recent work`；旧标题 `Opening task`/`Work log`/`Uncompressed tail`/`Final output`/`Closing report` 缺席；`# ` 仅 `SyntheticToml.comment` 注入；`last_words` 在 Recent work |
 | 无生产 Activation（原 20.2 / GLORY-018） | 合法正式文本 terminal **不**发送 `ManagerWorkActivation`；不写生产 `WorkActivated` 资格；planning-only 不完成 Manager；legacy journal 中 `WorkActivated` inert decode 不影响工作/压缩/Finality 决策 |
 | 工作输入（20.3） | `LifeOpened` 后用户消息不改写、不附加 planning-only tail、不创建新 Life、可进入正常 Y（floor=`WorkRecordStart`）；Pre-T1 可调查/规划，不得开始扛路 |
 | idle（20.4） | nudge 只有鼓励四行；不含 work record/issue；pending Finality 不发送；completed Life 不发送 |
@@ -44,7 +44,7 @@
 ### REVISE record-ready race（GLORY-044/072/073）
 
 1. durable REVISE 先于 reviewer `BlogEntryCommitted`：Reviewer continuation/cohort 立即关闭，且尚无 `FinalityRejected` 或 `WorkRecordRef`。
-2. record-ready 由物化成功判定，而非 coverage 越过 frontier（GLORY-073 off-by-one 死锁）：在 snapshot 上以全量 origin coverage 物化含 `Chronicle` 的 canonical LWR（raw 纯文本段标题 `Opening`/`Chronicle`/`Recent work`/`Closing report`）→ `RecordReady`；物化失败且 `coverageCanAdvance` → `AwaitJournal`；否则 `RecordUnavailable` → undecided。随后恰好一次 `FinalityRejected`，其 blob 含对应 `Chronicle`；经 `FinalityPrompt.rejected` / `SyntheticToml.comment` 的 wire 为单次 `# Chronicle`（或等价注释块）。
+2. record-ready 由物化成功判定，而非 coverage 越过 frontier（GLORY-073 off-by-one 死锁）：在 snapshot 上以全量 origin coverage 物化含 `Chronicle` 的 canonical LWR（raw 纯文本段标题 `Opening`/`Chronicle`/`Recent work`）→ `RecordReady`；物化失败且 `coverageCanAdvance` → `AwaitJournal`；否则 `RecordUnavailable` → undecided。随后恰好一次 `FinalityRejected`，其 blob 含对应 `Chronicle`；经 `FinalityPrompt.rejected` / `SyntheticToml.comment` 的 wire 为单次 `# Chronicle`（或等价注释块）。
 3. 记录等待只由 `AgentJournal.awaitChangeFrom` 唤醒；结构与行为 proof 均拒绝 timer/sleep/re-probe 轮询。
 4. REVISE 后、coverage 前崩溃并恢复：不重开 cohort、不补发 challenge；后续 coverage 仍只落同一 rejection。`BloggerRequestAbandoned` 不得产出 partial rejection；无法重建证据时只能 undecided。
 5. §29 拒绝/崩溃恢复专项回归（`tests/e2e/cases/finality-cohort-law.test.mjs` canary）：**GLORY_074** Blogger abandonment → `concludeRejection` fail-close 至 `Undecided`，绝不产出缺 `Chronicle` 的 `FinalityRejected`/`WorkRecordRef`；**GLORY_075** waiter 崩溃 → `resumeDurableRevise` 从 durable evidence 续等并经 `awaitChangeFrom` 唤醒，coverage 后唯一 `FinalityRejected` 引用非空 `Chronicle`。
@@ -70,7 +70,7 @@ Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006；TODO-013�
 | Gate | 证明 | 期望 |
 |------|------|------|
 | A | Manager/Orchestrator/Reviewer 工具名 | `fork`/`commission`/`horizon`/`judge`/`chronicle` 各唯一合同；旧 `list`/`verdict`/`blog`/`fork-manager` 缺席 |
-| B | Life / Finality / join / horizon provider 输出 | 无 SessionId/AgentId/ManagerJobId/worktree/status DTO；LWR 仅四段自然语言标题 |
+| B | Life / Finality / join / horizon provider 输出 | 无 SessionId/AgentId/ManagerJobId/worktree/status DTO；LWR 仅三段自然语言标题 |
 
 ## 完成判据
 
@@ -87,8 +87,8 @@ Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006；TODO-013�
 11. 普通 idle nudge 只有鼓励；
 12. `suicide` 经 TODO-010 drain 后，过程 PERFECT 才自动启动 Host-owned Finality Reviewer；
 13. REVISE 是 typed business outcome；
-14. REVISE feedback 是 Reviewer canonical LWR（request-range bounded；四段标题）；
-15. LWR 不含 Opening（`includeOpening=false` 路径）和 raw tool stream；Life LWR 仅四段；
+14. REVISE feedback 是 Reviewer canonical LWR（request-range bounded；三段标题）；
+15. LWR 不含 Opening（`includeOpening=false` 路径）和 raw tool stream；Life LWR 仅三段；
 16. Host 不结构化、摘要或改写反馈；
 17. feedback 通过 SyntheticToml 按数据边界发送；
 18. failure 继续同一 Life；

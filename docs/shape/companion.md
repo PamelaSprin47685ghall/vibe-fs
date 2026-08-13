@@ -56,7 +56,7 @@ TodoCheckpoint Y bundle **只**用 PrefixCoverage（禁止 RawGap）；不得用
 ## OpeningMaterial / WorkRecord 段所有权
 
 行为：`what/companion.md` COMPANION-003/014/015；Opening 关闭政策：`GLORY-074`；Manager floor：`TODO-001/015`。  
-本节只划唯一 owner；不复述四段文案。
+本节只划唯一 owner；不复述三段文案。
 
 | 关注点 | 唯一 owner | 边界 / 禁止 |
 |------|------|------|
@@ -65,10 +65,10 @@ TodoCheckpoint Y bundle **只**用 PrefixCoverage（禁止 RawGap）；不得用
 | `OpeningBoundary` / `WorkRecordStart` | Life / XTrace Opening cursor **纯推导**（TODO-001） | 禁止 Stage fact；禁止绑回 `WorkActivated` |
 | `OpeningMaterial` | preserved XTrace `[work start, OpeningBoundary)`（COMPANION-014） | **唯一** Opening 事实源；禁止 `OpeningPromptRaw` / AssignmentText / AuthoritativeRequirements 拼接重建 |
 | BlindPlan constitutive Opening | T1 `todowrite` call + canonical accepted result（TODO-015） | `XTrace.forOpening` 保留；不得当 incidental tool 滤入 Recent work |
-| WorkRecord 四段标题 | COMPANION-003：`Opening` / `Chronicle` / `Recent work` / `Closing report` | 旧标题已删、无 alias；Closing = prose claim，无 universal fixed schema |
+| WorkRecord 三段标题 | COMPANION-003：`Opening` / `Chronicle` / `Recent work` | 旧标题与 `Closing report` 已删、无 alias；正式陈述 = Recent work 最后一条助手文本（prose claim） |
 | Chronicle | 有效 Y frames（BlogEntryCommitted） | squash 只处理本 X frames（COMPANION-006） |
-| Recent work | RawGapFromX（未覆盖 suffix）经 LWR 投影 | ≠ receiver-relative recentness；LWR gap **剔除** raw tool |
-| Closing report | `TerminalOutputRaw` | 不复经 transform；不经 Y |
+| Recent work | RawGapFromX（未覆盖 suffix）经 LWR 投影；含最后一条助手文本 | ≠ receiver-relative recentness；LWR gap **剔除** raw tool |
+| Terminal | 私有完成标记（`TerminalOutputCaptured`） | **不是** LWR 段；不经 Y；不渲染进 WorkRecord |
 | LWR 物化 | `LifecycleWorkRecordProjection`（既有 range API） | process/Finality：`includeOpening=false`；禁止第二套 work-record renderer（TODO-008） |
 | `includeOpening` 投影策略 | COMPANION-015：父→子 true；子→父 false；同 Session frozen prefix true | Canonical record **保留** Opening，即使投影省略 |
 | Opening → Y | **禁止** | Opening always raw：never Blogger / never prefix-replaced；survives compaction / reanchor / recovery |

@@ -280,9 +280,9 @@ Concurrency 的目的不是创造互相竞争的现实。
 这里的荣耀，不是触碰了工作的每一部分。
 荣耀是把世界留在一个状态，使下一项正当行动成为可能。
 
-## Closing report 是散文
+## 最后的陈述是散文
 
-Closing report 是 testimony，不是表格。
+Recent work 中最后一条助手文本是 testimony，不是表格。
 
 说出什么变成了事实，什么在实质上支持这个 account，以及当确有未解决之事时，
 什么仍然 unresolved。

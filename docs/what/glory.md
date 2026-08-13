@@ -22,7 +22,7 @@ roster = 本 Life 已参加但尚未凭合法 dual-PERFECT witness graduate 的 
 
 REVISE、Blessing 与 process-review 反馈只可来自既有 canonical `LifecycleWorkRecord`（LWR）物化；禁止为 Magic Todo 或 Finality 另造平行工作记录投影（TODO-008）。
 
-Finality / process 用途一律 **request-range bounded**（`includeOpening=false`）：不得取 session head 冒充某次 checkpoint、process review 或 FinalityRequest 的 frontier-bounded LWR。形态为 Y frames、未覆盖 raw X tail（RecordCoverage 允许的 RawGap）与 terminal，不含 Opening 或 raw tool stream。
+Finality / process 用途一律 **request-range bounded**（`includeOpening=false`）：不得取 session head 冒充某次 checkpoint、process review 或 FinalityRequest 的 frontier-bounded LWR。形态为 Y frames 与未覆盖 raw X tail（RecordCoverage 允许的 RawGap；含最后一条助手文本），不含 Opening 或 raw tool stream。Terminal 是私有完成标记，不是 LWR 段。
 
 ## GLORY-005：普通 idle
 
@@ -114,7 +114,7 @@ Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart)
 
 ## GLORY-025：Manager Life 工作记录
 
-形态为 `Opening / Chronicle / Recent work / Closing report`（COMPANION-003/015）。Closing report 在已完成 Life 上承载 `last_words` 散文，不是固定报告 DTO。不再把 Birth record 当作 Activation 阶段产物；Opening 与 work 的分界由 `WorkRecordStart` / OpeningBoundary 表达（TODO-001；GLORY-074）。旧标题 `Opening task / Work log / Uncompressed tail / Final output` 已删除。
+形态为 `Opening / Chronicle / Recent work`（COMPANION-003/015）。已完成 Life 的 `last_words` 作为普通助手文本进入 Recent work，不是固定报告 DTO，也不是独立 Closing report 段。不再把 Birth record 当作 Activation 阶段产物；Opening 与 work 的分界由 `WorkRecordStart` / OpeningBoundary 表达（TODO-001；GLORY-074）。旧标题 `Opening task / Work log / Uncompressed tail / Final output` 与 `Closing report` 已删除。
 
 ## GLORY-026：工作期输入
 
@@ -203,7 +203,7 @@ REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的
 # It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue.
 ```
 
-随后以 `# ` 注释块附上该 sibling 的 Chronicle / Recent work / Closing report（ARCH-010；COMPANION-003）。成功路径在仍 Open 时：先预置 rejecting primary 的 record-ready/`WriteBlob`，再 append `ManagerLifecycleFact.FinalitySiblingSteered`，最后用已预置 blob 密封 `Rejected` 并发送 steer。Primary 硬物化失败 → `FinalityUndecided` 且**零** `FinalitySiblingSteered`（不得留下无 steer 投递的孤儿 SiblingSteered）。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
+随后以 `# ` 注释块附上该 sibling 的 Chronicle / Recent work（ARCH-010；COMPANION-003）。成功路径在仍 Open 时：先预置 rejecting primary 的 record-ready/`WriteBlob`，再 append `ManagerLifecycleFact.FinalitySiblingSteered`，最后用已预置 blob 密封 `Rejected` 并发送 steer。Primary 硬物化失败 → `FinalityUndecided` 且**零** `FinalitySiblingSteered`（不得留下无 steer 投递的孤儿 SiblingSteered）。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
 
 ## GLORY-045：Roster 与 graduate
 
@@ -229,7 +229,7 @@ Finality 与 process-review 只能物化 canonical LWR，不得从 verdict 参�
 
 ## GLORY-050：canonical LWR
 
-Y 是主体，raw gap 与 terminal 是不丢失最后发现的必要尾部。RecordCoverage（LWR/RawGap）与 PrefixCoverage（proven Y only）严格分型，不得互转（TODO-008/009）。
+Y 是主体，raw gap（Recent work，含最后一条助手文本）是不丢失最后发现的必要尾部。Terminal 不是 LWR 段。RecordCoverage（LWR/RawGap）与 PrefixCoverage（proven Y only）严格分型，不得互转（TODO-008/009）。
 
 ## GLORY-051：request 绑定
 
@@ -319,7 +319,7 @@ XTrace append-only；每 Life 以 cursor range 物化。
 
 拒绝 Reviewer 的 terminal frontier 是产生 durable REVISE 的 terminal evidence 所界定的 XTrace 边界；该边界必须能从 durable journal evidence 在恢复时重建，禁止以后来的 XTrace head 替换。
 
-`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `Chronicle`（及必要 Recent work / Closing report）的 canonical LWR（request-range bounded，`includeOpening=false`；raw 段标题为纯文本 `Opening`/`Chronicle`/`Recent work`/`Closing report`，`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。就绪判定是「能否物化有效工作记录」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
+`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `Chronicle`（及必要 Recent work）的 canonical LWR（request-range bounded，`includeOpening=false`；raw 段标题为纯文本 `Opening`/`Chronicle`/`Recent work`，`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。就绪判定是「能否物化有效工作记录」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
 
 coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `Chronicle` 时是物化不一致，fail closed，不得写 rejection。
 

@@ -393,7 +393,7 @@ export const toolResultBound = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening', 'captureLastWords'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -450,6 +450,10 @@ export const xTraceCapture = (() => {
     /** COMPANION-003: capture the opening; requirements are a JS array. */
     captureOpening: (journal, sessionIdValue, text, requirements = []) =>
       m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
+
+    /** last_words as a normal assistant part so LWR Recent work contains them. */
+    captureLastWords: (journal, sessionIdValue, textRef, textDigest, providerRunValue) =>
+      m.captureLastWords(journal, sessionIdValue, textRef, textDigest, providerRunValue),
   }
 })()
 

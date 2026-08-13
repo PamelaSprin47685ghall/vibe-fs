@@ -38,7 +38,7 @@ Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart)
 
 Opening 永久 raw：永不被 Y 替换；不随 TodoCheckpoint rebase 消失；不经 process-review LWR 再复制（`includeOpening=false`）。  
 删除的是 planning/labor stage floor，**不是** Opening protection。  
-WorkRecord 四段标题见 COMPANION-003。
+WorkRecord 三段标题见 COMPANION-003。
 
 ## TODO-002：obligations wire
 
@@ -174,7 +174,7 @@ Process 与 Finality 的 dedicated LWR 均 **request-range bounded**，不得取
 Y 未覆盖 frontier ≠ review 不可开始：合法 canonical RawGap 已是完整 process evidence。  
 PERFECT 与 REVISE 在 verdict 前都必须产生本 request 的 canonical ProcessReviewLWR（无 prose 的 PERFECT fail closed）。
 
-四段标题固定 `Opening / Chronicle / Recent work / Closing report`（COMPANION-003）。Closing = prose claim。
+三段标题固定 `Opening / Chronicle / Recent work`（COMPANION-003）。正式陈述 = Recent work 最后一条助手文本（散文 claim；无 Closing report 段）。
 
 跨域对 LWR / coverage split 的引用统一指向本条；rebase commit 见 TODO-009；Finality enlist/graduate 见 TODO-010。
 

@@ -34,6 +34,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  xTraceCapture,
 } from '../support/domain.mjs'
 
 const waitFor = async (predicate, message, ms = 2000) => {
@@ -60,10 +61,13 @@ const turn = (delegateKey, role, text, runId = 'asst_turn') =>
     undefined,
   )
 
+let activeJournal
+
 const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-ce-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  activeJournal = opened.journal
 
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []
@@ -168,18 +172,27 @@ test('EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
     const delegate = createCalls[0].child
 
+    const answer = '  normalized answer  \n'
+    xTraceCapture.captureProjection(
+      activeJournal,
+      sessionId(delegate),
+      xTraceCapture.semantic({
+        messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
+      }),
+    )
     const handled = await handleTurn(
       runtime,
-      turn(delegate, roles.of('Inspector'), '  normalized answer  \n', 'asst_norm_complete'),
+      turn(delegate, roles.of('Inspector'), answer, 'asst_norm_complete'),
       undefined,
     )
     assert.equal(handled, true)
 
     const done = resultOf(await pending)
     assert.equal(done.ok, true, done.error)
-    // The answer travels inside the bounded WorkRecord's Closing report, not as
+    // The answer travels inside the bounded WorkRecord's Recent work, not as
     // a trimmed raw last-message payload (EXEC-031).
     assert.match(done.value, /normalized answer/)
-    assert.match(done.value, /Closing report/)
+    assert.match(done.value, /Recent work/)
+    assert.doesNotMatch(done.value, /Closing report/)
   })
 })

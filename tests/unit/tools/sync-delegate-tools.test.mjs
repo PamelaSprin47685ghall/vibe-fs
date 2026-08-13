@@ -36,6 +36,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  xTraceCapture,
 } from '../support/domain.mjs'
 
 const {
@@ -113,7 +114,20 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
+let activeJournal
+
+const captureLastAssistant = (delegateKey, answer) => {
+  xTraceCapture.captureProjection(
+    activeJournal,
+    sessionId(delegateKey),
+    xTraceCapture.semantic({
+      messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
+    }),
+  )
+}
+
 const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_complete') => {
+  captureLastAssistant(delegateKey, answer)
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
@@ -122,6 +136,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-tools-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  activeJournal = opened.journal
 
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []
@@ -291,11 +306,12 @@ test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () =>
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), answer, 'asst_insp')
     const text = await pending
-    // EXEC-031: the tool payload is the bounded WorkRecord — the answer lives
-    // inside the Closing report (not the raw last message as the whole payload),
+    // EXEC-031: the tool payload is the bounded WorkRecord — last assistant
+    // text in Recent work (not the raw last message as the whole payload),
     // and Opening is not echoed back (includeOpening=false).
-    assert.match(text, /Closing report/)
+    assert.match(text, /Recent work/)
     assert.match(text, /inspector formal answer/)
+    assert.doesNotMatch(text, /Closing report/)
     assert.doesNotMatch(text, /^Opening\n/m)
     assert.equal(parseToml(text).error, undefined)
   })

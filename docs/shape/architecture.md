@@ -69,11 +69,11 @@ Session / Process   运行时 cell、fallback、review、PTY 所有权
 
 Horizon 法则正文见 `what/architecture.md` ARCH-014；本条只钉所有权：机器可尽知，参与者只见 horizon。
 
-## Closing report 边界（ARCH-015）
+## WorkRecord 陈述边界（ARCH-015）
 
-Closing report = prose，不是 schema（what ARCH-015）。  
+WorkRecord 陈述 = prose，不是 schema（what ARCH-015）。正式陈述在 Recent work 最后一条助手文本；无 Closing report 段。  
 machine-semantic 结构只留协议真需处（如 `exit_code`、`verdict` 参数、`root_requirement`）。  
-禁止 per-role fixed report DTO；WorkRecord 四标题所有权见 companion/glory。
+禁止 per-role fixed report DTO；WorkRecord 三标题所有权见 companion/glory。
 
 ## Gates A–E 所有权（ARCH-016）
 

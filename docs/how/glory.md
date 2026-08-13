@@ -44,7 +44,7 @@ effectiveStartSeq = max(blog.Coverage.IngestedThroughSequence, life.WorkRecordSt
 禁止使用 `WorkActivated.ProtectedPrefixEnd` 作为生产 floor。`CompanionTransform.hasMaterial` 预过滤同步。provider 记账动词 = `chronicle`（旧名 `blog` 非法）。
 
 3. lag-1 Manager prefix rebase 由 Magic Todo Accepted 链推导 desired cutoff，并在下一 provider attempt seal 前提交 `PrefixRebaseCommitted(EvidenceKind=TodoCheckpoint)`（TODO-009）；GLORY 不实现第二套 PrefixEpoch。
-4. `LifecycleWorkRecordProjection.lifecycleWorkRecord`：从 durable chronicle/XTrace/terminal 物化跨 Session 工作记录；按纯文本段标题 `Opening / Chronicle / Recent work / Closing report` 渲染（GLORY-025；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。旧标题 `Opening task / Work log / Uncompressed tail / Final output` **已删除**。process/Finality 调用一律 `includeOpening=false`、request-range bounded（TODO-008）。`XTraceCapture` 只拥有 semantic capture，不物化 LWR。
+4. `LifecycleWorkRecordProjection.lifecycleWorkRecord`：从 durable chronicle/XTrace 物化跨 Session 工作记录；按纯文本段标题 `Opening / Chronicle / Recent work` 渲染（GLORY-025；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。`last_words` 经 `captureLastWords` 进入 Recent work。旧标题 `Opening task / Work log / Uncompressed tail / Final output` 与 `Closing report` **已删除**。process/Finality 调用一律 `includeOpening=false`、request-range bounded（TODO-008）。`XTraceCapture` 只拥有 semantic capture，不物化 LWR。
 
 ## Slice C：工具与角色边界
 
@@ -88,8 +88,8 @@ let reverify
 ## Slice E：失败反馈
 
 1. REVISE 首先关闭 cohort：撤销对应 Reviewer continuation capability、cancel sibling 的下一次 effect；不发 confirmation/challenge，不 Dispose 未 graduate session（GLORY-044/055）。该步骤不写 `FinalityRejected`。
-2. record-ready 等待（首个 rejecting Reviewer）：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上以全量 origin coverage 物化 canonical LWR，并确认含 `Chronicle`（及必要 Recent work / Closing report）（`materializeRecord`）。就绪判定是「能否物化有效工作记录」，不是 `coverage >= frontier.Sequence`（GLORY-072/073）。物化成功 → `RecordReady`；物化失败但 `coverageCanAdvance` → `AwaitJournal`，经 `AgentJournal.awaitChangeFrom revision` 唤醒；否则 `RecordUnavailable` → `concludeUndecided`。就绪后才 `WriteBlob`，再 append `FinalityRejected`。
-3. Sibling 预检与双轨交付（multi durable REVISE，GLORY-044）：密封 `FinalityRejected` 之前对 durable sibling 并集预检；硬 `RecordUnavailable` → `concludeUndecided`。全部 `RecordReady` 后：先预置 primary record-ready/`WriteBlob`，再一次性 append 全部 `FinalitySiblingSteered`，最后密封 `FinalityRejected` 并发送 steer。Steer 注释块附 sibling 的 Chronicle / Recent work / Closing report。
+2. record-ready 等待（首个 rejecting Reviewer）：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上以全量 origin coverage 物化 canonical LWR，并确认含 `Chronicle`（及必要 Recent work）（`materializeRecord`）。就绪判定是「能否物化有效工作记录」，不是 `coverage >= frontier.Sequence`（GLORY-072/073）。物化成功 → `RecordReady`；物化失败但 `coverageCanAdvance` → `AwaitJournal`，经 `AgentJournal.awaitChangeFrom revision` 唤醒；否则 `RecordUnavailable` → `concludeUndecided`。就绪后才 `WriteBlob`，再 append `FinalityRejected`。
+3. Sibling 预检与双轨交付（multi durable REVISE，GLORY-044）：密封 `FinalityRejected` 之前对 durable sibling 并集预检；硬 `RecordUnavailable` → `concludeUndecided`。全部 `RecordReady` 后：先预置 primary record-ready/`WriteBlob`，再一次性 append 全部 `FinalitySiblingSteered`，最后密封 `FinalityRejected` 并发送 steer。Steer 注释块附 sibling 的 Chronicle / Recent work。
 4. `BloggerRequestAbandoned` 只令本次记录尝试失效；reconcile 以同一 durable frontier 重新建立机会（GLORY-056/057/073）。
 5. dedupe / 崩溃恢复：`FinalityRejected` 与 `FinalitySteer` 使用不同 claim scope（GLORY-053）。`resumeDurableRevise` 在 Open 路径复用同一预检/入账顺序。
 

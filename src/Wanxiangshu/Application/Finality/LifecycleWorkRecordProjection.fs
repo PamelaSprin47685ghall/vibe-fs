@@ -60,20 +60,12 @@ module LifecycleWorkRecordProjection =
                       Role = part.Role
                       Part = partValue })))
 
-    let private resolveTerminal (durable: AgentJournal) (terminalRef: (BlobRef * BlobDigest) option) : string option =
-        match terminalRef with
-        | Some(textRef, textDigest) ->
-            match durable.Writer.BlobWriter.Read textRef with
-            | Ok text when HostDigest.sha256Hex text = BlobDigest.value textDigest -> Some text
-            | _ -> None
-        | None -> None
-
     let lifecycleWorkRecordFromSnapshotWithTerminal
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
         (includeOpening: bool)
-        (terminalOverride: (BlobRef * BlobDigest) option)
+        (_terminalOverride: (BlobRef * BlobDigest) option)
         (coverageOverride: RecordCoverage option)
         : string option =
         match AgentProjection.tryFind sessionId snapshot.AgentProjections with
@@ -85,13 +77,6 @@ module LifecycleWorkRecordProjection =
             let frames = resolveFrames durable blog
 
             let trace = resolveTrace durable xTrace
-
-            let terminalRef =
-                match terminalOverride with
-                | Some specifiedTerminal -> Some specifiedTerminal
-                | None -> xTrace.Terminal
-
-            let terminal = resolveTerminal durable terminalRef
 
             match xTrace.Opening with
             | None -> None
@@ -130,19 +115,6 @@ module LifecycleWorkRecordProjection =
 
                 let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
 
-                // Terminal lives outside the trace parts; a head cursor keeps
-                // materialize's terminal-exclusion filter from touching any gap
-                // item while still carrying the text into the Closing report
-                // section.
-                let terminalItems =
-                    terminal
-                    |> Option.map (fun text ->
-                        [ { Cursor = XTrace.head trace
-                            Provenance = "terminal"
-                            Role = "assistant"
-                            Part = SemanticText text } ])
-                    |> Option.defaultValue []
-
                 Some(
                     LifecycleWorkRecord.materialize
                         openingMaterial
@@ -150,7 +122,7 @@ module LifecycleWorkRecordProjection =
                         trace
                         coverage
                         openingEnd
-                        terminalItems
+                        []
                         includeOpening
                 )
 
@@ -174,16 +146,9 @@ module LifecycleWorkRecordProjection =
 
     /// EXEC-031: per-invocation bounded LWR for reusable SyncDelegate children
     /// (includeOpening=false). Chronicle frames + Recent-work TRACE are sliced to
-    /// the invocation's XTrace range; the Closing report comes from the
-    /// just-captured xTrace.Terminal. Reuses LifecycleWorkRecord.materialize —
-    /// no second renderer.
-    ///
-    /// TRAP: the canonical projector parks Terminal at `XTrace.head` (one past
-    /// the last part). The bounded trace is sliced to [StartInclusive, EndExclusive);
-    /// `XTrace.head slicedTrace` = EndExclusive, which is never a part cursor, so
-    /// materialize's terminal-exclusion filter keeps every gap item while the
-    /// terminal text still renders as the Closing report. A full-lifecycle
-    /// projection here would leak prior invocations on a reused child.
+    /// the invocation's XTrace range, including the last part. Reuses
+    /// LifecycleWorkRecord.materialize — no second renderer.
+    /// A full-lifecycle projection here would leak prior invocations on a reused child.
     let lifecycleWorkRecordBoundedFromSnapshot
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
@@ -198,11 +163,9 @@ module LifecycleWorkRecordProjection =
 
             let frames = resolveFrames durable blog
 
-            // Recent-work TRACE sliced to the invocation's range; the Closing
-            // report is carried separately so prior invocations never appear.
+            // Recent-work TRACE sliced to the invocation's range so prior
+            // invocations never appear.
             let trace = resolveTrace durable xTrace |> XTrace.sliceBetween range.StartInclusive range.EndExclusive
-
-            let terminal = resolveTerminal durable xTrace.Terminal
 
             match xTrace.Opening with
             | None -> None
@@ -220,18 +183,6 @@ module LifecycleWorkRecordProjection =
                     else
                         coverage
 
-                // Terminal lives outside the sliced parts; a head cursor keeps
-                // materialize's terminal-exclusion filter from touching any gap
-                // item while still carrying the text into the Closing report.
-                let terminalItems =
-                    terminal
-                    |> Option.map (fun text ->
-                        [ { Cursor = XTrace.head trace
-                            Provenance = "terminal"
-                            Role = "assistant"
-                            Part = SemanticText text } ])
-                    |> Option.defaultValue []
-
                 Some(
                     LifecycleWorkRecord.materialize
                         opening
@@ -239,7 +190,7 @@ module LifecycleWorkRecordProjection =
                         trace
                         coverageClamped
                         range.StartInclusive
-                        terminalItems
+                        []
                         (* includeOpening = *) false
                 )
 
