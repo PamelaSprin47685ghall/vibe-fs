@@ -66,8 +66,10 @@ Inquiry / Coder / DevOps 的 dedicated `inspect` / `establish-behavior` / `repai
 
 ### Serialization 与 tier（行为面）
 
-- Serialization key = **immediate caller ReuseScope**（非 family root）。嵌套
-  `DevOps → Coder → Inspector` 合法；同 caller ReuseScope 禁止并发两个 active sync delegate calls。
+- Ownership / serialization key = **immediate caller ReuseScope**（非 family root）。嵌套
+  `DevOps → Coder → Inspector` 合法。
+- 同一 assistant `ProviderRunIdentity` 中、指向同一 `SyncDelegateRole` 的 sync calls 构成一个语义 batch；成员集合与顺序来自该 assistant message 的 Host tool-call 列表，禁止依赖 microtask / scheduler 到达时序猜批次。batch 的 charges / provider prompts 按 tool-call 顺序分别拼接后只发送一次。
+- 同 batch exactly one canonical caller（provider 顺序第一项）接收 bounded WorkRecord；其它 sibling caller 只收到“参见 canonical call”的短引用，不复制 WorkRecord。不同 ProviderRun 在上一 batch completion 前到达属于协议冲突，fail closed；不得向同一 dedicated Session 排队/叠发第二轮。
 - Owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；不可每轮选 Agent。复用既有 child 时沿用其已绑定 managed agent，不得把 `deep-*` 换成 `fast-*`。
 - Session 按 `(OwnerReuseScopeId, role)` 复用（EXEC-026）；不以 OneShot dispose-after 为准。
 
@@ -166,25 +168,26 @@ Dedicated SyncDelegate（`inspect` / `establish-behavior` / `repair-behavior`）
 
 ```text
 caller 发起同步委派
-→ admission / single-flight 成功
-→ 构造 typed SyncDelegatePromptRequest { Charge; ProviderPrompt }
+→ Host 以当前 assistant ProviderRun 的完整 tool-call 列表确定 sync batch
+→ batch 全体成员 admission 完成；按 provider tool-call 顺序拼接 Charge / ProviderPrompt
+→ 构造一个 typed SyncDelegatePromptRequest { Charge; ProviderPrompt }
 → specialist 按普通 Work Session 工作
-→ ordinary Assistant completion 结束本次 invocation
+→ ordinary Assistant completion 结束该 batch
 → Host 物化 bounded WorkRecord（InvocationStartCursor .. InvocationEndCursor，includeOpening=false）
-→ caller 收到该 WorkRecord 投影
+→ canonical caller 收到该 WorkRecord；siblings 只引用 canonical caller result
 ```
 
 不变量：
 
 - **删除** `return(message)` 工具与 `Returned → Completion` 双 await。  
 - **删除** `completion_text` magic literal。  
-- Reusable session 记忆可跨调用保留；每次 caller **只**看见当前 invocation range。  
+- Reusable session 记忆可跨调用保留；每个语义 batch **只**看见当前 batch range。canonical caller 得到该 bounded WorkRecord；siblings 不复制正文。  
 - `Charge` 是 semantic assignment、Opening/Casebook Q；`ProviderPrompt` 是实际发给 provider 的字节。没有 warm-start 时两者字节相同；有 AGENT-032 keywords 时只 enrich `ProviderPrompt`。禁止解析 rendered TOML 反推出 Charge。  
 - 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。  
 - 答案就是 bounded WorkRecord 本身，不是额外 `answer` 字段；最后一条助手文本在 Recent work（无 Closing report 段）。
 
 ## EXEC-032：RepositoryWarmStart invocation timing
 
-Warm-start 搜索属于 invocation admission 后、首个 provider send 前的 prompt preparation。SyncDelegate 必须先取得 ReuseScope single-flight，再调用注入的 `PrepareProviderPrompt`；通用 workflow 不依赖 Semble。搜索完成前不得发送 callee 首 prompt；搜索完成后也不得另发第二条“late hints” synthetic user message。
+Warm-start 搜索属于 batch admission 完成后、首个 provider send 前的 prompt preparation。SyncDelegate 必须先由 ProviderRun tool-call 集合确定完整 batch，再逐成员调用注入的 `PrepareProviderPrompt`；通用 workflow 不依赖 Semble。所有成员 prepare 完成后按 provider 顺序拼接；搜索完成前不得发送 callee 首 prompt；搜索完成后也不得另发第二条“late hints” synthetic user message。
 
 Fork 的新 work unit 同样保留原 `charge` 作为 child Opening，只把 warm-start envelope 作为该 work unit 的 provider prompt。reuse 时只有在确实开启一个新 work unit 时才能 enrich；对 active/busy reuse 不得先支付 Semble 成本后丢弃，也不得用 warm-start 改写既有 Opening。

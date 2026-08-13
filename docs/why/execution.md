@@ -28,7 +28,7 @@ Provider 面只投影后果与 WorkRecord，不投影 `job_id`/`worktree`/`agent
 
 **同步收口：`return` 双 await vs ordinary completion → WorkRecord。** 旧路径（superseded by GrandRewrite）：Dedicated Inspector/Coder 走 SyncDelegate，`return` resolve `Returned`，再等 `TurnCompleted`，防下一调用与上一 turn 尾部重叠。新路径拒第二出口：`return` 把「结束协议」伪装成工具能力，污染 self-model，并逼调用方解码双通道。选 ordinary completion 物化 bounded WorkRecord；ReuseScope 与 tier 绑定仍在墙内。OneShot dispose-after 与 dedicated reuse 仍互斥。
 
-**Serialization：immediate caller ReuseScope vs family-root gate。** 拒 family-root 单飞：`DevOps` 持 family gate 等 `Coder`，`Coder` 再要同一 gate 调 `Inspector` → deadlock。Gate 绑定 immediate caller ReuseScope，嵌套 `DevOps→Coder→Inspector` 合法；同 scope 仍禁止并发两路 sync delegate（EXEC-026）。
+**Sync batch：ProviderRun 语义批次 vs microtask/排队竞态。** 拒“先 drain 一次、创建 child 后再 drain、prepare 后再 drain”式时间窗口拼接，也拒把同一 assistant message 的并发 sync calls 当成多轮队列：批次成员应由 Host 已完成的 assistant message 直接给出。选 `(immediate caller ReuseScope, SyncDelegateRole, ProviderRunIdentity)` 作为语义批次；同一 ProviderRun、同一 dedicated role 的全部 sync calls 按 provider tool-call 顺序拼成一次 callee prompt。一个 canonical call 返回 bounded WorkRecord，其余 sibling call 只引用该 canonical result，不复制正文。不同 ProviderRun 若前一 sync call 尚未完成则 fail closed，不向同一 dedicated Session 叠发第二轮。嵌套 `DevOps→Coder→Inspector` 仍合法，因为 ownership key 留在 immediate caller ReuseScope（EXEC-026/031）。
 
 **Delegate tier：owner 确定性绑定 vs 每轮自选 Agent。** 拒模型每轮选 fast/deep：否则 `(OwnerReuseScopeId, role)` 无法对应唯一 dedicated Session，prefix/context 复用崩溃。`fast→fast`、`deep→deep`（EXEC-026）。Binding 属机器；Persona 不随 binding 变。
 

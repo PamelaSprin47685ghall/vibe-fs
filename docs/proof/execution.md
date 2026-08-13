@@ -38,7 +38,7 @@ G2 Universal Runtime 证据见下表 G2 行。**G2 Product Exit DONE**（2026-08
 | residual OneShot：Completed 无物化 LWR → 工具级 error=，不 soft-omit（fail-closed） | EXEC-028（residual OneShot）→ tests/unit/tools/oneshot-tools.test.mjs（`ONESHOT_completed_without_lifecycle_work_record_fails_closed`） |
 | residual OneShot：真实 Journal 物化成功 → LWR + formal（Opening 捕获 → ChildWorkRecordFor 物化） | EXEC-028（residual OneShot）→ tests/unit/tools/oneshot-tools.test.mjs（`ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal`） |
 | SyncDelegate：ReuseScope 内 dedicated Inspector 复用同一 SessionId（不每调新建） | EXEC-026 → tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_026_sync_delegate_reuses_session_after_full_completion`） |
-| SyncDelegate：同 immediate caller ReuseScope 禁止两路并发；第二调用不得在第一 Completion 前进入 provider | EXEC-026 → tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_026_sync_delegate_second_invoke_while_in_flight_is_rejected`） |
+| SyncDelegate semantic batch：同一 ProviderRun、同一 role 的 siblings 由 Host tool-call 集合确定成员与顺序，exactly one Send；canonical call 返回 WorkRecord，siblings 只引用 canonical result | EXEC-026/031 → tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`） |
 | SyncDelegate：嵌套 DevOps→Coder→Inspector 无 family-root deadlock；serialization key = immediate caller ReuseScope | EXEC-026 |
 | SyncDelegate：Dedicated Inspector/Coder = Attached（SyncInspector/SyncCoder）；Work ≠ InternalLeaf Satellite | EXEC-026、HOST-008 → tests/unit/kernel/sync-delegate.test.mjs（`HOST_008_delegateRoleToAttachment_maps_inspector_and_coder`、`HOST_008_SessionOwnership_tryOwner_and_attachmentKind`、`HOST_008_SessionExecutionClass_predicates`） |
 | SyncDelegate：owner tier → deterministic delegate tier（fast→fast，deep→deep）；模型不可同 scope 切换；复用既有 child 时沿用创建时 managed agent，不得把 `deep-*` 换成 `fast-*` | EXEC-026、PROMPT-006、EXEC-002 → tests/unit/kernel/sync-delegate.test.mjs（`EXEC_026_tierForOwner_is_identity_for_fast_and_deep`、`EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder`）；tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names`、`EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast`） |
@@ -47,7 +47,7 @@ G2 Universal Runtime 证据见下表 G2 行。**G2 Product Exit DONE**（2026-08
 | SyncDelegate WorkRecord：仅三段标题；答案就是 bounded record（最后一条助手文本在 Recent work）；无 `answer`/`inspector_id`/`coder_id`/`completion_text` magic | EXEC-031、GLORY-025、COMPANION-003 → tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message`：Recent work 含答案、无 Closing report、无 Opening 回传）；三段标题渲染 → tests/unit/context/lifecycle-work-record.test.mjs |
 | SyncDelegate Charge/ProviderPrompt split | warm-start provider bytes 可 enrich；Casebook `NoteInspectorPrompt` 与 Opening 仍 byte-exact raw Charge；zero-keyword 两者一致；prepare 在 single-flight admission 后 | EXEC-031/032、AGENT-032 |
 | warm-start no late injection | 首 prompt 已发送后不再发 hints；Semble failure 只退 raw Charge，不失败 invocation | EXEC-032、AGENT-032 |
-| G2 Q1–Q3 same SessionId serial reuse：in-flight 第二调用拒绝；Completion 后复用同一 child，不另建 | EXEC-026 → tests/unit/session/sync-delegate-runtime.test.mjs（`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（经 `tests/e2e/entry.test.mjs`；same SessionId Q1→Q2→Q3） |
+| G2 Q1–Q3 same SessionId serial reuse：不同 ProviderRun overlap fail closed；Completion 后复用同一 child，不另建 | EXEC-026 → tests/unit/session/sync-delegate-runtime.test.mjs（`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（经 `tests/e2e/entry.test.mjs`；same SessionId Q1→Q2→Q3） |
 | G2 PREFIX LAW：reused Inspector `ProviderProjection.isAppendOnlyPrefix` + `wireOf`/`sealHolds`（Q1 prefix-of Q2 prefix-of Q3；same model） | ARCH-004、HOST-013 → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：`assertG2InspectorPrefixLaw`。**G2 Product Exit DONE** |
 | G2 cancel：owner CancelSession → pending Invoke fail；不另建 child | EXEC-026、HOST-008 → tests/unit/session/sync-delegate-runtime.test.mjs（`G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child`）。unit 层；不拆唯一 Long Stroke |
 | G2 owner cascade：owner `session.deleted` → Attached Inspector 级联 | HOST-008 → G6 Long Stroke recursive `session.deleted`（`tests/e2e/entry.test.mjs`） |
@@ -81,8 +81,8 @@ G2 Universal Runtime 证据见下表 G2 行。**G2 Product Exit DONE**（2026-08
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
-| call scope / single-flight | 同 ReuseScope 并发第二调用拒绝；scope 释放后下一调用可开始 | EXEC-026 |
-| completion 单栈 | ordinary completion 后只完成一个父调用；无 return/重复/错 Session fallthrough | EXEC-026、EXEC-031 |
+| call scope / semantic batch | 同 ProviderRun+role siblings 合并；不同 ProviderRun overlap 拒绝；scope 释放后下一 batch 可开始 | EXEC-026 |
+| completion 单栈 | ordinary completion 只物化一份 WorkRecord；canonical call 得正文，siblings 得引用；无 return/重复正文/错 Session fallthrough | EXEC-026、EXEC-031 |
 | 静态所有权 | 无 mutable lifecycle record；registry 各一物理 lifetime；DSL gate 拒绝 stage-product PC | EXEC-026、FLOW-006 |
 | 正常结束 | Assistant completion → WorkRecord 投影；成功路径无 abort/interrupted；Session 可复用 | EXEC-026、EXEC-031、HOST-008 |
 | idle | 同 dedicated Session nudge；预算耗尽失败；普通正文不作答案；无 `SyncDelegateReturnCompletion` magic | EXEC-026 |

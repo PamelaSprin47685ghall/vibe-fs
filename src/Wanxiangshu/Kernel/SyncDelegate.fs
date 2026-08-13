@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Kernel
 
+open Wanxiangshu.Kernel.Identity
+
 /// EXEC-026 / HOST-008: SyncDelegate vocabulary — dedicated Inspector/Coder
 /// ownership keys, AttachmentKind mapping, and owner→delegate tier (fast→fast,
 /// deep→deep). Runtime/tools are wired later; this module is types + helpers only.
@@ -23,6 +25,18 @@ module ReuseScopeId =
 type DedicatedDelegateKey =
     { Scope: ReuseScopeId
       Role: SyncDelegateRole }
+
+/// EXEC-026/031: one semantic sync batch = all calls to one dedicated role
+/// emitted by one assistant ProviderRun, in provider tool-call order.
+type SyncDelegateBatch =
+    { ProviderRun: ProviderRunIdentity
+      CallOrder: ToolCallId list
+      CurrentCall: ToolCallId }
+
+[<RequireQualifiedAccess>]
+type SyncDelegateInvocationResult =
+    | WorkRecord of string
+    | MergedInto of ToolCallId
 
 module DedicatedDelegateKey =
     let create (scope: ReuseScopeId) (role: SyncDelegateRole) = { Scope = scope; Role = role }

@@ -118,14 +118,20 @@ Completed 缺 LWR 在 run 内 fail-closed，不改 encode 行为。
 Dedicated `inspect` / `establish-behavior` / `repair-behavior`（EXEC-026/031）算法：
 
 ```text
-use! scopeLease = syncDelegateGate.Acquire(immediateCallerReuseScope)
-let! delegate = attachedSessions.GetOrCreate(ownerReuseScopeId, role)  // tier from owner
-do! promptDispatcher.Send(delegate, message)
-let! completion = await ordinary Assistant Completion
-let workRecord = materializeBoundedWorkRecord(
-      InvocationStartCursor .. InvocationEndCursor,
-      includeOpening = false)
-return project workRecord to caller
+expected = syncCallsInHostMessage(providerRun, role)  // ordered ToolCallIds
+admit current invocation against expected
+when all expected members are present:
+  reserve (immediateCallerReuseScope, role)
+  delegate = attachedSessions.GetOrCreate(ownerReuseScopeId, role)
+  prepared = members |> map prepareProviderPrompt   // provider order
+  request = concat charges / concat prepared prompts
+  promptDispatcher.Send(delegate, request)
+  completion = await ordinary Assistant Completion
+  workRecord = materializeBoundedWorkRecord(
+        InvocationStartCursor .. InvocationEndCursor,
+        includeOpening = false)
+  return workRecord only from expected[0]
+  return sibling-reference from expected[1..]
 ```
 
 **删除**独立 `return(message)` 工具、`Returned` await、`Returned → Completion` 双 await、
@@ -140,15 +146,17 @@ ordinary Assistant completion
 ```
 
 成功路径不 `AbortSession` / 不 dispose dedicated Session；abort 只保留给失败、取消与 ReuseScope
-teardown。同 immediate caller ReuseScope 同时最多一个 active sync call；下一同步调用必须等上一
-Completion，防止与 terminal 尾部重叠。
+teardown。同 `(immediate caller ReuseScope, role)` 同时最多一个 active sync batch。另一个 ProviderRun
+若在上一 batch Completion 前到达直接 fail closed；禁止 queue-on-session。
 
-### Serialization / tier 机制
+### Batch / serialization / tier 机制
 
-- Gate key = immediate caller ReuseScope（**禁止** family-root gate）。嵌套
-  `DevOps waits Coder` / `Coder waits Inspector` 各持本层 scope lease，可并行完成而无 deadlock。
+- Batch boundary = current assistant `ProviderRunIdentity` 中同 `SyncDelegateRole` 的完整 Host tool-call 集合；顺序 = provider tool-call 顺序。禁止 `setImmediate` / microtask / 多次 drain 猜边界。
+- Ownership key = immediate caller ReuseScope + role（**禁止** family-root gate）。嵌套
+  `DevOps waits Coder` / `Coder waits Inspector` 各占本层 key，无 deadlock。
 - `GetOrCreate` 绑定 owner effective tier → 固定 delegate Agent（fast/deep）；调用参数不得覆盖 tier。
-- single-flight admission 成功后才执行 `PrepareProviderPrompt : unit -> Task<string>`；结果与 raw `Charge` 合成 `SyncDelegatePromptRequest`，`SendPrompt` 只见 `ProviderPrompt`，`NoteInspectorPrompt` 只见 `Charge`。prepare 失败必须 fail-open 为 raw Charge；不得在 admission 前 spawn Semble。
+- batch 全员 admission 后才执行每个成员的 `PrepareProviderPrompt : unit -> Task<string>`；prepare 失败只把该成员退回 raw Charge。随后按 provider 顺序 concat 成一个 `SyncDelegatePromptRequest`；`SendPrompt` 只见合并后的 `ProviderPrompt`，`NoteInspectorPrompt` 只见合并后的 `Charge`。
+- completion 只物化一份 bounded WorkRecord；canonical call = batch 第一项。siblings 只返回引用，不复制正文。
 - 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。
 
 ---

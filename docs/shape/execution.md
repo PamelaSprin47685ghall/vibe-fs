@@ -66,21 +66,23 @@ retire 与 OwnerReuseScope 级联；不得复制 child Session map，也不得�
 
 物理 owner：
 
-- `syncDelegateGate`：immediate caller ReuseScope 级单飞 lease（serialization key = **immediate caller
-  ReuseScope**，**不是** family root / repository / worktree）
+- sync batch mailbox：key = `(immediate caller ReuseScope, SyncDelegateRole)`；pending batch 身份 = 当前 assistant `ProviderRunIdentity`，expected members = Host message 中同 role 的完整 `ToolCallId` 顺序。禁止 microtask drain window。
+- active batch lease：同 key 至多一个 active batch；不同 ProviderRun 在前一 completion 前到达 fail closed，不排队、不叠发。
 - `attachedSessions`：`(OwnerReuseScopeId, SyncDelegateRole)` → at most one live dedicated Session
-- 进行中的 sync invocation：普通 Assistant completion 为结束信号；Host 物化
-  `InvocationStartCursor..InvocationEndCursor` 的 bounded WorkRecord（`includeOpening=false`）
-  投影给 caller（EXEC-028/031）
+- 进行中的 sync batch：普通 Assistant completion 为结束信号；Host 物化
+  `InvocationStartCursor..InvocationEndCursor` 的 bounded WorkRecord（`includeOpening=false`）；仅 canonical invocation 投影正文，其余 siblings 引用 canonical result（EXEC-028/031）
 
 单一 CE 调用栈（业务 caller 不可见）：
 
 ```text
-Acquire(immediate caller ReuseScope)
+Admit(current ToolCallId against ProviderRun expected members)
+→ when batch complete: reserve (ReuseScope, role)
 → GetOrCreate(OwnerReuseScopeId, role)
-→ Send
+→ prepare every member in provider order
+→ concat → one Send
 → await ordinary Completion
-→ materialize bounded WorkRecord → 投影 caller
+→ materialize one bounded WorkRecord
+→ canonical caller gets WorkRecord; siblings reference canonical caller
 ```
 
 **删除**独立 `return` 工具、`Returned` await、`pendingCompletionTexts` /
@@ -89,16 +91,13 @@ pending text；无 flight / 错误 owner / 物化失败均 fail closed。
 
 不变量：
 
-1. **Serialization**：同一 immediate caller ReuseScope 同时最多一个 active sync delegate call。
-   嵌套合法且不得死锁：`DevOps → Coder → Inspector`（各层 gate 绑定各自 immediate caller ReuseScope）。
-   禁止按 family root 串行（父持 family gate 等子、子再要同一 family gate → deadlock）。
+1. **Semantic batch / serialization**：同一 assistant `ProviderRunIdentity`、同一 `SyncDelegateRole` 的 sibling calls 必须按 Host tool-call 顺序合并成一个 active batch；同 key 同时最多一个 active batch。不得靠 scheduler 到达顺序决定成员；不得把另一个 ProviderRun 排队进 active dedicated Session。嵌套合法且不得死锁：`DevOps → Coder → Inspector`（各层 ownership 绑定各自 immediate caller ReuseScope）。禁止按 family root 串行。
 2. **Reuse key**：`(OwnerReuseScopeId, SyncDelegateRole)`；同 scope 兼容续问复用同一 Session，
    completion 后不 retire / 不 dispose。
 3. **Tier**：owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；
    模型不可每轮选择 target Agent。
-4. **单次完成**：callee 普通 completion 即结束本次 invocation；答案就是 bounded WorkRecord（最后一条助手文本在 Recent work），
-   无第二 await、无 `answer` 字段（EXEC-031）。
-5. **Prompt split**：`SyncDelegatePromptRequest = { Charge; ProviderPrompt }`。generic workflow 只把 `ProviderPrompt` 交给 SendPrompt，把 `Charge` 交给 Opening/Casebook prompt hook；prompt preparation callback 在 single-flight admission 后执行（EXEC-032）。
+4. **单次完成**：callee 普通 completion 即结束整个 sync batch；exactly one canonical invocation（provider 顺序第一项）返回 bounded WorkRecord（最后一条助手文本在 Recent work），siblings 只引用 canonical result。无第二 await、无 N 份正文复制、无 `answer` 字段（EXEC-031）。
+5. **Prompt split**：每个 batch member 各自拥有 `{ Charge; PrepareProviderPrompt }`；batch admission 完整后按 provider 顺序 prepare，再分别 concat 成单个 `SyncDelegatePromptRequest = { Charge; ProviderPrompt }`。generic workflow 只把 `ProviderPrompt` 交给 SendPrompt，把合并后的 `Charge` 交给 Opening/Casebook prompt hook（EXEC-032）。
 6. **Lifetime**：Dedicated Session lifetime = OwnerReuseScope lifetime；graceful ReuseScope close 才
    retire/release（Casebook synthesis 若启用见 Casebook 合同，不属本条所有权）。
 
