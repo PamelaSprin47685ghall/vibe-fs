@@ -1,16 +1,17 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
 /// Application-facing event store port (§2.4 / §9 / §10).
 type IEventStore =
-    abstract OpenSnapshot: unit -> StoreSnapshot
-    abstract Append: baseSnapshot: StoreSnapshot * events: EventEnvelope list -> Result<StoreSnapshot, AppendError>
-    abstract Refresh: unit -> StoreSnapshot
-    abstract Merge: snapshots: StoreSnapshot list -> Result<StoreSnapshot, MergeError>
-    abstract Publish: candidate: AppendCandidate -> Result<StoreSnapshot, PublishError>
-    abstract Converge: remote: string -> Result<StoreSnapshot, ConvergeError>
+    abstract OpenSnapshot: unit -> Task<StoreSnapshot>
+    abstract Append: baseSnapshot: StoreSnapshot * events: EventEnvelope list -> Task<Result<StoreSnapshot, AppendError>>
+    abstract Refresh: unit -> Task<StoreSnapshot>
+    abstract Merge: snapshots: StoreSnapshot list -> Task<Result<StoreSnapshot, MergeError>>
+    abstract Publish: candidate: AppendCandidate -> Task<Result<StoreSnapshot, PublishError>>
+    abstract Converge: remote: string -> Task<Result<StoreSnapshot, ConvergeError>>
 
 /// Test double: forwards reads/writes; CompareAndSwapRef always rejects.
 type CasRejectGitRawStore(inner: IGitRawStore) =
@@ -20,69 +21,81 @@ type CasRejectGitRawStore(inner: IGitRawStore) =
         member _.ReadObject(oid) = inner.ReadObject oid
         member _.ReadTree(oid) = inner.ReadTree oid
         member _.ReadRef(refName) = inner.ReadRef refName
-        member _.CompareAndSwapRef(_, _, _) = false
+        member _.CompareAndSwapRef(_, _, _) = Task.FromResult false
 
 [<RequireQualifiedAccess>]
 module EventStore =
     [<Literal>]
     let DefaultMaxRetries = 8
 
-    let private emptySnapshot (store: IGitRawStore) : StoreSnapshot =
-        match GitRawStore.materializeSnapshot store [] with
-        | Ok snapshot -> snapshot
-        | Error err -> failwith (sprintf "empty store materialization failed: %A" err)
+    let private emptySnapshot (store: IGitRawStore) : Task<StoreSnapshot> =
+        task {
+            match! GitRawStore.materializeSnapshot store [] with
+            | Ok snapshot -> return snapshot
+            | Error err -> return failwith (sprintf "empty store materialization failed: %A" err)
+        }
 
-    let private readPublished (store: IGitRawStore) : StoreSnapshot option =
-        store.ReadRef StoreRef.canonical
-        |> Option.map (fun oid -> { RootOid = RootOid.create oid })
+    let private readPublished (store: IGitRawStore) : Task<StoreSnapshot option> =
+        task {
+            let! oid = store.ReadRef StoreRef.canonical
+            return oid |> Option.map (fun value -> { RootOid = RootOid.create value })
+        }
 
-    let openSnapshot (store: IGitRawStore) : StoreSnapshot =
-        match readPublished store with
-        | Some snapshot -> snapshot
-        | None -> emptySnapshot store
+    let openSnapshot (store: IGitRawStore) : Task<StoreSnapshot> =
+        task {
+            match! readPublished store with
+            | Some snapshot -> return snapshot
+            | None -> return! emptySnapshot store
+        }
 
     let private asAppendStorage (error: StorageInvalid) : AppendError = AppendError.StorageInvalid error
 
     let private asPublishStorage (error: StorageInvalid) : PublishError = PublishError.StorageInvalid error
 
-    let private expectedOldFor (store: IGitRawStore) (baseSnapshot: StoreSnapshot) : GitObjectId option =
-        match store.ReadRef StoreRef.canonical with
-        | None -> None
-        | Some _ -> Some(RootOid.value baseSnapshot.RootOid)
+    let private expectedOldFor (store: IGitRawStore) (baseSnapshot: StoreSnapshot) : Task<GitObjectId option> =
+        task {
+            match! store.ReadRef StoreRef.canonical with
+            | None -> return None
+            | Some _ -> return Some(RootOid.value baseSnapshot.RootOid)
+        }
 
     let private unionOnto
         (store: IGitRawStore)
         (baseSnapshot: StoreSnapshot)
         (events: EventEnvelope list)
-        : Result<StoreSnapshot, StorageInvalid> =
-        match events with
-        | [] -> Ok baseSnapshot
-        | _ ->
-            match GitRawStore.materializeSnapshot store events with
-            | Error err -> Error err
-            | Ok delta ->
-                match EventStoreMerge.merge store (MergeInput.ofList [ baseSnapshot; delta ]) with
-                | Ok merged -> Ok merged
-                | Error(MergeError.StorageInvalid err) -> Error err
+        : Task<Result<StoreSnapshot, StorageInvalid>> =
+        task {
+            match events with
+            | [] -> return Ok baseSnapshot
+            | _ ->
+                match! GitRawStore.materializeSnapshot store events with
+                | Error err -> return Error err
+                | Ok delta ->
+                    match! EventStoreMerge.merge store (MergeInput.ofList [ baseSnapshot; delta ]) with
+                    | Ok merged -> return Ok merged
+                    | Error(MergeError.StorageInvalid err) -> return Error err
+        }
 
     let private eventsAlreadyCommitted
         (store: IGitRawStore)
         (snapshot: StoreSnapshot)
         (events: EventEnvelope list)
-        : Result<bool, StorageInvalid> =
+        : Task<Result<bool, StorageInvalid>> =
         let rec loop remaining =
-            match remaining with
-            | [] -> Ok true
-            | head :: tail ->
-                let normalized = EventEnvelope.normalize head
+            task {
+                match remaining with
+                | [] -> return Ok true
+                | head :: tail ->
+                    let normalized = EventEnvelope.normalize head
 
-                match GitRawStore.tryReadEvent store snapshot.RootOid normalized.EventId with
-                | Error err -> Error err
-                | Ok None -> Ok false
-                | Ok(Some existing) ->
-                    match CanonicalEventCodec.checkIdentity normalized existing with
-                    | Error err -> Error err
-                    | Ok() -> loop tail
+                    match! GitRawStore.tryReadEvent store snapshot.RootOid normalized.EventId with
+                    | Error err -> return Error err
+                    | Ok None -> return Ok false
+                    | Ok(Some existing) ->
+                        match CanonicalEventCodec.checkIdentity normalized existing with
+                        | Error err -> return Error err
+                        | Ok() -> return! loop tail
+            }
 
         loop events
 
@@ -96,110 +109,123 @@ module EventStore =
         (store: IGitRawStore)
         (baseSnapshot: StoreSnapshot)
         (events: EventEnvelope list)
-        : Result<EventEnvelope list, StorageInvalid> =
-        match events with
-        | [] -> Ok []
-        | _ ->
-            match CanonicalEventCodec.mergeByIdentity events with
-            | Error err -> Error err
-            | Ok normalized ->
-                let batchIds =
-                    normalized
-                    |> List.map (fun envelope -> EventId.value envelope.EventId)
-                    |> Set.ofList
+        : Task<Result<EventEnvelope list, StorageInvalid>> =
+        task {
+            match events with
+            | [] -> return Ok []
+            | _ ->
+                match CanonicalEventCodec.mergeByIdentity events with
+                | Error err -> return Error err
+                | Ok normalized ->
+                    let batchIds =
+                        normalized
+                        |> List.map (fun envelope -> EventId.value envelope.EventId)
+                        |> Set.ofList
 
-                let rec checkVocabulary remaining =
-                    match remaining with
-                    | [] -> Ok()
-                    | head :: tail ->
-                        if AuthoritativeEventTypes.isKnown head.EventType then
-                            checkVocabulary tail
-                        else
-                            Error(StorageInvalid.UnknownEventType head.EventType)
+                    let rec checkVocabulary remaining =
+                        match remaining with
+                        | [] -> Ok()
+                        | head :: tail ->
+                            if AuthoritativeEventTypes.isKnown head.EventType then
+                                checkVocabulary tail
+                            else
+                                Error(StorageInvalid.UnknownEventType head.EventType)
 
-                let rec checkIdentities remaining =
-                    match remaining with
-                    | [] -> Ok()
-                    | head :: tail ->
-                        let normalizedHead = EventEnvelope.normalize head
+                    let rec checkIdentities remaining =
+                        task {
+                            match remaining with
+                            | [] -> return Ok()
+                            | head :: tail ->
+                                let normalizedHead = EventEnvelope.normalize head
 
-                        match GitRawStore.tryReadEvent store baseSnapshot.RootOid normalizedHead.EventId with
-                        | Error err -> Error err
-                        | Ok None -> checkIdentities tail
-                        | Ok(Some existing) ->
-                            match CanonicalEventCodec.checkIdentity normalizedHead existing with
-                            | Error err -> Error err
-                            | Ok() -> checkIdentities tail
+                                match! GitRawStore.tryReadEvent store baseSnapshot.RootOid normalizedHead.EventId with
+                                | Error err -> return Error err
+                                | Ok None -> return! checkIdentities tail
+                                | Ok(Some existing) ->
+                                    match CanonicalEventCodec.checkIdentity normalizedHead existing with
+                                    | Error err -> return Error err
+                                    | Ok() -> return! checkIdentities tail
+                        }
 
-                let rec checkParents remaining =
-                    match remaining with
-                    | [] -> Ok()
-                    | head :: tail ->
-                        let rec parentsLeft parents =
-                            match parents with
-                            | [] -> checkParents tail
-                            | parent :: rest ->
-                                if Set.contains (EventId.value parent) batchIds then
-                                    parentsLeft rest
-                                else
-                                    match GitRawStore.tryReadEvent store baseSnapshot.RootOid parent with
-                                    | Error err -> Error err
-                                    | Ok None -> Error(StorageInvalid.MissingParent parent)
-                                    | Ok(Some _) -> parentsLeft rest
+                    let rec checkParents remaining =
+                        task {
+                            match remaining with
+                            | [] -> return Ok()
+                            | head :: tail ->
+                                let rec parentsLeft parents =
+                                    task {
+                                        match parents with
+                                        | [] -> return! checkParents tail
+                                        | parent :: rest ->
+                                            if Set.contains (EventId.value parent) batchIds then
+                                                return! parentsLeft rest
+                                            else
+                                                match! GitRawStore.tryReadEvent store baseSnapshot.RootOid parent with
+                                                | Error err -> return Error err
+                                                | Ok None -> return Error(StorageInvalid.MissingParent parent)
+                                                | Ok(Some _) -> return! parentsLeft rest
+                                    }
 
-                        parentsLeft head.Parents
+                                return! parentsLeft head.Parents
+                        }
 
-                /// Intra-batch cycle detection. Parents outside the batch are store-backed
-                /// (checked above) and do not contribute indegree — see Fold.validateBatchDag.
-                let checkBatchDag (batch: EventEnvelope list) : Result<unit, StorageInvalid> =
-                    match EventStoreFold.validateBatchDag batch with
-                    | Error(FoldError.StorageInvalid err) -> Error err
-                    | Ok() -> Ok()
+                    /// Intra-batch cycle detection. Parents outside the batch are store-backed
+                    /// (checked above) and do not contribute indegree — see Fold.validateBatchDag.
+                    let checkBatchDag (batch: EventEnvelope list) : Result<unit, StorageInvalid> =
+                        match EventStoreFold.validateBatchDag batch with
+                        | Error(FoldError.StorageInvalid err) -> Error err
+                        | Ok() -> Ok()
 
-                match checkVocabulary normalized with
-                | Error err -> Error err
-                | Ok() ->
-                    match checkIdentities normalized with
-                    | Error err -> Error err
+                    match checkVocabulary normalized with
+                    | Error err -> return Error err
                     | Ok() ->
-                        match checkParents normalized with
-                        | Error err -> Error err
+                        match! checkIdentities normalized with
+                        | Error err -> return Error err
                         | Ok() ->
-                            match checkBatchDag normalized with
-                            | Error err -> Error err
-                            | Ok() -> Ok normalized
+                            match! checkParents normalized with
+                            | Error err -> return Error err
+                            | Ok() ->
+                                match checkBatchDag normalized with
+                                | Error err -> return Error err
+                                | Ok() -> return Ok normalized
+        }
 
     let append
         (store: IGitRawStore)
         (maxRetries: int)
         (baseSnapshot: StoreSnapshot)
         (events: EventEnvelope list)
-        : Result<StoreSnapshot, AppendError> =
+        : Task<Result<StoreSnapshot, AppendError>> =
         let rec loop (baseSnap: StoreSnapshot) (retriesLeft: int) =
-            match validateAppendSet store baseSnap events with
-            | Error err -> Error(asAppendStorage err)
-            | Ok _ ->
-                match unionOnto store baseSnap events with
-                | Error err -> Error(asAppendStorage err)
-                | Ok candidate ->
-                    let expected = expectedOldFor store baseSnap
-                    let newOid = RootOid.value candidate.RootOid
+            task {
+                match! validateAppendSet store baseSnap events with
+                | Error err -> return Error(asAppendStorage err)
+                | Ok _ ->
+                    match! unionOnto store baseSnap events with
+                    | Error err -> return Error(asAppendStorage err)
+                    | Ok candidate ->
+                        let! expected = expectedOldFor store baseSnap
+                        let newOid = RootOid.value candidate.RootOid
+                        let! swapped = store.CompareAndSwapRef(StoreRef.canonical, expected, newOid)
 
-                    if store.CompareAndSwapRef(StoreRef.canonical, expected, newOid) then
-                        Ok candidate
-                    elif retriesLeft <= 0 then
-                        if maxRetries <= 0 then
-                            Error AppendError.AppendCasRejected
+                        if swapped then
+                            return Ok candidate
+                        elif retriesLeft <= 0 then
+                            if maxRetries <= 0 then
+                                return Error AppendError.AppendCasRejected
+                            else
+                                return Error AppendError.AppendRetryExhausted
                         else
-                            Error AppendError.AppendRetryExhausted
-                    else
-                        match readPublished store with
-                        | None -> loop (emptySnapshot store) (retriesLeft - 1)
-                        | Some current ->
-                            match eventsAlreadyCommitted store current events with
-                            | Error err -> Error(asAppendStorage err)
-                            | Ok true -> Ok current
-                            | Ok false -> loop current (retriesLeft - 1)
+                            match! readPublished store with
+                            | None ->
+                                let! empty = emptySnapshot store
+                                return! loop empty (retriesLeft - 1)
+                            | Some current ->
+                                match! eventsAlreadyCommitted store current events with
+                                | Error err -> return Error(asAppendStorage err)
+                                | Ok true -> return Ok current
+                                | Ok false -> return! loop current (retriesLeft - 1)
+            }
 
         loop baseSnapshot maxRetries
 
@@ -207,47 +233,51 @@ module EventStore =
         (store: IGitRawStore)
         (maxRetries: int)
         (candidate: AppendCandidate)
-        : Result<StoreSnapshot, PublishError> =
-        let writePayloads (payloads: (GitObjectId * byte[]) list) : Result<unit, PublishError> =
+        : Task<Result<StoreSnapshot, PublishError>> =
+        let writePayloads (payloads: (GitObjectId * byte[]) list) : Task<Result<unit, PublishError>> =
             let rec loop remaining =
-                match remaining with
-                | [] -> Ok()
-                | (expectedOid, bytes) :: tail ->
-                    let written = store.WriteBlob bytes
+                task {
+                    match remaining with
+                    | [] -> return Ok()
+                    | (expectedOid, bytes) :: tail ->
+                        let! written = store.WriteBlob bytes
 
-                    if GitObjectId.value written <> GitObjectId.value expectedOid then
-                        Error PublishError.IncompletePayloadClosure
-                    else
-                        loop tail
+                        if GitObjectId.value written <> GitObjectId.value expectedOid then
+                            return Error PublishError.IncompletePayloadClosure
+                        else
+                            return! loop tail
+                }
 
             loop payloads
 
-        match writePayloads candidate.NewPayloads with
-        | Error e -> Error e
-        | Ok() ->
-            let closure = PayloadClosure.ofEvents candidate.NewEvents
-
-            match PayloadClosure.validatePresent store closure with
-            | Error(StorageInvalid.MissingPayload _) -> Error PublishError.IncompletePayloadClosure
-            | Error err -> Error(asPublishStorage err)
+        task {
+            match! writePayloads candidate.NewPayloads with
+            | Error e -> return Error e
             | Ok() ->
-                match append store maxRetries candidate.BaseSnapshot candidate.NewEvents with
-                | Ok snapshot -> Ok snapshot
-                | Error(AppendError.StorageInvalid err) -> Error(asPublishStorage err)
-                | Error AppendError.AppendCasRejected -> Error PublishError.PublishCasRejected
-                | Error AppendError.AppendRetryExhausted -> Error PublishError.PublishRetryExhausted
+                let closure = PayloadClosure.ofEvents candidate.NewEvents
 
-    let merge (store: IGitRawStore) (snapshots: StoreSnapshot list) : Result<StoreSnapshot, MergeError> =
+                match! PayloadClosure.validatePresent store closure with
+                | Error(StorageInvalid.MissingPayload _) -> return Error PublishError.IncompletePayloadClosure
+                | Error err -> return Error(asPublishStorage err)
+                | Ok() ->
+                    match! append store maxRetries candidate.BaseSnapshot candidate.NewEvents with
+                    | Ok snapshot -> return Ok snapshot
+                    | Error(AppendError.StorageInvalid err) -> return Error(asPublishStorage err)
+                    | Error AppendError.AppendCasRejected -> return Error PublishError.PublishCasRejected
+                    | Error AppendError.AppendRetryExhausted -> return Error PublishError.PublishRetryExhausted
+        }
+
+    let merge (store: IGitRawStore) (snapshots: StoreSnapshot list) : Task<Result<StoreSnapshot, MergeError>> =
         EventStoreMerge.merge store (MergeInput.ofList snapshots)
 
     /// Unbound Converge — Application must compose with GitGateway (§11 / Phase 3 Wave A).
-    let unboundConverge (remote: string) : Result<StoreSnapshot, ConvergeError> =
-        Error(ConvergeError.Transport(sprintf "no GitGateway bound for Converge(%s)" remote))
+    let unboundConverge (remote: string) : Task<Result<StoreSnapshot, ConvergeError>> =
+        Task.FromResult(Error(ConvergeError.Transport(sprintf "no GitGateway bound for Converge(%s)" remote)))
 
     let createWithRetries
         (store: IGitRawStore)
         (maxRetries: int)
-        (convergeRemote: string -> Result<StoreSnapshot, ConvergeError>)
+        (convergeRemote: string -> Task<Result<StoreSnapshot, ConvergeError>>)
         : IEventStore =
         { new IEventStore with
             member _.OpenSnapshot() = openSnapshot store
@@ -263,11 +293,11 @@ module EventStore =
 
             member _.Converge(remote) = convergeRemote remote }
 
-    /// Inject a sync converge delegate (GitGateway sync path or test fake).
+    /// Inject a converge delegate (GitGateway path or test fake).
     let createWithConverge
         (store: IGitRawStore)
         (maxRetries: int)
-        (convergeRemote: string -> Result<StoreSnapshot, ConvergeError>)
+        (convergeRemote: string -> Task<Result<StoreSnapshot, ConvergeError>>)
         : IEventStore =
         createWithRetries store maxRetries convergeRemote
 

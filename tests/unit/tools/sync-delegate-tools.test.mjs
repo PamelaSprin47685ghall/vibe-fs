@@ -8,6 +8,16 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
+import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import {
+  HostToolPartIdModule_create as hostToolPartId,
+  ToolCallIdModule_create as toolCallId,
+} from '../../../dist/Kernel/Identity.js'
+import {
+  SessionMessage,
+  SessionToolPart,
+  SnapshotToolPartState,
+} from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
@@ -63,8 +73,33 @@ const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
 
 const sentinelRuntime = { kind: 'sync-delegate-sentinel' }
 
-const context = (session = 'ses_owner', providerRunId) =>
-  new HostToolContext(session, undefined, undefined, providerRunId, undefined, () => () => {})
+const context = (session = 'ses_owner', providerRunId, callId) =>
+  new HostToolContext(session, undefined, callId, providerRunId, undefined, () => () => {})
+
+const batchMessage = (id, calls) =>
+  new SessionMessage(
+    id,
+    'assistant',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    true,
+    false,
+    undefined,
+    [],
+    calls.map(
+      ({ id: callId, tool }, index) =>
+        new SessionToolPart(
+          hostToolPartId(`part_${index + 1}`),
+          callId,
+          tool,
+          '{}',
+          SnapshotToolPartState.Pending,
+        ),
+    ),
+  )
 
 const bareScope = () =>
   new ToolRuntimeScope(
@@ -132,7 +167,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   assert.equal(handled, true)
 }
 
-const withHarness = async (fn, { tier = 'Fast' } = {}) => {
+const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-tools-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
@@ -185,6 +220,10 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
+  const snapshot = snapshotMessages
+    ? { GetMessages: async () => okResult(ofArray(snapshotMessages)) }
+    : undefined
+
   const scope = new ToolRuntimeScope(
     sessions,
     opened.journal,
@@ -197,7 +236,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     undefined,
     undefined,
     undefined,
-    undefined,
+    snapshot,
     undefined,
   )
 
@@ -285,6 +324,78 @@ test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_char
     const result = resultOf(await pending)
     assert.equal(result.ok, true, result.error)
   })
+})
+
+test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', async () => {
+  const runId = 'asst_inspect_batch'
+  const firstCall = toolCallId('inspect_call_1')
+  const secondCall = toolCallId('inspect_call_2')
+  const message = batchMessage(runId, [
+    { id: firstCall, tool: 'inspect' },
+    { id: secondCall, tool: 'inspect' },
+  ])
+
+  await withHarness(async ({ runtime, createCalls, prompts, scope }) => {
+    const owner = 'ses_owner_inspect_batch'
+    const tool = inspectSpec(factory, scope, runtime)
+
+    const second = tool.Execute(
+      makeArgs({ charge: 'inspect second' }),
+      context(owner, providerRun(runId), secondCall),
+    )
+    const first = tool.Execute(
+      makeArgs({ charge: 'inspect first' }),
+      context(owner, providerRun(runId), firstCall),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'batched inspect did not send once')
+    assert.equal(prompts[0].text, 'inspect first\n\ninspect second')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'batched inspector answer')
+    const firstText = await first
+    const secondText = await second
+
+    assert.match(firstText, /batched inspector answer/)
+    assert.doesNotMatch(secondText, /batched inspector answer/)
+    assert.match(secondText, /inspect_call_1/)
+  }, { snapshotMessages: [message] })
+})
+
+test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
+  const runId = 'asst_coder_batch'
+  const establishCall = toolCallId('coder_call_1')
+  const repairCall = toolCallId('coder_call_2')
+  const message = batchMessage(runId, [
+    { id: establishCall, tool: 'establish-behavior' },
+    { id: repairCall, tool: 'repair-behavior' },
+  ])
+
+  await withHarness(async ({ runtime, createCalls, prompts, scope }) => {
+    const owner = 'ses_owner_coder_batch'
+    const establish = establishSpec(factory, scope, runtime)
+    const repair = repairSpec(factory, scope, runtime)
+
+    const repairPending = repair.Execute(
+      makeArgs({ charge: 'repair behavior' }),
+      context(owner, providerRun(runId), repairCall),
+    )
+    const establishPending = establish.Execute(
+      makeArgs({ charge: 'establish behavior' }),
+      context(owner, providerRun(runId), establishCall),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'batched Coder did not send once')
+    assert.equal(createCalls[0].agent, 'fast-coder')
+    assert.equal(prompts[0].text, 'establish behavior\n\nrepair behavior')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Coder'), 'batched coder answer')
+    const establishText = await establishPending
+    const repairText = await repairPending
+
+    assert.match(establishText, /batched coder answer/)
+    assert.doesNotMatch(repairText, /batched coder answer/)
+    assert.match(repairText, /coder_call_1/)
+  }, { snapshotMessages: [message] })
 })
 
 test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () => {

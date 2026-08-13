@@ -10,17 +10,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
-import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
+import { SyncDelegateBatch, SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
 import {
   AttachedSessionRuntime_$ctor_Z5DA00426 as createAttached,
 } from '../../../dist/Session/AttachedSessionRuntime.js'
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
+  SyncDelegateRuntime__InvokeBatchPrepared_71789EF8 as invokeBatchPrepared,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
   SyncDelegateRuntime__StageDeletedInspector_59B1A0C0 as stageDeletedInspector,
@@ -168,52 +171,71 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   assert.equal(handled, true)
 }
 
-test('EXEC_026_sync_delegate_concurrent_invokes_are_coalesced_into_single_prompt', async () => {
+test('EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
-    const owner = 'ses_owner_flight'
-    const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect first')
-    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect second')
+    const owner = 'ses_owner_batch'
+    const run = providerRun('asst_batch')
+    const firstCall = toolCallId('call_first')
+    const secondCall = toolCallId('call_second')
+    const callOrder = ofArray([firstCall, secondCall])
 
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'coalesced Invoke did not send')
+    // Arrival order is deliberately reversed. Provider order, not scheduler
+    // timing, defines prompt concatenation and canonical result ownership.
+    const second = invokeBatchPrepared(
+      runtime,
+      owner,
+      SyncDelegateRole.Inspector,
+      'inspect second',
+      new SyncDelegateBatch(run, callOrder, secondCall),
+      async () => 'prepared second',
+    )
+    const first = invokeBatchPrepared(
+      runtime,
+      owner,
+      SyncDelegateRole.Inspector,
+      'inspect first',
+      new SyncDelegateBatch(run, callOrder, firstCall),
+      async () => 'prepared first',
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'semantic batch did not send')
     assert.equal(createCalls.length, 1)
     assert.equal(prompts.length, 1)
-    assert.equal(prompts[0].text, 'inspect first\n\ninspect second')
+    assert.equal(prompts[0].text, 'prepared first\n\nprepared second')
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'combined answer')
     const firstDone = resultOf(await first)
     const secondDone = resultOf(await second)
+
     assert.equal(firstDone.ok, true, firstDone.error)
-    assert.match(firstDone.value, /combined answer/)
-    assert.match(firstDone.value, /Recent work/)
-    assert.doesNotMatch(firstDone.value, /Closing report/)
+    assert.equal(firstDone.value.tag, 0, 'provider-first call owns the WorkRecord')
+    assert.match(firstDone.value.fields[0], /combined answer/)
+    assert.match(firstDone.value.fields[0], /Recent work/)
+    assert.doesNotMatch(firstDone.value.fields[0], /Closing report/)
+
     assert.equal(secondDone.ok, true, secondDone.error)
-    assert.match(secondDone.value, /combined answer/)
+    assert.equal(secondDone.value.tag, 1, 'sibling must reference the canonical result')
+    assert.equal(idValue.toolCall(secondDone.value.fields[0]), 'call_first')
   })
 })
 
-test('EXEC_026_sync_delegate_in_flight_invoke_prompts_directly_and_queues_on_session', async () => {
+test('EXEC_026_sync_delegate_different_run_overlap_is_rejected_not_queued', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_inflight'
     const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'first in flight')
 
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'first Invoke did not send')
 
-    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'second arrival')
-    await waitFor(() => prompts.length === 2, 'second Invoke did not send prompt directly')
-
-    assert.equal(createCalls.length, 1, 'GetOrCreate must reuse child session')
-    assert.equal(prompts[0].text, 'first in flight')
-    assert.equal(prompts[1].text, 'second arrival')
+    const secondDone = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, 'second arrival'))
+    assert.equal(secondDone.ok, false)
+    assert.match(secondDone.error, /active batch/)
+    assert.equal(prompts.length, 1, 'overlap must not enqueue or dispatch a second prompt')
+    assert.equal(createCalls.length, 1)
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'first answer', 'asst_turn1')
     const firstDone = resultOf(await first)
     assert.equal(firstDone.ok, true, firstDone.error)
     assert.match(firstDone.value, /first answer/)
-
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'second answer', 'asst_turn2')
-    const secondDone = resultOf(await second)
-    assert.equal(secondDone.ok, true, secondDone.error)
-    assert.match(secondDone.value, /second answer/)
   })
 })
 

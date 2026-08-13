@@ -10,8 +10,6 @@ open Wanxiangshu.Kernel.Identity
 
 /// Capability port over content-addressed Git objects + ref CAS (§2.3 / §9).
 /// No CreateRef: first publication is CompareAndSwapRef(expectedOld=None).
-/// Capability port over content-addressed Git objects + ref CAS (§2.3 / §9).
-/// No CreateRef: first publication is CompareAndSwapRef(expectedOld=None).
 /// Members return Task so EventStore write/CAS can yield the Node event loop.
 type IGitRawStore =
     abstract WriteBlob: content: byte[] -> Task<GitObjectId>
