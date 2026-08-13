@@ -97,9 +97,22 @@ module MagicTodoHostCodec =
 
     let replaceEnrichedResult (output: obj) (text: string) = output?output <- box text
 
+    let private applyObligationDescriptions (lang: ProviderLanguage) (schema: obj) =
+        let items: obj = schema?properties?obligations?items
+        let properties: obj = items?properties
+
+        properties?name?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.ObligationNameDescription Map.empty)
+
+        properties?work?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.ObligationWorkDescription Map.empty)
+
     let applyDefinition (lang: ProviderLanguage) (output: obj) =
         let parameters = parseJson MagicTodoSurface.todoWriteJsonSchema
         let jsonSchema = parseJson MagicTodoSurface.todoWriteJsonSchema
+
+        applyObligationDescriptions lang parameters
+        applyObligationDescriptions lang jsonSchema
 
         output?description <- box (ProviderProse.render lang MagicTodoSurface.Path.TodoWriteDescription Map.empty)
 

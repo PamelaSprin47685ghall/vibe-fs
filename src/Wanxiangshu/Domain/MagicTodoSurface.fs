@@ -17,6 +17,12 @@ module MagicTodoSurface =
         let TodoWriteDescription = "lifecycle/magic-todo/todowrite-description"
 
         [<Literal>]
+        let ObligationNameDescription = "lifecycle/magic-todo/obligation-name-description"
+
+        [<Literal>]
+        let ObligationWorkDescription = "lifecycle/magic-todo/obligation-work-description"
+
+        [<Literal>]
         let ProcessReviewerPreamble = "lifecycle/magic-todo/process-reviewer-preamble"
 
         [<Literal>]

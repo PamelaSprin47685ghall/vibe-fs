@@ -1,0 +1,1 @@
+Name the owed end-state, user-facing deliverable, or externally meaningful condition that must become true. Do not name a planning, surveying, understanding, inventorying, or next-step activity that only helps discover the real plan. For an implementation mission, a name such as "survey-startup-and-complexity" is a disguised meta-todo, not an obligation.

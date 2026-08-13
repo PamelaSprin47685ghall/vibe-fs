@@ -30,8 +30,29 @@ test('TODO-002 Manager Role Law rejects meta-work without owning tool timing', (
   for (const path of ['resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
     const text = read(path)
     assert.match(text, /make a plan|analyze the request|先做计划|分析请求/i)
+    assert.match(text, /completion\s+counterfactual|完成反事实/i, `${path}: must distinguish cognition from mission debt semantically`)
+    assert.match(text, /investigation|调查/i, `${path}: investigative verbs must not hide planning`)
     assert.match(text, /obligation|mission|债务/i)
     assert.doesNotMatch(text, /\btodowrite\b/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
+  }
+})
+
+test('TODO-002 disguised investigative meta-todo is explicitly rejected before first checkpoint', () => {
+  const enPlanning = read('resources/provider/lifecycle/manager/planning-table/en.md')
+  const zhPlanning = read('resources/provider/lifecycle/manager/planning-table/zh-CN.md')
+  const enTool = read('resources/provider/lifecycle/magic-todo/todowrite-description/en.md')
+  const zhTool = read('resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md')
+
+  for (const [label, text] of [
+    ['planning-table/en', enPlanning],
+    ['planning-table/zh-CN', zhPlanning],
+    ['todowrite-description/en', enTool],
+    ['todowrite-description/zh-CN', zhTool],
+  ]) {
+    assert.match(text, /completion\s+counterfactual|完成反事实/i, `${label}: must use outcome-based classification, not keywords`)
+    assert.match(text, /survey-startup-and-complexity/i, `${label}: observed disguised meta-todo must be covered verbatim`)
+    assert.match(text, /O\(N\^2\)|hotspot|热点/i, `${label}: repository investigation disguise must be covered`)
+    assert.match(text, /deliverable|交付物/i, `${label}: exception must be tied to the user's actual deliverable`)
   }
 })
 

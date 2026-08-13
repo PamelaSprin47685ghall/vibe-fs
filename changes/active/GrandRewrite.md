@@ -5861,7 +5861,7 @@ Magic Todo live 宿主：本 Manager 会话后续 `todowrite` 仍返回 `Admissi
 
 - **Requested by**：用户。先要求「根据 changes/ 里面的语义精细确定真实意图」，随后明确补充：LLM 经常上来先写一条「我要做计划」的 meta todo；`review` 失败属于语义失败；**红字只留给语法失败**；**不得存在万象术自身失败作为 tool error**；基础设施异常应**直接杀死整个 OpenCode 并报错，方便调试人员处理**。
 - **覆盖关系**：本 Amendment 是对本文件早先 Magic Todo amendment 中 `processReview=None / producer missing / typed infrastructure failure → 当前操作 fail-closed` 的**后续明确覆盖**。旧记录保留作历史，但不得再作为当前实现依据。
-- **T1 / meta todo 最终裁决**：第一次 `todowrite` = Planning Table 已完成后的**完整 obligation account 提交**。`make a plan / analyze the request / write todos / decide next steps / 先做计划` 等描述 Manager 自己认知过程的 meta-work 不是 mission debt。需要这些认知动作时直接做；不得用一条 meta todo 提前触发 T1 entrustment。
+- **T1 / meta todo 最终裁决**：第一次 `todowrite` = Planning Table 已完成后的**完整 obligation account 提交**。`make a plan / analyze the request / write todos / decide next steps / 先做计划` 等描述 Manager 自己认知过程的 meta-work 不是 mission debt。**调查动词也不能洗白 meta-work**：若 `survey repository / trace startup / find O(N^2) hotspots / understand architecture / inventory risks / 调查仓库结构 / 追踪启动路径 / 寻找热点` 的目的只是为了发现真正 obligations 应该是什么，它仍属于 Planning Table cognition。判定用 completion counterfactual：若该项完美完成而用户要求的世界状态/交付物仍未改变，只是 Manager 更理解、有清单、有计划或知道下一步，则不是 obligation。只有当调查/诊断/分析/审计/报告本身就是用户要求的交付物时才例外。用户实测反例 `survey-startup-and-complexity: 调查仓库结构、启动路径与可疑 O(N^2) 热点，写出可交付的完整义务账` 明确判为 disguised meta-todo。
 - **CurrentObligations 最终裁决**：`TodoWriteAccepted(Tk)` 一旦 durable，matching Prepared 的 Submitted account **立即成为 CurrentObligations**。Process reviewer 不拥有 todo state；PERFECT/REVISE 都不 rollback、不 semanticMerge、不产生 accepted-but-not-current 半态。REVISE 只要求 Manager 在后续 checkpoint 写出更真实的完整 account。
 - **失败分型（唯一当前语义）**：
 

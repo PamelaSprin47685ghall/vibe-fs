@@ -65,6 +65,13 @@ Planning acts are not obligations of the user's mission.
 describe your own cognition. Perform those acts directly. The account you hand
 onward names only debts that must become true for the user's request.
 
+Do not hide planning inside an investigative verb. Ask the completion
+counterfactual: if the investigation were finished perfectly while the user's
+requested world or deliverable stayed otherwise unchanged, and only your own
+understanding improved, then that investigation was cognition serving the plan,
+not a mission obligation. Investigation becomes mission debt only when the user
+actually asked to receive investigation, diagnosis, analysis, audit, or a report.
+
 Do not invent order where the work itself supplies none.
 Do not collapse independent obligations into a single chain merely because a
 chain is easier to narrate.
