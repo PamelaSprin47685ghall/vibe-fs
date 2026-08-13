@@ -394,16 +394,36 @@ module MagicTodoHostHooks =
           Before: obj -> obj -> Task<unit>
           After: obj -> obj -> Task<unit> }
 
+    let private fatalInfrastructure (sessionText: string) (reason: string) : 'T =
+        let fields =
+            if String.IsNullOrWhiteSpace sessionText then
+                [ "result", reason ]
+            else
+                [ "session_id", sessionText; "result", reason ]
+
+        Diagnostic.fatal "magic-todo-infrastructure-failed" fields
+        failwith ("unreachable after Diagnostic.fatal: " + reason)
+
     let private requiredText (input: obj) (field: string) =
         if isNull input || isNull input?(field) then
-            invalidOp (sprintf "Magic Todo hook requires %s" field)
+            fatalInfrastructure "" (sprintf "Magic Todo hook requires %s" field)
 
         let value = string input?(field)
 
         if String.IsNullOrWhiteSpace value then
-            invalidOp (sprintf "Magic Todo hook requires non-empty %s" field)
+            fatalInfrastructure "" (sprintf "Magic Todo hook requires non-empty %s" field)
 
         value
+
+    let private syntaxPrepareFailure (reason: MagicTodoMembrane.PrepareRejection) : string option =
+        match reason with
+        | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.MultipleTodowriteInMessage callIds) ->
+            Some(sprintf "todowrite may appear only once in an assistant message; calls=%A" callIds)
+        | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.EmptyObligationName ordinal) ->
+            Some(sprintf "todowrite obligation.name must be non-empty at index %d" ordinal)
+        | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName name) ->
+            Some(sprintf "todowrite duplicate obligation name '%s'" name)
+        | _ -> None
 
     let private isTodoTool (input: obj) (field: string) =
         not (isNull input)
@@ -452,17 +472,17 @@ module MagicTodoHostHooks =
                     let durable =
                         match journal with
                         | Some value -> value
-                        | None -> invalidOp "Magic Todo requires a durable AgentJournal"
+                        | None -> fatalInfrastructure "" "Magic Todo requires a durable AgentJournal"
 
                     let snapshots =
                         match snapshot with
                         | Some value -> value
-                        | None -> invalidOp "Magic Todo requires the full session snapshot port"
+                        | None -> fatalInfrastructure "" "Magic Todo requires the full session snapshot port"
 
                     let reviews =
                         match processReview with
                         | Some value -> value
-                        | None -> invalidOp "Magic Todo requires the process review runtime"
+                        | None -> fatalInfrastructure "" "Magic Todo requires the process review runtime"
 
                     let sessionText = requiredText input "sessionID"
                     let callText = requiredText input "callID"
@@ -481,7 +501,8 @@ module MagicTodoHostHooks =
                                 let! messagesResult = snapshots.GetMessages sessionId
 
                                 match messagesResult with
-                                | Error reason -> return Error("snapshot unavailable: " + reason)
+                                | Error reason ->
+                                    return fatalInfrastructure sessionText ("snapshot unavailable: " + reason)
                                 | Ok messages ->
                                     match
                                         MagicTodoLocality.resolve
@@ -490,13 +511,17 @@ module MagicTodoHostHooks =
                                             (AgentJournal.snapshot durable)
                                             callId
                                     with
-                                    | Error reason -> return Error(sprintf "locality failed: %A" reason)
+                                    | Error reason ->
+                                        return fatalInfrastructure sessionText (sprintf "locality failed: %A" reason)
                                     | Ok initialLocality ->
                                         match
                                             MagicTodoLocality.materializeInput initialLocality providerInputCanonical
                                         with
                                         | Error reason ->
-                                            return Error(sprintf "input materialization failed: %A" reason)
+                                            return
+                                                fatalInfrastructure
+                                                    sessionText
+                                                    (sprintf "input materialization failed: %A" reason)
                                         | Ok locality ->
                                             let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
 
@@ -512,7 +537,13 @@ module MagicTodoHostHooks =
                                                 | Ok value -> Ok value
                                                 | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
                                                     Error "lag-1-retry"
-                                                | Error reason -> Error(sprintf "prepare failed: %A" reason)
+                                                | Error reason ->
+                                                    match syntaxPrepareFailure reason with
+                                                    | Some syntax -> Error syntax
+                                                    | None ->
+                                                        fatalInfrastructure
+                                                            sessionText
+                                                            (sprintf "prepare invariant failed: %A" reason)
 
                                             let rec admitAfterLag1 () =
                                                 task {
@@ -539,7 +570,10 @@ module MagicTodoHostHooks =
                                                                 writeId
                                                         with
                                                         | Error reason ->
-                                                            return Error("await ConsumableReview failed: " + reason)
+                                                            return
+                                                                fatalInfrastructure
+                                                                    sessionText
+                                                                    ("await ConsumableReview failed: " + reason)
                                                         | Ok() ->
                                                             match admitNow () with
                                                             | Ok value -> return Ok value
@@ -550,7 +584,8 @@ module MagicTodoHostHooks =
                                                         | Ok value -> return Ok value
                                                         | Error "lag-1-retry" ->
                                                             return
-                                                                Error
+                                                                fatalInfrastructure
+                                                                    sessionText
                                                                     "lag-1 wait without pending ConsumableReview (projection inconsistent)"
                                                         | Error reason -> return Error reason
                                                 }
@@ -567,14 +602,14 @@ module MagicTodoHostHooks =
                     let durable =
                         match journal with
                         | Some value -> value
-                        | None -> invalidOp "Magic Todo requires a durable AgentJournal"
+                        | None -> fatalInfrastructure "" "Magic Todo requires a durable AgentJournal"
 
                     let sessionText = requiredText input "sessionID"
                     let callText = requiredText input "callID"
                     let key = bridgeKey sessionText callText
 
                     match bridges.TryGetValue key with
-                    | false, _ -> invalidOp "Magic Todo after hook has no deferred prepare"
+                    | false, _ -> fatalInfrastructure sessionText "Magic Todo after hook has no deferred prepare"
                     | true, preparedTask ->
                         try
                             let! preparedResult = preparedTask
@@ -582,7 +617,7 @@ module MagicTodoHostHooks =
                             let prepared =
                                 match preparedResult with
                                 | Ok value -> value
-                                | Error reason -> invalidOp ("Magic Todo deferred prepare failed: " + reason)
+                                | Error syntaxReason -> invalidOp syntaxReason
 
                             let outputDigest = outputCanonical output |> HostDigest.sha256Hex
 
@@ -594,14 +629,16 @@ module MagicTodoHostHooks =
                                     prepared.Prepared.ProviderInputDigest
                                     outputDigest
                             with
-                            | Error reason -> invalidOp (sprintf "Magic Todo accept failed: %A" reason)
+                            | Error reason ->
+                                fatalInfrastructure sessionText (sprintf "Magic Todo accept invariant failed: %A" reason)
                             | Ok accepted ->
                                 if not (String.IsNullOrEmpty accepted.EnrichedResult) then
                                     MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
 
                                 if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
                                     match processReview with
-                                    | None -> () // before fail-closes this configuration before Prepared/Accepted
+                                    | None ->
+                                        fatalInfrastructure sessionText "Magic Todo process review runtime disappeared after before"
                                     | Some port ->
                                         match!
                                             port.EnsureReview
@@ -611,13 +648,9 @@ module MagicTodoHostHooks =
                                                 prepared.Prepared.TodoWriteId
                                         with
                                         | Error reason ->
-                                            // Accepted is already durable. A hidden reviewer startup failure
-                                            // cannot retroactively turn this todowrite into a provider-visible
-                                            // failure; Rk remains outstanding and every later reentry ensures it.
-                                            Diagnostic.emit
-                                                "magic-todo-review-ensure-deferred"
-                                                [ "session_id", SessionId.value prepared.ManagerSessionId
-                                                  "result", reason ]
+                                            fatalInfrastructure
+                                                sessionText
+                                                ("Magic Todo ensureReview infrastructure failed: " + reason)
                                         | Ok() -> ()
                         finally
                             bridges.Remove key |> ignore

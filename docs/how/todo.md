@@ -67,23 +67,24 @@ T1 无 prior lag-1 replacement（desiredCutoff(T1) 无 prior）。
 
 ```text
 todoCheckpointBefore:
-  1. require open Manager Life；V2 runner 无 hook parity → fail closed（TODO-004）
+  1. require open Manager Life；缺 Life / V2 hook parity / journal/snapshot/review runtime 均是 Host 不变量问题 → `Diagnostic.fatal` 终止 OpenCode（TODO-004）
   2. admitSingleCheckpointOrFail
        - 同 assistant message >1 不同 ToolCallId todowrite → 全部拒绝，无 ordinal winner（TODO-004）
        - 同 Life 同时最多一个新 admission
   3. same ToolCallId replay：
        - 已有 Prepared/Accepted → 校验 input/Life/BaseObligations/ordinal digest
        - 一致 → 同一 TodoWriteId / 同一 obligation account / 不新增 checkpoint
-       - 冲突 → identity corruption fail closed
+       - 冲突 → identity corruption → `Diagnostic.fatal`；不得作为 todowrite 红字返回
   4. synchronizePreviousReviewIfAny：
        - 若存在 Accepted(k-1) 且尚无 TodoReviewConcluded(k-1)
          → 阻塞至 ConsumableReview(k-1) durable（TODO-006）
-         → 该阻塞是合法因果等待，不是 `MagicTodoReject` 对 Manager 的 fail-closed 红字
+         → 该阻塞是合法因果等待，不是 `MagicTodoReject` 对 Manager 的红字
+       - Await/producer/runtime 返回 Error → infrastructure fatal，杀死 OpenCode；不伪装成当前 tool failure
        - 仅 VerdictKnown 不足
        - 读取 verdict/report 供本次 tool result 交付；**不**因此改 CurrentObligations
   5. C(k-1) = projection 当前最后 Accepted 对应 account（TODO-005）
   6. 读 provider input → decode obligations: [{ name, work }]（TODO-002）
-       - duplicate name → fail closed；禁止靠 work 文本猜 identity（TODO-003）
+       - blank/duplicate name → syntax reject，可红字；禁止靠 work 文本猜 identity（TODO-003）
        - provider account 必须描述 mission debt，不得用 `plan/analyze/write todos` meta-work 代替 T1 完整道路账
        - 禁止 kind/id/status/priority/reviewing 回流 provider 真值
   7. Pk = normalized submitted obligations
@@ -142,6 +143,7 @@ recovery path = 完整 SDK snapshot 中该 call ToolPart completed
      - fold Accepted 时 CurrentObligations **立即切到 Prepared.Submitted**（TODO-005）
      - Prepared + failed/absent/digest mismatch → 永不 Accepted，Current 不变
 3. ensure DedicatedTodoReviewer（每 Life 一次 logical；proven-loss 才 Replace）（TODO-008）
+   - create/resume/replace/assignment/runtime 异常 = infrastructure fatal；不返回 todowrite 红字
 4. ensureReview(Tk)：
      Accepted 且尚无 TodoReviewConcluded(Tk)
        → Rk 必然义务（TODO-006）
@@ -177,6 +179,8 @@ VerdictKnown(k)          // Reviewer 域 durable PERFECT|REVISE；立即定业�
   → append TodoReviewConcluded(k){ Verdict, WorkRecordRef, Digest, ... }
   → 此 fact 只封口 review obligation；不得写 CurrentObligations
   → 此后才可被 Tk+1 / suicide 同步
+
+任何 blob / Journal / XTrace / LWR / producer / reviewer runtime 异常都不编码成 REVISE/PERFECT，也不返回 tool error；调用 `Diagnostic.fatal` 终止 OpenCode。
 ```
 
 递归 CE（禁止一阶 PC / wall-clock poll；TODO-012）：
@@ -330,13 +334,15 @@ Blessed fast path **同样先** `drainLatestProcessReview`，然后才 rest in p
 ### 基础设施失败（非 verdict）
 
 ```text
-create/resume/assignment/LWR materialization failure
+create/resume/assignment/snapshot/locality/Journal/LWR materialization failure
   → 永远不是 REVISE/PERFECT
-  → 不推进 ConsumableReview
-  → obligation 保持 outstanding
-  → event-driven ensure（禁 wall-clock polling）
-  → 不可证明 → typed infra failure；Finality/下一 TodoWrite 不得越过（TODO-012）
+  → 永远不是 provider-visible todowrite failure
+  → Diagnostic.fatal("magic-todo-infrastructure-failed", ...)
+  → 打印一次结构化诊断
+  → 立即杀死整个 OpenCode 进程
 ```
+
+禁止「obligation 保持 outstanding 然后继续跑」的软失败模式：一旦 Wanxiangshu 无法证明 review/checkpoint 基础设施仍满足不变量，继续执行只会制造更难调试的半坏状态。调试人员应得到进程级失败，而 LLM 不应被要求理解插件自身故障。
 
 ---
 
@@ -349,7 +355,7 @@ create/resume/assignment/LWR materialization failure
 | Prepared，physical 未完成/失败 | 不 Accepted；下次 before 从 Journal canonical 覆盖 sink |
 | Prepared + live/recovery success，无 Accepted | ensure Accepted（digest 对齐） |
 | Accepted，无 ConsumableReview | derive Rk → ensure Dedicated/Assigned/ensureReview；VerdictKnown 无 LWR → await journal 同 snapshot 再结 |
-| reviewer prompt 已发，plugin crash | 证明原 session → resume；永久丢失 → Replace；不确定 → fail closed |
+| reviewer prompt 已发，plugin crash | 证明原 session → resume；永久丢失 → Replace；不确定 / contract 破坏 → `Diagnostic.fatal` kill OpenCode |
 | Concluded 已落，尚无下一 todowrite | 无需额外 fact；Current 早已由 Accepted 确定；下一 before/suicide 只消费 review feedback |
 | executor 成功，无 Accepted | 仅 Prepared+completed ToolPart 可 ensure Accepted；否则 checkpoint 未成立 |
 | desired cutoff 有、PrefixEpoch 未 commit | 下一次 transform seal 前原子 commit（无 RebasePending Stage） |

@@ -75,20 +75,40 @@ Obligation = { name, work }
 
 禁止把进度伪装成 provider-visible status 枚举（`pending` / `in_progress` / `reviewing` / `completed` / `cancelled`）。真实性由 process review 与 Manager 下一轮 truthful account 判断，不另造机械枚举机。
 
-同一 proposed list 内 duplicate `name` → fail closed。  
+同一 proposed list 内 duplicate `name` → 语法拒绝，可作为本次 tool 红字返回。  
 禁止靠 `work` 文本猜 identity。Host 内部若需稳定 id，不得穿过 provider horizon。
 
 ## TODO-004：Admission、replay 与 V2 门禁
 
-1. **同 message 多 todowrite**：同一 assistant message 出现 >1 个不同 `ToolCallId` 的 `todowrite` → **全部 fail closed**；无 ordinal winner、无 hook 到达顺序/wall-clock 仲裁。  
+1. **同 message 多 todowrite**：同一 assistant message 出现 >1 个不同 `ToolCallId` 的 `todowrite` → **全部作为调用语法/协议错误拒绝**；这是允许出现 provider 红字的类别。无 ordinal winner、无 hook 到达顺序/wall-clock 仲裁。  
 2. **单 inflight**：同一 Manager Life 同时最多一个新 checkpoint admission。  
-3. **Same ToolCallId replay**：幂等为同一 `TodoWriteId` / 同一 obligation account；`TodoWritePrepared.ProviderInputDigest`（tagged provider arguments 的 canonical digest）及 Life / BaseObligations / ordinal 合同必须与既有 Prepared 一致，否则 identity corruption fail closed；不新增 checkpoint / review。  
+3. **Same ToolCallId replay**：幂等为同一 `TodoWriteId` / 同一 obligation account；`TodoWritePrepared.ProviderInputDigest` 及 Life / BaseObligations / ordinal 合同必须与既有 Prepared 一致。若冲突，这是内部 identity corruption / replay contract 破坏，属于基础设施不变量失败：**fatal OpenCode**，不得降格成 tool 红字。不新增 checkpoint / review。  
 4. **不同 ToolCallId**：即使 list 相同也是新 checkpoint。  
 5. **Physical success 双路径**（live after-success / recovery completed ToolPart）必须收敛到同一 `TodoWriteId + input digest + output digest` 才可 `TodoWriteAccepted`。
 
 `TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 `TodoWritePrepared` 返回的真实 Journal `EventId`；不得重猜、伪造或用逻辑 id 代替。fold 必须拒绝不匹配的引用。
 
-**V2 fail-closed**：在 V2 runner 获得与 V1 等价的 tool definition / before / after hook contract 及 canary 证明之前，Magic-Todo Manager Attempt **不得**使用 V2 todowrite execution path。不是「V1 有协议、V2 暂时裸奔」。无 hook parity → 禁止上线；长期不维护两套不同 Magic Todo 语义。
+**失败分型（最终裁决）**：
+
+```text
+Syntax / call-shape failure
+  → 只拒绝当前 todowrite
+  → provider 红字允许
+
+Semantic review failure = REVISE
+  → 正常成功路径
+  → 自然语言反馈 + WorkRecord
+  → 绝不红字
+
+Wanxiangshu / infrastructure invariant failure
+  → Diagnostic.fatal
+  → 打印诊断后直接杀死整个 OpenCode 进程
+  → 绝不能作为 tool error 返回给 LLM
+```
+
+基础设施类包括但不限于：缺 AgentJournal / snapshot port / processReview runtime、snapshot/locality/materialization 失败、blob/journal I/O 或 digest 破坏、projection inconsistency、Prepared/Accepted identity corruption、hidden reviewer producer/assignment/runtime 异常。这样调试人员能立即看到真实故障，而 LLM 只会看到自己真正写错的调用语法或 reviewer 对工作语义的正常反馈。
+
+**V2 fail-closed**：在 V2 runner 获得与 V1 等价的 tool definition / before / after hook contract 及 canary 证明之前，Magic-Todo Manager Attempt **不得**使用 V2 todowrite execution path。这里的「fail-closed」属于部署/启动不变量：若错误进入该路径，应 fatal OpenCode，而不是给 LLM 一次 todowrite 红字。
 
 ## TODO-005：Accepted supersession 与 CurrentObligations
 
@@ -130,7 +150,7 @@ TodoWrite k  synchronizes Review(k-1)
 ```
 
 Rk **不**阻塞 Tk 返回；Manager 可立即做后续独立工作。  
-T(k+1) 到来时若 Rk 尚未形成 ConsumableReview → **必须作为合法因果等待**直至 `TodoReviewConcluded(k)` durable；不得把这一等待渲染成 provider 红字。Rk 成为 ConsumableReview 后，T(k+1) 才继续 admission。该同步只保证 Manager 不无限领先于真实性反馈；它不把 reviewer 变成 CurrentObligations 的提交者（TODO-005）。
+T(k+1) 到来时若 Rk 尚未形成 ConsumableReview → **必须作为合法因果等待**直至 `TodoReviewConcluded(k)` durable；不得把这一等待渲染成 provider 红字。Rk 成为 ConsumableReview 后，T(k+1) 才继续 admission。若等待链暴露出 reviewer/runtime/snapshot/Journal/locality 等基础设施异常，则这不是 tool failure：Host 必须 `Diagnostic.fatal` 记录后直接杀死整个 OpenCode 进程，交给调试人员处理；绝不得把「万象术自身失败」伪装成一次 todowrite 红字继续跑。
 
 ```text
 VerdictKnown(k)

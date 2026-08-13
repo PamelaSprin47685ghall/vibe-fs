@@ -12,25 +12,57 @@ module Representation =
     let private provenanceStrength action =
         action.Provenance |> List.distinct |> List.length
 
-    let dominates (left: CognitiveAction) (right: CognitiveAction) =
+    let private dominatesWith
+        (left: CognitiveAction)
+        leftStrength
+        (right: CognitiveAction)
+        rightStrength
+        =
         left.ExpectedRootGain >= right.ExpectedRootGain
         && left.GatewayGain >= right.GatewayGain
         && left.Value >= right.Value
         && left.Cost <= right.Cost
-        && provenanceStrength left >= provenanceStrength right
+        && leftStrength >= rightStrength
         && (left.ExpectedRootGain > right.ExpectedRootGain
             || left.GatewayGain > right.GatewayGain
             || left.Value > right.Value
             || left.Cost < right.Cost
-            || provenanceStrength left > provenanceStrength right)
+            || leftStrength > rightStrength)
+
+    let dominates (left: CognitiveAction) (right: CognitiveAction) =
+        dominatesWith left (provenanceStrength left) right (provenanceStrength right)
 
     let paretoFrontier actions =
-        actions
-        |> List.filter (fun candidate ->
+        let scored =
             actions
-            |> List.exists (fun other -> other.Id <> candidate.Id && dominates other candidate)
-            |> not)
-        |> List.sortBy (fun action -> -action.Value, action.Cost, -provenanceStrength action, action.Id)
+            |> List.map (fun action -> action, provenanceStrength action)
+
+        let ordered =
+            scored
+            |> List.sortBy (fun (action, strength) ->
+                -action.ExpectedRootGain,
+                -action.GatewayGain,
+                -action.Value,
+                action.Cost,
+                -strength,
+                action.Id)
+
+        ordered
+        |> List.fold
+            (fun frontier ((candidate, candidateStrength) as item) ->
+                let dominated =
+                    frontier
+                    |> List.exists (fun (other, otherStrength) ->
+                        other.Id <> candidate.Id
+                        && dominatesWith other otherStrength candidate candidateStrength)
+
+                if dominated then
+                    frontier
+                else
+                    item :: frontier)
+            []
+        |> List.sortBy (fun (action, strength) -> -action.Value, action.Cost, -strength, action.Id)
+        |> List.map fst
 
     let representative actions =
         paretoFrontier actions

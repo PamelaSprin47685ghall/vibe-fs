@@ -30,8 +30,15 @@ module Search =
         if problem.Edges |> List.exists (fun edge -> edge.Cost < 0.0) then
             None
         else
+            let neighborsOf =
+                problem.Edges
+                |> List.groupBy (fun edge -> edge.FromNode)
+                |> Map.ofList
+
             let neighbors node =
-                problem.Edges |> List.filter (fun edge -> edge.FromNode = node)
+                neighborsOf
+                |> Map.tryFind node
+                |> Option.defaultValue []
 
             let heuristic node =
                 problem.Heuristic |> Map.tryFind node |> Option.defaultValue 0.0

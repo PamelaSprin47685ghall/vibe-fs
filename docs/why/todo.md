@@ -18,8 +18,11 @@ GrandRewrite 删除 provider `kind/id/status/priority/reviewing` 后，`todowrit
 **Provider 冷状态：删除 vs 内部兼容。**  
 拒把 `kind/id/status/priority/reviewing/completed/cancelled` 带回 provider horizon。旧 Journal/Host sink 若为迁移仍需读历史形状，只能留在 compatibility boundary；新 admission、CurrentObligations、prompt 与 review 都以 `{name,work}` account 为唯一语言（TODO-002/003/007）。
 
-**Admission：同 message 全拒 vs ordinal winner；V2 fail-closed vs 裸奔。**  
-拒 winner 仲裁：多一个不必要的排序面，且与 lag-1 单链冲突（TODO-004）。拒 V2 裸奔：双语义长期分叉。
+**失败分型：tool red vs semantic REVISE vs infrastructure fatal。**  
+用户最终裁决：红字只属于模型写错的调用语法/shape；Reviewer REVISE 是语义判断，必须走正常结果；万象术或 Host 基础设施异常不能伪装成 tool failure，而应 `Diagnostic.fatal` 杀死整个 OpenCode 供调试。拒“所有异常都 invalidOp”的做法：它把 snapshot/journal/reviewer bug 错怪给 LLM，并允许已破坏不变量的进程继续执行。拒“infra 自动降级继续跑”：那会静默丢 review/recovery 真值。故 infrastructure fatal 是 fail-fast，不是 provider fail-closed。
+
+**Admission：同 message 全拒 vs ordinal winner；V2 裸奔。**  
+拒 winner 仲裁：多一个不必要的排序面，且与 lag-1 单链冲突（TODO-004）。同 message 多调用是调用协议错误，可红字。拒 V2 裸奔：双语义长期分叉；错误进入不具 parity 的 path 属于部署不变量破坏，fatal OpenCode。
 
 **CurrentObligations：Accepted supersession vs reviewer settlement。**  
 GrandRewrite 明确取代旧 `settled/proposed/semanticMerge`：每个 accepted account 就是 Manager 当下对 mission debt 的权威陈述，立即 supersede 上一个。若再让 process reviewer 以 PERFECT/REVISE 决定哪个 account 才「真正生效」，会制造 accepted-but-not-current 半态、回滚语义和第二 writer。故 reviewer 只判断并报告；REVISE 不涂改 Tk，只迫使 Manager 在后续 checkpoint 写出更真实的新 account（TODO-005）。这也让 crash recovery 只需重放 Accepted 链，不再重演 merge 策略。
@@ -27,7 +30,7 @@ GrandRewrite 明确取代旧 `settled/proposed/semanticMerge`：每个 accepted 
 **评审节拍：lag-1 1:1 vs 同次等待自己的 Rk / 无阻塞多飞。**  
 拒同次等待 Rk：Manager 无法在评审期间做独立工作。拒无阻塞多飞：结算链失去单链公式（TODO-006）。  
 **可消费结论：Concluded≡record-ready LWR vs verdict 即消费。**  
-拒「只有 verdict、尚无 report」中间态挤进同一 fact：下一 checkpoint 会消费空报告或竞态半态。`VerdictKnown` 复用 Reviewer 域，不造 Magic bool/Stage。
+拒「只有 verdict、尚无 report」中间态挤进同一 fact：下一 checkpoint 会消费空报告或竞态半态。`VerdictKnown` 复用 Reviewer 域，不造 Magic bool/Stage。若 reviewer infrastructure 无法把已知 verdict 物化成合法 ConsumableReview，不伪造 REVISE/PERFECT，也不向 LLM 抛 tool error；直接 fatal Host，让故障停在真实层级。
 
 **真相源：Journal canonical vs Host TodoTable。**  
 拒 Host 表当 canonical：Host 表是兼容 UI sink，不能决定 account identity、review cadence 或 recovery。新世界不再需要 `reviewing/merge`；Accepted 的 Prepared→Proposed 引用就是 CurrentObligations。sink 漂移只做幂等纯投影修复，REVISE 不触发 rollback（TODO-007）。

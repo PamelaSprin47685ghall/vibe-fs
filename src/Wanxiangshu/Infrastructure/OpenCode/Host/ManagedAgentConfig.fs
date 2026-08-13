@@ -257,6 +257,7 @@ module ManagedAgentConfig =
                     | _ -> ()
 
     let private loggedSource = ref false
+    let private liveInventory: ManagedAgentInventory option ref = ref None
 
     /// Best-effort bindings for the Error path: role knowledge only, no model
     /// validation (the model checks are what failed). Enough to write owned
@@ -284,6 +285,7 @@ module ManagedAgentConfig =
             Error err
         | Ok inventory ->
             applyOwnedFields config inventory
+            liveInventory := Some inventory
 
             if not loggedSource.Value then
                 loggedSource.Value <- true
