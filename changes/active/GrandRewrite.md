@@ -5885,7 +5885,7 @@ Wanxiangshu / infrastructure invariant failure
   基础设施类包括缺 Journal/snapshot/review runtime、snapshot/locality/materialization、blob/journal/digest/projection/Prepared identity、hidden reviewer producer/assignment/LWR/runtime 等不变量失败。
 - **Provider surface**：普通 accepted = `# Keep working.`（或等价静默成功）；上一 process PERFECT 静默；上一 REVISE = `# An earlier account of the work left something unresolved.` + canonical ProcessReviewLWR。不得回显 `settled/proposed/preview/status/reviewing` DTO。
 - **Clean break 实现方向**：新生产代数只保留 `{name,work}` obligation account、TodoWriteId/TodoReviewId/DedicatedReviewerId、Prepared/Accepted、lag-1 review。`TodoStatus / TodoItemId / MagicTodoInputItem / MagicTodoList / semanticMerge` 不得再是生产编译 owner；旧资源若物理残留只可作为明确 retired tombstone，不得可寻址恢复旧语义。
-- **Prompt owner**：meta-todo 边界同时写进 Planning Table、`todowrite` description、Manager Role Law；Host 不用自然语言关键词分类器猜 meta todo，避免重新发明隐藏 phase machine。
+- **Prompt owner**：具体的 first-`todowrite` / T1 时序只属于 Planning Table 与 `todowrite` description；Manager Role Law 只保留工具无关的认知原则——planning/analyzing/listing-next-steps 是 Manager 自己的 cognition，不是 mission debt。Role Law 不得出现 `todowrite` 等工具 inventory（identity ≠ mechanism）。Host 也不用自然语言关键词分类器猜 meta todo，避免重新发明隐藏 phase machine。
 - **验证记录**：本 Amendment 落地后的 Magic Todo 定向集曾在同一工作树完成 Fable `build ok`，随后 `72/72` targeted unit/canary/invariant 通过（Current supersession、REVISE feedback、lag-1、fatal triage、T1/Planning Table、Host codec/canary、prompt stability）。之后全量 unit 再验证被并行中的 `HostForkAgent.fs` 未完成编辑阻断；该并行编译错误不属于 Magic Todo，不得据此把本 Amendment 标成全栈已绿。
 - **关闭状态**：GrandRewrite 仍保持 `active/`；本 Amendment 只冻结 Magic Todo 的当前语义与已验证范围。
 

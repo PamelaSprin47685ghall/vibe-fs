@@ -169,3 +169,23 @@ ARCH-010 指令/数据分离：附件属背景数据，不进入 `Assignment`；
 # 8. 一句话
 
 `fork` 追加可选 `attach: X`：把本 mission 内另一 person X 的 canonical LWR（includeOpening=true，父→子版本）作为**背景附件**注入首 prompt——它可能对本次工作有价值，但不改变 charge，也不把 X 的未竟工作变成被 fork 人的义务。
+
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 已冻结（上方 §0–§8）；本节只追加实施状态。
+
+- Source: `changes/proposed/fork-attach.md` → `changes/active/fork-attach.md`（2026-08-13，用户明确启动）
+- Scope lock: 仅 §5「做」范围；§5「不做」禁止扩张。
+- Remaining work:
+  1. docs why→what→shape→how→proof 全链（EXEC-002 / AGENT-032 / EXEC-030 / ARCH-010 / COMPANION-003 / GLORY-025 + Glossary `attach`/`attached_work_record`）
+  2. `ForkChildPayload.fs`：Attachment 输入 + `fork-child-attachment` prose 路径 + 渲染顺序
+  3. `ForkTool.fs`：`attach` 可选参数 schema/decode + Byname→LWR 解析 + 错误文案（未知/自附/忙）
+  4. `HostForkAgent.fs`：附件传参进 relay（reuse + busy nudge 语义）
+  5. prose：`delegation/fork-child-attachment/{en,zh-CN}.md` + `tool/fork/arg-attach/{en,zh-CN}.md` + `tool/fork/attach-deferred-busy/{en,zh-CN}.md`
+  6. checks：`semantic-anchors.mjs` + `language-parity-gate.mjs`
+  7. tests：`fork-tool.test.mjs` + `manager-tool-contract.test.mjs`（attach 解析/渲染/未知/LWR 为空/自附/busy）+ size baseline
+- Blockers: 无（待实现中发现则追加）
+- Completion criteria: docs 全链闭环 + 实现与 §3–§4 语义一致 + proof/tests/gates 全绿 + 本文件追加 Final outcome 后移入 `changes/completed/`

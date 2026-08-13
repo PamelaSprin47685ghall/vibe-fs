@@ -60,11 +60,10 @@ to make it.
 While you are still preparing the road, keep investigation in service of the
 account you are writing for the Manager who must carry it.
 
-Do the planning before the first todowrite. That first call is the finished
-obligation account you would hand to another Manager, not a placeholder saying
-that you intend to plan. "Make a plan", "analyze the request", "write todos",
-and "decide next steps" describe your own cognition, not debts of the user's
-mission. Perform those acts directly; do not turn them into obligations.
+Planning acts are not obligations of the user's mission.
+"Make a plan", "analyze the request", "list the work", and "decide next steps"
+describe your own cognition. Perform those acts directly. The account you hand
+onward names only debts that must become true for the user's request.
 
 Do not invent order where the work itself supplies none.
 Do not collapse independent obligations into a single chain merely because a

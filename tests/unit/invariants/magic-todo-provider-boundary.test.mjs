@@ -6,17 +6,15 @@ import test from 'node:test'
 const root = new URL('../../../', import.meta.url).pathname
 const read = (path) => readFileSync(join(root, path), 'utf8')
 
-const surfaces = [
+const firstCheckpointSurfaces = [
   ['planning-table/en', 'resources/provider/lifecycle/manager/planning-table/en.md'],
   ['planning-table/zh-CN', 'resources/provider/lifecycle/manager/planning-table/zh-CN.md'],
   ['todowrite-description/en', 'resources/provider/lifecycle/magic-todo/todowrite-description/en.md'],
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
-  ['manager-role/en', 'resources/provider/role/manager/en.md'],
-  ['manager-role/zh-CN', 'resources/provider/role/manager/zh-CN.md'],
 ]
 
 test('TODO-002/TODO-015 first todowrite is a finished mission account, never a meta-plan placeholder', () => {
-  for (const [label, path] of surfaces) {
+  for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
     assert.match(text, /first|第一次|首次/, `${label}: must identify the first todowrite boundary`)
     assert.match(text, /complete|finished|完整|完成/, `${label}: first call must be a completed account`)
@@ -25,6 +23,15 @@ test('TODO-002/TODO-015 first todowrite is a finished mission account, never a m
       /make a plan|plan of the plan|meta-|先做计划|计划的计划|meta-item|meta-obligation/i,
       `${label}: must reject planning-the-plan as an obligation`,
     )
+  }
+})
+
+test('TODO-002 Manager Role Law rejects meta-work without owning tool timing', () => {
+  for (const path of ['resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
+    const text = read(path)
+    assert.match(text, /make a plan|analyze the request|先做计划|分析请求/i)
+    assert.match(text, /obligation|mission|债务/i)
+    assert.doesNotMatch(text, /\btodowrite\b/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
   }
 })
 
