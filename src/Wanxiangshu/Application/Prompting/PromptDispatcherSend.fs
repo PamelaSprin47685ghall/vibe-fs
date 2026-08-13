@@ -154,7 +154,8 @@ module PromptDispatcherSend =
                               Agent = Some agent
                               Directory = directory
                               Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
-                              Tools = tools }
+                              Tools = tools
+                              BindingIntent = SessionBindingIntent.Preserve }
 
                         let! outcome = port.SendPrompt(sessionId, text, options)
 
@@ -248,7 +249,12 @@ module PromptDispatcherSend =
                           Agent = Some effectiveAgent
                           Directory = directory
                           Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
-                          Tools = tools }
+                          Tools = tools
+                          BindingIntent =
+                            if effectiveAgent = profile.SelectedAgent then
+                                SessionBindingIntent.Preserve
+                            else
+                                SessionBindingIntent.ExplicitExecutionOverride }
 
                     let! outcome = port.SendPrompt(sessionId, text, options)
 

@@ -6,6 +6,8 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 `AttemptExecutionProfile` 必须原子：从 session cache 拼装会让 Role、工具面、probe 选择在同一请求内不一致，后续 seal/review 全部失真。
 
+Session execution binding 以 parent 边界分权：无 parent 的 user-facing session 允许真实用户下一条消息显式选择新的 agent/model，并由 Host 继续沿用；插件自产 request 不是用户选择，仍须沿用最近真实用户 binding。有 parent 的 managed session 绑定属于创建事实，普通 hook/prompt 参数不是重绑授权。拒“这次 request 写了什么就跟什么”：一次疏忽即可把 session 静默带到另一模型，且后续消息继续沿用错误状态。内部临时 fallback/assistance 换档必须由 typed execution override 明示，不能改写 frozen base binding。
+
 万象术没有单一 system prompt，只有语言系统。每个 provider-facing 文本恰属一个权威：World / Role / Library / Runtime / Mission。冲突按语义所有权边界裁决，不设「更靠近 system 者胜」全序。
 
 ## 备选与被拒

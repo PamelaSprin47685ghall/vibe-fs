@@ -54,6 +54,11 @@ type InjectedSessionPort
 
             findRoot sessionId
 
+    let managedChild (sessionId: SessionId) =
+        lock lockObj (fun () -> childParents.ContainsKey sessionId)
+        || restoredParent sessionId |> Option.isSome
+        || SessionExecutionBinding.tryParent sessionId |> Option.isSome
+
     let registerChild (parentId: SessionId) (childId: SessionId) =
         lock lockObj (fun () ->
             let rootId =
@@ -138,18 +143,35 @@ type InjectedSessionPort
                     // same wrong order cannot fix it.
                     return Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
                 else
-                    match underlyingPort with
-                    | Some port ->
-                        // Pass the outcome through unchanged. This layer knows less
-                        // about acceptance than the port does; narrowing here is how
-                        // AcceptanceUnknown used to become a plain error.
-                        return! port.SendPrompt sessionId text opts
-                    | None ->
-                        // No Host transport was resolved from the plugin input. The
-                        // previous code fabricated a completed AgentRunResult with
-                        // "test output" here, which made a misconfigured runtime
-                        // indistinguishable from a finished agent.
-                        return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
+                    let normalized =
+                        if managedChild sessionId then
+                            SessionExecutionBinding.normalizeManagedPrompt sessionId opts
+                        else
+                            SessionExecutionBinding.normalizeUserFacingPrompt sessionId opts
+
+                    match normalized with
+                    | Error error -> return Fatal error
+                    | Ok sendOptions ->
+                        match underlyingPort with
+                        | Some port ->
+                            // chat.params runs inside the Host send. Mark this interval so
+                            // its root-session observer cannot mistake our own continuation
+                            // or typed override for a new external user choice.
+                            SessionExecutionBinding.beginInternalSend sessionId
+
+                            try
+                                // Pass the outcome through unchanged. This layer knows less
+                                // about acceptance than the port does; narrowing here is how
+                                // AcceptanceUnknown used to become a plain error.
+                                return! port.SendPrompt sessionId text sendOptions
+                            finally
+                                SessionExecutionBinding.endInternalSend sessionId
+                        | None ->
+                            // No Host transport was resolved from the plugin input. The
+                            // previous code fabricated a completed AgentRunResult with
+                            // "test output" here, which made a misconfigured runtime
+                            // indistinguishable from a finished agent.
+                            return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
             }
 
         member me.AbortSession(sessionId) =
@@ -187,6 +209,8 @@ type InjectedSessionPort
                     match res with
                     | Ok childId ->
                         registerChild rootId childId
+                        SessionExecutionBinding.bind parentId childId options.Agent
+
                         // HOST-026: inherit owner/commissioner language (parentId), not family root.
                         ProviderLanguageBinding.ensureInherited parentId childId |> ignore
                         return Ok childId

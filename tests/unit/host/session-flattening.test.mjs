@@ -16,11 +16,13 @@ import { FSharpResult$2_Ok as ok } from '../../../dist/fable_modules/fable-libra
 // Host parentID.
 
 const eventPort = { SubscribeTerminalListener: () => ({ Dispose: () => {} }) }
+let childSequence = 0
 
 const openCodePort = (createdParents, aborts) => ({
   CreateChildSession: async (parentId) => {
     createdParents.push(parentId.fields[0])
-    return ok(sessionId(`child-${createdParents.length}`))
+    childSequence += 1
+    return ok(sessionId(`child-${childSequence}`))
   },
   ListChildren: async () => ok(ofArray([])),
   AbortSession: async (id) => {

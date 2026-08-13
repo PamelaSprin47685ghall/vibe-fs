@@ -60,6 +60,7 @@ type PluginSessionScope() =
         this.OwnedSessions.Remove sessionId |> ignore
         this.UserMessageBindings.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
+        SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore

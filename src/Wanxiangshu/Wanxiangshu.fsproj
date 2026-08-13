@@ -264,6 +264,7 @@
     <Compile Include="Application/Strength/StrengthTraceRecovery.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/SessionExecutionBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ProviderLanguageBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PersonaBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>

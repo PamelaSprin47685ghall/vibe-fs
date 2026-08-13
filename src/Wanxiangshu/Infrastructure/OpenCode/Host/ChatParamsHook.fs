@@ -6,13 +6,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 
-/// Pin the provider request to the bound model of the *request* agent.
+/// Observe external root binding; compatibility-pin parented managed sessions.
 ///
-/// OpenCode may otherwise resolve an agent-less or history-inferred request to
-/// the default build / Fast model. That is an unjustified Deep → Fast
-/// downgrade: Fallback and Strength already change the Agent name when a tier
-/// switch is intended, so this hook follows the request agent (or, if the
-/// Host omitted it, the Authority Root SelectedAgent) and never invents Fast.
+/// PROMPT-006 binding authority lives at InjectedSessionPort.SendPrompt. For a
+/// user-facing root this hook records the Host-resolved agent/model only when the
+/// request did not originate from our own SendPrompt. Older Host builds that still
+/// honor output.model also get the frozen child agent's model as an extra guard.
 module ChatParamsHook =
 
     let private nonEmpty (value: string) =
@@ -69,48 +68,55 @@ module ChatParamsHook =
             else
                 None
 
-    let private selectedAgent (journal: AgentJournal option) (sessionId: SessionId option) =
-        match journal, sessionId with
-        | Some durable, Some sid ->
-            let projections = (AgentJournal.snapshot durable).AgentProjections
+    let private userMessageBinding (source: obj) =
+        if isNull source || isNull source?message then
+            None
+        else
+            match readString source?message "agent", currentModel source?message with
+            | Some agent, Some model -> Some(agent, model)
+            | _ -> None
 
-            PromptAuthorityLedger.activeProfile sid projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sid projections)
-            |> Option.map (fun profile -> profile.SelectedAgent)
-        | _ -> None
+    let private managedChildAgent (sessionId: SessionId option) =
+        match sessionId with
+        | None -> None
+        | Some sid ->
+            match
+                SessionExecutionBinding.tryParent sid,
+                SessionExecutionBinding.tryAgent sid
+            with
+            | Some _, Some agent -> nonEmpty agent
+            | _ -> None
 
     let create
-        (journal: AgentJournal option)
+        (_journal: AgentJournal option)
         (inventoryOf: unit -> ManagedAgentConfig.ManagedAgentInventory)
         : obj =
         box (fun (inputObj: obj) (outputObj: obj) ->
             if isNull outputObj then
                 ()
             else
-                let requestAgent =
-                    agentOf inputObj
-                    |> Option.orElseWith (fun () -> agentOf outputObj)
-                    |> Option.orElseWith (fun () ->
-                        selectedAgent
-                            journal
-                            (sessionIdOf inputObj |> Option.orElseWith (fun () -> sessionIdOf outputObj)))
-
-                match requestAgent with
+                match sessionIdOf inputObj |> Option.orElseWith (fun () -> sessionIdOf outputObj) with
                 | None -> ()
-                | Some agent ->
-                    let current =
-                        currentModel outputObj
-                        |> Option.orElseWith (fun () -> currentModel inputObj)
-
-                    let inventory = inventoryOf ()
-
-                    match ManagedAgentConfig.tryOpencodeModel inventory agent current with
-                    | Some model -> outputObj?model <- box model
+                | Some sessionId ->
+                    match managedChildAgent (Some sessionId) with
                     | None ->
-                        // Bare model ids cannot invent a provider (tryOpencodeModel).
-                        // Still pin the bound id as a string so Host cannot keep a
-                        // Fast default when the request agent is Deep.
-                        match Map.tryFind (agent.Trim()) inventory.Bindings with
-                        | Some binding when not (String.IsNullOrWhiteSpace binding.Model) ->
-                            outputObj?model <- box (binding.Model.Trim())
-                        | _ -> ())
+                        userMessageBinding inputObj
+                        |> Option.iter (fun (agent, model) ->
+                            SessionExecutionBinding.observeUserFacing sessionId agent model)
+                    | Some agent ->
+                        let current =
+                            currentModel outputObj
+                            |> Option.orElseWith (fun () -> currentModel inputObj)
+
+                        let inventory = inventoryOf ()
+
+                        match ManagedAgentConfig.tryOpencodeModel inventory agent current with
+                        | Some model -> outputObj?model <- box model
+                        | None ->
+                            // Bare model ids cannot invent a provider (tryOpencodeModel).
+                            // Still pin the bound id as a string for older Host builds;
+                            // current Host ignores this field and SendPrompt remains law.
+                            match Map.tryFind (agent.Trim()) inventory.Bindings with
+                            | Some binding when not (String.IsNullOrWhiteSpace binding.Model) ->
+                                outputObj?model <- box (binding.Model.Trim())
+                            | _ -> ())

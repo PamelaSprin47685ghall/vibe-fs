@@ -66,6 +66,14 @@ Continuation 只延续已有 Logical Run：
 
 `JoinGuard` 语义见 EXEC-016。
 
+## PROMPT-006：Session execution binding
+
+无 parent 的 user-facing session 的 base binding 由最近一次真实外部用户请求决定：用户可用新的 agent/model 发送下一条消息并更新 base。插件自产 prompt / hook / continuation 不是用户重绑证据；普通 `Preserve` 必须沿用最近观测到的 base agent/model。
+
+有 parent 的 managed session 冻结创建时 execution binding。普通 hook / prompt / continuation 必须保持 frozen agent/model；请求字段与当前 Host default 都不能成为重绑依据。发现 agent/model 不一致 → fail closed，禁止静默发送。
+
+Fallback / Assistance 等现行显式换档只允许通过 typed `ExplicitExecutionOverride` 做单次 execution override；override 不改变 frozen base binding。下一次普通发送仍恢复 base binding。未知或缺失 base binding 同样 fail closed。
+
 ## PROMPT-018：Assistance continuation 不改变 authority
 
 `NeedHelpEscalation` 与 `NeedHelpAdvice` 是 typed ContinuationKind。二者延长当前 LogicalRun，必须复用现有 AuthorityRoot、CanonicalRole、Persona、system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset FallbackCursor、不得记作 ProviderRetryAttempt。

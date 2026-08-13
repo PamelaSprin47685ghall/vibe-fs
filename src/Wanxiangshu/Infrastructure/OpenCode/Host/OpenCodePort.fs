@@ -9,6 +9,11 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
 
+[<RequireQualifiedAccess>]
+type SessionBindingIntent =
+    | Preserve
+    | ExplicitExecutionOverride
+
 type OpenCodePromptOptions =
     {
         Model: OpencodeModel option
@@ -17,6 +22,7 @@ type OpenCodePromptOptions =
         Metadata: obj option
         /// PROMPT-012: complete request-local provider tool surface.
         Tools: Map<string, bool> option
+        BindingIntent: SessionBindingIntent
     }
 
 type IPromptPort =

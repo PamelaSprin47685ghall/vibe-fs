@@ -34,6 +34,12 @@ type PromptAbandonReason =
 - `accepted-*` 升级为 PhysicalAccepted  
 - 从 Submitted 推断 Authority 已生效  
 
+## Binding 海关（PROMPT-006）
+
+`InjectedSessionPort` 是 provider send 前最后一个 execution-binding owner。`SessionExecutionBinding` 对 parented managed session 记录 parent + frozen base agent/model；对无 parent user-facing session 只记录 `chat.params` 在非内部 send 区间观测到的最近 `input.message.agent/model`，不读 title/compaction 等顶层 provider agent/model。
+
+普通发送 = `Preserve`：已有 base binding 时必须与 base agent/model 完全一致后才能进入 `prompt_async`。Fallback / Assistance 的单次换档必须显式标为 `ExplicitExecutionOverride`；该 intent 只授权本次 request，不更新 base binding。root 的真实用户下一条消息可更新 base；插件自产 request 不可。
+
 ## PROMPT-008：原子 AttemptExecutionProfile
 
 一次 provider request 的执行身份必须来自**同一个不可变** profile：

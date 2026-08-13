@@ -165,7 +165,8 @@ module BookkeeperRuntime =
           Agent = Some "fast-inspector"
           Directory = None
           Metadata = None
-          Tools = Some(Map.ofList [ "*", false; "js-bookkeeper", true ]) }
+          Tools = Some(Map.ofList [ "*", false; "js-bookkeeper", true ])
+          BindingIntent = SessionBindingIntent.Preserve }
 
     let private retire (sessions: ISessionHostPort) (childId: SessionId) : Task<unit> =
         task {

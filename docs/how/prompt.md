@@ -10,7 +10,7 @@ Authority、PromptKey 和发送 writer 边界见 `shape/prompt.md`。
 
 ---
 
-## PROMPT-006：发送格式
+## 发送格式（PROMPT-006）
 
 每次发送固定：
 
@@ -22,13 +22,13 @@ Authority、PromptKey 和发送 writer 边界见 `shape/prompt.md`。
   Tools = requestToolOverride }
 ```
 
-Dispatcher 默认 `Model = None`：Host 按 `config.agent[effectiveAgent].model` 解析，并在 `prompt_async` 前写入该绑定。OpenCode 在缺 agent / model 时会 `defaultInfo()` 落到 Fast，把既有 Deep child 覆盖掉。
+Dispatcher 默认 `Model = None`：Host-final managed binding 负责解析 model；provider send 海关在 `prompt_async` 前把 parented session 的 base agent/model 显式写回。OpenCode 在缺 agent / model 时会 `defaultInfo()` 落到 Fast，把既有 Deep child 覆盖掉。
 
-续做既有 session（Fork existing / Reuse / SyncDelegate 复用 / Reviewer 续发）必须发送该 session 已绑定 managed agent：Durable Handle `TargetAgent`，否则 ChildRun.Agent，否则 Authority `SelectedAgent`。禁止从 Role 发明 `fast-ROLE`，禁止用调用方缺省把 `deep-*` 换成 `fast-*`。
+续做既有 parented session（Fork existing / Reuse / SyncDelegate 复用 / Reviewer 续发）必须发送 frozen managed agent：创建时 agent；恢复后由 durable Handle `TargetAgent` / Authority `SelectedAgent` 重建。普通 `Preserve` request 若 agent/model 与 frozen base binding 不一致 → fail closed，禁止调用 Host。
 
-有意换档只改 Agent（Fallback EffectiveAgent、Strength replica `fast-*`、NeedHelpEscalation `deep-*`）。
+有意换档（Fallback EffectiveAgent、NeedHelpEscalation 等）必须显式使用 `ExplicitExecutionOverride`；override 只影响本次 request，不重写 frozen base binding。Strength replica 是新 child，创建时即绑定自己的 fast agent，不属于旧 child 重绑。
 
-`chat.params` 必须把请求 Agent（缺省时为 Authority Root `SelectedAgent`）的绑定写成 `OpencodeModel` 钉死，防止 Host 把 agent-less / 历史推断请求落到默认 build/Fast。不得回退到 Peer，不得发明 Fast。
+`chat.params` 不是 binding owner。当前 Host hook contract 的 output 不含 agent/model；它只观测 Host 已解析的 request。无 parent session：仅非 `InjectedSessionPort.SendPrompt` 区间的 `input.message.agent/model` 可更新 user-facing base binding；禁止拿顶层 provider `input.agent/model`（title/compaction 可能不同）冒充用户选择。内部 send 区间的观察被忽略。parented session：可为旧 Host 做兼容 pin，但真正保护始终由 SendPrompt 海关完成。
 
 SyncDelegate Inspector/Coder 的 SendPrompt 额外带上同一绑定（G2 PREFIX LAW）；生产按 agent 名逐次查找，禁止进程级单一 ModelId。
 

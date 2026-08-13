@@ -1,5 +1,5 @@
-// ChatParamsHook: pin the request agent's bound model so Host cannot
-// silently resolve an agent-less / history-inferred request to Fast.
+// PROMPT-006: chat.params observes real root choices and may compatibility-pin
+// parented children, while SendPrompt owns the actual execution-binding gate.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -16,6 +16,9 @@ const { agentFact, agentJournal, authorityRoot, logicalRunId, mapOf, resultOf, s
 
 const { create } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ChatParamsHook.js'))
 const { validate } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js'))
+const { InjectedSessionPort_$ctor_Z60D0357E: createSessionPort } = await import(
+  join(here, '../../../dist/Infrastructure/OpenCode/Host/Sessions.js')
+)
 
 const NAMES = [
   'fast-orchestrator', 'deep-orchestrator',
@@ -58,22 +61,30 @@ const applyHook = (hook, input, output) => {
   if (typeof next === 'function') next(output)
 }
 
-test('CHAT_PARAMS_deep_agent_overwrites_host_fast_model', () => {
+test('CHAT_PARAMS_root_session_does_not_override_explicit_user_model', () => {
   const hook = create(undefined, () => inventoryOf(slashConfig()))
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   applyHook(hook, { sessionID: 'ses_deep', agent: 'deep-coder' }, output)
   assert.equal(output.model.providerID, 'anthropic')
-  assert.equal(output.model.modelID, 'deep-opus')
-})
-
-test('CHAT_PARAMS_justified_fast_agent_keeps_fast_model', () => {
-  const hook = create(undefined, () => inventoryOf(slashConfig()))
-  const output = { model: { providerID: 'anthropic', modelID: 'deep-opus' } }
-  applyHook(hook, { sessionID: 'ses_fast', agent: 'fast-coder' }, output)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 
-test('CHAT_PARAMS_agent_less_uses_selected_deep_not_fast_default', async () => {
+test('CHAT_PARAMS_parented_session_compat_pin_uses_frozen_child_agent', async () => {
+  const child = sessionId('ses_chat_params_child')
+  const sessions = createSessionPort(
+    { CreateChildSession: async () => ({ tag: 0, fields: [child] }) },
+    { SubscribeTerminalListener: () => ({ Dispose: () => {} }) },
+  )
+  const created = await sessions.CreateChildSession(sessionId('ses_chat_params_root'), { Agent: 'deep-coder' })
+  assert.equal(created.tag, 0)
+
+  const hook = create(undefined, () => inventoryOf(slashConfig()))
+  const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
+  applyHook(hook, { sessionID: 'ses_chat_params_child', agent: 'fast-coder' }, output)
+  assert.equal(output.model.modelID, 'deep-opus')
+})
+
+test('CHAT_PARAMS_agent_less_root_does_not_invent_binding_from_journal', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-chat-params-'))
   const opened = agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
@@ -99,7 +110,7 @@ test('CHAT_PARAMS_agent_less_uses_selected_deep_not_fast_default', async () => {
     const hook = create(opened.journal, () => inventoryOf(slashConfig()))
     const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
     applyHook(hook, { sessionID: 'ses_selected_deep' }, output)
-    assert.equal(output.model.modelID, 'deep-opus')
+    assert.equal(output.model.modelID, 'fast-haiku')
   } finally {
     opened.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -120,10 +131,9 @@ test('CHAT_PARAMS_empty_inventory_is_a_noop', () => {
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 
-test('CHAT_PARAMS_bare_binding_without_provider_still_pins_deep_id', () => {
+test('CHAT_PARAMS_root_bare_binding_is_a_noop', () => {
   const hook = create(undefined, () => inventoryOf(bareConfig()))
   const output = {}
   applyHook(hook, { sessionID: 'ses_bare', agent: 'deep-coder' }, output)
-  assert.equal(output.model, 'deep-model')
-  assert.notEqual(output.model, 'fast-model')
+  assert.equal(output.model, undefined)
 })

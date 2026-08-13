@@ -60,7 +60,24 @@ module PluginHost =
                     // run (EXEC-009 tombstone), and dropping it here would orphan a
                     // finished child from its Manager.
                     for record in HandleProjection.linkedChildren handles do
-                        sessionParents.[SessionId.value record.ChildSessionId] <- SessionId.value parentId
+                        let childKey = SessionId.value record.ChildSessionId
+                        sessionParents.[childKey] <- SessionId.value parentId
+                        SessionExecutionBinding.restore parentId record.ChildSessionId (Some record.TargetAgent)
+                | None -> ()
+
+            for KeyValue(sessionId, association) in snapshot.AgentProjections.Associations do
+                match association.ParentSessionId with
+                | Some parentId ->
+                    let sessionKey = SessionId.value sessionId
+                    sessionParents.[sessionKey] <- SessionId.value parentId
+
+                    let agent =
+                        PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+                        |> Option.orElseWith (fun () ->
+                            PromptAuthorityLedger.lastAuthorityProfile sessionId snapshot.AgentProjections)
+                        |> Option.map (fun profile -> profile.SelectedAgent)
+
+                    SessionExecutionBinding.restore parentId sessionId agent
                 | None -> ()
 
     let gitTreePortFromInput (input: obj) : GitTreePort option =
