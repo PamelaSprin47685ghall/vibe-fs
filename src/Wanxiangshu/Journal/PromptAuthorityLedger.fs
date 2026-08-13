@@ -72,6 +72,7 @@ module PromptAuthorityLedger =
 
     /// PROMPT-005 `Claimed`.
     let foldPromptClaimed
+        (runtimeStartCount: int)
         (projection: PromptAuthority.PromptAuthorityProjection)
         (fact:
             {| PromptKey: PromptKey
@@ -106,8 +107,9 @@ module PromptAuthorityLedger =
                   // PROMPT-005: `Claimed` precedes the Host call, so no transport
                   // receipt can exist yet. `foldPromptSubmitted` attaches it.
                   Receipt = None
-                  // PROMPT-011: counted by folding `RuntimeStarted`, never by a writer.
-                  RecoveryAttempts = 0 }
+                  // PROMPT-011: watermark of the workspace RuntimeStartCount.
+                  // Subsequent RuntimeStarted envelopes only advance that counter.
+                  ClaimedAtRuntimeStartCount = runtimeStartCount }
 
             PromptAuthorityRun.registerClaim claim projection
 

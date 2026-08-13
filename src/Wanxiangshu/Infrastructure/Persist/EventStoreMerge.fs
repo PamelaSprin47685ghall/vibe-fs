@@ -65,13 +65,12 @@ module EventStoreMerge =
             |> List.groupBy (fun entry -> entry.Name)
             |> List.sortBy fst
 
-        let folder
-            (acc: Result<TreeEntry list, MergeError>)
-            ((name: string), (group: TreeEntry list))
-            : Result<TreeEntry list, MergeError> =
-            match acc with
-            | Error e -> Error e
-            | Ok collected ->
+        let acc = ResizeArray<TreeEntry>()
+
+        let rec mergeGroups remaining =
+            match remaining with
+            | [] -> Ok(Seq.toList acc)
+            | (name, group) :: rest ->
                 let path = if pathPrefix = "" then name else pathPrefix + "/" + name
 
                 let normalized =
@@ -89,12 +88,13 @@ module EventStoreMerge =
 
                     match childOids with
                     | [ oid ] ->
-                        Ok(
-                            collected
-                            @ [ { Mode = StoreTree.TreeMode
-                                  Name = name
-                                  Oid = oid } ]
+                        acc.Add(
+                            { Mode = StoreTree.TreeMode
+                              Name = name
+                              Oid = oid }
                         )
+
+                        mergeGroups rest
                     | many ->
                         let childTrees = many |> List.choose (fun oid -> store.ReadTree oid)
 
@@ -106,12 +106,13 @@ module EventStoreMerge =
                             | Ok mergedChildren ->
                                 let oid = store.WriteTree mergedChildren
 
-                                Ok(
-                                    collected
-                                    @ [ { Mode = StoreTree.TreeMode
-                                          Name = name
-                                          Oid = oid } ]
+                                acc.Add(
+                                    { Mode = StoreTree.TreeMode
+                                      Name = name
+                                      Oid = oid }
                                 )
+
+                                mergeGroups rest
                 | [ mode ] ->
                     let oids =
                         normalized
@@ -120,7 +121,9 @@ module EventStoreMerge =
                         |> List.sortWith GitObjectId.compare
 
                     match oids with
-                    | [ oid ] -> Ok(collected @ [ { Mode = mode; Name = name; Oid = oid } ])
+                    | [ oid ] ->
+                        acc.Add({ Mode = mode; Name = name; Oid = oid })
+                        mergeGroups rest
                     | many ->
                         let bodies = many |> List.map (fun oid -> oid, store.ReadObject oid)
 
@@ -134,7 +137,8 @@ module EventStoreMerge =
                             if contents |> List.forall (fun (_, bytes) -> bytesEqual firstBytes bytes) then
                                 let oid = contents |> List.head |> fst
 
-                                Ok(collected @ [ { Mode = mode; Name = name; Oid = oid } ])
+                                acc.Add({ Mode = mode; Name = name; Oid = oid })
+                                mergeGroups rest
                             elif path.StartsWith(StoreTree.EventsDir + "/") then
                                 Error(collisionAt path)
                             else
@@ -145,7 +149,7 @@ module EventStoreMerge =
                                 )
                 | _ -> Error(asMergeError (StorageInvalid.NonCanonical(sprintf "mixed modes at %s" path)))
 
-        List.fold folder (Ok []) byName
+        mergeGroups byName
 
     let private readRootEntries (store: IGitRawStore) (snapshot: StoreSnapshot) : Result<TreeEntry list, MergeError> =
         match store.ReadTree(RootOid.value snapshot.RootOid) with

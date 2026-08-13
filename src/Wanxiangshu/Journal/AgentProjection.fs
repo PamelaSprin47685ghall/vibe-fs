@@ -67,6 +67,11 @@ type AgentProjectionSet =
         HandleByChildSession: Map<SessionId, HandleRecord>
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
+
+        /// PROMPT-011: how many `RuntimeStarted` envelopes have been folded.
+        /// Pending-claim recovery attempts are `this - ClaimedAtRuntimeStartCount`,
+        /// so a plugin start does not rewrite the session map (PERSIST-008).
+        RuntimeStartCount: int
     }
 
 /// Composition of bounded session projections. Fact routing lives in Fold.fs.
@@ -93,7 +98,8 @@ module AgentProjection =
           Associations = SessionAssociationProjection.empty
           Orchestrator = OrchestratorProjection.empty
           HandleByChildSession = Map.empty
-          MagicTodo = MagicTodoProjection.empty }
+          MagicTodo = MagicTodoProjection.empty
+          RuntimeStartCount = 0 }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
         Map.tryFind sessionId projection.Sessions

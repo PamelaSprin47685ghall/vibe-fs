@@ -60,7 +60,7 @@ module PromptAuthorityRun =
                   EffectiveAgent = Some name
                   PayloadDigest = payloadDigest
                   Receipt = None
-                  RecoveryAttempts = 0 }
+                  ClaimedAtRuntimeStartCount = 0 }
 
     /// Claim a continuation (PROMPT-003). It inherits the run and the root, and
     /// carries the EffectiveAgent the current fallback cursor selected.
@@ -80,7 +80,7 @@ module PromptAuthorityRun =
           EffectiveAgent = Some effectiveAgent
           PayloadDigest = payloadDigest
           Receipt = None
-          RecoveryAttempts = 0 }
+          ClaimedAtRuntimeStartCount = 0 }
 
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///

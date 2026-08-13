@@ -104,12 +104,12 @@ module EventStoreFold =
 
     /// Kahn topo order; EventId lexicographic tie-break among ready nodes (§5.0 physical only).
     let private topologicalOrder (byId: Map<string, EventEnvelope>) : Result<EventId list, FoldError> =
-        let ids = byId |> Map.toList |> List.map fst
+        let nodeCount = byId.Count
 
         let indegree = Dictionary<string, int>()
         let children = Dictionary<string, ResizeArray<string>>()
 
-        for id in ids do
+        for KeyValue(id, _) in byId do
             indegree.[id] <- 0
             children.[id] <- ResizeArray<string>()
 
@@ -121,36 +121,32 @@ module EventStoreFold =
                     children.[parentKey].Add id
                     indegree.[id] <- indegree.[id] + 1
 
-        let ready =
-            indegree
-            |> Seq.filter (fun (KeyValue(_, deg)) -> deg = 0)
-            |> Seq.map (fun (KeyValue(id, _)) -> id)
-            |> Seq.toList
-            |> List.sort
+        let queued = HashSet<string>()
+        let mutable ready = Set.empty<string>
 
-        let rec kahn (pending: string list) (acc: EventId list) (visited: int) =
-            match pending with
-            | [] ->
-                if visited <> ids.Length then
-                    Error(asFoldError StorageInvalid.CyclicParents)
-                else
-                    Ok(List.rev acc)
-            | next :: rest ->
-                let envelope = byId.[next]
-                let unlocked = ResizeArray<string>()
+        for KeyValue(id, deg) in indegree do
+            if deg = 0 && queued.Add id then
+                ready <- Set.add id ready
 
-                for child in children.[next] do
-                    let deg = indegree.[child] - 1
-                    indegree.[child] <- deg
+        let acc = ResizeArray<EventId>()
 
-                    if deg = 0 then
-                        unlocked.Add child
+        while not ready.IsEmpty do
+            let next = Set.minElement ready
+            ready <- Set.remove next ready
 
-                let readyQueue = rest @ (unlocked |> Seq.toList) |> List.distinct |> List.sort
+            acc.Add(byId.[next].EventId)
 
-                kahn readyQueue (envelope.EventId :: acc) (visited + 1)
+            for child in children.[next] do
+                let deg = indegree.[child] - 1
+                indegree.[child] <- deg
 
-        kahn ready [] 0
+                if deg = 0 && queued.Add child then
+                    ready <- Set.add child ready
+
+        if acc.Count <> nodeCount then
+            Error(asFoldError StorageInvalid.CyclicParents)
+        else
+            Ok(List.ofSeq acc)
 
     let private inStreamParentIds
         (byId: Map<string, EventEnvelope>)
@@ -164,62 +160,53 @@ module EventStoreFold =
             | _ -> false)
 
     /// Heads = in-stream events that are not an in-stream parent of another event in the stream.
-    let private streamHeads (byId: Map<string, EventEnvelope>) (streamEvents: EventEnvelope list) : EventId list =
-        let referenced =
-            streamEvents
-            |> List.collect (fun envelope ->
-                inStreamParentIds byId (streamKey envelope.StreamId) envelope
-                |> List.map eventIdKey)
-            |> Set.ofList
-
-        streamEvents
-        |> List.map (fun e -> e.EventId)
-        |> List.filter (fun id -> not (Set.contains (eventIdKey id) referenced))
+    let private snapshotHeads (heads: HashSet<string>) (idOf: Dictionary<string, EventId>) : EventId list =
+        heads
+        |> Seq.map (fun key -> idOf.[key])
+        |> Seq.toList
         |> List.sortWith (fun a b -> compare (EventId.value a) (EventId.value b))
 
     let private applyStream
         (byId: Map<string, EventEnvelope>)
         (stream: string)
-        (orderedInStream: EventEnvelope list)
+        (orderedInStream: ResizeArray<EventEnvelope>)
         : StreamHeadState =
-        let rec foldOne remaining (state: StreamHeadState) =
-            match remaining with
-            | [] -> state
-            | envelope :: rest ->
-                let nextState =
-                    match state with
-                    | StreamHeadState.Empty -> StreamHeadState.Unique envelope.EventId
-                    | StreamHeadState.Unique _
-                    | StreamHeadState.Conflict _ ->
-                        let prefix =
-                            orderedInStream
-                            |> List.takeWhile (fun e -> e.EventId <> envelope.EventId)
-                            |> fun prior -> prior @ [ envelope ]
+        if orderedInStream.Count = 0 then
+            StreamHeadState.Empty
+        else
+            let heads = HashSet<string>()
+            let idOf = Dictionary<string, EventId>()
 
-                        let prior = prefix |> List.filter (fun e -> e.EventId <> envelope.EventId)
+            for i = 0 to orderedInStream.Count - 1 do
+                let envelope = orderedInStream.[i]
+                let key = eventIdKey envelope.EventId
+                idOf.[key] <- envelope.EventId
 
-                        let priorHeads = streamHeads byId prior
+                if i = 0 then
+                    heads.Add key |> ignore
+                else
+                    let parentSet = HashSet<string>()
 
-                        let parentSet = envelope.Parents |> List.map eventIdKey |> Set.ofList
+                    for parent in envelope.Parents do
+                        parentSet.Add(eventIdKey parent) |> ignore
 
-                        let coversPriorHeads =
-                            priorHeads.Length > 1
-                            && priorHeads |> List.forall (fun head -> Set.contains (eventIdKey head) parentSet)
+                    let coversPriorHeads =
+                        heads.Count > 1 && Seq.forall (fun h -> parentSet.Contains h) heads
 
-                        if AuthoritativeEventTypes.isResolution envelope.EventType && coversPriorHeads then
-                            StreamHeadState.Unique envelope.EventId
-                        else
-                            match streamHeads byId prefix with
-                            | [] -> StreamHeadState.Empty
-                            | [ head ] -> StreamHeadState.Unique head
-                            | many ->
-                                StreamHeadState.Conflict(
-                                    DomainConflict.ConcurrentHeads(EventStreamId.create stream, many)
-                                )
+                    if AuthoritativeEventTypes.isResolution envelope.EventType && coversPriorHeads then
+                        heads.Clear()
+                        heads.Add key |> ignore
+                    else
+                        for parent in inStreamParentIds byId stream envelope do
+                            heads.Remove(eventIdKey parent) |> ignore
 
-                foldOne rest nextState
+                        heads.Add key |> ignore
 
-        foldOne orderedInStream StreamHeadState.Empty
+            match snapshotHeads heads idOf with
+            | [] -> StreamHeadState.Empty
+            | [ head ] -> StreamHeadState.Unique head
+            | many ->
+                StreamHeadState.Conflict(DomainConflict.ConcurrentHeads(EventStreamId.create stream, many))
 
     /// Structural DAG + vocabulary validation without building projection.
     let validate (events: EventEnvelope list) : Result<unit, FoldError> =
@@ -267,19 +254,23 @@ module EventStoreFold =
                     match topologicalOrder byId with
                     | Error e -> Error e
                     | Ok order ->
-                        let byStream =
-                            normalized
-                            |> List.groupBy (fun e -> streamKey e.StreamId)
-                            |> List.map (fun (stream, _group) ->
-                                let orderedInStream =
-                                    order
-                                    |> List.choose (fun eventId ->
-                                        match Map.tryFind (eventIdKey eventId) byId with
-                                        | Some envelope when streamKey envelope.StreamId = stream -> Some envelope
-                                        | _ -> None)
+                        let byStreamBuf = Dictionary<string, ResizeArray<EventEnvelope>>()
 
-                                stream, applyStream byId stream orderedInStream)
-                            |> Map.ofList
+                        for eventId in order do
+                            let envelope = byId.[eventIdKey eventId]
+                            let stream = streamKey envelope.StreamId
+
+                            match byStreamBuf.TryGetValue(stream) with
+                            | true, buf -> buf.Add envelope
+                            | false, _ ->
+                                let buf = ResizeArray<EventEnvelope>()
+                                buf.Add envelope
+                                byStreamBuf.[stream] <- buf
+
+                        let byStream =
+                            byStreamBuf
+                            |> Seq.map (fun (KeyValue(stream, buf)) -> stream, applyStream byId stream buf)
+                            |> Map.ofSeq
 
                         let conflicts =
                             byStream

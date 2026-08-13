@@ -18,7 +18,7 @@ module PromptFactFold =
             Ok(
                 updateAuthority
                     payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptClaimed authority payload)
+                    (fun authority -> PromptAuthorityLedger.foldPromptClaimed projection.RuntimeStartCount authority payload)
                     projection
             )
 

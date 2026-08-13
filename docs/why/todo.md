@@ -12,17 +12,17 @@ Manager BlindPlan：Pre-T1 = Planning Table（替他人规划）；第一次 acc
 **BlindPlan 揭示：conversation T1 result vs Activation / `WorkActivated` / system identity 切换。**  
 拒身份切换：office 不变，entrustment 可变。Planning Table → validate → durable `TodoWriteAccepted(T1)` → 含 revelation 的 canonical provider-visible result。generic `lifecycle.activation` 若作语义资产，只指「新 owner 获 responsibility」，不得承载 Manager phase 或触发 prompt 替换。
 
-**Identity：tagged `kind` vs optional `id`。**  
-拒缺字段猜新旧与 content 猜 id：恢复与并发会静默错配（TODO-002）。
+**Obligation 语义：mission debt vs meta-work。**  
+GrandRewrite 删除 provider `kind/id/status/priority/reviewing` 后，`todowrite` 不再描述「我现在处于哪个工作阶段」，只描述用户请求仍欠什么。若把 `make a plan` / `analyze first` / `write todos` 放进 obligation，模型会把 Planning Table 本身伪装成 mission debt，并过早触发 T1 revelation。拒这种 meta-account：认知动作直接完成，第一次 todowrite 必须是已经形成的完整道路账（TODO-002/015）。不在 Host 用关键词分类器猜语义，因为自然语言分类器会把脆弱启发式重新变成隐藏状态机；约束放在实际决策面的 prompt/tool law，并用 provider-surface proof 固化。
 
-**完成门禁：强制 `reviewing→completed` vs 任意跳 completed。**  
-拒任意跳：过程真实性失去 Host 可执行边界（TODO-003）。其它转移放宽，真实性交给 process review，避免第二套枚举真理。
+**Provider 冷状态：删除 vs 内部兼容。**  
+拒把 `kind/id/status/priority/reviewing/completed/cancelled` 带回 provider horizon。旧 Journal/Host sink 若为迁移仍需读历史形状，只能留在 compatibility boundary；新 admission、CurrentObligations、prompt 与 review 都以 `{name,work}` account 为唯一语言（TODO-002/003/007）。
 
 **Admission：同 message 全拒 vs ordinal winner；V2 fail-closed vs 裸奔。**  
 拒 winner 仲裁：多一个不必要的排序面，且与 lag-1 单链冲突（TODO-004）。拒 V2 裸奔：双语义长期分叉。
 
-**Settlement：PERFECT 替换 + REVISE min-merge vs 总 merge / 总替换。**  
-拒总 merge：PERFECT 失去「以提交表为准」。拒总替换：REVISE 会丢掉仍应保留的 old 进度。content/priority 在 REVISE 上 proposed 赢、status 迟滞——明确协议而非启发式（TODO-005）。
+**CurrentObligations：Accepted supersession vs reviewer settlement。**  
+GrandRewrite 明确取代旧 `settled/proposed/semanticMerge`：每个 accepted account 就是 Manager 当下对 mission debt 的权威陈述，立即 supersede 上一个。若再让 process reviewer 以 PERFECT/REVISE 决定哪个 account 才「真正生效」，会制造 accepted-but-not-current 半态、回滚语义和第二 writer。故 reviewer 只判断并报告；REVISE 不涂改 Tk，只迫使 Manager 在后续 checkpoint 写出更真实的新 account（TODO-005）。这也让 crash recovery 只需重放 Accepted 链，不再重演 merge 策略。
 
 **评审节拍：lag-1 1:1 vs 同次等待自己的 Rk / 无阻塞多飞。**  
 拒同次等待 Rk：Manager 无法在评审期间做独立工作。拒无阻塞多飞：结算链失去单链公式（TODO-006）。  
@@ -30,7 +30,7 @@ Manager BlindPlan：Pre-T1 = Planning Table（替他人规划）；第一次 acc
 拒「只有 verdict、尚无 report」中间态挤进同一 fact：下一 checkpoint 会消费空报告或竞态半态。`VerdictKnown` 复用 Reviewer 域，不造 Magic bool/Stage。
 
 **真相源：Journal canonical vs Host TodoTable。**  
-拒 Host 表当 canonical：无稳定 id、整表 DELETE+INSERT、无法承载 reviewing/merge（TODO-007）。sink 可显示 working Pk，但 REVISE 消费后必须 reconcile；repair 不作 checkpoint。
+拒 Host 表当 canonical：Host 表是兼容 UI sink，不能决定 account identity、review cadence 或 recovery。新世界不再需要 `reviewing/merge`；Accepted 的 Prepared→Proposed 引用就是 CurrentObligations。sink 漂移只做幂等纯投影修复，REVISE 不触发 rollback（TODO-007）。
 
 **证据：bounded LWR + coverage 分型 vs 纯 Y / session head / 第二 renderer。**  
 拒纯 Y：frontier 前合法 RawGap 会丢证据。拒 session head：串台历史污染单次 Rk/Finality。拒第二 renderer：双源漂移（TODO-008）。Prefix 只认 PrefixCoverage 可证 Y；LWR 只认 RecordCoverage。三段标题固定为 `Opening / Chronicle / Recent work`；正式陈述 = Recent work 最后一条助手文本（散文 claim），拒固定报告 schema 与独立 Closing 段。

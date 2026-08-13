@@ -189,8 +189,8 @@ export const authority = {
   /** PROMPT-011 bounds. */
   recoveryTailWindow: Authority.RecoveryTailWindow,
   recoveryAttemptBudget: Authority.RecoveryAttemptBudget,
-  countRecoveryAttempt: (projection) => Authority.countRecoveryAttempt(projection),
-  recoveryBudgetSpent: (claim) => Authority.recoveryBudgetSpent(claim),
+  recoveryAttempts: (runtimeStartCount, claim) => Authority.recoveryAttempts(runtimeStartCount, claim),
+  recoveryBudgetSpent: (runtimeStartCount, claim) => Authority.recoveryBudgetSpent(runtimeStartCount, claim),
 }
 
 export const authorityRun = {

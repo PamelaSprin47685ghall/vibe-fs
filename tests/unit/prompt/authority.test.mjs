@@ -416,19 +416,22 @@ test('PROMPT_011_prompt_key_is_deterministic_and_moves_with_every_component', ()
 test('PROMPT_011_recovery_budget_is_folded_from_plugin_starts_not_written', () => {
   const root = profileOf()
   const key = promptKey('pk_r')
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-  projection = authorityRun.registerClaim(
+  const projection = authorityRun.registerClaim(
     authorityRun.claimContinuation(key, SESSION, continuationKind.of('ManagerGuard'), root, 'fast-coder', 'pd-r'),
-    projection,
+    authorityRun.registerAuthority(root, authority.empty),
   )
+  const claim = mapTryFind(key, projection.PendingClaims)
 
   assert.equal(authority.recoveryAttemptBudget, 3)
-  const spentAfter = []
+  assert.equal(claim.ClaimedAtRuntimeStartCount, 0)
 
+  const spentAfter = []
   for (let start = 1; start <= 4; start += 1) {
-    projection = authority.countRecoveryAttempt(projection)
-    const claim = mapTryFind(key, projection.PendingClaims)
-    spentAfter.push({ starts: start, attempts: claim.RecoveryAttempts, spent: authority.recoveryBudgetSpent(claim) })
+    spentAfter.push({
+      starts: start,
+      attempts: authority.recoveryAttempts(start, claim),
+      spent: authority.recoveryBudgetSpent(start, claim),
+    })
   }
 
   assert.deepEqual(spentAfter, [

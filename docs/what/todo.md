@@ -61,6 +61,10 @@ CurrentObligations = last accepted obligations list
 
 Keep while owed；remove when earned by work。不得仅为让路看起来更短而删除仍欠义务；不得在已真正 discharge 后仅为「曾出现在计划中」而保留。
 
+**Obligation 层级**：每一项必须描述「为了让用户请求真正满足，仍需成为真的工作 / 证据 / 条件」。禁止把形成这份账本身写成 obligation：`make a plan`、`analyze the request`、`write todos`、`decide next steps`、`先规划`、`先分析` 等 meta-work 不是 mission obligation。需要这些认知动作时直接完成它们；不要把它们占成 todo。
+
+**T1 特例不是新状态机**：第一次 `todowrite` 是 Planning Table 已完成后的整份 obligation account 提交。`todowrite([{name="plan", work="make a plan"}])` 之类调用等于尚未完成 T1 前置认知，不应发出。Host 不用关键词分类器猜语义；该边界由 Planning Table、tool description、Manager Role Law 三个 provider decision boundary 同时表达，并由 golden/static proof 守住（TODO-015）。
+
 `tool.definition` 是 provider-visible schema 的语义合同锚点；membrane 投影细节见 Host / `how/todo.md`。
 
 ## TODO-003：义务账与禁止状态机
@@ -86,19 +90,32 @@ Obligation = { name, work }
 
 **V2 fail-closed**：在 V2 runner 获得与 V1 等价的 tool definition / before / after hook contract 及 canary 证明之前，Magic-Todo Manager Attempt **不得**使用 V2 todowrite execution path。不是「V1 有协议、V2 暂时裸奔」。无 hook parity → 禁止上线；长期不维护两套不同 Magic Todo 语义。
 
-## TODO-005：Settlement 与 CurrentObligations
+## TODO-005：Accepted supersession 与 CurrentObligations
+
+`GrandRewrite` 的 clean break：**CurrentObligations = 本 Life 最后一次 `TodoWriteAccepted` 对应的完整 submitted account**。
 
 ```text
-settle(Ck, Pk, PERFECT) = Pk          // CurrentObligations ← last accepted
-settle(Ck, Pk, REVISE)  = Ck          // 不把 proposed 升格为 Current；回灌报告，Manager 下一轮重写
+C0 = []（或一次性 legacy seed）
+Tk = Accepted(Pk)
+CurrentObligations(after Tk) = Pk
 ```
 
-记号：`Ck` = Tk 开始时已结算 CurrentObligations；`Pk` = 本轮 accepted proposed obligations。
+`TodoWritePrepared` 只冻结调用发生前的 `BaseObligations = C(k-1)` 与本次 `Submitted = Pk`；它本身不改变 Current。`TodoWriteAccepted` 一旦 durable，Pk 立即 supersede C(k-1)。这不是等待 reviewer 批准的 proposal，也不存在「accepted 但尚未成为 current」的半态。
 
-PERFECT：完全以 submitted account 为准。  
-REVISE：保留 Ck；Manager 依 ProcessReviewLWR 修正后再次 todowrite。禁止静默 semanticMerge 伪造「已结算的混合账」。
+Process review **不拥有 obligation state**：
 
-tool result 必须可稳定呈现：上一 ConsumableReview 的 verdict + canonical ProcessReviewLWR、CurrentObligations、submitted list；REVISE 时明示 proposed 未升格。PERFECT 时 preview 不生效、以 submitted 为准。
+```text
+Review(k) = PERFECT | REVISE + canonical ProcessReviewLWR
+PERFECT   → 证明本 checkpoint 的 account/work 没有需要纠正的实质问题
+REVISE    → 告知 Manager 该 checkpoint 的 account/work 留有实质问题
+两者都不回滚 Tk，不重写 CurrentObligations，不 semanticMerge
+```
+
+Manager 看到 REVISE 后，用后续 `todowrite` 写出新的完整 account；新的 Accepted 再自然 supersede 当前账。历史 checkpoint 仍是真实发生过的事实，不因后来评审被涂改。
+
+禁止恢复旧 `settled/proposed/semanticMerge` 三态、status min-merge、reviewer 决定 Current 的写权或「preview 尚未生效」文案。`BaseObligations` 只用于 replay identity 与 reviewer 对照，不是待恢复的旧 current。
+
+Tool result 可呈现上一 ConsumableReview 的 verdict + canonical ProcessReviewLWR，并呈现本次 accepted 后的 CurrentObligations；不得声称 reviewer 批准后才生效。
 
 ## TODO-006：评审节拍与 ConsumableReview
 
@@ -108,12 +125,12 @@ tool result 必须可稳定呈现：上一 ConsumableReview 的 verdict + canoni
 Tk = 第 k 个 TodoWriteAccepted
 Rk = Accepted(Tk) 派生的第 k 次 process-review obligation
 
-TodoWrite k  consumes Review(k-1)
-             creates  Review(k)
+TodoWrite k  synchronizes Review(k-1)
+             creates      Review(k)
 ```
 
 Rk **不**阻塞 Tk 返回；Manager 可立即做后续独立工作。  
-T(k+1) 到来时若 Rk 尚未形成 ConsumableReview → **必须阻塞**直至 `TodoReviewConcluded(k)` durable。
+T(k+1) 到来时若 Rk 尚未形成 ConsumableReview → **必须作为合法因果等待**直至 `TodoReviewConcluded(k)` durable；不得把这一等待渲染成 provider 红字。Rk 成为 ConsumableReview 后，T(k+1) 才继续 admission。该同步只保证 Manager 不无限领先于真实性反馈；它不把 reviewer 变成 CurrentObligations 的提交者（TODO-005）。
 
 ```text
 VerdictKnown(k)
@@ -146,16 +163,9 @@ Host TodoTable                       = compatibility sink only
 禁止用 Host TodoTable 恢复或反推 canonical obligations truth。  
 provider `name`/`work` 在 before 投影到 Host 前按 membrane 合同映射；canonical account 不得被 sink 策略改写回 status 枚举。
 
-**Compatibility sink reconciliation（P0）**：REVISE 被消费且 CurrentObligations 未改（仍为 Ck）后，Host TodoTable 必须幂等投影到 CurrentObligations。该项 repair：
+Compatibility sink 在每次 accepted 前可由 before 乐观投影本次 submitted account；Accepted 后 canonical 与 sink 指向同一个 Pk。Process review verdict 不回滚 canonical，因此也不得因 REVISE 把 sink 回刷到旧 account。
 
-```text
-不产生 checkpoint
-不触发 process review
-不改 canonical truth
-```
-
-Accepted 后 sink 可短暂显示 working `Pk`；settlement 消费后必须 reconcile。
-
+若 Host sink 因 crash / replay 与 canonical `CurrentObligations` 漂移，只允许做**纯投影修复**：不产生 checkpoint、不触发 process review、不改 canonical truth。
 ## TODO-008：Dedicated reviewer、bounded LWR 与 coverage 分型
 
 每个 Manager Life 复用 **一个** dedicated process reviewer physical session，至少保留到 `LifeCompleted`（或 proven-loss replacement）。  
@@ -205,7 +215,7 @@ first unblessed suicide
 
 T1 本身即该 Life 的第一次 accepted commitment，计入协议入口。
 
-有 checkpoint 时：await latest ConsumableReview ≡ TodoReviewConcluded → settle；REVISE → sink reconcile（TODO-007）、返回报告、**不**建 FinalityRequest、Life 继续；PERFECT → 进入既有 Finality 前置。  
+有 checkpoint 时：await latest ConsumableReview ≡ TodoReviewConcluded。REVISE → 返回 canonical report、**不**建 FinalityRequest、Life 继续；CurrentObligations 仍是 latest Accepted account，由 Manager 后续 checkpoint 修正。PERFECT → 进入既有 Finality 前置。  
 「至少一次 TodoWriteAccepted」≠ 机械要求 obligations 清空。未完成项真实性交给 process PERFECT/REVISE，不另造机械 terminal-todo completeness gate。  
 Blessed 之后的再次 suicide 同样 drain latest process review。
 
@@ -269,7 +279,7 @@ if canonical role = Manager AND todowrite provider-visible
 then MagicTodoManagerGuideline
 ```
 
-`MagicTodoManagerGuideline` 是 **Manager-only** fragment：要求持续用 `todowrite` 保持 obligations 真实；Post-T1 规划与执行同一连续活动；前序评审进行时继续独立下一阶段工作。Pre-T1 / T1 / Post-T1 文案分属 TODO-015。  
+`MagicTodoManagerGuideline` 是 **Manager-only** fragment，但不得抹平 BlindPlan 的关系边界：Pre-T1 只要求把 obligation account 做完整，**不得**用 todowrite 写「我要规划」这种 meta-account；Post-T1 才要求在执行中持续保持 living obligations 真实。前序评审进行时可继续独立工作。Pre-T1 / T1 / Post-T1 文案分属 TODO-015；这三者是 conversation relation，不是 system identity / persisted phase。  
 **禁止**把 Magic Todo 文案并入全局 `host/pair-programming-guideline`。
 
 **隐藏 reviewer 表面（窄例外）**：Manager **可以**看到过程 review 的 outcome 与 canonical ProcessReviewLWR 报告正文（checkpoint tool result / suicide drain 回传）。  

@@ -41,18 +41,16 @@ module Fold =
             // never expire — which is the unbounded-pending state the clause bounds.
             //
             // Replay is exact: envelopes fold in order, so a claim is only counted by
-            // the starts that came after it.
+            // the starts that came after it. The claim records the watermark at
+            // registration (`ClaimedAtRuntimeStartCount`); this arm only advances
+            // the workspace counter — O(1) in the session map, not O(sessions).
             Ok
                 { projection with
                     RuntimeId = Some runtime.RuntimeId
                     AgentProjections =
                         { projection.AgentProjections with
-                            Sessions =
-                                projection.AgentProjections.Sessions
-                                |> Map.map (fun _ session ->
-                                    { session with
-                                        PromptAuthority =
-                                            session.PromptAuthority |> Option.map PromptAuthority.countRecoveryAttempt }) } }
+                            RuntimeStartCount = projection.AgentProjections.RuntimeStartCount + 1 } }
+
         | Agent fact ->
             foldAgentFact projection.AgentProjections fact
             |> Result.map (fun agents ->

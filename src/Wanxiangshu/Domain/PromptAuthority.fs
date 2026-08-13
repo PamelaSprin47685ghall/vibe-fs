@@ -148,14 +148,16 @@ module PromptAuthority =
             /// a receipt) both stay pending, but they are different diagnoses for an
             /// operator — one means the Host accepted something we cannot locate.
             Receipt: TransportReceipt option
-            /// PROMPT-011 `RecoveryAttemptBudget`: how many plugin starts have seen
-            /// this claim still unresolved.
+            /// PROMPT-011 `RecoveryAttemptBudget`: the workspace `RuntimeStartCount`
+            /// observed when this claim was registered.
             ///
+            /// Attempts are `current RuntimeStartCount - ClaimedAtRuntimeStartCount`,
+            /// so a plugin start advances one counter instead of rewriting claims.
             /// Counted by folding `RuntimeStarted`, not stored by a writer. A fact
             /// saying "I tried to recover this" would itself have to be written
             /// during recovery, so a crash before writing it would lose the attempt
             /// and the budget could never expire.
-            RecoveryAttempts: int
+            ClaimedAtRuntimeStartCount: int
         }
 
     type PromptAuthorityProjection =
@@ -346,23 +348,17 @@ module PromptAuthority =
     /// carried forever.
     let RecoveryAttemptBudget = 3
 
-    /// PROMPT-011: a plugin start was observed, so every still-pending claim has
-    /// now survived one more recovery attempt.
+    /// PROMPT-011: how many plugin starts this pending claim has survived.
     ///
-    /// Bounded by the number of pending claims, which PROMPT-005 resolves or
-    /// abandons — it does not grow with session lifetime (PERSIST-008).
-    let countRecoveryAttempt (projection: PromptAuthorityProjection) =
-        { projection with
-            PendingClaims =
-                projection.PendingClaims
-                |> Map.map (fun _ claim ->
-                    { claim with
-                        RecoveryAttempts = claim.RecoveryAttempts + 1 }) }
+    /// Derived from the workspace `RuntimeStartCount` watermark. A plugin start
+    /// is O(1) because it only advances that counter; it does not rewrite claims.
+    let recoveryAttempts (runtimeStartCount: int) (claim: PromptClaim) =
+        runtimeStartCount - claim.ClaimedAtRuntimeStartCount
 
     /// PROMPT-011: this claim has spent its recovery budget and must be abandoned
     /// with `UnresolvedAfterRecovery`.
-    let recoveryBudgetSpent (claim: PromptClaim) =
-        claim.RecoveryAttempts >= RecoveryAttemptBudget
+    let recoveryBudgetSpent (runtimeStartCount: int) (claim: PromptClaim) =
+        recoveryAttempts runtimeStartCount claim >= RecoveryAttemptBudget
 
     /// The scope a ClaimSequence counts within.
     ///

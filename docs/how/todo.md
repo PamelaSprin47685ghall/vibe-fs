@@ -18,20 +18,22 @@
 
 ```text
 Tk = TodoWriteAccepted(k)     // 先有 Prepared
-Ck = settled CurrentObligations at Tk start   // [{name, work}]
-Pk = normalized proposed obligations at Tk
+C(k-1) = CurrentObligations immediately before Tk
+Pk = submitted complete obligation account at Tk
 Rk = process-review obligation of Tk
-Mk = semanticMerge(Ck, Pk)    // 单一 merge owner（TODO-005）
-ConsumableReview(k) ≡ TodoReviewConcluded(k)   // TODO-006
+ConsumableReview(k) ≡ TodoReviewConcluded(k)
 T1 = first TodoWriteAccepted on this Life     // BlindPlan commitment（TODO-015）
 ```
 
-结算（TODO-005）：
+Accepted supersession（TODO-005）：
 
 ```text
-settle(Ck, Pk, PERFECT) = Pk
-settle(Ck, Pk, REVISE)  = semanticMerge(Ck, Pk)
+Prepared(Tk)  freezes Base=C(k-1), Submitted=Pk; Current unchanged
+Accepted(Tk)  => CurrentObligations := Pk immediately
+Review(k)     => verdict/report only; never rewrites Current
 ```
+
+没有 `semanticMerge`、reviewer settlement、status progress min 或 accepted-but-not-current 半态。
 
 ---
 
@@ -73,18 +75,18 @@ todoCheckpointBefore:
        - 已有 Prepared/Accepted → 校验 input/Life/BaseObligations/ordinal digest
        - 一致 → 同一 TodoWriteId / 同一 obligation account / 不新增 checkpoint
        - 冲突 → identity corruption fail closed
-  4. settlePreviousCheckpointIfAny：
+  4. synchronizePreviousReviewIfAny：
        - 若存在 Accepted(k-1) 且尚无 TodoReviewConcluded(k-1)
          → 阻塞至 ConsumableReview(k-1) durable（TODO-006）
-         → 该阻塞是合法等待，不是 `MagicTodoReject` 对 Manager 的 fail-closed 红字
+         → 该阻塞是合法因果等待，不是 `MagicTodoReject` 对 Manager 的 fail-closed 红字
        - 仅 VerdictKnown 不足
-       - Ck = settle(C(k-1), P(k-1), verdict)（TODO-005）
-       - 若 REVISE 改变 canonical → Host TodoTable sink reconciliation（§下方；TODO-007）
-  5. 读 provider input → decode obligations: [{ name, work }]（TODO-002）
+       - 读取 verdict/report 供本次 tool result 交付；**不**因此改 CurrentObligations
+  5. C(k-1) = projection 当前最后 Accepted 对应 account（TODO-005）
+  6. 读 provider input → decode obligations: [{ name, work }]（TODO-002）
        - duplicate name → fail closed；禁止靠 work 文本猜 identity（TODO-003）
+       - provider account 必须描述 mission debt，不得用 `plan/analyze/write todos` meta-work 代替 T1 完整道路账
        - 禁止 kind/id/status/priority/reviewing 回流 provider 真值
-  6. Pk = normalized proposed obligations；existing names ∈ Ck 可续存
-  7. preview = semanticMerge(Ck, Pk)（不写入 canonical）
+  7. Pk = normalized submitted obligations
   8. append TodoWritePrepared
        - 冻结 tagged provider arguments 的 canonical `ProviderInputDigest`
          与 BaseObligations / Proposed digests
@@ -108,8 +110,8 @@ todoCheckpointBefore:
 ```text
 key = sessionID + ":" + callID
 carrier[Symbol] = {
-  settledOld, normalizedProposal, previousReview,
-  revisePreview, compatibilityProjection
+  baseObligations, submittedObligations, previousReview,
+  compatibilityProjection
 }
 ```
 
@@ -137,7 +139,8 @@ recovery path = 完整 SDK snapshot 中该 call ToolPart completed
 1. recover bridge 或从 Prepared + physical evidence 重建渲染输入
 2. ensure TodoWriteAccepted（幂等；继承 Prepared 的 ReviewFrontier）
      - Prepared + live/recovery success + digest 对齐 → Accepted
-     - Prepared + failed/absent/digest mismatch → 永不 Accepted
+     - fold Accepted 时 CurrentObligations **立即切到 Prepared.Submitted**（TODO-005）
+     - Prepared + failed/absent/digest mismatch → 永不 Accepted，Current 不变
 3. ensure DedicatedTodoReviewer（每 Life 一次 logical；proven-loss 才 Replace）（TODO-008）
 4. ensureReview(Tk)：
      Accepted 且尚无 TodoReviewConcluded(Tk)
@@ -146,10 +149,11 @@ recovery path = 完整 SDK snapshot 中该 call ToolPart completed
        → 提交/续跑 process reviewer
      ManagerCheckpointLWR 允许 RawGap；不得等 Manager Y 追平（TODO-008）
 5. desired lag-1 cutoff 由 Accepted 链纯推导；此处不 commit PrefixEpoch（TODO-009）
-6. render enriched tool result：
+6. render tool result：
      - 若 Tk = T1 → canonical entrustment revelation（TODO-015；conversation only；system 字节不变）
-     - 上一 ConsumableReview 的 ProcessReviewLWR
-     - 当前 REVISE preview / PERFECT「preview 不生效」提示（TODO-005/013）
+     - 上一 ConsumableReview 的 verdict + ProcessReviewLWR（若有）；REVISE 是反馈，不是 rollback
+     - 本次 Accepted 后的 CurrentObligations = Pk
+     - 不出现 `settled/proposed/preview/reviewing` 状态机词
 7. cleanup bridge → return
 ```
 
@@ -171,7 +175,8 @@ VerdictKnown(k)          // Reviewer 域 durable PERFECT|REVISE；立即定业�
        includeOpening = false
        与 verdict / frontier 同一 Journal snapshot
   → append TodoReviewConcluded(k){ Verdict, WorkRecordRef, Digest, ... }
-  → 此后才可被 Tk+1 / suicide 消费
+  → 此 fact 只封口 review obligation；不得写 CurrentObligations
+  → 此后才可被 Tk+1 / suicide 同步
 ```
 
 递归 CE（禁止一阶 PC / wall-clock poll；TODO-012）：
@@ -256,26 +261,24 @@ Blogger `effectiveStart = max(RecordCoverage, WorkRecordStart)`（TODO-001）。
 
 ---
 
-## Compatibility sink reconciliation
+## Compatibility sink repair
 
 归属 TODO-007。
 
 ```text
-视图：
-  Settled Current = Ck
-  Working Proposal = Pk   // Accepted 后 Host 可显示 Pk 兼容投影
+Canonical Current = latest Accepted account
+Host TodoTable     = compatibility projection only
 ```
 
-当 REVISE 被消费且 canonical 变为 `merge(Ck,Pk)`，而 Host 仍停在否决的 Pk 时（下一 before 因 transition 失败、或 suicide 消费后暂无新 Accepted）：
+before 可先把 submitted Pk 投影给 builtin executor；只有 physical success → Accepted 后 Pk 才成为 canonical。若 executor 失败、crash 或 replay 令 Host sink 与 projection 漂移，下一安全边界可幂等重投影 canonical Current：
 
 ```text
-幂等投影 Host TodoTable → settled current
+Host TodoTable := project(CurrentObligations)
 不产生 checkpoint / review
 不改 canonical
-随后合法 T(k+1) Accepted → executor 再覆盖为新 P(k+1)
 ```
 
-Host store **永不**参与 canonical recovery。
+REVISE **不是** sink rollback 触发器。Host store 永不参与 canonical recovery。
 
 ---
 
@@ -309,15 +312,15 @@ Blessing / ordinary graduate 不 Dispose process session
 suicide:
   requireAtLeastOneTodoWriteAcceptedOnFirstUnblessed(life)
        // first unblessed path ∧ 零 Accepted → fail closed（TODO-010）
-  todo = drainLatestProcessReview(life)
+  review = drainLatestProcessReview(life)
        // = awaitConsumableReview(latest Accepted) 若尚无 Concluded
-       //   否则 fold 已有 TodoReviewConcluded
-  reconcileHostTodoTableIfNeeded(life, todo)   // TODO-007
-  match todo with
-  | NeedsRevision report →
-       return processRevisionResult(report)    // 含 ProcessReviewLWR；不 create FinalityRequest；Life 继续
-  | Settled canonical →
-       return existingFinalityWorkflow(canonical)
+       //   否则读取已有 TodoReviewConcluded
+  match review.Verdict with
+  | REVISE →
+       return processRevisionResult(review)    // 含 ProcessReviewLWR；不 create FinalityRequest；Life 继续
+                                               // Current 仍为 latest Accepted；Manager 后续改账
+  | PERFECT →
+       return existingFinalityWorkflow(CurrentObligations)
        // 无机械 terminal-todo completeness gate（TODO-010）
 ```
 
@@ -347,7 +350,7 @@ create/resume/assignment/LWR materialization failure
 | Prepared + live/recovery success，无 Accepted | ensure Accepted（digest 对齐） |
 | Accepted，无 ConsumableReview | derive Rk → ensure Dedicated/Assigned/ensureReview；VerdictKnown 无 LWR → await journal 同 snapshot 再结 |
 | reviewer prompt 已发，plugin crash | 证明原 session → resume；永久丢失 → Replace；不确定 → fail closed |
-| Concluded 已落，尚无下一 todowrite | 无需额外 fact；下一 before/suicide fold settle |
+| Concluded 已落，尚无下一 todowrite | 无需额外 fact；Current 早已由 Accepted 确定；下一 before/suicide 只消费 review feedback |
 | executor 成功，无 Accepted | 仅 Prepared+completed ToolPart 可 ensure Accepted；否则 checkpoint 未成立 |
 | desired cutoff 有、PrefixEpoch 未 commit | 下一次 transform seal 前原子 commit（无 RebasePending Stage） |
 | 仅 VerdictKnown，waiter 丢 | 重建同一等待；禁空壳 Concluded |
@@ -396,8 +399,8 @@ LifeOpened → BlindPlan Opening（Planning Table）
 → T1 Prepared/Accepted → entrustment revelation（conversation）→ WorkRecordStart
 → ensureReview(R1) → desired cutoff 可推导（T1 无 prior replacement）
 → Manager 工作 ∥ D reviews R1（TODO-006/008）；system prompt 字节不变
-→ T2 before 等 TodoReviewConcluded(R1) → settle → sink reconcile?
-→ Accepted T2 → R2 → 下一 attempt seal 前 PrefixEpoch(TodoCheckpoint)（TODO-009）
+→ T2 before 等 TodoReviewConcluded(R1) → 读取 feedback；Current 不回滚
+→ Accepted T2 → Current=P2 → R2 → 下一 attempt seal 前 PrefixEpoch(TodoCheckpoint)（TODO-009）
 → …
 → suicide drain latest ConsumableReview → REVISE 继续 / PERFECT → Finality（TODO-010）
 → Blessed 后仍可 todowrite；Dedicated process 保留

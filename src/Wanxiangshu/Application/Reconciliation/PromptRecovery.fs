@@ -71,6 +71,7 @@ module PromptRecovery =
     let private reconcileClaim
         (runtime: PromptDispatcher.Runtime)
         (snapshot: ISessionSnapshotPort)
+        (runtimeStartCount: int)
         (sessionId: SessionId)
         (claim: PromptAuthority.PromptClaim)
         : Task<Reconciled> =
@@ -103,7 +104,7 @@ module PromptRecovery =
                     | Ok() -> return report (Proven physical)
                     | Error reason -> return report (Unreadable reason)
 
-                | None when PromptAuthority.recoveryBudgetSpent claim ->
+                | None when PromptAuthority.recoveryBudgetSpent runtimeStartCount claim ->
                     match runtime.Abandon claim.PromptKey sessionId PromptAbandonReason.UnresolvedAfterRecovery with
                     | Ok() -> return report GaveUp
                     | Error reason -> return report (Unreadable reason)
@@ -127,9 +128,11 @@ module PromptRecovery =
             | _, None -> return []
             | Some durable, Some snapshot ->
                 let runtime = PromptDispatcher.forJournal durable
+                let projections = (AgentJournal.snapshot durable).AgentProjections
+                let runtimeStartCount = projections.RuntimeStartCount
 
                 let pending =
-                    (AgentJournal.snapshot durable).AgentProjections.Sessions
+                    projections.Sessions
                     |> Map.toList
                     |> List.collect (fun (sessionId, session) ->
                         session.PromptAuthority
@@ -142,7 +145,7 @@ module PromptRecovery =
                 let results = ResizeArray<Reconciled>()
 
                 for sessionId, claim in pending do
-                    let! outcome = reconcileClaim runtime snapshot sessionId claim
+                    let! outcome = reconcileClaim runtime snapshot runtimeStartCount sessionId claim
                     results.Add outcome
 
                 return results |> Seq.toList
