@@ -192,7 +192,6 @@ test('TODO-011 rejects a legacy seed after the first Magic provider request', ()
     life,
     blobRef('legacy-list'),
     blobDigest('legacy-digest'),
-    toList([magicTodo.todoItemIdCreate('legacy-item')]),
   )
   const state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
   const rejected = error(foldMagic(state, fact('LegacyTodoSeedAdopted', legacySeed)))

@@ -49,8 +49,8 @@ module MagicTodoProjection =
             AcceptedIds: Set<string>
             Checkpoints: Map<string, CheckpointRecord>
             Dedicated: DedicatedReviewerState option
-            /// Blob list bodies live in the blob store; projection keeps their locator and ids.
-            LegacySeed: (BlobRef * BlobDigest * TodoItemId list) option
+            /// Upgrade-only canonical obligation seed locator.
+            LegacySeed: (BlobRef * BlobDigest) option
         }
 
     type MagicTodoProjectionState =
@@ -378,12 +378,7 @@ module MagicTodoProjection =
         let life, state = ensureLife payload.ManagerLifeId state
 
         match life.LegacySeed with
-        | Some(seedRef, seedDigest, seedItemIds) when
-            seedRef = payload.SeedTodoRef
-            && seedDigest = payload.SeedTodoDigest
-            && seedItemIds = payload.SeedItemIds
-            ->
-            Ok state
+        | Some(seedRef, seedDigest) when seedRef = payload.SeedTodoRef && seedDigest = payload.SeedTodoDigest -> Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
         | None when not (Map.isEmpty life.Checkpoints) -> Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
         | None ->
@@ -391,7 +386,7 @@ module MagicTodoProjection =
                 putLife
                     { life with
                         CurrentObligationsRef = Some(payload.SeedTodoRef, payload.SeedTodoDigest)
-                        LegacySeed = Some(payload.SeedTodoRef, payload.SeedTodoDigest, payload.SeedItemIds) }
+                        LegacySeed = Some(payload.SeedTodoRef, payload.SeedTodoDigest) }
                     state
             )
 

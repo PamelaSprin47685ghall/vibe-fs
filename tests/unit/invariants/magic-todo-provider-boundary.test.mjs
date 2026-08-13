@@ -56,6 +56,19 @@ test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrast
   assert.match(hostCodec, /output\.args is required[\s\S]*Diagnostic\.fatal|Diagnostic\.fatal[\s\S]*output\.args is required/)
 })
 
+test('TODO-003 clean break removes the legacy todo ontology from the production graph', () => {
+  const algebra = read('src/Wanxiangshu/Domain/MagicTodo.fs')
+  const project = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+
+  assert.doesNotMatch(
+    algebra,
+    /TodoStatus|TodoItemId|MagicTodoInputItem|MagicTodoItem|MagicTodoList|semanticMerge|RevisePreview/,
+    'MagicTodo algebra must stay obligation-only',
+  )
+  assert.doesNotMatch(project, /MagicTodoListCodec|MagicTodoLegacySeed|MagicTodoSuicide/)
+  assert.match(project, /MagicTodoObligationCodec\.fs/)
+})
+
 test('TODO-005 production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs',

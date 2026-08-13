@@ -5857,6 +5857,38 @@ Magic Todo live 宿主：本 Manager 会话后续 `todowrite` 仍返回 `Admissi
 - **Change**：撤回 premature `Final outcome` 与 `completed/` 关闭；Change 回到 `active/` 直至 Remaining work 全部闭环。
 - **Reason**：只要还有后续没做完就不能交付。
 
+## Amendment — 2026-08-13（Magic Todo 最终失败分型 / BlindPlan T1 / clean break）
+
+- **Requested by**：用户。先要求「根据 changes/ 里面的语义精细确定真实意图」，随后明确补充：LLM 经常上来先写一条「我要做计划」的 meta todo；`review` 失败属于语义失败；**红字只留给语法失败**；**不得存在万象术自身失败作为 tool error**；基础设施异常应**直接杀死整个 OpenCode 并报错，方便调试人员处理**。
+- **覆盖关系**：本 Amendment 是对本文件早先 Magic Todo amendment 中 `processReview=None / producer missing / typed infrastructure failure → 当前操作 fail-closed` 的**后续明确覆盖**。旧记录保留作历史，但不得再作为当前实现依据。
+- **T1 / meta todo 最终裁决**：第一次 `todowrite` = Planning Table 已完成后的**完整 obligation account 提交**。`make a plan / analyze the request / write todos / decide next steps / 先做计划` 等描述 Manager 自己认知过程的 meta-work 不是 mission debt。需要这些认知动作时直接做；不得用一条 meta todo 提前触发 T1 entrustment。
+- **CurrentObligations 最终裁决**：`TodoWriteAccepted(Tk)` 一旦 durable，matching Prepared 的 Submitted account **立即成为 CurrentObligations**。Process reviewer 不拥有 todo state；PERFECT/REVISE 都不 rollback、不 semanticMerge、不产生 accepted-but-not-current 半态。REVISE 只要求 Manager 在后续 checkpoint 写出更真实的完整 account。
+- **失败分型（唯一当前语义）**：
+
+```text
+Syntax / call-shape failure
+  → 只拒绝本次 todowrite
+  → provider 红字允许
+
+Semantic review failure = REVISE
+  → 正常成功路径
+  → 自然语言反馈 + canonical WorkRecord
+  → 绝不红字
+
+Wanxiangshu / infrastructure invariant failure
+  → Diagnostic.fatal("magic-todo-infrastructure-failed", ...)
+  → 打印结构化错误
+  → SIGKILL / process.exit whole OpenCode
+  → 绝不能降格为一次 todowrite 红字后继续跑
+```
+
+  基础设施类包括缺 Journal/snapshot/review runtime、snapshot/locality/materialization、blob/journal/digest/projection/Prepared identity、hidden reviewer producer/assignment/LWR/runtime 等不变量失败。
+- **Provider surface**：普通 accepted = `# Keep working.`（或等价静默成功）；上一 process PERFECT 静默；上一 REVISE = `# An earlier account of the work left something unresolved.` + canonical ProcessReviewLWR。不得回显 `settled/proposed/preview/status/reviewing` DTO。
+- **Clean break 实现方向**：新生产代数只保留 `{name,work}` obligation account、TodoWriteId/TodoReviewId/DedicatedReviewerId、Prepared/Accepted、lag-1 review。`TodoStatus / TodoItemId / MagicTodoInputItem / MagicTodoList / semanticMerge` 不得再是生产编译 owner；旧资源若物理残留只可作为明确 retired tombstone，不得可寻址恢复旧语义。
+- **Prompt owner**：meta-todo 边界同时写进 Planning Table、`todowrite` description、Manager Role Law；Host 不用自然语言关键词分类器猜 meta todo，避免重新发明隐藏 phase machine。
+- **验证记录**：本 Amendment 落地后的 Magic Todo 定向集曾在同一工作树完成 Fable `build ok`，随后 `72/72` targeted unit/canary/invariant 通过（Current supersession、REVISE feedback、lag-1、fatal triage、T1/Planning Table、Host codec/canary、prompt stability）。之后全量 unit 再验证被并行中的 `HostForkAgent.fs` 未完成编辑阻断；该并行编译错误不属于 Magic Todo，不得据此把本 Amendment 标成全栈已绿。
+- **关闭状态**：GrandRewrite 仍保持 `active/`；本 Amendment 只冻结 Magic Todo 的当前语义与已验证范围。
+
 ---
 
 # Final outcome（已撤回 — 不得作为关闭依据）

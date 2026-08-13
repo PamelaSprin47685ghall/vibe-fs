@@ -89,15 +89,15 @@ todoCheckpointBefore:
        - 禁止 kind/id/status/priority/reviewing 回流 provider 真值
   7. Pk = normalized submitted obligations
   8. append TodoWritePrepared
-       - 冻结 tagged provider arguments 的 canonical `ProviderInputDigest`
-         与 BaseObligations / Proposed digests
+       - 冻结 canonical `{obligations:[{name,work}]}` `ProviderInputDigest`
+         与 BaseObligations / Submitted digests
        - 返回真实 Journal `EventId`；after/recovery 仅以它填 `TodoWriteAccepted.PreparedFactRef`
        - ReviewFrontier = 本 tool-call 前 exclusive cursor（绑 ManagerLifeId）
          pending before-hook：= next-assigned + 同 message 中本 call 之前的可捕获 part 数
          （不得把 frontier 冻在最后一条助手文本将占用的 cursor）
   9. install ephemeral bridge（process-local Map + hidden Symbol；非 durable）
  10. mutateArgsInPlace → Host TodoTable V1 compatibility sink only
-       （content/status/priority 投影；canonical 仍是 obligations；reviewing sink 策略见 HOST canary）
+       （固定投影 `content=name: work / status=in_progress / priority=medium`；这些字段只是 builtin UI 适配，canonical 仍是 obligations，绝不回读）
 ```
 
 `Prepared` ≠ checkpoint；不派生 Rk。provider-visible 真值 = obligations，不是 sink 枚举。
@@ -117,7 +117,7 @@ carrier[Symbol] = {
 ```
 
 - after 成功消费后 delete entry；tool/turn failure cleanup 清残留。
-- **禁止** bridge 表示 Prepared/Accepted/obligation/settlement。
+- **禁止** bridge 表示 durable Prepared/Accepted/CurrentObligations 或任何 settlement 状态；它只搬运本次 effect shell 所需的 ephemeral 数据。
 - crash recovery **忽略** bridge；只读 Journal + physical ToolPart（TODO-012）。
 - Canary：before 改 args 不得 alias 改写 durable pre-before ToolPart.input（HOST membrane；失败则 membrane 不得上线）。
 

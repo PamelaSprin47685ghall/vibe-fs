@@ -9,7 +9,6 @@ import { join } from 'node:path'
 import {
   SyntheticTomlModule,
   MagicTodoModule,
-  MagicTodoListCodecModule,
   MagicTodoAdmissionModule,
   MagicTodoHostCodecModule,
   MagicTodoFactsModule,
@@ -140,21 +139,13 @@ export const syntheticToml = (() => {
  * boundary instead of depending on emitted union ordinals or module spellings.
  */
 export const magicTodo = (() => {
-  const input = unionCase(MagicTodoModule.MagicTodoInputItem, 'MagicTodoInputItem')
-  const listCodec = bind(MagicTodoListCodecModule, 'MagicTodoListCodec', ['encode', 'tryDecode'])
   const m = bind(MagicTodoModule, 'MagicTodo', [
     'todoWriteId',
-    'todoItemId',
     'todoReviewId',
     'dedicatedReviewerId',
-    'listDigest',
     'canonicalObligationListWire',
     'obligationListDigest',
     'validateObligations',
-    'validateCompletedGate',
-    'normalizeProposed',
-    'semanticMerge',
-    'settle',
     'admitTodowriteBatch',
     'checkPreparedReplay',
     'desiredLag1Cutoff',
@@ -167,21 +158,11 @@ export const magicTodo = (() => {
 
   return {
     ...m,
-    encodeList: (items) => listCodec.encode(toList(items)),
-    decodeList: (json) => resultOf(listCodec.tryDecode(json)),
-    TodoStatus: MagicTodoModule.TodoStatus,
-    MagicTodoInputItem: MagicTodoModule.MagicTodoInputItem,
-    MagicTodoItem: MagicTodoModule.MagicTodoItem,
     ProcessReviewVerdict: MagicTodoModule.ProcessReviewVerdict,
     PreparedIdentity: MagicTodoModule.PreparedIdentity,
     Obligation: MagicTodoModule.Obligation,
-    todoItemIdCreate: MagicTodoModule.TodoItemIdModule_create,
-    todoItemIdValue: MagicTodoModule.TodoItemIdModule_value,
     todoWriteIdCreate: MagicTodoModule.TodoWriteIdModule_create,
     todoWriteIdValue: MagicTodoModule.TodoWriteIdModule_value,
-    existing: (id, content, status, priority) => input('Existing', [id, content, status, priority]),
-    new: (content, status, priority) => input('New', [content, status, priority]),
-    item: (id, content, status, priority) => new MagicTodoModule.MagicTodoItem(id, content, status, priority),
     perfect: MagicTodoModule.ProcessReviewVerdict.Perfect,
     revise: MagicTodoModule.ProcessReviewVerdict.Revise,
     workRecordStart: (openingSequence) => Number(m.workRecordStart({ Sequence: BigInt(openingSequence) }).Sequence),

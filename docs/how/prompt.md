@@ -22,8 +22,11 @@ Authority、PromptKey 和发送 writer 边界见 `shape/prompt.md`。
   Tools = requestToolOverride }
 ```
 
-Dispatcher 默认 `Model = None`：Host 按 `config.agent[effectiveAgent].model` 解析。  
-有意换档只改 Agent（Fallback EffectiveAgent、Strength replica `fast-*`、NeedHelpEscalation `deep-*`），禁止从 Role 发明 `fast-ROLE`。
+Dispatcher 默认 `Model = None`：Host 按 `config.agent[effectiveAgent].model` 解析，并在 `prompt_async` 前写入该绑定。OpenCode 在缺 agent / model 时会 `defaultInfo()` 落到 Fast，把既有 Deep child 覆盖掉。
+
+续做既有 session（Fork existing / Reuse / SyncDelegate 复用 / Reviewer 续发）必须发送该 session 已绑定 managed agent：Durable Handle `TargetAgent`，否则 ChildRun.Agent，否则 Authority `SelectedAgent`。禁止从 Role 发明 `fast-ROLE`，禁止用调用方缺省把 `deep-*` 换成 `fast-*`。
+
+有意换档只改 Agent（Fallback EffectiveAgent、Strength replica `fast-*`、NeedHelpEscalation `deep-*`）。
 
 `chat.params` 必须把请求 Agent（缺省时为 Authority Root `SelectedAgent`）的绑定写成 `OpencodeModel` 钉死，防止 Host 把 agent-less / 历史推断请求落到默认 build/Fast。不得回退到 Peer，不得发明 Fast。
 

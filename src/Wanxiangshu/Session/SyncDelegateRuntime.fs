@@ -135,6 +135,14 @@ type SyncDelegateRuntime
                     let! result = sendDelegatePrompt call request
                     return result |> Result.map ignore
                 }
+          ResolveBoundAgent =
+            fun childId ->
+                let projections = (AgentJournal.snapshot journal).AgentProjections
+
+                PromptAuthorityLedger.activeProfile childId projections
+                |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile childId projections)
+                |> Option.map (fun profile -> profile.SelectedAgent)
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
           DescribeWait = SyncDelegateWait.describe }
 
     member _.Attached = attached

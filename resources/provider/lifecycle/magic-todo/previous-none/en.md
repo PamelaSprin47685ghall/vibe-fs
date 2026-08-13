@@ -1,1 +1,1 @@
-None — this is the first checkpoint.
+Retired semantic asset. PERFECT/no-previous-review is intentionally silent.

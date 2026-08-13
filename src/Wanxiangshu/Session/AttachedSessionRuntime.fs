@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Identity
 /// Does not use SatelliteRuntime / SatelliteKind (those remain Companion/Teacher only).
 type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?isUsable: SessionId -> bool) =
     let gate = obj ()
-    let bindings = Dictionary<string, SessionId>()
+    let bindings = Dictionary<string, SessionId * string>()
     let register = defaultArg registerParent (fun _ _ -> ())
     let usable = defaultArg isUsable (fun _ -> true)
 
@@ -25,16 +25,16 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
 
     let tryGetLocked (scope: ReuseScopeId) (role: SyncDelegateRole) =
         match bindings.TryGetValue(bindingKey scope role) with
-        | true, sessionId when usable sessionId -> Some sessionId
+        | true, (sessionId, agent) when usable sessionId -> Some(sessionId, agent)
         | true, _ -> None
         | false, _ -> None
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
         let scope = ReuseScope.ofSession ownerSessionId
-        lock gate (fun () -> tryGetLocked scope role)
+        lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
 
     member _.TryFindByScope(scope: ReuseScopeId, role: SyncDelegateRole) : SessionId option =
-        lock gate (fun () -> tryGetLocked scope role)
+        lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
 
     member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
         let scope = ReuseScope.ofSession ownerSessionId
@@ -44,7 +44,7 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
         lock gate (fun () ->
             let doomed =
                 bindings
-                |> Seq.tryFind (fun kv -> kv.Value = delegateSessionId)
+                |> Seq.tryFind (fun kv -> fst kv.Value = delegateSessionId)
                 |> Option.map (fun kv -> kv.Key)
 
             match doomed with
@@ -54,6 +54,9 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     /// Reuse an existing compatible binding, or create a Work child and bind it.
     /// `createChild ownerSessionId agentName directory` must CreateChildSession as a
     /// Work child with `Agent = Some agentName` (not a SatelliteKind leaf).
+    ///
+    /// On reuse the returned agent is the one stored at create time. A later
+    /// owner-tier lookup must not overwrite a Deep child with Fast.
     member _.GetOrCreate
         (
             ownerSessionId: SessionId,
@@ -62,7 +65,7 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
             directory: string option,
             createChild: SessionId -> string -> string option -> Task<Result<SessionId, string>>,
             onReady: SessionId -> string -> unit
-        ) : Task<Result<SessionId, string>> =
+        ) : Task<Result<SessionId * string, string>> =
         task {
             let scope = ReuseScope.ofSession ownerSessionId
             let key = bindingKey scope role
@@ -70,15 +73,15 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
             let existing = lock gate (fun () -> tryGetLocked scope role)
 
             match existing with
-            | Some sessionId -> return Ok sessionId
+            | Some(sessionId, boundAgent) -> return Ok(sessionId, boundAgent)
             | None ->
                 match! createChild ownerSessionId agentName directory with
                 | Error error -> return Error error
                 | Ok childId ->
                     register ownerSessionId childId
                     onReady childId agentName
-                    lock gate (fun () -> bindings.[key] <- childId)
-                    return Ok childId
+                    lock gate (fun () -> bindings.[key] <- (childId, agentName))
+                    return Ok(childId, agentName)
         }
 
     member _.Clear() = lock gate (fun () -> bindings.Clear())

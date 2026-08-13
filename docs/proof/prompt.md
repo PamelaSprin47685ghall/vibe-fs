@@ -16,10 +16,11 @@
 |------|------|
 | AttemptExecutionProfile 原子：禁止拼装 | PROMPT-008 |
 | StrengthReplica：same-role profile，schema/execution gate 恰为 Read/Glob/Grep，mayCarryProbe=false，成功不清 owner failure count | PROMPT-008、STRENGTH-004/015 |
-| 发送 `Agent=EffectiveAgent`，`Model=None` | PROMPT-006 |
+| 发送 `Agent=EffectiveAgent`，`Model=None`；Host 在 `prompt_async` 前按 Agent 填绑定 model | PROMPT-006 |
+| 续做既有 session：SendPrompt.Agent = 已绑定 managed agent；禁止 caller Fast 覆盖 Deep | PROMPT-006、EXEC-002 |
 | Fire-and-forget 仍完整 claim | PROMPT-007 |
 
-代表：`tests/unit/prompt/*`、`tests/unit/context/attempt-plan.test.mjs`、`tests/unit/strength/authority-policy.test.mjs`。
+代表：`tests/unit/prompt/*`、`tests/unit/context/attempt-plan.test.mjs`、`tests/unit/strength/authority-policy.test.mjs`、`tests/unit/session/host-fork-agent.test.mjs`、`tests/unit/tools/fork-tool.test.mjs`、`tests/unit/session/sync-delegate-runtime.test.mjs`、`tests/unit/host/managed-agent-config.test.mjs`。
 
 ## Gate D — System prompt 稳定性（PROMPT-014 / ARCH-016）
 

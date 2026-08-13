@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
+import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
@@ -75,6 +76,7 @@ const captureLastAssistant = (delegateKey, answer) => {
 }
 
 const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
+  SessionPersona_clearAllForTests()
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
@@ -85,6 +87,7 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
   const createCalls = []
   const prompts = []
   let physicalSeq = 0
+  const ownerTier = { current: tier }
 
   const sessions = {
     SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -116,7 +119,7 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
     dispatcher,
     opened.journal,
     attached,
-    (_owner) => roles.tier(tier),
+    (_owner) => roles.tier(ownerTier.current),
     (delegateSession, agent) => {
       ready.push({ session: idValue.session(delegateSession), agent })
     },
@@ -142,6 +145,7 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
       ready,
       sessions,
       journal: opened.journal,
+      ownerTier,
     })
   } finally {
     disposeRuntime(runtime)
@@ -258,6 +262,30 @@ test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => 
     assert.match(secondDone.value, /answer two/)
     assert.equal(createCalls[0].child, delegateId)
   })
+})
+
+test('EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast', async () => {
+  await withHarness(async ({ runtime, prompts, createCalls, ownerTier }) => {
+    const owner = 'ses_owner_keep_deep'
+    const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect deep')
+    await waitFor(() => createCalls.length === 1 && prompts.length === 1, 'deep inspector not created')
+    assert.equal(createCalls[0].agent, 'deep-inspector')
+    assert.equal(prompts[0].agent, 'deep-inspector')
+
+    const delegateId = createCalls[0].child
+    await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'answer one', 'asst_deep1')
+    assert.equal((resultOf(await first)).ok, true)
+
+    ownerTier.current = 'Fast'
+    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect again')
+    await waitFor(() => prompts.length === 2, 'reuse send missing')
+    assert.equal(createCalls.length, 1, 'GetOrCreate must reuse; createChild once')
+    assert.equal(prompts[1].agent, 'deep-inspector')
+    assert.notEqual(prompts[1].agent, 'fast-inspector')
+
+    await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'answer two', 'asst_deep2')
+    assert.equal((resultOf(await second)).ok, true)
+  }, { tier: 'Deep' })
 })
 
 // ProviderWire(Q1) prefix-of Q2 prefix-of Q3 (ARCH-004) is proved in

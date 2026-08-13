@@ -375,6 +375,10 @@ module DedicatedTodoReviewerRuntime =
 
                                             let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
 
+                                            let sendAgent =
+                                                runtime.BoundManagedAgent(handleId, enlisted.ReviewerSessionId)
+                                                |> Option.defaultValue agentName
+
                                             let! sent =
                                                 match delivery with
                                                 | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
@@ -386,7 +390,7 @@ module DedicatedTodoReviewerRuntime =
                                                                 sessions
                                                                 (Some journal)
                                                                 enlisted.ReviewerSessionId
-                                                                agentName
+                                                                sendAgent
                                                                 assignmentDirectory
                                                                 assignmentText
                                                         with

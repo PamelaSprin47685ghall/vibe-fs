@@ -356,11 +356,7 @@ module MagicTodoMembrane =
                 ProviderProse.render
                     lang
                     MagicTodoSurface.Path.ObligationWriteResult
-                    (MagicTodoSurface.obligationWriteSubs
-                        previousBody
-                        (MagicTodoSurface.renderObligationListWire bridge.SubmittedObligations)
-                        (MagicTodoSurface.renderObligationListWire bridge.SubmittedObligations)
-                        acceptedEpilogue)
+                    (MagicTodoSurface.obligationWriteSubs previousBody acceptedEpilogue)
 
             let enrichedResult =
                 if isT1Commitment then

@@ -15,7 +15,7 @@ const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindin
 // Production installs resources at plugin init.
 runtimeResources.installFromPackage()
 
-const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel } = await import(
+const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel, tryBoundModel } = await import(
   join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js')
 )
 const { OpencodeModel } = await import(
@@ -196,4 +196,22 @@ test('MACFG_tryOpencodeModel_bare_id_keeps_current_provider_and_refuses_without_
   const corrected = tryOpencodeModel(inventory, 'deep-coder', current)
   assert.equal(corrected.providerID, 'anthropic')
   assert.equal(corrected.modelID, 'deep-model')
+})
+
+test('MACFG_tryBoundModel_reads_live_inventory_after_configure', () => {
+  const cfg = fullConfig()
+  cfg.agent['deep-coder'] = { model: 'anthropic/deep-opus' }
+  cfg.agent['fast-coder'] = { model: 'anthropic/fast-haiku' }
+  const ok = okOf(configureFromHostConfig(cfg))
+  assert.equal(ok.ok, true, ok.ok ? '' : ok.error)
+
+  const deep = tryBoundModel('deep-coder')
+  assert.equal(isSome(deep), true)
+  assert.equal(deep.providerID, 'anthropic')
+  assert.equal(deep.modelID, 'deep-opus')
+
+  const fast = tryBoundModel('fast-coder')
+  assert.equal(fast.modelID, 'fast-haiku')
+  assert.notEqual(fast.modelID, deep.modelID)
+  assert.equal(isNone(tryBoundModel('unknown-agent')), true)
 })

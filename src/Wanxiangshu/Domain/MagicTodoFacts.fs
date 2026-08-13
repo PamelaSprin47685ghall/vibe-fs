@@ -100,17 +100,14 @@ module MagicTodoFacts =
           NewSessionId: SessionId
           EvidenceRef: BlobRef }
 
-    /// Upgrade-path only: seed legacy open Life before first Magic provider request.
-    /// Forbidden for subsequent Lives in the same Host session.
+    /// Upgrade-path only: seed one already-open Life with a canonical obligation
+    /// account before its first Magic provider request. Historical facts may carry
+    /// an extra SeedItemIds field; v2 ignores it on decode.
     type LegacyTodoSeedAdopted =
-        {
-            ManagerSessionId: SessionId
-            ManagerLifeId: ManagerLifeId
-            SeedTodoRef: BlobRef
-            SeedTodoDigest: BlobDigest
-            /// Host-assigned Magic ids for each legacy row (position → TodoItemId).
-            SeedItemIds: TodoItemId list
-        }
+        { ManagerSessionId: SessionId
+          ManagerLifeId: ManagerLifeId
+          SeedTodoRef: BlobRef
+          SeedTodoDigest: BlobDigest }
 
     /// EvidenceKind for PrefixRebaseCommitted generalization (protocol §16.7).
     /// TodoCheckpoint rebase must enter existing ActivePrefixEpoch SSOT — not a

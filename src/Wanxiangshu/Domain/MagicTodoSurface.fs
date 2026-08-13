@@ -72,16 +72,6 @@ module MagicTodoSurface =
               Status = "in_progress"
               Priority = "medium" })
 
-    type RawObligationFields =
-        { Name: string option
-          Work: string option }
-
-    let decodeObligation (raw: RawObligationFields) : Obligation =
-        { Name = defaultArg raw.Name ""
-          Work = defaultArg raw.Work "" }
-
-    let decodeObligations (rows: RawObligationFields list) : ObligationList = rows |> List.map decodeObligation
-
     // ── Canonical obligation wire (tool result / blob body) ────────────────
 
     let renderObligationListWire (items: ObligationList) : string =
@@ -91,26 +81,11 @@ module MagicTodoSurface =
         { Verdict: ProcessReviewVerdict
           ReportText: string }
 
-    type ObligationWriteResult =
-        { Previous: PreviousReviewView option
-          Current: ObligationList
-          Submitted: ObligationList
-          Accepted: bool }
-
     let previousReviewSubs (verdictWire: string) (reportText: string) : Map<string, string> =
         Map [ "verdict", verdictWire; "report", reportText ]
 
-    let obligationWriteSubs
-        (previousBody: string)
-        (currentWire: string)
-        (submittedWire: string)
-        (acceptedEpilogue: string)
-        : Map<string, string> =
-        Map
-            [ "previous_body", previousBody
-              "current_wire", currentWire
-              "submitted_wire", submittedWire
-              "accepted_epilogue", acceptedEpilogue ]
+    let obligationWriteSubs (previousBody: string) (acceptedEpilogue: string) : Map<string, string> =
+        Map [ "previous_body", previousBody; "accepted_epilogue", acceptedEpilogue ]
 
     /// Process reviewer assignment body: preamble already localized by caller.
     let renderAssignmentUserMessage (preamble: string) (sections: string list) : string =

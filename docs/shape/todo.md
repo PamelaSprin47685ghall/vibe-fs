@@ -27,6 +27,7 @@
 | Finality drain 入口 | Manager `suicide` 前序（GLORY Finality CE 扩展） | 零 `TodoWriteAccepted` 的 first unblessed path fail closed；不另造 mechanical todo-completeness gate（TODO-010） |
 | Manager-visible process surface | enriched `todowrite` tool result + safety-sealed ProcessReviewLWR | 允许 outcome / report；禁止泄漏 reviewer session / barrier / witness / 2N（TODO-013） |
 | Compatibility sink | Host `TodoTable` writer（membrane projection + drift repair） | 只投影；REVISE 不 rollback；repair **不**产生 checkpoint/review（TODO-007） |
+| Failure triage | `MagicTodoHostHooks` + `Diagnostic.fatal` | syntax/call-shape 才可 tool red；REVISE 是正常语义反馈；任何 Wanxiangshu/Host infra invariant failure 必须 kill whole OpenCode，禁止降格成 tool error（TODO-004/006/012） |
 | V1 membrane 执行路径 | Host tool hooks（definition / before / after）；细节 HOST-* | V2 runner 无 hook parity 应在启动/构造 gate 阻止；若运行时仍错入则 `Diagnostic.fatal`，不得 tool red（TODO-004） |
 | Legacy seed | 一次性 `LegacyTodoSeedAdopted`（仅升级瞬间 legacy open Life） | 正常新 Life canonical 空；禁止同 session 后续 Life 再 adopt Host table（TODO-011） |
 | Obligation checkpoint projection | `MagicTodoProjection` | **只** Accepted→Current + review obligation；没有 settlement writer / semanticMerge；**不是**工作记录 renderer（TODO-005/007/008） |
@@ -38,12 +39,14 @@
 实现路径随仓库命名；**不得因路径不同改变上表 owner**（TODO-014）：
 
 ```text
-Domain/        TodoCheckpoint · TodoIdentity · TodoSettlement · TodoReview · TodoPrompt
-Application/   TodoCheckpointProgram · TodoProcessReviewProgram
+Domain/        MagicTodo · MagicTodoObligationCodec · MagicTodoFacts · MagicTodoProcessReview
+Application/   MagicTodoMembrane · TodoProcessReviewProgram · DedicatedTodoReviewerRuntime
+Journal/       MagicTodoProjection · MagicTodoFactCodec
 Infrastructure/OpenCode/
-  TodoWrite{Definition,Before,After}Hook · TodoCheckpointBridge
-  TodoCheckpointProjection · DedicatedTodoReviewerRuntime
+  MagicTodoHostCodec · MagicTodoHostHooks · Diagnostic.fatal
 ```
+
+旧 `TodoSettlement / MagicTodoListCodec / MagicTodoLegacySeed / MagicTodoSuicide` 不再是生产 owner；若物理文件为迁移记录保留，只能是 retired tombstone，且不得进入 `.fsproj`。
 
 CE 表达 facts 上的递归等待（Journal 变化 → 同 snapshot 重读），**禁止**一阶 `WaitingReview|Settling|…` 大状态机（TODO-012；算法见 `how/todo.md`）。
 

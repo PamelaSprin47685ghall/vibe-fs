@@ -19,6 +19,7 @@ type Dependencies =
       CleanupInspectorDraft: string -> unit
       Directory: string option
       SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
+      ResolveBoundAgent: SessionId -> string option
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
 
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE with concurrent batch coalescing and direct in-flight dispatch.
@@ -90,7 +91,7 @@ let invoke
 
                             for item in initialBatch do
                                 AsyncSupport.trySetResult item.Completion (Error error) |> ignore
-                        | Ok delegateSession ->
+                        | Ok(delegateSession, attachedAgent) ->
                             let extraBatch = store.DrainBatch(ownerScope, role)
                             let batch = initialBatch @ extraBatch
 
@@ -118,8 +119,12 @@ let invoke
 
                             let combinedProviderPrompt = fullPrompts |> String.concat "\n\n"
 
+                            let sendAgent =
+                                deps.ResolveBoundAgent delegateSession
+                                |> Option.defaultValue attachedAgent
+
                             let call, registration =
-                                store.BeginCall(batchOwner, ownerScope, role, delegateSession, agentName, fullBatch)
+                                store.BeginCall(batchOwner, ownerScope, role, delegateSession, sendAgent, fullBatch)
 
                             use _registration = registration
 

@@ -19,7 +19,7 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents } =
+const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents, HostForkRuntime__get_PendingRuns: pendingRunsOf, HostForkRuntime__FailRun_1B5DABF9: failRun } =
   await import('../../../dist/Session/HostForkRuntime.js')
 const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: forkRuntime } = await import(
   '../../../dist/Session/HostForkAgent.js'
@@ -263,6 +263,30 @@ test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'Byname continuation must not spawn a second session')
+  live.cleanup()
+})
+
+test('FORK_engineer_continuation_keeps_deep_coder', async () => {
+  const live = liveScope()
+  const spec = managerSpec(factory, live.scope)
+
+  assert.match(await runManager(spec, 'Ada', 'implement the feature', { calling: 'engineer' }), /Ada carries/)
+
+  for (const run of pendingRunsOf(live.runtime).values()) {
+    failRun(live.runtime, run, 'settled')
+  }
+
+  assert.match(await runManager(spec, 'Ada', 'continue the work'), /Ada carries/)
+
+  const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
+  assert.equal(created.length, 1, 'Byname continuation must not spawn a second session')
+  assert.equal(created[0][1].Agent, 'deep-coder')
+
+  const prompts = live.sessions.calls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
+  assert.equal(prompts.length, 2)
+  for (const prompt of prompts) {
+    assert.equal(prompt[3]?.Agent, 'deep-coder')
+  }
   live.cleanup()
 })
 

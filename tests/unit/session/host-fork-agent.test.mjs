@@ -220,3 +220,41 @@ test('HFA_reuse_after_join_sends_prompt_on_same_child', async () => {
   assert.equal(liveCtx.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 1, 'reuse must not spawn')
   liveCtx.cleanup()
 })
+
+test('HFA_existing_fork_keeps_deep_agent_when_caller_passes_fast', async () => {
+  const liveCtx = live()
+  const first = await fork(liveCtx.runtime, 'hf-deep', Role.Coder, 'deep-coder', 'first task')
+  assert.equal(first.tag, 0, first.tag === 1 ? first.fields[0] : '')
+
+  const run = pendingRunsOf(liveCtx.runtime).get('hf-deep')
+  failRun(liveCtx.runtime, run, 'settled')
+  assert.equal(pendingRunCount(liveCtx.runtime), 0)
+
+  const second = await fork(liveCtx.runtime, 'hf-deep', Role.Coder, 'fast-coder', 'continue please')
+  assert.equal(second.tag, 0, second.tag === 1 ? second.fields[0] : '')
+
+  const prompts = liveCtx.sessions.calls.filter(([name]) => name === 'SendPromptAsync' || name === 'SendPrompt')
+  assert.equal(prompts.length, 2, 'first fork + existing-child each send a prompt')
+  const agents = prompts.map((call) => call[3]?.Agent)
+  assert.deepEqual(agents, ['deep-coder', 'deep-coder'])
+  assert.equal(liveCtx.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 1)
+  liveCtx.cleanup()
+})
+
+test('HFA_reuse_keeps_deep_agent', async () => {
+  const liveCtx = live()
+  const first = await fork(liveCtx.runtime, 'hf-reuse-deep', Role.Coder, 'deep-coder', 'first task')
+  assert.equal(first.tag, 0, first.tag === 1 ? first.fields[0] : '')
+
+  const run = pendingRunsOf(liveCtx.runtime).get('hf-reuse-deep')
+  failRun(liveCtx.runtime, run, 'settled')
+
+  const reused = await reuse(liveCtx.runtime, 'hf-reuse-deep', 'continue please')
+  assert.equal(reused.tag, 0, reused.tag === 1 ? reused.fields[0] : '')
+
+  const prompts = liveCtx.sessions.calls.filter(([name]) => name === 'SendPromptAsync' || name === 'SendPrompt')
+  assert.equal(prompts.length, 2)
+  const agents = prompts.map((call) => call[3]?.Agent)
+  assert.deepEqual(agents, ['deep-coder', 'deep-coder'])
+  liveCtx.cleanup()
+})

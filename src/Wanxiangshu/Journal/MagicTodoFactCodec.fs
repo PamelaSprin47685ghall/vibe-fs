@@ -23,11 +23,6 @@ module MagicTodoFactCodec =
     let private todoWriteIdDecoder: Decoder<TodoWriteId> =
         Decode.string |> Decode.map TodoWriteId.create
 
-    let private todoItemIdEncoder (id: TodoItemId) = Encode.string (TodoItemId.value id)
-
-    let private todoItemIdDecoder: Decoder<TodoItemId> =
-        Decode.string |> Decode.map TodoItemId.create
-
     let private todoReviewIdEncoder (id: TodoReviewId) = Encode.string (TodoReviewId.value id)
 
     let private todoReviewIdDecoder: Decoder<TodoReviewId> =
@@ -161,8 +156,7 @@ module MagicTodoFactCodec =
                       "ManagerSessionId", Encode.string (SessionId.value p.ManagerSessionId)
                       "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
                       "SeedTodoRef", Encode.string (BlobRef.value p.SeedTodoRef)
-                      "SeedTodoDigest", Encode.string (BlobDigest.value p.SeedTodoDigest)
-                      "SeedItemIds", Encode.list (List.map todoItemIdEncoder p.SeedItemIds) ]
+                      "SeedTodoDigest", Encode.string (BlobDigest.value p.SeedTodoDigest) ]
             | MagicTodoFact.PrefixRebaseCommittedV2 p ->
                 Encode.object
                     [ "case", Encode.string "PrefixRebaseCommittedV2"
@@ -271,8 +265,7 @@ module MagicTodoFactCodec =
                         { ManagerSessionId = SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)
                           ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
                           SeedTodoRef = BlobRef.create (get.Required.Field "SeedTodoRef" Decode.string)
-                          SeedTodoDigest = BlobDigest.create (get.Required.Field "SeedTodoDigest" Decode.string)
-                          SeedItemIds = get.Required.Field "SeedItemIds" (Decode.list todoItemIdDecoder) }
+                          SeedTodoDigest = BlobDigest.create (get.Required.Field "SeedTodoDigest" Decode.string) }
                 | "PrefixRebaseCommittedV2" ->
                     MagicTodoFact.PrefixRebaseCommittedV2
                         { SessionId = SessionId.create (get.Required.Field "SessionId" Decode.string)

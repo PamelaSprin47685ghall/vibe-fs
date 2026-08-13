@@ -16,6 +16,7 @@ Join 批次、blob、进程预算见 `how/execution.md`。
 
 - 新建：`calling`（Persona 名）+ `name`（Byname）+ 非空 `charge`。  
 - 续做：省略 `calling`，按 `name` + 当前 `charge` 识别既有 person；不暴露 AgentId，不用 `reuse` flag。  
+- 续发必须沿用该 person 已绑定的 managed agent 与其 model；不得把 `deep-*` 换成 `fast-*`。  
 - Busy existing：不新 RunId、不新 listener、不新 completion；nudge 归属当前 active Run。  
 - 成功：仅 Byname 承接 charge 的自然语言后果；不返回 agent_id / role / tier / fallback_peer / worktree。
 
@@ -67,7 +68,7 @@ Inquiry / Coder / DevOps 的 dedicated `inspect` / `establish-behavior` / `repai
 
 - Serialization key = **immediate caller ReuseScope**（非 family root）。嵌套
   `DevOps → Coder → Inspector` 合法；同 caller ReuseScope 禁止并发两个 active sync delegate calls。
-- Owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；不可每轮选 Agent。
+- Owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；不可每轮选 Agent。复用既有 child 时沿用其已绑定 managed agent，不得把 `deep-*` 换成 `fast-*`。
 - Session 按 `(OwnerReuseScopeId, role)` 复用（EXEC-026）；不以 OneShot dispose-after 为准。
 
 ## EXEC-005：Horizon 语义
