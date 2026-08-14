@@ -257,6 +257,14 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 - **DELETE 清单已固化**：`student-teacher-absence.mjs`、`g4r-freeze.mjs`、dsl-ownership legacy blacklist、provider-leak 历史 DTO blacklist、各 absence/clean-break tests。
 - 最大混合 dir = `tests/unit/verify/`（24 文件），需按断言逐条拆 owner；file-level ORPHAN 审计推迟到 cutover。
 
+## changes/ reverse audit（已完）
+
+以 docs 标准逆向 `changes/`。完整分类见 `CHANGES-AUDIT.md`。
+
+- 36 份 completed 全部命中：27 EVIDENCE + 5 GARBAGE-mixed + 3 GARBAGE-pure + 1 HOW；**0 份升级为 authority**、0 新 ORPHAN。
+- GARBAGE 沉积与 Phase A 一致：Student/Teacher 删除（3 份）、ChatGPT/review transcript（5 份）、absence ratchet。
+- Active（GrandRewrite / fork-attach）= in-flight，非历史；blockedForNow（fission / Steward / Sphinx-wiki）= DEFERRED / 不立包 / HOW，与 HANDOFF §10 三个 WATCH/DEFERRED 一一对应。
+
 ## Phase C — Source / runtime evidence（已完）
 
 逐包映射六证据轴（canonical type / wiring / Host boundary / resource / durable fact / failure path）。完整 ledger 见 `EVIDENCE.md`。
