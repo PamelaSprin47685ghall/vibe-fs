@@ -21,7 +21,7 @@ module HostSessionDeletion =
         (parentSessionIdOpt: SessionId option)
         : Task =
         scope.LoopSensor.DropSession sessionId
-        scope.DropAssistanceSession sessionId
+        let assistanceDrop = scope.DropAssistanceSession sessionId
 
         // STRENGTH-004/011: owner deletion cancels the decision-local
         // InternalLeaf immediately. CancelOwner completes the waiting
@@ -39,6 +39,10 @@ module HostSessionDeletion =
         let signal = SessionDeleted(sessionId, parentSessionIdOpt)
 
         task {
+            // DELEG-018: physical assistance abort was issued synchronously above;
+            // durable HandleAbandoned must settle before session/journal teardown.
+            do! assistanceDrop
+
             let stagedInspector =
                 match scope.SyncDelegateRuntime, parentSessionIdOpt with
                 | Some runtime, Some parentSessionId -> runtime.StageDeletedInspector(parentSessionId, sessionId)
