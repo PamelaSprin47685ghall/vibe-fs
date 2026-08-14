@@ -18,6 +18,8 @@ PROOF.md    测试落点表（每条 WHAT 命题 → 测试）
 tests/      本包拥有的可执行 proof（*.test.mjs）
 ```
 
+已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
+
 ## 45 包索引
 
 ### 1. Requirement system

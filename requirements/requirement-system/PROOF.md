@@ -35,6 +35,6 @@ anchor id**；本包的机器事实由 meta-verifier + spec-rules 承担。
   （meta-verifier 同步迁移）。
 - `archive/docs/README.md` 导航职责 → `requirements/README.md`。
 - spec gate 的 archive/docs/changes 检查面 → requirements/ 树治理（archive/docs/changes 归档后整体重写）。
-- WHAT-013/014/015 机器落点：change-lifecycle verifier（GAP@cutover 补）。
+- WHAT-013/014/015 机器落点：change-lifecycle verifier（GAP@cutover 补；聚合台账见 `requirements/GAP.md` GAP-003/004/005）。
 - PROOF-MAP「顶层 3 文件」归属分歧（verdict-feed / domain.meta / guide-contract 的
   assertion 级 owner）：见 `requirements/verification-system/PROOF.md`，cutover 按断言复核。

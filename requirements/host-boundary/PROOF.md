@@ -30,6 +30,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 
 ## GAP 记录
 
+- 聚合台账见 `requirements/GAP.md`（GAP-007/008）。
 - `HOST-BOUNDARY-008` 的 HOST-010 因果读 canary（`archive/docs/proof/host.md`「绑定与身份」）目前主要靠
   review 家族 + journal 代理等式（REUSE），transform 内存 id ≡ ToolContext.messageID 的共时等价
   由 e2e canary 承担（不在 unit 范围）——GAP 标记为「e2e 承担」，cutover 时若 e2e 不迁移则需补

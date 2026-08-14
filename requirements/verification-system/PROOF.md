@@ -36,4 +36,4 @@ advisory 承担。
   verification-system；PROOF-MAP 曾将 verdict-feed 标 review-judgement、domain.meta 标
   requirement-system，本包以断言内容为准并在此显式记录差异。
 - 语义分支「禁止直跳 E2E」的人工裁决面：VERIFY-002 文本 + review 过程，无机器落点
-  （GAP@cutover 若需机器化再补）。
+  （GAP@cutover 若需机器化再补；聚合台账见 `requirements/GAP.md` GAP-006）。

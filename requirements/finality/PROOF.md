@@ -65,7 +65,7 @@
 
 - 命题 28 / 落点 27（NEW 1 文件 11 断言；REUSE 4 文件族；GAP 1）。
 - GAP：FINALITY-028（ManagerJob 不复活）——现有 proof 在 e2e 剧本与 Orchestrator 域，本包无单测；
-  已记录于上表，计划随 `dispatch-protocol` 迁移补 oracle（不影响最终绿：REUSE 侧已覆盖主要语义）。
+  聚合台账见 `requirements/GAP.md` GAP-001（dispatch-protocol 已迁移，单元 oracle 仍待补）。
 - 移动文件：0（glory 族按 PROOF-MAP KEEP 保留原位，SPLIT@cutover 拆分见上表）。
 - 新写文件：1（`manager-finality-disposition.test.mjs`，11 断言全绿）。
 

@@ -37,6 +37,7 @@
 
 ## GAP 声明
 
+- 聚合台账见 `requirements/GAP.md`（GAP-002）。
 - EXTERNAL-INVESTIGATION-011 无独立可执行断言：义务产生路径（office consequence →
   obligation）由 `office-capability` / `obligation-ledger` 拥有，本包持负边界
   （「外部事实本身不产生义务」）。可红性由 010 的 role-lock（browser 无本地检查权）与
