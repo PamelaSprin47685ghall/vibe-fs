@@ -102,20 +102,20 @@ type ActivePrefixEpoch =
 
 | 源 | 信息落点 |
 |---|---|
-| `archive/docs/what/host.md` HOST-005/006/013 | WHAT-001/002/006/010/011/014；WHY §4.1/4.3 |
-| `archive/docs/why/host.md`（决策 9–13） | WHY §4.3；WHAT-010/011 考古 |
-| `archive/docs/what/companion.md` COMPANION-009/010/011/013 | WHAT-002/008/009/015 |
-| `archive/docs/shape/companion.md`（COMPANION-009 表） | WHAT-002/004；HOW §1.3 |
-| `archive/docs/what/context.md` CTX-010/011/012/015 | WHAT-002/003/004/005/009 |
-| `archive/docs/why/context.md`（ActivePrefixEpoch 理由） | WHY §4.4；WHAT-004/005 |
-| `archive/docs/what/prompt.md` PROMPT-014 | WHAT-007 |
-| `archive/docs/what/todo.md` TODO-009 | WHAT-004/005 |
-| `archive/docs/what/architecture.md` ARCH-004 | WHAT-001 |
-| `archive/changes/completed/cache.md` | WHY §4.1；WHAT-001/010/011/013 |
-| `archive/changes/completed/cursor-pair-hint.md` §12 | WHY §4.2；WHAT-013 边界 |
-| `archive/changes/completed/pair-parallel-tools.md` | 只取 prefix 相关：placement 不破坏 bracket；正文 craft 归 cognitive-environment |
-| `archive/requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
-| `archive/requirements-design/COVERAGE.md`（PROMPT-014/HOST-013/HOST-006/COMPANION-009..013/CTX-010..015 行） | WHAT 命题归属 |
+| 历史 HOST-005/006/013 | WHAT-001/002/006/010/011/014；WHY §4.1/4.3 |
+| 历史 why/host（决策 9–13） | WHY §4.3；WHAT-010/011 考古 |
+| 历史 COMPANION-009/010/011/013 | WHAT-002/008/009/015 |
+| 历史 shape/companion（COMPANION-009 表） | WHAT-002/004；HOW §1.3 |
+| 历史 CTX-010/011/012/015 | WHAT-002/003/004/005/009 |
+| 历史 why/context（ActivePrefixEpoch 理由） | WHY §4.4；WHAT-004/005 |
+| 历史 PROMPT-014 | WHAT-007 |
+| 历史 TODO-009 | WHAT-004/005 |
+| 历史 ARCH-004 | WHAT-001 |
+| 历史 change（cache） | WHY §4.1；WHAT-001/010/011/013 |
+| 历史 change（cursor-pair-hint）§12 | WHY §4.2；WHAT-013 边界 |
+| 历史 change（pair-parallel-tools） | 只取 prefix 相关：placement 不破坏 bracket；正文 craft 归 cognitive-environment |
+| 历史 requirements-design card（13-context-continuity） | 全部 OWNS/DOES NOT OWN 裁决 |
+| 历史 COVERAGE（PROMPT-014/HOST-013/HOST-006/COMPANION-009..013/CTX-010..015 行） | WHAT 命题归属 |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

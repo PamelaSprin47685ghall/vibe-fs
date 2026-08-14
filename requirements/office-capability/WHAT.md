@@ -8,7 +8,7 @@
 office capability = 该职位有权产生的后果，不是 persona 名、不是工具名、不是权限清单的口语转写
 （ARCH-017）。调用方按「后果」认识 office：`Know another office by its promises, not by its keys`。
 
-含义/动机：`archive/docs/why/architecture.md`「名单 vs 有权产生的后果」：权限矩阵已精确，但调用方看不到
+含义/动机：历史 why/architecture「名单 vs 有权产生的后果」：权限矩阵已精确，但调用方看不到
 被调用方 Role Law 时会把 Inspector 当「另一个能处理 repository 的 agent」；工具可达 ≠ 有权做。
 
 边界：工具名 → 工具可见性清单归 `capability-enforcement`（矩阵是投影）；「后果」本身是本包唯一
@@ -42,7 +42,7 @@ Manager 当前可 fork 的五类 Office（Coder / Inspector / DevOps / Browser /
 同一 Office 的两个 calling 名（fast/deep）只差 persona 与推理深度，不差 authority（ARCH-017；
 `resources/provider/tool/fork/description` 双语文档明文）。fast/deep 权限一致（AGENT-010 交叉）。
 
-含义/动机：caller 选后果不选权限档；换深度不是换权限（`archive/docs/why/agent.md`「fast/deep 随换模型
+含义/动机：caller 选后果不选权限档；换深度不是换权限（历史 agent 条款「fast/deep 随换模型
 演化成两套产品」是反面案例）。
 
 边界：tier/ExecutionBinding 的机器精度 → `participant-identity`；权限相等的结构性证明 →
@@ -69,7 +69,7 @@ Manager 当前可 fork 的五类 Office（Coder / Inspector / DevOps / Browser /
 边界镜）（ARCH-017 投影表）。投影文案可以不同；entitled consequence 不得不同；禁止手工维护五份
 互不相干清单（PROMPT-021 单一语义所有权）。
 
-含义/动机：真实事故——Coder 按 inspect tooltip 把修复交给 Inspector（`archive/docs/why/architecture.md`
+含义/动机：真实事故——Coder 按 inspect tooltip 把修复交给 Inspector（历史 why/architecture
 「关键区别：单点陈述 vs 每个会改变行动的决策面」）。
 
 边界：Gate F 机制（`scanOfficeCapabilityIntegrity`）由 `verification-system` 提供共享 checker，

@@ -109,7 +109,7 @@ managed-session-lifecycle 的**真实物理归属**词汇时合法——物理�
 变成构建期失败，同时不误伤合法领域/物理组合（fixtures `state-axes-{illegal,domain,physical}.fs`）。
 
 **边界**：门禁只守卫「未分类即红」，不替代 DSL-002/005 的人工语义判断（正交组合
-人工证明见 `archive/docs/proof/dsl-structured-program.md`「正交组合证明」节）。
+人工证明见 HOW.md §3.4.1）。
 
 **证据**：PROOF.md §1 第 5 行。
 

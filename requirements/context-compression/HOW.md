@@ -81,13 +81,13 @@
 
 | 源 | 信息落点 |
 |---|---|
-| `archive/docs/why/context.md`、`archive/docs/what/context.md`（CTX-001..016） | WHAT-001..017；WHY §4 |
-| `archive/docs/how/context.md` | HOW §1.2/1.3/1.5 |
-| `archive/docs/shape/context.md` | HOW §2（coverage 读边界、ActivePrefixEpoch 所有权） |
-| `archive/docs/what/companion.md` COMPANION-005/006/007/008/013 | WHAT-010/011/012/014/015/016 |
-| `archive/docs/what/host.md` HOST-006 | WHAT-002；HOW §1.5 |
-| `archive/requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
-| `archive/requirements-design/COVERAGE.md` CTX-* 行 | WHAT 命题归属（CTX-011 → prefix-stability + →context-compression 的交界） |
+| 历史 why/what context（CTX-001..016） | WHAT-001..017；WHY §4 |
+| 历史 how/context | HOW §1.2/1.3/1.5 |
+| 历史 shape/context | HOW §2（coverage 读边界、ActivePrefixEpoch 所有权） |
+| 历史 COMPANION-005/006/007/008/013 | WHAT-010/011/012/014/015/016 |
+| 历史 HOST-006 | WHAT-002；HOW §1.5 |
+| 历史 requirements-design card（13-context-continuity） | 全部 OWNS/DOES NOT OWN 裁决 |
+| 历史 COVERAGE（CTX-* 行） | WHAT 命题归属（CTX-011 → prefix-stability + →context-compression 的交界） |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

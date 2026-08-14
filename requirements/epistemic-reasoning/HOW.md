@@ -149,7 +149,7 @@ Answer 不复制 transcript，也不把 candidate/value estimate/method score �
   handle/SessionStore、F# 文件布局、value 系数（0.65、synthesis factor 0.72 等）、闭包 16 轮
   guard、方法库权重（0.58/0.42）——全部当前实现，不进 WHAT（边界卡片 DOES NOT OWN 与
   HANDOFF §6.7 同类裁决：`sphinx` 组件名与算法降为 HOW/proof）。
-- **`Sphinx-wiki.html`（archive/changes/proposed/）**：算法资料，HOW 参考，非 ontology（CHANGES-AUDIT）。
+- **`Sphinx-wiki.html`（proposals/）**：算法资料，HOW 参考，非 ontology（CHANGES-AUDIT）。
 - **旧完成声明的语义漂移**：`evidenceMass` 伪置信度、primary argmax、bind-once、wire
   equivalenceKey、LLM 自报 confidence、开局一次性生成候选，已在 corrective round
   （archive/changes/completed/Sphinx.md「Corrective outcome — 2026-08-12」）逐条修正；被拒方向归档于

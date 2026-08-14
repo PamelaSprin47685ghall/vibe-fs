@@ -25,19 +25,64 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | HOST-BOUNDARY-016 | `tests/events-port.test.mjs`（EVT 全 5 锚点：同 run 去重 / 无 run 不去重 / failed+aborted 不去重 / sticky replay / disposal） | MOVE | `node --test requirements/host-boundary/tests/events-port.test.mjs` |
 | HOST-BOUNDARY-017 | `tests/host-session-context.test.mjs`（HOST_CTX 全 6 锚点：read 提取 + roleOf 解析/alias 拒绝）；REUSE `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` `MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model`（external_directory 归属字段） | MOVE + REUSE | `node --test requirements/host-boundary/tests/host-session-context.test.mjs` / `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` |
 | HOST-BOUNDARY-018 | REUSE `requirements/host-boundary/tests/host-hooks.test.mjs`（ARCH-003 只用现有 Hook/SDK） | REUSE | `node --test requirements/host-boundary/tests/host-hooks.test.mjs` |
-| HOST-BOUNDARY-019 | 本包全部 canary（MOVE/NEW 表）；`tests/host-capability-observation.test.mjs`（HostContractUnsupported 显式失败）；REUSE `archive/docs/proof/host.md` membrane canary 清单（H/A/C 未落地 → GAP，见下） | NEW + REUSE | 见各行 |
+| HOST-BOUNDARY-019 | 本包全部 canary（MOVE/NEW 表）；`tests/host-capability-observation.test.mjs`（HostContractUnsupported 显式失败）；REUSE 本文件 Magic Todo membrane canary 清单（H/A/C 未落地 → GAP，见下） | NEW + REUSE | 见各行 |
 | HOST-BOUNDARY-020 | `tests/session-snapshot-locality.test.mjs`（Ambiguous）、`tests/host001-fragment-events.test.mjs`（codec 丢弃）、`tests/needhelp-sensor.test.mjs`（armed 唯一） | MOVE | 见各行 |
 
 ## GAP 记录
 
 - 聚合台账见 `requirements/GAP.md`（GAP-007/008）。
-- `HOST-BOUNDARY-008` 的 HOST-010 因果读 canary（`archive/docs/proof/host.md`「绑定与身份」）目前主要靠
-  review 家族 + journal 代理等式（REUSE），transform 内存 id ≡ ToolContext.messageID 的共时等价
-  由 e2e canary 承担（不在 unit 范围）——GAP 标记为「e2e 承担」，cutover 时若 e2e 不迁移则需补
-  unit oracle。
-- `HOST-BOUNDARY-019` 的 Magic Todo membrane canaries（`archive/docs/proof/host.md` A..R）尚未落地实现
-  （`tests/unit/host/magic-todo-membrane-canary*.test.mjs` 不存在）——GAP：release gate 清单，
-  由 obligation-ledger 团队 + host-boundary 的 H（定位）/A（时序）/C（原地 mutation）在实现后补。
+- `HOST-BOUNDARY-008` 的 HOST-010 因果读 canary（「绑定与身份」，见下 canary 表）
+  目前主要靠 review 家族 + journal 代理等式（REUSE），transform 内存 id ≡ ToolContext.messageID
+  的共时等价由 e2e canary 承担（不在 unit 范围）——GAP 标记为「e2e 承担」，cutover 时若 e2e
+  不迁移则需补 unit oracle。
+- `HOST-BOUNDARY-019` 的 Magic Todo membrane canaries（下表 A..R）尚未落地实现（尚无
+  production membrane 或对应 canary 文件）——GAP：release gate 清单，由 obligation-ledger
+  团队 + host-boundary 的 H（定位）/A（时序）/C（原地 mutation）在实现后补。
+
+## Magic Todo V1 membrane canaries（A..R，release-gate 清单）
+
+2026-08-14 cutover 自旧 proof 归档迁入。语义交叉：`obligation-ledger`（TODO-002..013）与
+`host-boundary`（HOST-017..025，历史编号）。**任一 blocking canary 未证明 → 禁止写
+production membrane；禁止改 Host core 绕过。**
+
+| ID | 证明 | 期望 | 条款 | 级别 |
+|----|------|------|------|------|
+| A | deferred materialization + before 原地 mutation 达 executor | before 不等待 snapshot/Journal IO；`pending + {}` 在 deferred prepare 中等待，同一 physical ToolPart materialize 后 canonical input == captured live args，digest 取 materialized input；executor 见 V1 compatibility list；after 必须 await prepare 才可 Accepted | HOST-019 | **blocking** |
+| B | 同时替换 parameters + jsonSchema | provider 见 V2；原 executor 仍跑 V1 decoder | HOST-018 | blocking |
+| C | non-enumerable compatibility view | 原 V1 decoder 可读 `todos`；`Object.keys`/`JSON.stringify`/Host persistence 仍只见 provider `obligations` | HOST-019/020 | blocking |
+| D | `status="reviewing"` 经 TodoTable → todo.updated → API → TUI | 全容忍 → passthrough；否则冻结 sink→`in_progress` | HOST-023、TODO-003 | blocking（策略冻结） |
+| E | after 改写 `output.output` | 本次模型可见 ∧ 下一 provider history **同字节** | HOST-021、TODO-005/013 | blocking |
+| F | execute throw | 记录 after 是否运行；协议不依赖其运行 | HOST-021 | 冻结观测 |
+| G | after 运行瞬间 | 冻结 ToolPart 是否已 durable completed；Accepted 仍走双路径 | HOST-022、TODO-004 | blocking（防误绑） |
+| H | 仅 sessionID+callID | 完整 SDK snapshot **唯一**定位 ToolPart / assistant / run / ordinal / XTrace range | HOST-025、HOST-011 | **blocking** |
+| I | 第五态消费者回归 | 承接 D；UI 不稳则强制 compatibility `in_progress` | HOST-023 | blocking if D flaky |
+| J | live Accepted | executor 成功→after → `TodoWriteAccepted` 与 Prepared digest 对齐 | HOST-022 | blocking |
+| K | recovery Accepted | 无 after 时 snapshot completed ToolPart → 同一 digests Accepted | HOST-022、TODO-012 | blocking |
+| L | Prepared+失败 | 不 Accepted；sink 乐观 Pk 不构成 checkpoint；下次 before Journal 覆盖 sink | HOST-022、TODO-007 | blocking |
+| M | REVISE 消费后 reconcile | Host TodoTable == settled current；**零**新 checkpoint/review facts | HOST-023、TODO-005/007 | blocking |
+| N | V2 runner | 无 hook parity 时 MagicTodo Manager Attempt **construction fail closed**；零裸 `SessionTodo.update` | HOST-024、TODO-004 | **blocking** |
+| O | 无 Host core / 同名覆盖 | builtin executor 仍为 sink；无 OpenCode 源码修改；无 plugin 同名 tool 夺权 | HOST-017 | 静态/集成 |
+| P | bridge 非真相 | crash 后忽略 Map；只从 Journal 恢复；failure cleanup 无残留 key | HOST-021、TODO-012 | blocking |
+| Q | description 面 | 含 tagged/reviewing/lag/multi-reject；**不含** reviewer/session/barrier/witness/2N | HOST-018、TODO-013 | 静态 |
+| R | multi-todowrite | 同 assistant message 两个不同 callID → 全部拒绝、无 winner | HOST-020、TODO-004 | blocking |
+
+代表落点（实现后）：`requirements/host-boundary/tests/magic-todo-membrane-canary*.test.mjs`、
+integration plugin hook 契约、e2e Manager todowrite unhappy-path。未落地前以本表为
+release gate 清单（对齐历史 magic-todo change §47 Host canary 门禁）。
+
+### 反例（必须红）
+
+```text
+before 等待 snapshot/Journal 导致 executor 被 IO 阻塞        → A 红
+pending `{}` 被降级受理或用于 ProviderInputDigest            → A 红
+before mutation 改写最终 historical ToolPart.input           → A 红 → 停
+after 不 await deferred prepare 就 Accepted                  → A/J 红
+after 回写“修复”被污染的历史 input                           → 仍停（不可补救）
+V2 settle 静默写 TodoTable                              → N 红
+REVISE settlement 后 sink 永久留否决 Pk                 → M 红
+bridge / Host TodoTable 当 canonical 恢复源             → P/L 红
+plugin tool 名 todowrite 覆盖 builtin                   → O 红
+```
 
 ## 反向覆盖（OWNED / NEEDS-SPLIT clause → 本包命题）
 

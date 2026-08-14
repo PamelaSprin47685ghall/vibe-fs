@@ -16,9 +16,9 @@
 |---|---|---|---|---|---|---|---|
 | GAP-001 | `finality` | FINALITY-028（ManagerJob 不复活） | 无单测落点；现有 proof 在 e2e Long Stroke 剧本与 Orchestrator 域 | CLOSED | `requirements/finality/tests/manager-job-no-resurrection.test.mjs`：terminal → 非 active / CleanUp / 后续 progress 与 `ManagerJobCreated` replay 均不能重开；active 续做身份 = 同 session/worktree | 已落地独立 unit oracle | finality |
 | GAP-002 | `external-investigation` | EXTERNAL-INVESTIGATION-011（外部事实不自动产生义务） | 无独立可执行断言；义务产生归 `office-capability`/`obligation-ledger`，本包持负边界 | CLOSED | `requirements/external-investigation/tests/facts-not-obligations.test.mjs` + Role Law「Observation is not obligation」双语 + `BROWSER_OBLIGATION_BOUNDARY_ANCHORS`（本包无 F# observation 类型，负边界落在契约面） | 已落地独立 canary | external-investigation |
-| GAP-003 | `requirement-system` | REQUIREMENT-SYSTEM-013（change-lifecycle 治理：Active 原文冻结 / Completed 不作当前依据） | 机器落点缺失 | OPEN | 人工评审（archive/docs/proof/document-governance.md 人工评审表） | change-lifecycle verifier（扫描 requirements/ 变更纪律） | requirement-system |
-| GAP-004 | `requirement-system` | REQUIREMENT-SYSTEM-014（GOV-009 blocker 协议） | 机器落点缺失 | OPEN | 人工评审 + blocker 协议文本 | 同上 verifier | requirement-system |
-| GAP-005 | `requirement-system` | REQUIREMENT-SYSTEM-015（普通小修复不要求自动 Change） | 机器落点缺失 | OPEN | 人工（AGENTS.md 文档生命周期节） | 同上 verifier | requirement-system |
+| GAP-003 | `requirement-system` | REQUIREMENT-SYSTEM-013（change-lifecycle 治理：Active 原文冻结 / Completed 不作当前依据） | 机制停用（2026-08-14 cutover 归档） | CLOSED | 人工评审承接表已收进 `requirement-system/PROOF.md`；无 lifecycle 树可扫 | verifier 无对象；机制重启时再立 | requirement-system |
+| GAP-004 | `requirement-system` | REQUIREMENT-SYSTEM-014（blocker 协议） | 机制停用 | CLOSED | 人工评审承接表 + blocker 协议文本 | 同上 | requirement-system |
+| GAP-005 | `requirement-system` | REQUIREMENT-SYSTEM-015（普通小修复不要求自动 Change） | 机制停用 | CLOSED | 人工（AGENTS.md 文档生命周期节） | 同上 | requirement-system |
 | GAP-006 | `verification-system` | VERIFICATION-SYSTEM-003（「禁止跨级」物理契约论证） | 人工裁决面无机器落点 | OPEN | VERIFICATION-SYSTEM-003 文本 + review 过程 | 若需机器化再补（先回答「依赖哪个不可模拟 physical contract」） | verification-system |
 | GAP-007 | `host-boundary` | HOST-BOUNDARY-008（HOST-010 因果读 canary：transform 内存 id ≡ ToolContext.messageID 共时等价） | unit 无 oracle | PARTIAL | e2e canary（verification-system/tests/e2e） | 若需 unit 化再补 | host-boundary |
 | GAP-008 | `host-boundary` | HOST-BOUNDARY-019（Magic Todo membrane canaries A..R） | 未落地实现（release gate 清单） | OPEN | 无 | 实现后由 obligation-ledger + host-boundary 补 H（定位）/A（时序）/C（原地 mutation） | host-boundary + obligation-ledger |

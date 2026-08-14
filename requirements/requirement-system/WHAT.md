@@ -75,7 +75,7 @@ normative authority」= 连元规则都有归属文件。
 
 **规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 46 个包每个都有
 `{README,WHY,WHAT,HOW,PROOF}.md`；树入口（requirements/README.md）与
-archive/requirements-design/INDEX.md 命名同一包集。
+`requirements/INDEX.md` 命名同一包集。
 
 **含义/动机**：包清单是机器可校验的边界；目录级越界（INDEX 外神秘包）与文件级残缺
 （缺 WHY）都必须可红。
@@ -88,7 +88,7 @@ archive/requirements-design/INDEX.md 命名同一包集。
 
 **规范陈述**：WHAT.md 是 package 的唯一 normative semantic contract；WHY 解释理由、
 HOW 说明实现（不另造 normative owner）、PROOF 指向证据。正式产品语义只定义在被认可的
-正式层（当前 archive/docs/；cutover 后 requirements/<pkg>/WHAT.md），README/AGENTS/CHANGELOG/
+正式层（`requirements/<pkg>/WHAT.md`），README/AGENTS/CHANGELOG/
 Changes 不是规范正文。
 
 **含义/动机**：读者找「这条规则权威在哪」只有一个答案。HOW 写错不构成产品违约，WHAT
@@ -103,7 +103,7 @@ Changes 不是规范正文。
 **规范陈述**：正式 Clause ID 只能在其唯一定义位置定义；其它位置只能引用；引用必须可解析
 （无悬空引用、无未知前缀）；既有 ID 移动定义时保留编号；删除后编号永久空缺。
 
-**含义/动机**：ID 是跨 archive/docs/requirements 讨论的共同锚点。同 ID 双定义、悬空引用、后缀伪造
+**含义/动机**：ID 是跨 requirements 讨论的共同锚点。同 ID 双定义、悬空引用、后缀伪造
 （`ARCH-010-TOOL-BOUND` 冒充）都会让「引用条款」失去语义。
 
 **边界**：ID 前缀表与当前 5 层文件层级是当前 HOW（迁移载体），ID 稳定性原则本身是 WHAT。
@@ -123,44 +123,48 @@ Changes 不是规范正文。
 
 **证据指针**：→ PROOF.md L16。
 
-## REQUIREMENT-SYSTEM-010：生命周期目录即状态；废止路径不引用；实现不依赖 Change 历史
+## REQUIREMENT-SYSTEM-010：生命周期停用；废止路径不引用；实现不依赖 Change 历史
 
-**规范陈述**：变更生命周期状态只由 `archive/changes/proposed|active|completed` 目录位置表达；
-正文不维护重复 status 字段。废止工作流路径（`archive/docs/proposal/`、`archive/docs/status/`）不得被当前
-仓库引用。当前规范与实现不得从具体 Change 历史文件解释当前语义（不得依赖
-`archive/changes/completed/<file>.md`）。
+**规范陈述**：变更生命周期机制已于 2026-08-14 cutover 停用并归档，当前树不维护
+proposed/active/completed 生命周期目录；正式语义只存在于 `requirements/<package>/`。
+旧 proposal/status 工作流路径与归档的 Change 历史文件不得被当前仓库引用为语义依据
+（历史裁决只作考古，git 可回溯全文）。
 
-**含义/动机**：目录位置是唯一状态源，正文状态字段 = 第二真相源。Completed 是历史，解释
-当前产品行为 = 让历史设计重新成为影子规范。
+**含义/动机**：目录位置是唯一状态源的时代结束于 cutover；当前世界只有 requirements/ 树
+是权威。引用已删路径 = 死引用；从 Change 历史解释当前产品行为 = 让历史设计重新成为
+影子规范。
 
-**边界**：`archive/changes/active/<file>.md` 作为工作范围定位允许；proposed/completed 作为当前
-依赖禁止。cutover 后 archive/changes/ 归档，本条承接为 requirements/ 树的变更治理规则。
+**边界**：deferred 未来材料归 `proposals/`（见 REQUIREMENT-SYSTEM-011）；归档树路径的
+字面引用由 `scripts/checks/spec.mjs` 全仓禁引门禁机器可红。
 
 **证据指针**：→ PROOF.md L17。
 
 ## REQUIREMENT-SYSTEM-011：用户所有权与启动授权
 
-**规范陈述**：`archive/changes/proposed/` 由用户管理；进入其中的 Proposal 已完成人工裁决。Agent
-不重裁决、不扫描自选工作、不修改批准范围；用户明确请求启动指定 Proposal 即充分授权；
-发现正式冲突时记录 blocker 报告用户，不自改范围。
+**规范陈述**：deferred 未来材料归 `proposals/`，由用户管理；进入其中的 Proposal 已完成
+人工裁决。Agent 不重裁决、不扫描自选工作、不修改批准范围；用户明确请求启动指定 Proposal
+即充分授权；发现正式冲突时记录 blocker 报告用户，不自改范围。
 
 **含义/动机**：Admission 与裁决是用户的事；Agent 重复裁决不会增加安全，只会阻塞。安全
-边界是「不自选工作、不改范围、遇矛盾上报」。
+边界是「不自选工作、不改范围、遇矛盾上报」。生命周期机制停用后，`proposals/` 是未来
+材料（如 Steward）的单一存放点。
 
-**边界**：本条是过程合同（人工评审承接），机器可红面只有「proposed 不作为当前依赖」。
+**边界**：本条是过程合同（人工评审承接）；机制停用后无机器可红面。
 
 **证据指针**：→ PROOF.md L18。
 
-## REQUIREMENT-SYSTEM-012：单文件 Change 生命周期
+## REQUIREMENT-SYSTEM-012：单文件 Change 生命周期（停用）
 
-**规范陈述**：每项 Change 恰对应一个文件，在 proposed→active→completed 之间移动；不创建
-平行 Proposal/Status/Decision/Outcome 文件；不引入 manifest、中央注册表、状态数据库或
+**规范陈述**：变更生命周期机制已停用（2026-08-14 归档）。若用户重新启用变更管理流程，
+恢复为单文件 proposed→active→completed 移动：每项 Change 恰对应一个文件，不创建平行
+Proposal/Status/Decision/Outcome 文件；不引入 manifest、中央注册表、状态数据库或
 复杂状态机；`CHG-NNN` 是独立 Change 编号，不是产品 Clause ID，不建立中央登记。
 
 **含义/动机**：单文件 + 目录即状态 = 零同步债务；平行账本会让范围、进度与结果漂移。
+停用后该纪律休眠，重启时原样恢复。
 
 **边界**：正文追加内容（Active work、Amendments、Blockers、Final outcome）允许，不得改写
-冻结的 Original proposal。
+冻结的 Original proposal（重启时有效）。
 
 **证据指针**：→ PROOF.md L19。
 
@@ -173,8 +177,8 @@ Changes 不是规范正文。
 **含义/动机**：Active 是工作记录不是状态日志；Completed 是历史证据不是当前规范。两类文件
 的正文合同由人工评审把关（GOV-008）。
 
-**边界**：机器可红面当前为空（正文内容检查无 gate），由人工评审承接；cutover 后如建
-change-lifecycle verifier 再补机器落点。
+**边界**：机制停用后无机器可红面（正文内容检查无 gate），由人工评审承接表把关
+（见 PROOF.md 人工评审承接表）。
 
 **证据指针**：→ PROOF.md L20。
 
@@ -209,11 +213,11 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **规范陈述**：每个包 README/WHY/WHAT 中出现的 DEPENDS ON 引用集合是 INDEX 依赖骨架的子集
 （允许子集，不允许多出边）；引用别的包用包名，不得复制别的包的命题。
 
-**含义/动机**：依赖骨架（archive/requirements-design/INDEX.md，87 edge / 0 cycle）是唯一来源；
+**含义/动机**：依赖骨架（`requirements/INDEX.md`，87 edge / 0 cycle）是唯一来源；
 多出的边 = 未裁决的 coupling。子集允许 = 包可以只声明它实际消费的 guarantee。
 
-**边界**：骨架是迁移期协调文件；cutover 后骨架迁入 requirements/ 树，解析源同步迁移
-（SPLIT@cutover）。本命题管「边不超集」，不管边的理由（理由逐条写各包 HOW）。
+**边界**：骨架已于 2026-08-14 cutover 迁入 `requirements/INDEX.md`。本命题管「边不超集」，
+不管边的理由（理由逐条写各包 HOW）。
 
 **证据指针**：→ PROOF.md L23。
 
@@ -226,7 +230,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **含义/动机**：树结构合同若只活在散文里就是裸权威；meta-verifier 把 REQUIREMENT-SYSTEM-
 003/004/006/007/016 变成可红测试。「绿」可以检查，「红」有失败价值。
 
-**边界**：meta-verifier 只查结构事实，不裁决语义归属内容；归属裁决在设计期完成
-（archive/requirements-design/）。
+**边界**：meta-verifier 只查结构事实，不裁决语义归属内容；归属裁决在 2026-08-14
+cutover 设计期完成（历史见 git）。
 
 **证据指针**：→ PROOF.md L24。

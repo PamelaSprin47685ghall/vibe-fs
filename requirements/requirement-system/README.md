@@ -26,8 +26,9 @@ tests/      本包拥有的可执行 proof
   normative 合同、依赖声明 ⊆ INDEX 依赖骨架。
 - **条款治理**（008–009）：Clause ID 唯一且稳定、条款按层归属（行为→what、所有权→shape、
   算法→how、证明→proof、理由→why）。
-- **变更生命周期**（010–015）：目录即状态、废止路径不引用、用户所有权与启动授权、
-  单文件 Change、Active/Completed 合同、矛盾 blocker 协议、直接闭环小变更。
+- **变更生命周期**（010–015）：机制已停用（2026-08-14 归档）；废止路径不引用、
+  用户所有权与启动授权（`proposals/`）、单文件 Change（重启时恢复）、Active/Completed
+  合同、矛盾 blocker 协议、直接闭环小变更。
 - **机器 verifier**（017）：meta-verifier 扫描 requirements/ 全树，把上面的结构事实变成
   可红测试。
 
@@ -37,10 +38,10 @@ tests/      本包拥有的可执行 proof
 
 1. `requirements/requirement-system/tests/meta-verifier.test.mjs`：扫描 requirements/ 全树，
    断言 5 文档齐备、WHAT→PROOF 交叉、落点文件存在、无 INDEX 外目录、DEPENDS ON ⊆ 骨架。
-2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：当前 archive/docs/changes 世界的
-   条款唯一性、引用解析、生命周期目录与废止路径静态门（spec-rules 的纯规则回归在
-   `tests/spec-rules.test.mjs`）。
-3. `requirements/README.md`：46 包树入口导航（当前由 archive/docs/README.md 同构承接导航职责）。
+2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：requirements/ 树治理门
+   （定义只在 WHAT.md、引用可解析、全仓零归档树引用、废止路径、链接完整性；
+   spec-rules 的纯规则回归在 `tests/spec-rules.test.mjs`）。
+3. `requirements/README.md`：46 包树入口导航（2026-08-14 cutover 后承担导航职责）。
 
 ## proof 概览
 
@@ -57,7 +58,7 @@ node --test requirements/requirement-system/tests/spec-rules.test.mjs
 - 什么证据技术足够证明某个产品事实 → `verification-system`。
 - 任一产品领域事实（prompt/journal/review/host/…）→ 各对应包。
 - Git/PR 历史沉积、Proposal 生命周期本身；未来 requirements/ 树只表达当前接受真理。
-- 当前 Clause ID 前缀表、`archive/docs/why|what|shape|how|proof` 文件层级 → 当前 HOW（历史载体）。
+- 当前 Clause ID 前缀表、旧五层 docs 文件层级 → 当前 HOW（历史载体，2026-08-14 归档）。
 
 ## DEPENDS ON
 

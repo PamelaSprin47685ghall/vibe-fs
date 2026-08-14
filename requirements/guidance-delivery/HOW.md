@@ -107,12 +107,12 @@ node requirements/verification-system/tests/run.mjs                             
 
 | 源 | 裁决 | 记录 |
 |---|---|---|
-| 「tip 不投 Main」单消费者叙述 | GARBAGE（双消费者裁决：Blogger 历史 ≠ Main 指令面） | `archive/changes/completed/rulebook.md` §27 |
-| `delivered-tips.json` / process-local HashSet / 文件 tip ledger | GARBAGE（交付 substrate 只能是 EventStore fold） | `archive/changes/completed/rulebook.md` §16 |
-| Main fake-user enforcement overlay / NudgeAnchored / NudgeConsumed | GARBAGE（clean break；交付不 mint authority） | `archive/changes/completed/enforcer.md` §10；`archive/docs/why/enforcer.md` |
-| 每次 Full 或仅 Identity | GARBAGE（被拒方案：烧上下文 or 首次不可执行） | `archive/docs/why/enforcer.md` 备选与被拒 |
-| 单一 durable bool 压 Frontier+Coverage | GARBAGE（reanchor 后误删/假装仍在） | `archive/docs/why/enforcer.md` 交付前沿 vs 语义覆盖 |
-| 历史 pair 随 main.md 版本改写 | GARBAGE（byte-identical replay 冻结） | `archive/changes/completed/rulebook.md` §17 |
-| enforcer-cross-family-collision.mjs | KEEP proof（机械 A40 替代，不冒充人类 tournament） | `archive/requirements-design/PROOF-MAP.md` Phase D；`archive/changes/completed/rulebook.md` Final outcome |
-| `enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；本包不依赖任何 prose 形状门 | `archive/requirements-design/HANDOFF.md` §24 |
+| 历史 change（rulebook）§27 | GARBAGE（双消费者裁决：Blogger 历史 ≠ Main 指令面） | 历史 change（rulebook）§27 |
+| `delivered-tips.json` / process-local HashSet / 文件 tip ledger | GARBAGE（交付 substrate 只能是 EventStore fold） | 历史 change（rulebook）§16 |
+| Main fake-user enforcement overlay / NudgeAnchored / NudgeConsumed | GARBAGE（clean break；交付不 mint authority） | 历史 change（enforcer）§10；历史 why/enforcer 条款 |
+| 每次 Full 或仅 Identity | GARBAGE（被拒方案：烧上下文 or 首次不可执行） | 历史 why/enforcer 备选与被拒 |
+| 单一 durable bool 压 Frontier+Coverage | GARBAGE（reanchor 后误删/假装仍在） | 历史 why/enforcer 交付前沿 vs 语义覆盖 |
+| 历史 pair 随 main.md 版本改写 | GARBAGE（byte-identical replay 冻结） | 历史 change（rulebook）§17 |
+| enforcer-cross-family-collision.mjs | KEEP proof（机械 A40 替代，不冒充人类 tournament） | 历史 PROOF-MAP Phase D；历史 change（rulebook）Final outcome |
+| `enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；本包不依赖任何 prose 形状门 | 历史 HANDOFF §24 |
 | 当前实现中 TipSemanticCoverage 与 TipDeliveryProjection 同投影（applyReanchor 清空） | HOW（horizon 可恢复性以投影近似表达；字节级 horizon 探测是未来增强，不改变两轴分离合同） | 本文件 §1 诚实性注 |

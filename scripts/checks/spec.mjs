@@ -78,11 +78,16 @@ for (const file of [...walkMarkdown(REQUIREMENTS), ...walkMarkdown(PROPOSALS)]) 
 }
 
 // ── 3. references with a known prefix must resolve ──────────────────────────
+// Code spans (backticked anchors, test names, paths) are identifiers, not
+// citations: a legacy sub-number inside an anchor name must not read as a
+// dangling clause (e.g. `FINALITY-007/040` — 040 is the old GLORY sub-number).
+
+const maskCodeSpans = (text) => text.replace(/`[^`\n]*`/g, (match) => ' '.repeat(match.length))
 
 for (const file of [...walkMarkdown(REQUIREMENTS), ...walkMarkdown(PROPOSALS), ...ROOT_MD]) {
   if (isTestFile(file)) continue
   const text = readFileSync(file, 'utf8')
-  for (const { id, line } of clauseReferences(text, PREFIXES))
+  for (const { id, line } of clauseReferences(maskCodeSpans(text), PREFIXES))
     if (!definitions.has(id)) fail(rel(file), line, `悬空条款引用：${id} 无定义`)
 }
 
