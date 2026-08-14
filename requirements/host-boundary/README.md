@@ -41,7 +41,8 @@ Domain/HostCompactionPolicy.fs         HOST-006 纯策略（prevention keys + co
 
 - MOVE（7）：`events-port`、`host-message-projection`、`host-session-context`、`needhelp-sensor`、
   `session-snapshot-locality`、`host001-fragment-events`、`host012-tool-part`。
-- NEW：`host-capability-observation`（HOST-006 gate + HostSignal wake + HostDigest）。
+- NEW：`host-capability-observation`（HOST-006 gate + HostSignal wake + HostDigest）；
+  `host010-run-id-equivalence`（HOST-010 bindableRun id ≡ ToolContext.messageID encoding）。
 - REUSE：`codec/signals.test.mjs`（HOST-002/003）、`plugin/host-hooks.test.mjs`（ARCH-002/003）、
   `context/tool-result-bound.test.mjs`（ARCH-012）、`host/shared-state`（HOST-012 部分）、
   `session-execution-binding`（PROMPT-008 物理身份绑定部分）、`reconciliation/`（xwire 部分）、

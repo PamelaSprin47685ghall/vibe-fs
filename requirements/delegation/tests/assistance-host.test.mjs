@@ -281,7 +281,9 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
     assert.equal(creates.length, 1)
     assert.equal(sends.length, 1)
 
-    dropSession(host, sessionId(owner))
+    const dropped = dropSession(host, sessionId(owner))
+    assert.equal(typeof dropped?.then, 'function', 'owner drop must return an awaitable durable-cleanup Task')
+    await dropped
     const late = await handleTurn(
       host,
       completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_late', 'Inquiry', 'late advice'),
