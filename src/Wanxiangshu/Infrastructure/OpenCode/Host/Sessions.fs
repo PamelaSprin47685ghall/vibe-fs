@@ -43,6 +43,9 @@ type InjectedSessionPort
     let lockObj = obj ()
     let restoredParent = defaultArg familyParent (fun _ -> None)
 
+    let _terminalSub =
+        eventPort.SubscribeTerminalListener(fun sId _outcome -> SessionExecutionBinding.endInternalSend sId)
+
     let familyRoot (sessionId: SessionId) =
         match lock lockObj (fun () -> childParents.TryGetValue sessionId) with
         | true, rootId -> rootId
@@ -160,12 +163,19 @@ type InjectedSessionPort
                             SessionExecutionBinding.beginInternalSend sessionId sendOptions
 
                             try
-                                // Pass the outcome through unchanged. This layer knows less
-                                // about acceptance than the port does; narrowing here is how
-                                // AcceptanceUnknown used to become a plain error.
-                                return! port.SendPrompt sessionId text sendOptions
-                            finally
+                                let! outcome = port.SendPrompt sessionId text sendOptions
+
+                                match outcome with
+                                | AdmittedWithReceipt _
+                                | AdmittedWithPhysicalMessage _ -> return outcome
+                                | Retryable _
+                                | AcceptanceUnknown _
+                                | Fatal _ ->
+                                    SessionExecutionBinding.endInternalSend sessionId
+                                    return outcome
+                            with ex ->
                                 SessionExecutionBinding.endInternalSend sessionId
+                                return Fatal ex.Message
                         | None ->
                             // No Host transport was resolved from the plugin input. The
                             // previous code fabricated a completed AgentRunResult with

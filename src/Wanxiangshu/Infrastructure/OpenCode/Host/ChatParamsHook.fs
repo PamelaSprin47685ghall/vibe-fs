@@ -47,19 +47,25 @@ module ChatParamsHook =
                           modelID = text.Substring(index + 1)
                           variant = None }
                 | _ -> None
-            elif not (isNull model?providerID) && not (isNull model?modelID) then
-                let variant =
-                    if isNull model?variant then
-                        None
-                    else
-                        nonEmpty (string model?variant)
-
-                Some
-                    { providerID = unbox<string> model?providerID
-                      modelID = unbox<string> model?modelID
-                      variant = variant }
             else
-                None
+                let providerId =
+                    readString model "providerID"
+                    |> Option.orElseWith (fun () -> readString model "providerId")
+
+                let modelId =
+                    readString model "modelID"
+                    |> Option.orElseWith (fun () -> readString model "modelId")
+                    |> Option.orElseWith (fun () -> readString model "id")
+
+                let variant = readString model "variant"
+
+                match providerId, modelId with
+                | Some p, Some m ->
+                    Some
+                        { providerID = p
+                          modelID = m
+                          variant = variant }
+                | _ -> None
 
     let private userMessageBinding (source: obj) =
         if isNull source || isNull source?message then

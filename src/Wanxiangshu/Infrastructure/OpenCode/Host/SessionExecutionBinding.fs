@@ -116,7 +116,10 @@ module SessionExecutionBinding =
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID
         && left.modelID = right.modelID
-        && left.variant = right.variant
+        && match left.variant, right.variant with
+           | Some lv, Some rv when not (String.IsNullOrWhiteSpace lv) && not (String.IsNullOrWhiteSpace rv) ->
+               lv.Trim() = rv.Trim()
+           | _ -> true
 
     let requiresProviderBindingProof (sessionId: SessionId) =
         lock gate (fun () ->
