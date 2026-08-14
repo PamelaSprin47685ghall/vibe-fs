@@ -59,7 +59,11 @@ test('DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_check
   const pipeline = pkg.scripts['format-build-test']
   assert.equal(typeof pipeline, 'string', 'format-build-test must exist')
   assert.match(pipeline, /node scripts\/build\.mjs/, 'release proof must build')
-  assert.match(pipeline, /node tests\/integration\/package\/run\.mjs/, 'release proof must run package install/import/resources checks')
+  assert.match(
+    pipeline,
+    /node requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
+    'release proof must run package install/import/resources checks (distribution package suite)',
+  )
   assert.match(pipeline, /npm pack --dry-run$/, 'release proof must end with npm pack --dry-run (packing membership)')
 })
 

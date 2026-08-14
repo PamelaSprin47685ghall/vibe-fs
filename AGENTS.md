@@ -1,7 +1,9 @@
 # AGENTS.md — 仓库工作协议
 
 本文件只规定 Agent 如何查找规范、修改仓库和验证交付。产品语义只由
-`docs/{why,what,shape,how,proof}` 中的 Clause 定义；本文件引用条款，不复述条款。
+`requirements/<package>/` 的 WHY/WHAT/HOW/PROOF 定义（45 包 normative 树，
+2026-08-14 cutover 自 `docs/` 迁移）；迁移前 Clause 原文归档于 `archive/docs/`。
+本文件引用条款，不复述条款。
 
 # Kolmogorov 标准工作流程
 
@@ -85,20 +87,15 @@
 
 # 文档生命周期
 
-生命周期合同见 `changes/README.md`、`GOV-006`、`GOV-007` 和
-`docs/how/document-governance.md`。
+正式语义在 `requirements/<package>/`（每包 WHY/WHAT/HOW/PROOF + 包自有测试）。
+旧 Proposal 生命周期合同（`changes/proposed|active|completed` 与
+`docs/how/document-governance.md`）已随 2026-08-14 cutover 归档于 `archive/changes/`、
+`archive/docs/`；历史决策与失败模式复盘见 `archive/changes/completed/`。
 
-- `changes/proposed/` 由用户管理。进入其中的 Proposal 已完成人工裁决并获批准；Agent
-  不重新执行 Admission、寻找批准证据或判断 Accepted/Rejected。
-- Agent 默认不得在 `changes/proposed/` 创建、修改、重命名、移动或删除文件，也不得扫描
-  后自行选择工作。只有用户明确要求启动指定 Proposal 时，才可将该文件移动到
-  `changes/active/`；该请求本身就是充分授权。
-- 启动时保留并冻结 Proposal 原文，在同一文件追加 `Active work`。Active Change 只限定
-  已批准范围、剩余关闭条件和 blocker，不能代替正式规范。
-- 完成正式规范、实现与 proof 闭环后，在同一文件追加 `Final outcome`，再移动到
-  `changes/completed/`。不得创建平行的 Proposal、Status、Decision 或 Outcome 文件。
-- 普通小型修复、局部重构、测试或格式修复不要求自动创建 Change；能在一次修改内完整
-  对齐 docs、实现和 proof 的工作可直接完成。
+- 若用户重新启用变更管理流程，`changes/proposed/` 由用户管理。进入其中的 Proposal
+  已完成人工裁决并获批准；Agent 不重新执行 Admission、寻找批准证据或判断 Accepted/Rejected。
+- 普通小型修复、局部重构、测试或格式修复不要求创建 Change；能在一次修改内完整对齐
+  requirements/ 文档、实现与 proof 的工作可直接完成。
 
 Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由用户或负责人管理。
 

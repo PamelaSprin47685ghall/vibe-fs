@@ -44,7 +44,7 @@ npm install wanxiangshu --registry <your-private-registry>
 2. 按 Host 的 plugin 配置挂载入口（包名 `wanxiangshu` 或已安装包的 `main`）。
 3. 启动 Host。插件初始化时加载 `resources/` 下 system prompt 与 Enforcer catalog；资源缺失或非法则启动失败（fail fast），无代码内置副本兜底。
 
-配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [docs/README.md](docs/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
+配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [requirements/README.md](requirements/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
 
 可选环境变量：
 
@@ -77,7 +77,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 
 ### Agent 角色
 
-与 `docs/what/agent.md` 一致（十个 system prompt 角色）：
+与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致（十个 system prompt 角色）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
@@ -92,7 +92,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | Executor | 无工具 | 内部执行/摘要 |
 | Blogger | `blog` | Companion 叶子，写认知上下文 |
 
-每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `docs/what/agent.md`。
+每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 
 ### 运行时数据
 
@@ -119,7 +119,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | 插件无法加载 / import 失败 | 确认 `dist/.../Plugin.js` 存在；tarball 须含 `dist/` 与 `resources/` |
 | 启动即失败（资源） | 检查 `resources/provider/` 语言对与 `resources/enforcer/<tip>/` 完整合法 |
 | peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
-| 行为与预期不符 | 对照 CHANGELOG 与 [docs/README.md](docs/README.md)；商业支持见下节 |
+| 行为与预期不符 | 对照 CHANGELOG 与 [requirements/README.md](requirements/README.md)；商业支持见下节 |
 
 源码排查见贡献者指南与 `AGENTS.md`。
 
@@ -138,19 +138,18 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 ### 仓库结构
 
 ```text
-src/         生产源码
-resources/   随包运行时资源
-docs/        当前有效的分域规范 why/what/shape/how/proof
-changes/     已批准变更的 proposed/active/completed 生命周期记录
-tests/       unit / integration / e2e
-scripts/     构建与少量仓库检查
-dist/        最终编译输出，不提交
-artifacts/   中间产物与本地发布产物，不提交
+src/           生产源码
+resources/     随包运行时资源
+requirements/  45 包 normative 语义树：每包 WHY/WHAT/HOW/PROOF + 包自有测试
+archive/       已归档旧 docs/ 与 changes/（历史 Clause 与变更记录）
+scripts/       构建与少量仓库检查
+dist/          最终编译输出，不提交
+artifacts/     中间产物与本地发布产物，不提交
 ```
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
-- 规范导航 [docs/README.md](docs/README.md)；词汇表 `docs/what/glossary.md`；变更工作流见 [changes/README.md](changes/README.md)
-- 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（单一 Long Stroke：`scenarios/` + `support/`）
+- 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流见 [archive/docs/README.md](archive/docs/README.md) / [archive/changes/README.md](archive/changes/README.md)
+- 测试全部包自有：`requirements/<package>/tests/`；共享 harness 在 `requirements/verification-system/tests/`（含 `support/`、unit runner、integration orchestrator、Long Stroke e2e）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
 ### 开发环境
@@ -183,22 +182,19 @@ npm run format-build-test
 
 | 层 | 入口 | 范围 |
 |----|------|------|
-| unit | `tests/unit/run.mjs` | 对 `dist/` 的契约；经 `tests/unit/support/domain.mjs` |
-| integration | `tests/integration/run.mjs` | resources、journal、plugin、package、harness |
-| e2e | `tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
+| unit | `requirements/verification-system/tests/run.mjs` | 对 `dist/` 的契约；经 `requirements/verification-system/tests/support/domain.mjs` |
+| integration | `requirements/verification-system/tests/integration/run.mjs` | resources、plugin、persist、strength、package、harness（套件在 owner 包 `tests/integration/` 下） |
+| e2e | `requirements/verification-system/tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
 `dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 
 ### 规范与文档体系
 
-- **行为 / 边界 / 目标实现 / 证明**：`docs/what` · `docs/shape` · `docs/how` · `docs/proof`（条款 ID 稳定寻址）。
-- **理由**：`docs/why/`（含 Kolmogorov 工程纪律）。
-- **变更记录**：`changes/proposed/` 保存用户管理、已批准且等待启动的工作；
-  `changes/active/` 保存已启动但未闭环的工作；`changes/completed/` 保存完成历史。
-- `changes/` 不定义当前产品语义；Active Change 也不能代替正式文档。
-- 测试直接引用条款 ID。规范不跟踪实现进度。
+- **规范**：`requirements/<package>/{WHY,WHAT,HOW,PROOF}.md`（45 包 normative 树；WHAT 命题 ID 稳定寻址，每条有测试落点）。
+- **历史 Clause 与变更记录**：`archive/docs/`、`archive/changes/`（2026-08-14 cutover 归档；含 Kolmogorov 工程纪律与 completed change 考古）。
+- 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
-导航：[docs/README.md](docs/README.md)。治理：[docs/what/document-governance.md](docs/what/document-governance.md) · [docs/how/document-governance.md](docs/how/document-governance.md)。
+导航：[requirements/README.md](requirements/README.md)。治理见 `AGENTS.md` 与归档文档。
 
 ### 运行时资源
 
@@ -216,7 +212,7 @@ resources/enforcer/<TipName>/{enforcer.md,main.md}
 ### 构建与打包
 
 - **构建**：`scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
-- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`tests/`、`scripts/`、`docs/`、`artifacts/`。
+- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`archive/`、`artifacts/`。
 
 发布预检：`npm run format-build-test`（干净工作树；验证日志进 CI artifact）。
 
