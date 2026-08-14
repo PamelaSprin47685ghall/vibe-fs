@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, payloadOf, resultOf, okResult, errorResult } from '../support/domain.mjs'
+import { caseOf, payloadOf, resultOf, okResult, errorResult } from '../../../tests/unit/support/domain.mjs'
 
 const {
   PtyPort,
