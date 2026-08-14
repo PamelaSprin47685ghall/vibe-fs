@@ -24,8 +24,9 @@ Evidence notes
 | `agent.md`（含 shape AGENT-007/019/021、how 装配） | DONE | 32 条款；15 NEEDS-SPLIT、12 OWNED、5 GARBAGE、0 ORPHAN |
 | `host.md`（含 shape HOST-003/008/011/012、how HOST-004/009/010） | DONE | 27 条款；11 NEEDS-SPLIT、15 OWNED、1 GARBAGE、0 ORPHAN |
 | `companion.md`（含 shape COMPANION-009、how COMPANION-005） | DONE | 15 条款；3 NEEDS-SPLIT、12 OWNED、0 ORPHAN |
+| `execution.md`（含 shape EXEC-009/014/023/024/026、how EXEC-010..013/018/019/025） | DONE | 32 条款；8 NEEDS-SPLIT、23 OWNED、1 GARBAGE、0 ORPHAN |
 
-下一 topic：`execution.md`。
+下一 topic：`persist.md`。
 
 ---
 
@@ -450,3 +451,116 @@ prompt-stability（prefix byte）    → prefix-stability
 ## 边界观察
 
 1. companion.md 是 §11.1「Companion 不是永久 ontology」的直接证据：15 条 COMPANION 无一条需要独立 `companion` package；topology→`session-ontology`、frame/squash→`context-compression`、XTrace→`semantic-trace`、WorkRecord→`work-record`、prefix→`prefix-stability`。未来 deterministic in-process summarizer 替代 physical Blogger leaf 时这些 WHAT 均不变。
+
+---
+
+# `docs/what/execution.md`（+ shape/execution.md + how/execution.md）
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| EXEC-001 | Fork/Join/Horizon + 终端 + commission 工具面角色表 | `capability-enforcement` | 工具面 projection；fork/commission 语义→`delegation`，office 后果→`office-capability` |
+| EXEC-002 | Fork 语义：calling/name/charge；续做按 Byname；不暴露 AgentId/reuse/agent_id/role/tier | `delegation` | fork = mission witness；machine topology 不进 contract |
+| EXEC-003 | 终端四动词四合同（open/send/read/signal）；不返回 pty_id/closed/status | `process-execution` | 真实终端 act/observation 分型 |
+| EXEC-006 | Child Run 生命周期与父背景记录分离 | `managed-session-lifecycle` | child lifecycle |
+| EXEC-007 | Nudge 是 Continuation，不建新 Authority | `interaction-authority` | continuation 语义 |
+| EXEC-008 | 父背景记录不冒充 child completion | `work-record` | record honesty |
+| EXEC-009 | Handle 四态（Active/CompletedAwaitingJoin/Abandoned/Retired）；tombstone 不可回退 | `managed-session-lifecycle` | handle lifecycle；消费唯一 |
+| EXEC-010 | Process Request 类型化 | `process-execution` | typed process request |
+| EXEC-011 | Process Deadline 有界；超时确定失败路径 | `process-execution` | bounded deadline；时间→`time-capability` |
+| EXEC-012 | 大输出摘要：超限走摘要，不静默截断成成功空结果 | `output-distillation` | fragment 不能冒充整体成功 |
+| EXEC-013 | Large Gate 与输出预算合同一致；禁无界缓冲 | `output-distillation` | output budget |
+| EXEC-015 | PTY completion 只由 backend onExit；禁 stdout 启发式 | `process-execution` | physical completion 由 backend fact 建立 |
+| EXEC-018 | Join 批次：MaxJoinBatch=32、稳定排序、逐项 CAS、非确定序禁 | `delegation` | bounded batch；`MaxJoinBatch=32`=HOW |
+| EXEC-019 | Orchestrator commission 批量 join（FIFO 排空上限 32） | `delegation` | commission join |
+| EXEC-020 | Agent 终态代数 `Completed\|Failed\|Abandoned`；ABORTED 非终态，取消是控制面 | `effect-accounting` | outcome 分型；控制面/数据面→`structured-workflow` |
+| EXEC-021 | completion blob v2：finality 仅 completed\|failed；`LegacyFalseAbort` 永不 RunCompletion | `effect-accounting` | outcome 分型；schemaVersion=HOW |
+| EXEC-022 | 假 completion 补偿：`HandleFalseCompletionRejected`→确定性 replacement；禁把假 abort 洗成成功 | `effect-accounting` | unknown≠success；reconcile→`crash-reconciliation` |
+| EXEC-023 | 恢复所有权与线性序：permit→join，禁跳步；Distiller 定向等待受 permit 门 | `crash-reconciliation` | restart 从 durable facts 重入普通程序 |
+| EXEC-024 | Mailbox 双通道：agent 路径 Pulse（读 Journal）、PTY 路径 PublishPty | `process-execution` | 完成事实双通道；Journal→`durable-events` |
+| EXEC-025 | DevOps Join 超时（10s）→ `DeadlineExpired` 自然语言；Manager/Orchestrator 无限期 | `time-capability` | bounded deadline；10s=HOW |
+| EXEC-029 | Commission 语义：Orchestrator 委托独立集成之路给 Manager；不暴露 job_id/worktree/reused | `delegation` | commission = independent road |
+| EXEC-030 | Provider leak 禁令：机器拓扑不进 provider；穿过 horizon 的只有后果与 WorkRecord | `participant-horizon` | admission filter |
+| EXEC-032 | RepositoryWarmStart invocation timing：batch admission 后、首 send 前 prepare；不另发 late hints | `knowledge-reuse` | warm-start 时序；Semble→`repository-investigation` |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| EXEC-004 | Join 消费 owner 可用 completion、有界批次 | `delegation` | join semantics |
+| EXEC-004 | agent 完成项 = entry-local WorkRecord（includeOpening=false），禁字段式 DTO | `work-record` | bounded statement |
+| EXEC-004 | 禁投影 status/count/ordinal/kind/agent/code/message | `participant-horizon` | no DTO |
+| EXEC-004 | DevOps 10s 等待预算 → `DeadlineExpired` | `time-capability` | deadline |
+| EXEC-005 | horizon = pull-only snapshot（在场名册 Byname/TerminalName），禁 timer/watcher | `delegation` | roster semantics |
+| EXEC-005 | 最新 BlogFrame 作 child 工作记录；blob 缺失/digest 无效 fail closed | `context-compression` | frame source |
+| EXEC-005 | 无 status/id/kind/ordinal | `participant-horizon` | no DTO |
+| EXEC-014 | Distiller 映射子会话是私有 runtime，不暴露公开 fork/horizon | `output-distillation` | Distiller office |
+| EXEC-014 | durable handle `HostOwnedHidden`，对 list/join/horizon/guard/恢复不可见 | `managed-session-lifecycle` | hidden handle |
+| EXEC-014 | 机器 Assignment（map/reduce/chunk/session id）不进 provider 工具面 | `participant-horizon` | hidden surface |
+| EXEC-016 | 有 join 义务且 outstanding 后台时只发 JoinGuard Continuation | `interaction-authority` | continuation |
+| EXEC-016 | finality 处理停放，Manager 不做 idle 鼓励 | `finality` | drain rule |
+| EXEC-017 | join 中断 = `JoinWaitOutcome.Interrupted`，不是 ForkError | `delegation` | interrupt semantics |
+| EXEC-017 | external-user ingress 只打断当前 wait，不授予 Prompt authority、不 cancel child | `interaction-authority` | authority boundary |
+| EXEC-017 | operator abort → TurnAborted cleanup 取消父全部 running sub-session | `managed-session-lifecycle` | cascade cancel |
+| EXEC-026 | SatelliteRuntime/SyncDelegateRuntime 拥有 create/reuse/abort/retire/级联 | `managed-session-lifecycle` | runtime ownership |
+| EXEC-026 | Dedicated Inspector/Coder = Work + Attached，非 Teacher-style InternalLeaf | `session-ontology` | HOST-008 |
+| EXEC-026 | sync batch 成员/顺序/canonical/serialization 合同 | `delegation` | sync delegate |
+| EXEC-028 | OneShot dispose-after vs Reusable SyncDelegate 两条互斥生命周期 | `managed-session-lifecycle` | lifecycle |
+| EXEC-028 | 成功 wire = child LWR（includeOpening=false）+ 末条 TurnFormalText | `work-record` | bounded record |
+| EXEC-028 | 同步返回语义（canonical/sibling/答案=WorkRecord 本身） | `delegation` | sync semantics |
+| EXEC-031 | SyncDelegate 无 return：ordinary completion 结束 batch，Host 物化 bounded WorkRecord | `delegation` | sync delegate contract |
+| EXEC-031 | 答案 = bounded WorkRecord 本身；最后一条助手文本在 Recent work；无 answer 字段 | `work-record` | prose claim |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| EXEC-027 全条（Student Learn/Compile、teacher、StudentQaStore、SKILL、return 已删） | GARBAGE | migration absence ratchet |
+| Meditator/Executor、fork-manager/list/verdict/blog/executor(工具)/fork-pty/return 已删算法面 | GARBAGE | GrandRewrite absence；`student-teacher-absence` / legacy gates 基线稳定后删 |
+| `MaxJoinBatch=32`、`DevOpsJoinTimeoutMs=10_000` | HOW | 具体预算值；「有界批次/有界等待」才是 WHAT |
+| completion blob `schemaVersion=2`、`fromDecoded` 唯一构造 | HOW | 编码机制 |
+
+---
+
+# execution.md 轮 delta
+
+## Boundary delta
+
+```text
+UNCHANGED  45 包全部不变
+SPLIT      无（8 条 NEEDS-SPLIT 均被现有包分解吸收）
+MERGED     无
+NEW        无
+REMOVED    无
+```
+
+## Coverage delta
+
+```text
+new OWNED     23 条（EXEC-001/002/003/006/007/008/009/010/011/012/013/015/018/019/020/021/022/023/024/025/029/030/032）
+new NEEDS-SPLIT  8 条（EXEC-004/005/014/016/017/026/028/031）
+new GARBAGE   EXEC-027（Student absence）+ 已删算法面（Meditator/Executor/return 等）
+new ORPHAN   0
+new OVERLAP  0（clause 级已定位）
+```
+
+## Proof delta
+
+```text
+PTY/process run/signal/onExit  → process-execution
+Distiller fragment-humility     → output-distillation
+fork/commission/sync-delegate   → delegation
+canonical LWR materializer       → work-record
+```
+
+## Dependency delta
+
+```text
+无新增/删除 hard edge。
+```
+
+## 边界观察
+
+1. execution.md 的 SyncDelegate 条款（EXEC-026/028/031）确认「同步委派 = delegation + work-record + managed-session-lifecycle」三方：delegation 拥有语义 batch/canonical/serialization，work-record 拥有 bounded WorkRecord = 答案，managed-session-lifecycle 拥有 reusable vs dispose-after 生命周期。无独立 `sync-delegate` package。
+2. EXEC-004/005/014/030 的「禁止 DTO / 机器拓扑穿过 provider」反复确认 `participant-horizon` 是 execution 面所有 leak 禁令的 owner，不是每个工具的附属字段。

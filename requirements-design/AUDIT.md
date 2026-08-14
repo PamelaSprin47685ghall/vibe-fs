@@ -137,6 +137,12 @@ HOST-014（Student/Teacher absence）+ HOST-008 历史字段判 GARBAGE。NEEDHE
 Clause 级结果见 `COVERAGE.md`：12 单 owner（topology→`session-ontology`、frame/squash→`context-compression`、WorkRecord→`work-record`、prefix→`prefix-stability`）；
 COMPANION-003/007/008 标 NEEDS-SPLIT 但均被现有包分解。无一条需要独立 `companion` package（HANDOFF §11.1 维持）。
 
+### `docs/what/execution.md`
+
+至少混合：delegation（fork/commission/inspect/sync）、process-execution（PTY/run）、output-distillation（Distiller）、work-record（LWR）、participant-horizon（leak 禁令）、managed-session-lifecycle（handle/child）。
+
+Clause 级结果见 `COVERAGE.md`：23 单 owner；8 条 NEEDS-SPLIT（EXEC-004/005/014/016/017/026/028/031）均被现有包分解；EXEC-027（Student absence）+ 已删算法面判 GARBAGE。无独立 `sync-delegate` package。
+
 ### `docs/what/architecture.md`
 
 - Horizon → `participant-horizon`。
