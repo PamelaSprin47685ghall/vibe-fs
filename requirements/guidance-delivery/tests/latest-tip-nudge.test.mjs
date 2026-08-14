@@ -22,7 +22,7 @@ import {
   stream,
   toList,
   toolCallId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 runtimeResources.installFromPackage()
 

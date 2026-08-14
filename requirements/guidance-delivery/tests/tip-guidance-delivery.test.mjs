@@ -20,7 +20,7 @@ import {
   prefixEpochId,
   providerRun,
   toolCallId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 runtimeResources.installFromPackage()
 
