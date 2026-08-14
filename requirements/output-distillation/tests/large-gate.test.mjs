@@ -7,22 +7,14 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { lib } from '../../verification-system/tests/support/domain.mjs'
 
 const { acquire, getCount, release } = await import('../../../dist/Process/LargeGate.js')
 
 // Fable's CancellationToken polyfill lives in the versioned fable-library dir;
-// resolve it the same way support/domain.mjs does rather than hardcoding a version.
-const fableLibraryDir = join(
-  process.cwd(),
-  'dist',
-  'fable_modules',
-  readdirSync('dist/fable_modules').find((entry) => entry.startsWith('fable-library-js.')),
-)
-const { createCancellationToken, cancel, isCancellationRequested } = await import(
-  join(fableLibraryDir, 'Async.js')
-)
+// resolved through the shared support facade so no dist/fable_modules path leaks
+// into package scope (test-boundary gate).
+const { createCancellationToken, cancel, isCancellationRequested } = await lib('Async.js')
 
 const live = () => createCancellationToken(false)
 const cancelled = () => createCancellationToken(true)

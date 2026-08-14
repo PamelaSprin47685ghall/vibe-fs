@@ -1,16 +1,19 @@
-// tests/unit/process/process-runner.test.mjs — VERIFY-009 coverage: EXEC-011 runner.
+// Split from tests/unit/process/process-runner.test.mjs (cutover Wave 2a); owner: process-execution
 //
+// EXEC-011 runWithLauncher/runWithHost 生命周期：run/spawn/kill/cancel 语义。
 // runWithLauncher turns a pure launcher (cmd -> (exit, stdout, stderr)) into a host,
-// so the full lifecycle — estimate validation, LargeGate, spawn, wait, timeout kill —
-// is exercised without spawning a real process.
+// so the full lifecycle — spawn, wait, timeout kill, cancellation — is exercised
+// without spawning a real process.
+// (estimate 拒绝 → time-capability；large gate → output-distillation。)
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { cancelledToken, caseOf, liveToken, payloadOf, processRequest } from '../support/domain.mjs'
+import { cancelledToken, caseOf, liveToken, payloadOf, processRequest } from '../../verification-system/tests/support/domain.mjs'
+import { lib } from '../../verification-system/tests/support/domain.mjs'
 
 const { runWithLauncher, runWithHost } = await import('../../../dist/Process/ProcessRunner.js')
-const { fromSeconds } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/TimeSpan.js')
+const { fromSeconds } = await lib('TimeSpan.js')
 
 const CTX = {
   WorkingDirectory: undefined,
@@ -27,29 +30,6 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_cmd, _ct) 
   new TextEncoder().encode(out),
   new TextEncoder().encode(err),
 ]
-
-// ── estimate validation ──────────────────────────────────────────────────────
-
-test('EXEC_011_rejects_nan_runtime_estimate', async () => {
-  const result = await runWithLauncher(okLauncher(), cmd, estimate(NaN), CTX, liveToken())
-  assert.equal(caseOf(result), 'Error')
-  assert.equal(caseOf(payloadOf(result)), 'ExecutionFailed')
-  assert.match(String(payloadOf(payloadOf(result))), /finite positive number/)
-})
-
-test('EXEC_011_rejects_zero_and_negative_runtime_estimate', async () => {
-  for (const bad of [0, -5, -Infinity, Infinity]) {
-    const result = await runWithLauncher(okLauncher(), cmd, estimate(bad), CTX, liveToken())
-    assert.equal(caseOf(result), 'Error', String(bad))
-    assert.equal(caseOf(payloadOf(result)), 'ExecutionFailed')
-  }
-})
-
-test('EXEC_011_rejects_negative_output_estimate', async () => {
-  const result = await runWithLauncher(okLauncher(), cmd, estimate(10, -1), CTX, liveToken())
-  assert.equal(caseOf(result), 'Error')
-  assert.match(String(payloadOf(payloadOf(result))), /non-negative/)
-})
 
 // ── happy path ───────────────────────────────────────────────────────────────
 
@@ -119,24 +99,4 @@ test('EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled', asyn
 
   assert.equal(caseOf(result), 'Error')
   assert.equal(caseOf(payloadOf(result)), 'ProcessCancelled')
-})
-
-// ── Large gate ───────────────────────────────────────────────────────────────
-
-test('EXEC_011_large_estimate_acquires_and_releases_the_gate', async () => {
-  const { acquire, release, getCount } = await import('../../../dist/Process/LargeGate.js')
-  // Drain to a known state.
-  while (getCount() === 0) release()
-
-  let gateCountDuringRun = undefined
-  const observingLauncher = async (_cmd, _ct) => {
-    gateCountDuringRun = getCount()
-    return [0, new Uint8Array(0), new Uint8Array(0)]
-  }
-
-  const result = await runWithLauncher(observingLauncher, cmd, estimate(10, 1024, 'Large'), CTX, liveToken())
-
-  assert.equal(caseOf(result), 'Ok')
-  assert.equal(gateCountDuringRun, 0, 'the gate is held while the large process runs')
-  assert.equal(getCount(), 1, 'the gate is released after the run')
 })

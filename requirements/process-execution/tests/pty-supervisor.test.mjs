@@ -7,8 +7,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawn } from 'node:child_process'
 
-import { caseOf, payloadOf, resultOf, okResult, errorResult } from '../support/domain.mjs'
-import { StringBuilder__Append_Z721C83C5 } from '../../../dist/fable_modules/fable-library-js.5.13.0/System.Text.js'
+import { caseOf, lib, payloadOf, resultOf, okResult, errorResult } from '../../verification-system/tests/support/domain.mjs'
+
+const { StringBuilder__Append_Z721C83C5 } = await lib('System.Text.js')
 
 const {
   PtySupervisorModule_create,

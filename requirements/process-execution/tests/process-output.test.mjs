@@ -1,21 +1,19 @@
-// tests/unit/process/process-output.test.mjs — VERIFY-009 coverage targets.
+// Split from tests/unit/process/process-output.test.mjs (cutover Wave 2a); owner: process-execution
 //
-// EXEC-011 process estimates, the OutputCollector (stdout/stderr aggregation, byte
-// counting, spool-threshold handoff) and the Spool chunking primitives. Pure byte
-// and TimeSpan math; the only side effect is a temp spool file, deleted per test.
+// EXEC-011 OutputCollector (stdout/stderr aggregation, byte counting,
+// spool-threshold handoff) and the Spool chunking primitives. Pure byte math;
+// the only side effect is a temp spool file, deleted per test.
+// (effectiveDeadline / DefaultHardLimit 纯代数断言 → time-capability。)
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf } from '../support/domain.mjs'
+import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   EstimatedRuntime,
   EstimatedOutput,
   EstimatedMemory,
-  ProcessEstimateModule_DefaultHardLimit,
-  ProcessEstimateModule_effectiveDeadline,
-  ProcessEstimateModule_outputThreshold,
 } = await import('../../../dist/Process/ProcessRequest.js')
 
 const { OutputCollector, create, addStdout, addStderr, buildResult } = await import(
@@ -35,10 +33,6 @@ const {
 // Spool.ChunkSizeBytes is a [<Literal>] — Fable inlines it and exports nothing.
 const CHUNK_SIZE_BYTES = 204800
 
-const { fromSeconds, fromHours, compare } = await import(
-  '../../../dist/fable_modules/fable-library-js.5.13.0/TimeSpan.js'
-)
-
 const runtime = (seconds) => new EstimatedRuntime(seconds)
 const output = (bytes) => new EstimatedOutput(bytes)
 const estimate = (seconds, bytes, memory = EstimatedMemory.Medium) => ({
@@ -48,33 +42,6 @@ const estimate = (seconds, bytes, memory = EstimatedMemory.Medium) => ({
 })
 
 const text = (value) => new TextEncoder().encode(value)
-
-// ── EXEC-011: estimate math ──────────────────────────────────────────────────
-
-test('EXEC_011_output_threshold_uses_provider_willingness_at_face_value', () => {
-  assert.equal(ProcessEstimateModule_outputThreshold(output(0n)), 0n)
-  assert.equal(ProcessEstimateModule_outputThreshold(output(-5n)), 0n)
-  assert.equal(ProcessEstimateModule_outputThreshold(output(10n)), 10n)
-})
-
-test('EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit', () => {
-  const oneHour = fromHours(1)
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(10), oneHour), fromSeconds(10)), 0)
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(100), oneHour), fromSeconds(100)), 0)
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(2000), oneHour), fromSeconds(2000)), 0)
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(5000), oneHour), oneHour), 0)
-})
-
-test('EXEC_011_nonfinite_or_nonpositive_estimate_collapses_to_hard_limit', () => {
-  const hard = fromSeconds(60)
-  for (const bad of [NaN, Infinity, -Infinity, 0, -10]) {
-    assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(bad), hard), hard), 0, String(bad))
-  }
-})
-
-test('EXEC_011_default_hard_limit_is_one_hour', () => {
-  assert.equal(compare(ProcessEstimateModule_DefaultHardLimit, fromHours(1)), 0)
-})
 
 // ── OutputCollector ──────────────────────────────────────────────────────────
 
