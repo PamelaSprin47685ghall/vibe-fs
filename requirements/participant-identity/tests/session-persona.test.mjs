@@ -1,4 +1,5 @@
-// tests/unit/prompt/session-persona.test.mjs — AGENT-028 / FALLBACK-014 Phase 16.
+// requirements/participant-identity/tests/session-persona.test.mjs — AGENT-028 /
+// FALLBACK-014 Phase 16, moved from tests/unit/prompt/.
 //
 // SessionPersona bind-once + child inherit. Full prompt-stability bytes → Phase 19.
 
@@ -9,8 +10,8 @@ import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
 import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
 import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
-import { resultOf, unwrapOption } from '../support/domain/interop.mjs'
-import { sessionId } from '../support/domain.mjs'
+import { resultOf, unwrapOption } from '../../../tests/unit/support/domain/interop.mjs'
+import { sessionId } from '../../../tests/unit/support/domain.mjs'
 
 const persona = PersonaCatalog.PersonaCatalog_persona
 const bindOnce = (id, value) => resultOf(PersonaCatalog.SessionPersona_bindOnce(id, value))

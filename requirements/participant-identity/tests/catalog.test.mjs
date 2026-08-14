@@ -1,4 +1,5 @@
-// tests/unit/Agent/catalog.test.mjs — AGENT-001/002/003/004 direct catalog tests (C5).
+// requirements/participant-identity/tests/catalog.test.mjs — AGENT-001/002/003/004
+// direct catalog tests (C5), moved from tests/unit/agent/.
 //
 // ManagedAgentCatalog is the sole identity directory (AGENT-001…004):
 //   - 10 canonical roles × 2 tiers → exactly 20 required names (AGENT-002)
@@ -10,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { authority, caseOf, managedAgentCatalog, roles } from '../support/domain.mjs'
+import { authority, caseOf, managedAgentCatalog, roles } from '../../../tests/unit/support/domain.mjs'
 
 const TIER_NAMES = ['Fast', 'Deep']
 
