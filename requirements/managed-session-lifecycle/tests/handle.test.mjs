@@ -1,4 +1,11 @@
-// tests/unit/Execution/handle.test.mjs — EXEC-004/005/009/011.
+// Split from tests/unit/execution/handle.test.mjs (cutover Wave 2a);
+// owner: managed-session-lifecycle. EXEC-004/005/009 handle 生命周期：typed
+// handle 身份、completion cell 单赋值、三视图、tombstone 永久、Abandoned 单赋值、
+// fold 事实重放/拒绝、blob 负载与 0.5.1 codec 迁移（MANAGED-SESSION-006/007/008/
+// 009/015）。EXEC-011/012 deadline/estimate 代数 → time-capability；
+// EXEC-011 kill-ack/oneshot/EXEC-010 process request → process-execution；
+// EXEC-008 child background → delegation；ENFORCER stopPhysicalRun →
+// behavior-diagnosis。
 //
 // A handle's durable lifecycle has three states and they must stay
 // distinguishable. The model this replaced held two maps (linked / unlinked),
@@ -11,34 +18,26 @@
 // the input as an agent name and forks a second child.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 import {
   blobDigest,
   blobRef,
-  clockAt,
   caseOf,
+  clockAt,
   completionKind,
-  deadline,
   envelope,
   fact,
   fold,
-  forkChildPayload,
   handleId,
   handleOwnership,
   handleProjection,
   isSome,
   journal,
-  listItems,
   payloadOf,
-  processEstimate,
-  processRequest,
   roles,
   sessionId,
   stream,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const PARENT = sessionId('ses_p')
 const CHILD = sessionId('ses_c')
@@ -392,158 +391,6 @@ test('EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
   assert.notEqual(folded.error.Reason, foldFacts([handleFact.completed]).error.Reason)
 })
 
-// ── EXEC-011: the deadline is min(estimate, administrator ceiling) ───────────
-
-test('EXEC_011_the_model_estimate_is_capped_by_the_hard_limit', () => {
-  const hourMs = processEstimate.defaultHardLimitMs
-  assert.equal(hourMs, 3_600_000, 'the default ceiling is one hour')
-
-  assert.equal(processEstimate.effectiveDeadlineMs(10, hourMs), 10_000)
-  assert.equal(processEstimate.effectiveDeadlineMs(600, hourMs), 600_000)
-  assert.equal(processEstimate.effectiveDeadlineMs(3_600, hourMs), hourMs)
-  assert.equal(processEstimate.effectiveDeadlineMs(10, 15_000), 10_000)
-})
-
-test('EXEC_011_a_nonsense_estimate_falls_back_to_the_hard_limit', () => {
-  // Zero or negative cannot mean "no deadline": the clause requires a finite
-  // limit. Falling back to the ceiling is the only answer that stays finite
-  // without inventing a budget the model did not give.
-  const hourMs = processEstimate.defaultHardLimitMs
-
-  assert.equal(processEstimate.effectiveDeadlineMs(0, hourMs), hourMs)
-  assert.equal(processEstimate.effectiveDeadlineMs(-5, hourMs), hourMs)
-
-  // And the fallback is still capped, so a small ceiling still wins.
-  assert.equal(processEstimate.effectiveDeadlineMs(0, 15_000), 15_000)
-})
-
-test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
-  // After SIGKILL, wait must not use MaxTimerWaitMs (~24.8d) or unbounded Exit.Task.
-  // KillAckGraceMs is the management bound; TimedOut + ExitCode=-1 when close never comes.
-  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const waitSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessWait.fs'), 'utf8')
-
-  assert.match(waitSrc, /let KillAckGraceMs = /, 'named kill-ack constant required')
-  assert.match(waitSrc, /waitForSignal child KillAckGraceMs/, 'post-kill wait uses kill-ack, not MaxTimerWaitMs')
-  assert.doesNotMatch(
-    waitSrc,
-    /killSent then[\s\S]{0,80}waitSegment Deadline\.MaxTimerWaitMs/,
-    'post-kill must not wait MaxTimerWaitMs',
-  )
-  assert.match(
-    waitSrc,
-    /ExitCode = -1[\s\S]{0,40}TimedOut = true/,
-    'kill-ack expiry returns TimedOut with unknown exit code, not fake success',
-  )
-  assert.match(waitSrc, /KillNotAcknowledged/, 'kill-ack expiry exits the wait loop')
-})
-
-test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
-  // OneShotAgentTool must not await completion.Task unbounded.
-  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const oneshot = readFileSync(
-    join(root, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs'),
-    'utf8',
-  )
-
-  assert.match(oneshot, /CompletionTimeoutMs\s*=\s*600_000/, 'named completion deadline')
-  assert.match(oneshot, /PtyTiming\.raceExit/, 'completion races a timer, not bare Task')
-  assert.doesNotMatch(
-    oneshot,
-    /let! output = completion\.Task\s*$/m,
-    'must not bare-await completion.Task without race',
-  )
-  assert.match(
-    oneshot,
-    /AbortSession childId/,
-    'timeout path aborts the child session',
-  )
-  assert.match(
-    oneshot,
-    /timed out after/,
-    'timeout returns Error with timeout message, not hang',
-  )
-})
-
-test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
-  // Definition: stopPhysicalRun (messages) (fallback) (reason).
-  // Call sites must pass (rawMessages, fallback, reason), not swapped.
-  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const host = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerHost.fs'), 'utf8')
-  const continuation = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerContinuation.fs'), 'utf8')
-
-  assert.match(
-    host,
-    /let private stopPhysicalRun\s*\(messages: obj list\)\s*\(fallback: obj list\)\s*\(reason: string\)/,
-    'definition order is messages, fallback, reason',
-  )
-  // The only remaining direct call site is the ctx.Stop injection in mkCtx
-  // (first arg rawMessages on both sides); continuation branches go through
-  // ctx.Stop and must not re-call stopPhysicalRun directly.
-  const calls = [...host.matchAll(/stopPhysicalRun\s+(\w+)\s+(\w+)\s+/g)].map((m) => [
-    m[1],
-    m[2],
-  ])
-  assert.ok(calls.length >= 1, `expected injection call site, got ${calls.length}`)
-  for (const [first, second] of calls) {
-    assert.equal(
-      first,
-      'rawMessages',
-      `stopPhysicalRun first arg must be rawMessages, got ${first} ${second}`,
-    )
-  }
-  assert.doesNotMatch(
-    continuation,
-    /stopPhysicalRun\s+\w+\s+\w+\s+/,
-    'continuation branches must use ctx.Stop, never stopPhysicalRun directly',
-  )
-})
-
-test('EXEC_012_the_output_threshold_uses_provider_willingness_at_face_value', () => {
-  assert.equal(processEstimate.outputThreshold(1_000), 1_000n)
-  assert.equal(processEstimate.outputThreshold(0), 0n)
-  assert.equal(processEstimate.outputThreshold(9_223_372_036_854_775_807n), 9_223_372_036_854_775_807n)
-})
-
-test('EXEC_011_a_deadline_is_a_point_in_time_not_a_remaining_duration', () => {
-  // Stored as an instant, so re-reading it cannot drift: `remaining` is derived
-  // from the clock each time rather than decremented.
-  const value = deadline.ofBudget('2026-01-01T00:00:00Z', 5_000)
-
-  assert.deepEqual(
-    ['2026-01-01T00:00:00Z', '2026-01-01T00:00:02Z', '2026-01-01T00:00:05Z', '2026-01-01T00:00:09Z'].map((iso) =>
-      deadline.remainingMs(clockAt(iso), value),
-    ),
-    [5_000, 3_000, 0, 0],
-    'remaining never goes negative',
-  )
-})
-
-test('EXEC_011_expiry_is_inclusive_at_the_deadline_instant', () => {
-  const value = deadline.ofBudget('2026-01-01T00:00:00Z', 5_000)
-
-  assert.deepEqual(
-    ['2026-01-01T00:00:04Z', '2026-01-01T00:00:05Z', '2026-01-01T00:00:06Z'].map((iso) =>
-      deadline.isExpired(clockAt(iso), value),
-    ),
-    [false, true, true],
-    'the deadline instant itself counts as expired',
-  )
-})
-
-test('EXEC_011_the_next_wait_is_clamped_to_what_a_timer_can_hold', () => {
-  // A JS timer silently fires immediately above 2^31-1 ms, which would turn a
-  // long deadline into a busy loop. Clamping keeps the wait a real wait.
-  const value = deadline.ofBudget('2026-01-01T00:00:00Z', 5_000)
-  assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:00Z'), value), 5_000)
-  assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:05Z'), value), 0)
-  assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:09Z'), value), 0)
-
-  const distant = deadline.ofBudget('2026-01-01T00:00:00Z', 5_000_000_000)
-  assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:00Z'), distant), deadline.maxTimerWaitMs)
-  assert.equal(deadline.maxTimerWaitMs, 2_147_483_647)
-})
-
 // ── EXEC-001: fork creates a child run and list / join show its lifecycle ─────
 
 test('EXEC_001_fork_creates_a_child_run', () => {
@@ -582,22 +429,6 @@ test('EXEC_007_nudge_is_fire_and_forget', () => {
   assert.deepEqual(views(nudged).active, ['agent:h1'])
   assert.equal(handleProjection.linkedChildren(nudged).length, 1)
   assert.deepEqual(stateOf(nudged).child, 'ses_c')
-})
-
-// ── EXEC-008: child background uses the latest durable work record ────────────
-
-test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
-  const lwrSnapshot = 'LWR snapshot at turn 9'
-  const rendered = forkChildPayload.render({
-    assignment: 'Summarize the output',
-    commissionerRecord: lwrSnapshot,
-    rootRequirements: [],
-    payload: undefined,
-  })
-
-  assert.equal(rendered.includes(lwrSnapshot), true)
-  assert.equal(rendered.includes(forkChildPayload.commissionerRecordInstruction), true)
-  assert.equal(rendered.includes('parent_work_record'), false)
 })
 
 // ── EXEC-009: durable completion payload on the lifecycle ────────────────────
@@ -693,24 +524,4 @@ test('EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () =>
   assert.equal(state.completion, 'Terminal')
   assert.equal(state.completionRef, undefined)
   assert.equal(state.completionDigest, undefined)
-})
-
-// ── EXEC-010: a process request carries the full executor estimate ─────────────
-
-test('EXEC_010_process_request_carries_all_fields', () => {
-  const cmd = processRequest.command({
-    fileName: 'sh',
-    args: ['-lc', 'echo hi'],
-    workingDirectory: '/tmp/wx',
-    stdin: 'input',
-  })
-  const est = processRequest.estimate({ runtimeSeconds: 42, outputBytes: 65536, memory: 'Large' })
-
-  assert.equal(cmd.FileName, 'sh')
-  assert.deepEqual(listItems(cmd.Arguments), ['-lc', 'echo hi'])
-  assert.equal(cmd.WorkingDirectory, '/tmp/wx')
-  assert.equal(cmd.Stdin, 'input')
-  assert.equal(payloadOf(est.EstimatedRuntime), 42)
-  assert.equal(payloadOf(est.EstimatedOutput), 65536n)
-  assert.equal(caseOf(est.EstimatedMemory), 'Large')
 })

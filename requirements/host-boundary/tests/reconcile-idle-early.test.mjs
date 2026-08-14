@@ -1,6 +1,8 @@
-// Behavioral regression: idle signal arrives before transcript materializes
-// (highest-probability completion-loss point). Bounded causal rereads within
-// one Kick (maxCausalRereads); no wall-clock backoff/budget.
+// Split from tests/unit/execution/reconcile-idle-early.test.mjs (cutover Wave 2a);
+// owner: host-boundary. Reconciler 有界因果重读 machinery（HOST-BOUNDARY-005）：
+// reread 预算耗尽不是永久丢失（第二次 Kick 恢复）、SnapshotError 不消耗预算、
+// 连续错误有界 StopPass。idle-observation 非权威面（idle 先于 transcript 到达）
+// → causal-wait。
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -9,48 +11,11 @@ import {
   physicalUser,
   reconcileSupervisor,
   sessionId,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 // Causal rereads complete synchronously inside Kick's async task; one macrotask
 // is enough for the promise chain. Short settle covers that hop.
 const settle = () => new Promise((r) => setTimeout(r, 10))
-
-// ── 1. terminal materializes inside the same Kick via causal rereads ─────────
-
-test('EXEC_reconcile_idle_before_transcript_materializes_within_causal_rereads', async () => {
-  const sid = sessionId('ses_idle_early_causal')
-  const physical = physicalUser('user-1')
-  const turns = []
-  const inProgress = reconcileSupervisor.inProgressTranscript('user-1', 'asst-ip')
-  const terminal = reconcileSupervisor.terminalTranscript('user-1', 'asst-terminal')
-  // Get#1 remaining=3 → Provisional → Reread(2)
-  // Get#2 remaining=2 → Provisional → Reread(1)
-  // Get#3 remaining=1 → Terminal → Publish
-  const reads = [
-    { ok: true, messages: inProgress },
-    { ok: true, messages: inProgress },
-    { ok: true, messages: terminal },
-  ]
-  const snapshot = reconcileSupervisor.createSnapshot(reads)
-  const binding = reconcileSupervisor.createStore()
-  const onTurn = (turn) => {
-    turns.push(turn)
-    return Promise.resolve()
-  }
-  const supervisor = reconcileSupervisor.create({
-    snapshot,
-    binding,
-    onTurn,
-    maxCausalRereads: 3,
-  })
-  reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
-  reconcileSupervisor.kick(supervisor, sid)
-
-  await settle()
-  assert.equal(turns.length, 1, 'exactly one onTurn within same Kick')
-  assert.equal(caseOf(turns[0].Outcome), 'TurnCompleted')
-  assert.ok(snapshot.readCount >= 3, `expect ≥3 reads (initial + rereads); got ${snapshot.readCount}`)
-})
 
 // ── 2. causal rereads exhaust is not permanent loss; second Kick recovers ────
 

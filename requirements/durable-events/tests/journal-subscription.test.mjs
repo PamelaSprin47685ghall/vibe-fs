@@ -13,7 +13,7 @@ import {
   roles,
   sessionId,
   stream,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jrev-'))

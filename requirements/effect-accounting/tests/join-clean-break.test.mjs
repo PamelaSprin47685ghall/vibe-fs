@@ -1,5 +1,10 @@
 /**
- * P0 Clean Break GREEN-3: Agent ABORTED destroyed as join finality.
+ * Split from tests/unit/execution/join-abort-clean-break.test.mjs (cutover Wave 2a);
+ * owner: effect-accounting. P0 Clean Break GREEN-3 false-finality 半边
+ * （EFFECT-ACCOUNTING-007）：Agent finality = Completed | Failed | Abandoned ——
+ * 无 AgentAborted；LegacyFalseAbort 永不 RunCompletion；假 completion 经
+ * HandleFalseCompletionRejected 确定性补偿；agent join wire 永不渲染 status="aborted"。
+ * 恢复/重启侧的 delayed-recovery race 断言 → crash-reconciliation。
  *
  * Final contract (user adjudication):
  *   Agent finality = Completed | Failed | Abandoned — no AgentAborted.
@@ -42,7 +47,7 @@ import {
   roles,
   sessionId,
   stream,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
@@ -328,70 +333,6 @@ test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', async () =>
     }
   } finally {
     restarted.dispose()
-  }
-})
-
-// ── 3. Delayed recovery race (unit shape; full E2E later) ────────────────────
-
-test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-race-'))
-  const created = await agentJournal.create({ directory: dir })
-  assert.equal(created.ok, true)
-
-  try {
-    const j = created.journal
-    const linked = await durableLink(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
-    assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
-
-    // Host Aborted observation while recovery still incomplete → never Joinable.
-    const resolution = childRecovery.resolveChild(
-      childRecovery.durableActive(),
-      childRecovery.snapshotMissing(),
-      [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
-    )
-    assert.notEqual(caseOf(resolution), 'RecoveredTerminal')
-    assert.equal(
-      caseOf(resolution),
-      'RecoveryIncomplete',
-      `expected RecoveryIncomplete, got ${caseOf(resolution)}`,
-    )
-
-    // Before true terminal: drain empty, HandleRetired=0, no aborted item.
-    const early = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
-    assert.equal(early.ok, true)
-    assert.deepEqual(early.items, [])
-    assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), false)
-
-    // True terminal → completed once, retire once; never aborted.
-    const sealed = agentCompletion.completedRun({
-      runId: 'run-true-terminal',
-      agentId: AGENT_ID,
-      agentName: TARGET,
-      workRecord: 'real work done',
-    })
-    const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
-    const recorded = await handleController.recordCompletion(j, PARENT, AGENT_ID, 'Terminal', body, CHILD)
-    assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
-
-    const finalDrain = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
-    assert.equal(finalDrain.ok, true)
-    assert.equal(finalDrain.items.length, 1)
-    assert.equal(finalDrain.items[0].status, 'completed')
-    assert.notEqual(finalDrain.items[0].status, 'aborted')
-    assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), true)
-
-    const batch = nonEmptyBatch.ofHeadTail(
-      agentCompletion.completedRun({
-        runId: finalDrain.items[0].runId,
-        agentId: finalDrain.items[0].agentId,
-        agentName: finalDrain.items[0].agentName,
-        workRecord: finalDrain.items[0].workRecord,
-      }),
-    )
-    const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
-    assert.ok(!wire.includes('status = "aborted"'))
-  } finally {
-    created.dispose()
   }
 })
 

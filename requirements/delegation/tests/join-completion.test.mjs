@@ -1,38 +1,33 @@
-// Join completion reliability (Part 1): immediate terminal claim, sticky terminal, Join deadline.
+// Split from tests/unit/execution/join-completion.test.mjs (cutover Wave 2a);
+// owner: delegation. Join 完成可靠性（EXEC-017/018）：Join deadline 到点 → TimedOut；
+// deadline 前 completion 返回 Ok；terminal 立即 claim run（无 Ready gate）。
+// HostEventPort sticky/dedupe 断言 → host-boundary。
 
 import assert from 'node:assert/strict'
-import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
   agentCompletion,
   caseOf,
   completionMailbox,
+  fableLibraryDir,
   hostEventPort,
   pendingRunLifecycle,
   roles,
   sessionId,
-} from '../support/domain.mjs'
-
-const BUILD_ROOT = new URL('../../../dist/', import.meta.url).pathname
-const fableLibDir = (() => {
-  const root = join(BUILD_ROOT, 'fable_modules')
-  const name = readdirSync(root).find((e) => e.startsWith('fable-library-js.'))
-  if (!name) throw new Error(`no fable-library-js.* under ${root}`)
-  return join(root, name)
-})()
+} from '../../verification-system/tests/support/domain.mjs'
 
 /** Fable Dictionary with TryGetValue tuple shape used by HostForkRunLifecycle. */
 const loadDictionary = async () => {
   const candidates = ['MutableMap.js', 'System.Collections.Generic.js', 'MapUtil.js']
   for (const file of candidates) {
     try {
-      const mod = await import(join(fableLibDir, file))
+      const mod = await import(join(fableLibraryDir, file))
       const Ctor = mod.Dictionary ?? mod.default?.Dictionary
       if (typeof Ctor === 'function') {
         // Fable Dictionary (MutableMap) requires a comparer for hash-based access;
         // mirror production construction (dist/Process/Pty.js).
-        const util = await import(join(fableLibDir, 'Util.js'))
+        const util = await import(join(fableLibraryDir, 'Util.js'))
         return {
           Dictionary: Ctor,
           comparer: { Equals: util.equals, GetHashCode: (x) => (util.safeHash(x) | 0) },
@@ -72,36 +67,6 @@ const loadDictionary = async () => {
   }
   return { Dictionary: DictShim }
 }
-
-// ── sticky terminal ──────────────────────────────────────────────────────────
-
-test('EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
-  const port = hostEventPort.create()
-  const child = sessionId('ses_sticky_child')
-  const seen = []
-
-  const delivered = hostEventPort.notify(port, child, hostEventPort.failed('early-terminal'))
-  assert.equal(delivered, false, 'hasListeners=false when nobody subscribed yet')
-
-  hostEventPort.subscribe(port, (_sid, outcome) => {
-    seen.push(caseOf(outcome))
-  })
-
-  assert.equal(seen.length, 1, 'late subscriber must receive sticky terminal once')
-  assert.equal(seen[0], 'Failed')
-})
-
-test('EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
-  const port = hostEventPort.create()
-  const child = sessionId('ses_dedupe')
-  let count = 0
-  hostEventPort.subscribe(port, () => {
-    count += 1
-  })
-  hostEventPort.notify(port, child, hostEventPort.failed('a'))
-  hostEventPort.notify(port, child, hostEventPort.failed('b'))
-  assert.equal(count, 2)
-})
 
 // ── Join deadline ────────────────────────────────────────────────────────────
 

@@ -1,17 +1,14 @@
-// P1 unit surface: ReconcileSupervisor causal reread materialization,
-// ClearSession mid-pass, HostSignalSubscribe reconnect markers,
-// ForkRuntime AwaitAgent deadline, Distillation cancelOwned on map failure.
+// Split from tests/unit/execution/reconcile-supervisor.test.mjs (cutover Wave 2a);
+// owner: host-boundary. P1 unit surface：ReconcileSupervisor 因果重读 materialization、
+// ClearSession mid-pass、generation fence（HOST-BOUNDARY-005）；HostSignalSubscribe
+// 传输选择（HOST-BOUNDARY-002/003）；HostEventPort sticky 容量 256
+// （HOST-BOUNDARY-016）。ForkRuntime AwaitAgent deadline → delegation；
+// Distillation cancelOwned → output-distillation。
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
 import {
   caseOf,
-  diagnostic,
-  distillationRuntime,
-  forkRuntime,
   hostEventPort,
   hostSignalSubscribe,
   idValue,
@@ -20,7 +17,7 @@ import {
   reconcileSupervisor,
   resultOf,
   sessionId,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const settle = () => new Promise((r) => setTimeout(r, 10))
@@ -362,58 +359,4 @@ test('HOST_signal_subscribe_client_events_listen_supported', async () => {
   const decoded = resultOf(result)
   assert.equal(decoded.ok, true)
   assert.equal(decoded.value[1], 'events.listen')
-})
-
-
-// ── 4. ForkRuntime.AwaitAgent timeout ────────────────────────────────────────
-
-test('EXEC_fork_runtime_await_agent_timeout', async () => {
-  // Never settles: no timer handle (child can exit), no late resolution (no
-  // asynchronous activity after verdict). AwaitAgent's timeout path races the
-  // completion cell via PtyTiming.raceExit and does not depend on the runner.
-  const hang = () => new Promise(() => {})
-  const rt = forkRuntime.create((_agentId, _role, _prompt) => hang())
-  const role = forkRuntime.role('Coder')
-  forkRuntime.fork(rt, 'agent-hang', role, 'fast-coder', 'work')
-
-  const started = Date.now()
-  const result = await forkRuntime.awaitAgent(rt, 'agent-hang', 40)
-  const elapsed = Date.now() - started
-
-  assert.ok(elapsed >= 25, `expected ~40ms wait, got ${elapsed}ms`)
-  assert.ok(elapsed < 2000, `must not hang unbounded; got ${elapsed}ms`)
-  assert.equal(result.tag, 1, 'Error result')
-  assert.match(result.fields[0], /timed out/)
-  assert.match(result.fields[0], /agent-hang/)
-})
-
-// ── 5. Distillation cancelOwned on map failure ───────────────────────────────
-
-test('EXEC_distillation_cancel_owned_on_failure', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
-  const spoolPath = join(dir, 'spool.bin')
-   // One small chunk → one map agent; Join NotFound → map failure → cancelOwned.
-  writeFileSync(spoolPath, Buffer.from('chunk-body-for-summarize'))
-
-  const forked = []
-  const { runtime, cancelled } = distillationRuntime.fake({
-    fork: (agentId) => {
-      forked.push(agentId)
-      return distillationRuntime.forkOk(agentId)
-    },
-     join: () => distillationRuntime.notFound(),
-  })
-
-  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
-  assert.ok(typeof summary === 'string', 'distillSpool returns partial text, not throw')
-  assert.ok(forked.length >= 1, 'at least one map agent forked')
-  assert.ok(
-    cancelled.length >= 1,
-    `CancelAgent must run for owned forked ids on map failure; forked=${forked.join(',')} cancelled=${cancelled.join(',')}`,
-  )
-  for (const id of forked) {
-    assert.ok(cancelled.includes(id), `owned agent ${id} must be cancelled`)
-  }
-
-  rmSync(dir, { recursive: true, force: true })
 })

@@ -8,7 +8,7 @@ import {
   childRecovery,
   handleId,
   sessionId,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const AGENT = 'fast-coder'
 const HANDLE = handleId.agent('h-abort')

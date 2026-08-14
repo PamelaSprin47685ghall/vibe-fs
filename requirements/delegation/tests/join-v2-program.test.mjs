@@ -16,7 +16,7 @@ import {
   joinProgram,
   roles,
   sessionId,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 

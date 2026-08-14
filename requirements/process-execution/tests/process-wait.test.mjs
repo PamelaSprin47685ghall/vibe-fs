@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { deadline, liveToken, processWait, utcOffset } from '../support/domain.mjs'
+import { deadline, liveToken, processWait, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 
 const nowIso = () => new Date().toISOString()
 

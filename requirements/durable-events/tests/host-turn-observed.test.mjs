@@ -20,7 +20,7 @@ import {
   sessionId,
   stream,
   utcOffset,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = sessionId('ses_obs')
 const AT = utcOffset('2026-04-01T08:00:00Z')

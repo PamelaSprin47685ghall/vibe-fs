@@ -28,7 +28,7 @@ import {
   sessionId,
   stream,
   utcOffset,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const PARENT = sessionId('ses_p')
 const CHILD = sessionId('ses_c')

@@ -1,5 +1,10 @@
-// Join v2 mailbox / interrupt / batch drain contract (EXEC-017 / EXEC-018 / EXEC-019).
-// CompletionMailbox + VerdictMailbox only — no HostForkRuntime (journal/durable).
+// Split from tests/unit/execution/join-v2-mailbox.test.mjs (cutover Wave 2a);
+// owner: delegation. Join v2 mailbox / interrupt / batch drain contract
+// （DELEG-013/014/015，EXEC-017/018/019）：CompletionMailbox + VerdictMailbox，
+// 有界批次、稳定排序、join 中断 = Interrupted 非 ForkError、wake 机制。
+// `EXEC_018_drain_available_returns_two_completions_in_publish_order`
+// （PTY 队列 FIFO，PROC-008 完成事实双通道）→ process-execution。
+// No HostForkRuntime (journal/durable) — mailbox only.
 
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -16,7 +21,7 @@ import {
   nonEmptyBatch,
   payloadOf,
   verdictMailbox,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
 import {
   JoinAttemptRegistry,
@@ -46,19 +51,6 @@ const run = (id) =>
 test('EXEC_018_max_join_batch_is_32', () => {
   assert.equal(maxJoinBatch, 32)
   assert.equal(completionMailbox.maxJoinBatch, 32)
-})
-
-// ── 4: two completions drained in one batch ──────────────────────────────────
-
-test('EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
-  const box = completionMailbox.create(() => true)
-  completionMailbox.publish(box, run('a'))
-  completionMailbox.publish(box, run('b'))
-  const batch = completionMailbox.drainAvailable(box, maxJoinBatch)
-  assert.equal(batch.length, 2)
-  assert.equal(batch[0].AgentId, 'a')
-  assert.equal(batch[1].AgentId, 'b')
-  assert.equal(completionMailbox.pendingCount(box), 0)
 })
 
 // ── 5: 33 completions → first drain 32, second drain 1 ───────────────────────

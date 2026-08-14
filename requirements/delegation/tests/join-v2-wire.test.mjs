@@ -1,5 +1,9 @@
-// Join v2 wire contract (EXEC-004 / EXEC-017 / EXEC-030).
-// Renderer-only: natural language + entry-local WorkRecord; no legacy DTO plane.
+// Split from tests/unit/execution/join-v2-wire.test.mjs (cutover Wave 2a);
+// owner: delegation. Join v2 wire contract（DELEG-005/013/014/015/016，
+// EXEC-004 / EXEC-017 / EXEC-030）：自然语言 + entry-local WorkRecord；
+// 无 legacy DTO plane；interrupted wire 是自然语言不是错误。
+// `EXEC_004_pty_completion_is_natural_language_plus_exit_code`
+// （exit_code + 输出，PROC-010）→ process-execution。
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -10,7 +14,7 @@ import {
   nonEmptyBatch,
   syntheticToml,
   verdictMailbox,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const runtime = joinResultRenderer.stubRuntime()
 
@@ -117,26 +121,6 @@ test('EXEC_004_agent_failed_is_natural_language_consequence', () => {
   assert.match(wire, /# fast-coder could not complete the charge\./)
   assert.match(wire, /# boom/)
   assert.ok(!LEGACY_DTO.test(wire))
-})
-
-test('EXEC_004_pty_completion_is_natural_language_plus_exit_code', () => {
-  const run = agentCompletion.completedRun({
-    runId: 'pty-9',
-    agentId: 'pty-9',
-    agentName: '',
-    role: 'DevOps',
-    workRecord: '0',
-  })
-  const ptyRuntime = joinResultRenderer.stubRuntime({ ptyRunIds: new Set(['pty-9']) })
-  const wire = joinResultRenderer.renderCompletedBatch(
-    ptyRuntime,
-    nonEmptyBatch.ofHeadTail(run),
-    (id) => (id === 'pty-9' ? 'shell' : 'Terminal'),
-  )
-
-  assert.match(wire, /# shell has ended\./)
-  assert.match(wire, /exit_code = 0/)
-  assert.ok(!wire.includes('pty_id'))
 })
 
 test('EXEC_019_orchestrator_batch_is_natural_language_only', () => {

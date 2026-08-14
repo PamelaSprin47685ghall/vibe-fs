@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { agentCompletion, caseOf, pendingRunLifecycle, roles, sessionId } from '../support/domain.mjs'
+import { agentCompletion, caseOf, pendingRunLifecycle, roles, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const BUILD_ROOT = new URL('../../../dist/', import.meta.url).pathname
 

@@ -1,4 +1,8 @@
-// Join v2 Reviewer fixes: EXEC-009 Abandoned batch + EXEC-018 CreationOrder drain.
+// Split from tests/unit/execution/join-v2-abandoned-order.test.mjs (cutover Wave 2a);
+// owner: delegation. EXEC-009 Abandoned 批次 + EXEC-018 CreationOrder drain
+// （DELEG-013/014）：生产路径 JoinDrain.orderedCandidates / stableJoinKey /
+// drainFromJournal（merge → sort → CAS consume）；wire 是自然语言单批次。
+// Abandoned→Retired consume 与 retire/reportable 投影 → managed-session-lifecycle。
 //
 // Production path must be called:
 // - JoinDrain.orderedCandidates / stableJoinKey (sort)
@@ -27,7 +31,7 @@ import {
   roles,
   sessionId,
   utcOffset,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
 import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
@@ -232,42 +236,6 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
   })
 })
 
-// ── EXEC-009: HandleController.consume Abandoned → Retired, second = AlreadyRetired ─
-
-test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', async () => {
-  await withJournal(async (j) => {
-    await linkDurable(j, 'h1', 'ses_c', 'fast-coder')
-    const abandoned = await handleController.recordAbandon(
-      j,
-      PARENT,
-      'h1',
-      'ParentCancelled',
-      utcOffset('2026-03-01T12:00:00Z'),
-    )
-    assert.equal(abandoned.ok, true, abandoned.ok ? '' : abandoned.error)
-
-    let p = agentJournal.handleProjection(j, PARENT)
-    assert.equal(handleProjection.reportableAbandoned(p).length, 1)
-    assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(handleId.agent('h1'), p)), 'Abandoned')
-
-    const first = await handleController.consume(j, PARENT, handleId.agent('h1'))
-    assert.equal(first.ok, true, first.ok ? '' : first.error)
-    assert.equal(handleProjection.lifecycleOf(first.record), 'Abandoned')
-
-    p = agentJournal.handleProjection(j, PARENT)
-    assert.equal(handleProjection.isRetired(handleId.agent('h1'), p), true)
-    assert.equal(handleProjection.reportableAbandoned(p).length, 0)
-
-    const second = await handleController.consume(j, PARENT, handleId.agent('h1'))
-    assert.deepEqual(second, { ok: false, error: 'AlreadyRetired' })
-
-    // Drain after consume must not re-report the same abandoned handle.
-    const drained = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
-    assert.equal(drained.ok, true)
-    assert.deepEqual(drained.items, [])
-  })
-})
-
 // ── EXEC-004: failed agent item still carries agent field ────────────────────
 
 test('EXEC_004_failed_item_names_agent_in_natural_language', () => {
@@ -284,20 +252,6 @@ test('EXEC_004_failed_item_names_agent_in_natural_language', () => {
   assert.match(wire, /# fast-coder could not complete the charge\./)
   assert.match(wire, /# boom/)
   assert.ok(!/\bstatus\s*=/.test(wire))
-})
-
-// ── EXEC-018: CreationOrder from HandleLinked fold order ─────────────────────
-
-test('EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
-  let p = handleProjection.empty
-  p = link(p, 'later-id-zzz', 'ses_z', 'zebra-agent')
-  p = link(p, 'earlier-id-aaa', 'ses_a', 'alpha-agent')
-  p = link(p, 'mid-id-mmm', 'ses_m', 'mid-agent')
-
-  const children = handleProjection.linkedChildren(p).map((r) => handleProjection.read(r))
-  assert.equal(children.find((c) => c.handle === 'agent:later-id-zzz').creationOrder, 0)
-  assert.equal(children.find((c) => c.handle === 'agent:earlier-id-aaa').creationOrder, 1)
-  assert.equal(children.find((c) => c.handle === 'agent:mid-id-mmm').creationOrder, 2)
 })
 
 // ── EXEC-018: production stableJoinKey + orderedCandidates (not JS sort re-impl) ─
@@ -358,24 +312,4 @@ test('EXEC_018_orderedCandidates_prefers_creation_order_over_agent_name_dict', (
   assert.equal(handleId.describe(ordered[1].Handle), 'agent:id-early')
   assert.equal(ordered[0].TargetAgent, 'aaa-first-name')
   assert.equal(ordered[1].TargetAgent, 'zzz-last-name')
-})
-
-// ── EXEC-009: Abandoned single-report via retire after reportable ────────────
-
-test('EXEC_009_abandoned_retire_clears_reportable_single_report', () => {
-  let p = link(handleProjection.empty, 'h1', 'ses_c')
-  const abandoned = handleProjection.abandon(handleId.agent('h1'), 'ParentCancelled', p)
-  assert.equal(abandoned.ok, true)
-  p = abandoned.value
-  assert.equal(handleProjection.reportableAbandoned(p).length, 1)
-
-  const retired = handleProjection.retire(handleId.agent('h1'), p)
-  assert.equal(retired.ok, true)
-  p = retired.value
-  assert.equal(handleProjection.reportableAbandoned(p).length, 0)
-  assert.equal(handleProjection.isRetired(handleId.agent('h1'), p), true)
-  assert.deepEqual(handleProjection.retire(handleId.agent('h1'), p), {
-    ok: false,
-    error: 'HandleIsRetired',
-  })
 })
