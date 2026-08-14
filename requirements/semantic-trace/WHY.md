@@ -34,7 +34,7 @@ RED = 满足下列任一：
 
 ## 4. 历史考古：曾经 RED 过什么
 
-### 4.1 `strength.md`（archive/changes/completed/strength.md）—— Candidate 差点变成历史
+### 4.1 `strength.md`（历史 completed change）—— Candidate 差点变成历史
 
 Replica 行为是 intervention。primary 尚未消费时，它既不是用户行为，也不是 primary 已发生的因果历史。
 「提前写入 XTrace/Companion 会让未发生的世界污染未来请求；反过来，primary 已消费后若重启时丢失，
@@ -81,9 +81,9 @@ Journal，就会把「模型窗口猜测」写成产品事实——这属于 `co
 
 ## 6. 源材料
 
-- `archive/docs/why/host.md`、`archive/docs/what/host.md`（HOST-005）、`archive/docs/what/companion.md`（COMPANION-003/007/014）
-- `archive/docs/why/context.md`、`archive/docs/what/context.md`（CTX-015/016 交叉）
-- `archive/docs/why/strength.md`（Candidate ≠ 历史）、`archive/changes/completed/strength.md`
-- `archive/archive/archive/requirements-design/13-context-continuity.md`（semantic-trace card）
-- `archive/archive/archive/requirements-design/COVERAGE.md`（HOST-005 / COMPANION-003 / COMPANION-007 行）
-- `archive/archive/archive/requirements-design/EVIDENCE.md`（semantic-trace 行：`Domain/XTrace.fs` 等）
+- 历史 why/what host（HOST-005）、历史 what companion（COMPANION-003/007/014）
+- 历史 why/what context（CTX-015/016 交叉）
+- 历史 why/strength（Candidate ≠ 历史）、历史 change（strength）
+- 历史 requirements-design card（13-context-continuity，semantic-trace card）
+- 历史 COVERAGE（HOST-005 / COMPANION-003 / COMPANION-007 行）
+- 历史 EVIDENCE（semantic-trace 行：`Domain/XTrace.fs` 等）

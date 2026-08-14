@@ -80,9 +80,9 @@ Y bundle，或反过来用 PrefixCoverage 填 LWR gap——两种都是「用一
 
 ## 6. 源材料
 
-- `archive/docs/what/companion.md`（COMPANION-003/005/007/014/015）
-- `archive/docs/what/todo.md`（TODO-001/008/009/015）、`archive/docs/what/review.md`（REVIEW-016）
-- `archive/docs/what/execution.md`（EXEC-004/028/031）、`archive/docs/what/glory.md`（GLORY-004/006/072/074）
-- `archive/docs/why/companion.md`、`archive/docs/shape/companion.md`、`archive/docs/how/companion.md`
-- `archive/requirements-design/21-work-record.md`、`archive/requirements-design/13-context-continuity.md`（work-record 部分）
-- `archive/requirements-design/COVERAGE.md`（COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行）
+- 历史 what companion（COMPANION-003/005/007/014/015）
+- 历史 what todo（TODO-001/008/009/015）、历史 what review（REVIEW-016）
+- 历史 what execution（EXEC-004/028/031）、历史 what glory（GLORY-004/006/072/074）
+- 历史 why/shape/how companion
+- 历史 requirements-design card（21-work-record、13-context-continuity work-record 部分）
+- 历史 COVERAGE（COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行）

@@ -141,7 +141,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 src/           生产源码
 resources/     随包运行时资源
 requirements/  45 包 normative 语义树：每包 WHY/WHAT/HOW/PROOF + 包自有测试
-archive/       已归档旧 docs/ 与 changes/（历史 Clause 与变更记录）
+proposals/     deferred 未来材料（用户管理）
 scripts/       构建与少量仓库检查
 dist/          最终编译输出，不提交
 artifacts/     中间产物与本地发布产物，不提交
@@ -191,7 +191,7 @@ npm run format-build-test
 ### 规范与文档体系
 
 - **规范**：`requirements/<package>/{WHY,WHAT,HOW,PROOF}.md`（45 包 normative 树；WHAT 命题 ID 稳定寻址，每条有测试落点）。
-- **历史 Clause 与变更记录**：`archive/docs/`、`archive/changes/`（2026-08-14 cutover 归档；含 Kolmogorov 工程纪律与 completed change 考古）。
+- **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
 导航：[requirements/README.md](requirements/README.md)。治理见 `AGENTS.md` 与归档文档。
@@ -212,7 +212,7 @@ resources/enforcer/<TipName>/{enforcer.md,main.md}
 ### 构建与打包
 
 - **构建**：`scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
-- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`archive/`、`artifacts/`。
+- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
 
 发布预检：`npm run format-build-test`（干净工作树；验证日志进 CI artifact）。
 
@@ -242,4 +242,4 @@ Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[docs/README.md](docs/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · `AGENTS.md`
+更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · `AGENTS.md`

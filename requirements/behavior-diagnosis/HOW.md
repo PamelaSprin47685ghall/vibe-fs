@@ -34,7 +34,7 @@ type CanonicalBlogCall = { Text: string option; Evidence: string option; Tip: En
   未知 tip → `UnknownTip <value>`。
 - `hasValidText`：entry trim 后非空才算有效文本。
 
-> 注意（诚实性）：`archive/docs/what/enforcer.md` ENFORCER-004/020 声称「无 `evidence`
+> 注意（诚实性）：历史 what/enforcer 条款 ENFORCER-004/020 声称「无 `evidence`
 > 字段」，但当前 codec **仍保留 optional `evidence`**（合并时精确去重、上限
 > 128 KiB）。本包按当前世界记录：evidence 不改变 occurrence 身份（BD-009），
 > 「evidence 删除」是文档与代码之间的漂移，见 §7 弃权。
@@ -140,9 +140,9 @@ node requirements/verification-system/tests/run.mjs                             
 
 | 源 | 裁决 | 记录 |
 |---|---|---|
-| 旧 `SSOT/15` score-vector / throttle / NudgeAnchored / Main overlay | GARBAGE（clean break，ENFORCER-072/073） | `archive/docs/why/enforcer.md`；`archive/changes/completed/enforcer.md` §10 |
-| `catalog.json` 与 `enforcement-a01` 旧 id | GARBAGE（目录即身份取代） | `archive/changes/completed/rulebook.md` §0/§23 |
-| `archive/docs/what/enforcer.md` 声称「无 evidence 字段」 | HOW 漂移：当前 codec 仍保留 optional evidence（merge 去重 + 128 KiB 界）；occurrence 身份不因 evidence 改变 | 本文件 §1.2；cutover 时需与文档统一 |
-| `scripts/checks/enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；tip-SSOT proof 由 `tests/unit/enforcer/**` catalog 测试承担，不再有 prose 形状机器门 | `archive/requirements-design/HANDOFF.md` §24 |
-| enforcer.md 写作宪法 A4–A30（mandatory headings / token budget / sibling 校准） | HOW（authoring 规范，非 runtime 合同）；不再有机械门 | `archive/changes/completed/rulebook.md` Appendix A |
+| 旧 `SSOT/15` score-vector / throttle / NudgeAnchored / Main overlay | GARBAGE（clean break，ENFORCER-072/073） | 历史 why/enforcer；历史 change（enforcer）§10 |
+| `catalog.json` 与 `enforcement-a01` 旧 id | GARBAGE（目录即身份取代） | 历史 change（rulebook）§0/§23 |
+| 历史 what/enforcer 声称「无 evidence 字段」 | HOW 漂移：当前 codec 仍保留 optional evidence（merge 去重 + 128 KiB 界）；occurrence 身份不因 evidence 改变 | 本文件 §1.2；cutover 时需与文档统一 |
+| `scripts/checks/enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；tip-SSOT proof 由 `tests/unit/enforcer/**` catalog 测试承担，不再有 prose 形状机器门 | 历史 HANDOFF §24 |
+| enforcer.md 写作宪法 A4–A30（mandatory headings / token budget / sibling 校准） | HOW（authoring 规范，非 runtime 合同）；不再有机械门 | 历史 change（rulebook）Appendix A |
 | Blogger 生命周期物理所有权（HasFlight / HasParked / PendingOffer / DrainWindow） | 归 Blogger convergence 交叉（`context-compression` 侧）；本包只消费 cycle 提交事实 | `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs` |

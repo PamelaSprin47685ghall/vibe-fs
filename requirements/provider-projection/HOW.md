@@ -91,12 +91,12 @@ Review 双 PERFECT（消费点归各 owner）。
 
 | 源 | 判定 | 说明 / 落点 |
 |---|---|---|
-| `archive/changes/completed/projection-algebra-gap.md` | EVIDENCE | PROJ-008 迁移闭环：八 intent + Planner Canonical Rank + Renderer fold；`SuppressTransportOnly` 仅 Domain 骨架（生产 `TransportMessages` 恒空）；`replaceMessagesInPlace` 保留为 Host 适配写回原语。落点：WHY.md 失败模式 + WHAT 001/005 + 本 HOW |
-| `archive/changes/completed/js-tools-toml-result.md` | EVIDENCE | SyntheticToml 值树能力；两份文档（`# failed`+code/reason；`# ok`+`[data]`/`[fs]`）；被拒方向（JSON-in-string、status 信封、从结果 TOML 反解析控制流）。落点：WHAT 008/009/010 + 本 HOW |
-| `archive/changes/completed/cursor-pair-hint.md` | EVIDENCE（authority firewall 部分） | synthetic role 不产生 HumanRoot/Opening/completion/evidence；single semantic owner（不 tune wording per mode）。落点：WHAT 010 |
-| `archive/changes/completed/corrective.md` | EVIDENCE | instruction/data plane 判据；显式采用安全边界；已正确 surface 清单。落点：WHAT 009 |
-| `archive/changes/completed/cache.md` | 弃权（anchored prefix 部分） | HOST-013 anchored prefix / gap anchor / replay 属 `prefix-stability`（任务边界明确不重复收）；本包只收 renderer 侧（WHAT 005/010 的 wire 机制） |
-| `archive/docs/why/synthetic-toml.md` | EVIDENCE | 字符串写法唯一 owner；同 semantic input 同 bytes。落点：WHAT 008/012 |
+| 历史 change（projection-algebra-gap） | EVIDENCE | PROJ-008 迁移闭环：八 intent + Planner Canonical Rank + Renderer fold；`SuppressTransportOnly` 仅 Domain 骨架（生产 `TransportMessages` 恒空）；`replaceMessagesInPlace` 保留为 Host 适配写回原语。落点：WHY.md 失败模式 + WHAT 001/005 + 本 HOW |
+| 历史 change（js-tools-toml-result） | EVIDENCE | SyntheticToml 值树能力；两份文档（`# failed`+code/reason；`# ok`+`[data]`/`[fs]`）；被拒方向（JSON-in-string、status 信封、从结果 TOML 反解析控制流）。落点：WHAT 008/009/010 + 本 HOW |
+| 历史 change（cursor-pair-hint） | EVIDENCE（authority firewall 部分） | synthetic role 不产生 HumanRoot/Opening/completion/evidence；single semantic owner（不 tune wording per mode）。落点：WHAT 010 |
+| 历史 change（corrective） | EVIDENCE | instruction/data plane 判据；显式采用安全边界；已正确 surface 清单。落点：WHAT 009 |
+| 历史 change（cache） | 弃权（anchored prefix 部分） | HOST-013 anchored prefix / gap anchor / replay 属 `prefix-stability`（任务边界明确不重复收）；本包只收 renderer 侧（WHAT 005/010 的 wire 机制） |
+| 历史 why/synthetic-toml 条款 | EVIDENCE | 字符串写法唯一 owner；同 semantic input 同 bytes。落点：WHAT 008/012 |
 | PROJ-008 迁移日程（Batch 1–6 顺序） | HOW | 迁移执行记录，非永久命题 |
 | `NUL+BOM`、`-` 工具名（原 `auto-injected`）、`source="pair-programming-auto-injected"` | HOW | wire 分隔符与工具名机制（COVERAGE HOST-013 HOW 行） |
 | LegacyProjection 删除 / `LegacyDigest = DslDigest` 切换 | HOW | 迁移期机制 |
