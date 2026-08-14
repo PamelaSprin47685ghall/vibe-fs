@@ -28,9 +28,6 @@ type StoreFileGate internal (releaseFn: obj) =
                 do! release ()
         }
 
-    interface IDisposable with
-        member this.Dispose() = this.Release() |> ignore
-
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
 
@@ -118,6 +115,22 @@ module ProcessEventLog =
                                 "factor" ==> 1 ] ])
 
             return new StoreFileGate(release)
+        }
+
+    /// Resource CE for the physical cross-process gate. Completion of the
+    /// returned Task includes completion of proper-lockfile release; no
+    /// heartbeat/retry handle may escape the operation boundary.
+    let withStoreLock (commonDir: string) (work: unit -> Task<'T>) : Task<'T> =
+        task {
+            let! gate = acquireStoreLock commonDir
+
+            try
+                let! result = work ()
+                do! gate.Release()
+                return result
+            with ex ->
+                do! gate.Release()
+                return raise ex
         }
 
     let private safeWriterId (writerId: string) =

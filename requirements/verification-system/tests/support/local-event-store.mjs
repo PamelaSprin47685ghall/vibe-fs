@@ -17,8 +17,8 @@ export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
   }
 
   mkdirSync(gitCommonDir, { recursive: true })
-  const integrator = Integrator.create()
-  const store = Store.createLocal(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''), integrator)
+  const integrator = Integrator.CanonicalIntegrator_create()
+  const store = Store.EventStore_createLocal(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''), integrator)
 
   return {
     commonDir: gitCommonDir,

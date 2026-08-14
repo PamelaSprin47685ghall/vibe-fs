@@ -14,8 +14,8 @@
 
 | GAP | 包 | 命题 | 缺口 | 状态 | 现状承载 | 补法计划 | Owner |
 |---|---|---|---|---|---|---|---|
-| GAP-001 | `finality` | FINALITY-028（ManagerJob 不复活） | 无单测落点；现有 proof 在 e2e Long Stroke 剧本与 Orchestrator 域 | OPEN | e2e `manager-unhappy-path` 剧本（Long Stroke） | 补 unit oracle：ManagerJob 不复活断言（terminal 后无 re-enlist / 无二次 run） | finality |
-| GAP-002 | `external-investigation` | EXTERNAL-INVESTIGATION-011（外部事实不自动产生义务） | 无独立可执行断言；义务产生归 `office-capability`/`obligation-ledger`，本包持负边界 | PARTIAL | `stealth-browser-role-lock`（010 role-lock 交叉可红） | 若需机器化：负边界断言（外部 observation 不触发 obligation 事实） | external-investigation |
+| GAP-001 | `finality` | FINALITY-028（ManagerJob 不复活） | 无单测落点；现有 proof 在 e2e Long Stroke 剧本与 Orchestrator 域 | CLOSED | `requirements/finality/tests/manager-job-no-resurrection.test.mjs`：terminal → 非 active / CleanUp / 后续 progress 与 `ManagerJobCreated` replay 均不能重开；active 续做身份 = 同 session/worktree | 已落地独立 unit oracle | finality |
+| GAP-002 | `external-investigation` | EXTERNAL-INVESTIGATION-011（外部事实不自动产生义务） | 无独立可执行断言；义务产生归 `office-capability`/`obligation-ledger`，本包持负边界 | CLOSED | `requirements/external-investigation/tests/facts-not-obligations.test.mjs` + Role Law「Observation is not obligation」双语 + `BROWSER_OBLIGATION_BOUNDARY_ANCHORS`（本包无 F# observation 类型，负边界落在契约面） | 已落地独立 canary | external-investigation |
 | GAP-003 | `requirement-system` | REQUIREMENT-SYSTEM-013（change-lifecycle 治理：Active 原文冻结 / Completed 不作当前依据） | 机器落点缺失 | OPEN | 人工评审（archive/docs/proof/document-governance.md 人工评审表） | change-lifecycle verifier（扫描 requirements/ 变更纪律） | requirement-system |
 | GAP-004 | `requirement-system` | REQUIREMENT-SYSTEM-014（GOV-009 blocker 协议） | 机器落点缺失 | OPEN | 人工评审 + blocker 协议文本 | 同上 verifier | requirement-system |
 | GAP-005 | `requirement-system` | REQUIREMENT-SYSTEM-015（普通小修复不要求自动 Change） | 机器落点缺失 | OPEN | 人工（AGENTS.md 文档生命周期节） | 同上 verifier | requirement-system |

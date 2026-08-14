@@ -27,14 +27,16 @@ no-cross-sea-certainty（009）、外部/本地证据分离（010）、外部事
 本包无 F# runtime provenance 类型——真实 browsing 在外部 `stealth-browser-mcp`；
 Wanxiangshu 注入服务器（`Kernel/StealthBrowserMcp.fs`）+ 按角色锁（Browser-only）+ 以
 Browser Role Law（`resources/provider/role/browser/{en,zh-CN}.md`）固化 contract。
-契约 proof = `scripts/checks/semantic-anchors.mjs` 的 8 锚点 + `scanSemanticAnchorParity`
-双语命中 + canary。真实 runtime oracle（真实 browse）需 browser MCP adapter / Long
-Stroke，落在 unit 套件之外。
+契约 proof = `scripts/checks/semantic-anchors.mjs` 的 8 条 provenance 锚点 + 011 负边界
+`observation-not-obligation` + `scanSemanticAnchorParity` 双语命中 + canary。真实 runtime
+oracle（真实 browse）需 browser MCP adapter / Long Stroke，落在 unit 套件之外。
 
 ## Proof 概览
 
 - NEW：`tests/browser-provenance-canary.test.mjs`（Oracle 1：pin 8 id、真实散文双语绿、
   删区分变红、`disagreement-not-averaged` 非单词级）。
+- NEW：`tests/facts-not-obligations.test.mjs`（011：`observation-not-obligation` 双语命中 /
+  删区分红 / 反面句子不命中）。
 - REUSE：`requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs`（role-lock，capability-enforcement
   交叉，`SPLIT@cutover`）。
 
@@ -49,6 +51,7 @@ Stroke，落在 unit 套件之外。
 
 ```text
 node --test requirements/external-investigation/tests/browser-provenance-canary.test.mjs
+node --test requirements/external-investigation/tests/facts-not-obligations.test.mjs
 node --test requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs
 ```
 

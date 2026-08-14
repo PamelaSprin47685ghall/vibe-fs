@@ -14,7 +14,8 @@ import {
   Observations_normalize as normalize,
   Observations_classifyReplay as classifyReplay,
   CasebookEvent,
-  CasebookProjection_fold as fold,
+  CasebookProjection_emptyState as emptyState,
+  CasebookProjection_apply as apply,
   CasebookProjection_evict as evict,
 } from '../../../dist/Domain/Casebook.js'
 import { caseOf, listItems, mapEntries, toList } from '../../verification-system/tests/support/domain.mjs'
@@ -25,6 +26,7 @@ const read = (path, hash) => observation('FileRead', [path, hash])
 const glob = (pattern, paths) => observation('GlobResult', [pattern, toList(paths)])
 
 const event = (name, payload) => new CasebookEvent(caseIndex(CasebookEvent, name), payload)
+const fold = (events) => listItems(events).reduce((state, item) => apply(state, item), emptyState).Cases
 const captured = (sessionId, q, a, observations) =>
   event('CaseCaptured', [{ SessionId: sessionId, Q: q, A: a, Observations: toList(observations), LastAccessOrder: 0 }])
 const refreshed = (sessionId, q, a, observations) => event('CaseRefreshed', [sessionId, q, a, toList(observations)])

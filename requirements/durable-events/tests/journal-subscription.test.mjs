@@ -9,6 +9,7 @@ import {
   agentFact,
   agentJournal,
   handleId,
+  handleOwnership,
   journalRevision,
   roles,
   sessionId,
@@ -32,7 +33,9 @@ const appendHandleLinked = async (journal, parent = 'ses_p', child = 'ses_c', ag
     ChildSessionId: sessionId(child),
     Handle: handleId.agent(agent),
     TargetAgent: 'fast-coder',
+    Byname: 'journal-subscription-child',
     CanonicalRole: roles.of('Coder'),
+    Ownership: handleOwnership.durableParentHandle(),
   })
   return agentJournal.appendAgent(stream.session(sessionId(parent)), undefined, fact, journal)
 }

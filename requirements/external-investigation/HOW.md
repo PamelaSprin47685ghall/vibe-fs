@@ -31,12 +31,14 @@ Wanxiangshu 只做三件事：
 ```text
 resources/provider/role/browser/en.md + zh-CN.md   ← 散文合同（规范文本）
 scripts/checks/semantic-anchors.mjs
-  ROLE_SEMANTIC_ANCHORS.browser                    ← 8 个锁定实质区分的锚点（本包拥有）
+  ROLE_SEMANTIC_ANCHORS.browser                    ← 8 个 provenance 实质区分（本包拥有）
+  BROWSER_OBLIGATION_BOUNDARY_ANCHORS              ← 011 负边界 observation-not-obligation
 scripts/checks/language-parity-gate.mjs
   scanSemanticAnchorParity(providerAbs, {browser}) ← 同 id 双语命中（结构 parity 机制，
                                                       机制 owner = provider-language）
 requirements/external-investigation/tests/
-  browser-provenance-canary.test.mjs               ← 本包 canary（Oracle 1）
+  browser-provenance-canary.test.mjs               ← provenance canary（Oracle 1）
+  facts-not-obligations.test.mjs                   ← 011 负边界 canary
 ```
 
 锚点不是单词级正则：每条都锁定**实质区分**（例：`disagreement-not-averaged` 锁
@@ -58,14 +60,15 @@ canary（contract 锁定）+ role-lock（能力归属）+ 散文合同（规范�
 - `disagreement-not-averaged` 被改回单词级 → 反面句子测试红（008 RED）。
 - 非 Browser role 获得 `stealth-browser-mcp_*` → role-lock 测试红（010 交叉，owner =
   capability-enforcement）。
+- Role Law 丢掉「观察不是义务」或退化成单词级 obligation 匹配 → `facts-not-obligations.test.mjs` 红（011 RED）。
 
 ## 历史与弃权
 
 | 源 | 判定 | 说明 / 落点 |
 |---|---|---|
 | HANDOFF §29 Oracle 1 | EVIDENCE | 调查结论（lead 已完成，勿重新考古）：8 锚点强化 + canary 要求 + role-lock 已覆盖 + runtime oracle 落套件外。落点：WHY.md 历史病灶 + WHAT 002–009 + 本 HOW + canary 测试 |
-| `resources/provider/role/browser/{en,zh-CN}.md` | EVIDENCE（规范文本） | 散文合同全文吸收为 WHAT 001–010 的规范陈述与锚点 |
-| `scripts/checks/semantic-anchors.mjs` browser 锚点 | EVIDENCE | 8 条锚点 id 与正则，逐条对应 WHAT 002–009 |
+| `resources/provider/role/browser/{en,zh-CN}.md` | EVIDENCE（规范文本） | 散文合同全文吸收为 WHAT 001–011 的规范陈述与锚点 |
+| `scripts/checks/semantic-anchors.mjs` browser 锚点 | EVIDENCE | 8 条 provenance id 对应 WHAT 002–009；`observation-not-obligation` 对应 011 |
 | `requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs` | REUSE | `AGENT_026_browser_only_wildcard_permission`（role-lock）归 capability-enforcement 交叉；`AGENT_026_kernel_identity_and_commands`（uvx/ref/fixture）归 host-boundary HOW。本包只 REUSE 权限事实 |
 | ARCH-017 Browser consequence | EVIDENCE | office 后果投影（`OFFICE_CAPABILITY_ANCHORS.browser` id `browser-external-provenance`）——归属 office-capability，不重复收 |
 | `Kernel/StealthBrowserMcp.fs` uvx command / ref / env 前缀 / fixture 启动判定 | HOW | Host adapter 机制（COVERAGE AGENT-026 HOW 行）；本包不拥有 |
