@@ -5,8 +5,8 @@ open System.Threading
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.AsyncSupport
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.AsyncSupport
 
 /// JS-host process adapter. All Node/Bun interop for child-process spawn and
 /// spool-file I/O lives here so the rest of the Process namespace stays pure.

@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System.Threading.Tasks
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Outcome
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation.Outcome
 
 /// Byte-offset frontier keyed by runtime (legacy NDJSON boot field retained for
 /// `RuntimeSnapshot` shape; production durability is EventStore-only after Phase 5).

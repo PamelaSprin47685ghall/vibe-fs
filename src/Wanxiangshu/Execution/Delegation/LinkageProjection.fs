@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 
 /// EXEC-009: a handle's durable lifecycle has four states, and they must be
 /// distinguishable.

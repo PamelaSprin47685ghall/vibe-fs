@@ -3,9 +3,9 @@ namespace rec Wanxiangshu.Process
 open System
 open System.Threading
 open System.Threading.Tasks
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.AsyncSupport
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.AsyncSupport
 
 module ProcessRunner =
 

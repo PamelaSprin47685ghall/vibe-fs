@@ -3,8 +3,8 @@ namespace Wanxiangshu.Persistence.Journal
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 
 /// Process-local shared AgentJournal owners.

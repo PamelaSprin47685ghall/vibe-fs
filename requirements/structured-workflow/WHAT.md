@@ -130,35 +130,55 @@ bounded context 内单一定义 + 显式转换理由 = 合法。
 
 ---
 
-## STRUCTURED-WORKFLOW-007：纯决策与效果分层
+## STRUCTURED-WORKFLOW-007：纯决策与效果按 owner 成树，不按分层成根
 
 **规范陈述**：
 
+生产目录按 bounded owner 成树（Context / Interaction / Enforcer / Execution /
+Mission / Change / …），**禁止** `Domain/`、`Application/`、`Session/`、
+`Infrastructure/` 作为顶层根。`Kernel/` 只允许 universal primitives，正式名
+`Foundation/`（Identity / Roles / Outcome / Temporal / Parallel / AsyncSupport）。
+
+CE、Semantic Vocabulary、Port Decorator、Physical Adapter 是 owner **内部**的
+实现种类，不是目录根。
+
+代码性质约束（与目录根正交）：
+
 ```text
-Domain / Kernel   纯规则 / Evidence / Decision / Projection — 无 Host I/O
-Application       CE workflow / 直接调用端口；Semantic Vocabulary 的唯一家
-Session           运行时 single-flight 与物理资源所有权
-Process           进程/PTY 生命周期
-Infrastructure    Host hooks / codec / resource adapter
+纯规则 / Evidence / Decision / Projection / Fact cases
+    无 Host I/O；不得引用 OpenCode、Process 或 Fable.Core.JsInterop
+
+Semantic Vocabulary
+    住在其 bounded owner；名字描述完整业务承诺
+
+Physical Adapter
+    只适配外部协议，不解释业务命令
+    能力专属 adapter 住在该 owner 的 OpenCode/ 或 Host/ 叶
+    删掉任意单个 capability 仍成立的 Host 协议面住在 OpenCode/、Git/、
+    Persistence/、Process/、Resources/
 ```
 
-`Domain` 不得引用 Infrastructure、OpenCode、Process 或 `Fable.Core.JsInterop`；
-Infrastructure 只适配外部协议，不解释业务命令；Vocabulary 只允许住在 Application，
-不得下沉 Infrastructure tool adapter、不得上提 Domain 纯规则层、Session 不得拥有业务
-承诺名字的语义本体。`Evidence → Decision` → 穷尽 `match` → effect 是一种可用形态，
-但不是唯一理想形态，不得压过具名 Vocabulary 组合（FLOW-004 首选形态）。
+`open Wanxiangshu.OpenCode|Process` 仅允许：`OpenCode/`、`Process/`、`Git/`、
+`Persistence/`、`Resources/`、`Host/`，或路径含 `/OpenCode/` 或 `/Host/` 的
+adapter 叶。**禁止 basename 白名单。**
 
-**含义/动机**：分层让纯函数可测、效果可注入、边界可静态守（`infrastructure-leak` 门）；
-能力端口只暴露 `Task<'T>`，不解释业务命令。
+Session 是 `Execution/Session` 的领域概念，不是「凡长生命周期对象都扔这里」的
+技术层。event 来源不是 ownership（Journal 不是 projection owner；Host fact 不是
+OpenCode Contract）。
+
+`Evidence → Decision` → 穷尽 `match` → effect 是一种可用形态，但不是唯一理想
+形态，不得压过具名 Vocabulary 组合（FLOW-004 首选形态）。
+
+**含义/动机**：双根（ownership 树 + layer 树）让同一能力拆成两半；分层标签回答
+不了「这个文件消失，哪个概念会不完整」。owner 树让依赖长成非均匀平衡树；
+代码性质仍可静态守（`infrastructure-leak` 门）。
 
 **边界**：
 - 领域操作必须通过**具名 capability** 调用副作用，每操作一种结果类型，禁止泛化
   `execute Command` 与大 Reply DU 吞掉不可能分支（FLOW-003）。
-- Host 边界白名单（`HOST_BOUNDARY_OPEN_BASENAMES`）是分层机制的例外登记处
-  （DSL-010）：新增业务文件需 open Host/Process/Infrastructure 时先登记 basename，
-  未登记 fail closed。
 - 测试对 Fable 产物形状的适配只属于 `requirements/verification-system/tests/support/domain.mjs`（DSL-011）；
   不为测试便利新增生产 export。
+- Vocabulary 不得下沉 OpenCode tool adapter、不得上提为与 owner 无关的纯规则层。
 
 **证据**：PROOF.md §1 第 7 行。
 
@@ -170,9 +190,9 @@ Infrastructure 只适配外部协议，不解释业务命令；Vocabulary 只允
 内）、并发原语（`Kernel/Parallel.fs`）、物理 Task / Dictionary / TaskCompletionSource /
 CancellationTokenRegistration / 锁对象。禁止用 `mutable`/`ref` 表达业务阶段、
 `slotArmed`、行为 bool 等控制流状态；record 的 `Foo: T ref` 与 `mutable Foo: T` 同受
-state-product 与 physical-owner proof 约束。Domain/Application 的 mutable 字段直接红；
-Session/Process 只有真正物理状态允许，且必须显式
-`/// DSL-state-combination: physical`。
+state-product 与 physical-owner proof 约束。纯语义路径（无 `/OpenCode/`、`/Host/`、`/Runtime/`、`/Wait/`、`Process/`、
+`Git/`、`Persistence/`、`Resources/`）的 mutable 字段直接红；物理运行时路径只有
+真正物理状态允许，且必须显式 `/// DSL-state-combination: physical`。
 
 **含义/动机**：可变存储是第二运行时的地基；把豁免变成**声明式**（`// DSL-MUTABLE:
 <category>` + physical annotation）让编译器站岗，让「字段改名逃逸」失效。
@@ -236,8 +256,8 @@ reviewer 是否能够合理知道调用者在等待什么语义？
 文档——伪 opcode 名让审查失去锚点（rabbit.md，WHY.md §2.5）。
 
 **边界**：
-- Vocabulary 只允许住在 Application（按 bounded context 的具名 module）；Domain 仍只
-  拥有 `Evidence → Decision` / Projection 纯函数。
+- Vocabulary 住在其 bounded owner 的具名 module；纯规则层仍只拥有
+  `Evidence → Decision` / Projection，不因「它是纯的」而回到已删除的 `Domain/` 根。
 - 命名 review 义务（DSL-013 五问：名字声明什么承诺 / 隐藏哪些时序 / 哪个 proof 证明 /
   是否改变 trace / crash 后从什么 durable evidence 重入）见 HOW.md §3.5。
 

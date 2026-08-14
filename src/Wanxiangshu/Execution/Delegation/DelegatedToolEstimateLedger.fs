@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 

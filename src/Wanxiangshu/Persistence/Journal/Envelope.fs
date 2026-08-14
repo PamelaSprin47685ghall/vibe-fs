@@ -2,10 +2,10 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System
 open Thoth.Json
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable.Fact
 
 type StreamId =
     | Workspace

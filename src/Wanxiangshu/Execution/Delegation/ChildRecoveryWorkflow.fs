@@ -2,14 +2,32 @@ namespace Wanxiangshu.Execution.Delegation
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Domain.ChildRecovery
+open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Session
+open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Strength
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
 /// Sole production owner of HandleController.recordCompletion.

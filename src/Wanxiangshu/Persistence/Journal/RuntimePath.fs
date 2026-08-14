@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
-open Wanxiangshu.Infrastructure.Git
+open Wanxiangshu.Git
 
 module RuntimePath =
 

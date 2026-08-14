@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 
 /// Durable Companion link. Blog frames and coverage belong to `BlogProjection`.
 ///

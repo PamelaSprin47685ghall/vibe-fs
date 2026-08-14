@@ -4,8 +4,8 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.AsyncSupport
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.AsyncSupport
 
 /// Single-holder large-process gate with cancelable FIFO waiters.
 module LargeGate =

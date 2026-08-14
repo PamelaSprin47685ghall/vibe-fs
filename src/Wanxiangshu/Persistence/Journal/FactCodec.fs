@@ -2,8 +2,8 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System
 open Thoth.Json
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable.Fact
 
 /// Fact serialization (PERSIST-005).
 module FactCodec =

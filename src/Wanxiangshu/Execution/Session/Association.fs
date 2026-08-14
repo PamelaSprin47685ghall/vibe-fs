@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Session
 
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 
 /// HOST-008 / COMPANION-002: which kind of managed session this is.
 ///
@@ -16,7 +16,7 @@ open Wanxiangshu.Kernel.Identity
 /// whether a given id is somebody's Y.
 ///
 /// Long-lived ownership is `SessionExecutionClass` × `SessionOwnership` /
-/// `AttachmentKind` in `Wanxiangshu.Kernel`. Dedicated SyncInspector/SyncCoder are
+/// `AttachmentKind` in `Wanxiangshu.Foundation`. Dedicated SyncInspector/SyncCoder are
 /// Work+Attached and must not be stuffed into `SatelliteKind`. See
 /// `SessionOwnershipClassification` and `SyncDelegateAssociationHints`.
 [<RequireQualifiedAccess>]

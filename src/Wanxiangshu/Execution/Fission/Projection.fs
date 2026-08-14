@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 type FissionGroupTerminal =

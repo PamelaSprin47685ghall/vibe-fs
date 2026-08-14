@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation.Identity
 
 type DelegatedToolEstimateProjectionState =
     { Remaining: int

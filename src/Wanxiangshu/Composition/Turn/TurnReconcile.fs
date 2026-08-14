@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Composition.Turn
 
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 

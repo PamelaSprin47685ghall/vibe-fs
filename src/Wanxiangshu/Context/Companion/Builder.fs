@@ -1,0 +1,148 @@
+namespace Wanxiangshu.Context.Companion
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Host
+open Wanxiangshu.Host.Contract
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.Mission.Manager
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.WorkRecord
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt
+open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.Repository.Investigation.WarmStart
+open Wanxiangshu.Strength
+open Wanxiangshu.Strength.Prediction
+
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+
+/// Which physical request the Companion is about to make.
+[<RequireQualifiedAccess>]
+type CompanionRequestKind =
+    | Normal
+    | Squash of frameCount: int
+
+/// One message in the Companion's provider-visible projection.
+type CompanionProjectedMessage =
+    { MessageId: string
+      Role: string
+      Text: string
+      IsPhysical: bool }
+
+/// COMPANION-005: message list for one Companion request.
+/// System is NOT here — managed-agent config owns PromptResources Blogger Role Law (ENFORCER-030).
+type CompanionProjectionPlan =
+    { Messages: CompanionProjectedMessage list }
+
+/// COMPANION-005 / CTX-012: build provider-visible messages from durable frames.
+[<RequireQualifiedAccess>]
+module CompanionProjectionBuilder =
+
+    let private kindLabel (kind: CompanionRequestKind) =
+        match kind with
+        | CompanionRequestKind.Normal -> "normal"
+        | CompanionRequestKind.Squash _ -> "squash"
+
+    /// ENFORCER-071: one low-trust previous tip message.
+    /// Domain shape is (FieldName, CycleId); Journal maps RecentTips into this.
+    let private tipMessage
+        (sha256: string -> string)
+        (bloggerSessionId: SessionId)
+        (tipField: string, cycleId: string)
+        : CompanionProjectedMessage =
+        { MessageId = CompanionIdentity.previousTipMessageId sha256 bloggerSessionId cycleId
+          Role = "assistant"
+          Text = CompanionPrompt.previousTipMessage tipField cycleId
+          IsPhysical = false }
+
+    /// Pair tips with frames into interleaved tip+frame observation units (oldest → newest).
+    /// Zip from the front: tipᵢ then frameᵢ while both remain; leftover tips or frames
+    /// append unpaired. Prefer this over tips∥frames parallel streams (rulebook §2).
+    let private pairTipFrameUnits
+        (tips: CompanionProjectedMessage list)
+        (frames: CompanionProjectedMessage list)
+        : CompanionProjectedMessage list =
+        let rec loop tipRest frameRest acc =
+            match tipRest, frameRest with
+            | t :: ts, f :: fs -> loop ts fs (f :: t :: acc)
+            | ts, [] -> List.rev acc @ ts
+            | [], fs -> List.rev acc @ fs
+
+        loop tips frames []
+
+    /// Normal: paired previous_enforcer_tip + historic_frame units + one user delta.
+    /// Squash: paired tip+frame units over oldest k frames + squash instruction LAST.
+    /// Tips cover normal / squash / restart / recovery / compaction rebuilds because
+    /// every rebuild path calls this builder with the same RecentTips projection.
+    ///
+    /// HOST-010: last user message binds the outbound assistant. For normal that
+    /// is the combined delta message; for squash it is the instruction message.
+    let build
+        (sha256: string -> string)
+        (bloggerSessionId: SessionId)
+        (frameEpoch: FrameEpochId)
+        (kind: CompanionRequestKind)
+        (frameBodies: (BlobDigest * string) list)
+        (physicalDelta: (string * string) option)
+        (previousTips: (string * string) list)
+        (normalInstructionLines: string list)
+        (squashInstructionLines: string list)
+        : CompanionProjectionPlan =
+        let selected =
+            match kind with
+            | CompanionRequestKind.Normal -> frameBodies
+            | CompanionRequestKind.Squash count -> frameBodies |> List.truncate count
+
+        let tipMsgs = previousTips |> List.map (tipMessage sha256 bloggerSessionId)
+
+        let frameMessages =
+            selected
+            |> List.mapi (fun ordinal (digest, body) ->
+                { MessageId = CompanionIdentity.frameMessageId sha256 bloggerSessionId frameEpoch ordinal digest
+                  // Role only: body still `[[do_not_exec]] historic_frame = …`.
+                  Role = "assistant"
+                  Text = CompanionPrompt.workingRecordMessage body
+                  IsPhysical = false })
+
+        let pairedHistory = pairTipFrameUnits tipMsgs frameMessages
+
+        match kind with
+        | CompanionRequestKind.Normal ->
+            let deltaMessages =
+                match physicalDelta with
+                | Some(messageId, toml) ->
+                    [ { MessageId = messageId
+                        Role = "user"
+                        Text = CompanionPrompt.newWorkMessage normalInstructionLines toml
+                        IsPhysical = true } ]
+                | None -> []
+
+            // Paired observation units then combined delta last (HOST-010).
+            { Messages = pairedHistory @ deltaMessages }
+        | CompanionRequestKind.Squash _ ->
+            let instruction =
+                { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
+                  Role = "user"
+                  Text = CompanionPrompt.asCommentedInstruction squashInstructionLines
+                  IsPhysical = false }
+
+            { Messages = pairedHistory @ [ instruction ] }
+
+    /// First-turn shape: one physical user message whose body is an ARCH-010 comment header.
+    /// Language-agnostic — do not match English prose (PROMPT-019).
+    let isFirstTurnShape (plan: CompanionProjectionPlan) =
+        match plan.Messages with
+        | [ delta ] -> delta.IsPhysical && delta.Text.StartsWith("# ")
+        | _ -> false

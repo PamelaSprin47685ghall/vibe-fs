@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Execution.Session
 
 open System
-open Wanxiangshu.Domain.SessionRecovery
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Change.Orchestration
+open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 

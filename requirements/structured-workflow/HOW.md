@@ -3,18 +3,19 @@
 > 本文件**非 normative**：只解释实现模型、静态门禁机制与历史考古。唯一 normative
 > 合同是 WHAT.md。命名/行数/文件布局可整体重写，只要 WHAT 命题不变。
 
-## 1. 四层实现模型（rabbit.md 目标架构）
+## 1. 实现种类（住在 owner 内部，不是目录根）
 
 生产代码分成四种东西：
 
 ```text
-Business CE          讲故事（Application workflow 入口与有界递归）
+Business CE          讲故事（owner workflow 入口与有界递归）
 Semantic Vocabulary  给复杂时序一个领域名字与 law（DSL-013/014）
 Port Decorator       给一次能力逐层增加 observation / normalization / physical policy（DSL-015）
-Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure / Process）
+Physical Adapter     真的碰 OpenCode / Git / process / timer（owner 的 OpenCode/Host 叶，或 OpenCode/Git/Persistence/Process/Resources 根）
 ```
 
 原则：**CE 负责故事；Vocabulary 负责定理；Decorator 负责能力；Port 负责物理。**
+四种是代码性质，不是 `Domain/` / `Application/` / `Session/` / `Infrastructure/` 根。
 不发明第二套 workflow framework，不造 AST / interpreter / `ReliableFlowBuilder` 黑盒，
 不把生产程序重新压成几十个 `Decision` case。
 

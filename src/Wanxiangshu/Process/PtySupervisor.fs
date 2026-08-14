@@ -6,7 +6,23 @@ open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Session
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Strength
 
 /// DSL-state-combination: physical — spawn fn + load task are runtime resource slots
 type PtySupervisor =

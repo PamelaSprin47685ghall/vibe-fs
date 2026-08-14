@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion.Blogger
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).

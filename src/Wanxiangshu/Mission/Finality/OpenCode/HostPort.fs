@@ -1,0 +1,237 @@
+namespace Wanxiangshu.Mission.Finality.OpenCode
+open Wanxiangshu.Change
+open Wanxiangshu.Change.Host
+open Wanxiangshu.Context.Companion.Blogger.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.OpenCode
+open Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.Git
+open Wanxiangshu.Git.Hook
+open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Mission.Manager.OpenCode
+open Wanxiangshu.Mission.Obligation.Todo.OpenCode
+open Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.Repository.Investigation.Semble
+open Wanxiangshu.Strength.OpenCode
+open Wanxiangshu.Strength.Persistence
+
+open System
+open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Foundation
+open Wanxiangshu.Host
+open Wanxiangshu.Host.Contract
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.Mission.Manager
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.Mission.WorkRecord
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt
+open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Repository.Investigation.WarmStart
+open Wanxiangshu.Repository.Knowledge.Casebook
+open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Strength
+open Wanxiangshu.Strength.Prediction
+open Wanxiangshu.Strength.Projection
+open Wanxiangshu.Strength.Replica
+open Wanxiangshu.Finality
+open Wanxiangshu.Resources
+open Wanxiangshu.Resources
+open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Strength
+
+/// Physical OpenCode adapter for Application Finality workflows.
+module FinalityHostPort =
+
+    let create
+        (scope: ToolRuntimeScope)
+        (managerSessionId: SessionId)
+        (reviewerTimeoutMs: int)
+        : FinalityReviewerPort * FinalityTreePort =
+        let runtime =
+            HostForkRuntime(
+                managerSessionId,
+                scope.Sessions,
+                ?journal = scope.Journal,
+                onChildCreated =
+                    (fun _ _ childId ->
+                        scope.SessionParents.[SessionId.value childId] <- SessionId.value managerSessionId),
+                onChildCreatedDir =
+                    (fun _ childId directory ->
+                        directory
+                        |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))),
+                directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
+                onRunStarted = scope.RunStarted,
+                parentWorkRecordFor =
+                    (fun _ -> LifecycleWorkRecordProjection.lifecycleWorkRecord scope.Journal managerSessionId true),
+                childWorkRecordFor = (fun _ -> Task.FromResult None),
+                ?sessionSnapshot = scope.Snapshot,
+                managerOpensReviewBarrier = false,
+                ownership = HandleOwnership.HostOwnedHidden
+            )
+
+        let reviewerAgentName =
+            scope.ActiveProfileFor managerSessionId
+            |> Option.map (fun profile -> profile.SelectedTier)
+            |> Option.defaultValue AgentTier.Deep
+            |> fun tier -> ManagedAgent.nameOf tier Role.Reviewer
+
+        let openingAssignment () =
+            ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty
+
+        let prepareSession (request: FinalityReviewerRequest) =
+            task {
+                match request.ReviewerSessionId with
+                | Some existing ->
+                    runtime.AdoptChild(request.AgentId, existing)
+
+                    return
+                        Ok
+                            { ReviewerSessionId = existing
+                              IsNew = false }
+                | None ->
+                    match!
+                        runtime.Fork(
+                            request.AgentId,
+                            Role.Reviewer,
+                            reviewerAgentName,
+                            openingAssignment (),
+                            None,
+                            ownership = HandleOwnership.HostOwnedHidden,
+                            deferSend = true
+                        )
+                    with
+                    | Error error -> return Error error
+                    | Ok _ ->
+                        match runtime.TryChildSession request.AgentId with
+                        | None -> return Error "reviewer session was not created"
+                        | Some childId ->
+                            return
+                                Ok
+                                    { ReviewerSessionId = childId
+                                      IsNew = true }
+            }
+
+        let startReview (memberInfo: EnlistedMember) =
+            task {
+                if memberInfo.IsNew then
+                    return! runtime.SendDeferredFirstPrompt memberInfo.AgentId
+                else
+                    match!
+                        runtime.Fork(memberInfo.AgentId, Role.Reviewer, reviewerAgentName, openingAssignment (), None)
+                    with
+                    | Error error -> return Error error
+                    | Ok _ -> return Ok()
+            }
+
+        let awaitTerminal reviewerSessionId =
+            task {
+                let completed =
+                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                let accepting = ref false
+
+                use subscription =
+                    scope.Sessions.SubscribeTerminal(
+                        reviewerSessionId,
+                        fun _ outcome ->
+                            if accepting.Value then
+                                AsyncSupport.trySetResult completed outcome |> ignore
+                    )
+
+                accepting.Value <- true
+
+                let finished =
+                    task {
+                        match! completed.Task with
+                        | TerminalOutcome.Completed _ -> return Ok()
+                        | TerminalOutcome.Failed error -> return Error error
+                        | TerminalOutcome.Aborted reason -> return Error reason
+                    }
+
+                let timedOut: Task<Result<unit, string>> =
+                    emitJsExpr
+                        reviewerTimeoutMs
+                        "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['await reviewer timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
+
+                return! (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
+            }
+
+        let sendRevisionSteer targetSessionId prompt =
+            task {
+                match!
+                    HostSessionNudge.sendContinuation
+                        scope.Sessions
+                        targetSessionId
+                        prompt
+                        PromptAuthority.ContinuationKind.FinalitySteer
+                        (scope.DirectoryFor(SessionId.value targetSessionId))
+                        scope.Journal
+                with
+                | Ok _ -> return Ok()
+                | Error error -> return Error error
+            }
+
+        let reviewerPort: FinalityReviewerPort =
+            { PrepareSession = prepareSession
+              StartReview = startReview
+              AwaitTerminal = awaitTerminal
+              SendRevisionSteer = sendRevisionSteer
+              AbortReviewer = fun reviewerSessionId -> scope.Sessions.AbortSession reviewerSessionId |> ignore }
+
+        let treePort: FinalityTreePort =
+            { ReadManagerTree =
+                fun sessionId ->
+                    try
+                        match scope.TreePortFor(SessionId.value sessionId) with
+                        | None -> Error "manager Git tree is unavailable"
+                        | Some port ->
+                            let current = port.GetTreeHash().Trim()
+
+                            if String.IsNullOrWhiteSpace current then
+                                Error "manager Git tree is empty"
+                            else
+                                Ok(GitTreeHash.create current)
+                    with ex ->
+                        Error ex.Message }
+
+        reviewerPort, treePort

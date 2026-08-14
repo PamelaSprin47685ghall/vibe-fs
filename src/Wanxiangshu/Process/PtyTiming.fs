@@ -3,7 +3,7 @@ namespace Wanxiangshu.Process
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel
+open Wanxiangshu.Foundation
 
 /// Compatibility alias — prefer Kernel.IDeadlineHandle (G4R-CE S1 transition).
 type ITimerHandle = IDeadlineHandle
