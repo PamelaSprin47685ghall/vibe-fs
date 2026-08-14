@@ -192,6 +192,24 @@ const preFlowCanaries = async (scenario) => {
   assertG6BookkeeperFinalize(scenario);
 };
 
+const awaitManagerJoinRunning = async (scenario, ctx) => {
+  const managerSessionId = ctx?.childId;
+  assert.ok(managerSessionId, 'Long Stroke join-running barrier requires the bound Manager session');
+
+  const isRunningJoin = (event) =>
+    event?.type === 'message.part.updated'
+    && event?.sessionID === managerSessionId
+    && event?.toolName === 'join'
+    && event?.toolStatus === 'running';
+
+  await scenario.events.awaitEvent(isRunningJoin, null);
+  scenario.watchdog?.advance({
+    reason: 'manager-join-tool-running',
+    lane: `session:${managerSessionId}`,
+    blocking: true,
+  });
+};
+
 const assertG6ColdFetch = async (scenario) => {
   const fetchResults = (scenario.provider.requests ?? [])
     .flatMap((request) => request?.messages ?? [])
@@ -237,6 +255,7 @@ const code = await runCanary('long-stroke', {
   preFlow: preFlowCanaries,
   customs: {
     ...CUSTOMS,
+    awaitManagerJoinRunning,
     assertG6ColdFetch,
     assertHostCanariesAEGH,
   },

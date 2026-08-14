@@ -57,8 +57,10 @@ physical contract」，答不出则降回 Pure/Temporal/Adapter。
 
 **边界**：禁止跨级的机器可红面 = case 天花板 0 + 唯一入口 + 精确 event 天花板（由
 e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）+ 唯一 Long Stroke 入口必须
-声明不可模拟 physical contract（`tests/physical-contract.test.mjs`；删声明即红）。答不出
-则不得留在 e2e。
+声明不可模拟 physical contract（`tests/physical-contract.test.mjs`；删声明即红）。针对“某个 tool
+正在执行”才有意义的外部刺激（例如 EXEC-017 user-message join wake），provider expectation 只证明
+模型已返回 tool-call，**不证明 Host 已开始执行 tool**；注入前必须先观察真实 Host ToolPart 的 running
+状态，禁止用调度运气或 fixed sleep 代替该物理 barrier。答不出则不得留在 e2e。
 
 **证据指针**：→ PROOF.md L10。
 

@@ -142,6 +142,10 @@ flow = [
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   { wait = "manager.0" },
   { wait = "manager.1" },
+  # EXEC-017 stimulus must target an ACTIVE join attempt. Provider expectation only
+  # proves the model returned a join call; wait for the real Host ToolPart running
+  # event before injecting the external user message, or the wake is correctly dropped.
+  { custom = "awaitManagerJoinRunning" },
   { prompt = { agent = "fast-manager", text = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end." }, session = "child" },
 
   # Labor: premature suicide against held child → interrupted join wake → harvest
