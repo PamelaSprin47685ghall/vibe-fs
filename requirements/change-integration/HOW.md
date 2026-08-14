@@ -59,7 +59,7 @@ Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作；Publis
 - `GitOperations.fs`：typed Git 动词——`freezeTargetBranch`（symbolic-ref；detached/blank → refuse）、
   `isDirty`（porcelain 非空）、`rebase`/`conflictedFiles`/`hasRebaseHead`、`readHead`/`getTargetHead`
   （空 → missing）、`ffMerge`（ORCH-008 CAS 梯：branch==frozen ∧ head==expected ∧ ff-only）。
-- `WorktreeResource.fs`：owned worktree（identity 定位，path 仅诊断）；create/release/adopt/durable 生命周期。
+- `WorktreeResource.fs`：owned worktree（identity 定位，path 仅诊断）；create/release/adopt/durable 生命周期。物理 create 的 argv 必须由真实 temp-repo integration proof 证明当前 Git parser 可接受；fake runner 只验证 typed wiring，不能替代 Git parser 证据。
 - `HookDispatcher.fs`：store sync 的 pre-push / reference-transaction hooks（**归属 `durable-events`**，
   见 SPLIT@cutover）。
 

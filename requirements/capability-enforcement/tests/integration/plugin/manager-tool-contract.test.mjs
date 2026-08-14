@@ -70,8 +70,8 @@ const EXPECTED_ARGUMENTS = {
     entry: 'required',
     tip: 'required',
   },
-  'establish-behavior': { charge: 'required', keywords: 'optional' },
-  'repair-behavior': { charge: 'required', keywords: 'optional' },
+  'establish-behavior': { charge: 'required', keywords: 'optional', expected_tool_calls: 'optional' },
+  'repair-behavior': { charge: 'required', keywords: 'optional', expected_tool_calls: 'optional' },
   run: {
     command: 'required',
     deadline_seconds: 'required',
@@ -81,13 +81,20 @@ const EXPECTED_ARGUMENTS = {
   'query-shell': {
     command: 'required',
   },
-  fork: { calling: 'optional', name: 'required', charge: 'required', keywords: 'optional' },
-  commission: { calling: 'optional', name: 'required', charge: 'required' },
+  fork: {
+    calling: 'optional',
+    name: 'required',
+    charge: 'required',
+    keywords: 'optional',
+    attach: 'optional',
+    expected_tool_calls: 'optional',
+  },
+  commission: { calling: 'optional', name: 'required', charge: 'required', expected_tool_calls: 'optional' },
   'open-terminal': { name: 'required', command: 'required' },
   'send-terminal': { name: 'required', input: 'required' },
   'read-terminal': { name: 'required' },
   'signal-terminal': { name: 'required', signal: 'required' },
-  inspect: { charge: 'required', keywords: 'optional' },
+  inspect: { charge: 'required', keywords: 'optional', expected_tool_calls: 'optional' },
   join: {},
   'js-browser': { program: 'required' },
   'js-coder': { program: 'required' },
@@ -208,8 +215,8 @@ const KNOWN_TOOL_KEYS = [
 const ALLOWED_TOOLS = {
   orchestrator: ['commission', 'join', 'horizon'],
   manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
-  inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
+  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
+  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch'],
   devops: [
     'open-terminal',
     'send-terminal',
@@ -225,8 +232,8 @@ const ALLOWED_TOOLS = {
     'repair-behavior',
     'run',
   ],
-  browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
-  inquiry: ['inspect', 'sphinx_*'],
+  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp_*'],
+  inquiry: ['fission', 'inspect', 'sphinx_*'],
   reviewer: ['read', 'glob', 'grep', 'judge'],
   // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
   blogger: ['chronicle'],
@@ -537,7 +544,9 @@ test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
     assert.equal(pair.parts[0].tool, '-')
     assert.equal(pair.parts[0].state.status, 'completed')
     assert.notEqual(pair.parts[0].state.status, 'pending')
-    assert.equal(pair.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
+    const pairOutput = pair.parts[0].state.output
+    assert.match(pairOutput, /^# This session has existed for about /, 'elapsed opportunity-cost calibration must precede the pair guideline')
+    assert.equal(pairOutput.endsWith(PAIR_PROGRAMMING_THOUGHT_TEXT), true, 'canonical pair guideline must remain the final composed fragment')
     assert.equal(user.role ?? user.info?.role, 'user')
 
     const markerRe = /\[(CAPS|REVIEW|HINT):/

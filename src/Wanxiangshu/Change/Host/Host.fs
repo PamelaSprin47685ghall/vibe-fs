@@ -227,7 +227,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 run.Finished <- true
                 run.Subscription |> Option.iter (fun s -> s.Dispose())
 
-                run.Source.TrySetResult(
+                run.Source.SetResult(
                     AgentCompletion.failed
                         agentId
                         ("run-" + agentId)
@@ -236,7 +236,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                         "SUPERSEDED"
                         "superseded by ResumeManager"
                 )
-                |> ignore
 
                 runtime.PendingRuns.Remove agentId |> ignore
             | true, _ -> runtime.PendingRuns.Remove agentId |> ignore
@@ -568,5 +567,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 finally
                     lock joinGate (fun () -> joinInFlight <- false)
             }
+
+    member _.CancelAndDrain() : Task = runtime.CancelAndDrain()
 
     member _.Cancel() = runtime.Cancel()

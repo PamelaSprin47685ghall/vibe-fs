@@ -20,7 +20,7 @@ const {
 const { runSpec } = await import('../../../dist/OpenCode/Tools/ExecutorTool.js')
 const {
   ToolRuntimeScope,
-  ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery,
+  ToolRuntimeScope__AttachFamilyRecovery_Z49212CC2: attachFamilyRecovery,
 } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const {
   FamilyRecovery,

@@ -82,8 +82,11 @@ type HostForkRuntime
     let terminalByName = Dictionary<string, string>()
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
+    let cancelGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
+    // DSL-MUTABLE: resource — one parent-cancel drain owns durable abandon + physical teardown.
+    let mutable cancelDrainTask: Task option = None
 
     // DSL-MUTABLE: resource — first prompts deferred until the review barrier
     // has durably opened (GLORY-040: barrier before assignment).
@@ -316,27 +319,37 @@ type HostForkRuntime
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
         HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
 
+    member this.CancelAndDrain() : Task =
+        lock cancelGate (fun () ->
+            match cancelDrainTask with
+            | Some drain -> drain
+            | None ->
+                let drain =
+                    HostForkChildDispatch.cancelParent
+                        cancelSignals
+                        // GREEN-4: no second recovery ownership; cancel does not start restore.
+                        (fun () -> Task.FromResult(()))
+                        runtime
+                        ptyPortInstance
+                        parentKey
+                        parentAbortToken
+                        gate
+                        pendingRuns
+                        children
+                        sessions
+                        journal
+                        (journal
+                         |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
+                        parentId
+                        (fun run -> HostForkRunLifecycle.settleParentCancelled gate pendingRuns run)
+                        (clockPort.UtcNow())
+                    :> Task
+
+                cancelDrainTask <- Some drain
+                drain)
+
     member this.Cancel() : unit =
-        Async.StartImmediate(
-            HostForkChildDispatch.cancelParent
-                cancelSignals
-                // GREEN-4: no second recovery ownership; cancel does not start restore.
-                (fun () -> Task.FromResult(()))
-                runtime
-                ptyPortInstance
-                parentKey
-                parentAbortToken
-                gate
-                pendingRuns
-                children
-                sessions
-                journal
-                (journal
-                 |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
-                parentId
-                (fun run outcome -> this.Complete(run, outcome))
-                (clockPort.UtcNow())
-        )
+        this.CancelAndDrain() |> ignore
 
     member _.List() = runtime.List()
 

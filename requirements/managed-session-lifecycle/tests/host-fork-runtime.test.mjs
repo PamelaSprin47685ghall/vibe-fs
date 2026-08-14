@@ -12,19 +12,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
+import { agentJournal, caseOf, handleId, handleProjection, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { HostForkRuntime, HostForkRuntime__get_PendingRunCount: pendingRunCount, HostForkRuntime__get_IsCancelled: runtimeIsCancelled, HostForkRuntime__Cancel: cancelRuntime } = hostRuntimeModule
 // Resolve Fable-exported members by prefix; the hash suffix is a compiler
 // artifact and must not be pinned in tests (VERIFY-008).
-const hostMemberOf = (name) => Object.entries(hostRuntimeModule).find(([k]) => k.startsWith(`HostForkRuntime__${name}_`))?.[1]
+const hostMemberOf = (name) =>
+  hostRuntimeModule[`HostForkRuntime__${name}`] ??
+  Object.entries(hostRuntimeModule).find(([k]) => k.startsWith(`HostForkRuntime__${name}_`))?.[1]
 const installRun = hostMemberOf('InstallRun')
 const failRun = hostMemberOf('FailRun')
 const markReady = hostMemberOf('MarkReady')
 const isRetiredHandle = hostMemberOf('IsRetiredHandle')
 const tryChildSession = hostMemberOf('TryChildSession')
 const adoptChild = hostMemberOf('AdoptChild')
+const cancelAndDrain = hostMemberOf('CancelAndDrain')
 const { joinAvailable, cancelAgent } = await import('../../../dist/Execution/Delegation/Fork/Host/Join.js')
 const forkRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Runtime.js')
 const { ForkRuntime, ForkRuntime__List: forkList, ForkRuntime__Cancel: forkCancel, ForkRuntime__get_ActiveRunCount: forkActiveRunCount } = forkRuntimeModule
@@ -203,6 +206,25 @@ test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', asyn
   // is still aborted (the map retains the child until join retires it).
   cancelAgent(liveCtx.runtime, 'ag7')
   assert.deepEqual(liveCtx.sessions.calls.filter(([name]) => name === 'AbortSession'), [['AbortSession', 'ses_c7']])
+  liveCtx.cleanup()
+})
+
+test('MANAGED_SESSION_009_shutdown_cancel_drains_durable_abandon_before_return', async () => {
+  assert.equal(typeof cancelAndDrain, 'function', 'HostForkRuntime must expose an awaitable parent-cancel drain')
+  const liveCtx = await live()
+  await link(liveCtx.journal, 'ag8', sessionId('ses_c8'))
+  const run = installRun(liveCtx.runtime, 'ag8', sessionId('ses_c8'), Role.Coder)
+  adoptChild(liveCtx.runtime, 'ag8', sessionId('ses_c8'))
+
+  await cancelAndDrain(liveCtx.runtime)
+
+  const outcome = await run.Source.get_Task()
+  assert.equal(caseOf(outcome), 'AgentAbandoned', 'parent cancel must settle the in-memory waiter as Abandoned')
+  assert.equal(outcome.fields[1], 'ParentCancelled')
+  const projection = agentJournal.handleProjection(liveCtx.journal, PARENT)
+  const record = handleProjection.tryFind(handleId.agent('ag8'), projection)
+  assert.equal(handleProjection.lifecycleOf(record), 'Abandoned', 'awaitable cancel must settle durable HandleAbandoned')
+  assert.deepEqual(liveCtx.sessions.calls.filter(([name]) => name === 'AbortSession'), [['AbortSession', 'ses_c8']])
   liveCtx.cleanup()
 })
 

@@ -63,9 +63,6 @@ module HookDispatcher =
     [<Emit("import.meta.url")>]
     let private importMetaUrl: string = jsNative
 
-    [<Emit("process.execPath")>]
-    let private nodeExecutable: string = jsNative
-
     let private hookFileName =
         function
         | HookKind.ReferenceTransaction -> "reference-transaction"
@@ -117,8 +114,8 @@ module HookDispatcher =
     let private shellQuote (value: string) =
         "'" + value.Replace("'", "'\"'\"'") + "'"
 
-    /// Compiled HookDispatcher lives at dist/Infrastructure/Git. The independently
-    /// shipped runner lives at resources/git under the same package root.
+    /// Compiled HookDispatcher lives at dist/Git/Hook. The independently shipped
+    /// runner lives at resources/git under the same package root.
     let private runnerPath () =
         let here = dirname (fileURLToPath importMetaUrl)
         let packageRoot = dirname (dirname (dirname here))
@@ -131,8 +128,7 @@ module HookDispatcher =
               shimHeaderComment
               sprintf "if [ \"${%s:-}\" = \"1\" ]; then exit 0; fi" SyncActiveEnv
               sprintf
-                  "exec %s %s %s \"$@\""
-                  (shellQuote nodeExecutable)
+                  "exec /usr/bin/env node %s %s \"$@\""
                   (shellQuote (runnerPath ()))
                   (hookRunnerArgument kind)
               "" ]

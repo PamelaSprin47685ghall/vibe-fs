@@ -75,6 +75,9 @@ type ISessionRuntimeOwner =
     inherit IDisposable
     abstract DisposeSession: string -> unit
     abstract DisposeExecutorRuntime: string -> unit
+    /// MANAGED-SESSION-009: plugin shutdown must await durable parent-cancel drain
+    /// before the shared Journal/EventStore lifetime is released.
+    abstract DisposeAsync: unit -> Task
     /// EXEC-016: live PTY still tracked for this parent session (DevOps).
     abstract HasLivePty: string -> bool
 
@@ -95,8 +98,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable sharedTerminalKey: string option = None
     // DSL-MUTABLE: resource — shared terminal bus port handle
     let mutable sharedTerminalPort: Events.HostEventPort option = None
+    let disposeGate = obj ()
     // DSL-MUTABLE: resource — scope dispose latch
     let mutable disposed = false
+    // DSL-MUTABLE: resource — one shutdown Task owns the Journal/store release sequence.
+    let mutable disposeTask: Task option = None
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -314,26 +320,49 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
             recovery.ClearAttemptPlansFor key
 
+    member this.DisposeAsync() : Task =
+        lock disposeGate (fun () ->
+            match disposeTask with
+            | Some running -> running
+            | None ->
+                disposed <- true
+
+                let running =
+                    task {
+                        subscription |> Option.iter (fun active -> active.Dispose())
+                        subscription <- None
+
+                        blogger.Dispose()
+
+                        let runtimeOwner =
+                            lock toolRuntimeGate (fun () ->
+                                let owner = toolRuntime
+                                toolRuntime <- None
+                                owner)
+
+                        match runtimeOwner with
+                        | Some owner -> do! owner.DisposeAsync()
+                        | None -> ()
+
+                        sessions.Dispose()
+                        syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
+                        syncDelegateRuntime <- None
+                        strength.Dispose()
+
+                        // MANAGED-SESSION-009: the shared durable substrate is the
+                        // last owner released, after every parent-cancel drain.
+                        SharedAgentJournal.release journal
+                        SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
+                        sharedTerminalKey <- None
+                        sharedTerminalPort <- None
+                    }
+                    :> Task
+
+                disposeTask <- Some running
+                running)
+
     member this.Dispose() =
-        if not disposed then
-            disposed <- true
-            subscription |> Option.iter (fun active -> active.Dispose())
-            subscription <- None
-
-            blogger.Dispose()
-
-            lock toolRuntimeGate (fun () ->
-                toolRuntime |> Option.iter (fun owner -> owner.Dispose())
-                toolRuntime <- None)
-
-            sessions.Dispose()
-            syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
-            syncDelegateRuntime <- None
-            strength.Dispose()
-            SharedAgentJournal.release journal
-            SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
-            sharedTerminalKey <- None
-            sharedTerminalPort <- None
+        this.DisposeAsync() |> ignore
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

@@ -104,7 +104,10 @@ completion 不可再返回。
 
 **规范**：`Abandoned`（含 `ParentCancelled` 等 reason）不可 join、不可回退；parent cancel 对每个
 owned agent 逐个写 `HandleAbandoned`，无批量 fact（EXEC-009）；operator abort → `TurnAborted`
-cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。
+cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。任何随后会释放
+`AgentJournal` / EventStore / workspace 的 owner teardown，必须等待这次 parent cancel 完成 durable
+`HandleAbandoned` 与 physical child teardown 后才能返回；不得用 detached `Async.StartImmediate` 把
+cancel 留到 store/repository 已释放之后继续执行。
 
 **含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
 

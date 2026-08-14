@@ -71,21 +71,15 @@ test('PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', 
 })
 
 test('PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () => {
-  const packageResourcesJs = path.join(
-    repoRoot,
-    'dist',
-    'Infrastructure',
-    'Resources',
-    'PackageResources.js',
-  )
+  const packageResourcesJs = path.join(repoRoot, 'dist', 'Resources', 'PackageResources.js')
   assert.ok(fs.existsSync(packageResourcesJs), 'PackageResources.js must exist under dist')
 
-  const fromModule = path.resolve(path.dirname(packageResourcesJs), '../../..', 'resources')
+  const fromModule = path.resolve(path.dirname(packageResourcesJs), '../..', 'resources')
   const expected = path.join(repoRoot, 'resources')
   assert.equal(
     path.normalize(fromModule),
     path.normalize(expected),
-    'PackageResources ../../../resources must resolve to package resources/',
+    'PackageResources ../../resources must resolve to package resources/',
   )
   assert.ok(fs.existsSync(path.join(fromModule, 'enforcer', 'primitive-obsession', 'enforcer.md')))
   assert.ok(fs.existsSync(path.join(fromModule, 'provider', 'role', 'manager', 'en.md')))

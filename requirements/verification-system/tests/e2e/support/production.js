@@ -62,9 +62,9 @@ const fableLibraryDir = (() => {
 const { ofArray } = await import(join(fableLibraryDir, 'List.js'));
 
 const [ForkModule, BloggerModule, SyntheticModule] = await Promise.all([
-  import(join(BUILD_ROOT, 'Domain/ForkChildPayload.js')),
-  import(join(BUILD_ROOT, 'Domain/BloggerToml.js')),
-  import(join(BUILD_ROOT, 'Domain/SyntheticToml.js')),
+  import(join(BUILD_ROOT, 'Execution/Delegation/Fork/Payload.js')),
+  import(join(BUILD_ROOT, 'Context/Companion/Blogger/Toml.js')),
+  import(join(BUILD_ROOT, 'Foundation/SyntheticToml.js')),
 ]);
 
 /** An F# list from an array, or an already-converted list left alone. */
@@ -97,6 +97,7 @@ const forkDefaultProse = () =>
   new ForkModule.ForkChildInstructions(
     toList(forkReadLines(ForkModule.ForkChildPayload_BasePath)),
     forkReadOne(ForkModule.ForkChildPayload_CommissionerRecordPath),
+    forkReadOne(ForkModule.ForkChildPayload_AttachmentPath),
     forkReadOne(ForkModule.ForkChildPayload_RequirementsPath),
   );
 
@@ -106,6 +107,7 @@ export const forkBaseInstructions = forkReadLines(ForkModule.ForkChildPayload_Ba
 export const forkCommissionerRecordInstruction = forkReadOne(
   ForkModule.ForkChildPayload_CommissionerRecordPath,
 );
+export const forkAttachmentInstruction = forkReadOne(ForkModule.ForkChildPayload_AttachmentPath);
 export const forkRequirementsInstruction = forkReadOne(ForkModule.ForkChildPayload_RequirementsPath);
 /** @deprecated use forkCommissionerRecordInstruction */
 export const forkParentWorkRecordInstruction = forkCommissionerRecordInstruction;
@@ -115,6 +117,7 @@ export const forkPayload = ({
   assignment,
   parentWorkRecord,
   commissionerRecord,
+  attachment,
   originalUserRequirements = [],
   payload,
 }) => {
@@ -124,6 +127,7 @@ export const forkPayload = ({
     new ForkModule.ForkChildAssignment(
       assignment,
       record ?? undefined,
+      attachment ?? undefined,
       toList(originalUserRequirements),
       payload ?? undefined,
     ),
@@ -135,6 +139,7 @@ export const forkRelay = (assignment, commissionerRecord, requirements = [], pay
     forkDefaultProse(),
     assignment,
     commissionerRecord ?? undefined,
+    undefined,
     toList(requirements),
     payload ?? undefined,
   );

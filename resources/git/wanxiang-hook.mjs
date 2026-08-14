@@ -9,7 +9,7 @@ if (process.env.WANXIANG_GIT_SYNC_ACTIVE === '1') {
   process.exit(0)
 }
 
-const HookSync = await import(new URL('../../dist/Infrastructure/Git/HookSync.js', import.meta.url))
+const HookSync = await import(new URL('../../dist/Git/Hook/Sync.js', import.meta.url))
 const [kind, arg1] = process.argv.slice(2)
 
 let error = null

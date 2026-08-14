@@ -153,11 +153,9 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
-let activeJournal
-
-const captureLastAssistant = (delegateKey, answer) => {
+const captureLastAssistant = (journal, delegateKey, answer) => {
   xTraceCapture.captureProjection(
-    activeJournal,
+    journal,
     sessionId(delegateKey),
     xTraceCapture.semantic({
       messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
@@ -165,19 +163,21 @@ const captureLastAssistant = (delegateKey, answer) => {
   )
 }
 
-const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_complete') => {
-  captureLastAssistant(delegateKey, answer)
+const settlePendingInvoke = async (runtime, journal, delegateKey, role, answer, runId = 'asst_complete') => {
+  captureLastAssistant(journal, delegateKey, answer)
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
 
+let harnessSequence = 0
+
 const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   SessionPersona_clearAllForTests()
+  harnessSequence += 1
+  const harnessId = harnessSequence
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-tools-'))
   const opened = await agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  activeJournal = opened.journal
-
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []
   const prompts = []
@@ -193,10 +193,10 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
         text,
         agent: options?.Agent,
       })
-      return promptDispatcher.admittedWithPhysicalMessage(`msg_phys_${physicalSeq}`)
+      return promptDispatcher.admittedWithPhysicalMessage(`msg_phys_${harnessId}_${physicalSeq}`)
     },
     CreateChildSession: async (parentId, options) => {
-      const child = sessionId(`delegate-${createCalls.length + 1}`)
+      const child = sessionId(`delegate-${harnessId}-${createCalls.length + 1}`)
       createCalls.push({
         parent: idValue.session(parentId),
         agent: options?.Agent,
@@ -251,7 +251,7 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   }
 
   try {
-    await fn({ runtime, createCalls, prompts, inspectorPrompts, scope, delegatedRemaining })
+    await fn({ runtime, journal: opened.journal, createCalls, prompts, inspectorPrompts, scope, delegatedRemaining })
   } finally {
     disposeRuntime(runtime)
     opened.dispose()
@@ -314,7 +314,7 @@ test('ESTABLISH_missing_charge_is_refused_as_a_natural_consequence', async () =>
 })
 
 test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_charge', async () => {
-  await withHarness(async ({ runtime, createCalls, prompts, inspectorPrompts }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, inspectorPrompts }) => {
     const owner = 'ses_owner_prepared'
     const charge = 'raw semantic question'
     const providerPrompt = '# enriched provider envelope\n\n[[repository_hint]]\nfile_path = "src/a.fs"\n'
@@ -333,7 +333,7 @@ test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_char
     assert.equal(prompts[0].text, providerPrompt, 'provider must receive prepared bytes')
     assert.deepEqual(inspectorPrompts, [charge], 'Casebook Q hook must receive raw semantic Charge')
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'bounded answer', 'asst_prepared')
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Inspector'), 'bounded answer', 'asst_prepared')
     const result = resultOf(await pending)
     assert.equal(result.ok, true, result.error)
   })
@@ -348,7 +348,7 @@ test('DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
     { id: secondCall, tool: 'inspect' },
   ])
 
-  await withHarness(async ({ runtime, createCalls, prompts, scope, delegatedRemaining }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope, delegatedRemaining }) => {
     const owner = 'ses_owner_inspect_estimate_batch'
     const tool = inspectSpec(factory, scope, runtime)
 
@@ -364,14 +364,14 @@ test('DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'estimated inspect batch did not send once')
     assert.equal(delegatedRemaining(createCalls[0].child), 7)
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'estimated batch answer')
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Inspector'), 'estimated batch answer')
     await first
     await second
   }, { snapshotMessages: [message] })
 })
 
 test('DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async () => {
-  await withHarness(async ({ runtime, createCalls, prompts, scope, delegatedRemaining }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope, delegatedRemaining }) => {
     const owner = 'ses_owner_inspect_estimate_reuse'
     const tool = inspectSpec(factory, scope, runtime)
 
@@ -379,14 +379,14 @@ test('DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'first estimated inspect did not send')
     const child = createCalls[0].child
     assert.equal(delegatedRemaining(child), 4)
-    await settlePendingInvoke(runtime, child, roles.of('Inspector'), 'first answer', 'asst_estimate_first')
+    await settlePendingInvoke(runtime, journal, child, roles.of('Inspector'), 'first answer', 'asst_estimate_first')
     await first
 
     const second = tool.Execute(makeArgs({ charge: 'second inquiry' }), context(owner))
     await waitFor(() => prompts.length === 2, 'reused inspect did not send')
     assert.equal(createCalls.length, 1, 'Inspector session must be reused')
     assert.equal(delegatedRemaining(child), 4, 'omitted expected_tool_calls must preserve remaining')
-    await settlePendingInvoke(runtime, child, roles.of('Inspector'), 'second answer', 'asst_estimate_second')
+    await settlePendingInvoke(runtime, journal, child, roles.of('Inspector'), 'second answer', 'asst_estimate_second')
     await second
   })
 })
@@ -400,7 +400,7 @@ test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', asy
     { id: secondCall, tool: 'inspect' },
   ])
 
-  await withHarness(async ({ runtime, createCalls, prompts, scope }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_inspect_batch'
     const tool = inspectSpec(factory, scope, runtime)
 
@@ -416,7 +416,7 @@ test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', asy
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'batched inspect did not send once')
     assert.equal(prompts[0].text, 'inspect first\n\ninspect second')
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'batched inspector answer')
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Inspector'), 'batched inspector answer')
     const firstText = await first
     const secondText = await second
 
@@ -435,7 +435,7 @@ test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
     { id: repairCall, tool: 'repair-behavior' },
   ])
 
-  await withHarness(async ({ runtime, createCalls, prompts, scope }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_coder_batch'
     const establish = establishSpec(factory, scope, runtime)
     const repair = repairSpec(factory, scope, runtime)
@@ -453,7 +453,7 @@ test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
     assert.equal(createCalls[0].agent, 'fast-coder')
     assert.equal(prompts[0].text, 'establish behavior\n\nrepair behavior')
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Coder'), 'batched coder answer')
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Coder'), 'batched coder answer')
     const establishText = await establishPending
     const repairText = await repairPending
 
@@ -464,7 +464,7 @@ test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
 })
 
 test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () => {
-  await withHarness(async ({ runtime, createCalls, prompts, scope }) => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_insp'
     const answer = 'inspector formal answer'
     const pending = inspectSpec(factory, scope, runtime).Execute(
@@ -480,7 +480,7 @@ test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () =>
     assert.ok(found != null, 'TryFind must return Some while delegate is attached')
     assert.equal(idValue.session(found), createCalls[0].child)
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), answer, 'asst_insp')
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Inspector'), answer, 'asst_insp')
     const text = await pending
     // EXEC-031: the tool payload is the bounded WorkRecord — last assistant
     // text in Recent work (not the raw last message as the whole payload),

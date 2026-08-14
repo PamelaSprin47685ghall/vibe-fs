@@ -255,7 +255,7 @@ module PluginHooks =
             // sessions. `scope.Dispose` owns all of it, and the Host awaits this
             // hook (`plugin/index.ts:266`), so teardown completes before shutdown
             // proceeds.
-            hooks?dispose <- box (fun () -> scope.Dispose())
+            hooks?dispose <- box (fun () -> scope.DisposeAsync())
 
             let client = if isNull input then null else input?client
 

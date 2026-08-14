@@ -15,6 +15,7 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
 }
 
 const { initSpikePlugin } = await import('../../../../dist/OpenCode/Plugin/SpikePlugin.js')
+const { requiredNames: managedAgentNames } = await import('../../../../dist/Participant/Persona/ManagedCatalog.js')
 
 // ── the layer-3 executable fixture (EXEC-002, AGENT-007 layer two) ───────────
 //
@@ -246,6 +247,12 @@ export const withExecutablePlugin = async (body, options = {}) => {
       directory,
       events: { listen: () => () => {} },
     })
+    const hostConfig = {
+      agent: Object.fromEntries(
+        Array.from(managedAgentNames).map((name) => [name, { model: `fixture/${name}-model` }]),
+      ),
+    }
+    hooks.config(hostConfig)
     let runtime
     try {
       const runtimePath = forWorkspace(directory)

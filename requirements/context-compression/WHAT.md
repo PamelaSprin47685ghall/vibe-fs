@@ -221,7 +221,9 @@ instruction header 是渲染时注入，不是 frame 内容。
 squash 分支。
 
 **含义/动机**：`Diagnostic.emit` 只接受白名单字段；任何 `context_ratio` 式字段
-（把窗口估算写成日志）都会被 tombstone 测试拦下。
+（把窗口估算写成日志）都会被 tombstone 测试拦下。白名单可以包含纯观察性的稳定 identity
+provenance（例如 DryRun 可见 child 的 `replica_session_id`），前提是该字段只解释“观察的是谁”，
+绝不参与 Fallback / probe / squash / promotion 等控制决定。
 
 **边界**：诊断模块共享使用（LOOP-010 等）不影响 owner；本命题拥有「诊断不得回流控制流」。
 

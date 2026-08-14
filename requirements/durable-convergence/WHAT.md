@@ -94,7 +94,10 @@ Current；唯一 Integrator 与注册规则由 `durable-events` 014/019 保证�
 **规范陈述**：Wanxiangshu 不提供 timer/background/event-count 同步器，也不从 OpenCode/Wanxiangshu 产品进程
 主动调用 fetch/pull/push。Wanxiangshu 启动时必须 ensure `reference-transaction` / `pre-push` hook 以及各已知
 remote 的 Wanxiang store fetch-refspec 正确安装；无法安全安装时 fail fast/明确诊断，不得静默降级。之后同步由
-**用户自己的 Git 进程启动的 hook 子进程**执行，即使 OpenCode/Wanxiangshu 已退出也必须可工作：读取 local writer
+**用户自己的 Git 进程启动的 hook 子进程**执行，即使 OpenCode/Wanxiangshu 已退出也必须可工作。hook shim
+不得固化安装时宿主的 `process.execPath`（OpenCode/Bun/其它 host binary 都不是 Node runtime）；它必须通过
+`/usr/bin/env node <package>/resources/git/wanxiang-hook.mjs` 调起随包 runner，由 package 的 Node `>=20` runtime 独立解释，
+且不得依赖 runner 文件本身具有 executable bit。随后读取 local writer
 files + remote writer blobs → k-way merge/validate → 直接替换本地同步后的 writer-file 集合 → 将每个完整 writer
 file 编码为一个 blob 并发布 remote snapshot。成功终态必须 local/remote 表示同一 event history；不得提供可成功的
 Store-only 单向 Download/Upload 模式。

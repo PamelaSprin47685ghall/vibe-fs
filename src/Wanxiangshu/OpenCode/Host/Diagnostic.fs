@@ -18,6 +18,8 @@ module Diagnostic =
     let AllowedFields =
         set
             [ "session_id"
+              // SPEC-INV-013: visible DryRun child identity; observation-only.
+              "replica_session_id"
               "blogger_session_id"
               "operation"
               "request_kind"

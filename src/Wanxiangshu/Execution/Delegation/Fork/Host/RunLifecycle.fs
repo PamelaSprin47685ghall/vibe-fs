@@ -281,6 +281,28 @@ module HostForkRunLifecycle =
 
         run
 
+    /// Parent cancellation has already committed durable HandleAbandoned before
+    /// this runs. Settle only the in-memory waiter/subscription; routing the same
+    /// run through `complete(Failed "cancelled")` would incorrectly compete with
+    /// Abandoned by attempting a HandleCompleted(CANCELLED) commit.
+    let settleParentCancelled
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (run: PendingHostRun)
+        =
+        let claimed, subscriptionToDispose =
+            lock gate (fun () ->
+                match pendingRuns.TryGetValue run.AgentId with
+                | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
+                    run.Finished <- true
+                    pendingRuns.Remove run.AgentId |> ignore
+                    true, run.Subscription
+                | _ -> false, None)
+
+        if claimed then
+            subscriptionToDispose |> Option.iter (fun subscription -> subscription.Dispose())
+            run.Source.SetResult(AgentCompletion.abandoned run.AgentId "ParentCancelled")
+
     let failRun
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)

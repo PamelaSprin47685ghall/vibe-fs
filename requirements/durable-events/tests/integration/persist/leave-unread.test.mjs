@@ -1,10 +1,9 @@
-// FROZEN — 2026-08-14. Shock-cut legacy layouts are completely leave-unread.
-// Intentionally NOT executed before implementation.
+// Shock-cut legacy layouts are completely leave-unread and legacy source is absent.
 
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -54,10 +53,12 @@ test('shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async 
   const { readFile } = await import('node:fs/promises')
   const eventStore = await readFile(new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
   const sync = await readFile(new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs', import.meta.url), 'utf8')
-  const tombstones = [
-    await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs', import.meta.url), 'utf8'),
-    await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/UniversalGitRawStore.fs', import.meta.url), 'utf8'),
-  ].join('\n')
+  const legacySources = [
+    new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs', import.meta.url),
+    new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/UniversalGitRawStore.fs', import.meta.url),
+  ]
   assert.doesNotMatch(eventStore + sync, /LegacyEventsDir|isLegacy|migrat|reset.*root|wanxiangshu-next/i)
-  assert.match(tombstones, /GARBAGE/)
+  for (const legacy of legacySources) {
+    assert.equal(existsSync(legacy), false, `${legacy.pathname}: shock-cut legacy source must stay deleted`)
+  }
 })

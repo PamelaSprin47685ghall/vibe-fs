@@ -190,9 +190,9 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (durableHandles: AgentLinkageProjection option)
         (parentId: SessionId)
-        (complete: PendingHostRun -> TerminalOutcome -> unit)
+        (settleAbandoned: PendingHostRun -> unit)
         (abandonedAt: DateTimeOffset)
-        : Async<unit> =
+        : Task<unit> =
         // Synchronous: make sure observers (runtime.Join, tests, parent abort
         // callbacks) see cancellation immediately.
         runtime.Cancel()
@@ -213,26 +213,23 @@ module HostForkChildDispatch =
         // EXEC-009: durable abandon before aborting. A crash mid-Cancel must not
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
-        async {
-            match!
-                HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
-                |> Async.AwaitTask
-            with
+        task {
+            match! HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt with
             | Error err ->
                 // Journal failure during abandon is a durable-state bug; surface it.
                 return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err))
             | Ok() ->
-                do! Async.AwaitTask(ptyPort.CloseAll())
+                do! ptyPort.CloseAll()
                 Pty.unregisterParentAbort parentKey parentAbortToken
 
                 let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
 
                 for run in pending do
-                    complete run (TerminalOutcome.Failed "cancelled")
+                    settleAbandoned run
 
-                do! Async.AwaitTask(awaitRecovery ())
+                do! awaitRecovery ()
 
-                let! teardown = Async.AwaitTask(teardownChildren sessions (childIds |> List.distinct))
+                let! teardown = teardownChildren sessions (childIds |> List.distinct)
 
                 match teardown with
                 | Ok() ->

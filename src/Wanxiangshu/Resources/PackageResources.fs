@@ -14,7 +14,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 /// Fixed package-relative resource reads.
-/// Compiled module lives at dist/Infrastructure/Resources/; package root is ../../../.
+/// Compiled module lives at dist/Resources/; package root is ../...
 module PackageResources =
 
     [<Import("readFileSync", "node:fs")>]

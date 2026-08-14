@@ -398,20 +398,44 @@ type ToolRuntimeScope
             orchestratorHosts.Remove sessionId |> ignore
             treePorts.Remove sessionId |> ignore)
 
-    member this.Dispose() =
-        let sessionIds =
+    member _.DisposeAsync() : Task =
+        let forkRuntimes, orchestrators =
             lock gate (fun () ->
                 if disposed then
-                    []
+                    [], []
                 else
                     disposed <- true
-                    Seq.append runtimes.Keys executorRuntimes.Keys |> Seq.distinct |> Seq.toList)
 
-        sessionIds |> List.iter this.DisposeSession
+                    let ownedForkRuntimes =
+                        Seq.append runtimes.Values executorRuntimes.Values
+                        |> Seq.distinct
+                        |> Seq.toList
+
+                    let ownedOrchestrators = orchestratorHosts.Values |> Seq.toList
+
+                    runtimes.Clear()
+                    executorRuntimes.Clear()
+                    orchestratorHosts.Clear()
+                    treePorts.Clear()
+
+                    ownedForkRuntimes, ownedOrchestrators)
+
+        task {
+            for runtime in forkRuntimes do
+                do! runtime.CancelAndDrain()
+
+            for host in orchestrators do
+                do! host.CancelAndDrain()
+        }
+        :> Task
+
+    member this.Dispose() =
+        this.DisposeAsync() |> ignore
 
     interface ISessionRuntimeOwner with
         member this.DisposeSession sessionId = this.DisposeSession sessionId
         member this.DisposeExecutorRuntime sessionId = this.DisposeExecutorRuntime sessionId
+        member this.DisposeAsync() = this.DisposeAsync()
         member this.HasLivePty sessionId = this.HasLivePty sessionId
 
     interface IDisposable with

@@ -180,10 +180,10 @@ module GitGateway =
             try
                 execFile GitSubject.Executable argv options (fun error stdout stderr ->
                     if isNull error then
-                        tcs.TrySetResult(0, asText stdout, asText stderr) |> ignore
+                        tcs.SetResult(0, asText stdout, asText stderr)
                     else
-                        tcs.TrySetResult(errorCode error, asText stdout, asText stderr) |> ignore)
+                        tcs.SetResult(errorCode error, asText stdout, asText stderr))
             with ex ->
-                tcs.TrySetResult(1, "", ex.Message) |> ignore
+                tcs.SetResult(1, "", ex.Message)
 
             tcs.Task

@@ -30,6 +30,16 @@ test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_r
     'startup ensure must install the membrane, not perform synchronization')
 })
 
+test('HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () => {
+  const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
+  const runner = read('resources/git/wanxiang-hook.mjs')
+  assert.match(runner, /^#!\/usr\/bin\/env node/)
+  assert.doesNotMatch(dispatcher, /process\.execPath|nodeExecutable/,
+    'hook must survive after an OpenCode/Bun installer process exits')
+  assert.match(dispatcher, /exec \/usr\/bin\/env node %s %s/,
+    'shim must resolve Node independently and pass the packaged runner as data, not as the installer executable')
+})
+
 test('HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
   const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   const sync = read('src/Wanxiangshu/Git/Hook/Sync.fs')

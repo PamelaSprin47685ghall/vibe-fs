@@ -248,9 +248,10 @@ features/score、cost estimate、promotion evidence 与 failure reason。Host-on
 必须作为 OpenCode 中可观察的 attached/internal execution 出现在用户可见 session/transcript/tool
 activity 中。**owner 主路径不得等待 DryRun completion、budget deadline 或 terminal result**：
 Replica 成功启动后 owner provider transform 立即继续。DryRun 可真实执行 K1/K2 readonly provider/tool
-请求并记录 Host diagnostics，但其结果不得映射回 owner provider bytes，不得产生
-`StrengthCandidatePrepared` / `StrengthCandidatePromoted` / replay frame，也不得改变 owner fallback/
-repair/finality 状态。owner cancel/delete 仍级联取消该 child。
+请求并记录 Host diagnostics；DryRun terminal diagnostics 可携带 `replica_session_id` 作为该可见
+physical child 的观察性 identity provenance，但该字段不得成为任何控制输入。其结果不得映射回 owner
+provider bytes，不得产生 `StrengthCandidatePrepared` / `StrengthCandidatePromoted` / replay frame，也不得
+改变 owner fallback/repair/finality 状态。owner cancel/delete 仍级联取消该 child。
 
 **含义/动机**：Dry 的是 semantic influence，不是 physical execution。用户能直接观察 Strength 是否真的
 做了有价值的只读调查，同时一次 canary/实验永远不把 2500ms Replica deadline 加到 owner critical path。

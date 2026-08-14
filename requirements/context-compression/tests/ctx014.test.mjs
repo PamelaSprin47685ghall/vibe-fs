@@ -75,6 +75,16 @@ test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
   )
 })
 
+test('CTX_014_strength_dry_run_visible_replica_identity_is_observation_only_and_whitelisted', () => {
+  assert.doesNotThrow(() =>
+    diag.emit('strength-dry-run-finished', [
+      ['session_id', 'ses_owner'],
+      ['replica_session_id', 'ses_shadow'],
+      ['result', 'Completed'],
+    ]),
+  )
+})
+
 test('CTX_014_enforcer_protocol_violation_fields_are_whitelisted', () => {
   // ENFORCER-042: the multi-call protocol-violation emit carries `result` and
   // `call_count`. Both must be in AllowedFields so the emit never throws and the
