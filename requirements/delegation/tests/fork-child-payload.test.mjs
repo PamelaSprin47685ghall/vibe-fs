@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { forkChildPayload as fork } from '../support/domain.mjs'
+import { forkChildPayload as fork } from '../../../tests/unit/support/domain.mjs'
 
 const REPORT_INSTRUCTIONS = [
   'When your charge is complete, leave an ordinary closing report in natural prose.',
