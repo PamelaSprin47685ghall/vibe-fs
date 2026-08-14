@@ -15,7 +15,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { nudge } = await import('../../../dist/Infrastructure/OpenCode/Host/HostJoinGuard.js')
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),

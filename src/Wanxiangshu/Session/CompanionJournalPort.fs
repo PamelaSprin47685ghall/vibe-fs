@@ -4,7 +4,9 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
@@ -22,7 +24,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
         }
 
     let latestBlogText (blog: BlogProjectionState) : Task<Result<BlogText option, string>> =
-        let rec readFrames frames acc =
+        let rec readFrames (frames: BlogFrame list) acc =
             task {
                 match frames with
                 | [] ->

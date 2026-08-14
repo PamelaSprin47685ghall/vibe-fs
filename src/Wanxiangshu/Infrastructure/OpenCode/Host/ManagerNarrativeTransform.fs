@@ -11,7 +11,10 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

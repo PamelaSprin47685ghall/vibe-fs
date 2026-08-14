@@ -5,7 +5,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
 ///

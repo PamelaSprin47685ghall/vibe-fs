@@ -12,7 +12,7 @@ import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerCrashRecovery.fs'),
+  join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs'),
   'utf8',
 )
 const enforcerSrc = readFileSync(
@@ -25,7 +25,7 @@ const repairSrc = readFileSync(
 )
 
 const probeModuleSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+  join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
   'utf8',
 )
 
@@ -33,10 +33,10 @@ const loadRecovery = async () => {
   // ENFORCER-153 derivation lives in BloggerRecoveryProbe; the crash window
   // classify/restore stays in BloggerCrashRecovery.
   const crash = await import(
-    new URL('../../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
+    new URL('../../../dist/Context/Companion/Blogger/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const probe = await import(
-    new URL('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js', import.meta.url).pathname
+    new URL('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js', import.meta.url).pathname
   )
   return { crash, probe }
 }
@@ -140,7 +140,7 @@ test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   // (rejudgeFromEvidence / rejudgeToolRecovery in BloggerRecoveryProbe) must
   // restore InteractionNudgeIssued at most, never AabbRepairConsumed.
   const probeSrc = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+    join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
     'utf8',
   )
   const coldRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
@@ -161,8 +161,8 @@ test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run'
   // must read as InteractionNudgeIssued(A) — handleContinuation then takes the
   // AABB branch (issued run != current terminal), never a second nudge.
   const { agentFact, agentJournal, authorityRoot, idValue, logicalRunId, payloadOf, promptKey, providerRun, sessionId, stream } = await import('../../verification-system/tests/support/domain.mjs')
-  const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import('../../../dist/Journal/AgentJournal.js')
-  const probe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
+  const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
+  const probe = await import('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js')
   const repairState =
     probe.BloggerRecoveryProbe_repairState ||
     probe.repairState

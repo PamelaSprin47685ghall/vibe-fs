@@ -34,7 +34,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const Option = await lib('Option.js')
-const { reconcile } = await prod('Application/Reconciliation/PromptRecovery')
+const { reconcile } = await prod('Interaction/Dispatch/Recovery')
 const { SessionMessage } = await prod('Infrastructure/OpenCode/Host/SessionSnapshotPort')
 
 const BOOT_AFTER_CLAIM = '2099-01-01T00:00:00Z'

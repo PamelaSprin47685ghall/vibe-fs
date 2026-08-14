@@ -19,8 +19,8 @@
 本命题拥有「唯一 + append-only + 三事实捕获」的语义。XTrace 是 `work-record` 物化的 source
 material，不是第二事实源。
 
-**证据**：`archive/docs/what/host.md` HOST-005；`archive/docs/what/companion.md` COMPANION-003；
-`src/Wanxiangshu/Domain/XTrace.fs`；`src/Wanxiangshu/Journal/XTraceProjection.fs`。
+**证据**：历史 HOST-005；历史 COMPANION-003；
+`src/Wanxiangshu/Domain/XTrace.fs`；`src/Wanxiangshu/Context/Trace/Projection.fs`。
 
 ---
 
@@ -37,7 +37,7 @@ provenance（证明/恢复用），renderer 永不输出它们（SEMANTIC-TRACE-
 **边界**：渲染形状（wire）归 `provider-projection`；「哪些 part 语义上算数」是本命题。
 媒体以 omission marker 记录存在性，不记内容——媒体字节本身不是语义文本。
 
-**证据**：HOST-005；`src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs`
+**证据**：HOST-005；`src/Wanxiangshu/Context/Trace/Capture.fs`
 （`semanticPart`、`partShape`）。
 
 ---
@@ -57,7 +57,7 @@ provenance（证明/恢复用），renderer 永不输出它们（SEMANTIC-TRACE-
 SEMANTIC-TRACE-009；epoch 语义本身归 `prefix-stability`。
 
 **证据**：HOST-005/006；`Domain/XTrace.fs`（`originCursor`/`nextCursor`/`isAfter`）；
-`Journal/XTraceProjection.fs`（`headSequence`/`applyPart`/`CursorNotAfterHead`）。
+`Context/Trace/Projection.fs`（`headSequence`/`applyPart`/`CursorNotAfterHead`）。
 
 ---
 
@@ -74,8 +74,8 @@ reanchor 后 provenance 携带新的 generation（`g:N/...`），使重编号的
 **边界**：ExecutionBinding 变化语义归 `participant-identity` / `provider-attempt-recovery`；
 本命题只要求 trace 的定位身份按 run 分段。
 
-**证据**：HOST-005；`Journal/XTraceProjection.fs`（`provenanceGeneration`、
-`currentGenerationParts`）；`Application/Reconciliation/XTraceCapture.fs`
+**证据**：HOST-005；`Context/Trace/Projection.fs`（`provenanceGeneration`、
+`currentGenerationParts`）；`Context/Trace/Capture.fs`
 （`captureGeneration`、`captureSourcesStable` 的 `g:N/msg:...` provenance）。
 
 ---
@@ -113,7 +113,7 @@ tool 渲染为 `[tool call] name args`）。
 作为 XTrace 游标的事实。
 
 **证据**：`Domain/XTrace.fs`（`sliceBetween`/`sliceFrom`/`head`）；
-`Journal/XTraceProjection.fs`（`head`/`parts`/`semanticCursorFor`）。
+`Context/Trace/Projection.fs`（`head`/`parts`/`semanticCursorFor`）。
 
 ---
 
@@ -131,7 +131,7 @@ Semantic projection，禁止反向解析 TOML（COMPANION-007）。同一 segmen
 本命题只拥有「同源 + 投影分叉」这个事实本身。
 
 **证据**：COMPANION-007；`Domain/XTrace.fs`（`flatten`/`isWorkRecordPart`/`forWorkRecord`）；
-`Journal/XTraceProjection.fs`。
+`Context/Trace/Projection.fs`。
 
 ---
 
@@ -145,13 +145,13 @@ Semantic projection，禁止反向解析 TOML（COMPANION-007）。同一 segmen
   `TerminalOutputCaptured`——没有「candidate frame」事实族。
 
 **含义/动机**：提前写入 = 用未发生的干预污染未来请求；事后回滚 = 删除真实因果。两者都破坏
-「历史 = 已发生」。（与 `archive/docs/why/strength.md` 的 Candidate ≠ 历史同构。）
+「历史 = 已发生」。（与历史 why/strength 的 Candidate ≠ 历史同构。）
 
 **边界**：promotion 的因果链（何时 Candidate 算被消费）归 `speculative-investigation`；
 本命题拥有 capture 侧负律。
 
-**证据**：`archive/docs/why/context.md`（probe 失败不写事实）；`archive/docs/why/strength.md`；
-`archive/changes/completed/strength.md`；`src/Wanxiangshu/Journal/XTraceProjection.fs`（无 candidate 事实）。
+**证据**：历史 why/context（probe 失败不写事实）；历史 why/strength；
+历史 change（strength）；`src/Wanxiangshu/Context/Trace/Projection.fs`（无 candidate 事实）。
 
 ---
 
@@ -168,7 +168,7 @@ parts / Opening / RecordCoverage / Frames 全部存活（COMPANION-008）。
 **边界**：`ContextReanchored` 的 epoch 语义归 `prefix-stability`；「什么时候允许重锚」归
 `context-compression`（HOST-006 containment）；本命题只拥有「XTrace 不被删除」。
 
-**证据**：HOST-005/006；COMPANION-008；`Journal/ContextFactFold.fs`
+**证据**：HOST-005/006；COMPANION-008；`Context/Companion/Blogger/ContextFactFold.fs`
 （`ContextReanchored` 分支只更新 PrefixEpoch + Blog + TipDelivery，不动 XTrace）。
 
 ---
@@ -188,5 +188,5 @@ constitutive 材料，一旦滤入 Recent work，Opening 就缺了「交托关�
 `context-compression`。本命题只拥有「Opening 区间在 trace 内是 preserved 的原始材料」。
 
 **证据**：COMPANION-014；`Domain/XTrace.fs`（`forOpening` = identity）；
-`Journal/XTraceProjection.fs`（`applyOpening`：同文本幂等、异文本拒绝）；
+`Context/Trace/Projection.fs`（`applyOpening`：同文本幂等、异文本拒绝）；
 `Application/Finality/LifecycleWorkRecordProjection.fs`（`withConstitutive`）。

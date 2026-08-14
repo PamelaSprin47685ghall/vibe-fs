@@ -4,7 +4,7 @@
 > 全部命题。历史断言、迁移沉积、被拒方案不在此列（见 HOW.md「历史与弃权」）。
 > 每条命题的测试落点见 PROOF.md §1 表对应行。
 
-条款来源映射：`archive/docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md`
+条款来源映射：历史五层 docs（dsl-structured-program/flow/architecture/loop/execution，2026-08-14 归档）
 的 OWNED Clause（COVERAGE.md 归属）与本包 boundary card 的 OWNS。反向下述全部
 structured-workflow OWNED Clause 均已落到下列命题或显式驳斥/移交（见各命题「边界」）。
 
@@ -257,7 +257,7 @@ rebase/review…），但被压缩的 Vocabulary **必须拥有自己的 tempora
 名字（rabbit.md DSL-014 目标条款）。
 
 **边界**：每个高阶 Vocabulary 的 proof 义务表见 HOW.md §3.4（源自
-`archive/docs/proof/dsl-structured-program.md` 高阶 Vocabulary 证明义务表）；新增高阶
+历史 DSL proof 条款高阶 Vocabulary 证明义务表）；新增高阶
 Vocabulary 必须追加该表一行并挂可观察效果测试。
 
 **证据**：PROOF.md §1 第 12 行。

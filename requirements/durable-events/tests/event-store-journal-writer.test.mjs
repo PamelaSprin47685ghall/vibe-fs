@@ -8,8 +8,8 @@ import test from 'node:test'
 import { agentFact, caseOf, idValue, payloadOf, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const EsWriter = await import('../../../dist/Journal/EventStoreJournalWriter.js')
-const AgentJournal = await import('../../../dist/Journal/AgentJournal.js')
+const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
+const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const CLOSED_AGENT = agentFact('CompanionBloggerClosed', { SessionId: sessionId('ses_es_writer') })
 
 const createFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_create'))?.[1]

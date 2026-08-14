@@ -22,7 +22,7 @@ import {
 
 const { mainContextFromChunk } = await import('../../../dist/Session/EnforcerHost.js')
 const { XTraceProjection_empty, XTraceProjection_semanticCursorFor, XTraceProjection_parts: xTraceParts } = await import(
-  '../../../dist/Journal/XTraceProjection.js'
+  '../../../dist/Context/Trace/Projection.js'
 )
 const { PrefixEpochIdModule_initial } = await import('../../../dist/Kernel/Identity.js')
 

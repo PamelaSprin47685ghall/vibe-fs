@@ -39,7 +39,7 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
-import { observationsOfSession } from '../../../dist/Journal/ObservationProjection.js'
+import { observationsOfSession } from '../../../dist/Feedback/Enforcer/Observation.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const RULEBOOK = join(ROOT, 'resources/enforcer')

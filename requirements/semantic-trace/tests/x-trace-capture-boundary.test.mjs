@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems, idValue } from '../../verification-system/tests/support/domain.mjs'
 
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
 
 const SESSION = 'ses_boundary'
 const session = sessionId(SESSION)

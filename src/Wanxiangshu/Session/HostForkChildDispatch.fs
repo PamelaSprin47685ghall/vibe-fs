@@ -10,7 +10,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 
 /// Existing-child dispatch + parent teardown helpers.
 module HostForkChildDispatch =

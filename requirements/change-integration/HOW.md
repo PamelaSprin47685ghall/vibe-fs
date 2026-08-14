@@ -26,7 +26,7 @@ rebaseReviewPublishLoop:
 冲突递归只能发生在 `rebaseReviewPublishLoop` 内；Integration Gate 只覆盖 ref mutation 窗口，
 不在 LLM Review / 冲突修复期间持有（ORCH-005）。
 
-### 持久事实（`Journal/OrchestratorFactFold.fs` / `OrchestratorProjection.fs`，ORCH-006）
+### 持久事实（`Change/Orchestration/OrchestratorFactFold.fs` / `OrchestratorProjection.fs`，ORCH-006）
 
 ```fsharp
 ManagerJobCreated = { ManagerJobId; ManagerSessionId; ManagerAgent
@@ -79,7 +79,7 @@ Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作；Publis
 ## 边界与弃权（非 normative）
 
 - **GARBAGE——`fork-manager`/`list` 旧面**：Orchestrator 旧工具名（`agent=fast-manager|job_id` +
-  worktree + `reused=true`）已 clean-break 删除，无 alias（`archive/docs/why/orchestrator.md` 备选节）。
+  worktree + `reused=true`）已 clean-break 删除，无 alias（历史 why/orchestrator 备选节）。
 - **GARBAGE——`Steward`**：`proposals/Steward.md` 明确「不在本轮创建」（orchestrator why）；
   不进入未来 WHAT。
 - **HOW——机制常数**：`MaxJoinBatch=32`（join 批次）、`DevOpsJoinTimeoutMs=10_000`（join 等待预算）、

@@ -20,7 +20,7 @@ import {
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
-import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
+import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
 import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
 import {
   AttachedSessionRuntime_$ctor_Z5DA00426 as createAttached,
@@ -59,7 +59,7 @@ const { spec: inspectSpec } = await import('../../../dist/Infrastructure/OpenCod
 const { establishSpec, repairSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/CoderTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
-  '../../../dist/Journal/DelegatedToolEstimateProjection.js'
+  '../../../dist/Execution/Delegation/DelegatedToolEstimateProjection.js'
 )
 
 const chain = (kind, extra = {}) => ({

@@ -15,7 +15,7 @@ import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Iden
 const {
   DelegatedToolEstimateProjection_remaining: remaining,
   DelegatedToolEstimateProjection_countedCallCount: countedCallCount,
-} = await import('../../../dist/Journal/DelegatedToolEstimateProjection.js')
+} = await import('../../../dist/Execution/Delegation/DelegatedToolEstimateProjection.js')
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-delegated-estimate-'))

@@ -8,7 +8,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

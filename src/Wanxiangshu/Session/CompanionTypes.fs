@@ -6,7 +6,8 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
 
 type BlogText = string
 
@@ -40,7 +41,7 @@ type CompanionMemory =
 /// `EnableReplacement`, which flipped a per-session opt-in flag. COMPANION-009's epoch
 /// now has exactly two movers — `PrefixRebaseCommitted` (CTX-012) and
 /// `ContextReanchored` (HOST-006) — and neither goes through this port: they are
-/// written by the recovery path against `Journal/PrefixEpochProjection`, which is the
+/// written by the recovery path against `Context/Prefix/Epoch`, which is the
 /// single owner. A recovery slot either has a candidate or does not, so there is no
 /// enable flag left to persist.
 type ICompanionDurablePort =

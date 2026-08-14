@@ -13,8 +13,8 @@ import {
 
 const { nudgeReviewer, requestPerfectConfirmation } =
   await import('../../../dist/Infrastructure/OpenCode/Host/HostReviewGuard.js')
-const { openBarrier } = await import('../../../dist/Journal/ReviewBarrier.js')
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { openBarrier } = await import('../../../dist/Mission/Review/Barrier/Workflow.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { SessionDirectories } = await import('../../../dist/Infrastructure/OpenCode/Host/SharedState.js')
 
 const VERDICT_NUDGE = '# Your previous response did not submit a verdict.'

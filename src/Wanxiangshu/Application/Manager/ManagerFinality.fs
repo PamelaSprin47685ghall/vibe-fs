@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Journal
+open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Kernel.Identity
 
 /// Manager-side ownership boundary while a Finality request is durably open.

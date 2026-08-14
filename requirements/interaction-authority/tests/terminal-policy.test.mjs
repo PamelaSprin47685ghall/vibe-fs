@@ -16,7 +16,7 @@ import {
   handleId, handleOwnership, stream, caseOf, roles,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { isTopLevelManager } = await import('../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js')
 
 const MAIN = sessionId('ses_main')

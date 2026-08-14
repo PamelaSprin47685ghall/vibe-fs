@@ -6,7 +6,10 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

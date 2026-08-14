@@ -20,9 +20,9 @@ const {
   RecoveryBlock,
 } = await import('../../../dist/Domain/SessionRecovery.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } =
-  await import('../../../dist/Journal/AgentJournal.js')
+  await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
-const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
+const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const { PtyPort, PtyPort__Complete_3BA7AC67: completePty } = await import('../../../dist/Process/Pty.js')
 const {

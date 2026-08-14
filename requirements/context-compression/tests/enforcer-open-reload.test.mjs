@@ -40,7 +40,7 @@ const {
   AgentJournalModule_appendAgent,
   AgentJournalModule_snapshot,
   AgentJournal__WriteBlob_Z721C83C5,
-} = await import('../../../dist/Journal/AgentJournal.js')
+} = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,

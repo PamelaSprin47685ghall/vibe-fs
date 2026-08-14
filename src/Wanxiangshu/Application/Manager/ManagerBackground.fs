@@ -4,7 +4,8 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

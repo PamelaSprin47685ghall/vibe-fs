@@ -6,7 +6,8 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 
 /// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =

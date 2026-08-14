@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Review
 

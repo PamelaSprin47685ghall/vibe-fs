@@ -2,7 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Resources
 

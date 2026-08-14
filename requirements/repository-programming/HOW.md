@@ -68,7 +68,7 @@ resolve Attempt → immutable profile（AttemptExecutionProfile.ToolCapabilitySe
 
 ## 历史与弃权
 
-### 被拒方案（详见 `archive/changes/completed/js-capability-projected-tools.md`、`js-tools-toml-result.md`、`archive/docs/why/js-tools.md`）
+### 被拒方案（详见历史 change（js-capability-projected-tools、js-tools-toml-result）、历史 why/js-tools 条款）
 
 - 五套独立 js-* RPC；万能基类 + prose warning；手写 role→JS 矩阵；alias/clean-break 替换 builtin；模型 JS 拿 ambient OS authority；事务先写盘再执行；结果 commit 后才发现不可用；walk-then-filter glob；`**`→`.*`；grep 仅靠 `glob()+file()+RegExp`；JSON stringify 进 TOML 字符串；`status` discriminator；程序对象扁平到文档根 + 保留字；逗号拼接路径；失败带半截 `[data]`；统一 `kind`/`origin`/`ok` 信封；js-tools 私有 TOML 方言（第二套 `"""`、null 哨兵）；从结果 TOML 反向解析控制流。全部按「为什么被拒」记录在 `WHY.md` §历史拒绝方案与各 change 文件。
 

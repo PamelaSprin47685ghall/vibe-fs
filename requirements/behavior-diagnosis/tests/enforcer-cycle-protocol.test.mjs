@@ -46,14 +46,14 @@ import * as PromptDispatcher from '../../../dist/Application/Prompting/PromptDis
 runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
-  '../../../dist/Journal/AgentJournal.js'
+  '../../../dist/Persistence/Journal/AgentJournal.js'
 )
 const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
 const { RepairInstruction } = await import('../../../dist/Session/EnforcerRepair.js')
 const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
 const FallbackLedger = await import('../../../dist/Application/Recovery/FallbackLedger.js')
 const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
-const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
+const BloggerRecoveryProbe = await import('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js')
 const { lastAssistantStep } = await import('../../../dist/Session/EnforcerCycleDecode.js')
 const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/ChronicleTool.js')
 
@@ -568,7 +568,7 @@ test('ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send',
       providerRun,
       sessionId,
     } = await import('../../verification-system/tests/support/domain.mjs')
-    const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+    const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
     // Pre-claim InteractionRepair for asst-preclaim (same shape as SendInteractionRepair).
     const terminal = providerRun('asst-preclaim')

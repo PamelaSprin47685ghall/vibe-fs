@@ -4,7 +4,9 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact

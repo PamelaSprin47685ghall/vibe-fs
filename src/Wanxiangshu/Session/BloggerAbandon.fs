@@ -2,7 +2,8 @@ namespace Wanxiangshu.Session
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact

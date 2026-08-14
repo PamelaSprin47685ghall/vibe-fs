@@ -16,7 +16,7 @@ import {
 const {
   SessionStartedAtProjection_bind: bindStartedAt,
   SessionStartedAtProjection_startedAt: startedAt,
-} = await import('../../../dist/Journal/SessionStartedAtProjection.js')
+} = await import('../../../dist/Execution/Session/SessionStartedAtProjection.js')
 const { composeWithElapsed, renderElapsed } = await import(
   '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js'
 )

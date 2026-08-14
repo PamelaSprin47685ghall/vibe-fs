@@ -6,7 +6,11 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

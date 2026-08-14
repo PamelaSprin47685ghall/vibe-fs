@@ -9,8 +9,8 @@
 //   Former multi-canary TOMLs orchestrator-restart-publish{,-conflict}.toml deleted.
 //
 // Production symbols:
-//   Fold.foldEnvelope / Fold.apply          — Journal/Fold.fs
-//   OrchestratorProjection.recoveryAction   — Journal/OrchestratorProjection.fs (ORCH-007)
+//   Fold.foldEnvelope / Fold.apply          — Composition/Durable/Fold.fs
+//   OrchestratorProjection.recoveryAction   — Change/Orchestration/OrchestratorProjection.fs (ORCH-007)
 //   OrchestratorFactCases                   — Kernel/Fact.fs
 //   agentJournal + dropEphemeral            — durable restart (G4R §12)
 //

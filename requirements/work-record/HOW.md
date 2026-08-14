@@ -46,7 +46,7 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
   coverage 夹到 range 内（`max(…, range start)` / `min(…, range end)`）；`includeOpening=false`。
 - full 与 bounded 共用 `LifecycleWorkRecord.materialize` —— 单一 renderer（WORK-RECORD-010）。
 
-### 1.4 floor（`src/Wanxiangshu/Journal/ManagerOpeningFloor.fs`）
+### 1.4 floor（`src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs`）
 
 - `workRecordStart life magic xTrace`：Post-T1 = `MagicTodo.blindPlanOpeningBoundary`
   （首次 true 的 T1 call cursor + callId + part anchors）；此前任意 false planning checkpoints 仍属于 Pre-T1 Opening。

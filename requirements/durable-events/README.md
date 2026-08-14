@@ -62,7 +62,7 @@ PROOF.md  命题 → executable oracle；本轮新增/改写测试 FROZEN 未执
 | hook-process Git transport | `Infrastructure/Git/GitGateway.fs` |
 | standalone hook entry | `Infrastructure/Git/HookSync.fs` + `resources/git/wanxiang-hook.mjs` |
 | startup ensure | `Infrastructure/Git/HookDispatcher.fs` / `OpenCode/Plugin/PluginBoot.fs` |
-| Journal adapter | `Journal/EventStoreJournalWriter.fs` / `Journal/AgentJournal.fs` |
+| Journal adapter | `Persistence/Journal/EventStoreJournalWriter.fs` / `Persistence/Journal/AgentJournal.fs` |
 
 ## 关键红线
 

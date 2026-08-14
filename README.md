@@ -148,7 +148,7 @@ artifacts/     中间产物与本地发布产物，不提交
 ```
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
-- 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流见 [archive/docs/README.md](archive/docs/README.md) / [archive/changes/README.md](archive/changes/README.md)
+- 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流已归档（2026-08-14 cutover；git 历史可回溯）
 - 测试全部包自有：`requirements/<package>/tests/`；共享 harness 在 `requirements/verification-system/tests/`（含 `support/`、unit runner、integration orchestrator、Long Stroke e2e）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 

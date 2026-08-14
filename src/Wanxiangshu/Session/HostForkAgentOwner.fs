@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 
 module HostForkAgentOwner =
 

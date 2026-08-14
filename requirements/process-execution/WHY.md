@@ -22,7 +22,7 @@ observation、exit。此时世界 RED。
 
 ## 历史失败模式（为什么现在是这个形状）
 
-- **stdout 启发式假完成**（`archive/docs/why/execution.md`）：曾用「看起来结束了」判断 PTY 完成，假完成污染
+- **stdout 启发式假完成**（历史 why/execution 条款）：曾用「看起来结束了」判断 PTY 完成，假完成污染
   join 与父状态机。拒启发式：PTY completion 只信 backend `onExit`（EXEC-015）。
 - **timeout flag 存在进程上**（`src/Wanxiangshu/Process/NodeProcessHost.fs` 注释）：旧 `Exit` 是
   `int * bool`，bool 表示「超时了」——但进程不知道自己是否被 deadline 等过，该 flag 是 waiter 的知识

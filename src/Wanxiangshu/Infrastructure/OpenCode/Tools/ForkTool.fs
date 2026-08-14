@@ -5,7 +5,9 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Change.Orchestration
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

@@ -7,7 +7,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Git
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process

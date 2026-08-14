@@ -12,7 +12,7 @@
 | `src/Wanxiangshu/Application/Recovery/FallbackLedger.fs` | **唯一写入口**：confirmed failure → dedupe → advance/exhaust → append 事实；`admitConfirmedFailure` 投影 host-facing admission | PAR-003/005/007 |
 | `src/Wanxiangshu/Application/Recovery/FallbackEvidence.fs` | 只读查询（currentCursor/currentSide/effectiveAgent/mayContinue） | PAR-004/013 |
 | `src/Wanxiangshu/Application/Recovery/ProviderRecoveryWorkflow.fs` | 失败后的恢复编排：记录失败 → 等 coverage material → 决定 continuation；`continueAfterLoopKill` 桥接 degeneration-guard | PAR-003/010/014 |
-| `src/Wanxiangshu/Journal/FallbackProjection.fs` / `FallbackFactFold.fs` | 持久事实的 fold 与拒绝条件 | PAR-002/007 |
+| `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs` / `FallbackFactFold.fs` | 持久事实的 fold 与拒绝条件 | PAR-002/007 |
 | `src/Wanxiangshu/Session/EnforcerRepair.fs` | `interrupted=true` 残留的判定 | PAR-012 |
 
 ## 一次已确认失败的主路径（代码时序）
@@ -48,7 +48,7 @@ FallbackExhausted      = { SessionId; LogicalRunId; AuthorityRootUserMessageId
 
 ## 历史与弃权
 
-以下事实来自 `archive/docs/why/fallback.md` 与 `archive/changes/` 考古，均为决策记录，不是现行命题：
+以下事实来自历史 why/fallback 与归档 changes 考古，均为决策记录，不是现行命题：
 
 - **Offset 表示**：拒 byte/int 裸计数（0–255 皆可构造，side 对非法字节无分支）；拒 decode 抛
   `invalidOp`（持久化损坏是可预见失败）；选 `Result<FallbackOffset, FallbackOffsetDecodeError>`。
@@ -61,7 +61,7 @@ FallbackExhausted      = { SessionId; LogicalRunId; AuthorityRootUserMessageId
 - **切边**：拒随 fallback 重写 Persona/prompt/language（伪造新身份、打碎 KV-cache 前缀）；
   只换 EffectiveAgent；cursor/Side/Offset/count 不投影给 provider。
 - **FALLBACK-011 槽算法与 FALLBACK-012 armed 合取**：维护子请求失败即槽失败；armed 只由真实失败
-  推进产生。算法细节在 `archive/docs/how/fallback.md` 已并入上文模块地图，不再另列。
+  推进产生。算法细节在历史 how/fallback 条款已并入上文模块地图，不再另列。
 
 ## GARBAGE / 弃权裁决
 

@@ -22,8 +22,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { rosterOf, graduatedReviewer } from '../../../dist/Journal/FinalityReviewCohort.js'
-import { AgentJournalModule_appendManagerLifecycle } from '../../../dist/Journal/AgentJournal.js'
+import { rosterOf, graduatedReviewer } from '../../../dist/Composition/Bridges/FinalityReview/FinalityReviewCohort.js'
+import { AgentJournalModule_appendManagerLifecycle } from '../../../dist/Persistence/Journal/AgentJournal.js'
 import {
   agentJournal,
   blobDigest,

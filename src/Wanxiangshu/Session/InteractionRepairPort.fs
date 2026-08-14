@@ -3,7 +3,7 @@ namespace Wanxiangshu.Session
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 
 /// Durable InteractionRepair send (ENFORCER-066).
 ///

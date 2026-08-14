@@ -18,7 +18,7 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 - `forWorkRecord` 过滤 raw tool（LWR 用）；`forOpening` = identity（Opening 保留一切，SEMANTIC-TRACE-010）。
 - `render` 永不输出 Provenance；assistant 正文不带 role 前缀；空列表渲染为空字符串。
 
-### 1.2 durable 投影（`src/Wanxiangshu/Journal/XTraceProjection.fs`）
+### 1.2 durable 投影（`src/Wanxiangshu/Context/Trace/Projection.fs`）
 
 `XTraceProjectionState = { Opening: OpeningMaterial option; Parts: XTracePartRef list; Terminal: (BlobRef*BlobDigest) option }`
 
@@ -30,7 +30,7 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 - `provenanceGeneration` 解析 `g:N/...`（reanchor 后），legacy `turn:N/part:M` → 0。
 - `currentGenerationParts` 只取最新 generation，避免跨 reanchor 混用 Host turn 编号。
 
-### 1.3 捕获链路（`src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs`）
+### 1.3 捕获链路（`src/Wanxiangshu/Context/Trace/Capture.fs`）
 
 - `semanticPart`：唯一的 `MessagePart → SemanticPart` mapper；`Activity` → `None`（丢弃）。
 - `captureSources`：按 provenance `g:N/turn:M/part:P` 幂等 append（recorded 集合去重）。
@@ -39,7 +39,7 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 - `captureGeneration`：generation = `ReanchoredRuns` 集合大小，reanchor 后 +1。
 - `captureOpening` / `captureTerminalText` / `captureLastWords`：Opening 与 Terminal 的捕获入口。
 
-### 1.4 fold 接线（`src/Wanxiangshu/Journal/Fold.fs` + `ContextFactFold.fs`）
+### 1.4 fold 接线（`src/Wanxiangshu/Composition/Durable/Fold.fs` + `ContextFactFold.fs`）
 
 - XTrace 事实经 `Fold` 维护（durable-events substrate）。
 - `ContextReanchored` 在 `ContextFactFold` 只更新 `PrefixEpoch` / `Blog` / `TipDelivery`，

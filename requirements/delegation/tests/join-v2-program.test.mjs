@@ -17,7 +17,7 @@ import {
   roles,
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 /** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs
@@ -55,7 +55,7 @@ test('EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
 })
 
 test('EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
-  const mod = await import(new URL('../../../dist/Application/Reconciliation/Join.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Execution/Delegation/Join.js', import.meta.url).pathname)
   const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
   assert.equal(
     names.some((n) => /Command|Reply|JoinProgram|Interpreter|Step|Return/.test(n)),

@@ -101,12 +101,12 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
   `tryReloadRequestContext`（durable open materialization 恢复）、
   `lastCoveredSequence` / `coveredPrefixDigest`（出生门，BD-013）。
 
-### 3.4 投影：`src/Wanxiangshu/Journal/EnforcementProjection.fs`（BD-014）
+### 3.4 投影：`src/Wanxiangshu/Feedback/Enforcer/Projection.fs`（BD-014）
 
 - `RecentTipLimit = 8`；`applyFromEntry`（每 cycle 一个 tip，按 ProviderRun 幂等）；
   `applySquash count`（co-truncate 最老 `min(count, tips)`）；`recentTips`
   oldest → newest；`tryFindByProviderRun`。
-- `src/Wanxiangshu/Journal/ObservationProjection.fs`（BD-015/016）：
+- `src/Wanxiangshu/Feedback/Enforcer/Observation.fs`（BD-015/016）：
   `observationsOf` / `observationsOfSession` / `observationsAfterSquash` 把
   Enforcement 与 Blog 两个投影 zip 成配对 Observation 视图——命名 fold，非第二
   store；物理事实仍是 `BlogObservationCommitted` / `BlogObservationsSquashed`。

@@ -11,7 +11,14 @@ open Wanxiangshu.Host
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Mission.Review.Assurance
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery

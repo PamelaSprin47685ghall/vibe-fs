@@ -3,7 +3,10 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

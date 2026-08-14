@@ -39,7 +39,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
   `src/Wanxiangshu/Kernel/Outcome.fs`（AgentRunResult / SendOutcome / SessionError）
 - 直接 CE：`src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs`（`observe` / `observeIdle`）、
   `src/Wanxiangshu/Application/Review/ReviewerWorkflow.fs`（`observe`）、
-  `src/Wanxiangshu/Application/Reconciliation/TurnWorkflow.fs`（薄 router，按 bounded context 委派）
+  `src/Wanxiangshu/Composition/Turn/Workflow.fs`（薄 router，按 bounded context 委派）
 - 纯领域：`src/Wanxiangshu/Domain/ReconcileProgram.fs`（观测稳定边界：`decideStep` /
   `publishDecision` / `isTerminalOutcome`）
 - 静态门禁：`scripts/checks/dsl-ownership.mjs`（positive 结构门，`--threshold=0`）、

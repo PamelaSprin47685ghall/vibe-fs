@@ -4,7 +4,11 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery

@@ -133,7 +133,7 @@ Jaccard ≥ 0.90 或 Levenshtein ≥ 0.95）；warn/note 级证据照常输出�
 
 - 含义：detection 语料的可区分性是 delivery 质量的前置——选择一条 tip 时不能被
   另一条的同词触发条件污染（Rulebook A40；PROOF-MAP Phase D 归属本包）。
-- 边界：门是词法机械替代，**不冒充**人类 tournament（`archive/changes/completed/rulebook.md`
+- 边界：门是词法机械替代，**不冒充**人类 tournament（历史 change（rulebook）
   Final outcome 诚实声明）。
 - 证据：REUSE `requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`
   `enforcer_collision_*`；`PROOF.md` 行 20。

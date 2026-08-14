@@ -32,7 +32,7 @@ runtimeResources.installFromPackage()
 const {
   AgentJournalModule_appendAgent,
   AgentJournalModule_snapshot,
-} = await import('../../../dist/Journal/AgentJournal.js')
+} = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,

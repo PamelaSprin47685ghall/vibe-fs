@@ -11,7 +11,9 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow

@@ -7,7 +7,6 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

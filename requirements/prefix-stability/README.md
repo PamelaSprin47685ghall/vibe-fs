@@ -24,10 +24,10 @@ provider cache 与认知连续性依赖「已呈现的过去不会无故重排�
 - 类型：`Domain/PrefixCandidate.fs`（PrefixSnapshot/PrefixProbe/XProjectionChoice）、
   `Domain/XPrefixProjection.fs`（forSnapshot/forChoice/requiredBlob）、
   `Domain/MagicTodoPrefixEpoch.fs`（TodoCheckpoint 同一 epoch 合同）
-- epoch：`Journal/PrefixEpochProjection.fs`（applyRebase/applyReanchor/isReanchored）、
-  `Journal/ContextFactFold.fs`（PrefixRebaseCommitted/ContextReanchored）
+- epoch：`Context/Prefix/Epoch.fs`（applyRebase/applyReanchor/isReanchored）、
+  `Context/Companion/Blogger/ContextFactFold.fs`（PrefixRebaseCommitted/ContextReanchored）
 - 权威判定：`Domain/ProviderProjection.isAppendOnlyPrefix`；生产前置 proof 与回归测试共用
-  （`Application/Reconciliation/XWire.fs`）
+  （`Context/Prefix/XWire.fs`）
 
 ## proof 概览（→ PROOF.md）
 

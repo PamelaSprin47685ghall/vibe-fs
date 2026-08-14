@@ -6,7 +6,10 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process

@@ -8,7 +8,12 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -46,7 +51,7 @@ module EnforcerFrameRecovery =
                     if List.isEmpty blog.Frames then
                         return Ok([], blog.FrameEpochId)
                     else
-                        let rec load remaining acc =
+                        let rec load (remaining: BlogFrame list) acc =
                             task {
                                 match remaining with
                                 | [] -> return Ok(List.rev acc, blog.FrameEpochId)

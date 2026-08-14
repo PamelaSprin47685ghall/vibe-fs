@@ -5,7 +5,11 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Bridges.FinalityReview
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

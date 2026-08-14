@@ -6,7 +6,10 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 
 /// One `verdict` tool call, with every identity needed for durable judgement.
 type VerdictSubmission =

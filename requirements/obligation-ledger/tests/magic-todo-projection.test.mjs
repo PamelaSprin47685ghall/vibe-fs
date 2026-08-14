@@ -19,7 +19,7 @@ import {
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const FactCodec = await import('../../../dist/Journal/FactCodec.js')
+const FactCodec = await import('../../../dist/Persistence/Journal/FactCodec.js')
 
 const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('manager-life')

@@ -10,7 +10,7 @@
 完整执行历史 `h=(q0,a1,y1,…,at,yt)` 中大量表面差异对未来认知决策无影响。把历史直接当状态，
 会让「多说一遍」伪装成「多知道一点」。真正维护的是历史关于未来认知决策的**充分统计量**
 `S=[h]~`；日志可以 append-only，推理状态不应该 append-only。搜索树、posterior、frontier、
-MCTS stats 都是 representation，不是 ontology（archive/changes/completed/Sphinx.md 第 1 篇 §2/§3）。
+MCTS stats 都是 representation，不是 ontology（历史 change（Sphinx）第 1 篇 §2/§3）。
 
 ### 1.2 Proposal 与 Evidence 必须物理分槽（No Free Information）
 
@@ -95,7 +95,7 @@ Agent/Host/Journal；Host 只知道入口与权限。这样既消除第二编译
 | 用 argmax/bind-once 硬标签 | 0.51/0.49 与 0.99/0.01 变同一控制状态 | EPI-007 |
 | 算法只挂名不退化 | 无法验证母模型被错误抽象设计窄 | EPI-010 |
 
-历史修正第一手考古：`archive/changes/completed/Sphinx.md`「Corrective outcome — 2026-08-12」——旧
+历史修正第一手考古：历史 change（Sphinx）「Corrective outcome — 2026-08-12」——旧
 完成声明曾引入 `evidenceMass` 伪置信度、primary argmax、bind-once、wire equivalenceKey、
 LLM 自报 confidence、开局一次性生成候选，全部在 corrective round 逐条修正为本包命题。
 
@@ -125,4 +125,4 @@ LLM 自报 confidence、开局一次性生成候选，全部在 corrective round
   （`managed-session-lifecycle` 相关）。
 - 组件名 Sphinx、A*/Bayes/MCTS 算法、MCP 工具名 → HOW，不进 WHAT。
 
-边界卡片：`archive/archive/archive/requirements-design/18-optimization-epistemics.md`。
+边界卡片：历史 requirements-design card（18-optimization-epistemics）。

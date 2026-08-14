@@ -14,6 +14,8 @@ const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinT
 const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { forJournal, Runtime__RegisterAuthority_Z6B6240E7: registerAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
+const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'
 )
@@ -24,9 +26,9 @@ const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Ident
 const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
 
 const context = (session = 'ses_join') =>
-  new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})
+  new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => { })
 
-const lock = () => ({ Enter: () => ({ Exit: () => {} }) })
+const lock = () => ({ Enter: () => ({ Exit: () => { } }) })
 
 const scopeFor = async ({ engineTask, mailbox }) => {
   const opened = await agentJournal.create({ directory: `join-family-${Math.random()}` })

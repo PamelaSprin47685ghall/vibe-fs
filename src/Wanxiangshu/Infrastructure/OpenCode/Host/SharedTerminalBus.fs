@@ -5,7 +5,7 @@ open System.Collections.Generic
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 
 /// Process-local terminal fan-out keyed by the same workspace runtime path as
 /// SharedAgentJournal. OpenCode loads the plugin once for the root workspace and

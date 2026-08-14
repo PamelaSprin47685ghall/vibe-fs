@@ -15,7 +15,7 @@ import { ObservationCollector__Collect_Z15AE2BE0 as collect } from '../../../dis
 import { contentHash as hash } from '../../../dist/Infrastructure/CasebookCapture.js'
 import { Observation } from '../../../dist/Domain/Casebook.js'
 import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
-import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
+import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, resultOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'

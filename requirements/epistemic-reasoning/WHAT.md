@@ -5,9 +5,8 @@
 > 历史断言、迁移沉积、被拒方案**不是**命题（见 HOW.md「历史与弃权」）。
 > 前缀 `EPI-`。测试落点表见 `PROOF.md`。
 
-源条款：`archive/docs/what/sphinx.md` SPHINX-001..010（本包主导全部 10 条，COVERAGE.md 单-owner
-裁决）；`archive/docs/why/sphinx.md`、`archive/docs/shape/sphinx.md`、`archive/docs/how/sphinx.md`、
-`archive/docs/proof/sphinx.md`、`archive/changes/completed/Sphinx.md`。
+源条款：历史 what/sphinx SPHINX-001..010（本包主导全部 10 条，COVERAGE.md 单-owner
+裁决）；历史 why/shape/how/proof sphinx 条款、历史 change（Sphinx）。
 
 ---
 

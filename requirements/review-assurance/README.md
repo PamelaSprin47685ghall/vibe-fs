@@ -26,7 +26,7 @@ Reviewer 输出了 `PERFECT`/`REVISE`，不等于系统已经证明这个判断*
 - witness/challenge 代数：`src/Wanxiangshu/Domain/{ReviewWitness,ReviewChallenge}.fs`。
 - 投影与 fold：`src/Wanxiangshu/Journal/{ReviewProjection,ReviewBarrier,ReviewFactFold,FinalityReviewCohort}.fs`。
 - 确认写入：`src/Wanxiangshu/Application/Review/{VerdictWorkflow,ReviewBarrierWorkflow,ReviewerContinuation,ReviewerWorkflow}.fs`。
-- seal 绑定：`src/Wanxiangshu/Application/Reconciliation/ReviewSeal.fs`。
+- seal 绑定：`src/Wanxiangshu/Mission/Review/Assurance/Seal.fs`。
 - record-ready 等待：`src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs`。
 
 ## proof 概览（详见 PROOF.md）

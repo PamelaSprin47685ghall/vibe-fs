@@ -33,12 +33,12 @@ const { initSpikePlugin } = await import('../../../../dist/Infrastructure/OpenCo
 // HostEventPort `initSpikePlugin` wired. No production export or visibility was
 // widened for this (VERIFY-008); the same-import precedent is this file's own
 // `initSpikePlugin` line.
-const { forWorkspace, gitCommonDir } = await import('../../../../dist/Journal/RuntimePath.js')
-const { acquire: acquireJournal, release: releaseJournal } = await import('../../../../dist/Journal/SharedAgentJournal.js')
+const { forWorkspace, gitCommonDir } = await import('../../../../dist/Persistence/Journal/RuntimePath.js')
+const { acquire: acquireJournal, release: releaseJournal } = await import('../../../../dist/Persistence/Journal/SharedAgentJournal.js')
 const { acquire: acquireTerminalBus } = await import('../../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
 const { bootPort } = await import('../../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
 const { AgentJournalModule_runtimeId, AgentJournalModule_createFromProjection } = await import(
-  '../../../../dist/Journal/AgentJournal.js'
+  '../../../../dist/Persistence/Journal/AgentJournal.js'
 )
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
   '../../../../dist/Application/Prompting/PromptDispatcher.js'
@@ -54,7 +54,7 @@ const {
 } = await import('../../../../dist/Session/HandleController.js')
 const ChildRecovery = await import('../../../../dist/Domain/ChildRecovery.js')
 const { ManagerLifecycleFact } = await import('../../../../dist/Kernel/Fact.js')
-const { StreamId } = await import('../../../../dist/Journal/Envelope.js')
+const { StreamId } = await import('../../../../dist/Persistence/Journal/Envelope.js')
 const {
   MagicTodoFact,
   PhysicalSuccessEvidence,
@@ -63,7 +63,7 @@ const {
 } = await import('../../../../dist/Domain/MagicTodoFacts.js')
 const { TodoWriteIdModule_create } = await import('../../../../dist/Domain/MagicTodo.js')
 const { XTraceCursor } = await import('../../../../dist/Domain/XTrace.js')
-const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../../dist/Persistence/Journal/AgentJournal.js')
 const terminalEvidenceCompleted =
   ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed
 const terminalEvidenceFailed =

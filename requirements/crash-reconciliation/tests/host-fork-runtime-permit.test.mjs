@@ -35,10 +35,10 @@ const {
   RecoveryClosureModule_members,
 } = await import('../../../dist/Domain/SessionRecovery.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import(
-  '../../../dist/Journal/AgentJournal.js'
+  '../../../dist/Persistence/Journal/AgentJournal.js'
 )
 const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
-const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
+const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
 
 const PARENT = sessionId('ses_hfrt')
 

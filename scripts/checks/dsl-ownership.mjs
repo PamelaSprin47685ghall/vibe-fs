@@ -131,6 +131,36 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'SyncDelegateRuntime.fs',
   // W1 EventStore-backed journal adapter (Journal IJournalWriter over IEventStore).
   'EventStoreJournalWriter.fs',
+  // Round-1 ownership rotation (2026-08-14): files moved out of
+  // Application/Reconciliation + Journal into their owning subtrees still
+  // depend on Wanxiangshu.OpenCode host types (ISessionSnapshotPort,
+  // HostSignal, MessagePart…). Round 2 moves those host files into the tree,
+  // after which these opens become internal and these entries can be removed.
+  'BloggerRecoveryProbe.fs',
+  'BloggerCrashRecovery.fs',
+  'Capture.fs',
+  'ChildRecoveryWorkflow.fs',
+  'CompletedTurn.fs',
+  'CompanionTransform.fs',
+  'Fold.fs',
+  'GuidelineProjection.fs',
+  'HostFactFold.fs',
+  'InteractionRepair.fs',
+  'MagicTodoLocality.fs',
+  'MagicTodoMembrane.fs',
+  'Observation.fs',
+  'OrdinaryTurnWorkflow.fs',
+  'Projection.fs',
+  'ReconcilePass.fs',
+  'Recovery.fs',
+  'Scheduler.fs',
+  'Seal.fs',
+  'SessionRecoveryWorkflow.fs',
+  'Supervisor.fs',
+  'TerminalReporter.fs',
+  'TurnReconcile.fs',
+  'Workflow.fs',
+  'XWire.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {

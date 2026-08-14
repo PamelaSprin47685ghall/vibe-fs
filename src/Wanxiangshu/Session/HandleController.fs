@@ -6,7 +6,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 
 /// Why a controlled consume refused to retire (EXEC-009).
 type HandleConsumeRejection =

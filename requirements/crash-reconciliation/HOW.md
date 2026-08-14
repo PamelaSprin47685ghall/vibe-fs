@@ -7,17 +7,17 @@
 | 模块 | 角色 | 对应命题 |
 |---|---|---|
 | `src/Wanxiangshu/Domain/SessionRecovery.fs` | recovery 纯代数：RecoveryNode/RecoveryClosure/validateClosurePure、SessionRecovery.combine、authorizeFamilyResume、FamilyRecoveryPermit（私有构造 + missingFrom） | CRASH-005/010/011/013/014 |
-| `src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs` | family 恢复编排：SessionRecoveryPorts（全强制）、recoverFamilyDirect（child-first recoverNodes）、authorize | CRASH-002/005/006/010/011 |
+| `src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs` | family 恢复编排：SessionRecoveryPorts（全强制）、recoverFamilyDirect（child-first recoverNodes）、authorize | CRASH-002/005/006/010/011 |
 | `src/Wanxiangshu/Domain/ChildRecovery.fs` | child 恢复纯决策：DurableHandleEvidence / ChildSnapshotEvidence / HostObservation → resolveChild；JoinableCompletion（fromDecoded / tryFromProvenTerminal）；JoinRecoveryTrace | CRASH-005/009/010/011/012 |
-| `src/Wanxiangshu/Application/Reconciliation/ChildRecoveryWorkflow.fs` | resolveAndCommit：读 durable + snapshot → resolve → recordCompletion/recordAbandon → Pulse | CRASH-002/009/012 |
+| `src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs` | resolveAndCommit：读 durable + snapshot → resolve → recordCompletion/recordAbandon → Pulse | CRASH-002/009/012 |
 | `src/Wanxiangshu/Session/HandleController.fs` | completion 单一 owner（recordCompletion/recordAbandon/retire/consume） | CRASH-009/012 |
-| `src/Wanxiangshu/Application/Reconciliation/ReconcilePass.fs` / `Reconciler.fs` / `ReconciledTurn.fs` | snapshot 观测 → wake evidence → publish；TurnUnknown 私有观测 | CRASH-003/007/008 |
-| `src/Wanxiangshu/Application/Reconciliation/BloggerCrashRecovery.fs` / `BloggerRecoveryProbe.fs` | Blogger 崩溃窗口分类与恢复探针 | CRASH-002/016 |
-| `src/Wanxiangshu/Application/Reconciliation/PromptRecovery.fs` | Prompt claim 恢复（Proven / StillPending / GaveUp） | CRASH-005 |
+| `src/Wanxiangshu/Composition/Turn/ReconcilePass.fs` / `Reconciler.fs` / `ReconciledTurn.fs` | snapshot 观测 → wake evidence → publish；TurnUnknown 私有观测 | CRASH-003/007/008 |
+| `src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs` / `BloggerRecoveryProbe.fs` | Blogger 崩溃窗口分类与恢复探针 | CRASH-002/016 |
+| `src/Wanxiangshu/Interaction/Dispatch/Recovery.fs` | Prompt claim 恢复（Proven / StillPending / GaveUp） | CRASH-005 |
 | `src/Wanxiangshu/Session/HostForkRestart.fs` / `HostForkRunLifecycle.fs` / `ForkRecovery.fs` | restart 恢复 walk：restoreLinkedChildren、HostForkRestart 的证明结构（p0-recovery-join 正向模式） | CRASH-002/009/012 |
-| `src/Wanxiangshu/Journal/RecoveryClosureProjection.fs` | 从 durable 关联发现 closure（child-first 序） | CRASH-002/014 |
+| `src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs` | 从 durable 关联发现 closure（child-first 序） | CRASH-002/014 |
 | `src/Wanxiangshu/Session/FamilyRecoveryCoordinator.fs` | 物理 single-flight runOnce（Session 层，非 Application） | CRASH-006 |
-| `src/Wanxiangshu/Session/CompletionMailbox.fs` / `JoinDrain.fs` / `Application/Reconciliation/Join.fs` | agent Pulse vs PTY Publish 双通道；join 消费 v2 terminal | CRASH-011/012 |
+| `src/Wanxiangshu/Session/CompletionMailbox.fs` / `JoinDrain.fs` / `Execution/Delegation/Join.fs` | agent Pulse vs PTY Publish 双通道；join 消费 v2 terminal | CRASH-011/012 |
 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs` / `PluginRecoveryScope.fs` | RequireFamilyRecovery 端口接线 | CRASH-006 |
 
 ## 一次 family 恢复的主路径（代码时序）
@@ -67,7 +67,7 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
 
 ## 历史与弃权
 
-以下事实来自 `archive/docs/why/*`、`archive/docs/how/host.md` 与 gate 考古，均为决策记录，不是现行命题：
+以下事实来自历史五层 docs（why/*、how/host）与 gate 考古，均为决策记录，不是现行命题：
 
 - **恢复哲学（ARCH-005 / FLOW-005 / DSL-004）**：恢复重入普通程序，不恢复协程；「执行到第几步」
   不是可恢复对象。曾有一个 `EnsureRecoveryDone: Task<unit>`（collapsed FamilyRecovery → unit）

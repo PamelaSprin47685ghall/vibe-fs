@@ -3,7 +3,9 @@ namespace Wanxiangshu.Finality
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 

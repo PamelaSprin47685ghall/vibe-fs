@@ -3,7 +3,10 @@ namespace Wanxiangshu.Finality
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

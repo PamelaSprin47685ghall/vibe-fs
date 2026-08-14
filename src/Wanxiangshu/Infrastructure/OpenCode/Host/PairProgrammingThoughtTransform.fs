@@ -8,7 +8,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Session
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.OpenCode.Contract
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

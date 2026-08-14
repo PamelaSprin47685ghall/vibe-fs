@@ -18,7 +18,7 @@ Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界
 **边界**：本命题只定分类轴本身；具体有哪些 `AttachmentKind`、kind 之间的生命周期机制不归本命题。
 
 **证据**：类型 `src/Wanxiangshu/Kernel/SessionOwnership.fs`；派生视图
-`Journal/SessionAssociation.fs` `SessionOwnershipClassification`；→ PROOF.md `SESSION-ONTOLOGY-001/002`。
+`Execution/Session/Association.fs` `SessionOwnershipClassification`；→ PROOF.md `SESSION-ONTOLOGY-001/002`。
 
 ## SESSION-ONTOLOGY-002：ExecutionClass 与 Ownership 是正交且穷尽的组合
 
@@ -91,7 +91,7 @@ Host 树深度恒为 2。归属关系不由物理 parentID 承载，只由 durab
 **规范**：durable `SessionAssociation`（FactCodec）仍以 `ManagedSessionKind`
 （`WorkSession | SatelliteSession(_, Companion)`）记录；`ExecutionClass × Ownership` 是
 `SessionOwnershipClassification` 派生视图，**additive only**——不改 `SessionAssociation` 字段与
-FactCodec（`Journal/SessionAssociation.fs` 头注释）。
+FactCodec（`Execution/Session/Association.fs` 头注释）。
 
 **含义/动机**：既有 journal 不必迁移；新视图不破坏 codec 稳定性。`SatelliteKind` 仅 `Companion`。
 
@@ -131,7 +131,7 @@ map O(1) 回答，无第二索引可分歧（PERSIST-008）。
 Authority / Fallback 临时决定（HOST-008 不变量）；「有没有 Companion」不由角色资格白名单决定
 （COMPANION-001）。
 
-**含义/动机**：把拓扑绑到身份会让换执行者 = 换人、换 Peer = 换世界（`archive/docs/why/host.md` §21）。
+**含义/动机**：把拓扑绑到身份会让换执行者 = 换人、换 Peer = 换世界（历史 why/host §21）。
 
 **证据**：`SessionAssociationProjection.isCompanion` 只读 durable kind，无任何 role 参数；
 → PROOF.md `SESSION-ONTOLOGY-010`。
@@ -177,7 +177,7 @@ label 稳定性」这一可观察面。
 **规范**：`Role.Student` / `Role.Teacher`、Student↔Teacher 绑定、HOST-014 canary 与
 `TeacherSessionId` 投影 **absent**（G3 clean-break）；不得写成 pending / 仍存在的过渡路径，
 不得以 alias / deprecated type / 隐藏 storage / SyncDelegate fallthrough 复活
-（`archive/docs/shape/host.md` HOST-008 G3；`archive/docs/what/host.md` HOST-014 空号）。
+（历史 shape/host HOST-008 G3；历史 what/host HOST-014 空号）。
 
 **含义/动机**：absence ratchet 防止旧领域借兼容层复活；`SatelliteKind` 只允许 `Companion`。
 
@@ -192,6 +192,6 @@ label 稳定性」这一可观察面。
 - `AGENT-002` exact catalog（22 agent 名等）→ GARBAGE（machine vocabulary）。
 - `AGENT-020/021/022` Student absence 细节 → GARBAGE（与 SESSION-ONTOLOGY-014 同源，收敛到 absence）。
 - 历史 `SatelliteKind = { Companion, Teacher }` 中的 Teacher 案例 → GARBAGE（G3 删除）。
-- `archive/changes/completed/ce-student-teacher-collapse.md` 的 CE/registry 细节 → HOW/GARBAGE
+- 历史 change（ce-student-teacher-collapse）的 CE/registry 细节 → HOW/GARBAGE
   （实施记录 + 已删领域；其 durable WHY 已由 session-ontology / delegation 拥有）。
 

@@ -35,7 +35,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
 |---|---|---|
 | `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | `observe`、`observeIdle` | Manager 终态业务故事：handoff → background → activation → idle labor，全部 CE 顺序表达 |
 | `src/Wanxiangshu/Application/Review/ReviewerWorkflow.fs` | `observe` | Reviewer turn 唯一 continuation writer：`ReviewerEvidence.classifyNeed` 分派 → 具名 Vocabulary 发送承诺，无存储 State/Stage 计数器 |
-| `src/Wanxiangshu/Application/Reconciliation/TurnWorkflow.fs` | `observe` | 极薄 router：按 bounded context 委派（Manager/Reviewer/Ordinary），不计算 pending/shouldContinue/phase |
+| `src/Wanxiangshu/Composition/Turn/Workflow.fs` | `observe` | 极薄 router：按 bounded context 委派（Manager/Reviewer/Ordinary），不计算 pending/shouldContinue/phase |
 
 Manager 词汇：`ManagerBackground.ensureSettled`、`ManagerActivation.ensureAccepted`、
 `ManagerIdle.encourageLabor`、`ManagerJobHandoff.completeIfTransferred`、

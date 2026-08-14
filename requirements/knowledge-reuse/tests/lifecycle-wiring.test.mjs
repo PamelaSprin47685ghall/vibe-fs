@@ -12,7 +12,7 @@ import { collector, setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cl
 import { CasebookWorkflow_fetchCase as fetchCase, CasebookWorkflow_touchCaseAccess as touchCaseAccess } from '../../../dist/Infrastructure/CasebookWorkflow.js'
 import { ObservationCollector__Collect_Z15AE2BE0 as collect, ObservationCollector__Count_Z721C83C5 as count } from '../../../dist/Infrastructure/ObservationCollector.js'
 import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
-import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
+import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
 import { listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
 import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Infrastructure/BookkeeperRuntime.js'

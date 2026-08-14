@@ -12,6 +12,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
+open Wanxiangshu.Composition.Turn
 
 
 [<RequireQualifiedAccess>]

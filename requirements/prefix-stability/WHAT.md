@@ -18,7 +18,7 @@ message prefix）；**不得**再写第二套「差不多是前缀」的 helper�
 **边界**：why/when 需要替换前缀归 context-compression；本命题拥有「替换后的字节关系」。
 
 **证据**：ARCH-004；HOST-013 行为约束 5；`Domain/ProviderProjection.fs`
-（`isAppendOnlyPrefix`）；`archive/changes/completed/cache.md` §1/§2/§11。
+（`isAppendOnlyPrefix`）；历史 change（cache）§1/§2/§11。
 
 ---
 
@@ -39,7 +39,7 @@ message prefix）；**不得**再写第二套「差不多是前缀」的 helper�
 **边界**：每个来源的触发条件分别归 context-compression（probe/candidate）、host-boundary
 （compaction 观察）、obligation-ledger（Accepted 链）；本命题拥有「切换只由这三源发生」。
 
-**证据**：COMPANION-009；`shape/companion.md`（epoch 切换表）；`archive/docs/why/context.md`。
+**证据**：COMPANION-009；`shape/companion.md`（epoch 切换表）；历史 why/context 条款。
 
 ---
 
@@ -92,7 +92,7 @@ seal/绑定**之前**原子提交；provider Failed/Aborted **不**回滚已 sea
 **边界**：desired cutoff 的推导归 obligation-ledger（仅从首次 accepted `planComplete=true` 起的
 committed Accepted 子链；Pre-T1 planning checkpoints 不参与）；本命题拥有「commit 后不可逆」。
 
-**证据**：CTX-015；TODO-009；`Journal/PrefixEpochProjection.fs`
+**证据**：CTX-015；TODO-009；`Context/Prefix/Epoch.fs`
 （`applyRebase` 只校验 epoch 序，不读 provider 结局）。
 
 ---
@@ -111,7 +111,7 @@ pseudo-run **永不**重锚两次（`CompactionAlreadyReanchored`）。重锚是
 **边界**：「观察到 compaction 就重锚」的决策归 context-compression（HOST-006 containment）；
 本命题拥有 epoch 事实语义。
 
-**证据**：HOST-006；`Journal/PrefixEpochProjection.fs`（`applyReanchor`/`isReanchored`）；
+**证据**：HOST-006；`Context/Prefix/Epoch.fs`（`applyReanchor`/`isReanchored`）；
 `tests/prefix-epoch.test.mjs`（`HOST_006_*`）。
 
 ---
@@ -196,7 +196,7 @@ replay / compaction / reanchor 重算 elapsed——只重放已存字节（`Sess
 **边界**：elapsed 采样归 host-boundary（HOST-013 的 wall-clock 计量）；本命题拥有
 「不得借 epoch 掩盖漂移」。
 
-**证据**：HOST-013 行为约束 5/7；cache.md §10；`archive/docs/why/host.md` 决策 13。
+**证据**：HOST-013 行为约束 5/7；cache.md §10；历史 why/host 决策 13。
 
 ---
 
@@ -210,7 +210,7 @@ replay / compaction / reanchor 重算 elapsed——只重放已存字节（`Sess
 
 **边界**：与 PREFIX-STABILITY-005 合并表述在 card 中；本命题覆盖 reanchor 一侧。
 
-**证据**：CTX-015；HOST-006；`Journal/PrefixEpochProjection.fs`（apply 函数无回滚路径）。
+**证据**：CTX-015；HOST-006；`Context/Prefix/Epoch.fs`（apply 函数无回滚路径）。
 
 ---
 

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, prefixEpochId, idValue, listItems } from '../../verification-system/tests/support/domain.mjs'
 
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
 
 const SESSION = 'ses_provenance'
 const session = sessionId(SESSION)

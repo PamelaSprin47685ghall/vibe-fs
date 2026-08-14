@@ -7,7 +7,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact

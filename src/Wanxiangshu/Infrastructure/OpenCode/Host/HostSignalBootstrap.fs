@@ -8,7 +8,10 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 

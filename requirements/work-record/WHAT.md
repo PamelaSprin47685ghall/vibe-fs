@@ -124,7 +124,7 @@ SyncDelegate caller `false`（REVIEW-016、EXEC-031）。
 trace 区间事实归 `semantic-trace`（SEMANTIC-TRACE-010）；本命题拥有「record 里的 Opening
 来自 preserved 区间」这一半。
 
-**证据**：COMPANION-014；`archive/docs/what/glory.md` GLORY-074。
+**证据**：COMPANION-014；历史 what/glory GLORY-074。
 
 ---
 
@@ -143,7 +143,7 @@ tool 滤入 Recent work。
 在 record 里属于 Opening 区间」。
 
 **证据**：COMPANION-014 ⑨；TODO-015；`Domain/LifecycleWorkRecord.fs` `withConstitutive`；
-`Journal/ManagerOpeningFloor.fs`（WorkRecordStart 含 T1 call）。
+`Mission/Manager/Life/OpeningFloor.fs`（WorkRecordStart 含 T1 call）。
 
 ---
 
@@ -189,7 +189,7 @@ fixed report schema（`### Summary` / files/tests/risks/blockers 等强制字段
 **边界**：角色可自然提及事实；「提及义务」不得写成格式。协议真需处的结构（如
 `SyncDelegatePromptRequest { Charge; ProviderPrompt }`）不属于 report DTO。
 
-**证据**：ARCH-015；COMPANION-015 ⑫；`archive/docs/why/companion.md`（陈述：散文 vs 固定字段 schema）。
+**证据**：ARCH-015；COMPANION-015 ⑫；历史 why/companion 条款（陈述：散文 vs 固定字段 schema）。
 
 ---
 
@@ -246,7 +246,7 @@ RecordCoverage 推导可替换前缀，禁止用 PrefixCoverage 填 LWR gap。
 **边界**：epoch/rebase 语义归 `prefix-stability`；Y 从 floor 起算的压缩行为归
 `context-compression`；本命题拥有「floor 的结构性 + Opening 不复制」这一半。
 
-**证据**：TODO-001；COMPANION-014；GLORY-006；`Journal/ManagerOpeningFloor.fs`
+**证据**：TODO-001；COMPANION-014；GLORY-006；`Mission/Manager/Life/OpeningFloor.fs`
 （`workRecordStart`/`effectiveOpeningFloor`，从不读 `WorkActivated`）。
 
 ---

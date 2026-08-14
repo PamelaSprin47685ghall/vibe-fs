@@ -23,7 +23,7 @@ publish/CAS semantics 不变——本包 WHAT 全部不动。反之，改 gate �
 
 ## 历史失败模式
 
-- **全 Job 串行 vs 只锁 ref mutation**（`archive/docs/why/orchestrator.md` 备选节）：曾考虑把 Integration Gate
+- **全 Job 串行 vs 只锁 ref mutation**（历史 why/orchestrator 备选节）：曾考虑把 Integration Gate
   提前到 `runManagerJob` 入口「先锁后干活」，会在远端长 Review 期间阻塞所有 Job 的并行 rebase。
   拒因：Gate 缩为短 CAS 只保护 ref 变更（ORCH-005）。
 - **脏工作区上猜意图**（ORCH-002 备选）：自动 stash / 自动 commit / 猜用户意图清理——拒因：编排必须
@@ -32,7 +32,7 @@ publish/CAS semantics 不变——本包 WHAT 全部不动。反之，改 gate �
   事实链不可跳步（PERSIST-009 / `durable-events`）。
 - **PublishClaimed 三分支折叠**（ORCH-007 备选）：CAS 窗口崩溃后无法区分「已 ff / 未 ff / 过期」，
   折叠会造出不可判定的中间态。拒因：三分支穷尽且互斥、顺序固定不可换。
-- **e2e 超时先放大再查因**（`archive/changes/completed/orchestrator-e2e-timeout.md`）：三 canary watchdog 超时
+- **e2e 超时先放大再查因**（历史 change（orchestrator-e2e-timeout））：三 canary watchdog 超时
   （`orch.2`/`manager.3`/`manager.4` blocked expectations）——根因是 companion blogger flights
   per-plugin-instance 与 blogger sessions 在 RootWorkspace 下脱节，Finality 挂在 `journal-work-log`；
   修复 = 因果 frontier（`SharedState.BloggerFlights`），**不是**把 `check:release` 缩水成 targeted

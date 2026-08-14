@@ -7,7 +7,10 @@ open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// horizon() — natural-language roster of who remains at the caller's horizon.

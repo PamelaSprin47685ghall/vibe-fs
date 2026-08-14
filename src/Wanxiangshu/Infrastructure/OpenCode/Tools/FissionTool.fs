@@ -6,7 +6,9 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

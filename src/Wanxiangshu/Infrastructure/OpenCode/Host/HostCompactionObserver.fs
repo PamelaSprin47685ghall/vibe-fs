@@ -4,7 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.SessionRecovery
-open Wanxiangshu.Journal
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

@@ -3,7 +3,8 @@ namespace Wanxiangshu.Infrastructure.Persist
 open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Identity
 
 /// Structural frontier oracle. It sees every durable event but owns no business

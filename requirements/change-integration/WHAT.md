@@ -153,7 +153,7 @@ Gate / Clean Gate / target head / `job_id` / worktree / CAS 属墙内机械；�
 （Byname 承接 charge）与 join/horizon 的自然语言 + WorkRecord。
 
 含义/动机：编排者看见集成机械，会把 CAS/worktree 当 craft，污染「拥有道路、不拥有机械」的 epistemic
-边界（`archive/docs/why/orchestrator.md` 备选节）。
+边界（历史 why/orchestrator 备选节）。
 
 边界：完整准入过滤法则 → `participant-horizon`；本包只声明发布机械的隐藏义务。
 

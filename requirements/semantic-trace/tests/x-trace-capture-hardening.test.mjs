@@ -30,7 +30,7 @@ import {
 let appendAgentFn = null
 const appendAgent = async (...args) => {
   if (!appendAgentFn) {
-    const mod = await import('../../../dist/Journal/AgentJournal.js')
+    const mod = await import('../../../dist/Persistence/Journal/AgentJournal.js')
     appendAgentFn = mod.AgentJournalModule_appendAgent
   }
   return appendAgentFn(...args)

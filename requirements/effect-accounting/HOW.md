@@ -22,7 +22,7 @@ MagicTodoFact（Domain/MagicTodoFacts.fs）：TodoWritePrepared / TodoWriteAccep
   （携带 PreparedFactRef + InputDigest/OutputDigest + PhysicalSuccessEvidence）
 ```
 
-## effect 状态投影（`Journal/OrchestratorProjection.fs`）
+## effect 状态投影（`Change/Orchestration/OrchestratorProjection.fs`）
 
 ```text
 WorktreeEffectStatus = Requested of {| ManagerJobId; WorktreePath |}
@@ -40,7 +40,7 @@ recoveryAction（ORCH-007，三分支固定顺序）——见 WHAT 009：
       _                                        → RebaseAndReviewAgain（witness 作废）
 ```
 
-## fold 拒绝回归（`Journal/OrchestratorFactFold.fs`）
+## fold 拒绝回归（`Change/Orchestration/OrchestratorFactFold.fs`）
 
 ```text
 PublishClaimed 分支：job 当前无 RebasedCandidateReady → reject
@@ -49,7 +49,7 @@ Published → JobProgress.Published；terminal job 不再接受任何 progress�
 WorktreeCreateRequested → requestWorktree；WorktreeCreated → acceptWorktree
 ```
 
-## outcome-unknown 机械面（`Journal/EventStoreJournalWriter.fs` / `Journal/AgentJournal.fs`）
+## outcome-unknown 机械面（`Persistence/Journal/EventStoreJournalWriter.fs` / `Persistence/Journal/AgentJournal.fs`）
 
 ```text
 EventStoreJournalWriter.AppendLocked：写失败 → poisoned <- true；返回

@@ -42,7 +42,7 @@ import {
 runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
-  '../../../dist/Journal/AgentJournal.js'
+  '../../../dist/Persistence/Journal/AgentJournal.js'
 )
 const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
 

@@ -48,7 +48,7 @@ append replace fact。SyncDelegate semantic batch 对全部显式值求和；无
 - `delegateRoleToAttachment`：`Inspector → SyncInspector`、`Coder → SyncCoder`（HOST-008 的
   Work+Attached 登记；AttachmentKind 归属 `managed-session-lifecycle`/`session-ontology`）。
 
-### 同步委托 CE 单栈（`archive/docs/how/execution.md` EXEC-026/031）
+### 同步委托 CE 单栈（历史 how/execution EXEC-026/031）
 
 ```text
 expected = syncCallsInHostMessage(providerRun, role)   // ordered ToolCallIds
@@ -95,10 +95,10 @@ WorkRecord → typed `NeedHelpAdvice` continuation 返回原 binding。single-fl
 - **GARBAGE——Student/Teacher/`return`/Meditator**：`Role.Student|Teacher`、Learn/Compile/SKILL、
   `StudentQaStore`、独立 `return` 工具、`Returned → Completion` 双 await、`completion_text` /
   `SyncDelegateReturnCompletion` magic、`tdd`、`list` DTO、legacy `meditator` 身份：已 clean-break 删除，
-  不进入未来 WHAT（EXEC-027 空缺、AGENT-020/022 空缺、`archive/docs/how/execution.md`「已删除算法面」、
+  不进入未来 WHAT（EXEC-027 空缺、AGENT-020/022 空缺、历史 how/execution「已删除算法面」、
   CHANGES-AUDIT：universal.md / ce-student-teacher-collapse.md 的 GARBAGE 裁决）。
 - **GARBAGE——fork-manager 工具面**：旧 `fork-manager` / `list` / `verdict` / `blog` / `executor`(工具) /
-  `fork-pty` 名：GrandRewrite clean-break，无 alias（`archive/docs/how/execution.md`）。
+  `fork-pty` 名：GrandRewrite clean-break，无 alias（历史 how/execution 条款）。
 - **HOW——具体数值**：`MaxJoinBatch=32`、`DevOpsJoinTimeoutMs=10_000`、`ReduceFanIn=8`、
   `AwaitAgentTimeoutMs=600_000`：有界性才是 WHAT。
 - **HOW——工具名**：`fork`/`commission`/`inspect`/`establish-behavior`/`repair-behavior` 是当前选择

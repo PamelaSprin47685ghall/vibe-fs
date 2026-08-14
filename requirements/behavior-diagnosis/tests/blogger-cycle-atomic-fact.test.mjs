@@ -21,7 +21,7 @@ test('C0_no_EnforcementCycleCommitted_fact', () => {
     'EnforcementCycleCommitted must stay deleted; BlogObservationCommitted is the atomic fact',
   )
   // FactCodec may list it only as a pre-0.5.0 refuse marker (escaped JSON case name).
-  const codec = prodText('src/Wanxiangshu/Journal/FactCodec.fs')
+  const codec = prodText('src/Wanxiangshu/Persistence/Journal/FactCodec.fs')
   assert.ok(
     codec.includes('EnforcementCycleCommitted') && /pre050Markers|pre-0\.5\.0/.test(codec),
     'FactCodec must keep the legacy refuse marker for old journals',

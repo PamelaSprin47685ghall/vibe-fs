@@ -122,7 +122,7 @@ live:  newly committed EventEnvelope     → same Integrator CE → Current'
 
 Integrator 拥有：history reader、k-way frontier、identity dedupe、parent/vocabulary structural validation、
 Current。注册 rule 只接受“当前槽位 + 单个 EventEnvelope”，返回更新后的槽位/拒绝；rule 不得读取文件、
-不得枚举历史、不得自己建立 replay loop。`Journal/Fold.fs` 的各 domain fold 变成 Journal rule 内部的
+不得枚举历史、不得自己建立 replay loop。`Composition/Durable/Fold.fs` 的各 domain fold 变成 Journal rule 内部的
 单-event integration primitives，而不是另一个 history owner。
 
 ### 6. Local files 与 remote Git 编码
@@ -153,8 +153,8 @@ AgentJournal.AppendEnvelope：local commit → Integrator live integration；不
 
 ## 恢复 fold 不变量（PERSIST-010）的实现落点
 
-不变量权威定义在 `archive/docs/what/persist.md` PERSIST-010（迁移后由本包 WHAT 015 承接）；
-逐 fact 校验在 `Journal/Fold.fs` 恢复事实分支 + 各 domain fold（`CompanionFactFold`/
+不变量权威定义在历史 what/persist PERSIST-010（迁移后由本包 WHAT 015 承接）；
+逐 fact 校验在 `Composition/Durable/Fold.fs` 恢复事实分支 + 各 domain fold（`CompanionFactFold`/
 `ContextFactFold`/`BlogProjection`/`PrefixEpochProjection`/`XTraceProjection` 等）。
 物理 event 形状见 WHAT 002/004；Journal 行经 codec 进入 EventStore。
 

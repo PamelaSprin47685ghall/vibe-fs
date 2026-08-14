@@ -11,8 +11,8 @@ Process/Deadline.fs       typed deadline（ofBudget / remaining / isExpired / ne
 Process/ProcessRunner.fs  process 等待消费 deadline（物理层，允许直接采样 UtcNow）
 Session/CompletionMailbox.fs  join 等待用注入 IClockPort + ITimerPort + Deadline.nextWaitMs 分段等待
 Kernel/CausalWait.fs      WaitEscape.DeadlineAt（causal-wait 引用本包的 typed 时刻）
-Journal/SessionStartedAtProjection.fs  HOST-013 session 起点的 bounded projection
-Journal/SessionStartedAtLedger.fs      首次 prompt bind-once durable writer
+Execution/Session/SessionStartedAtProjection.fs  HOST-013 session 起点的 bounded projection
+Execution/Session/SessionStartedAtLedger.fs      首次 prompt bind-once durable writer
 Infrastructure/OpenCode/Plugin/PluginBoot.fs / PluginTransforms.fs  注入 IClockPort；新 occurrence 采 elapsed
 ```
 

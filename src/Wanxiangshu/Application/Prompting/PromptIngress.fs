@@ -3,7 +3,8 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Persistence.Journal
 
 /// chat.message authority policy (PROMPT-004).
 ///

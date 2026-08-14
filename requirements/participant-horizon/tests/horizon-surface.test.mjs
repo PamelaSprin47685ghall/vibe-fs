@@ -24,7 +24,7 @@ const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
+const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
 const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Session/ChildRun.js')
 
 const FORBIDDEN = /\b(agent_id|session_id|pty_id|child_session_id|status|kind|ordinal|has_pending_completion|current_run_id|fallback_peer|tier|role)\s*=|completed-awaiting-join|running|busy/

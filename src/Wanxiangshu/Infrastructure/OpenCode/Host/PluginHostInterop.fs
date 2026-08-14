@@ -9,7 +9,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Review

@@ -2,9 +2,24 @@
 
 ## Unreleased
 
+- 结构重排第一轮（平衡树式旋转，2026-08-14）：`Application/Reconciliation` 拆散归各语义 owner，
+  `Journal` 掏空为持久化基板；此后 **namespace = dir** 为仓库规则。
+  - `Composition/Turn/`（ReconciledTurn→Observation、TurnBinding→Binding、Reconciler→Scheduler、
+    ReconcileSupervisor→Supervisor、TurnWorkflow→Workflow + TurnReconcile/ReconcilePass/OrdinaryTurnWorkflow）、
+    `Composition/Durable/`（AgentProjection→Projection、ProjectionState、ProjectionUpdate、FoldRejection、Fold 路由）、
+    `Composition/Bridges/FinalityReview/`（FinalityReviewCohort 接缝显式化）。
+  - 各 bounded projection/fact-fold 归家：Context/{Trace,Prefix,Companion/Blogger}、
+    Interaction/{Authority,Dispatch,Repair}、Feedback/Enforcer(+Guidance)、
+    Execution/{Session,Delegation,Fission}、Mission/{Manager/Life,Obligation/Todo,Review,Review/Barrier,Review/Assurance}、
+    Change/Orchestration、Participant/Provider/Attempt/Fallback、OpenCode/Contract。
+  - `Persistence/Journal/` 仅剩 substrate：Envelope/Codec/Writer/Boot/AgentJournal/SharedJournal/RuntimePath/FactCodec/EventStoreJournalWriter。
+  - `Kernel/Fact.fs` 外层 union 与 per-family facts 拆分（第三刀）留待下一轮（wire-compat 评估后）。
+  - 移动文件 namespace 跟随目录；引用按编译器驱动补 opens；测试 dist import 与 requirements 文档路径同步更新；
+    `dsl-ownership` host-boundary 白名单扩展（过渡项，第二轮后移除）。
+
 - Requirement Package cutover 收尾：`docs/`、`changes/`、`tests/` 全部腾空。
   - 45 包 normative 树 `requirements/<package>/{WHY,WHAT,HOW,PROOF}.md` 为唯一语义权威；
-    旧 Clause 与变更记录归档于 `archive/docs/`、`archive/changes/`。
+    旧 Clause 与变更记录已归档（2026-08-14 cutover；git 历史可回溯）。
   - 测试全部分包：`tests/unit` 146 文件 MOVE/SPLIT/DELETE 归各包 `tests/`；
     `tests/eval` → `office-capability`；`tests/integration` suites 归 owner 包；
     e2e Long Stroke、support harness、unit/integration runner 归 `verification-system/tests/`。

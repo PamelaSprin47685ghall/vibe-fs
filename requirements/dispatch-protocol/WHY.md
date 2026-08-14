@@ -21,9 +21,9 @@ DOES NOT OWN：generic effect-accounting law）。`durable-events` 提供事件 
 
 1. **`accepted-*` 被当物理落地**：旧测试曾断言 transport receipt 能携带 authority/证明落地。
    `PROMPT-005` 后禁止：`accepted-*` 只是 Host 调用返回的收据；`isAdmissionShaped` 区分
-   admission 与真实 `msg_*`（`archive/docs/shape/prompt.md` 四阶段表）。
+   - admission 与真实 `msg_*`（历史 shape/prompt 四阶段表）。
 2. **崩溃后重发 = 第二次逻辑效果**：Host 可能已接受消息并开始 provider run。恢复协议选
-   at-most-once 而非重发（`archive/docs/why/prompt.md` 备选与被拒：拒 exactly-once、拒重发）。
+   - at-most-once 而非重发（历史 why/prompt 备选与被拒：拒 exactly-once、拒重发）。
    未证明物理落地就保持 Pending；只有预算耗尽才 Abandoned。
 3. **时间窗口/随机身份**：用时间窗口找落地跨崩溃不可靠，且无法区分「同一 Guard 连发两次」。
    选 `ClaimSequence` 单调序号，使同 payload 重发成为两个 key。

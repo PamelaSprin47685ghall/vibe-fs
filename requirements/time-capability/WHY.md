@@ -20,7 +20,7 @@
 
 ### 1. `TurnCompletionProgram` 变成事实上的第二运行时（ce-temporal-ownership.md §1.3）
 
-`archive/docs/what/dsl-structured-program.md` 的 DSL 静态门曾有一个机械漏洞，让 `StudentRunCell`（`mutable record` 状态机）整体漏过去；`TurnCompletionProgram` 长期充当「什么都管」的决策器。那时的时序判断散落在长期 `State / Pending / bool` 字段里，业务「走到第几步」与「现在几点」纠缠在一起——这正是 ambient 时间偷渡的温床：下一步靠可变状态 + 隐藏 timer 决定，无法测试、无法重放。`time-capability` 与 `structured-workflow`（无第二程序计数器）互为表里：本包负责时间**以显式能力进入**，`structured-workflow` 负责控制流**以语言结构表达**。
+历史 what/dsl-structured-program 的 DSL 静态门曾有一个机械漏洞，让 `StudentRunCell`（`mutable record` 状态机）整体漏过去；`TurnCompletionProgram` 长期充当「什么都管」的决策器。那时的时序判断散落在长期 `State / Pending / bool` 字段里，业务「走到第几步」与「现在几点」纠缠在一起——这正是 ambient 时间偷渡的温床：下一步靠可变状态 + 隐藏 timer 决定，无法测试、无法重放。`time-capability` 与 `structured-workflow`（无第二程序计数器）互为表里：本包负责时间**以显式能力进入**，`structured-workflow` 负责控制流**以语言结构表达**。
 
 ### 2. 轮询与 sleep 充当因果进展（reconciler-event-driven-de-polling.md）
 

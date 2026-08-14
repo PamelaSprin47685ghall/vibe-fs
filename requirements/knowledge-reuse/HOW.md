@@ -39,7 +39,7 @@
 
 ### Session 交叉（不归本包 HOW 主体）
 
-Bookkeeper child 生命周期（`fast-bookkeeper`/`deep-bookkeeper`、Clerk/Curator Persona、InternalLeaf + Attached）由 Session/Process 侧持有（`archive/docs/shape/casebook.md` Bookkeeper 身份边界）；本包只消费 `BookkeeperRequest` 契约（KNOWLEDGE-REUSE-006）。
+Bookkeeper child 生命周期（`fast-bookkeeper`/`deep-bookkeeper`、Clerk/Curator Persona、InternalLeaf + Attached）由 Session/Process 侧持有（历史 shape/casebook Bookkeeper 身份边界）；本包只消费 `BookkeeperRequest` 契约（KNOWLEDGE-REUSE-006）。
 
 ## 主流程
 
@@ -71,7 +71,7 @@ Inspector 调用（复用或非复用 scope）
 
 ## 历史与弃权
 
-### 被拒方案（详见 `archive/changes/completed/perm-inspector.md`、`archive/docs/why/casebook.md`）
+### 被拒方案（详见历史 change（perm-inspector）、历史 why/casebook 条款）
 
 独立 Git store / refs / hook；timestamp / revision 决定 freshness 与 merge winner；逐调用 finalize；从 transcript 文本推断 observation；full knowledge base；无 marker 也运行；`edit-qa` 双文档字符串替换；Bookkeeper 借用 Inspector self-model；`(revision, wall_clock)` LWW。均记录于 `WHY.md` §历史拒绝方案。
 
@@ -79,7 +79,7 @@ Inspector 调用（复用或非复用 scope）
 
 - marker 目录名 `.wanxiang/casebook`、LRU capacity / prune key 权重、`CompletionTimeoutMs = 600_000` 等常数。
 - `fast-bookkeeper`/`deep-bookkeeper` 机器身份、Clerk/Curator Persona、`js-bookkeeper` 工具的具体 JS SDK 形态 → 当前实现词汇（`participant-identity`/`session-ontology` 交叉）。
-- digest synthesizer：`archive/changes/completed/perm-inspector.md` 曾规划 LearningCompiler / CaseSynthesizer；G6 Product Exit 明确 **synthesizer gone**——「不新建 LearningCompiler/CaseSynthesizer/StudentReplacement」是当前 absence（KNOWLEDGE-REUSE-006 边界），无合成器可迁移。
+- digest synthesizer：历史 change（perm-inspector）曾规划 LearningCompiler / CaseSynthesizer；G6 Product Exit 明确 **synthesizer gone**——「不新建 LearningCompiler/CaseSynthesizer/StudentReplacement」是当前 absence（KNOWLEDGE-REUSE-006 边界），无合成器可迁移。
 
 ### 判定为 GARBAGE（migration/clean-break 沉积）
 

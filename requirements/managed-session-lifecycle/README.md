@@ -20,7 +20,7 @@ create（先写 SessionAssociation 再发首个 prompt）
   managed session 家族的 runtime owner；任何 feature 不得复制 parent map / cancel / retire 框架。
 - **ReuseScope**：`(OwnerReuseScopeId, SyncDelegateRole)` → at most one live dedicated Session；
   同 scope 兼容续问复用，不同 scope 不共享。
-- **Handle**（`Journal/LinkageProjection.fs`）：Active / CompletedAwaitingJoin / Abandoned /
+- **Handle**（`Execution/Delegation/LinkageProjection.fs`）：Active / CompletedAwaitingJoin / Abandoned /
   Retired 四态；completion cell 单赋值；consume 唯一写 retire；Abandoned 与 Retired 不可回退。
 
 ## HOW 概览
@@ -32,8 +32,8 @@ Session/HostForkRuntime.fs           fork child：create → HandleLinked → se
 Session/ForkRuntime.fs               in-process ChildRun 注册 / mailbox / cancel
 Session/HostForkRestart.fs           restoreLinkedChildren：durable handle 投影 → re-enlist
 Session/HandleController.fs          HandleLinked/Completed/Abandoned/Retired 唯一 writer
-Journal/LinkageProjection.fs         HandleProjection 四态 + rejectFalseCompletion + 视图
-Journal/SessionAssociation.fs        关联事实（Work↔Companion；Sync* 走 hints）
+Execution/Delegation/LinkageProjection.fs         HandleProjection 四态 + rejectFalseCompletion + 视图
+Execution/Session/Association.fs        关联事实（Work↔Companion；Sync* 走 hints）
 ```
 
 ## proof 概览

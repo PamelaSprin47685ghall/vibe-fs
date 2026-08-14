@@ -6,7 +6,9 @@ open System.Collections.Generic
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

@@ -5,7 +5,10 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Review
 open Wanxiangshu.Session
 open Wanxiangshu.Host

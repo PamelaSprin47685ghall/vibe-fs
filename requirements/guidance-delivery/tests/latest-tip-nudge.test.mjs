@@ -26,7 +26,7 @@ import {
 
 runtimeResources.installFromPackage()
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { EnforcerTipGuidance_latestTipNudge: latestTipNudge } = await import(
   '../../../dist/Session/EnforcerTipGuidance.js',
 )

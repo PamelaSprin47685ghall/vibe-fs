@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Composition.Turn
 
 /// STRENGTH-007: maps Host reconciliation material onto the domain's causal
 /// consumption evidence. Host bookkeeping alone is never proof that a provider

@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Change.Orchestration
 open Wanxiangshu.Orchestrator
 
 /// Remove worktrees and branches no active ManagerJob owns.

@@ -1,7 +1,8 @@
 namespace Wanxiangshu.Recovery
 
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Kernel.Identity
 
 /// Durable fallback evidence. Read-only; FallbackLedger is the only writer.

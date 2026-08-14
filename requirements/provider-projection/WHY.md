@@ -27,7 +27,7 @@ representation；representation 绝不能反向创造 authority 或 state。
 3. **representation 被反解析成 authority/state**：把 wire 反解析回 Semantic 当 digest、
    把 synthetic role 当成真实 HumanRoot/Opening/completion、把结果 TOML 反解析回控制流。
 
-历史病灶（`archive/docs/why/projection.md` 备选与被拒）：
+历史病灶（历史 why/projection 备选与被拒）：
 
 - 各功能直接改 `Message list` → Seal/digest/前缀稳定性被隐式破坏，无法做 intent 冲突检测。
 - Wire 与 Semantic 混用同一相等键 → 要么 Review 假确认、要么 canary 永不命中。
@@ -40,7 +40,7 @@ representation；representation 绝不能反向创造 authority 或 state。
 替换 TOML/wire renderer 或 planner，只要 semantic intent、horizon 与 equality contract
 不变 → 本包可独立重大变化；反之亦然（`07-projection.md` INDEPENDENT CHANGE）。
 
-## DEPENDS ON（`archive/requirements-design/INDEX.md` 依赖骨架唯一来源）
+## DEPENDS ON（`requirements/INDEX.md` 依赖骨架唯一来源）
 
 - `participant-horizon`：投影输入是「已获准进入 experience」的最小事实集；admission
   过滤是前提。

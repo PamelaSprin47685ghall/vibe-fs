@@ -8,7 +8,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 
 /// EXEC-009 + EXEC-018 + clean-break: pure durable join drain.
 ///

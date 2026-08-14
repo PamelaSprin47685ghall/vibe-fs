@@ -24,7 +24,7 @@ import {
   partsSessionText,
   partsText,
   roleOfAgent,
-} from '../../../dist/Application/Reconciliation/CompletedTurnClassifier.js'
+} from '../../../dist/Interaction/Repair/CompletedTurn.js'
 import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 
 const text = (value) => xTraceCapture.text(value)

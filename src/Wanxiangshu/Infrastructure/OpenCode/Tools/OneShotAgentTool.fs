@@ -9,6 +9,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Process
+open Wanxiangshu.Context.Trace
 
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,
 /// subscribe-before-send, await one terminal, then physically abort/dispose.

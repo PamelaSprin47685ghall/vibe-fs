@@ -7,7 +7,8 @@ open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// EXEC-016: join-capable roles must join outstanding work before terminal idle.

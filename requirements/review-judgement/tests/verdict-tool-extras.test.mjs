@@ -13,7 +13,7 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
+const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 
 const fakeSchema = {

@@ -22,8 +22,8 @@ provider history 可能超过可用上下文。压缩若靠猜模型窗口、先
 
 - 类型：`Domain/PrefixCandidate.fs`、`Domain/PrefixProbeSelection.fs`、`Domain/BloggerDelta.fs`、
   `Domain/BloggerRequestContext.fs`、`Domain/RecoverySlot.fs`、`Domain/HostCompactionPolicy.fs`
-- 投影：`Journal/BlogProjection.fs`（frames/squash/coverage）、`Journal/CompanionProjection.fs`、
-  `Journal/ContextFactFold.fs`
+- 投影：`Context/Companion/Blogger/Projection.fs`（frames/squash/coverage）、`Context/Companion/Projection.fs`、
+  `Context/Companion/Blogger/ContextFactFold.fs`
 - 接线：`Session/{Companion,CompanionHost,BloggerCoordinator,CompanionHostBlogger}.fs`
 
 ## proof 概览（→ PROOF.md）

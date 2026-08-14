@@ -10,7 +10,11 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Session.AgentRoleIdentity
 

@@ -15,7 +15,9 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Journal
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session.AgentRoleIdentity
 
 /// Bridges real child sessions to the existing completion mailbox.

@@ -21,7 +21,7 @@ import {
   xTraceCapture,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
 
 const SEM = sessionId('ses_bounded_lwr')
 
