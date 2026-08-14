@@ -1,8 +1,11 @@
-// tests/unit/Prompt/fire-and-forget.test.mjs — PROMPT-007.
+// requirements/dispatch-protocol/tests/fire-and-forget.test.mjs — PROMPT-007.
 //
 // Fire-and-forget = AwaitMode.Detached: caller does not wait for PhysicalAccepted.
 // Claim, authority, persist and error recording still run. No standalone
 // SendChildPromptFireAndForget port may exist.
+//
+// dispatch-protocol 单-owner：MOVE 自 tests/unit/prompt/fire-and-forget.test.mjs
+// （import 深度已按新路径修正）。运行：node --test requirements/dispatch-protocol/tests/fire-and-forget.test.mjs
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -17,7 +20,7 @@ import {
   mapCount,
   promptDispatcher,
   transportReceipt,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const capturingPort = (captured) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
