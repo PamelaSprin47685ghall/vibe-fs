@@ -121,51 +121,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | AgentAbandoned(_, reason) -> return Error reason
         }
 
-    // After Resume/Fork: wait for an unfinished Host pending Source, await it,
-    // then return. If the manager finishes before we observe pending (fast path),
-    // treat as done. Never finalize before this returns — early Ok on missing
-    // pending raced installRun and staged an unresolved conflict (ORCH-003).
-    let awaitCurrentPendingRun (agentId: string) =
-        task {
-            let deadline =
-                DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
-            // Brief window for sendToExistingChild to installRun after Fork returns.
-            let appearDeadline = DateTimeOffset.UtcNow.AddMilliseconds(2000.0)
-
-            let trySource () =
-                lock runtime.Gate (fun () ->
-                    match runtime.PendingRuns.TryGetValue agentId with
-                    | true, run when not run.Finished -> Some run.Source.Task
-                    | _ -> None)
-
-            let rec waitAppear () =
-                task {
-                    match trySource () with
-                    | Some source -> return Some source
-                    | None when DateTimeOffset.UtcNow >= appearDeadline -> return None
-                    | None ->
-                        do! Wanxiangshu.Process.PtyTiming.timerTask 10
-                        return! waitAppear ()
-                }
-
-            match! waitAppear () with
-            | Some source -> return! awaitPendingSource agentId source
-            | None ->
-                // No pending within appear window: either still installing (spin)
-                // or already finished. Poll until deadline for a late pending.
-                let rec waitLate () =
-                    task {
-                        match trySource () with
-                        | Some source -> return! awaitPendingSource agentId source
-                        | None when DateTimeOffset.UtcNow >= deadline -> return Ok()
-                        | None ->
-                            do! Wanxiangshu.Process.PtyTiming.timerTask 25
-                            return! waitLate ()
-                    }
-
-                return! waitLate ()
-        }
-
     let awaitChild (agentId: string) =
         task {
             match
@@ -224,9 +179,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     /// Drop a leftover Host pending for this agent so Resume can install a fresh
     /// work unit. A stuck unfinished pending (e.g. dual-suicide race) would make
-    /// sendToExistingChild take the busy-nudge path and never re-installRun, leaving
-    /// awaitCurrentPendingRun waiting on a Source that will not observe conflict
-    /// resolution (ORCH-003 measured: conflict-resume on wire, REBASE_HEAD unmerged).
+    /// sendToExistingChild take the busy-nudge path and never re-installRun, so the
+    /// resumed work unit would not observe conflict resolution (ORCH-003 measured:
+    /// conflict-resume on wire, REBASE_HEAD unmerged).
     let clearStaleHostRun (agentId: string) =
         lock runtime.Gate (fun () ->
             match runtime.PendingRuns.TryGetValue agentId with
@@ -274,9 +229,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
                 | Error error -> return Error error
                 | Ok _ ->
-                    // Keep Host pending progressing in the background.
-                    awaitCurrentPendingRun agentId |> ignore
-
+                    // The Host pending is advanced by the existing session callbacks.
+                    // Do not spawn a second detached waiter: it owns no state transition
+                    // and would retain timeout/polling handles after Continue returns.
                     let resolutionDeadline =
                         DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
 

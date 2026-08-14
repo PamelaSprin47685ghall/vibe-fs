@@ -53,7 +53,7 @@ subscriber sticky replay、listener disposal。
 ### 其它
 
 - `HostMessageProjection.sanitizeMessages`（HOST-016）在 PairProgrammingThought 之后、
-  ReviewSeal 之前执行（`archive/docs/how/host.md` 链序）。
+  ReviewSeal 之前执行（历史 how/host 链序）。
 - `HostDigest.sha256Hex`：全仓唯一 sha256（durable digest 单点定义）。
 - `NeedHelpSensor`（`Host/NeedHelpSensor.fs`）：rolling suffix + reasoning PartId 集 + armed
   identity（SessionId × ProviderRun）；`NeedHelpEventCodec` 先登记 `part.type=reasoning` 再适配
@@ -74,7 +74,7 @@ subscriber sticky replay、listener disposal。
 - **canary 不可弯曲**（canary-unbend.md）：canary 是生产前置证明，不得为绿而弯曲（归
   verification-system 纪律；本包消费其结果）。
 - **HOST-013 全部**：归 prefix-stability 等（见 WHAT 弃权）；本包不复制。
-- **Magic Todo membrane canaries**：`archive/docs/proof/host.md` 的 A..R 清单中本包只拥有 H（唯一
+- **Magic Todo membrane canaries**：A..R 清单（见 PROOF.md）中本包只拥有 H（唯一
   定位）、A/C（before 时序/原地 mutation）的 Host 观察面；canonical 语义归各 feature owner。
 - **`external_directory`**：AGENT-019 唯一 enforcement 写点归 capability-enforcement；Host 路径
   边界机制是 host-boundary 交叉（本包只记录观察面）。

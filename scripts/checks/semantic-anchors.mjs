@@ -518,3 +518,14 @@ export const OFFICE_CAPABILITY_NEGATIVES = Object.freeze({
   managerZhRequired: /可互换|碰巧没有 shell/,
   forkForbidden: /Commission another witness/i,
 })
+
+/** EXTERNAL-INVESTIGATION-011. Not mixed into the eight provenance ids. */
+export const BROWSER_OBLIGATION_BOUNDARY_ANCHORS = Object.freeze({
+  browser: Object.freeze([
+    {
+      id: 'observation-not-obligation',
+      en: /Observation is not obligation|do not mint a repository or product obligation/i,
+      zh: /观察不是义务|不铸造 repository 或 product obligation/,
+    },
+  ]),
+})

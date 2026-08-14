@@ -9,6 +9,14 @@
  * (g4r-freeze gate retired 2026-08-14; the e2e-watchdog-feed gate keeps the
  * sole-entry scope).
  *
+ * PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003): this file is the sole Long Stroke
+ * because it depends on Host facts Pure/Temporal/Adapter cannot simulate:
+ *   1. OpenCode process lifetime — spawn count === 1, one serve, one journal writer
+ *   2. Host-assigned assistant messageID persisted before transform, then
+ *      ToolContext.messageID at execute (HOST-010 共时)
+ *   3. Host ToolPart / idle / abort / child-session physical threading
+ * Repeat-until-pass is forbidden; semantic branches stay at Pure/Temporal/Adapter.
+ *
  * G4R §2 / Exit: one continuous OpenCode lifetime — spawn count must be exactly 1.
  *
  * Real-host Magic Todo canaries A/E/G/H: a test-only wrapper plugin observes

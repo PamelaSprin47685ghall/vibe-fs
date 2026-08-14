@@ -122,7 +122,7 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
     assert.equal(idValue.toolCall(checkpoint.ToolCallId), 'call_magic_todo')
     assert.equal(Number(checkpoint.ReviewFrontier.Sequence), 7)
   } finally {
-    resumed[0].Dispose()
+    resumed[0].Release()
     local.close()
   }
 })

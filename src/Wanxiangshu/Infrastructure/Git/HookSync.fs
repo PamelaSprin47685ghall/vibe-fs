@@ -42,11 +42,14 @@ module HookSync =
                 let gitCommonDir = commonDir repo
                 let raw = ProcessGitRawStore.create repo
                 let run = GitGateway.createDefaultRunner repo
-                use! _physical = ProcessEventLog.acquireStoreLock gitCommonDir
 
-                match! GitGateway.converge raw gitCommonDir run MaxRetries remote observed with
-                | Ok _ -> return None
-                | Error error -> return Some(formatError remote error)
+                return!
+                    ProcessEventLog.withStoreLock gitCommonDir (fun () ->
+                        task {
+                            match! GitGateway.converge raw gitCommonDir run MaxRetries remote observed with
+                            | Ok _ -> return None
+                            | Error error -> return Some(formatError remote error)
+                        })
             with ex ->
                 return Some(sprintf "Wanxiang EventStore sync failed: %s" ex.Message)
         }

@@ -28,7 +28,7 @@ RED = 满足下列任一：
 
 ## 4. 历史考古
 
-### 4.1 `cache.md`（HOST-013 anchored prefix，archive/changes/completed/cache.md）
+### 4.1 `cache.md`（HOST-013 anchored prefix，历史 completed change）
 
 P0 缺陷：HOST-013 auto-injected 的当前实现把历史 synthetic pair 重组、搬家，破坏了已经发给
 provider 的字节前缀。正确设计：
@@ -61,7 +61,7 @@ provider-family transition 可以改变物理字节（FakeToolPair bytes ≠ Cur
 **那不是 prefix corruption，是另一种 provider projection**；durable semantic occurrence
 identity 必须稳定。
 
-### 4.3 `archive/docs/why/host.md` 决策 9–13（HOST-013）
+### 4.3 历史 why/host 决策 9–13（HOST-013）
 
 - durable gap anchor 原位 replay vs 移动/重定位 marker：pair 一经加入即不可变永久历史；
   位置由 durable gap anchor 唯一决定；
@@ -87,9 +87,9 @@ TodoCheckpoint lag-1 rebase。禁止按容量/token 主动切换 epoch。
 
 ## 6. 源材料
 
-- `archive/docs/what/host.md`（HOST-005/006/013）、`archive/docs/why/host.md`（决策 9–13）
-- `archive/docs/what/companion.md`（COMPANION-009/010/011/013）、`archive/docs/shape/companion.md`
-- `archive/docs/what/context.md`（CTX-010/011/012/015）、`archive/docs/why/context.md`（ActivePrefixEpoch 理由）
-- `archive/docs/what/prompt.md`（PROMPT-014）、`archive/docs/what/todo.md`（TODO-009）、`archive/docs/what/architecture.md`（ARCH-004）
-- `archive/changes/completed/cache.md`、`archive/changes/completed/cursor-pair-hint.md`（§12）、`archive/changes/completed/pair-parallel-tools.md`（prefix 相关）
-- `archive/requirements-design/13-context-continuity.md`（prefix-stability card）
+- 历史 HOST-005/006/013、历史 why/host（决策 9–13）
+- 历史 COMPANION-009/010/011/013、历史 shape/companion
+- 历史 CTX-010/011/012/015、历史 why/context（ActivePrefixEpoch 理由）
+- 历史 PROMPT-014、历史 TODO-009、历史 ARCH-004
+- 历史 change（cache）、历史 change（cursor-pair-hint §12）、历史 change（pair-parallel-tools，prefix 相关）
+- 历史 requirements-design card（13-context-continuity，prefix-stability card）

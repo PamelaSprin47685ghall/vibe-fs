@@ -82,16 +82,16 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 
 | 源 | 信息落点 |
 |---|---|
-| `archive/docs/what/companion.md` COMPANION-003/014/015 | WHAT-001..013；HOW §1.1 |
-| `archive/docs/what/todo.md` TODO-001/008/009/015 | WHAT-014/015/016；HOW §1.4 |
-| `archive/docs/what/review.md` REVIEW-016 | WHAT-014/016 |
-| `archive/docs/what/execution.md` EXEC-004/028/031 | WHAT-004/010/011/016 |
-| `archive/docs/what/glory.md` GLORY-004/006/072/074 | WHAT-008/009/015/016 |
-| `archive/docs/why/companion.md` | WHY §4.2/4.4；WHAT-012 证据 |
-| `archive/docs/how/companion.md` / `archive/docs/shape/companion.md` | HOW §1.1/1.3/1.4 |
-| `archive/requirements-design/21-work-record.md` | 全部 WHAT 的 owner 裁决（OWNS 表） |
-| `archive/requirements-design/13-context-continuity.md` | 边界裁决（DOES NOT OWN） |
-| `archive/requirements-design/COVERAGE.md` COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行 | WHAT 命题归属 |
+| 历史 COMPANION-003/014/015 | WHAT-001..013；HOW §1.1 |
+| 历史 TODO-001/008/009/015 | WHAT-014/015/016；HOW §1.4 |
+| 历史 REVIEW-016 | WHAT-014/016 |
+| 历史 EXEC-004/028/031 | WHAT-004/010/011/016 |
+| 历史 GLORY-004/006/072/074 | WHAT-008/009/015/016 |
+| 历史 why/companion | WHY §4.2/4.4；WHAT-012 证据 |
+| 历史 how/shape companion | HOW §1.1/1.3/1.4 |
+| 历史 requirements-design card（21-work-record） | 全部 WHAT 的 owner 裁决（OWNS 表） |
+| 历史 requirements-design card（13-context-continuity） | 边界裁决（DOES NOT OWN） |
+| 历史 COVERAGE（COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行） | WHAT 命题归属 |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

@@ -11,13 +11,13 @@
 
 **规范**：provider-visible 消息投影必须用 typed 组合子 / 直接执行的 computation
 expression 管线表达（FLOW-001）。不存在 `ProjectionProgram` AST + Interpreter 中间层。
-禁止各功能直接接收并任意修改 `Message list`（`archive/docs/what/projection.md` PROJ-001）。
+禁止各功能直接接收并任意修改 `Message list`（历史 PROJ-001）。
 
 **含义**：投影的唯一生产路径是同构纯管线；「解释器」意味着第二次控制流，等于再造一个
 程序计数器。
 **边界**：`replaceMessagesInPlace` 作为 Host 适配写回原语保留是 HOW（projection-algebra-gap
 Final outcome），不是对「功能不直接改消息」的豁免。
-**证据**：PROJ-001、`archive/docs/why/projection.md`「投影形态」被拒方案。
+**证据**：PROJ-001、历史「投影形态」被拒方案。
 
 ## PROVIDER-PROJECTION-002：输入是不可变 ProjectionSnapshot（消费者驱动字段子集）
 
@@ -40,17 +40,17 @@ ProviderWireProjection → ProviderInputSeal`。`ProviderWireProjection` 与
 ID、字节相等（seal / 前缀缓存 / 本地时间线用）。两者相等键不同，混用必错。
 **边界**：Wire 补合成 identity（COMPANION-013）的确定性派生属 `prefix-stability` 交叉；
 「不同型」的结构事实归本包。
-**证据**：PROJ-003、`archive/docs/why/projection.md`「投影分层」被拒方案。
+**证据**：PROJ-003、历史「投影分层」被拒方案。
 
 ## PROVIDER-PROJECTION-004：三层结构 Coordinator / Planner / Renderer
 
 **规范**：实现必须分三层：Effectful Coordinator（读 Host、生成不可变快照）、Pure
 Projection Planner（汇总 intent、排序、冲突检查）、Canonical Renderer（渲染 provider
-wire bytes、生成 digest/seal）（`archive/docs/shape/projection.md` PROJ-004）。
+wire bytes、生成 digest/seal）（历史 shape/projection 条款 PROJ-004）。
 
 **含义**：副作用只发生在 Coordinator；Planner/Renderer 是同入同出的纯函数。
 **边界**：三层是当前实现合同；若未来证明其它分层同样满足本包命题，是 HOW 变化。
-**证据**：PROJ-004、`archive/docs/how/projection.md`「装配：三层」。
+**证据**：PROJ-004、历史「装配：三层」说明。
 
 ## PROVIDER-PROJECTION-005：功能只声明 ProjectionIntent；禁止直接改消息
 
@@ -69,7 +69,7 @@ HOST-013 pair-programming marker 不占 intent（wire 级无消息地址，由
 **含义**：intent 是功能与渲染器之间的唯一海关；渲染器收敛字节，编译期拦非法组合。
 **边界**：intent case 列表**永久同构现有代码**不是承诺（`07-projection.md` DOES NOT
 OWN）——intent 集合可随消费方变化，封闭性（变更必须显式）才是命题。
-**证据**：PROJ-005、`archive/docs/shape/projection.md` PROJ-005。
+**证据**：PROJ-005、历史 PROJ-005。
 
 ## PROVIDER-PROJECTION-006：canonical order + 显式合并/冲突；禁注册顺序选边
 
@@ -81,7 +81,7 @@ OWN）——intent 集合可随消费方变化，封闭性（变更必须显式�
 **含义**：同一 intent 集无论以什么顺序装配，产出同一投影世界或同一冲突结局。
 **边界**：Strength 的 `useStrengthMirror`/`insertStrengthFrames` 专属冲突律
 （STRENGTH-009/016）语义归 `speculative-investigation`；「冲突必须显式」的代数性质归本包。
-**证据**：PROJ-006、`archive/docs/why/projection.md`「Intent 冲突解决」被拒方案。
+**证据**：PROJ-006、历史「Intent 冲突解决」被拒方案。
 
 ## PROVIDER-PROJECTION-007：DSL 不负责生命周期
 
@@ -92,7 +92,7 @@ OWN）——intent 集合可随消费方变化，封闭性（变更必须显式�
 **含义**：投影层若长出第二套编排运行时，就翻回 Program AST 反模式。
 **边界**：生命周期语义归各自 owner（session-ontology / managed-session-lifecycle /
 dispatch-protocol / …）；本包只拥有「投影不承担生命周期」这条负边界。
-**证据**：PROJ-007、`archive/docs/why/projection.md`「DSL 是否承载生命周期」被拒方案。
+**证据**：PROJ-007、历史「DSL 是否承载生命周期」被拒方案。
 
 ## PROVIDER-PROJECTION-008：SyntheticToml 是唯一字符串/值树/布局/转义 owner；无 parser
 
@@ -106,14 +106,14 @@ dispatch-protocol / …）；本包只拥有「投影不承担生命周期」这
 TOML 反解析出控制流。
 **边界**：各 surface 的 schema（哪些字段、什么顺序）归各自 owner；「唯一写法 owner」的
 机制归本包。
-**证据**：ARCH-010、`archive/changes/completed/js-tools-toml-result.md`、`archive/docs/why/synthetic-toml.md`。
+**证据**：ARCH-010、历史 change（js-tools-toml-result）、历史 synthetic-toml 条款。
 
 ## PROVIDER-PROJECTION-009：instruction/data plane 由投影 owner 的消费语义决定
 
 **规范**：每个 synthetic surface 的 owner 投影一段内容时，按「当前接收 agent 应把这段
 内容当作行动/认知指导，还是当作结构化数据读取」分类：当前指导 → instruction plane
 （顶层 `#` comment）；状态/参数/证据值 → data plane（TOML field/table/value）
-（`archive/changes/completed/corrective.md` §1）。
+（历史 change（corrective）§1）。
 
 以下**都不是**合法判据：trusted→comment、untrusted→data；current→comment、
 historical→data；来自 child→data、来自 Host→comment；像祈使句→comment、像事实→data。
@@ -138,7 +138,7 @@ authority/state/lifecycle：
 **含义**：`Provider role user is not Domain user authority.` 表示层不能偷偷写权威事实。
 **边界**：synthetic identity 的确定性派生（SealRoot/frameEpoch/ordinal）归
 `prefix-stability`；「反解析禁令」的投影侧归本包。
-**证据**：ARCH-011、`archive/changes/completed/cursor-pair-hint.md` §8、corrective.md §8。
+**证据**：ARCH-011、历史 change（cursor-pair-hint）§8、corrective.md §8。
 
 ## PROVIDER-PROJECTION-011：semantic equality ≠ wire equality；canonical digest 只从 Semantic 投影算
 

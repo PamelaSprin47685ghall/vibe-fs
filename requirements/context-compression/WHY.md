@@ -24,7 +24,7 @@ RED = 满足下列任一：
 
 ## 4. 历史考古
 
-### 4.1 失败驱动 vs 预测式（archive/docs/why/context.md）
+### 4.1 失败驱动 vs 预测式（历史 why/context）
 
 拒预测：估计容量把错误阈值固化成产品行为，与 KV-cache / 前缀稳定性冲突（CTX-001/002）。
 接受「第一次溢出必失败」的代价，换取协议零窗口表依赖。
@@ -66,9 +66,9 @@ RED = 满足下列任一：
 
 ## 6. 源材料
 
-- `archive/docs/why/context.md`、`archive/docs/what/context.md`（CTX-001..016）
-- `archive/docs/how/context.md`、`archive/docs/shape/context.md`
-- `archive/docs/why/companion.md`、`archive/docs/what/companion.md`（COMPANION-005/006/007/008/013）
-- `archive/docs/what/host.md`（HOST-006 containment 层）
-- `archive/requirements-design/13-context-continuity.md`（context-compression card）
-- `archive/requirements-design/COVERAGE.md`（CTX-*、COMPANION-005/006/007/008 行）
+- 历史 why/what context（CTX-001..016）
+- 历史 how/context、历史 shape/context
+- 历史 why/what companion（COMPANION-005/006/007/008/013）
+- 历史 HOST-006（containment 层）
+- 历史 requirements-design card（13-context-continuity，context-compression card）
+- 历史 COVERAGE（CTX-*、COMPANION-005/006/007/008 行）

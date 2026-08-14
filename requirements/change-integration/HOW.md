@@ -80,7 +80,7 @@ Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作；Publis
 
 - **GARBAGE——`fork-manager`/`list` 旧面**：Orchestrator 旧工具名（`agent=fast-manager|job_id` +
   worktree + `reused=true`）已 clean-break 删除，无 alias（`archive/docs/why/orchestrator.md` 备选节）。
-- **GARBAGE——`Steward`**：`archive/changes/proposed/Steward.md` 明确「不在本轮创建」（orchestrator why）；
+- **GARBAGE——`Steward`**：`proposals/Steward.md` 明确「不在本轮创建」（orchestrator why）；
   不进入未来 WHAT。
 - **HOW——机制常数**：`MaxJoinBatch=32`（join 批次）、`DevOpsJoinTimeoutMs=10_000`（join 等待预算）、
   gate 锁重试参数（proper-lockfile 50×≤500ms）——有界性与原子性才是 WHAT。

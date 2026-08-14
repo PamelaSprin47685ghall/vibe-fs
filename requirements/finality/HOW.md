@@ -97,3 +97,5 @@ at-rest 经验。输出逐字等于 last_words。
 - `participant-horizon`：Manager 面可见/禁止词与句的 admission law → 引用其命题。
 - `work-record`：canonical LWR 物化、三段标题、`includeOpening=false` → 引用其命题。
 - `crash-reconciliation`：undecided 恢复与 infra fatal 的进程级处理 → 引用其命题。
+- `change-integration`：ManagerJob 投影与 `ContinueManager` 在 Orchestrator 域；本包拥有
+  FINALITY-028（已发布/释放不复活；active 可在同 session/worktree 续做）。

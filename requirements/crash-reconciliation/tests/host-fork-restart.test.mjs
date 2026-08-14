@@ -158,7 +158,8 @@ test('HFR_restart_multiple_children_recovered_in_link_order', async () => {
     await linkDurable(j, 'b-second', sessionId('ses_b'), 'beta')
     await linkDurable(j, 'c-third', sessionId('ses_c'), 'gamma')
     await completeTerminal(j, 'b-second', sessionId('ses_b'))
-    await handleController.recordAbandon(j, PARENT, 'c-third', 'ParentCancelled')
+    const abandoned = await handleController.recordAbandon(j, PARENT, 'c-third', 'ParentCancelled')
+    assert.equal(abandoned.ok, true, abandoned.ok ? '' : abandoned.error)
 
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     const recovered = recoveredOf(result)

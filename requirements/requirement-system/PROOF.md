@@ -1,7 +1,7 @@
 # PROOF：requirement-system 测试落点表
 
-落点类型：`MOVE`（从 tests/unit 物理移入）/ `REUSE`（留原处，记锚点与 SPLIT@cutover）/
-`NEW`（新写）。运行命令均为仓库根目录相对。每条 WHAT 命题恰一行。
+落点类型：`MOVE`（物理移入本包 tests/）/ `REUSE`（留原处，记锚点）/ `NEW`（新写）/
+`GATE`（静态门禁，`node scripts/check.mjs` 集成执行）。运行命令均为仓库根目录相对。每条 WHAT 命题恰一行。
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
@@ -13,15 +13,35 @@
 | REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——树入口与 INDEX 同一包集 + 无外目录） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-007 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（命题 ID 只从 WHAT 标题提取，树入口只导航不定义）；`requirements/requirement-system/tests/spec-rules.test.mjs`（navigationProblems——README 精确导航） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-008 | `requirements/requirement-system/tests/spec-rules.test.mjs`（unknownClauseReferences / clauseReferences / clauseDefinitionHeadings / formalClauseDefinitionHeadings / navigationProblems 五组断言） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
+<<<<<<< HEAD
+| REQUIREMENT-SYSTEM-009 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：Change 文件禁止定义正式 Clause）；人工评审承接（本文件 人工评审承接表） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
+| REQUIREMENT-SYSTEM-010 | `scripts/checks/spec.mjs`（archivePathReferences：全仓零归档树引用；legacyWorkflowPathReferences：废止路径）；`tests/spec-rules.test.mjs`（规则单测） | GATE + MOVE | node scripts/check.mjs / node --test requirements/requirement-system/tests/spec-rules.test.mjs |
+| REQUIREMENT-SYSTEM-011 | `tests/spec-rules.test.mjs`（changeDependencyReferences：proposed 非当前依赖，规则单测）；人工评审承接（本文件 人工评审承接表：Agent 未经用户指定启动 Proposed） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
+| REQUIREMENT-SYSTEM-012 | `tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：CHG-001 与产品条款区分）；`scripts/checks/spec.mjs`（正式定义只在 WHAT.md） | MOVE + GATE | 分别 node --test / node scripts/check.mjs |
+| REQUIREMENT-SYSTEM-013 | 人工评审承接（本文件 人工评审承接表：Active 原文被反向改写 / Completed 被用作当前实现依据）；机制停用，无机器命令 | REUSE | 人工评审（机制停用） |
+| REQUIREMENT-SYSTEM-014 | 人工评审承接（本文件 人工评审承接表 + blocker 协议）；机制停用，无机器命令 | REUSE | 人工评审（机制停用） |
+| REQUIREMENT-SYSTEM-015 | 人工评审承接（AGENTS.md 文档生命周期节「普通小型修复不要求自动创建 Change」）；机制停用，无机器命令 | REUSE | 人工评审（机制停用） |
+=======
 | REQUIREMENT-SYSTEM-009 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：Change 文件禁止定义正式 Clause）；人工评审承接（archive/docs/proof/document-governance.md 人工评审表） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-010 | `requirements/requirement-system/tests/spec-rules.test.mjs`（legacyWorkflowPathReferences：废止路径；changeDependencyReferences：不依赖 proposed/completed 历史） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-011 | `requirements/requirement-system/tests/spec-rules.test.mjs`（changeDependencyReferences：proposed 非当前依赖）；人工评审承接（archive/docs/proof/document-governance.md 人工评审表：Agent 未经用户指定启动 Proposed） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-012 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：CHG-001 与产品条款区分）；人工评审承接（spec.mjs 三目录存在 / 同路径不并存机制，check 集成时执行） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
-| REQUIREMENT-SYSTEM-013 | 人工评审承接（archive/docs/proof/document-governance.md 人工评审表：Active 原文被反向改写 / Completed 被用作当前实现依据）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
-| REQUIREMENT-SYSTEM-014 | 人工评审承接（archive/docs/proof/document-governance.md 人工评审表 + GOV-009 blocker 协议）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
-| REQUIREMENT-SYSTEM-015 | 人工评审承接（AGENTS.md 文档生命周期节「普通小型修复不要求自动创建 Change」）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
+| REQUIREMENT-SYSTEM-013 | `tests/change-lifecycle.test.mjs`（Completed 不作当前依据；live Active 必须声明冻结 origin）；Active 原文冻结 / 正文白名单仍人工评审（archive/docs/proof/document-governance.md） | NEW + 人工 | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+| REQUIREMENT-SYSTEM-014 | `tests/change-lifecycle.test.mjs`（WHAT-014 四步 blocker 协议；删步即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+| REQUIREMENT-SYSTEM-015 | `tests/change-lifecycle.test.mjs`（AGENTS.md「普通小型修复不要求创建 Change」；删句即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+>>>>>>> cce0ad6d4180a09efd4b6b289d309ef42a069e6f
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个包 README/WHY/WHAT 的 DEPENDS ON ⊆ INDEX 骨架断言） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（本测试自身即机器执行；删已存在包 PROOF 行必红） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
+
+## 人工评审承接表（生命周期机制停用后仍有效的过程检查）
+
+| 检查 | 失败含义（对应条款） |
+|---|---|
+| Agent 未经用户指定启动 Proposed | REQUIREMENT-SYSTEM-011 |
+| Active 原文被反向改写 | REQUIREMENT-SYSTEM-013 |
+| Active 成为目标产品语义的唯一来源 | REQUIREMENT-SYSTEM-007/013 |
+| Completed 被用作当前实现依据 | REQUIREMENT-SYSTEM-010 |
+| Active 保存进度流水或未经批准的新设计 | REQUIREMENT-SYSTEM-013 |
 
 ## 语义 anchor
 
@@ -29,12 +49,20 @@
 cognitive-environment / office-capability / action-affordance）。本包是 META 包，**无
 anchor id**；本包的机器事实由 meta-verifier + spec-rules 承担。
 
-## SPLIT@cutover 清单
+## SPLIT@cutover（已闭合 2026-08-14）
 
+<<<<<<< HEAD
+- 依赖骨架解析源已迁至 `requirements/INDEX.md`；meta-verifier 已同步。
+- 树导航职责已移交 `requirements/README.md`。
+- spec gate 已重写为 requirements/ 树治理（归档树检查面整体替换）。
+- WHAT-013/014/015 机器落点：change-lifecycle verifier 无对象可扫（机制停用），
+  人工评审承接表见本文件；GAP-003/004/005 记 CLOSED（`requirements/GAP.md`）。
+=======
 - 依赖骨架解析源：`archive/requirements-design/INDEX.md` → requirements/ 树新权威位置
   （meta-verifier 同步迁移）。
 - `archive/docs/README.md` 导航职责 → `requirements/README.md`。
 - spec gate 的 archive/docs/changes 检查面 → requirements/ 树治理（archive/docs/changes 归档后整体重写）。
-- WHAT-013/014/015 机器落点：change-lifecycle verifier（GAP@cutover 补；聚合台账见 `requirements/GAP.md` GAP-003/004/005）。
+- WHAT-013/014/015：`tests/change-lifecycle.test.mjs`（聚合台账 `requirements/GAP.md` GAP-003 PARTIAL / GAP-004 CLOSED / GAP-005 CLOSED）。Active 原文冻结仍人工。
+>>>>>>> cce0ad6d4180a09efd4b6b289d309ef42a069e6f
 - PROOF-MAP「顶层 3 文件」归属分歧（verdict-feed / domain.meta / guide-contract 的
-  assertion 级 owner）：见 `requirements/verification-system/PROOF.md`，cutover 按断言复核。
+  assertion 级 owner）：见 `requirements/verification-system/PROOF.md`。

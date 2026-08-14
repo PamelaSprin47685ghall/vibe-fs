@@ -1,10 +1,8 @@
 # WHAT — session-ontology（唯一 normative 合同）
 
 命题前缀：`SESSION-ONTOLOGY-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：`archive/docs/{shape,what,why,proof}/host.md`（HOST-008/015）、`archive/docs/shape/companion.md`
-（COMPANION-001/002）、`archive/docs/shape/execution.md`（EXEC-026）、`archive/docs/what/execution.md`
-（EXEC-028）、`archive/docs/what/agent.md`（AGENT-001/024）、`archive/docs/why/host.md` §15。
-落点与运行命令见 `PROOF.md`。
+来源：旧 host/companion/execution/agent 条款（HOST-008/015、COMPANION-001/002、EXEC-026/028、
+AGENT-001/024，2026-08-14 归档）与历史 why/host §15。落点见 `PROOF.md`。
 
 ---
 
@@ -12,7 +10,7 @@
 
 **规范**：长期 session 所有权由 `SessionExecutionClass`（`Work | InternalLeaf`）与
 `SessionOwnership`（`Root | Attached of ownerSessionId × AttachmentKind`）两个正交维度联合决定，
-不再以单一 `SatelliteKind` 轴为唯一模型（`archive/docs/shape/host.md` HOST-008）。
+不再以单一 `SatelliteKind` 轴为唯一模型（历史 shape/host 条款 HOST-008）。
 
 **含义/动机**：Dedicated Sync* 是长期 hot-knowledge Work Session（需要 Companion/context），
 Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界；单轴分类必然把两种不同事实揉成一个。
@@ -28,7 +26,7 @@ Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界
 `Attached` 恒携带恰一个 `ownerSessionId` 与一个 `AttachmentKind`。
 
 **含义/动机**：四格穷尽使「这个 session 是什么」可 O(1) 分辨，不需要从 agent 名、工具面、
-Logical Run、Authority、Fallback 临时推导（`archive/docs/proof/host.md`「正交投影」行）。
+Logical Run、Authority、Fallback 临时推导（历史 proof/host 条款「正交投影」行）。
 
 **边界**：分类不暗示任何 lifecycle 行为（复用/取消/retire 归 `managed-session-lifecycle`）。
 
@@ -39,7 +37,7 @@ Logical Run、Authority、Fallback 临时推导（`archive/docs/proof/host.md`�
 
 **规范**：Dedicated SyncInspector / SyncCoder 是 `Work + Attached(SyncInspector|SyncCoder)`，
 可拥有自己的 Companion（Work 能力路径）；**不得**实现成历史 Teacher-style InternalLeaf /
-no-Companion Satellite（`archive/docs/shape/host.md` HOST-008；`archive/docs/shape/execution.md` EXEC-026）。
+no-Companion Satellite（历史 shape/host 条款 HOST-008；历史 shape/execution 条款 EXEC-026）。
 
 **含义/动机**：Dedicated Sync* 吃 prefix/context 复用，长上下文需要 Companion；做成叶子会撞
 context 问题。「复用 Teacher 的调用代数，不复用 Teacher 的 Session 分类」（universal.md §13.6）。

@@ -5,7 +5,8 @@
 
 命题前缀：`EXTERNAL-INVESTIGATION-`。散文证据：`resources/provider/role/browser/{en,zh-CN}.md`
 （Browser Role Law，本包契约的规范文本）。锚点：`scripts/checks/semantic-anchors.mjs`
-`ROLE_SEMANTIC_ANCHORS.browser` 的 8 个 id（本包拥有）。
+`ROLE_SEMANTIC_ANCHORS.browser` 的 8 个 provenance id，以及 011 负边界
+`BROWSER_OBLIGATION_BOUNDARY_ANCHORS` 的 `observation-not-obligation`（本包拥有）。
 
 ---
 
@@ -136,7 +137,10 @@ repository/product obligation。外部可能性必须经 office 的 consequence 
 **含义**：调查不越权——发现事实与获得义务是两件事。
 **边界**：义务的产生/记账归 `office-capability` / `obligation-ledger`；「外部事实本身不
 产生义务」的负边界归本包。
-**证据**：`20-capability-external.md` OWNS「external facts 只建立外部世界事实」。
+**证据**：Role Law「Observation is not obligation」节；锚点 `observation-not-obligation`
+（en：`Observation is not obligation|do not mint a repository or product obligation`；
+zh：`观察不是义务|不铸造 repository 或 product obligation`）。义务产生路径交叉
+`office-capability` OFF-013。
 
 ---
 

@@ -101,8 +101,7 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
 
 ### 3.4 高阶 Vocabulary 证明义务（DSL-014）
 
-每个改变 trace 的压缩 Vocabulary 必须有 temporal/behavioral proof。当前义务表
-（源自 `archive/docs/proof/dsl-structured-program.md`）：
+每个改变 trace 的压缩 Vocabulary 必须有 temporal/behavioral proof。当前义务表：
 
 | Vocabulary | 必须证明 |
 |---|---|
@@ -118,6 +117,88 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
 | `Orchestrator.publishEventually` | target movement recursion |
 
 新增高阶 Vocabulary 必须追加本表一行并挂可观察效果测试。
+
+### 3.4.1 正交组合证明（DSL-005，人工）
+
+> 本节约 DSL-005 的人工证明（2026-08-14 cutover 自旧 proof 归档吸收）。
+> 自动化下限现已含结构化 `state-product` 门禁：`scripts/checks/dsl-ownership.mjs` 解析
+> record 的字段类型结构（本地 DU/`option`/`bool`），识别 ≥2 个独立状态轴并要求显式
+> `/// DSL-state-combination: domain|physical` 分类；判定与字段名无关。`ControlState`
+> 分类要求机器可校验的 `/// DSL-control-state-reason:` 理由。下表仍是架构级语义枚举，
+> 门禁只守卫「未分类即红」，不替代 DSL-002/DSL-005 的人工语义判断。
+
+**正交轴与物理归属（当前生产）**
+
+| 轴 | 物理归属 / 类型 | 说明 |
+|---|---|---|
+| busy / current request | `IParkedTransformHost` flight registry（`HasFlight` / `bloggerFlights`） | 唯一 writer 与读取来源；不再用 `BloggerRuntimeState` DU |
+| parked waiter | physical parked registry / `HasParked` | 与 flight 分离 |
+| pending offer | pending-offer 物理槽（与 current request 分离） | 见收敛测试 C0 断言 |
+| drain | `DrainWindow`（`Closed \| Open of DrainPermit`） | 单轴；permit 不可伪造 |
+| tool recovery | `BloggerToolRecovery`（由 durable evidence 派生） | 非长期 cell 程序计数 |
+| material 路由 | 纯函数 `BloggerRuntime.decideMaterial` | 由物理事实 + 请求上下文派生，不持久化流程位置 |
+
+**可表示组合与业务意义**
+
+当前 Blogger 运行时**不**将 State + Pending/Offer + Recovery/Repair + Drain 编码进同一长期
+record/DU。可观察「组合」由**独立物理槽位的存在性**构成，而非组合状态机 case：
+
+1. 无 flight / 无 parked / drain Closed：可接受新 material（空闲路径）。
+2. 有 flight：busy；新 material 由 `decideMaterial`/`blocksNewRequest` 跳过或排队策略处理，不另写 Idle|InFlight 镜像。
+3. 有 parked（无或有关联 offer 槽）：parked 等待；与 flight 正交，不合并为单一程序计数 DU。
+4. drain Open：仅 reactivation 路径可 mint；与 busy 由物理槽位分别表示，不合成 `InFlightAndDraining` 一类 case。
+5. recovery 需要：由 journal/durable evidence 派生 `BloggerToolRecovery`，不写入 runtime cell 位置字段。
+
+因此 DSL-005 要求的「组合总数」在当前架构下为**槽位笛卡尔积的可观测子集**，每种可达
+组合均对应上表真实物理语义；不可达组合（例如「用 cell.State 表示下一步」）已通过删除
+`BloggerRuntimeState`/`BloggerRuntimeCell` 与 C0 永久测试禁止。
+
+**自动化下限**（防止重新引入程序计数字段与影子状态）：
+
+- `scripts/checks/dsl-ownership.mjs --threshold=0`（program-counter / large-DU / ControlState 理由 /
+  `state-product` 组合轴等结构门；全量扫描全部生产 `src/Wanxiangshu/**/*.fs`，无目录级豁免）
+- `scripts/checks/dsl-ownership-ratchet.mjs`（基线防回归）
+- `requirements/context-compression/tests/blogger-convergence-gaps.test.mjs`（`HasFlight` 唯一 busy、
+  无 shadow state API）
+- `requirements/structured-workflow/tests/dsl-ownership.test.mjs`（含 `state-axes-{illegal,domain,physical}.fs`
+  与 `ControlState` reason fixtures）与 `dsl-ownership-ratchet.test.mjs`
+
+`state-product` 门禁在字段名无关的结构层面识别 record 状态轴乘积；它不替代上表人工枚举
+的架构级语义，只把「未分类组合」变成构建期失败。`registry-joint-branch` 只拒绝两个
+declared registry 的 direct/try probe 联合选择 effect branch 这一语法反例；其它多 registry
+联合 presence 的分散探测不在该自动门禁范围内，须由人工 proof 判断是否驱动阶段推进。
+
+**SyncDelegate registries — CE collapse（原 StudentTeacher 证明已迁此）**
+
+`StudentTeacherRuntime` / `StudentQaStore` / Learn·Compile·SKILL **G3 已删除（absent）**，不得再作
+当前架构证明面。原 Teacher Returned→Completion CE 价值由
+`src/Wanxiangshu/Session/SyncDelegateRuntime.fs` 承接（EXEC-026/028）。
+
+参照上表 Blogger 正交物理槽位风格：SyncDelegate registries **各拥有单一物理 lifetime /
+投递地址**，且批次边界来自 Host 已知事实，不从 registry presence 或调度时机推断：
+
+| registry | 物理归属 | 消费方式 |
+|---|---|---|
+| `pendingBatches` | `(ReuseScope, role, ProviderRun)` 尚未收齐的 semantic batch；expected `ToolCallId` 顺序由 Host assistant message 固定 | 每个 tool invocation 只填自己的已知 slot；收齐 expected members 后一次性转 active，禁止 timer/microtask drain |
+| `activeBatches` | `(ReuseScope, role)` 当前唯一已 admission batch reservation | batch completion / cancel / dispose 释放；另一 ProviderRun overlap fail closed，不排队 |
+| `callsByOwnerScope` / `callsByDelegate` | semantic batch 对 dedicated Session 的一次真实 Send→ordinary Completion | `HandleTurn` 只按 delegate Session 找当前 active call；完成后只写一份 bounded WorkRecord |
+
+`Invoke` 为单一 CE 栈：Admit current `ToolCallId` against ProviderRun expected members → batch
+complete 后 GetOrCreate → ordered prepare/concat → one Send → await ordinary Completion →
+materialize one bounded WorkRecord。provider 顺序第一项是 canonical invocation；siblings 只得到
+`MergedInto canonicalCall`。不存在 `Returned`、`pendingCompletionTexts`、
+`SyncDelegateReturnCompletion` 或 `return` 工具。
+
+结构性证明目标：batch membership 只由 `(ProviderRunIdentity, ToolCallId order)` 决定；`HandleTurn`
+只消费一个 active call。无 joint-registry PC、无到达时序分支、无 queue-on-session，因此
+「批次尚未收齐」与「callee 正在执行」是两个互斥物理 lifetime，而不是隐式业务阶段。
+
+举一反三（同仓联合 presence / park→bind 对照）：`BloggerRuntime.decideMaterial`、
+`PluginRuntimeScope` parked∩pendingOffer、`Reconciler` active∩queued、`BloggerCrashRecovery`
+多 presence、`ReviewSeal` PendingReviewSeals park→bind 均属**物理资源路由 / 投递握手 /
+调度 latch**，不是用 mailbox presence 推导 lifecycle stage 的 PC；保持 ACCEPT-as-physical，
+不套用 CE collapse。ReviewSeal 消费面是 VerdictTool fail-closed resolve，不是 HandleTurn 上的
+nudge-vs-complete 分支。
 
 ### 3.5 Vocabulary 命名 review（DSL-013 五问）
 
@@ -144,7 +225,7 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
 
 ## 4. 依赖
 
-无产品语义依赖（`archive/requirements-design/INDEX.md`）。历史上 `structured-workflow →
+无产品语义依赖（`requirements/INDEX.md` 骨架）。历史上 `structured-workflow →
 causal-wait` hard edge 已删（Phase E）：CE builder 是实现耦合；event-driven wake /
 deadline escape 都是消费关系，非定义前提。
 
@@ -154,24 +235,24 @@ deadline escape 都是消费关系，非定义前提。
 
 | 源 | 吸收位置 |
 |---|---|
-| `archive/changes/completed/rabbit.md`（G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.3 |
-| `archive/changes/completed/ce-temporal-ownership.md`（时序所有权清算） | WHY.md §2.1/§2.2/§3；WHAT 009；HOW §2.2/§2.3 |
-| `archive/changes/completed/fsharp-dsl-governance.md`（mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
-| `archive/changes/completed/dsl-structured-program-gap.md`（DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
-| `archive/docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md` | WHAT.md 反向覆盖清单 + 各命题 |
-| `archive/requirements-design/COVERAGE.md`（flow/dsl/arch/execution/loop 小节） | WHAT.md 反向覆盖清单 |
-| `archive/requirements-design/EVIDENCE.md` §2 行 | README.md HOW 概览 |
-| `archive/requirements-design/PROOF-MAP.md`（dsl-ownership SPLIT、g4r-ce-vocabulary KEEP、g4r-freeze DELETE、domain/kernel/temporal/verify family） | PROOF.md §4/§6 |
+| 历史 change（rabbit，G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.3 |
+| 历史 change（ce-temporal-ownership，时序所有权清算） | WHY.md §2.1/§2.2/§3；WHAT 009；HOW §2.2/§2.3 |
+| 历史 change（fsharp-dsl-governance，mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
+| 历史 change（dsl-structured-program-gap，DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
+| 历史五层 docs（dsl-structured-program/flow/architecture/loop/execution） | WHAT.md 反向覆盖清单 + 各命题 |
+| 历史 COVERAGE（flow/dsl/arch/execution/loop 小节） | WHAT.md 反向覆盖清单 |
+| 历史 EVIDENCE §2 行 | README.md HOW 概览 |
+| 历史 PROOF-MAP（dsl-ownership SPLIT、g4r-ce-vocabulary KEEP、g4r-freeze DELETE、domain/kernel/temporal/verify family） | PROOF.md §4/§6 |
 
 ### 5.2 GARBAGE（弃权记录）
 
 | 源 | 弃权理由 | 记录位置 |
 |---|---|---|
-| `archive/changes/completed/ChatGPT-时序控制流修复提案.md`（4310 行 raw chat export） | **GARBAGE（transcript）**：ChatGPT 对话原始导出，非规范源。其中 2N Finality cohort、REVISE 立即短路、Blessed 后 rest-in-peace、Reviewer HostOwnedHidden、Join 中断仅 OperatorAbort\|DeadlineExpired 等决策的**规范结果**已落 `archive/docs/`（GLORY/EXEC-017/EXEC-020 等）并由对应 owner 拥有；transcript 本身不携带任何独立 normative 内容，不迁移为命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 56 |
-| `archive/changes/completed/refactor.md`（1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（kolmogorov-size.mjs ratchet、god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属 verification-system MECHANISM / 各 semantic owner；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
-| `archive/docs/what/loop.md` LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
-| `archive/docs/what/execution.md` EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
-| `archive/docs/what/architecture.md` ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |
+| 历史 transcript（ChatGPT-时序控制流修复提案，4310 行 raw chat export） | **GARBAGE（transcript）**：ChatGPT 对话原始导出，非规范源。其中 2N Finality cohort、REVISE 立即短路、Blessed 后 rest-in-peace、Reviewer HostOwnedHidden、Join 中断仅 OperatorAbort\|DeadlineExpired 等决策的**规范结果**已落旧五层 docs（GLORY/EXEC-017/EXEC-020 等）并由对应 owner 拥有；transcript 本身不携带任何独立 normative 内容，不迁移为命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 56 |
+| 历史 transcript（refactor，1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（kolmogorov-size.mjs ratchet、god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属 verification-system MECHANISM / 各 semantic owner；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
+| 历史 LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
+| 历史 EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
+| 历史 ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |
 | `scripts/checks/dsl-ownership.mjs` 的 `program-counter` 词表 + `behaviour-bool` 名称正则、`dsl-ownership-ratchet` 基线、`g4r-ce-vocabulary` obsolete-controller absence、`g4r-freeze` | **migration ratchet（DELETE@cutover）**：旧 symbol absence 黑名单只能防已经想起来的坏名字；新世界以 positive 结构门（state-product / mutable-record-field / second-runtime-protocol / registry-joint-branch）+ 本包 NEW 测试为正式证明面 | PROOF.md §4/§6；PROOF-MAP DELETE 清单 |
 
 ### 5.3 已实施的 clean break（不再回退）

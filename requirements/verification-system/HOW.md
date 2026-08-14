@@ -5,7 +5,7 @@
 ## 实现模型
 
 无 runtime 源码（META 包正确形态，见 `archive/requirements-design/EVIDENCE.md` §1）。证据面
-分布在三个机制层：
+分布在四个机制层：
 
 ### 1. proof ladder（`tests/proof-ladder.test.mjs`）
 
@@ -38,7 +38,13 @@ VERIFY-004 因果 watchdog feed 门禁的永久回归：top-level e2e 测试不�
 Kolmogorov size 是 advisory：超过基线只给 suggestion，0 blocking finding——行数不是
 门禁（VERIFY-005 不设行数门禁）。（自 `tests/unit/verify/` 迁移，ROOT 深度不变。）
 
-### 4. 运行器机制（lead 集成时执行，本包 REUSE 登记）
+### 4. physical contract 声明面（`tests/physical-contract.test.mjs`）
+
+唯一 Long Stroke 入口必须写出它依赖的不可模拟 physical contract（OpenCode lifetime /
+HOST-010 messageID / Repeat-until-pass forbidden）；删声明即红。`format-build-test` 禁止
+repeat-until-pass。答不出则不得留在 e2e。
+
+### 5. 运行器机制（lead 集成时执行，本包 REUSE 登记）
 
 ```text
 node scripts/check.mjs              # 22 个 wired layer-0 gate（proof-ladder pin 清单）
@@ -84,7 +90,8 @@ proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 
 
 - **SPLIT@cutover**：g4r-freeze 迁移 ratchet → 永久 One World 门（已执行：`e2e-watchdog-feed`）；
   覆盖门禁 → 独立 oracle 或包内测试；PROOF-MAP 归属分歧按 assertion 复核后回写协调文件。
-- **GAP@cutover**：「禁止跨级」的人工裁决面（物理契约论证）暂无机器落点，若需机器化再补。
+- 「禁止跨级」物理契约声明面：`tests/physical-contract.test.mjs` + e2e entry PHYSICAL CONTRACTS
+  块（`requirements/GAP.md` GAP-006 CLOSED）。
 - 本包测试均为文本/文件系统级，不依赖 dist；proof-ladder 对 package.json / check.mjs 的
   格式假设（`&&` 拼接、`const checks = [...]` 形状）若未来改格式需同步适配（属本包独立
   变化）。

@@ -361,8 +361,8 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('Q3')), true)
 
     const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    const fetched = resultOf(await fetchCase(store, raw, 10, delegateId))
+    const store = acquire(common)
+    const fetched = resultOf(await fetchCase(store, 10, delegateId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'Case exists after finalize')
     assert.equal(fetched.value.SessionId, delegateId)

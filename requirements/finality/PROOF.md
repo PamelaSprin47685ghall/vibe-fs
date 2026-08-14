@@ -9,8 +9,10 @@
 | 文件 | 来源 | 类型 | 断言数 |
 |---|---|---|---|
 | `manager-finality-disposition.test.mjs` | NEW | `ManagerFinality.classifyEnding` / `admitLabor` 纯代数 + `Roles_isAllowed` | 11 |
+| `manager-job-no-resurrection.test.mjs` | NEW | FINALITY-028：terminal 不复活 / active 同 session·worktree 续做 | 4 |
 
 `node --test requirements/finality/tests/manager-finality-disposition.test.mjs` 单独跑绿。
+`node --test requirements/finality/tests/manager-job-no-resurrection.test.mjs` 单独跑绿。
 
 ### REUSE（留在原处；glory 族按 PROOF-MAP KEEP，多 owner 交叉 SPLIT@cutover）
 
@@ -59,15 +61,13 @@
 | F-25 025 | REUSE lifecycle `GLORY_021_WorkActivated_fixes_the_protected_prefix_end_once`（inert decode 回归）；`GLORY_010/062`（completed 保持） | REUSE | lifecycle SPLIT@cutover |
 | F-26 026 | `tests/manager-finality-disposition.test.mjs` `FINALITY-054/055 rejection ...`（undecided/resolved 不阻塞劳动——LaborMayContinue）；REUSE lifecycle `GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record`、`GLORY_057_host_undecidable_golden_bytes` | NEW + REUSE | 见 F-1 |
 | F-27 027 | REUSE lifecycle `GLORY_029_idle_encouragement_golden_bytes`（idle 只在非 finality 情形）；join 资源检查 → host-boundary canary 指针 | REUSE | lifecycle SPLIT@cutover |
-| F-28 028 | 无单测落点（ManagerJob 不复活在 Orchestrator 交叉）；GAP 记录：e2e manager-unhappy-path 覆盖（cutover 范围），单元 oracle 待 `dispatch-protocol`/`managed-session-lifecycle` 迁移时补 | GAP | — |
+| F-28 028 | `tests/manager-job-no-resurrection.test.mjs` `FINALITY-028 a terminal ManagerJob is not active and does not resume` / `later progress cannot reopen` / `replaying ManagerJobCreated cannot re-enlist` / `an active owned job continues on the same session and worktree` | NEW | `node --test requirements/finality/tests/manager-job-no-resurrection.test.mjs` |
 
 ## 覆盖统计
 
-- 命题 28 / 落点 27（NEW 1 文件 11 断言；REUSE 4 文件族；GAP 1）。
-- GAP：FINALITY-028（ManagerJob 不复活）——现有 proof 在 e2e 剧本与 Orchestrator 域，本包无单测；
-  聚合台账见 `requirements/GAP.md` GAP-001（dispatch-protocol 已迁移，单元 oracle 仍待补）。
+- 命题 28 / 落点 28（NEW 2 文件；REUSE 4 文件族；GAP 0）。
 - 移动文件：0（glory 族按 PROOF-MAP KEEP 保留原位，SPLIT@cutover 拆分见上表）。
-- 新写文件：1（`manager-finality-disposition.test.mjs`，11 断言全绿）。
+- 新写文件：2（`manager-finality-disposition.test.mjs` 11 断言；`manager-job-no-resurrection.test.mjs` FINALITY-028）。
 
 ## semantic anchor id（semantic-anchors.mjs，MECHANISM 逐 ID 归包）
 

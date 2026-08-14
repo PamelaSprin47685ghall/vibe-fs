@@ -8,7 +8,7 @@
 // to requirements/review-assurance/tests/host-reverify.test.mjs.
 
 import assert from 'node:assert/strict'
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -104,6 +104,15 @@ test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
   live.cleanup()
 })
 
+test('HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs', import.meta.url), 'utf8')
+  assert.doesNotMatch(
+    source,
+    /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/,
+    'continuation must not leak a detached timeout/polling task after the Host callback path is already live',
+  )
+})
+
 test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {
   const live = await liveOrchestrator()
   const forked = await forkManagerJob(live.host, managerJobId('hostfw8'), 'fast-manager', 'first pass')
@@ -112,6 +121,12 @@ test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () =>
   const continued = await continueManagerJob(live.host, managerJobId('hostfw8'), 'second pass')
   assert.equal(continued.ok, true, continued.ok ? '' : continued.error)
   assert.ok(continued.value, 'the continued job reports its worktree')
+
+  // The real engine owns a publication task after ForkManagerJob. Teardown must
+  // first consume that owned task's verdict; deleting the repo while it is still
+  // appending durable facts turns its physical store-lock acquisition into an
+  // orphaned retry loop.
+  await hostJoinPublished(live.host)
   live.cleanup()
 })
 

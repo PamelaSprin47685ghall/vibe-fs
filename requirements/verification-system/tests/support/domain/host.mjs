@@ -354,7 +354,7 @@ export const handleController = (() => {
           parentId,
           agentId,
           typeof reason === 'string' ? handleAbandonReason.of(reason) : reason,
-          abandonedAt,
+          abandonedAt ?? utcOffset('2026-01-01T00:00:00Z'),
         ),
       ),
     retire: async (journal, parentId, agentId) => resultOf(await m.retire(journal, parentId, agentId)),

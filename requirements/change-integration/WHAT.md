@@ -122,7 +122,9 @@ expected head（ORCH-008）。
 ## CHGINT-009：same-road continuation 与独立 road 的 integration identity
 
 `commission` 续做既有路（省略 `calling`，按 Byname 识别）时，续做 = 同 job / 同 worktree / 同 session
-（墙内事实）；不新建 worktree、不换 Manager、不重绑 Persona（AGENT-015、ORCH-003）。独立 road 的
+（墙内事实）；不新建 worktree、不换 Manager、不重绑 Persona（AGENT-015、ORCH-003）。Resume 的
+Host pending 由既有 session callback/source 自行推进；continuation 路径不得另起一个丢弃结果的 detached
+`awaitCurrentPendingRun`/polling waiter 来“推进”它，也不得因此留下 timer/subscription handle。独立 road 的
 integration identity 由 `ManagerJobId` + `WorktreeIdentity` 承载（identity 稳定，path 仅诊断）。
 
 含义/动机：续做必须继续同一条 integration 路线的物理身份，否则恢复/发布上下文断裂。

@@ -3,8 +3,8 @@
 // Inquiry capability matrix (AGENT-025 / AGENT-030): ENF-010 role-predicate gate +
 // ENF-007 MCP wildcard schema mechanism.
 //
-// Inquiry = SyncDelegate inspect + Sphinx MCP: Roles.permissions carries Inspect and
-// Sphinx; must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
+// Inquiry = SyncDelegate inspect + Sphinx MCP + Fission: Roles.permissions carries Inspect,
+// Sphinx and Fission; must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
 // and ToolRegistry.rolePredicate all derive from that set (or deny when the
 // capability is absent).
 // (office-capability OFF-014 / repository-investigation REPOSITORY-INVESTIGATION-003
@@ -30,17 +30,18 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('Inquiry_permissions_are_inspect_and_sphinx', () => {
+test('Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
   const allowed = roles.permissions(roles.of('Inquiry'))
-  assert.deepEqual(allowed, ['Inspect', 'Sphinx'])
+  assert.deepEqual(allowed, ['Fission', 'Inspect', 'Sphinx'])
   assert.equal(allowed.includes('Read'), false)
   assert.equal(allowed.includes('Glob'), false)
   assert.equal(allowed.includes('Grep'), false)
 })
 
-test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx', () => {
+test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx_fission', () => {
   assert.equal(isAllowed(Role.Inquiry, ToolPermission.Inspect), true)
   assert.equal(isAllowed(Role.Inquiry, ToolPermission.Sphinx), true)
+  assert.equal(isAllowed(Role.Inquiry, ToolPermission.Fission), true)
   for (const permission of READ_PERMISSIONS) {
     assert.equal(isAllowed(Role.Inquiry, permission), false, `Inquiry must lack ${permission}`)
   }
@@ -48,7 +49,7 @@ test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx', () => 
 
 test('Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
   const caps = names(toolCapabilitiesFor(Role.Inquiry, ProviderRequestKind.WorkMain))
-  assert.deepEqual(caps, ['inspect', 'sphinx_*'])
+  assert.deepEqual(caps, ['fission', 'inspect', 'sphinx_*'])
   for (const tool of READ_TOOLS) {
     assert.equal(caps.includes(tool), false, `toolCapabilitiesFor must omit ${tool}`)
   }
@@ -70,7 +71,7 @@ test('Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
   assert.equal(inspect(Role.Inquiry), true, 'rolePredicate(inspect) must allow Inquiry')
 })
 
-test('Inquiry_host_schema_allow_list_is_inspect_and_sphinx', () => {
+test('Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission', () => {
   const config = {
     agent: {
       'fast-inquiry': { model: 'fast-inquiry-model' },
@@ -103,6 +104,7 @@ test('Inquiry_host_schema_allow_list_is_inspect_and_sphinx', () => {
     assert.equal(permission['*'], 'deny')
     assert.equal(permission.inspect, 'allow')
     assert.equal(permission['sphinx_*'], 'allow')
+    assert.equal(permission.fission, 'allow')
     for (const tool of READ_TOOLS) {
       assert.notEqual(permission[tool], 'allow', `${name} must not allow ${tool}`)
     }
