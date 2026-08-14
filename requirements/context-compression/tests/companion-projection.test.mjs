@@ -11,7 +11,7 @@ import {
   companionIdentity as ident,
   companionPrompt as prompt,
   companionProjection as proj,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const spy = (input) => `«${input}»`
 

@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { blogProjection as blog, listItems } from '../support/domain.mjs'
+import { blogProjection as blog, listItems } from '../../../tests/unit/support/domain.mjs'
 
 const entryFrame = (n) => blog.frame({ kind: 'Entry', digest: `sha-entry-${n}`, ref: `blob-entry-${n}` })
 const squashFrame = (n) => blog.frame({ kind: 'Squash', digest: `sha-squash-${n}`, ref: `blob-squash-${n}` })

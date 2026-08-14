@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { prefixEpochProjection as prefix, probeSelection as selection } from '../support/domain.mjs'
+import { prefixEpochProjection as prefix, probeSelection as selection } from '../../../tests/unit/support/domain.mjs'
 
 /** A digest oracle that agrees with the Companion at every cutoff. */
 const agreeing = (digest) => () => digest
