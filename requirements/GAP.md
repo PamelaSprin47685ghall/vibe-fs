@@ -22,6 +22,7 @@
 | GAP-006 | `verification-system` | VERIFICATION-SYSTEM-003（「禁止跨级」物理契约论证） | 人工裁决面无机器落点 | OPEN | VERIFY-002 文本 + review 过程 | 若需机器化再补（先回答「依赖哪个不可模拟 physical contract」） | verification-system |
 | GAP-007 | `host-boundary` | HOST-BOUNDARY-008（HOST-010 因果读 canary：transform 内存 id ≡ ToolContext.messageID 共时等价） | unit 无 oracle | PARTIAL | e2e canary（verification-system/tests/e2e） | 若需 unit 化再补 | host-boundary |
 | GAP-008 | `host-boundary` | HOST-BOUNDARY-019（Magic Todo membrane canaries A..R） | 未落地实现（release gate 清单） | OPEN | 无 | 实现后由 obligation-ledger + host-boundary 补 H（定位）/A（时序）/C（原地 mutation） | host-boundary + obligation-ledger |
+| GAP-009 | `prefix-stability` | HOST-013 dynamic elapsed sampling（cutover 丢失；PREFIX-STABILITY-011 仅保留 historical replay half） | 新 marker 应采样 `SessionStartedAt → now` 并把 human-readable elapsed 冻结进当次 `MarkerText`；当前正式 WHAT 缺独立正向命题，production 也未注入，且无 oracle | OPEN | `archive/docs/what/host.md` / `archive/changes/active/GrandRewrite.md §14.5` 保留迁移前语义；当前 `PREFIX-STABILITY-011` 仅证明历史 marker 不重算 | 恢复正向 WHAT owner；在 HOST-013 marker 组装处按新 occurrence 一次采样并持久化；补 fresh-sample + replay-byte-freeze oracle | prefix-stability + time-capability + guidance-delivery |
 
 ## 纪律
 

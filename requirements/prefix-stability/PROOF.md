@@ -20,6 +20,10 @@
 | PREFIX-STABILITY-014（synthetic 正文不进 trace 系） | REUSE：`requirements/prefix-stability/tests/pair-thought-anchored.test.mjs`（pair 正文只在 wire，不进 XTrace 的交叉由 HOST-013 行为约束 4 覆盖）；跨包：`requirements/semantic-trace/tests/x-trace-capture.test.mjs`（semantic-trace 包）`COMPANION_012_*`（capture 边界无 synthetic 输入） | REUSE + 跨包 | `node --test requirements/prefix-stability/tests/pair-thought-anchored.test.mjs` |
 | PREFIX-STABILITY-015（synthetic id 确定性派生） | 跨包：`requirements/context-compression/tests/companion-projection.test.mjs`（context-compression 包）`COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity`、`COMPANION_013_seal_root_changes_when_any_identity_field_changes`、`COMPANION_013_seal_root_is_stable_across_calls`；REUSE：`requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs` `COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id` | 跨包 + REUSE | `node --test requirements/context-compression/tests/companion-projection.test.mjs` |
 
+## GAP
+
+- `GAP-009`：HOST-013 的 elapsed 动态 marker 在 cutover 后只保留了 `PREFIX-STABILITY-011` 的历史字节不重算约束；“每条新 marker 采样 `SessionStartedAt → now` 并把 human-readable elapsed 写入当次 immutable `MarkerText`”的正向义务没有进入当前 WHAT 的独立命题，也没有可执行 oracle。生产 `Infrastructure/OpenCode/Plugin/PluginTransforms.fs` 当前只组装 `tip guidance + pair-programming guideline`，未注入 elapsed；因此该行为实际缺失。恢复时必须保持一条原则：新 occurrence 只采样一次，已持久化 `MarkerText` 永不重算。
+
 ## 2. 本包拥有的测试文件（全部单跑绿）
 
 | 文件 | 来源 | 状态 |
