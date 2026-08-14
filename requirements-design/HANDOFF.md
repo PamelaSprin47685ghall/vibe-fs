@@ -1289,7 +1289,7 @@ CURRENT EVIDENCE
 - ~~没有完成 Clause-by-Clause 全仓 reverse coverage~~ —— 已完成（Phase A），结果见 `requirements-design/COVERAGE.md`：~418 条款、0 新包、0 ORPHAN、45 包不需增删并；
 - ~~没有完成 WHY 反审计~~ —— 已完成（Phase B），见 `requirements-design/COVERAGE.md` Phase B 节：45 包单-WHY 全通过、0 double-WHY、0 假边界；修复 1 处 OVERLAP（`repository-programming` 不再重复拥有 capability 同构律，新增 `capability-enforcement` edge）+ 删除 1 处假依赖（`finality → managed-session-lifecycle`）；4 处弱依赖转入 Phase E；
 - ~~没有完成 Source/runtime evidence~~ —— 已完成（Phase C），见 `requirements-design/EVIDENCE.md`：43 REAL + 2 META、0 THIN、0 FANTASY；无文档幻想包；
-- ~~没有完成 Test/gate reverse coverage~~ —— 已完成（Phase D），见 `requirements-design/PROOF-MAP.md` Phase D 节：24 gates + 35 test families 逐项标 KEEP/SPLIT/MECHANISM/DELETE；family 级 0 ORPHAN、3 missing oracle 待补；
+- ~~没有完成 Test/gate reverse coverage~~ —— 已完成（Phase D），见 `requirements-design/PROOF-MAP.md` Phase D 节：24 gates + 35 test families 逐项标 KEEP/SPLIT/MECHANISM/DELETE；family 级 0 ORPHAN、3 missing oracle 已定位、补法见 §29（进行中，未提交）；
 - ~~没有完成 changes/ 逆向~~ —— 已完成，见 `requirements-design/CHANGES-AUDIT.md`：36 份 completed 全部命中（27 EVIDENCE + 5 GARBAGE-mixed + 3 GARBAGE-pure + 1 HOW）、0 份升级为 authority、无新 ORPHAN；
 - ~~没有完成 dependency audit~~ —— 已完成（Phase E）：删 3 条 coupling edge（`structured-workflow`/`time-capability`→`causal-wait`、`guidance-delivery`→`provider-projection`），保留 `finality`→`participant-horizon`；INDEX 骨架重画为完整邻接清单，90→87 edges、0 cycle、0 unknown ref；
 - 没有最终确定 45 是最终数量；
@@ -1432,3 +1432,74 @@ requirements/
 宁可多一个边界清楚的小包，也不要一个“什么都管一点”的大包。
 
 只有在全仓反向覆盖后仍能同时成立的那些包，才值得进入未来 normative world。
+
+---
+
+# 29. 进行中：补 3 个 missing oracle（交接快照，未提交）
+
+状态：调查完成，尚未落盘。工作树干净（`18a434e9`）。下一个对话直接按本节执行，无需重新考古。
+
+## 任务来源
+
+`PROOF-MAP.md` Phase D「ORPHAN / missing oracle」列了 3 项，用户要求补齐。它们不是 DELETE，是缺可红 proof。
+
+## 已完成的调查结论（不要重做）
+
+### Oracle 1 — browser provenance canary（`external-investigation`）
+
+- provenance contract 只活在 `resources/provider/role/browser/{en,zh-CN}.md` 散文里，没有 F# runtime provenance 类型（真实 browsing 在外部 stealth-browser MCP）。
+- 现有 proof = `scripts/checks/semantic-anchors.mjs` 的 `ROLE_SEMANTIC_ANCHORS.browser`，5 条**松**锚点（`/disagreement/i`、`/far shore/i` 这类单词级），即便合同退化成反面也能通过。
+- 修复 = 强化成锁定**实质区分**（已逐条核对当前双语散文都命中）：
+  - 保留：`provenance-not-reachability`、`far-shore`、`source-closest`
+  - 强化 `visual-truth`：en `/Some truths are only visible|Read visual evidence when the charge depends/i`，zh `/有些事实只有看见才成立|读取视觉证据/`
+  - 新增（替换松 `disagreement`）：`condition-preserved`、`inference-not-observation`、`disagreement-not-averaged`、`no-cross-sea-certainty`
+- 新建 `tests/unit/verify/browser-provenance-canary.test.mjs`：
+  1. pin 8 个 anchor id；2. `scanSemanticAnchorParity(realProvider, {browser})` 绿；3. 删掉一条 distinction 的 fixture 变红；4. 断言 `disagreement-not-averaged` 不是单词级（`"Just average the disagreement."` 必须不命中）。
+- 注意：role-lock（只有 Browser 有 `stealth-browser-mcp_*` allow）已由 `tests/unit/agent/stealth-browser-mcp.test.mjs` 覆盖。真实 runtime provenance oracle 需要 browser MCP adapter/Long Stroke，正确落在无 browser 的 unit 套件之外——在测试注释里写明这层边界。
+
+### Oracle 2 — Distiller behavioral fixtures（`output-distillation`）
+
+- fragment-humility 语义只活在 Distiller Role Law + 部分在 `executor-summarize.test.mjs`；**raw tail verbatim 保留未断言**。
+- 行为面已存在：`Distillation.fs` `distillSpool` 失败时 `partialWithTail` 返回 Condensation incomplete/unavailable/failed + `raw_tail` = 最后一个 chunk 的原始字节。
+- 新建 `tests/unit/verify/distiller-fragment-humility.test.mjs`：
+  - 行为：spool 大小 `SPOOL_CHUNK_BYTES(204800)+64` 造 2 chunk，把 distinct marker 写进第 2 个 chunk；第 2 个 map agent 用 `distillationRuntime.notFound` 失败；断言 summary 命中 `/Condensation incomplete|Most recent raw output/`、verbatim 含 marker、不含 `summary-for-<failedId>`、`cancelled.length≥1`。用 `distillationRuntime.fake` + `distillationRuntime.distillSpool(runtime, spoolPath, lang)`（见 `tests/unit/support/domain/execution.mjs`）。
+  - 散文：强化 distiller 锚点（`fragment-humility` 加 `Do not manufacture success`、`merge-conflicts` 加 `not outvoted`、新增 `locatable-to-unseen-reader`），pin + 真实散文扫描绿。
+
+### Oracle 3 — proof ladder 分层可红（`verification-system`）
+
+- ladder（VERIFY-001 五层）实际在 `package.json` `format-build-test`，不在 `scripts/check.mjs`（后者只跑 layer-0 静态门）。没有测试 pin 它 → 会静默漂移。
+- 新建 `tests/unit/verify/proof-ladder.test.mjs`：
+  1. 解析 `format-build-test`，断言层序：fantomas → check.mjs(L0) → build.mjs → unit/run.mjs → integration/run.mjs → integration/package/run.mjs → warmup-opencode.mjs → e2e/entry.test.mjs(L4，恰一个) → `npm pack --dry-run`(L5)。
+  2. 解析 `check.mjs` wired gate 清单：每个 wired 路径存在；`scripts/checks/*.mjs` == wired ∪ {`spec-rules.mjs`(lib)、`semantic-anchors.mjs`(catalog)、`enforcer-rulebook-gate.mjs`(retired stub)}。
+  3. 断言 check.mjs fail-closed（`process.exit(result.status ?? 1)` 传播非零）。
+  - 「可红」由现有 `tests/unit/verify/*.test.mjs` 的 per-gate red fixture 交叉证明，不在 ladder test 里重造。
+
+## 调查中发现的两处 drift（本任务必须一并修）
+
+1. **`scripts/checks/e2e-watchdog-feed.mjs` 是活跃 layer-0 gate 却未接入 check.mjs**（有 exit 逻辑 + `tests/unit/verify/e2e-watchdog-feed.test.mjs`）。修复：加进 check.mjs gate 清单（追加在 `test-boundary.mjs` 之后）。
+2. **`scripts/checks/enforcer-rulebook-gate.mjs` 及其 `.test.mjs` 是 retired 空壳**（头注释 "Retired 2026-08-12"），但仍被当作活跃门引用在：
+   - `docs/proof/verify.md`（声称「check.mjs 以 --require-headings --strict 接线」——已假）
+   - `requirements-design/PROOF-MAP.md`（Phase D 表标 KEEP behavior-diagnosis——应为 DELETE/retired）
+   - `requirements-design/EVIDENCE.md`（guidance-delivery failure 列）
+   - `requirements-design/16-feedback.md`（guidance-delivery CURRENT EVIDENCE，六轴回写 commit `18a434e9` 时从 EVIDENCE 带入）
+   - `scripts/checks/kolmogorov-size-baseline.json`（baseline 项，无害；kolmogorov 是 advisory）
+   修复：verify.md / PROOF-MAP / EVIDENCE / 16-feedback 四处的 retired gate 引用删除或改标 retired（behavior-diagnosis 的 tip-SSOT proof 现由 `tests/unit/enforcer/**` catalog 测试承担）。是否删除两个 retired 空壳文件：要同步改 kolmogorov baseline；否则留在 ladder test 的 allowlist 里并加「retired stub」注释。
+
+## 收尾必做
+
+- `PROOF-MAP.md`：3 条 missing oracle 标 RESOLVED（带测试路径）；修 enforcer-rulebook-gate 行。
+- `EVIDENCE.md`：guidance-delivery failure 去掉 enforcer-rulebook-gate；「待 Phase D 关注」3 项标已补。
+- `AUDIT.md`：记 3 oracle 闭环 + 2 drift 修复。
+- commit。
+
+## 验证命令
+
+```text
+node scripts/checks/language-parity-gate.mjs   # 强化锚点后必须仍绿（Gate C 受影响）
+node scripts/check.mjs                          # 接入 e2e-watchdog-feed 后必须仍绿
+node tests/unit/verify/browser-provenance-canary.test.mjs
+node tests/unit/verify/distiller-fragment-humility.test.mjs
+node tests/unit/verify/proof-ladder.test.mjs
+```
+
+distiller 行为测试 import dist → 需 build 新鲜；本轮不改 .fs，dist 保持新鲜。可直接 `node --test <file>` 单跑。
