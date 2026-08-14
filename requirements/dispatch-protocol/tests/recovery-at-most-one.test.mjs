@@ -31,7 +31,7 @@ import {
   sessionId,
   toList,
   transportReceipt,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const Option = await lib('Option.js')
 const { reconcile } = await prod('Application/Reconciliation/PromptRecovery')

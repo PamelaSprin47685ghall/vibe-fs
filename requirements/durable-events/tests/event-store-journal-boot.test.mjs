@@ -21,7 +21,7 @@ import {
   stream,
   toList,
   utcOffset,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
 const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { caseOf, okResult, errorResult, payloadOf, toList } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, okResult, errorResult, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
 const Hook = await import('../../../dist/Infrastructure/Git/HookDispatcher.js')

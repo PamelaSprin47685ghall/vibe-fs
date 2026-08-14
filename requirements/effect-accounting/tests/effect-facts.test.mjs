@@ -20,7 +20,7 @@ import {
   targetRef,
   worktreeIdentity,
   worktreePath,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const JOB = managerJobId('job_ea')
 const MANAGER = stream.session('ses_ea')

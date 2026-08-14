@@ -20,7 +20,7 @@ import {
   mapCount,
   promptDispatcher,
   transportReceipt,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const capturingPort = (captured) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
