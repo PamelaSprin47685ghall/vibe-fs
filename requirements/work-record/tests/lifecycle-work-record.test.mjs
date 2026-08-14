@@ -7,7 +7,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { xTrace, lifecycleWorkRecord } from '../../../tests/unit/support/domain.mjs'
+import { xTrace, lifecycleWorkRecord } from '../../verification-system/tests/support/domain.mjs'
 
 const opening = (assignment, requirements = []) => lifecycleWorkRecord.opening({ assignment, requirements })
 

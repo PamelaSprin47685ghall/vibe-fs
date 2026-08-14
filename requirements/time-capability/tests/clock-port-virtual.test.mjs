@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clockAt, clockPort, deadline, utcOffset } from '../../../tests/unit/support/domain.mjs'
+import { clockAt, clockPort, deadline, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 

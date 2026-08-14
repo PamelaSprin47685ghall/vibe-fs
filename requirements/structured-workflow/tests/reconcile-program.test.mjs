@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { quiescencePermit, reconcileProgram, reconcileWake } from '../../../tests/unit/support/domain.mjs'
+import { quiescencePermit, reconcileProgram, reconcileWake } from '../../verification-system/tests/support/domain.mjs'
 
 // ── pure classifiers ─────────────────────────────────────────────────────────
 

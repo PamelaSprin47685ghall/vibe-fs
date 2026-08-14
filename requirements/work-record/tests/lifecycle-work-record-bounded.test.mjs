@@ -19,7 +19,7 @@ import {
   sessionId,
   stream,
   xTraceCapture,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
 

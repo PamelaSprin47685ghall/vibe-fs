@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clockAt, deadline } from '../../../tests/unit/support/domain.mjs'
+import { clockAt, deadline } from '../../verification-system/tests/support/domain.mjs'
 
 const ISO_START = '2026-01-01T00:00:00Z'
 
