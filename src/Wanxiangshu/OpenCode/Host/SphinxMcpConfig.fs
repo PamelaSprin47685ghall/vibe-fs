@@ -29,10 +29,10 @@ module SphinxMcpConfig =
     [<Emit("import.meta.url")>]
     let private importMetaUrl: string = jsNative
 
-    /// Compiled module: dist/Infrastructure/OpenCode/Host/ → four levels to package root.
+    /// Compiled module: dist/OpenCode/Host/ → three levels to package root.
     let private packageRoot () =
         let here = dirname (fileURLToPath importMetaUrl)
-        pathJoin (pathJoin (pathJoin (pathJoin (here, ".."), ".."), ".."), "..")
+        pathJoin (pathJoin (pathJoin (here, ".."), ".."), "..")
 
     let defaultServerEntry () : string =
         pathJoin (pathJoin (pathJoin (packageRoot (), "dist"), "Sphinx"), "McpServer.js")

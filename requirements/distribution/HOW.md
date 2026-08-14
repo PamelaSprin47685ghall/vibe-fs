@@ -7,8 +7,8 @@
 ```json
 {
   "name": "wanxiangshu",
-  "main": "./dist/Infrastructure/OpenCode/Plugin/Plugin.js",
-  "exports": { ".": "./dist/Infrastructure/OpenCode/Plugin/Plugin.js" },
+  "main": "./dist/OpenCode/Plugin/Plugin.js",
+  "exports": { ".": "./dist/OpenCode/Plugin/Plugin.js" },
   "files": ["dist/", "resources/"],
   "engines": { "node": ">=20" },
   "peerDependencies": { "@opencode-ai/plugin": ">=1.17.4" }
@@ -27,7 +27,7 @@ rm -rf dist/
 dotnet tool run fable precompile src/Wanxiangshu/Wanxiangshu.fsproj -o dist
    → 递归删除 dist/ 内的 .gitignore 与 .fs/.fsproj 残留（防源文件混入产物）
    → 校验：
-       dist/Infrastructure/OpenCode/Plugin/Plugin.js 存在（entry）
+       dist/OpenCode/Plugin/Plugin.js 存在（entry）
        resources/enforcer/ 至少一个 tip 目录，且 <tip>/{enforcer.md,main.md} 存在
        resources/enforcer/catalog.json 不存在（已废止）
        resources/provider/role/<11 角色>/{en,zh-CN}.md 存在
@@ -107,7 +107,7 @@ distribution → 特殊：所有声明 runtime resource 的 semantic packages（
 | 历史 why/enforcer「元数据：catalog.json vs 目录即清单」 | 拒 JSON 第二真相；lexical order 由扫描派生 | EVIDENCE | DISTRIBUTION-006；§3 |
 | 历史 change（repository-warm-start）§10 Resource bounds | `MaxKeywords=8 / TopKPerKeyword=4 / MaxHintsTotal=24 / MaxWarmStartBytes=64KiB`——warm-start **hint 预算**，非 artifact 资源闭包 | 弃权（GARBAGE 于本包） | 归 `repository-investigation`/`knowledge-reuse`；本包不拥有 |
 | 历史 verify 条款（VERIFY-001/002 第 5 层、Release gate、VERIFY-006） | 分层结构、晋级纪律、`repeat-until-pass` 禁令、watchdog 治理 | 弃权（HOW 于本包，机制归 `verification-system`） | DISTRIBUTION-007 只取「release proof 覆盖 closure」 |
-| 历史 architecture 条款（ARCH-*，2026-08-14 归档） | 分层所有权、资源读取仅在 `Infrastructure/Resources/`、入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js` | HOW | §3 |
+| 历史 architecture 条款（ARCH-*，2026-08-14 归档） | 分层所有权、资源读取仅在 `Infrastructure/Resources/`、入口 `dist/OpenCode/Plugin/Plugin.js` | HOW | §3 |
 | `README.md` §构建与打包/运行时资源/故障排查 | tarball = dist + resources + metadata；不得含 src/scripts/requirements/artifacts；`resources/prompts/*` 已删 | HOW | §1/§2 |
 | npm 必须永久是分发介质 | 当前实现用 npm package；换介质不改命题 | HOW（独立 change test 通过） | WHY.md |
 | `dist/`/`resources/` 路径名必须永久 | 现行 HOW/contract evidence；改名需同步全部测试与 README | HOW | §1 |

@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 
 import {
   serverName,
@@ -58,6 +59,7 @@ test.before(() => {
 test('AGENT_030_launch_disabled_fixture_test_local', () => {
   const entry = defaultServerEntry()
   assert.ok(entry.endsWith(join('dist', 'Sphinx', 'McpServer.js')))
+  assert.equal(existsSync(entry), true, 'defaultServerEntry must resolve to a file that exists on disk')
 
   const disabled = injected({ SPHINX_MCP_DISABLED: '1' })
   assert.equal(disabled.enabled, false)

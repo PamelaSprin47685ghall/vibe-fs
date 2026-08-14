@@ -13,7 +13,7 @@ Use, copying, modification, and distribution are governed by LICENSE.
 
 ```text
 import "wanxiangshu"
-→ dist/Infrastructure/OpenCode/Plugin/Plugin.js
+→ dist/OpenCode/Plugin/Plugin.js
 ```
 
 `package.json` 的 `main` / `exports["."]` 指向同一路径。npm 包含 `dist/` 与 `resources/`，不含源码与测试树。

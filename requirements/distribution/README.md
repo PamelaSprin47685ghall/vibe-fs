@@ -26,7 +26,7 @@
 
 ## HOW 概览
 
-- **artifact 形态**：npm package `wanxiangshu`（`package.json`），`files: ["dist/", "resources/"]`；`main`/`exports["."]` 均指向 `./dist/Infrastructure/OpenCode/Plugin/Plugin.js`。tarball = `dist/` + `resources/` + metadata（`package.json`/`README.md`/`LICENSE`）。
+- **artifact 形态**：npm package `wanxiangshu`（`package.json`），`files: ["dist/", "resources/"]`；`main`/`exports["."]` 均指向 `./dist/OpenCode/Plugin/Plugin.js`。tarball = `dist/` + `resources/` + metadata（`package.json`/`README.md`/`LICENSE`）。
 - **编译**：`scripts/build.mjs`（清空 `dist/` → Fable precompile → 删 `.gitignore`/`.fs` 残留 → 校验入口、rulebook、Role Law 双语文档）。不把 `resources/` 复制进 `dist/`（单份发布）。
 - **资源加载**：`src/Wanxiangshu/Infrastructure/Resources/{PackageResources,RuntimeResources}.fs`；`PackageResources.readText` 经 `import.meta.url` 上溯 3 层到包根拼 `resources/<rel>`，无 cwd walk、无候选搜索、无 fallback；缺失抛 `package resource missing: <full>`。
 - **运行前装配**：plugin init 调 `RuntimeResources.load()` → `install()` 一次，之后 `current()` 只读。

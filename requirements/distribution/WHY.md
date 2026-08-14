@@ -6,7 +6,7 @@
 
 具体到本产品：Wanxiangshu 是 OpenCode 插件，运行时同时依赖
 
-- **编译代码**：`dist/**`（Fable 编译产物，入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`）；
+- **编译代码**：`dist/**`（Fable 编译产物，入口 `dist/OpenCode/Plugin/Plugin.js`）；
 - **semantic resources**：`resources/provider/**`（Common Law / Role Law / Library 双语散文）、`resources/enforcer/**`（rulebook tip 双文件）。
 
 这两者缺一，安装后的插件就无法启动（fail fast）或提供错误世界。它们的**同时、同包、同版本到达**由本包保证。

@@ -7,7 +7,7 @@
 
 **规范陈述**：安装产物（npm tarball / 已安装包）必须同时包含 production entrypoint 的编译代码与全部 runtime semantic resources；两者作为同一个 artifact 交付，不存在「代码从 A 渠道、资源从 B 渠道」的分发。
 
-**含义/动机**：Wanxiangshu 运行时依赖 `dist/**`（入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`）与 `resources/**`（provider 双语散文 + enforcer rulebook）。缺任何一边，安装后的插件世界不完整。closure 单点=消费者只需安装一个 artifact。
+**含义/动机**：Wanxiangshu 运行时依赖 `dist/**`（入口 `dist/OpenCode/Plugin/Plugin.js`）与 `resources/**`（provider 双语散文 + enforcer rulebook）。缺任何一边，安装后的插件世界不完整。closure 单点=消费者只需安装一个 artifact。
 
 **边界**：不拥有 `resources/**` 内部 prose/rule 的业务意义（→ 各 semantic owner）；不决定具体打包工具/介质（→ HOW）。
 
@@ -25,7 +25,7 @@
 
 ## DISTRIBUTION-003 — manifest main/exports 与实际 shipped paths 一致
 
-**规范陈述**：`package.json` 的 `main` 与 `exports["."]` 必须指向同一个、实际存在于 artifact 内的文件（当前：`./dist/Infrastructure/OpenCode/Plugin/Plugin.js`）；消费者按 manifest 解析入口必须成功。
+**规范陈述**：`package.json` 的 `main` 与 `exports["."]` 必须指向同一个、实际存在于 artifact 内的文件（当前：`./dist/OpenCode/Plugin/Plugin.js`）；消费者按 manifest 解析入口必须成功。
 
 **含义/动机**：manifest 是消费者与工具链（Host plugin loader、bundler、`import "wanxiangshu"`）定位入口的唯一契约。manifest 与实际路径漂移 = 装上了但 import 失败。
 
