@@ -143,10 +143,10 @@ module TodoProcessReviewProgram =
                     match Map.tryFind assignment.ReviewerSessionId snapshot.AgentProjections.HandleByChildSession with
                     | Some record ->
                         match record.Lifecycle with
-                        | HandleLifecycle.Active -> ProducerPresence.Present
-                        | HandleLifecycle.CompletedAwaitingJoin _
+                        | HandleLifecycle.Active
+                        | HandleLifecycle.CompletedAwaitingJoin _ -> ProducerPresence.Present
                         | HandleLifecycle.Abandoned _
-                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle is not Active"
+                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle is abandoned or retired"
                     | None -> ProducerPresence.Present
             | _ -> ProducerPresence.Absent "assignment missing"
 

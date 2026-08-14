@@ -14,8 +14,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { HandleCompletionKind, HandleOwnership } from '../../../dist/Kernel/Fact.js'
 import {
+  agentFact,
   agentJournal,
+  authorityRoot,
   blobDigest,
   blobRef,
   caseOf,
@@ -24,7 +27,9 @@ import {
   fact,
   fold,
   gitTreeHash,
+  handleId,
   idValue,
+  logicalRunId,
   magicTodo,
   magicTodoJournal,
   managerLifeId,
@@ -34,6 +39,7 @@ import {
   reviewBarrierId,
   reviewProjection,
   reviewWitness,
+  roles,
   sessionId,
   stream,
   toolCallId,
@@ -330,6 +336,101 @@ test('REVIEW_018_await_consumable_review_fails_closed_when_the_producer_is_absen
     const lifeState = snap.AgentProjections.MagicTodo.ByLife.get(idValue.managerLife(life))
     const cp = mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
     assert.equal(cp.Concluded == null, true, 'fail-closed wait must not fabricate a Concluded')
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedAwaitingJoin', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-completed-presence-'))
+  const created = await agentJournal.create({ directory, runtime: 'rt_completed_presence' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  try {
+    const journal = created.journal
+    const reviewerSession = sessionId('ses-completed-reviewer')
+    const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
+      life,
+      write,
+      review,
+      reviewer,
+      reviewerSession,
+      cursor(4),
+      cursor(10),
+    )
+
+    const append = async (caseName, payload) => {
+      const appended = await agentJournal.appendMagicTodo(
+        stream.session(managerSession),
+        undefined,
+        magicFact(caseName, payload),
+        journal,
+      )
+      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+      return appended.value.EventId
+    }
+
+    const preparedRef = await append('TodoWritePrepared', prepared)
+    const acceptedWithRef = new magicTodoJournal.TodoWriteAccepted(
+      life,
+      write,
+      call,
+      preparedRef,
+      'provider-input-digest',
+      'output-digest',
+      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+      'magic-v1',
+    )
+    await append('TodoWriteAccepted', acceptedWithRef)
+    await append('DedicatedTodoReviewerEnlisted', new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession))
+    await append('TodoProcessReviewAssigned', assigned)
+
+    // Simulate child session creation + completion
+    await agentJournal.appendAgent(
+      stream.session(reviewerSession),
+      undefined,
+      agentFact('AuthorityRootAccepted', {
+        SessionId: reviewerSession,
+        LogicalRunId: logicalRunId('run-rev'),
+        AuthorityRootUserMessageId: authorityRoot('root-rev'),
+        AuthorityKind: 'ChildRoot',
+        SelectedAgent: 'fast-reviewer',
+        PeerAgent: 'deep-reviewer',
+        CanonicalRole: 'Reviewer',
+        SelectedTier: 'fast',
+      }),
+      journal,
+    )
+    await agentJournal.appendAgent(
+      stream.session(managerSession),
+      undefined,
+      agentFact('HandleLinked', {
+        ParentSessionId: managerSession,
+        Handle: handleId.agent('h_rev'),
+        TargetAgent: 'fast-reviewer',
+        ChildSessionId: reviewerSession,
+        CanonicalRole: roles.of('Reviewer'),
+        Ownership: HandleOwnership.HostOwnedHidden,
+      }),
+      journal,
+    )
+    await agentJournal.appendAgent(
+      stream.session(managerSession),
+      undefined,
+      agentFact('HandleCompleted', {
+        ParentSessionId: managerSession,
+        Handle: handleId.agent('h_rev'),
+        ChildSessionId: reviewerSession,
+        CompletionKind: HandleCompletionKind.Terminal,
+        CompletionRef: undefined,
+        CompletionDigest: undefined,
+      }),
+      journal,
+    )
+
+    const presence = await producerPresence(journal, life, write)
+    assert.equal(caseOf(presence), 'Present', 'CompletedAwaitingJoin handle must be Present, not Absent')
   } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })
