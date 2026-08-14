@@ -39,7 +39,7 @@ import {
   toolCallId,
   verdict,
   verdictWitness,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { tryConclude, producerPresence, awaitConsumableReview } = await import(
   '../../../dist/Application/Review/TodoProcessReviewProgram.js'

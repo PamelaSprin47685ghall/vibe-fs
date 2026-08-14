@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, listItems, payloadOf, providerLanguage, providerResources, resultOf } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, payloadOf, providerLanguage, providerResources, resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const { StaticTools_reviewerVerdictOfString, StaticTools_reviewerVerdictSchemaJson } = await import(
   '../../../dist/Tools/StaticTools.js'

@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems } from '../../../tests/unit/support/domain.mjs'
+import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
 

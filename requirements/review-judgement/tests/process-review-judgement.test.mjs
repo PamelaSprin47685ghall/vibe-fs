@@ -24,7 +24,7 @@ import {
   toolCallId,
   verdict,
   verdictWitness,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { needsEnsureReview, renderAssignmentUserMessage, ReviewRequestKind } = await import(
   '../../../dist/Domain/MagicTodoProcessReview.js'

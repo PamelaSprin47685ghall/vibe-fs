@@ -23,7 +23,7 @@ import {
   prefixEpochId,
   providerRun,
   stream,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 // Lazy: top-level await import races the 2.5s file timeout under full-suite
 // concurrency on GHA (file cancelled before any test body runs).

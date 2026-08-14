@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { providerLanguage, providerResources } from '../../../tests/unit/support/domain.mjs'
+import { providerLanguage, providerResources } from '../../verification-system/tests/support/domain.mjs'
 
 const roleLaw = providerResources.readText(providerLanguage.english, 'role/reviewer')
 const ledger = providerResources.readText(providerLanguage.english, 'library/reviewer/quality-ledger')

@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems, idValue } from '../../../tests/unit/support/domain.mjs'
+import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems, idValue } from '../../verification-system/tests/support/domain.mjs'
 
 const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
 

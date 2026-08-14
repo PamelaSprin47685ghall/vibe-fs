@@ -18,7 +18,7 @@ import {
   sessionId,
   sessionOwnership,
   syncDelegate,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const {
   SessionOwnershipClassification_executionClassOf: executionClassOf,
