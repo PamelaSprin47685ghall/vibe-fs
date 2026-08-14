@@ -1,4 +1,5 @@
-// tests/unit/tools/executor-tool.test.mjs — VERIFY-009 coverage: run tool.
+// Split from tests/unit/tools/executor-tool.test.mjs (cutover Wave 2a); owner: process-execution
+// VERIFY-009 coverage: run tool.
 //
 // Decode errors are refused before any spawn. The Completed path runs a real
 // `sh -lc` through the real ProcessRunner (process-runner.test.mjs precedent).
@@ -9,7 +10,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { listItems, sessionId } from '../support/domain.mjs'
+import { listItems, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -166,29 +167,4 @@ test('RUN_spooled_output_family_blocked_surfaces_recovery_consequence', async ()
   const result = await run(runtimeScope, SPOOL_BUDGET)
   assert.doesNotMatch(result, /RECOVERY_BLOCKED|\berror\s*=/)
   assert.match(result, /large output cannot be reconciled while recovery is blocked/i)
-})
-
-test('RUN_spooled_output_runs_distillation_without_chunk_statistics', async () => {
-  const runtimeScope = scope()
-  // First permit request (the tool's own gate) waits; every later request from
-  // the map/reduce runtime hard-blocks so chunk forks/awaits fail fast into a
-  // partial account instead of retrying until the await budget expires.
-  let calls = 0
-  attachFamilyRecovery(runtimeScope, async () => {
-    calls += 1
-    return calls === 1
-      ? new FamilyRecovery(1, [nonEmptyOne(new RecoveryBlock(6, [sessionId('ses-exec')]))])
-      : new FamilyRecovery(2, [nonEmptyOne(new RecoveryBlock(6, [sessionId('ses-exec')]))])
-  })
-
-  const text = await run(runtimeScope, SPOOL_BUDGET)
-  const result = parseToml(text)
-
-  assert.equal(result.exit_code, '0')
-  assert.equal(result.chunk_count, undefined, 'provider must not expose chunk_count')
-  assert.equal(result.total_bytes, undefined, 'provider must not expose total_bytes')
-  assert.equal(result.spool_path, undefined, 'provider must not expose spool_path')
-  // No journal → the distiller chunk fork fails fast; the account degrades to a
-  // partial report carried as instructions, never a thrown exception.
-  assert.match(text, /Condensation|Most recent raw output/i)
 })

@@ -7,15 +7,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { sessionId } from '../support/domain.mjs'
+import { mapOfEntries, sessionId, structuralComparer } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
 const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
-const { ofList: mapOfList } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Map.js')
-const { compare } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Util.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'
@@ -27,7 +25,7 @@ const context = (session = 'ses_join') =>
 
 const lock = () => ({ Enter: () => ({ Exit: () => {} }) })
 
-const sessionMap = (entries) => mapOfList(entries, { Compare: compare })
+const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
 
 const scopeFor = ({ engineTask, mailbox }) => {
   const scope = new ToolRuntimeScope(

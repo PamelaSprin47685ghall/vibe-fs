@@ -409,6 +409,17 @@ export const mapOf = (obj) =>
 /** Fable structural comparer, kept behind the test anti-corruption boundary. */
 export const structuralComparer = { Compare: (left, right) => FsUtil.compare(left, right) }
 
+/**
+ * Fable's uncurry2 — converts a curried function into an uncurried pair.
+ *
+ * Production call sites do `curry2(context.AttachAbort)(callback)`; the
+ * curry/uncurry round-trip goes through the fable-library `curried` WeakMap,
+ * so a locally-written lookalike would defer the callback to the detach call.
+ * Re-exporting the real function keeps the registration immediate and keeps
+ * compiler-runtime imports inside this boundary.
+ */
+export const uncurry2 = FsUtil.uncurry2
+
 /** [key,value][] → FSharpMap without exposing compiler-runtime imports to tests. */
 export const mapOfEntries = (entries, comparer = ordinalComparer) => FsMap.ofArray(entries, comparer)
 

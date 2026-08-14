@@ -1,3 +1,4 @@
+// Split from tests/unit/tools/blog-tool.test.mjs (cutover Wave 2a); owner: behavior-diagnosis
 // chronicle: ENFORCER-020/022/023/040/041/061 contract.
 //
 // Live-cycle gate and canonical-text gate are pure; execute paths are driven
@@ -5,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listItems, payloadOf, sessionId, toList } from '../support/domain.mjs'
+import { listItems, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -90,15 +91,6 @@ test('CHRONICLE_tip_enum_equals_catalog_field_names', () => {
   const fields = listItems(tipFieldNames())
   assert.equal(fields.length, 120)
   assert.ok(fields.includes('primitive-obsession'))
-})
-
-test('CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
-  const tool = spec(factory, scope().scope, undefined)
-  assert.equal(tool.Name, 'chronicle')
-  const args = listItems(tool.Arguments)
-  assert.deepEqual(args.map(([n]) => n), ['entry', 'tip'])
-  const v = args[1][1]
-  assert.equal(v.fields[0].values.length, 120)
 })
 
 // ── execute: gate first, then canonical text, then tip validation ───────────

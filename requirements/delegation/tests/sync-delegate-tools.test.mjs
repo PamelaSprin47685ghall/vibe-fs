@@ -48,7 +48,7 @@ import {
   roles,
   sessionId,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,

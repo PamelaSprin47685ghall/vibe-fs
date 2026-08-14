@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sessionId, toList } from '../support/domain.mjs'
+import { mapOfEntries, sessionId, structuralComparer, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -14,8 +14,6 @@ const {
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
-const { ofList: mapOfList } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Map.js')
-const { compare } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Util.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 
 const fakeSchema = {
@@ -28,7 +26,7 @@ const context = ({ sessionId: sid = 'ses-reviewer', toolCallId = 'call-1', provi
 
 const REVIEWER = sessionId('ses-reviewer')
 
-const sessionMap = (entries) => mapOfList(entries, { Compare: compare })
+const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
 
 const reviewerSession = (guard) =>
   new SessionAgentProjection(

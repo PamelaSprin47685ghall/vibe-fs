@@ -1,4 +1,5 @@
-// tests/unit/tools/fork-tool.test.mjs — VERIFY-009 coverage: Manager fork/nudge tool.
+// Split from tests/unit/tools/fork-tool.test.mjs (cutover Wave 2a); owner: delegation
+// VERIFY-009 coverage: Manager fork/nudge tool.
 //
 // The tool calls module-level HostForkRuntime functions, so the runtime is REAL:
 // built on a fake ISessionHostPort plus a real AgentJournal in a temp dir. Fork,
@@ -10,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, listItems, sessionId, toList } from '../support/domain.mjs'
+import { agentJournal, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -30,7 +31,7 @@ const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/Open
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
   '../../../dist/Application/Orchestration/Runtime.js'
 )
-const { targetRef, commitHash, managerJobId, sessionId: makeSessionId, fact, stream } = await import('../support/domain.mjs')
+const { targetRef, commitHash, managerJobId, sessionId: makeSessionId, fact, stream } = await import('../../verification-system/tests/support/domain.mjs')
 
 const chain = (kind, extra = {}) => ({
   kind,
@@ -47,23 +48,6 @@ const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
 
 const context = (sessionId = 'ses_fork') =>
   new HostToolContext(sessionId, undefined, undefined, undefined, undefined, () => () => {})
-
-const parseToml = (text) =>
-  Object.fromEntries(
-    text
-      .split('\n')
-      .filter((line) => line.includes(' = '))
-      .map((line) => {
-        const [name, ...rest] = line.split(' = ')
-        const raw = rest.join(' = ')
-        return [name, raw.startsWith('"') ? JSON.parse(raw) : raw]
-      }),
-  )
-
-const rawResult = async (promise) => {
-  const text = await promise
-  return { text, fields: parseToml(text) }
-}
 
 const PARENT = sessionId('ses_fork')
 
@@ -189,30 +173,6 @@ test('FORK_name_without_calling_is_continuation_only', async () => {
   const result = await runManager(spec, 'Ada', 'do work')
   assert.match(result, /No continuing person is known by that name/)
   assert.doesNotMatch(result, /fast-|deep-|agent id/i)
-})
-
-test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
-  const live = await liveScope()
-  live.scope.disposed = true
-  const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'Ada', 'do work', { calling: 'coder' })
-  assert.doesNotMatch(result, /disposed|\berror\s*=/i)
-  assert.match(result, /cannot be placed from this execution context/i)
-  live.cleanup()
-})
-
-test('FORK_unavailable_calling_is_denied_generically', async () => {
-  const spec = managerSpec(factory, bareScope())
-  const result = await runManager(spec, 'Rhea', 'review this', { calling: 'examiner' })
-  assert.match(result, /Unknown or unavailable calling/)
-  assert.doesNotMatch(result, /Reviewer|fast-|deep-|\berror\s*=/i)
-})
-
-test('FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async () => {
-  const spec = managerSpec(factory, bareScope())
-  const result = await runManager(spec, 'Ada', 'do work', { calling: 'wizard' })
-  assert.match(result, /Unknown or unavailable calling/)
-  assert.doesNotMatch(result, /fast-|deep-|\berror\s*=/i)
 })
 
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
@@ -415,13 +375,6 @@ test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byna
   live.cleanup()
 })
 
-test('FORK_orchestrator_rejects_unknown_calling_without_binding_names', async () => {
-  const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  const result = await spec.Execute(makeArgs({ calling: 'coder', name: 'Road', charge: 'x' }), context())
-  assert.match(result, /Unknown or unavailable calling/)
-  assert.doesNotMatch(result, /fast-manager|deep-manager|\berror\s*=/i)
-})
-
 test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
   const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
@@ -446,17 +399,6 @@ test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async ()
   live.cleanup()
 })
 
-test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
-  const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  const emptyContext = new HostToolContext('', undefined, undefined, undefined, undefined, () => () => {})
-  const result = await spec.Execute(
-    makeArgs({ calling: 'coordinator', name: 'North Road', charge: 'x' }),
-    emptyContext,
-  )
-  assert.match(result, /caller's authority is established/)
-  assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
-})
-
 test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', async () => {
   const live = await liveOrchestrator()
   live.engine.git.IsDirty = async () => true
@@ -467,24 +409,5 @@ test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', as
   )
   assert.match(result, /That road could not be opened/)
   assert.doesNotMatch(result, /dirty|worktree|\berror\s*=/i)
-  live.cleanup()
-})
-
-test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', () => {
-  const fork = managerSpec(factory, bareScope())
-  const commission = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  assert.equal(fork.Name, 'fork')
-  assert.equal(commission.Name, 'commission')
-  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), ['calling', 'name', 'charge', 'keywords'])
-  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), ['calling', 'name', 'charge'])
-})
-
-test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
-  const live = await liveScope()
-  const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'Web Road', 'browse', { calling: 'navigator', keywords: 'repository clue' })
-  assert.match(result, /only available when fork targets Coder, Inspector, or DevOps/)
-  assert.doesNotMatch(result, /\berror\s*=/i)
-  assert.equal(listItems(listRuntimeAgents(live.runtime)[0]).length, 0)
   live.cleanup()
 })

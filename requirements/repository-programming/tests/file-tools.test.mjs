@@ -1,31 +1,23 @@
 // tests/unit/tools/file-tools.test.mjs — VERIFY-009 coverage: the static read/write/edit tools.
 //
 // Pure Node fs against a per-test temp directory; the only cross-boundary value is the
-// Fable CancellationToken, created the same way as in large-gate.test.mjs.
+// Fable CancellationToken, created via the shared support boundary (liveToken).
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readdirSync } from 'node:fs'
 import test from 'node:test'
+import { liveToken } from '../../verification-system/tests/support/domain.mjs'
 
 const { ToolContext } = await import('../../../dist/Tools/ToolContext.js')
 const { fileReadTool, fileWriteTool, fileEditTool } = await import('../../../dist/Tools/FileTools.js')
-
-const fableLibraryDir = join(
-  process.cwd(),
-  'dist',
-  'fable_modules',
-  readdirSync('dist/fable_modules').find((entry) => entry.startsWith('fable-library-js.')),
-)
-const { createCancellationToken } = await import(join(fableLibraryDir, 'Async.js'))
 
 const context = (workspace) =>
   new ToolContext(
     { fields: ['ses_file_tools'], cases: () => ['SessionId'], tag: 0 },
     workspace,
-    createCancellationToken(false),
+    liveToken(),
   )
 
 const input = (payload) => ({ Payload: payload })

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { completionKind, handleId, handleProjection, roles, sessionId, toList } from '../support/domain.mjs'
+import { completionKind, handleId, handleProjection, mapOfEntries, roles, sessionId, structuralComparer, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
@@ -11,9 +11,7 @@ const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
 const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Session/ChildRun.js')
-const { add: mapAdd, ofList: mapOfList } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Map.js')
-const { compare } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Util.js')
-const sessionMap = (entries) => mapOfList(entries, { Compare: compare })
+const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
 
 const context = (session = 'ses_list') => new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})
 
@@ -107,12 +105,14 @@ const liveRuntime = ({ agents = [], ptys = [] } = {}) => {
     undefined,
     undefined,
   )
-  let agentMap = mapOfList([], { Compare: compare })
-  for (const run of agents) agentMap = mapAdd(run.AgentId, run, agentMap)
-  runtime.runtime.agents = agentMap
-  let ptyMap = mapOfList([], { Compare: compare })
-  for (const pty of ptys) ptyMap = mapAdd(pty.PtyId, pty, ptyMap)
-  runtime.runtime.ptys = ptyMap
+  runtime.runtime.agents = mapOfEntries(
+    agents.map((run) => [run.AgentId, run]),
+    structuralComparer,
+  )
+  runtime.runtime.ptys = mapOfEntries(
+    ptys.map((pty) => [pty.PtyId, pty]),
+    structuralComparer,
+  )
   return runtime
 }
 

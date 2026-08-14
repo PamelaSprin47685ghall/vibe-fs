@@ -2,8 +2,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { acceptAuthorityRoot, withExecutablePlugin } from '../plugin/plugin-fixture.mjs'
-import { listItems, payloadOf } from '../support/domain.mjs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { listItems, payloadOf } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,

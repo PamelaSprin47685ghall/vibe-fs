@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listItems } from '../support/domain.mjs'
+import { listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } =
   await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')

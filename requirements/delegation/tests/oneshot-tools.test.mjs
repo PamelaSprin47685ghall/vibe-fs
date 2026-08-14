@@ -13,14 +13,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { uncurry2 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js'
 import {
   agentJournal,
   resultOf,
   sessionId,
+  uncurry2,
   lifecycleWorkRecordProjection,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext, ToolHostCodec_digest: digest } = await import(
   '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'

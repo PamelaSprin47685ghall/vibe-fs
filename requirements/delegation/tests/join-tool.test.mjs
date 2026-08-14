@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
-import { agentJournal, sessionId } from '../support/domain.mjs'
+import { agentJournal, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
