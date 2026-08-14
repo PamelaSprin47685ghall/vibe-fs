@@ -23,8 +23,9 @@ Evidence notes
 | `prompt.md`（含 shape PROMPT-005/008、how PROMPT-009） | DONE | 21 条款；3 条 NEEDS-SPLIT，无新包 |
 | `agent.md`（含 shape AGENT-007/019/021、how 装配） | DONE | 32 条款；15 NEEDS-SPLIT、12 OWNED、5 GARBAGE、0 ORPHAN |
 | `host.md`（含 shape HOST-003/008/011/012、how HOST-004/009/010） | DONE | 27 条款；11 NEEDS-SPLIT、15 OWNED、1 GARBAGE、0 ORPHAN |
+| `companion.md`（含 shape COMPANION-009、how COMPANION-005） | DONE | 15 条款；3 NEEDS-SPLIT、12 OWNED、0 ORPHAN |
 
-下一 topic：`companion.md`。
+下一 topic：`execution.md`。
 
 ---
 
@@ -363,3 +364,89 @@ MagicTodo membrane canary D..G        → obligation-ledger + effect-accounting 
 1. HOST-013（结对编程 marker）是 host.md 最重混合：prefix-stability（anchored append-only）+ provider-projection（renderer）+ cognitive-environment（craft 正文）+ guidance-delivery（occurrence/nudge）+ time-capability（elapsed）。五个 WHY 均已有 owner，不立新包；`NUL+BOM`、`auto-injected` 等 wire 机制判 HOW。
 2. HOST-017..025（Magic Todo membrane）确认 HANDOFF §13.4：membrane 不是单包，canonical → `obligation-ledger`，Accepted → `effect-accounting`，review 可消费 → `review-assurance`，description → `action-affordance`，hidden 编排 → `participant-horizon`，SDK 定位 canary → `host-boundary`。
 3. HOST-027（NEEDHELP sensor）与 AGENT-031 同构，继续维持 WATCH：interaction-authority + delegation + degeneration-guard + host-boundary 已能组合解释，不立 `collaboration-guidance`。
+
+---
+
+# `docs/what/companion.md`（+ shape/companion.md + how/companion.md）
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| COMPANION-001 | 每个 Work Session X 恰好一个叶子 Companion Y；与 Role/Tier/工具面/LogicalRun/Authority/Fallback 无关 | `session-ontology` | topology；不是 role eligibility（HANDOFF §11.1） |
+| COMPANION-002 | X → 恰好一个 Y，Y 不再递归，深度恒 1 | `session-ontology` | topology |
+| COMPANION-004 | Y 的 system 唯一来源 = PromptResources 组合 Blogger Role Law；fast/deep 同 prompt、同 `chronicle` 面 | `cognitive-environment` | Role Law 组合；同 office 跨 tier → `participant-identity`；禁动态 token → `context-compression` |
+| COMPANION-005 | BlogFrame（Entry/Squash，无 Seed）投影；frame 正文 = 纯工作记录 | `context-compression` | Y frame = 压缩表示；BlobRef → `durable-events` |
+| COMPANION-006 | squash 只处理本 X frames，不混父 context | `context-compression` | compression 操作 |
+| COMPANION-009 | 同一 PrefixEpoch 内前缀逐字节稳定；epoch 切换仅 probe/reanchor/TodoCheckpoint 三证据源 | `prefix-stability` | append-only prefix law + cold boundary |
+| COMPANION-010 | FrozenRecordPrefix 明确标记 context block 注入，不伪装指令，同 epoch 冻结 | `prefix-stability` | frozen prefix；「不伪装 instruction」→ `provider-projection` |
+| COMPANION-011 | Cutoff 只在完整 semantic turn 边界；投影前重算 digest，失配 fail closed | `prefix-stability` | cutoff boundary；digest 失配不是 compaction 善后 |
+| COMPANION-012 | 缓存比较只用进模型字段（排除 timestamp/cost/usage/runtimeId） | `provider-projection` | semantic ≠ wire equality |
+| COMPANION-013 | Synthetic id 由 SealRoot/frameEpoch/ordinal 确定性派生；禁 GUID/random/时间 | `prefix-stability` | 稳定 synthetic identity；promote 继承 SealRoot |
+| COMPANION-014 | OpeningMaterial = preserved XTrace `[work start, OpeningBoundary)`；禁止 Assignment/requirements 重建；关闭永不移动；always raw | `work-record` | work-record OWNS「Opening preserved，不从 Assignment 重建」 |
+| COMPANION-015 | WorkRecord 十条不变量（①..⑩）；Sync/Async 同一协议；prose claim 无固定 schema | `work-record` | work-record 核心 OWNS 全部 |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| COMPANION-003 | WorkRecord 三段（Opening/Chronicle/Recent work）+ prose claim + 无 Closing report | `work-record` | bounded canonical statement |
+| COMPANION-003 | XTrace = X 唯一原始语义轨迹；Strength Candidate 永不入迹 | `semantic-trace` | canonical history capture |
+| COMPANION-003 | RecordCoverage（XTrace 游标）与 PrefixCoverage（完整 turn 边界）分型；CoverableRecordPrefix 才可 rebase | `prefix-stability` | 两种证明量纲分离 |
+| COMPANION-007 | 送 Y 的 delta 可含 tool 作压缩输入 | `context-compression` | compression 输入投影 |
+| COMPANION-007 | LWR gap 剔 raw tool | `work-record` | LWR gap 表示 |
+| COMPANION-007 | canonical digest 用 Semantic projection，禁反向解析 TOML | `provider-projection` | semantic ≠ wire |
+| COMPANION-008 | BlogEntryCommitted 原子推进 frame 可见性与 RecordCoverage；busy/失败不推进 | `context-compression` | commit boundary |
+| COMPANION-008 | RecordCoverage = LWR gap 起点 | `work-record` | coverage 分型 |
+| COMPANION-008 | Host compaction 只作废 PrefixCoverage，不得清零 RecordCoverage/Frames | `prefix-stability` | reanchor 边界 |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| 旧标题 `Opening task`/`Work log`/`Uncompressed tail`/`Final output` 已删 | GARBAGE | absence ratchet；`Closing report` DTO 删除同 |
+| `OpeningPromptRaw = { AssignmentText; AuthoritativeRequirements }` 拼接重建 | GARBAGE | legacy blob；由 preserved XTrace interval 取代 |
+| `[[do_not_exec]] historic_frame` 消息层渲染、`#` 由 SyntheticToml.comment 注入 | HOW | wire rendering 机制 |
+| COMPANION-005 instruction header 不进 200 KiB chunk / frame blob | HOW | 具体容量值（HANDOFF §12） |
+
+---
+
+# companion.md 轮 delta
+
+## Boundary delta
+
+```text
+UNCHANGED  45 包全部不变
+SPLIT      无（3 条 NEEDS-SPLIT 均被现有包分解吸收）
+MERGED     无
+NEW        无
+REMOVED    无
+```
+
+## Coverage delta
+
+```text
+new OWNED     12 条（COMPANION-001/002/004/005/006/009/010/011/012/013/014/015）
+new NEEDS-SPLIT  3 条（COMPANION-003/007/008）
+new GARBAGE   旧标题 + OpeningPromptRaw（legacy blob）
+new ORPHAN   0
+new OVERLAP  0（clause 级已定位）
+```
+
+## Proof delta
+
+```text
+canonical LWR materializer/proofs → work-record
+XTrace append/capture/frontier    → semantic-trace
+prompt-stability（prefix byte）    → prefix-stability
+```
+
+## Dependency delta
+
+```text
+无新增/删除 hard edge。
+```
+
+## 边界观察
+
+1. companion.md 是 §11.1「Companion 不是永久 ontology」的直接证据：15 条 COMPANION 无一条需要独立 `companion` package；topology→`session-ontology`、frame/squash→`context-compression`、XTrace→`semantic-trace`、WorkRecord→`work-record`、prefix→`prefix-stability`。未来 deterministic in-process summarizer 替代 physical Blogger leaf 时这些 WHAT 均不变。
