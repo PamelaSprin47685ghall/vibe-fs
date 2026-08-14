@@ -15,7 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { diagnostic as diag, toList } from '../../../tests/unit/support/domain.mjs'
+import { diagnostic as diag, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu')

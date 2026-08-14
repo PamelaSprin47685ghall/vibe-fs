@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, listItems, setItems, stringSet, toList } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, setItems, stringSet, toList } from '../../verification-system/tests/support/domain.mjs'
 import { SessionIdModule_create as sid } from '../../../dist/Kernel/Identity.js'
 import { AgentHandleIdModule_create as hid } from '../../../dist/Kernel/Identity.js'
 import { ManagerJobIdModule_create as jobId } from '../../../dist/Kernel/Identity.js'

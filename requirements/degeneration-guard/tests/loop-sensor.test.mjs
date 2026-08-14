@@ -25,7 +25,7 @@ import {
   promptDispatcher,
   runtimeNudge,
   sessionId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import * as PromptDispatcher from '../../../dist/Application/Prompting/PromptDispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))

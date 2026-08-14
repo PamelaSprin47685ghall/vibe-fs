@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { childRecovery, sessionId } from '../../../tests/unit/support/domain.mjs'
+import { childRecovery, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const CHILD = sessionId('ses_trace_child')
 const AGENT = 'fast-coder'

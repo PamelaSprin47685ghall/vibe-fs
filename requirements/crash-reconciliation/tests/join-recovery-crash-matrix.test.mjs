@@ -16,7 +16,7 @@ import {
   roles,
   sessionId,
   stream,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const PARENT = sessionId('ses_crash_p')

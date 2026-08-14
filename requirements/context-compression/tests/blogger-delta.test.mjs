@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerDelta as delta, bloggerToml as toml, companionPrompt as prompt, syntheticToml as syn } from '../../../tests/unit/support/domain.mjs'
+import { bloggerDelta as delta, bloggerToml as toml, companionPrompt as prompt, syntheticToml as syn } from '../../verification-system/tests/support/domain.mjs'
 
 const origin = delta.cursor(0, 0)
 

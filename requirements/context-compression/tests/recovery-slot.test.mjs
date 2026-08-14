@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cursor, recoverySlot as slot, requestKind } from '../../../tests/unit/support/domain.mjs'
+import { cursor, recoverySlot as slot, requestKind } from '../../verification-system/tests/support/domain.mjs'
 
 // ── arming is a control-flow fact, not a position ───────────────────────────
 

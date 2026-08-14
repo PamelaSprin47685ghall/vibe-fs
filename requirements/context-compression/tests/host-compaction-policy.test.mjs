@@ -16,7 +16,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hostCompaction as policy } from '../../../tests/unit/support/domain.mjs'
+import { hostCompaction as policy } from '../../verification-system/tests/support/domain.mjs'
 
 // ── prevention: the settings that must be off ──────────────────────────────
 

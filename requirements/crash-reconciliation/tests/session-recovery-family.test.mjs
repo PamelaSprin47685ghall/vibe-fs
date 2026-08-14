@@ -111,7 +111,7 @@ test('RECOVERY_FAMILY_authorize_blocks_on_child_block', async () => {
     caseOf,
     sessionRecovery,
     sessionId,
-  } = await import('../../../tests/unit/support/domain.mjs')
+  } = await import('../../verification-system/tests/support/domain.mjs')
 
   const root = sessionId('parent')
   const child = sessionId('child')
@@ -124,7 +124,7 @@ test('RECOVERY_FAMILY_authorize_blocks_on_child_block', async () => {
 })
 
 test('RECOVERY_FAMILY_authorize_ready_issues_private_permit', async () => {
-  const { caseOf, sessionRecovery, sessionId, payloadOf } = await import('../../../tests/unit/support/domain.mjs')
+  const { caseOf, sessionRecovery, sessionId, payloadOf } = await import('../../verification-system/tests/support/domain.mjs')
 
   const root = sessionId('parent')
   const recovered = sessionRecovery.recoveredClosure(root, {})
@@ -136,7 +136,7 @@ test('RECOVERY_FAMILY_authorize_ready_issues_private_permit', async () => {
 
 // HandlesWaiting → SessionRecovery.Waiting → FamilyWaiting (no permit, not FamilyBlocked).
 test('RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', async () => {
-  const { caseOf, sessionRecovery, sessionId } = await import('../../../tests/unit/support/domain.mjs')
+  const { caseOf, sessionRecovery, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
 
   const root = sessionId('parent')
   const child = sessionId('child')
@@ -164,7 +164,7 @@ test('RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async 
 })
 
 test('RECOVERY_FAMILY_ready_before_business_is_type_enforced', async () => {
-  const { caseOf, sessionRecovery, sessionId } = await import('../../../tests/unit/support/domain.mjs')
+  const { caseOf, sessionRecovery, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
   const root = sessionId('p')
   const family = sessionRecovery.authorizeFamilyResume(root, 7, sessionRecovery.recoveredClosure(root, {}))
   assert.equal(caseOf(family), 'FamilyReady')

@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { envelope, stream, sessionId, physicalUser, managerLifeId, blobRef, blobDigest, providerRun, fact, fold, managerLifecycleFact } from '../../../tests/unit/support/domain.mjs'
+import { envelope, stream, sessionId, physicalUser, managerLifeId, blobRef, blobDigest, providerRun, fact, fold, managerLifecycleFact } from '../../verification-system/tests/support/domain.mjs'
 
 const { floorSequence } = await import('../../../dist/Journal/ManagerOpeningFloor.js')
 const { bloggerEffectiveStart } = await import('../../../dist/Domain/MagicTodo.js')
