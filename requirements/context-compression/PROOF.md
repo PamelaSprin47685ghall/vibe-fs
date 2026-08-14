@@ -58,7 +58,7 @@ node --test requirements/context-compression/tests/ctx-opening-floor.test.mjs
 |---|---|---|
 | `tests/unit/context/attempt-plan.test.mjs` | `CTX_010_*`（probe 只在 armed work-main slot） | SPLIT@cutover：AttemptExecutionProfile 归 provider-attempt-recovery；本包引用 probe 资格 |
 | `tests/unit/context/fold-context-recovery.test.mjs` | `PERSIST_010_*`（fold 语义） | 归 durable-events |
-| `tests/unit/context/synthetic-toml.test.mjs`、`blogger-toml.test.mjs` | TOML 布局/转义渲染 | 归 provider-projection（CTX-013 的渲染半边） |
+| `requirements/provider-projection/tests/synthetic-toml.test.mjs`、`tests/unit/context/blogger-toml.test.mjs` | TOML 布局/转义渲染 | 归 provider-projection（CTX-013 的渲染半边）；blogger-toml 待 provider-projection cutover 迁移 |
 | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`、`blogger-runtime.test.mjs` | Blogger request-cycle 收敛（C0/ENFORCER-047） | SPLIT@cutover：enforcer 协议面归 behavior-diagnosis；压缩输入面归本包 |
 | `tests/unit/context/x-trace-locality.test.mjs`（semantic-trace 包） | `TODO-004/008` XTrace range 与 LWR 交叉 | 本包引用 effectiveStart/floor |
 
