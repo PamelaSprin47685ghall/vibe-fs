@@ -21,8 +21,9 @@ Evidence notes
 | Topic | 状态 | 备注 |
 |---|---|---|
 | `prompt.md`（含 shape PROMPT-005/008、how PROMPT-009） | DONE | 21 条款；3 条 NEEDS-SPLIT，无新包 |
+| `agent.md`（含 shape AGENT-007/019/021、how 装配） | DONE | 32 条款；15 NEEDS-SPLIT、12 OWNED、5 GARBAGE、0 ORPHAN |
 
-下一 topic：`agent.md`。
+下一 topic：`host.md`。
 
 ---
 
@@ -80,7 +81,7 @@ Evidence notes
 
 ---
 
-# 本轮 delta
+# prompt.md 轮 delta
 
 ## Boundary delta
 
@@ -120,3 +121,128 @@ student-teacher-absence   → DELETE（migration-only）
 ## 边界观察（watch，不立新包）
 
 1. PROMPT-006 的 execution-binding 解析律归 `participant-identity`，但 send 海关（Preserve/ExplicitExecutionOverride/fail-closed）机制与 `dispatch-protocol`/`provider-attempt-recovery` 共用。当前语义 owner 唯一（identity），机制不构成第二个 WHY；若未来 dispatch 层要独立重写 binding 海关而不动 identity，需重审。
+
+---
+
+# `docs/what/agent.md`（+ shape/agent.md + how/agent.md）
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| AGENT-003 | `peer(fast)=deep` / `peer(deep)=fast` 对称且启动可证明 | `participant-identity` | 绑定配对本体；`fast`/`deep` 名 = HOW；fallback 消费 peer → `provider-attempt-recovery` |
+| AGENT-005 | 新公开 Authority Root 必须携准确 Agent；省略/旧名/build/plan → fail-closed | `interaction-authority` | HumanRoot provenance 要求显式 agent；精确 `fast-*` 名 = HOW |
+| AGENT-006 | 能力矩阵（Role→工具投影表） | `capability-enforcement` | 矩阵 = enforcement projection；每格「entitled consequence」→ `office-capability`（ARCH-017）；工具名清单 = HOW |
+| AGENT-007 | 双层边界：Host-final schema + ToolRegistry execution gate 都只读同一 `AttemptExecutionProfile` | `capability-enforcement` | capability-enforcement OWNS「schema 与 runtime gate 读同一 capability truth」 |
+| AGENT-008 | Blogger/Distiller/Bookkeeper 不得出现在任何 provider-visible enum/schema | `participant-horizon` | horizon OWNS internal participant 不进入无资格 choice surface；enforcement → `capability-enforcement` |
+| AGENT-010 | `permissions(fast-ROLE)=permissions(deep-ROLE)`；不得 fast 只读 deep 可写 | `capability-enforcement` | capability-enforcement OWNS「tier 不改变同 office authority」 |
+| AGENT-017 | `mv` POSIX 语义（source/destination、覆盖、目录/跨文件系统） | `repository-programming` | 文件变换编程面语义 |
+| AGENT-018 | `rm` POSIX 语义但禁删非空目录 | `repository-programming` | 文件变换编程面语义 |
+| AGENT-019 | `external_directory="allow"` 每 managed agent 显式写入、唯一生产写点 | `capability-enforcement` | 唯一 enforcement 写点；`external_directory` 是 Host 路径边界机制 → `host-boundary` 交叉 |
+| AGENT-027 | Semble 进程内搜索 = 低可信 orientation data，不是 repository fact/evidence | `repository-investigation` | 低可信 orientation → `knowledge-reuse` 交叉；stdio MCP/uvx/env = HOW |
+| AGENT-028 | Persona Registry：`Role × initial tier → SessionPersona` 创建时一次冻结 | `participant-identity` | identity OWNS Persona freeze；具体 Persona display 名 = GARBAGE |
+| AGENT-029 | `Role ≠ Persona ≠ ExecutionBinding`；Fallback/Strength 只改 Binding，Persona/system 字节不变 | `participant-identity` | identity 核心 ontology |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| AGENT-001 | `Role` DU + `AgentTier`；Tier 只改 ExecutionBinding | `participant-identity` | Role=office identity，Tier=binding |
+| AGENT-001 | Canonical Role 决定工具权限与 system prompt | `office-capability` | role→entitled consequence |
+| AGENT-001 | Bookkeeper 保持 InternalLeaf + Attached，不进 public Role DU | `session-ontology` | InternalLeaf + Attached ontology |
+| AGENT-009 | 示踪面可见集合（fork/commission/inspect/horizon 可见集合） | `participant-horizon` | 什么有资格被看见 |
+| AGENT-009 | `fork` description 写五 Office entitled consequence + navigator/researcher 区分 | `action-affordance` | 调用方局部 contract + boundary mirror |
+| AGENT-009 | fork/commission 可见面背后的委托语义 | `delegation` | fork/commission = delegation surface |
+| AGENT-011 | Manager 无普通工具：不读文件/不跑终端/不改仓库/不 inspect | `office-capability` | Manager non-consequence |
+| AGENT-011 | Manager 矩阵只有 fork/join/horizon/todowrite/fission/suicide | `capability-enforcement` | matrix projection |
+| AGENT-012 | `inspect` description 把 Inspector 写成见证者，不写「第二双编辑的手」 | `action-affordance` | PROMPT-021 调用方 boundary mirror |
+| AGENT-012 | Inspector 不得泄露 query-shell/取证权、不得当验证代理 | `office-capability` | Inspector consequence |
+| AGENT-013 | 只有 DevOps 可 open/send/read/signal-terminal + run；修改只能经委派 | `office-capability` | DevOps terminal consequence |
+| AGENT-013 | terminal 的物理 act/completion semantics | `process-execution` | 真实进程/PTY 语义 |
+| AGENT-013 | 不向 provider 暴露 status/code/TIMED_OUT DTO；10s join 预算 = HOW | `participant-horizon` | 内部状态转 consequence |
+| AGENT-014 | Reviewer 只读 + judge，不能写文件/跑命令 | `office-capability` | Reviewer consequence |
+| AGENT-014 | Reviewer 矩阵 projection | `capability-enforcement` | matrix |
+| AGENT-015 | Orchestrator 只 commission fast/deep-manager，不暴露 job id/worktree/reused | `office-capability` | Orchestrator consequence |
+| AGENT-015 | `commission` = 委托（新路/按 Byname 续做） | `delegation` | commission semantics |
+| AGENT-015 | 不暴露机器字段 | `participant-horizon` | admission filter |
+| AGENT-016 | `mv`/`rm` 只进 Coder 矩阵，其它角色（含 DevOps）不得 | `office-capability` | Coder consequence |
+| AGENT-016 | 双层 fail-closed 适用 | `capability-enforcement` | gate |
+| AGENT-023 | `bash-honeypot` 仅 Coder；不执行 shell、只返越权拒绝；非放行 bash | `office-capability` | Coder consequence boundary |
+| AGENT-023 | bash 对 managed role deny | `capability-enforcement` | gate |
+| AGENT-024 | SyncDelegate DAG（Inquiry/Coder/DevOps→Inspector、DevOps→Coder）无环 + InvocationMode | `delegation` | 同步委派 topology |
+| AGENT-024 | Dedicated Inspector/Coder = Work + Attached | `session-ontology` | HOST-008 execution class |
+| AGENT-024 | callee 普通 completion 结束；Host 物化 bounded WorkRecord(includeOpening=false) | `work-record` | bounded canonical statement |
+| AGENT-025 | Inquiry = reasoning（reason/question/compare/challenge/synthesize，经 Sphinx co-yield） | `epistemic-reasoning` | 认识状态求解，不是证据扫库 |
+| AGENT-025 | Inspector = evidence acquisition；分层 Inquiry→Inspector | `repository-investigation` | 证据采集边界 |
+| AGENT-025 | Inquiry 工具面 = {inspect, sphinx MCP}，禁止 filesystem 直读 | `capability-enforcement` | surface projection |
+| AGENT-026 | Browser 的 network 能力 = public-web 事实建立 | `external-investigation` | Browser consequence |
+| AGENT-026 | `ToolPermission.Network` → 仅 Browser allow `stealth-browser-mcp_*` | `capability-enforcement` | permission |
+| AGENT-026 | stealth-browser MCP = Host 集成机制（uvx/ref/env 启动判定） | `host-boundary` | Host adapter HOW |
+| AGENT-030 | Sphinx = 认识状态求解器（不是业务工具） | `epistemic-reasoning` | SPHINX-001..010 |
+| AGENT-030 | `ToolPermission.Sphinx` → 仅 Inquiry allow `sphinx_*` | `capability-enforcement` | permission |
+| AGENT-031 | 同 Session/LogicalRun/AuthorityRoot/Persona 上的 fast→deep escalation continuation | `interaction-authority` | authority continuity |
+| AGENT-031 | deep 命中 → 真实 consultation child（freeze frontier、CommissionerRecord、advice 返回） | `delegation` | consultation = 委托 |
+| AGENT-031 | Cursor Pair Hint 附着真实 terminal tool result，不造 synthetic role | `provider-projection` + `prefix-stability` | wire injection |
+| AGENT-031 | Pair Hint 鼓励 `[NEEDHELP]` 的正常协作语义 | `cognitive-environment` | craft |
+| AGENT-032 | Semble 搜索 hits = 低可信 hint，不是 instructions/proof/tool history | `knowledge-reuse` | low-trust cache |
+| AGENT-032 | explicit keywords fresh search；不自动抽词、无 cross-call cache | `repository-investigation` | evidence acquisition 边界 |
+| AGENT-032 | SyntheticToml 渲染 instruction/data 分界 | `provider-projection` | renderer |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| AGENT-002 全条（必须恰好 22 个 agent、fast/deep 名、非空互异 model 串） | GARBAGE | exact catalog + machine names = implementation vocabulary；「缺一启动失败」是当前 runtime 契约。Bookkeeper 内部身份 → `session-ontology` |
+| AGENT-004 全条（非法旧名清单：orchestrator/meditator/executor/student/teacher/裸名…） | GARBAGE | legacy reject ratchet = migration proof；`student-teacher-absence.mjs` 基线稳定后删 |
+| AGENT-020（Student/Teacher 已删） | GARBAGE | migration absence |
+| AGENT-021（Student request-specific 双门已删） | GARBAGE | migration absence |
+| AGENT-022（Student SKILL 已删） | GARBAGE | migration absence |
+| AGENT-026/030 MCP 的 uvx command、ref、env 前缀、fixture 启动判定 | HOW | Host adapter 机制，非产品 ontology |
+| AGENT-032 `MaxKeywords=8`/`TopK=4`/`MaxHintsTotal=24`/`64 KiB` | HOW | tuning values（HANDOFF §12 已列） |
+| AGENT-013 `join` 10s 等待预算 | HOW | 具体 budget 值；「有界等待」才是 WHAT |
+| Persona display 名（Integrator/Director/Coordinator/…） | HOW | AGENT-028 表；除非命名本身是 public contract |
+
+---
+
+# agent.md 轮 delta
+
+## Boundary delta
+
+```text
+UNCHANGED  45 包全部不变
+SPLIT      无（15 条 NEEDS-SPLIT 均被现有包分解吸收）
+MERGED     无
+NEW        无
+REMOVED    无
+```
+
+## Coverage delta
+
+```text
+new OWNED     12 条（AGENT-003/005/006/007/008/010/017/018/019/027/028/029）
+new NEEDS-SPLIT  15 条（AGENT-001/009/011/012/013/014/015/016/023/024/025/026/030/031/032）
+new GARBAGE   AGENT-002（exact catalog）、AGENT-004（legacy names）、AGENT-020/021/022（Student absence）
+new ORPHAN   0
+new OVERLAP  0（clause 级已定位）
+```
+
+## Proof delta
+
+```text
+agent-permission-gate.test.mjs  → capability-enforcement
+capability-isomorphism-gate.mjs → capability-enforcement
+session-ownership-matrix/ratchet → session-ontology
+semantic-anchors.mjs / prompt-semantic-depth → 拆 cognitive-environment + office-capability + action-affordance（已知）
+student-teacher-absence.mjs      → DELETE（migration-only）
+```
+
+## Dependency delta
+
+```text
+无新增/删除 hard edge。
+```
+
+## 边界观察
+
+1. AGENT-031（NEEDHELP）继续维持 WATCH：四类 guarantee（interaction-authority / delegation / provider-projection+prefix-stability / cognitive-environment）已能组合解释，本轮未发现独立 WHY → 不立 `collaboration-guidance`（HANDOFF §10.2 维持）。
+2. agent.md 的「office consequence + capability matrix」双层（如 AGENT-011/013/016）确认 §7.1 person/office/execution 边界：consequence 属 `office-capability`，matrix/gate 属 `capability-enforcement`，二者不同 WHY。

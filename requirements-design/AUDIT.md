@@ -118,6 +118,10 @@ PROMPT-012 全条判 GARBAGE（Student/Teacher migration absence）。本轮无�
 - epistemic reasoning integration；
 - warm-start optimization。
 
+Clause 级结果见 `COVERAGE.md`：AGENT-002（22 catalog）/AGENT-004（legacy names）/AGENT-020..022（Student absence）判 GARBAGE；
+15 条 NEEDS-SPLIT（AGENT-001/009/011..016/023..026/030..032）均被现有包分解；
+AGENT-031（NEEDHELP）仍维持 WATCH，未发现独立 WHY，不立 `collaboration-guidance`。
+
 ### `docs/what/architecture.md`
 
 - Horizon → `participant-horizon`。
