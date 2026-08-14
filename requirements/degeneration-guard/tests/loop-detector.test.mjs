@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { loopDetector, loopEventCodec } from '../support/domain.mjs'
+import { loopDetector, loopEventCodec } from '../../../tests/unit/support/domain.mjs'
 
 test('LOOP_004_constants_match_the_clause', () => {
   assert.equal(loopDetector.ngramSize, 4)

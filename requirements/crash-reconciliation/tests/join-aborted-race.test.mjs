@@ -14,7 +14,7 @@ import {
   handleProjection,
   roles,
   sessionId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 

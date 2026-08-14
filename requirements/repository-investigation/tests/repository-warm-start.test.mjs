@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
-import { BUILD_ROOT, listItems, resultOf, roles, sessionId, toList } from '../support/domain.mjs'
+import { BUILD_ROOT, listItems, resultOf, roles, sessionId, toList } from '../../../tests/unit/support/domain.mjs'
 import {
   RepositoryWarmStartHint,
   RepositoryWarmStartSearch,
