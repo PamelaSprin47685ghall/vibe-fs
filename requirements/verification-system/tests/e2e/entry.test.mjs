@@ -6,7 +6,8 @@
  *
  * NOT registered under cases/ — G4R-0 freeze forbids growing the multi-canary
  * ceiling; this is the required-exactly-one-when-present cutover path
- * (scripts/checks/g4r-freeze.mjs LONG_STROKE_ENTRY_REL).
+ * (g4r-freeze gate retired 2026-08-14; the e2e-watchdog-feed gate keeps the
+ * sole-entry scope).
  *
  * G4R §2 / Exit: one continuous OpenCode lifetime — spawn count must be exactly 1.
  *

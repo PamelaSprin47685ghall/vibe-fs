@@ -13,7 +13,7 @@
 //      L5 npm pack --dry-run）；
 //   2. check.mjs 的 wired gate 清单：每个 wired 路径存在；
 //      scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib)、
-//      semantic-anchors.mjs(catalog)、enforcer-rulebook-gate.mjs(retired stub)}；
+//      semantic-anchors.mjs(catalog)}；
 //   3. check.mjs fail-closed：`process.exit(result.status ?? 1)` 传播非零。
 //
 // 「可红」由现有 per-gate red fixture（tests/unit/verify/*.test.mjs 与
@@ -45,11 +45,11 @@ test('VERIFY_001_format_build_test_ladder_pins_the_five_layers_in_order', () => 
     'dotnet tool run fantomas src/Wanxiangshu', // format
     'node scripts/check.mjs', // L0 static gates
     'node scripts/build.mjs', // build（dist 生产字节）
-    'node tests/unit/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
-    'node tests/integration/run.mjs',
-    'node tests/integration/package/run.mjs',
+    'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
+    'node requirements/verification-system/tests/integration/run.mjs',
+    'node requirements/distribution/tests/integration/package/run.mjs',
     'node scripts/warmup-opencode.mjs',
-    'node tests/e2e/entry.test.mjs', // L4 唯一 Long Stroke
+    'node requirements/verification-system/tests/e2e/entry.test.mjs', // L4 唯一 Long Stroke
     'npm pack --dry-run', // L5 release（打包面）
   ])
 })
@@ -68,11 +68,11 @@ test('VERIFY_001_every_ladder_step_target_exists', () => {
   const required = [
     'scripts/check.mjs',
     'scripts/build.mjs',
-    'tests/unit/run.mjs',
-    'tests/integration/run.mjs',
-    'tests/integration/package/run.mjs',
+    'requirements/verification-system/tests/run.mjs',
+    'requirements/verification-system/tests/integration/run.mjs',
+    'requirements/distribution/tests/integration/package/run.mjs',
     'scripts/warmup-opencode.mjs',
-    'tests/e2e/entry.test.mjs',
+    'requirements/verification-system/tests/e2e/entry.test.mjs',
   ]
   for (const rel of required) {
     assert.ok(existsSync(join(ROOT, rel)), `ladder step target missing: ${rel}`)
@@ -84,7 +84,6 @@ test('VERIFY_001_every_ladder_step_target_exists', () => {
 const WIRED_ALLOWLIST = new Set([
   'spec-rules.mjs', // lib：被 spec.mjs import，不直接 spawn
   'semantic-anchors.mjs', // catalog：被各 gate import 的 anchor 清单，不直接 spawn
-  'enforcer-rulebook-gate.mjs', // retired stub（2026-08-12）；保留空壳不接线
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */
@@ -120,7 +119,7 @@ test('VERIFY_001_checks_directory_is_wired_plus_allowlist_only', () => {
   assert.deepEqual(
     actual,
     [...new Set([...wired, ...WIRED_ALLOWLIST])].sort(),
-    'scripts/checks/*.mjs must equal wired gates ∪ {spec-rules(lib), semantic-anchors(catalog), enforcer-rulebook-gate(retired stub)}',
+    'scripts/checks/*.mjs must equal wired gates ∪ {spec-rules(lib), semantic-anchors(catalog)}',
   )
 })
 

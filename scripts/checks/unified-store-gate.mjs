@@ -8,9 +8,9 @@
  *   3. git-bypass — direct git process invocations outside Git/Persist ownership (§37)
  *
  * Scanners (P4U2 GATE-NO-MIGRATOR / clean-break):
- *   4. student-qa-revival — StudentQaStore / QA.md store paths under src/ (cross-check:
- *      scripts/checks/student-teacher-absence.mjs already ratchets StudentQa* tokens; this
- *      scanner keeps the unified-store gate fail-closed on storage-path revival)
+ *   4. student-qa-revival — StudentQaStore / QA.md store paths under src/ (the
+ *      student-teacher-absence ratchet was retired 2026-08-14; this scanner is
+ *      the sole fail-closed guard on Student QA storage revival)
  *   5. no-migrator — one-shot legacy importer / LegacyProjection≡NewProjection tooling
  *   6. dual-write — same production module writing EventStore AND Journal NDJSON
  *

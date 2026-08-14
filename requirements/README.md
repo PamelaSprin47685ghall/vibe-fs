@@ -4,7 +4,10 @@
 > 唯一拥有的 WHAT 命题、显式 hard dependencies，以及 package-local 的可执行 proof。
 > 全部 packages 同时为真；dependency 只表示 guarantee consumption，不表示优先级。
 
-本树由 `archive/docs/`、`archive/changes/`、`src/`、`tests/` 综合迁移而来（非机械改名）。每个包目录：
+本树由 `archive/docs/`、`archive/changes/`、`src/` 综合迁移而来（非机械改名）；
+旧 `tests/` 已全部分包（2026-08-14 Wave 2a/2b cutover）：测试全部包自有
+`<package>/tests/`，共享 harness（support adapters、unit runner、integration
+orchestrator、Long Stroke e2e）归 `verification-system/tests/`。每个包目录：
 
 ```text
 README.md   包入口（阅读顺序 + 概览）

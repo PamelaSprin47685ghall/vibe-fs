@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Requirement Package cutover 收尾：`docs/`、`changes/`、`tests/` 全部腾空。
+  - 45 包 normative 树 `requirements/<package>/{WHY,WHAT,HOW,PROOF}.md` 为唯一语义权威；
+    旧 Clause 与变更记录归档于 `archive/docs/`、`archive/changes/`。
+  - 测试全部分包：`tests/unit` 146 文件 MOVE/SPLIT/DELETE 归各包 `tests/`；
+    `tests/eval` → `office-capability`；`tests/integration` suites 归 owner 包；
+    e2e Long Stroke、support harness、unit/integration runner 归 `verification-system/tests/`。
+  - `package.json` release ladder 与新路径对齐；meta-verifier 骨架源迁入 `requirements/INDEX.md`。
+  - 迁移 ratchet 退休：`g4r-freeze`、`student-teacher-absence`、`enforcer-rulebook-gate`（retired stub）。
+
 ## 0.8.2
 
 - Provider Surface Grand Repair：ARCH-017 Office Capability；PROMPT-020 Tool Affordance；PROMPT-021 Critical Semantic Redundancy；ARCH-016 Gate F。Role Law 教身份，Tool Law 教动作，Delegation Law 教他人能成为什么。
