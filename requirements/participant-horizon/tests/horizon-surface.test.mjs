@@ -1,5 +1,7 @@
 // EXEC-005 / EXEC-030 — horizon output must not carry id/status/state-machine DTO.
 
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -16,7 +18,7 @@ import {
   sessionId,
   structuralComparer,
   toList,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')

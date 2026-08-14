@@ -1,0 +1,119 @@
+// action-affordance — calling-time act contracts (PROMPT-020/021, ARCH-006/007).
+//
+// What this file proves:
+//   1. High-risk verbs carry a local contract answering the five questions
+//      (act / fit / tempting nearby act NOT performed / success consequence /
+//      argument meaning), pinned by TOOL_DESCRIPTION_ANCHORS in both locales.
+//   2. Tool descriptions are caller-facing boundary mirrors (PROMPT-021):
+//      the confusable adjacent act is named, not implied.
+//   3. Action names express semantic acts; distinct semantics get distinct
+//      names (commission ≠ fork; ARCH-006/007).
+//   4. A successful return establishes a bounded consequence, not more.
+
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+
+import { TOOL_DESCRIPTION_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
+
+const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
+const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
+
+const LOCALES = ['en', 'zh-CN']
+
+const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
+
+test('AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog', () => {
+  assert.deepEqual(
+    Object.keys(TOOL_DESCRIPTION_ANCHORS).sort(),
+    ['commission', 'establish-behavior', 'fork', 'inspect', 'query-shell', 'repair-behavior', 'run'].sort(),
+    'Gate C high-risk minimum set must be anchored',
+  )
+})
+
+test('AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales', () => {
+  for (const [tool, anchors] of Object.entries(TOOL_DESCRIPTION_ANCHORS)) {
+    for (const locale of LOCALES) {
+      const text = readTool(tool, locale)
+      for (const { id, en, zh } of anchors) {
+        const re = locale === 'en' ? en : zh
+        assert.match(text, re, `${tool}/${locale}.md missing anchor ${id}`)
+      }
+    }
+  }
+})
+
+test('AA_prompt_020_inspect_contract_names_the_not_performed_act', () => {
+  for (const locale of LOCALES) {
+    const text = readTool('inspect', locale)
+    assert.match(text, /read-only in the causal sense|因果意义上是只读的/i, 'causal read-only must be explicit')
+    assert.match(
+      text,
+      /does not implement or repair code|不会实现或修复代码|不实现或修复代码/i,
+      'the tempting adjacent act must be named and refused',
+    )
+    assert.match(text, /Do not use inspect to ask for code changes|不要用 inspect 请求代码修改/i)
+  }
+})
+
+test('AA_prompt_020_repair_behavior_contract_defines_mechanical', () => {
+  for (const locale of LOCALES) {
+    const text = readTool('repair-behavior', locale)
+    assert.match(text, /meaning is already decided|含义已经被决定|已经决定.*含义/i, 'mechanical = decided meaning')
+    assert.match(
+      text,
+      /Do not treat the returned WorkRecord as proof that the repair passes|不要把返回的 WorkRecord 当作[^。]*通过的证明/i,
+      'returned record must not be claimed as passing proof',
+    )
+  }
+})
+
+test('AA_prompt_020_establish_behavior_contract_separates_mutation_from_execution', () => {
+  for (const locale of LOCALES) {
+    const text = readTool('establish-behavior', locale)
+    assert.match(text, /Coder writes source|Coder[^。]{0,24}(?:写入|修改|写|改变) source|托付 Coder/i)
+    assert.match(text, /not execution evidence|不是执行证据|不运行这些测试/i)
+  }
+})
+
+test('AA_prompt_020_run_contract_grounds_command_as_act_with_bounded_consequence', () => {
+  for (const locale of LOCALES) {
+    const text = readTool('run', locale)
+    assert.match(text, /command is an act|命令是一种行动|command 是一次行动|命令是一次行动/i)
+    assert.match(text, /economic commitments|经济承诺|不是运行时预测/i)
+  }
+})
+
+test('AA_prompt_020_success_returns_establish_bounded_consequence', () => {
+  const inspectEn = readTool('inspect', 'en')
+  assert.match(inspectEn, /The returned WorkRecord is evidence from a witness\.\nIt is not a mutation and it is not behavioral execution evidence\./i)
+  const commissionEn = readTool('commission', 'en')
+  assert.match(commissionEn, /A successful return establishes that the named road has taken the charge\./)
+  assert.match(commissionEn, /It does not establish that the destination has been reached\./)
+})
+
+test('AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law', () => {
+  const inspect = readTool('inspect', 'en')
+  assert.match(inspect, /read-only in the causal sense/i, 'caller-facing description must mirror the causal boundary')
+  assert.match(inspect, /Do not use inspect to ask for code changes/i, 'caller must be told the forbidden request shape')
+  const establish = readTool('establish-behavior', 'en')
+  assert.match(establish, /Coder completion is not execution evidence|does not run those tests/i)
+})
+
+test('AA_arch_006_007_distinct_semantics_have_distinct_names_and_contracts', () => {
+  const fork = readTool('fork', 'en')
+  const commission = readTool('commission', 'en')
+  assert.match(fork, /another office within this mission/i)
+  assert.match(commission, /independent road/i)
+  assert.match(commission, /This is not fork/i, 'commission must name the confusable nearby act it does NOT perform')
+  assert.match(commission, /not position in a\s*lifecycle/i, 'commission is not a lifecycle stage')
+  assert.match(commission, /not size of labor/i)
+})
+
+test('AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to', () => {
+  const fork = readTool('fork', 'en')
+  assert.match(fork, /Choose the office by the consequence you need/i)
+  assert.match(fork, /The two calling names belonging to one office differ in persona and reasoning depth,\nnot in the office's authority\./i)
+})
