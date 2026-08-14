@@ -3,12 +3,13 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Domain
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Mission.Review.Barrier
 
 /// Shared session-scoped projection-update algebra for the fold families
 /// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the

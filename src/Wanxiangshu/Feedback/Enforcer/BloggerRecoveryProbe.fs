@@ -1,12 +1,13 @@
 namespace Wanxiangshu.Feedback.Enforcer
 
 open Fable.Core
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Persistence.Journal
-open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Interaction.Authority
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// ENFORCER-153: Blogger missing-tool recovery stage is DERIVED, never stored.

@@ -2,13 +2,14 @@ namespace Wanxiangshu.Finality
 
 open System
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Persistence.Journal
-open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Execution.Delegation
+open System.Threading.Tasks
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 module FinalityJournal =

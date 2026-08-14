@@ -7,13 +7,15 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
+open CompanionProjection
 open Wanxiangshu.Review
 open Wanxiangshu.Session
-open CompanionProjection
 
 module PluginHostInterop =
 

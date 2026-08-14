@@ -3,11 +3,12 @@ namespace Wanxiangshu.Execution.Session
 open System.Threading.Tasks
 open Wanxiangshu.Change.Orchestration
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// Direct-CE family recovery (FLOW-001 / P0-2).

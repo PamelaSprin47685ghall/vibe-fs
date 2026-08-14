@@ -5,6 +5,7 @@ open Fable.Core
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
 
 /// Single reconcile pass: snapshot → evidence → reread/publish until causal decision.

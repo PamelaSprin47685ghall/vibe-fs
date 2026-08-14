@@ -2,12 +2,16 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Resources
 open Wanxiangshu.Session
 open Wanxiangshu.Tools
 

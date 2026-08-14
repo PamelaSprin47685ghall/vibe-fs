@@ -10,6 +10,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
 
 /// Direct-CE reconcile scheduler (FLOW-001 / PR4).

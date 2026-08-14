@@ -1,9 +1,10 @@
 namespace Wanxiangshu.Composition.Turn
 
+open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
-open Wanxiangshu.Domain
 
 type ReconciledTurn =
     {

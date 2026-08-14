@@ -3,12 +3,13 @@ namespace Wanxiangshu.Interaction.Repair
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Resources
 open Wanxiangshu.Session
 
 /// Idle-derived interaction repair (missing-final-report / incomplete interaction).

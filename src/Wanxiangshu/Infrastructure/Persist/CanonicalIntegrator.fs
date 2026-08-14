@@ -1,9 +1,11 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
 open System
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
 
 /// Structural frontier oracle. It sees every durable event but owns no business
 /// meaning; DomainConflict is simply `heads.Count > 1` in this Integrator slot.

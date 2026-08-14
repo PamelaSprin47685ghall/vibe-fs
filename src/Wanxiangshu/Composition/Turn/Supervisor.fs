@@ -3,10 +3,11 @@ namespace Wanxiangshu.Composition.Turn
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
+open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
-open Wanxiangshu.Host
 
 /// Compatibility surface for existing Host and focused tests.
 /// Reconciler.Scheduler owns queueing and direct-CE pass execution.

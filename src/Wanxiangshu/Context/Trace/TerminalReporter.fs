@@ -2,13 +2,14 @@ namespace Wanxiangshu.Context.Trace
 
 open System.Collections.Generic
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Persistence.Journal
-open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open System.Threading.Tasks
+open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// Physical terminal materialisation: ReconciledTurn → AgentRunResult →

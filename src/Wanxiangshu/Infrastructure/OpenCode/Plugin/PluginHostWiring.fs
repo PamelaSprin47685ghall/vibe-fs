@@ -10,6 +10,7 @@ open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 module PluginHostWiring =

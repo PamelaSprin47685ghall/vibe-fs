@@ -2,12 +2,14 @@ namespace Wanxiangshu.Context.Companion.Blogger
 
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Domain
 open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Feedback.Enforcer.Guidance
+open Wanxiangshu.Journal.ProjectionUpdate
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal.ProjectionUpdate
 
 module ContextFactFold =
 

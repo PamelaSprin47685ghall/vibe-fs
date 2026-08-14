@@ -3,6 +3,7 @@ namespace Wanxiangshu.Infrastructure
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 
 /// CASE-009: assembles the conditional Casebook tool specs. This module is
 /// the only place that names the EventStore for tool registration, keeping

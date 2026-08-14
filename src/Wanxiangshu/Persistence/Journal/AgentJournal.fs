@@ -2,19 +2,20 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Kernel
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Outcome
-open Wanxiangshu.Domain.MagicTodoFacts
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// One successful fold after append. Wake payload for revision subscribers.
 /// No retained history: only the latest change is kept for the recheck path.

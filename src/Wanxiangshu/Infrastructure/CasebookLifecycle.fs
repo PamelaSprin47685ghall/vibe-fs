@@ -3,6 +3,7 @@ namespace Wanxiangshu.Infrastructure
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 
 /// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,
 /// observation drain, graceful finalize vs unexpected cleanup. Publication

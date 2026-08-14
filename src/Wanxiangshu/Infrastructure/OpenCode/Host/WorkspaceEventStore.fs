@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
+open Wanxiangshu.Persistence.Journal
 
 /// Process-local EventStore owners keyed by git common-dir.
 /// One acquired entry owns exactly one WriterId.ndjson and one CanonicalIntegrator.

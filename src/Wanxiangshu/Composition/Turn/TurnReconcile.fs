@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Turn
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 
 /// Pure `snapshot + binding -> ReconciledTurn option`. Unknown origin is None.
 ///

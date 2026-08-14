@@ -3,9 +3,12 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System.Threading.Tasks
+open Wanxiangshu.Change.Orchestration
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 module PluginRecoveryWiring =
