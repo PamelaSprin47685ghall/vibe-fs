@@ -15,6 +15,8 @@ type HostSignal =                    // Infrastructure/OpenCode/Signals/HostSign
 
 `HostEventCodec.isHostSignalEvent / tryDecode` 在最早边界丢弃 fragment
 （`message.updated` / `part.delta` / `session.updated` / `chat.message` 非 terminal）；
+`session.status(status.type="idle")` 与 OpenCode 1.18 的独立 `session.idle` 都归一为 `SessionIdle`
+wake，重复编码只触发一次新的 bounded reconcile pass，terminal 仍只由完整 snapshot 判定。
 `HostSignalSubscribe`（one-shot silence deadline，无事件不触发）。`AttemptAborted` 撤销
 idle-derived continuation 能力（QuiescenceGate 属 causal-wait，本包只拥有信号 admission）。
 

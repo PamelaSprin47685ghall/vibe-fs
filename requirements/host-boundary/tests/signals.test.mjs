@@ -26,6 +26,7 @@ const { trySubscribe } = await import('../../../dist/OpenCode/Signals/HostSignal
 
 
 const idleRaw = (sessionID, extra = {}) => ({ type: 'session.status', sessionID, properties: { status: { type: 'idle' }, ...extra } })
+const dedicatedIdleRaw = (sessionID) => ({ type: 'session.idle', properties: { sessionID } })
 const retryRaw = (sessionID, attempt = '2', message = 'rate limited') => ({
   type: 'session.status',
   sessionID,
@@ -57,6 +58,7 @@ test('MISC_signals_session_id_of_all_cases', () => {
 test('MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
   const owned = () => true
   assert.equal(caseOf(tryAdapt(owned, idleRaw('s1'))), 'SessionIdle')
+  assert.equal(caseOf(tryAdapt(owned, dedicatedIdleRaw('s1'))), 'SessionIdle')
   assert.equal(caseOf(tryAdapt(owned, retryRaw('s1', '3', 'backoff'))), 'ProviderRetry')
   const deleted = tryAdapt(owned, deletedRaw('s1', 'owner-1'))
   assert.equal(caseOf(deleted), 'SessionDeleted')

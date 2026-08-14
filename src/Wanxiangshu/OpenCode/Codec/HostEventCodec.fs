@@ -8,7 +8,7 @@ open Wanxiangshu.Foundation.Identity
 
 /// The only module that unwraps raw host `obj` events.
 /// Outputs typed `HostSignal` for the coarse signals:
-///   - session.status idle
+///   - session.status idle / session.idle
 ///   - session.status retry
 ///   - session.deleted
 ///   - session.error as a non-durable failure wakeup
@@ -60,6 +60,7 @@ module HostEventCodec =
     let isHostSignalEvent (raw: obj) : bool =
         match eventTypeOf raw with
         | "session.status"
+        | "session.idle"
         | "session.deleted"
         | "session.error" -> true
         | _ -> false
@@ -117,6 +118,7 @@ module HostEventCodec =
                         | "idle" -> Some(SessionIdle sessionId)
                         | "retry" -> retrySignal sessionId raw |> Option.map ProviderRetry
                         | _ -> None
+            | "session.idle" -> tryReadSessionId raw |> Option.map SessionIdle
             | "session.deleted" ->
                 match tryReadSessionId raw with
                 | Some sessionId ->

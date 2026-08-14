@@ -10,8 +10,10 @@
 
 **规范**：业务层不得消费流式碎片。合法路径只有：`碎片事件 → 最早边界丢弃 → 粗粒度信号
 （idle / retry / deleted）→ single-flight → SDK 完整消息 → 纯策略`（HOST-001；ARCH-002）。
-禁止处理 `message.updated` / `part.delta` / `session.updated` / `session.diff` 作为业务输入；
-禁止从 idle payload 推断 terminal/完成/失败；禁止依赖事件先后顺序推导因果。
+OpenCode 的 `session.status(status.type="idle")` 与独立 `session.idle` 都只是同一 typed `SessionIdle`
+wake 的物理编码；两者都不得携带 terminal 事实。禁止处理 `message.updated` / `part.delta` /
+`session.updated` / `session.diff` 作为业务输入；禁止从 idle payload 推断 terminal/完成/失败；禁止依赖
+两个 idle 编码的先后顺序推导因果。
 
 **含义/动机**：碎片顺序/形状随 Host 版本漂移；把因果绑在传输噪声上（why/host.md §4）。
 
@@ -20,8 +22,9 @@
 
 ## HOST-BOUNDARY-002：允许进入业务层的信号是闭集，且分型正确
 
-**规范**：仅 `session.status = idle`、`session.status = retry`、`session.error =
-MessageAbortedError | AbortError`、`session.deleted` 可进入 Session 生命周期与 Reconciler。
+**规范**：仅 `session.status = idle`、`session.idle`、`session.status = retry`、`session.error =
+MessageAbortedError | AbortError`、`session.deleted` 可进入 Session 生命周期与 Reconciler；两个 idle
+编码都必须归一为不携带业务事实的 `SessionIdle`。
 abort error 必须解码为 typed `AttemptAborted`（撤销当前 attempt 的 idle-derived continuation
 能力；**不是** `ProviderFailure`，不得推进 fallback）（HOST-002）。
 

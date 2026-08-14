@@ -33,6 +33,16 @@ test('HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => 
   assert.equal(caseOf(idle), 'SessionIdle')
   assert.equal(idValue.session(payloadOf(idle)), SESSION)
 
+  // OpenCode 1.18 emits a dedicated session.idle after the status transition.
+  // It is a second physical encoding of the same coarse wake, not a terminal fact.
+  const dedicatedIdle = hostSignals.tryDecode({
+    type: 'session.idle',
+    properties: { sessionID: SESSION },
+  })
+  assert.equal(hostSignals.isHostSignalEvent({ type: 'session.idle' }), true)
+  assert.equal(caseOf(dedicatedIdle), 'SessionIdle')
+  assert.equal(idValue.session(payloadOf(dedicatedIdle)), SESSION)
+
   const retry = hostSignals.tryDecode({
     type: 'session.status',
     properties: { sessionID: SESSION, status: { type: 'retry', attempt: 3, message: 'rate limited' } },
