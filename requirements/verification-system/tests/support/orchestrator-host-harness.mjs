@@ -31,14 +31,19 @@ import {
 const hostModule = await import(new URL('../../../../dist/Infrastructure/OpenCode/Orchestration/Host.js', import.meta.url).pathname)
 const {
   OrchestratorHost,
-  OrchestratorHost__ContinueManagerJob_Z3E358215: rawContinueManagerJob,
   OrchestratorHost__JoinPublishedAvailable_Z2FFF68F8: rawJoinPublishedAvailable,
 } = hostModule
-const rawForkManagerJob = Object.entries(hostModule).find(
-  ([name, value]) => name.includes('OrchestratorHost__ForkManagerJob_') && typeof value === 'function',
-)?.[1]
-if (typeof rawForkManagerJob !== 'function') {
-  throw new Error('ForkManagerJob export must be discoverable without pinning Fable hash')
+const member = (name) =>
+  Object.entries(hostModule).find(
+    ([exportName, value]) => exportName.includes(`OrchestratorHost__${name}_`) && typeof value === 'function',
+  )?.[1]
+const rawForkManagerJob = member('ForkManagerJob')
+const rawContinueManagerJob = member('ContinueManagerJob')
+for (const [name, value] of [
+  ['ForkManagerJob', rawForkManagerJob],
+  ['ContinueManagerJob', rawContinueManagerJob],
+]) {
+  if (typeof value !== 'function') throw new Error(`${name} export must be discoverable without pinning Fable hash`)
 }
 const { OrchestratorHostDeps } = await import('../../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(

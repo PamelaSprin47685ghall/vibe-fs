@@ -38,6 +38,17 @@ module SessionExecutionBinding =
 
     let restore (parentId: SessionId) (childId: SessionId) (agent: string option) = bind parentId childId agent
 
+    /// Fission physical lane: preserve a managed execution binding without
+    /// declaring the lane a managed child of the logical owner. The Host parent
+    /// edge is handled separately by CreateSiblingSession.
+    let bindInternalRoot (sessionId: SessionId) (agent: string option) =
+        match agent |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some(value.Trim())) with
+        | None -> invalidOp "PROMPT-006: internal root requires a managed agent binding"
+        | Some selected ->
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                agents.[key] <- selected)
+
     let tryParent (sessionId: SessionId) =
         lock gate (fun () ->
             match parents.TryGetValue(SessionId.value sessionId) with
@@ -256,9 +267,16 @@ module SessionExecutionBinding =
                     normalizeOverride opts
 
     let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
-        match tryAgent sessionId, tryModel sessionId with
-        | Some baseAgent, Some baseModel ->
-            match opts.BindingIntent with
-            | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some baseModel) opts
-            | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
-        | _ -> Error "PROMPT-006: user-facing session has no observed user binding"
+        match tryAgent sessionId with
+        | Some baseAgent ->
+            let baseModel = tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent)
+
+            match baseModel with
+            | None -> Error "PROMPT-006: user-facing session has no provable model binding"
+            | Some model ->
+                rememberModel sessionId model
+
+                match opts.BindingIntent with
+                | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some model) opts
+                | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
+        | None -> Error "PROMPT-006: user-facing session has no observed user binding"

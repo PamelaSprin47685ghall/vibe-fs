@@ -330,8 +330,8 @@ module StrengthSpeculate =
                                                     with
                                                     | Error _ -> return ()
                                                     | Ok replicaMirror ->
-                                                        let! outcome =
-                                                            runtime.StartDecision(
+                                                        match!
+                                                            runtime.StartDryRun(
                                                                 owner,
                                                                 id,
                                                                 target,
@@ -340,27 +340,38 @@ module StrengthSpeculate =
                                                                 replicaMirror,
                                                                 anchorDigest
                                                             )
-
-                                                        match outcome with
-                                                        | Ok completed ->
-                                                            Diagnostic.emit
-                                                                "strength-dry-run-finished"
-                                                                [ "session_id", SessionId.value owner
-                                                                  "result", sprintf "%A" completed.Terminal ]
-
-                                                            match completed.Terminal with
-                                                            | StrengthReplicaTerminal.InvalidFrame reason ->
-                                                                scope.Strength.TripStrengthFuse(
-                                                                    "Strength dry-run invalid frame: " + reason
-                                                                )
-                                                            | _ -> ()
+                                                        with
                                                         | Error error ->
                                                             Diagnostic.emit
                                                                 "strength-dry-run-finished"
                                                                 [ "session_id", SessionId.value owner
                                                                   "result", "start-error:" + error ]
 
-                                                        return ()
+                                                            return ()
+                                                        | Ok started ->
+                                                            // SPEC-INV-013: DryRun is a real, visible OpenCode child,
+                                                            // but terminal observation is not on the owner's transform
+                                                            // critical path. "Dry" means zero promotion while the shadow still executes for real.
+                                                            task {
+                                                                let! completed = started.Completion
+
+                                                                Diagnostic.emit
+                                                                    "strength-dry-run-finished"
+                                                                    [ "session_id", SessionId.value owner
+                                                                      "replica_session_id",
+                                                                      SessionId.value started.ReplicaSessionId
+                                                                      "result", sprintf "%A" completed.Terminal ]
+
+                                                                match completed.Terminal with
+                                                                | StrengthReplicaTerminal.InvalidFrame reason ->
+                                                                    scope.Strength.TripStrengthFuse(
+                                                                        "Strength dry-run invalid frame: " + reason
+                                                                    )
+                                                                | _ -> ()
+                                                            }
+                                                            |> ignore
+
+                                                            return ()
                                             | StrengthRolloutMode.Off -> return ()
                                             | StrengthRolloutMode.Treatment ->
                                                 let decision =

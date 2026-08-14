@@ -32,13 +32,13 @@ module ManagerFinality =
         | _ -> LaborAdmission.LaborMayContinue
 
     /// Interpret one suicide call against the durable Life. Pre-T1 BlindPlan
-    /// (zero TodoWriteAccepted) stays at the Planning Table — not Activation.
+    /// (no accepted plan commitment) stays at the Planning Table.
     let classifyEnding
         (toolCallId: ToolCallId option)
         (life: LifeProjection)
-        (hasTodoWriteAccepted: bool)
+        (hasPlanCommitment: bool)
         : EndingDisposition =
-        if not hasTodoWriteAccepted then
+        if not hasPlanCommitment then
             EndingDisposition.ContinuePlanning
         elif life.Completed then
             EndingDisposition.AlreadyCompleted

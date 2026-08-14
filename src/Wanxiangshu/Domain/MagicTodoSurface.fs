@@ -17,6 +17,9 @@ module MagicTodoSurface =
         let TodoWriteDescription = "lifecycle/magic-todo/todowrite-description"
 
         [<Literal>]
+        let PlanCompleteDescription = "lifecycle/magic-todo/plan-complete-description"
+
+        [<Literal>]
         let ObligationNameDescription = "lifecycle/magic-todo/obligation-name-description"
 
         [<Literal>]
@@ -43,8 +46,9 @@ module MagicTodoSurface =
         """{
   "type": "object",
   "additionalProperties": false,
-  "required": ["obligations"],
+  "required": ["planComplete", "obligations"],
   "properties": {
+    "planComplete": { "type": "boolean" },
     "obligations": {
       "type": "array",
       "items": {

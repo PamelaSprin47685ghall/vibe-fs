@@ -8,7 +8,7 @@
 // The drain *mechanics* (await ConsumableReview, REVISE report delivery) live
 // in FinalityTool.execute and are covered by the membrane / magic-todo domain
 // suites (REUSE in PROOF.md); this file locks the pure disposition algebra:
-//   - zero TodoWriteAccepted on first unblessed path  → ContinuePlanning
+//   - no accepted planComplete=true commitment       → ContinuePlanning
 //     (TODO-010 zero-checkpoint fail closed, GLORY-039)
 //   - completed Life                                  → AlreadyCompleted
 //   - open request, same ToolCallId                   → ResumeRequest
@@ -139,7 +139,7 @@ test('FINALITY-001 only the Manager holds ToolPermission.Finality', () => {
   }
 })
 
-test('FINALITY-005 zero TodoWriteAccepted on the first unblessed path is fail closed', () => {
+test('FINALITY-004 no accepted planComplete=true commitment stays at Planning Table', () => {
   const life = foldLife([lifeOpened()]).CurrentLife
   const ending = classifyEnding(undefined, life, false)
   assert.equal(ending, EndingDisposition.ContinuePlanning)
@@ -223,7 +223,7 @@ test('FINALITY-065 a new Life inherits no blessing/roster/request and starts fre
 test('FINALITY-020 disposition never derives from narrative text', () => {
   // The pure dispatcher only reads typed projections; a Life without any
   // Finality fact set but with obligations is still BeginFinality, and the
-  // zero-checkpoint gate is a typed count, not prose inspection.
+  // commitment gate is typed projection evidence, not prose inspection.
   const life = foldLife([lifeOpened()]).CurrentLife
   assert.equal(classifyEnding(undefined, life, true), EndingDisposition.BeginFinality)
 })

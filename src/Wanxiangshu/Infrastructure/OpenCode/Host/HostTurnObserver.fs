@@ -115,7 +115,22 @@ module HostTurnObserver =
                     // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
                     // block. Bounded-context workflows still observe the terminal.
 
+                    let durableFissionReplacement =
+                        journal
+                        |> Option.exists (fun durable ->
+                            FissionProjection.tryActiveForOwner
+                                turn.SessionId
+                                (AgentJournal.snapshot durable).AgentProjections.Fission
+                            |> Option.isSome)
+
                     match turn.Outcome with
+                    | ReconcileProgram.TurnAborted _
+                        when FissionRuntime.isSilentInterrupt turn.SessionId || durableFissionReplacement ->
+                        // Physical-present replacement, not logical failure. The old
+                        // owner completion remains open for Fission convergence.
+                        // Durable admission is enough to recover the classification
+                        // after a process restart.
+                        ()
                     | ReconcileProgram.TurnFailed _
                     | ReconcileProgram.TurnAborted _ ->
                         scope.ArmRecovery turn.SessionId
@@ -136,22 +151,31 @@ module HostTurnObserver =
                     do! XWire.reconcileAttempt journal scope turn
                     TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
-                    // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                    // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
-                    do!
-                        TurnWorkflow.observe
-                            recoveryTimerPort
-                            Pty.abortParent
+                    let! fissionHandled =
+                        FissionHost.observeLaneTurn
                             sessionPort
                             eventPort
                             journal
-                            scope.SyncDelegateRuntime
-                            reviewerContinuationPort
-                            scope.Sessions.NudgeSent
                             scope.Sessions.JoinGuardNudges
-                            scope.HasLivePty
-                            scope.Sessions.AbortedSessions
-                            (Some scope.LoopSensor)
-                            scope.Sessions.Quiescence
-                            context
+                            turn
+
+                    if not fissionHandled then
+                        // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+                        // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                        do!
+                            TurnWorkflow.observe
+                                recoveryTimerPort
+                                Pty.abortParent
+                                sessionPort
+                                eventPort
+                                journal
+                                scope.SyncDelegateRuntime
+                                reviewerContinuationPort
+                                scope.Sessions.NudgeSent
+                                scope.Sessions.JoinGuardNudges
+                                scope.HasLivePty
+                                scope.Sessions.AbortedSessions
+                                (Some scope.LoopSensor)
+                                scope.Sessions.Quiescence
+                                context
         }

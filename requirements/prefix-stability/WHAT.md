@@ -89,8 +89,8 @@ seal/绑定**之前**原子提交；provider Failed/Aborted **不**回滚已 sea
 **含义/动机**：若 provider 失败能回滚 epoch，同一段历史会在两次 attempt 间「换世界」，
 已 seal 的 ReviewSeal / 前缀证明全部失真。
 
-**边界**：desired cutoff 的推导归 obligation-ledger（Accepted 链）；本命题拥有
-「commit 后不可逆」。
+**边界**：desired cutoff 的推导归 obligation-ledger（仅从首次 accepted `planComplete=true` 起的
+committed Accepted 子链；Pre-T1 planning checkpoints 不参与）；本命题拥有「commit 后不可逆」。
 
 **证据**：CTX-015；TODO-009；`Journal/PrefixEpochProjection.fs`
 （`applyRebase` 只校验 epoch 序，不读 provider 结局）。

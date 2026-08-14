@@ -70,26 +70,44 @@ module OrdinaryTurnWorkflow =
                 // (The XTrace parts are captured at the transform boundary.)
                 InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
             | ReconcileProgram.TurnAborted reason ->
-                // LOOP-006: our own kill is bridged into the provider-failure AABB path.
-                // User / cleanup aborts still report Aborted and do not advance the cursor.
-                let loopKill =
-                    match loopSensor with
-                    | Some sensor when sensor.IsArmed turn.SessionId ->
-                        sensor.ClearArmed turn.SessionId
-                        true
-                    | _ -> false
+                let processReplacement = FissionRuntime.tryConsumeSilentInterrupt turn.SessionId
 
-                if loopKill then
-                    ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
-                else
-                    abortedSessions.Add sessionKey |> ignore
-                    abortParent sessionKey
-                    sessionPort.AbortChildren turn.SessionId |> ignore
+                let durableReplacement =
+                    journal
+                    |> Option.exists (fun durable ->
+                        FissionProjection.tryActiveForOwner
+                            turn.SessionId
+                            (AgentJournal.snapshot durable).AgentProjections.Fission
+                        |> Option.isSome)
 
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-                    |> ignore
-
+                if processReplacement || durableReplacement then
+                    // The old physical present was replaced by admitted sibling
+                    // lanes. The durable active-group fact is sufficient after a
+                    // crash even when the process-local interrupt marker is gone.
+                    // Do not cascade children/PTY, publish Aborted, or route this
+                    // observation into provider recovery.
                     AsyncSupport.completedTask ()
+                else
+                    // LOOP-006: our own kill is bridged into the provider-failure AABB path.
+                    // User / cleanup aborts still report Aborted and do not advance the cursor.
+                    let loopKill =
+                        match loopSensor with
+                        | Some sensor when sensor.IsArmed turn.SessionId ->
+                            sensor.ClearArmed turn.SessionId
+                            true
+                        | _ -> false
+
+                    if loopKill then
+                        ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
+                    else
+                        abortedSessions.Add sessionKey |> ignore
+                        abortParent sessionKey
+                        sessionPort.AbortChildren turn.SessionId |> ignore
+
+                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                        |> ignore
+
+                        AsyncSupport.completedTask ()
             | ReconcileProgram.TurnFailed error ->
                 ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                     timerPort

@@ -182,3 +182,7 @@ Witness 混淆：把搜索结果当成原因，或请 witness 让项目运动起
 不要为下一个职位规定命令。
 
 留下对书写改变的诚实说明，把运动留给那些被托付让世界运动起来的人。
+
+## 裂分可分离的 mutation 工作
+
+当独立的实现、调查、测试书写或文档切片能够安全共享同一个 worktree 时，可以用 fission 暴露你自己 charge 内部的并行性。不要让多条 blind writer lanes 同时写同一个脆弱表面。每条 lane 仍然是同一个 Coder、承担同一 mutation responsibility；结束前必须把 sibling handoff 与已经产生的 effects 全部入账并整合。

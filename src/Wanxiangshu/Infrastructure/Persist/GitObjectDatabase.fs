@@ -209,10 +209,10 @@ module GitObjectDatabase =
     /// no separators. Git writes tree modes without the leading zero (`40000`, not `040000`).
     let private treeBody (entries: TreeEntry list) : byte[] =
         entries
-        |> StoreTree.canonicalOrder
+        |> GitTree.canonicalOrder
         |> List.map (fun entry ->
             let mode =
-                if StoreTree.isTreeMode entry.Mode then
+                if GitTree.isTreeMode entry.Mode then
                     "40000"
                 else
                     entry.Mode.TrimStart('0')
@@ -246,7 +246,7 @@ module GitObjectDatabase =
                         loop (separator + 21) acc
                     else
                         let entry =
-                            { Mode = StoreTree.normalizeMode (meta.Substring(0, space))
+                            { Mode = GitTree.normalizeMode (meta.Substring(0, space))
                               Name = meta.Substring(space + 1)
                               Oid = GitObjectId.create oidHex }
 

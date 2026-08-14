@@ -1,203 +1,42 @@
-// Split from tests/unit/persist/event-store-merge.test.mjs (cutover Wave 2a);
-// owner: durable-convergence.
-//
-// §10.6 K-way merge: associative / commutative / idempotent / deterministic.
-//
-// Spec oracle = EventStoreMergeSpec.mergeEvents (set union + identity dedupe)
-// Production  = EventStoreMerge.merge (structural tree union → StoreSnapshot)
-//
-// The shard/payload/materialization read-path assertions of the original file
-// moved with durable-events (EventId shard layout, WriteBlob hash-object,
-// payload closure, loadEventEnvelopes).
+// FROZEN — 2026-08-14. Historical filename retained; Git snapshot merge was shock-cut.
+// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, eventId, idValue, isSome, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { eventId, idValue, listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')
-const Merge = await import('../../../dist/Infrastructure/Persist/EventStoreMerge.js')
-
+const Merge = await import('../../../dist/Infrastructure/Persist/EventKWayMerge.js')
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
-const payloadRef = (v) => Domain.PayloadRefModule_create(v)
-const oidValue = (rootOid) => Persist.GitObjectIdModule_value(Persist.RootOidModule_value(rootOid))
-const snapshotOid = (snapshot) => oidValue(snapshot.RootOid)
+const make = (id, parents = [], stream = 'merge/main', payload = {}) => new Domain.EventEnvelope(
+  eventId(id), streamId(stream), 'JobRequested', toList(parents.map(eventId)), payload, toList([]),
+)
+const ids = (result) => listItems(resultOf(result).value).map((e) => idValue.event(e.EventId))
 
-const envelope = ({
-  id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  stream = 'job/main',
-  eventType = 'JobRequested',
-  parents = [],
-  payload = { status: 'open' },
-  payloadRefs = [],
-} = {}) =>
-  new Domain.EventEnvelope(
-    eventId(id),
-    streamId(stream),
-    eventType,
-    toList(parents.map(eventId)),
-    payload,
-    toList(payloadRefs.map(payloadRef)),
-  )
+const A = 'a'.repeat(40)
+const B = 'b'.repeat(40)
+const C = 'c'.repeat(40)
 
-const mustOk = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Ok', `${label} should be Ok, got ${caseOf(result)}`)
-  return payloadOf(result)
-}
-
-const mustErr = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Error', `${label} should be Error`)
-  return payloadOf(result)
-}
-
-const createStore = () => GitRaw.GitRawStore_createInMemory()
-
-const materialize = async (store, events) => {
-  const result = await GitRaw.GitRawStore_materializeSnapshot(store, toList(events))
-  return mustOk(result, 'materializeSnapshot')
-}
-
-const productionMerge = async (store, snapshots) => {
-  const input = Persist.MergeInputModule_ofList(toList(snapshots))
-  return await Merge.EventStoreMerge_merge(store, input)
-}
-
-const specMergeEvents = (events) => Merge.EventStoreMergeSpec_mergeEvents(toList(events))
-
-const specMergeSnapshots = async (store, snapshots) => {
-  const input = Persist.MergeInputModule_ofList(toList(snapshots))
-  return await Merge.EventStoreMergeSpec_merge(store, input)
-}
-
-const eventIdsOf = (events) =>
-  listItems(events)
-    .map((e) => idValue.event(e.EventId))
-    .sort()
-
-test('CompareAndSwapRef_Absent_then_expected_oid', async () => {
-  const store = createStore()
-  const oid = await store.WriteBlob(new TextEncoder().encode('x\n'))
-  assert.equal(await store.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, oid), true)
-  assert.equal(await store.CompareAndSwapRef(Persist.StoreRef_canonical, undefined, oid), false)
-  const other = await store.WriteBlob(new TextEncoder().encode('y\n'))
-  assert.equal(await store.CompareAndSwapRef(Persist.StoreRef_canonical, oid, other), true)
-  const current = await store.ReadRef(Persist.StoreRef_canonical)
-  assert.equal(isSome(current), true)
-  assert.equal(Persist.GitObjectIdModule_value(current), Persist.GitObjectIdModule_value(other))
+test('DURABLE_CONVERGENCE_001_set_union_never_drops_distinct_events', () => {
+  const result = Merge.merge(toList([['writer-a', toList([make(A)])], ['writer-b', toList([make(B)])]]))
+  assert.deepEqual(ids(result).sort(), [A, B].sort())
 })
 
-test('merge_spec_oracle_associative_commutative_idempotent_deterministic', () => {
-  const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })
-  const b = envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })
-  const c = envelope({ id: 'cccccccccccccccccccccccccccccccccccccccc', payload: { n: 3 } })
-
-  const ab = mustOk(specMergeEvents([a, b]))
-  const bc = mustOk(specMergeEvents([b, c]))
-  const left = mustOk(specMergeEvents([...listItems(ab), c]))
-  const right = mustOk(specMergeEvents([a, ...listItems(bc)]))
-  assert.deepEqual(eventIdsOf(left), eventIdsOf(right))
-
-  const abOrder = mustOk(specMergeEvents([a, b]))
-  const baOrder = mustOk(specMergeEvents([b, a]))
-  assert.deepEqual(eventIdsOf(abOrder), eventIdsOf(baOrder))
-
-  const once = mustOk(specMergeEvents([a, b, c]))
-  const twice = mustOk(specMergeEvents([...listItems(once), ...listItems(once)]))
-  assert.deepEqual(eventIdsOf(once), eventIdsOf(twice))
-  assert.equal(listItems(twice).length, 3)
-
-  const orders = [
-    [a, b, c],
-    [c, a, b],
-    [b, c, a],
-    [a, c, b],
-  ].map((order) => eventIdsOf(mustOk(specMergeEvents(order))))
-  for (const ids of orders) assert.deepEqual(ids, orders[0])
+test('DURABLE_CONVERGENCE_002_writer_enumeration_is_commutative', () => {
+  const a = ['writer-a', toList([make(A), make(C, [A])])]
+  const b = ['writer-b', toList([make(B)])]
+  assert.deepEqual(ids(Merge.merge(toList([a, b]))), ids(Merge.merge(toList([b, a]))))
 })
 
-test('merge_production_associative_commutative_idempotent_deterministic', async () => {
-  const store = createStore()
-  const a = envelope({ id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', payload: { n: 1 } })
-  const b = envelope({ id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', payload: { n: 2 } })
-  const c = envelope({ id: 'cccccccccccccccccccccccccccccccccccccccc', payload: { n: 3 } })
-
-  const SA = await materialize(store, [a])
-  const SB = await materialize(store, [b])
-  const SC = await materialize(store, [c])
-
-  const merge2 = async (x, y) => mustOk(await productionMerge(store, [x, y]))
-  const merge3 = async (xs) => mustOk(await productionMerge(store, xs))
-
-  // commutative
-  assert.equal(snapshotOid(await merge2(SA, SB)), snapshotOid(await merge2(SB, SA)))
-
-  // associative
-  const left = await merge2(await merge2(SA, SB), SC)
-  const right = await merge2(SA, await merge2(SB, SC))
-  assert.equal(snapshotOid(left), snapshotOid(right))
-
-  // idempotent
-  assert.equal(snapshotOid(await merge2(SA, SA)), snapshotOid(SA))
-  const ABC = await merge3([SA, SB, SC])
-  assert.equal(snapshotOid(await merge2(ABC, ABC)), snapshotOid(ABC))
-
-  // deterministic across input enumeration order
-  const orders = await Promise.all([
-    [SA, SB, SC],
-    [SC, SA, SB],
-    [SB, SC, SA],
-    [SA, SC, SB],
-  ].map(async (order) => snapshotOid(await merge3(order))))
-  for (const oid of orders) assert.equal(oid, orders[0])
-
-  const spec = mustOk(await specMergeSnapshots(store, [SA, SB, SC]))
-  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(store, ABC.RootOid))
-  assert.equal(listItems(blobs).length, 3)
-  assert.equal(listItems(spec).length, 3)
+test('DURABLE_CONVERGENCE_002_duplicate_stream_input_is_idempotent_by_EventId', () => {
+  const event = make(A, [], 'merge/main', { x: 1 })
+  const result = Merge.merge(toList([['a', toList([event])], ['copy', toList([event])]]))
+  assert.deepEqual(ids(result), [A])
 })
 
-test('merge_identity_collision_fail_closed', async () => {
-  const store = createStore()
-  const left = envelope({
-    id: 'dddddddddddddddddddddddddddddddddddddddd',
-    payload: { status: 'open' },
-  })
-  const right = envelope({
-    id: 'dddddddddddddddddddddddddddddddddddddddd',
-    payload: { status: 'closed' },
-  })
-
-  const SL = await materialize(store, [left])
-  const SR = await materialize(store, [right])
-
-  const merged = await productionMerge(store, [SL, SR])
-  const err = mustErr(merged)
-  assert.equal(caseOf(err), 'StorageInvalid')
-  assert.equal(caseOf(payloadOf(err)), 'IdentityCollision')
-
-  const specErr = mustErr(specMergeEvents([left, right]))
-  assert.equal(caseOf(specErr), 'StorageInvalid')
-  assert.equal(caseOf(payloadOf(specErr)), 'IdentityCollision')
-})
-
-test('merge_production_matches_materialize_of_union', async () => {
-  const store = createStore()
-  const payloadOid = await store.WriteBlob(new TextEncoder().encode('shared\n'))
-  const payloadHex = Persist.GitObjectIdModule_value(payloadOid)
-
-  const a = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    payloadRefs: [payloadHex],
-  })
-  const b = envelope({
-    id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    payload: { only: 'b' },
-  })
-
-  const SA = await materialize(store, [a])
-  const SB = await materialize(store, [b])
-  const merged = mustOk(await productionMerge(store, [SA, SB]))
-  const direct = await materialize(store, [a, b])
-  assert.equal(snapshotOid(merged), snapshotOid(direct))
+test('DURABLE_CONVERGENCE_003_identity_collision_is_fail_closed_not_LWW', () => {
+  const left = make(A, [], 'merge/main', { x: 1 })
+  const right = make(A, [], 'merge/main', { x: 2 })
+  const result = resultOf(Merge.merge(toList([['left', toList([left])], ['right', toList([right])]])))
+  assert.equal(result.ok, false)
 })

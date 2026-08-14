@@ -15,11 +15,12 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Manager
 open Wanxiangshu.Review
 
 /// Durable half of the GrandRewrite Magic Todo membrane.
 ///
-/// before: localize the persisted ToolPart, validate `{obligations:[{name,work}]}`
+/// before: localize the persisted ToolPart, validate `{planComplete,obligations:[{name,work}]}`
 /// input, write canonical obligation bodies, append Prepared, then expose only
 /// legacy sink rows to the builtin executor. after/recovery proves physical
 /// success against that receipt before Accepted.
@@ -144,6 +145,7 @@ module MagicTodoMembrane =
           BaseTodoDigest = checkpoint.BaseTodoDigest
           ProposedTodoRef = checkpoint.ProposedTodoRef
           ProposedTodoDigest = checkpoint.ProposedTodoDigest
+          PlanCompleteDeclared = checkpoint.PlanCompleteDeclared
           ProviderInputDigest = checkpoint.ProviderInputDigest
           ReviewFrontier = checkpoint.ReviewFrontier
           SemanticVersion = checkpoint.SemanticVersion }
@@ -175,12 +177,15 @@ module MagicTodoMembrane =
         (managerSessionId: SessionId)
         (locality: MagicTodoLocality.LocalizedToolCall)
         (providerInputDigest: string)
+        (planCompleteDeclared: bool)
         (submitted: ObligationList)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         task {
             let snapshotMatchesSubmitted =
-                match MagicTodoObligationCodec.tryDecodeAccount locality.InputCanonical with
-                | Ok snapshotAccount -> snapshotAccount = submitted
+                match MagicTodoObligationCodec.tryDecodeInput locality.InputCanonical with
+                | Ok snapshotInput ->
+                    snapshotInput.PlanComplete = planCompleteDeclared
+                    && snapshotInput.Obligations = submitted
                 | Error _ -> false
 
             if locality.ToolName <> "todowrite" then
@@ -297,6 +302,7 @@ module MagicTodoMembrane =
                                       BaseTodoDigest = baseBlob.BlobDigest
                                       ProposedTodoRef = proposedBlob.BlobRef
                                       ProposedTodoDigest = proposedBlob.BlobDigest
+                                      PlanCompleteDeclared = planCompleteDeclared
                                       ProviderInputDigest = preparedPlan.ProviderInputDigest
                                       ReviewFrontier = preparedPlan.ReviewFrontier
                                       SemanticVersion = MagicTodo.SemanticVersion }
@@ -355,7 +361,8 @@ module MagicTodoMembrane =
                 let checkpoint =
                     Map.tryFind (TodoWriteId.value bridge.Prepared.TodoWriteId) life.Checkpoints
 
-                let isT1Commitment = List.isEmpty life.AcceptedOrder
+                let isT1Commitment =
+                    life.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
 
                 let accepted =
                     { ManagerLifeId = bridge.Prepared.ManagerLifeId
@@ -523,9 +530,10 @@ module MagicTodoHostHooks =
                     let callId = ToolCallId.create callText
                     let args: obj = output?args
 
-                    match MagicTodoHostCodec.tryDecodeObligations args with
+                    match MagicTodoHostCodec.tryDecodeInput args with
                     | Error reason -> invalidOp reason
-                    | Ok obligations ->
+                    | Ok submittedInput ->
+                        let obligations = submittedInput.Obligations
                         let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
                         MagicTodoHostCodec.replaceCompatibilityArgs output (obligationsToCompatibilityRows obligations)
 
@@ -566,14 +574,17 @@ module MagicTodoHostHooks =
                                                             sessionId
                                                             locality
                                                             providerInputDigest
+                                                            submittedInput.PlanComplete
                                                             obligations
                                                     with
-                                                    | Ok value -> return Ok value
+                                                    | Ok value ->
+                                                        return ObligationLedgerWorkflow.PreparationAttempt.Prepared value
                                                     | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
-                                                        return Error "lag-1-retry"
+                                                        return ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
                                                     | Error reason ->
                                                         match syntaxPrepareFailure reason with
-                                                        | Some syntax -> return Error syntax
+                                                        | Some syntax ->
+                                                            return ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
                                                         | None ->
                                                             return
                                                                 fatalInfrastructure
@@ -581,52 +592,46 @@ module MagicTodoHostHooks =
                                                                     (sprintf "prepare invariant failed: %A" reason)
                                                 }
 
-                                            let rec admitAfterLag1 () =
-                                                task {
-                                                    let snapshotNow = AgentJournal.snapshot durable
+                                            let currentPendingReview () =
+                                                let snapshotNow = AgentJournal.snapshot durable
 
-                                                    let pending =
-                                                        AgentProjection.tryFind sessionId snapshotNow.AgentProjections
-                                                        |> Option.bind (fun session -> session.ManagerLife)
-                                                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                                                        |> Option.bind (fun mlife ->
-                                                            MagicTodoProjection.tryLife
-                                                                mlife.LifeId
-                                                                snapshotNow.AgentProjections.MagicTodo
-                                                            |> Option.bind MagicTodoProjection.pendingReviewObligation
-                                                            |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
+                                                AgentProjection.tryFind sessionId snapshotNow.AgentProjections
+                                                |> Option.bind (fun session -> session.ManagerLife)
+                                                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                                                |> Option.bind (fun mlife ->
+                                                    MagicTodoProjection.tryLife
+                                                        mlife.LifeId
+                                                        snapshotNow.AgentProjections.MagicTodo
+                                                    |> Option.bind MagicTodoProjection.pendingReviewObligation
+                                                    |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
 
-                                                    match pending with
-                                                    | Some(lifeId, writeId) ->
-                                                        match!
-                                                            reviews.AwaitConsumableReview
-                                                                durable
-                                                                sessionId
-                                                                lifeId
-                                                                writeId
-                                                        with
-                                                        | Error reason ->
-                                                            return
-                                                                fatalInfrastructure
-                                                                    sessionText
-                                                                    ("await ConsumableReview failed: " + reason)
-                                                        | Ok() ->
-                                                            match! admitNow () with
-                                                            | Ok value -> return Ok value
-                                                            | Error "lag-1-retry" -> return! admitAfterLag1 ()
-                                                            | Error reason -> return Error reason
-                                                    | None ->
-                                                        match! admitNow () with
-                                                        | Ok value -> return Ok value
-                                                        | Error "lag-1-retry" ->
-                                                            return
-                                                                fatalInfrastructure
-                                                                    sessionText
-                                                                    "lag-1 wait without pending ConsumableReview (projection inconsistent)"
-                                                        | Error reason -> return Error reason
-                                                }
+                                            let awaitReview (lifeId, writeId) =
+                                                reviews.AwaitConsumableReview durable sessionId lifeId writeId
 
-                                            return! admitAfterLag1 ()
+                                            match!
+                                                ObligationLedgerWorkflow.prepareCheckpoint
+                                                    admitNow
+                                                    currentPendingReview
+                                                    awaitReview
+                                            with
+                                            | Ok value -> return Ok value
+                                            | Error(ObligationLedgerWorkflow.PreparationFailure.AttemptFailed syntax) ->
+                                                return Error syntax
+                                            | Error(ObligationLedgerWorkflow.PreparationFailure.ReviewWaitFailed reason) ->
+                                                return
+                                                    fatalInfrastructure
+                                                        sessionText
+                                                        ("await ConsumableReview failed: " + reason)
+                                            | Error ObligationLedgerWorkflow.PreparationFailure.MissingPendingReview ->
+                                                return
+                                                    fatalInfrastructure
+                                                        sessionText
+                                                        "lag-1 wait without pending ConsumableReview (projection inconsistent)"
+                                            | Error ObligationLedgerWorkflow.PreparationFailure.ReviewDidNotConverge ->
+                                                return
+                                                    fatalInfrastructure
+                                                        sessionText
+                                                        "ConsumableReview wait completed but checkpoint admission still reports the same pending review"
                             }
 
                         bridges[bridgeKey sessionText callText] <- prepared
@@ -657,41 +662,45 @@ module MagicTodoHostHooks =
 
                             let outputDigest = outputCanonical output |> HostDigest.sha256Hex
 
-                            match!
+                            let acceptDurably () =
                                 MagicTodoMembrane.accept
                                     durable
                                     prepared
                                     PhysicalSuccessEvidence.LiveAfterSuccess
                                     prepared.Prepared.ProviderInputDigest
                                     outputDigest
+
+                            let shouldEnsureReview (accepted: MagicTodoMembrane.AcceptOutcome) =
+                                accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist
+
+                            let ensureReview (_accepted: MagicTodoMembrane.AcceptOutcome) =
+                                match processReview with
+                                | None ->
+                                    Task.FromResult(Error "Magic Todo process review runtime disappeared after before")
+                                | Some port ->
+                                    port.EnsureReview
+                                        durable
+                                        prepared.ManagerSessionId
+                                        prepared.ManagerLifeId
+                                        prepared.Prepared.TodoWriteId
+
+                            match!
+                                ObligationLedgerWorkflow.acceptCheckpoint
+                                    acceptDurably
+                                    shouldEnsureReview
+                                    ensureReview
                             with
-                            | Error reason ->
+                            | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed reason) ->
                                 fatalInfrastructure
                                     sessionText
                                     (sprintf "Magic Todo accept invariant failed: %A" reason)
+                            | Error(ObligationLedgerWorkflow.AcceptanceFailure.ReviewFailed reason) ->
+                                fatalInfrastructure
+                                    sessionText
+                                    ("Magic Todo ensureReview infrastructure failed: " + reason)
                             | Ok accepted ->
                                 if not (String.IsNullOrEmpty accepted.EnrichedResult) then
                                     MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
-
-                                if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
-                                    match processReview with
-                                    | None ->
-                                        fatalInfrastructure
-                                            sessionText
-                                            "Magic Todo process review runtime disappeared after before"
-                                    | Some port ->
-                                        match!
-                                            port.EnsureReview
-                                                durable
-                                                prepared.ManagerSessionId
-                                                prepared.ManagerLifeId
-                                                prepared.Prepared.TodoWriteId
-                                        with
-                                        | Error reason ->
-                                            fatalInfrastructure
-                                                sessionText
-                                                ("Magic Todo ensureReview infrastructure failed: " + reason)
-                                        | Ok() -> ()
                         finally
                             bridges.Remove key |> ignore
             }

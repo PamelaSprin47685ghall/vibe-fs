@@ -1,1 +1,1 @@
-命名那项仍欠的最终状态、用户可接收的交付物，或必须成为真的外部有意义条件。名称必须承载真实的可托付含义，而不是仅仅占一个槽位或标记阶段；`placeholder`、`planning`、`TBD` 或同类延后内容的名称都不是 obligation。不要把仅用于发现真正计划的规划、调查、理解、盘点或决定下一步的动作当作名称。对于实现类 mission，像「survey-startup-and-complexity」这样的名称只是伪装后的 meta-todo，不是 obligation。
+给这项 owed work 一个稳定、可读的名称。当 `planComplete=false` 时，名称可以指向为了让道路可信而必须闭环的具体 planning work，例如建立某个事实、解决某项不确定性或完成某个分解。当 effective `planComplete=true` 时，名称应指向仍欠的 mission 最终状态、用户可接收的交付物或外部有意义条件。无论哪种关系，都不要只写空槽位或裸阶段名：`placeholder`、`TBD`、`planning` 或同类延后内容的 label 本身都不够成为 obligation。

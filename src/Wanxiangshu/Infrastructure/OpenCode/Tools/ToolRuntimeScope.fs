@@ -115,6 +115,16 @@ type ToolRuntimeScope
         else
             Some(SessionId.create ctx.SessionId)
 
+    let logicalOwnerFor (sessionId: SessionId) =
+        FissionRuntime.tryOwner sessionId
+        |> Option.orElseWith (fun () ->
+            journal
+            |> Option.bind (fun durable ->
+                FissionProjection.tryOwnerOfLane
+                    sessionId
+                    (AgentJournal.snapshot durable).AgentProjections.Fission))
+        |> Option.defaultValue sessionId
+
     let activeProfileFor sessionId =
         match journal with
         | Some durable ->
@@ -223,6 +233,11 @@ type ToolRuntimeScope
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
     member _.DirectoryFor(sessionId) = directoryFor sessionId
+    member _.LogicalOwnerFor(sessionId: SessionId) = logicalOwnerFor sessionId
+    member _.RegisterPhysicalParent(sessionId: SessionId, parentId: SessionId option) =
+        match parentId with
+        | Some parent -> sessionParents.[SessionId.value sessionId] <- SessionId.value parent
+        | None -> sessionParents.Remove(SessionId.value sessionId) |> ignore
     member _.ParentWorkRecordFor(sessionId) = parentRecord sessionId
     member _.ChildWorkRecordFor(sessionId) = childRecord sessionId
 
@@ -257,15 +272,20 @@ type ToolRuntimeScope
         if String.IsNullOrWhiteSpace ctx.SessionId then
             Error "Missing sessionID"
         else
+            let ownerKey =
+                SessionId.create ctx.SessionId
+                |> logicalOwnerFor
+                |> SessionId.value
+
             lock gate (fun () ->
                 if disposed then
                     Error "Tool runtime scope is disposed"
                 else
-                    match runtimes.TryGetValue ctx.SessionId with
+                    match runtimes.TryGetValue ownerKey with
                     | true, runtime when not runtime.IsCancelled -> Ok runtime
                     | _ ->
-                        let runtime = createRuntime ctx.SessionId
-                        runtimes.[ctx.SessionId] <- runtime
+                        let runtime = createRuntime ownerKey
+                        runtimes.[ownerKey] <- runtime
                         Ok runtime)
 
     member _.ExecutorRuntimeFor(ctx: HostToolContext) =

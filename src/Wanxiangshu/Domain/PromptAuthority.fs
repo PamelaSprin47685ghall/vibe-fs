@@ -30,6 +30,9 @@ module PromptAuthority =
         | NeedHelpEscalation
         /// AGENT-031/PROMPT-018: independent consultation returned to requester.
         | NeedHelpAdvice
+        /// Same-run Fission delivery: predecessor work or a pre-Fission shared
+        /// external completion enters a lane only at a safe provider boundary.
+        | FissionHandoff
         /// GLORY-020: the Host asks the Manager to carry out the plan it just
         /// described. Sent exactly once after a legal planning terminal.
         | ManagerWorkActivation
@@ -209,6 +212,7 @@ module PromptAuthority =
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
         | Continuation FinalitySteer -> "FinalitySteer"
+        | Continuation FissionHandoff -> "FissionHandoff"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -227,6 +231,7 @@ module PromptAuthority =
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
         | "FinalitySteer" -> Some FinalitySteer
+        | "FissionHandoff" -> Some FissionHandoff
         | _ -> None
 
     /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).

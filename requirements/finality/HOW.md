@@ -26,10 +26,10 @@
 
 ### classifyEnding（FINALITY-004/007/014/016/017）
 
-`ManagerFinality.classifyEnding(toolCallId, life, hasTodoWriteAccepted)` 纯函数：
+`ManagerFinality.classifyEnding(toolCallId, life, hasPlanCommitment)` 纯函数：
 
 ```text
-not hasTodoWriteAccepted        → ContinuePlanning        // 零 checkpoint fail closed（TODO-010）
+not hasPlanCommitment           → ContinuePlanning        // false planning checkpoints 仍是 Pre-T1
 life.Completed                  → AlreadyCompleted        // 幂等重放
 open request + same ToolCallId  → ResumeRequest
 open request + empty Members    → RecoverRequestWithoutReviewers
@@ -43,7 +43,7 @@ resolved 历史 request（Rejected/Blessed/Undecided）不阻塞劳动。
 
 ### FinalityTool.execute（GLORY-034/035/037-041）
 
-前置条件按序检查（含 TODO-010 drain：`awaitConsumableReview(latest Accepted)`）；
+前置条件按序检查（先要求 durable plan commitment，再含 TODO-010 drain：`awaitConsumableReview(latest Accepted)`）；
 过程 REVISE → 回灌 ProcessReviewLWR、sink reconcile、**不**建 FinalityRequest；
 过程 PERFECT → `gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` →
 append `FinalityRequested` → 启动 `FinalityController` cohort CE（`rosterOf` 选员）。

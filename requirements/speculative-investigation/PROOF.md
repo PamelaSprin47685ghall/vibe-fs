@@ -21,6 +21,7 @@
 | SPEC-INV-010 Predictor 与 control | 本包 `authority-policy.test.mjs`（`STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk`）+ `requirements/speculative-investigation/tests/predictor-rollout.test.mjs`（`STRENGTH_010_feature_key_has_no_replica_or_score_provenance`、`STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key`、`STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input`、`STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment`、`STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout`、`STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof`） | MOVE + REUSE | 对应文件 `node --test` |
 | SPEC-INV-011 失败、取消与熔断 | 本包 `host-policy.test.mjs`（`STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode`、`STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in`、`STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract`、`STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup`）+ 本包 `commit-promotion.test.mjs`（`STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing` fail-closed 行） | MOVE | `node --test requirements/speculative-investigation/tests/host-policy.test.mjs` |
 | SPEC-INV-012 模型不可见、系统可审计 | `requirements/speculative-investigation/tests/invisibility.test.mjs`（`STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance`）+ `requirements/speculative-investigation/tests/projection-algebra.test.mjs`（`STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place`） | REUSE | `node --test requirements/speculative-investigation/tests/invisibility.test.mjs` |
+| SPEC-INV-013 DryRun visible nonblocking shadow | `requirements/speculative-investigation/tests/dry-run-shadow.test.mjs`：DryRun branch uses distinct `StartDryRun` without awaiting decision terminal；runtime creates/registers real child and observes independently；zero Prepared/Promoted/message replacement；owner cancel still aborts child | NEW / FROZEN | **FROZEN；按用户要求未执行** |
 
 补充 REUSE 交叉引用（非本包命题落点，供追踪）：
 
@@ -30,6 +31,10 @@
   GARBAGE ratchet，owner `session-ontology`。
 - `requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*`（K2 恰好两轮、第 3 轮物理不外发、
   `StrengthCandidatePrepared=0`）→ `verification-system` MECHANISM（HOW.md §8 交叉引用）。
+
+## GAP
+
+- `GAP-015` —— **CLOSED**：production DryRun 已改为 distinct `StartDryRun`：真实 `CreateChildSession` / `registerReplica` / Detached OpenCode execution，owner 只等待物理 child bootstrap 后立即继续；terminal/deadline 在独立 observation task 中结束；DryRun 不 Prepared/Promoted、不映射回 owner。落点 `dry-run-shadow.test.mjs` **FROZEN 未执行**。
 
 ## Semantic anchor ids
 
@@ -52,6 +57,5 @@ anchor，应在 `ROLE_SEMANTIC_ANCHORS` 声明并在此登记。
 
 ## 验证状态
 
-- 4 个 MOVE 文件单跑绿：`authority-policy` 13 pass、`commit-promotion` 3 pass、
-  `host-policy` 5 pass、`turn-evidence` 1 pass（2026-08-14）。
-- 全部 strength 测试已为本包自有（`tests/`），由 `node requirements/verification-system/tests/run.mjs` 覆盖。
+- 既有历史验证记录保留：4 个 MOVE 文件曾单跑绿（`authority-policy` 13、`commit-promotion` 3、`host-policy` 5、`turn-evidence` 1；2026-08-14）。
+- 本轮 `SPEC-INV-013` DryRun oracle 为新增冻结测试：**按用户要求未执行**；本次不声称新的全量/单跑结果。

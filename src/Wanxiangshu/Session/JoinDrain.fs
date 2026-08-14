@@ -355,3 +355,25 @@ module JoinDrain =
                 drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) (fun () ->
                     AgentJournal.handleProjection durable parentId)
         }
+
+    /// Fission lane join: consume only completion cells whose logical active-run
+    /// affinity belongs to this present. Candidates not accepted by the predicate
+    /// stay untouched and remain joinable for their owning lane.
+    let drainFromJournalWhere
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (maxCount: int)
+        (completedAt: DateTimeOffset)
+        (accept: HandleRecord -> bool)
+        : Task<Result<RunCompletion list, ForkError>> =
+        let filtered () =
+            let projection = AgentJournal.handleProjection durable parentId
+            { projection with Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
+
+        task {
+            do! reconcileFalseAborts durable parentId
+            let projection = filtered ()
+
+            return!
+                drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
+        }

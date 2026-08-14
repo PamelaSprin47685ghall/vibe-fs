@@ -19,10 +19,9 @@ module CasebookTools =
             []
         else
             try
-                let raw, store =
-                    WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
+                let store = WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
 
-                [ FetchTool.spec factory workspaceRoot store raw
+                [ FetchTool.spec factory workspaceRoot store
                   JsBookkeeperTool.spec factory ]
             with _ ->
                 []

@@ -9,7 +9,7 @@ open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 
 /// The only raw Host boundary for the GrandRewrite Magic Todo account.
-/// Provider input is `{ obligations: [{ name, work }] }`; the built-in Host
+/// Provider input is `{ planComplete: bool, obligations: [{ name, work }] }`; the built-in Host
 /// executor still receives its legacy `{ todos: [{ content,status,priority }] }`
 /// sink shape. New provider semantics never round-trip through that sink.
 module MagicTodoHostCodec =
@@ -19,6 +19,9 @@ module MagicTodoHostCodec =
 
     [<Emit("typeof $0 === 'string'")>]
     let private isString (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'boolean'")>]
+    let private isBoolean (value: obj) : bool = jsNative
 
     [<Emit("JSON.parse($0)")>]
     let private parseJson (json: string) : obj = jsNative
@@ -45,8 +48,12 @@ module MagicTodoHostCodec =
         | Error error, _
         | _, Error error -> Error error
 
-    let tryDecodeObligations (args: obj) : Result<MagicTodo.ObligationList, string> =
-        if isNull args || isNull args?obligations then
+    let tryDecodeInput (args: obj) : Result<MagicTodo.TodoWriteInput, string> =
+        if isNull args || isNull args?planComplete then
+            Error "todowrite.planComplete is required"
+        elif not (isBoolean args?planComplete) then
+            Error "todowrite.planComplete must be a boolean"
+        elif isNull args?obligations then
             Error "todowrite.obligations is required"
         elif not (isArray args?obligations) then
             Error "todowrite.obligations must be an array"
@@ -55,7 +62,12 @@ module MagicTodoHostCodec =
 
             let rec decode remaining acc seen =
                 match remaining with
-                | [] -> Ok(List.rev acc)
+                | [] ->
+                    let decoded: MagicTodo.TodoWriteInput =
+                        { PlanComplete = unbox<bool> args?planComplete
+                          Obligations = List.rev acc }
+
+                    Ok decoded
                 | row :: tail ->
                     match decodeObligationRow row with
                     | Error error -> Error error
@@ -101,7 +113,10 @@ module MagicTodoHostCodec =
 
     let replaceEnrichedResult (output: obj) (text: string) = output?output <- box text
 
-    let private applyObligationDescriptions (lang: ProviderLanguage) (schema: obj) =
+    let private applyDescriptions (lang: ProviderLanguage) (schema: obj) =
+        schema?properties?planComplete?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.PlanCompleteDescription Map.empty)
+
         let items: obj = schema?properties?obligations?items
         let properties: obj = items?properties
 
@@ -115,8 +130,8 @@ module MagicTodoHostCodec =
         let parameters = parseJson MagicTodoSurface.todoWriteJsonSchema
         let jsonSchema = parseJson MagicTodoSurface.todoWriteJsonSchema
 
-        applyObligationDescriptions lang parameters
-        applyObligationDescriptions lang jsonSchema
+        applyDescriptions lang parameters
+        applyDescriptions lang jsonSchema
 
         output?description <- box (ProviderProse.render lang MagicTodoSurface.Path.TodoWriteDescription Map.empty)
 

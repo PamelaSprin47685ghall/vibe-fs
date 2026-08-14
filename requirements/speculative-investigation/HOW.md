@@ -31,7 +31,7 @@ src/Wanxiangshu/Domain/
                            （wrong run / NoOutput / TransportOnly → 不 Promote）
 
 src/Wanxiangshu/Application/Strength/
-  StrengthDurabilityPort.fs    Application 只依赖的 typed port（EventStore/GitRawStore 只在 Persist）
+  StrengthDurabilityPort.fs    Application 只依赖 typed port（local EventStore / PayloadRef 物理只在 Persist）
   StrengthLifecycle.fs         reconcileEvent（ReconciledTurn → Promotion/Abandoned）；replayPlans；
                                needsRawReplay（以 Companion coverage 判退休）；replayIntents
   StrengthReplicaRuntime.fs    decision-local InternalLeaf 物理资源 + request budget + fuse gate
@@ -57,8 +57,9 @@ StrengthReplay → XTraceCapture → Companion → XWire → EnforcerHost → St
 
 - `StrengthReplay` 只读 durable Promoted view，把 frame 插在 TargetProviderRun 对应 assistant
   output 之前；Candidate 永不早期 replay。
-- `StrengthSpeculate` 在 post-Enforcer view 上先冻结 `ProviderSemanticProjection`，再决定/运行
-  Replica，最后只为当前唯一 TargetProviderRun 声明 Candidate insertion。
+- `StrengthSpeculate` 在 post-Enforcer view 上先冻结 `ProviderSemanticProjection`。Treatment 路径可等待
+  Replica 并声明 Candidate insertion；**DryRun 路径只启动真实、OpenCode 可见的 Replica 后立即返回**，
+  不等待 Replica terminal/deadline，也不声明 Candidate。
 
 ## 2. Opportunity → Decision 管线
 
@@ -78,7 +79,8 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 
 ## 3. Replica request loop（决策内）
 
-1. 解析 same-role fast peer；创建/复用仅当前 decision 的 `InternalLeaf × Attached(StrengthReplica)`。
+1. 解析 same-role fast peer；创建/复用仅当前 decision 的 `InternalLeaf × Attached(StrengthReplica)`。Host 必须
+   以普通 child/session 表面把该 physical execution 暴露给 OpenCode 用户；“internal”不等于 UI 隐藏。
 2. **继承** owner `SessionPersona` / `SessionProviderLanguage`；只换 ExecutionBinding
    （`fast-<owner-role>`）。禁止新建 Persona、重写 system 身份字节、换世界语。
 3. `ProviderRequestKind.StrengthReplica` profile；tool schema 从 `ToolCapabilitySet` 生成，
@@ -92,9 +94,14 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 6. 请求计数达 K 后，在下一 transform/reconcile 边界停止并 retire，禁止 K+1 外发。text-only
    completion 丢弃正文并停止；之前完整 batch 可保留。
 7. owner cancellation 立即 abort/retire leaf。Replica provider/tool 普通失败不进入 owner fallback。
+8. **DryRun scheduling**：`StrengthSpeculate` 只负责 `StartDryRun` 并确认 child 已成功注册/启动；其后 request loop
+   由 `StrengthReplicaRuntime`/Host lifecycle 独立推进，terminal/budget timeout 只结束该 observation。owner transform
+   不 `let!` / await DryRun Task。Treatment 仍使用需要结果的 awaitable decision API。
 
 ## 4. Frame canonicalization 与 durable 事实
 
+- **DryRun 永远停在 observation**：可以收集 batch/diagnostics 供用户和 Host 审计，但不调用 Prepared/Promoted/
+  replay pipeline，不把 frame 映射回 owner。下面 Candidate/Promotion 流程只属于 Treatment。
 - 每个 exchange 规范化为 `ToolName + CanonicalArguments + CanonicalResult`；batch 保留
   `RequestOrdinal`，exchange 保留 stable ordinal。semantic digest 对去 wire-id 的 canonical
   bundle 计算。owner synthetic ToolCallId 由 `ownerSessionId + decisionId + requestOrdinal +
@@ -127,7 +134,8 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 
 | 崩溃点 | 行为 |
 |---|---|
-| Replica 尚未 Prepared | 重启丢弃，只读副作用为零 |
+| DryRun 正在执行 | owner 不依赖其 terminal；进程退出即自然丢弃 observation，已无 semantic promotion |
+| Treatment Replica 尚未 Prepared | 重启丢弃，只读副作用为零 |
 | Prepared durable、target 未消费 | 同 run + 同 AnchorDigest 重放同 Candidate；run 明确终止且未消费 → Abandoned |
 | provider 已产出可用 output、Promotion 前 crash | reconcile 以 ProviderRunIdentity 补 Promotion；Failed/Aborted 不补 |
 | Promoted、XTrace 未捕获 | StrengthReplay 重建 |
@@ -166,9 +174,9 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 - **`archive/docs/why/loop.md` / `archive/docs/{what,how,proof}/loop.md`**：loop 主题是退化循环检测
   （`degeneration-guard`），全篇 grep `speculat/投机/strength` 零命中——无本包可吸收的
   speculation 内容，弃权。
-- **dry-run / e2e**：`requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 是 Host
-  request-budget 的物理证明（K2 恰好两轮、第 3 轮不外发、`StrengthCandidatePrepared=0`），
-  归 `verification-system` MECHANISM，本包 PROOF 交叉引用。
+- **dry-run / e2e**：DryRun 定义现为“real + OpenCode-visible + owner-nonblocking + zero-promotion”。
+  `requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 继续证明 K2 物理 request budget；
+  本包新增 frozen unit contract 证明 owner continuation 不等待 unresolved Replica deadline，且 DryRun 不 Prepared/Promoted。
 - **GARBAGE 结论**：旧稿 `FrameBundleRef` / `PredictorSnapshotRef` / Journal NDJSON /
   RuntimePath blob 类型名已被存储收口删除（archive/changes/completed/strength.md §二十二）——只留
   EventStore `payload_refs`；不进入 WHAT。

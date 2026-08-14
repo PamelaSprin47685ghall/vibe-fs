@@ -1,13 +1,13 @@
 namespace Wanxiangshu.Infrastructure.Git
 
 open System
-open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Infrastructure.Persist
 
-/// reference-transaction + pre-push shim (§14 / §15 / §20 / §21).
-/// Converge protocol is injected — HookDispatcher never fetches or merges itself.
+/// DURABLE-CONVERGENCE-008. Product startup only ENSURES the Git hook membrane.
+/// Actual full bidirectional convergence runs later in an independent Git-hook
+/// process through resources/git/wanxiang-hook.mjs + HookSync.
 [<RequireQualifiedAccess>]
 module HookDispatcher =
 
@@ -20,27 +20,6 @@ module HookDispatcher =
     [<Literal>]
     let IncompleteDiagnosis = "Git integration incomplete"
 
-    type ConvergeFull = string -> Task<Result<StoreSnapshot, ConvergeError>>
-
-    type ConvergeObserved = string -> StoreSnapshot -> Task<Result<StoreSnapshot, ConvergeError>>
-
-    type HookDispatcherDeps =
-        { ConvergeFull: ConvergeFull
-          ConvergeObserved: ConvergeObserved
-          SyncRemote: string }
-
-    type ReferenceUpdate =
-        { RefName: string
-          OldOid: string option
-          NewOid: string option
-          IsCommitted: bool }
-
-    type HookDispatchResult =
-        | NoOp of reason: string
-        | Converged of StoreSnapshot
-        | Failed of ConvergeError
-        | Incomplete of diagnosis: string
-
     type HookKind =
         | ReferenceTransaction
         | PrePush
@@ -50,110 +29,6 @@ module HookDispatcher =
         | AlreadyOwned
         | ForeignHook of path: string
         | DiagnoseIncomplete of reason: string
-
-    let isSyncActive () : bool =
-        Environment.GetEnvironmentVariable SyncActiveEnv = "1"
-
-    [<Emit("process.env[$0] = $1")>]
-    let private setEnv (key: string) (value: string) : unit = jsNative
-
-    [<Emit("delete process.env[$0]")>]
-    let private clearEnv (key: string) : unit = jsNative
-
-    /// Test helper: set recursion guard, run, restore prior value.
-    let withSyncActive (action: unit -> 'a) : 'a =
-        let previous = Environment.GetEnvironmentVariable SyncActiveEnv
-
-        try
-            setEnv SyncActiveEnv "1"
-            action ()
-        finally
-            if isNull previous then
-                clearEnv SyncActiveEnv
-            else
-                setEnv SyncActiveEnv previous
-
-    let createDeps
-        (convergeFull: ConvergeFull)
-        (convergeObserved: ConvergeObserved)
-        (syncRemote: string)
-        : HookDispatcherDeps =
-        { ConvergeFull = convergeFull
-          ConvergeObserved = convergeObserved
-          SyncRemote =
-            if String.IsNullOrWhiteSpace syncRemote then
-                "origin"
-            else
-                syncRemote }
-
-    let private isAbsentOid (oid: string option) : bool =
-        match oid with
-        | None -> true
-        | Some value when String.IsNullOrWhiteSpace value -> true
-        | Some value -> value |> Seq.forall (fun ch -> ch = '0')
-
-    let private observedSnapshot (oid: string) : StoreSnapshot =
-        { RootOid = RootOid.create (GitObjectId.create oid) }
-
-    let private mapConverge (result: Result<StoreSnapshot, ConvergeError>) : HookDispatchResult =
-        match result with
-        | Ok snapshot -> Converged snapshot
-        | Error error -> Failed error
-
-    let private matchingStoreUpdate (syncRemote: string) (update: ReferenceUpdate) : string option =
-        if not update.IsCommitted then
-            None
-        elif update.RefName <> StoreRef.remoteTracking syncRemote then
-            None
-        elif isAbsentOid update.NewOid then
-            None
-        else
-            update.NewOid
-
-    /// reference-transaction: store remote-tracking committed tip → ConvergeObserved only (§14).
-    let onReferenceTransaction (deps: HookDispatcherDeps) (updates: ReferenceUpdate list) : Task<HookDispatchResult> =
-        task {
-            if isSyncActive () then
-                return NoOp "recursion guard"
-            else
-                match updates |> List.choose (matchingStoreUpdate deps.SyncRemote) |> List.tryLast with
-                | None -> return NoOp "no store remote-tracking update"
-                | Some oid ->
-                    let! result = deps.ConvergeObserved deps.SyncRemote (observedSnapshot oid)
-                    return mapConverge result
-        }
-
-    /// pre-push: full bidirectional ConvergeFull before user push continues (§15).
-    let onPrePush (deps: HookDispatcherDeps) (remote: string) : Task<HookDispatchResult> =
-        task {
-            if isSyncActive () then
-                return NoOp "recursion guard"
-            else
-                let target =
-                    if String.IsNullOrWhiteSpace remote then
-                        deps.SyncRemote
-                    else
-                        remote
-
-                let! result = deps.ConvergeFull target
-                return mapConverge result
-        }
-
-    let private containsOwnershipMarker (body: string) : bool =
-        // Avoid IndexOf(..., StringComparison): Fable maps the enum to fromIndex.
-        body.Contains OwnershipMarker
-
-    /// Pure ownership probe (no filesystem). None = would install.
-    let classifyExistingHook (existingBody: string option) : HookInstallVerdict =
-        match existingBody with
-        | None -> Installed
-        | Some body when containsOwnershipMarker body -> AlreadyOwned
-        | Some _ -> ForeignHook ""
-
-    let private hookFileName (kind: HookKind) : string =
-        match kind with
-        | ReferenceTransaction -> "reference-transaction"
-        | PrePush -> "pre-push"
 
     [<Import("existsSync", "node:fs")>]
     let private existsSync (path: string) : bool = jsNative
@@ -170,21 +45,47 @@ module HookDispatcher =
     [<Import("join", "node:path")>]
     let private joinPath (left: string) (right: string) : string = jsNative
 
-    let private tryReadHook (path: string) : string option =
-        if existsSync path then
-            Some(readFileSync path "utf8")
-        else
-            None
+    [<Import("dirname", "node:path")>]
+    let private dirname (path: string) : string = jsNative
 
-    let private writeShim (path: string) (shimBody: string) : unit =
-        writeFileSync path shimBody (createObj [ "encoding", box "utf8"; "mode", box 0o755 ])
+    [<Import("fileURLToPath", "node:url")>]
+    let private fileURLToPath (url: string) : string = jsNative
+
+    [<Emit("import.meta.url")>]
+    let private importMetaUrl: string = jsNative
+
+    [<Emit("process.execPath")>]
+    let private nodeExecutable: string = jsNative
+
+    let private hookFileName =
+        function
+        | HookKind.ReferenceTransaction -> "reference-transaction"
+        | HookKind.PrePush -> "pre-push"
+
+    let private hookRunnerArgument =
+        function
+        | HookKind.ReferenceTransaction -> "reference-transaction"
+        | HookKind.PrePush -> "pre-push"
+
+    let private tryReadHook path =
+        if existsSync path then Some(readFileSync path "utf8") else None
+
+    let private containsOwnershipMarker (body: string) = body.Contains OwnershipMarker
+
+    let classifyExistingHook (existingBody: string option) : HookInstallVerdict =
+        match existingBody with
+        | None -> Installed
+        | Some body when containsOwnershipMarker body -> AlreadyOwned
+        | Some _ -> ForeignHook ""
+
+    let private writeShim path body =
+        writeFileSync path body (createObj [ "encoding" ==> "utf8"; "mode" ==> 0o755 ])
 
         try
             chmodSync path 0o755
         with _ ->
             ()
 
-    /// Install Wanxiang shim when safe; never overwrite foreign hooks (§20 / §3.3).
     let installOrDiagnose (hooksDir: string) (kind: HookKind) (shimBody: string) : HookInstallVerdict =
         if not (containsOwnershipMarker shimBody) then
             DiagnoseIncomplete(sprintf "%s: shim body missing ownership marker" IncompleteDiagnosis)
@@ -198,9 +99,94 @@ module HookDispatcher =
             | AlreadyOwned ->
                 writeShim path shimBody
                 AlreadyOwned
-            | ForeignHook _ -> DiagnoseIncomplete(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
+            | ForeignHook _ -> ForeignHook path
             | DiagnoseIncomplete reason -> DiagnoseIncomplete reason
 
-    /// Canonical shim header body fragment (tests / install callers embed this).
-    let shimHeaderComment: string =
-        sprintf "# %s\n# ownership: Wanxiangshu HookDispatcher — do not replace with unrelated hooks" OwnershipMarker
+    let shimHeaderComment =
+        sprintf "# %s\n# ownership: Wanxiangshu HookDispatcher" OwnershipMarker
+
+    let private shellQuote (value: string) =
+        "'" + value.Replace("'", "'\"'\"'") + "'"
+
+    /// Compiled HookDispatcher lives at dist/Infrastructure/Git. The independently
+    /// shipped runner lives at resources/git under the same package root.
+    let private runnerPath () =
+        let here = dirname (fileURLToPath importMetaUrl)
+        let packageRoot = dirname (dirname (dirname here))
+        joinPath (joinPath (joinPath packageRoot "resources") "git") "wanxiang-hook.mjs"
+
+    let private shimBody kind =
+        String.concat
+            "\n"
+            [ "#!/bin/sh"
+              shimHeaderComment
+              sprintf "if [ \"${%s:-}\" = \"1\" ]; then exit 0; fi" SyncActiveEnv
+              sprintf
+                  "exec %s %s %s \"$@\""
+                  (shellQuote nodeExecutable)
+                  (shellQuote (runnerPath ()))
+                  (hookRunnerArgument kind)
+              "" ]
+
+    let private hooksDirectory workspace =
+        GitSubject.execIn workspace [| "rev-parse"; "--path-format=absolute"; "--git-path"; "hooks" |]
+        |> fun value -> value.Trim()
+
+    let private remotes workspace =
+        let output = GitSubject.execIn workspace [| "remote" |]
+
+        output.Split('\n')
+        |> Array.map (fun value -> value.Trim())
+        |> Array.filter (String.IsNullOrWhiteSpace >> not)
+        |> Array.toList
+
+    let private remoteFetchSpecs workspace remote =
+        try
+            let output =
+                GitSubject.execIn workspace [| "config"; "--get-all"; sprintf "remote.%s.fetch" remote |]
+
+            output.Split('\n')
+            |> Array.map (fun value -> value.Trim())
+            |> Array.filter (String.IsNullOrWhiteSpace >> not)
+            |> Array.toList
+        with _ ->
+            []
+
+    let private ensureRemoteStoreFetchRefspec workspace remote =
+        let expected = sprintf "+%s:%s" StoreRef.canonical (StoreRef.remoteTracking remote)
+
+        if remoteFetchSpecs workspace remote |> List.contains expected then
+            ()
+        else
+            GitSubject.execIn
+                workspace
+                [| "config"; "--add"; sprintf "remote.%s.fetch" remote; expected |]
+            |> ignore
+
+    /// Startup-only ensure. There is intentionally no fetch/pull/push here.
+    /// Both installed hooks later launch the same standalone FULL converge path.
+    let ensure (workspace: string) : Result<unit, string> =
+        try
+            let hooksDir = hooksDirectory workspace
+
+            let verdicts =
+                [ HookKind.ReferenceTransaction; HookKind.PrePush ]
+                |> List.map (fun kind -> kind, installOrDiagnose hooksDir kind (shimBody kind))
+
+            match
+                verdicts
+                |> List.tryPick (fun (_, verdict) ->
+                    match verdict with
+                    | ForeignHook path -> Some(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
+                    | DiagnoseIncomplete reason -> Some reason
+                    | Installed
+                    | AlreadyOwned -> None)
+            with
+            | Some error -> Error error
+            | None ->
+                for remote in remotes workspace do
+                    ensureRemoteStoreFetchRefspec workspace remote
+
+                Ok()
+        with ex ->
+            Error(sprintf "%s: %s" IncompleteDiagnosis ex.Message)

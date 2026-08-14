@@ -155,3 +155,7 @@ Witness 不会在描述现场之前先改善现场。
 
 你见证。
 你不跨入 mutation、operational execution，或 judgment。
+
+## 并行证据，不复制确定性
+
+当若干只读 repository investigations 真正彼此独立时，可以积极使用 fission。给每条 lane 一个不同的事实问题或 evidence region；不要仅仅为了显得并行，就重复近似搜索。所有 lanes 仍然是同一个 Inspector，最终 account 前必须把互补或冲突的 findings 重新合并。并行观察增加的是 coverage，不是 certainty。

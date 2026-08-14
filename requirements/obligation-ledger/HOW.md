@@ -2,27 +2,63 @@
 
 行为合同见 `WHAT.md`（OBLIGATION-LEDGER-001..026）。本文件只描述实现模型与约束，非 normative。
 
-## 1. 模块地图
+## 1. 目标模块地图（本次大修）
 
-| 模块 | 职责 | 命题 |
-|---|---|---|
-| `src/Wanxiangshu/Domain/MagicTodo.fs` | `TodoWriteInput={planComplete,obligations}`、Obligation wire、单调 commitment 推导、validate/admission 纯函数 | 001-009、016/021 |
-| `src/Wanxiangshu/Domain/MagicTodoAdmission.fs` | `admitObligations`：FreshPrepare / IdempotentReplay / 拒绝分型 | 007/008/025 |
-| `src/Wanxiangshu/Domain/MagicTodoFacts.fs` | `TodoWritePrepared` / `TodoWriteAccepted` / `DedicatedTodoReviewerEnlisted` / `TodoProcessReviewAssigned` / `TodoReviewConcluded` / `LegacyTodoSeedAdopted` 等事实 | 008/010/012/019 |
-| `src/Wanxiangshu/Domain/MagicTodoAfter.fs` | `assignmentDelivery`（dedicated reviewer 首个 checkpoint = AgentOwnerRoot；重试等 XTrace head；后续 = Continuation） | 020/026 |
-| `src/Wanxiangshu/Domain/MagicTodoObligationCodec.fs` | obligations wire codec（与 tool.definition 同源） | 002/024 |
-| `src/Wanxiangshu/Domain/MagicTodoSurface.fs` | Manager-only guideline / compatibility TodoTable sink 投影 | 003/015/023 |
-| `src/Wanxiangshu/Domain/MagicTodoProcessReview.fs` | Rk 派生与 verdict/conclusion 关系 | 012-014 |
-| `src/Wanxiangshu/Domain/MagicTodoPrefixEpoch.fs` | desired cutoff 推导（effective committed Accepted 子链） | 021 |
-| `src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs` | before/after hook overlay；Diagnostic.fatal 分型 | 007-009/024-026 |
-| `src/Wanxiangshu/Application/Reconciliation/MagicTodoLocality.fs` | `LocalizedToolCall` / `materializeInput`（snapshot 定位与 materialization） | 025 |
-| `src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs` | ensureReview / ConsumableReview 判定 | 012-014 |
-| `src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs` | dedicated reviewer session 续跑 / assignment | 020 |
-| `src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs` | provider schema / 富化 result 渲染 | 024/026 |
-| `src/Wanxiangshu/Journal/MagicTodoProjection.fs` | fold：`CurrentObligationsRef = Some(cp.ProposedTodoRef, cp.ProposedTodoDigest)`（唯一 Current writer）、Checkpoints、conclusion gate | 010-015 |
-| `src/Wanxiangshu/Journal/MagicTodoFactCodec.fs` | MagicTodo 事实的 typed NDJSON codec | 008/018 |
+| 层 | 模块 | 职责 | 命题 |
+|---|---|---|---|
+| Domain | `src/Wanxiangshu/Domain/MagicTodo.fs` | Obligation / provider input 值对象、纯 validation、identity、纯 decision；不得读 Journal/Host | 001-009/016 |
+| Domain | `src/Wanxiangshu/Domain/MagicTodoFacts.fs` | 只定义已发生事实：Prepared/Accepted/reviewer/legacy seed；不定义 Stage/NextAction | 008/010/012/018/019 |
+| Domain | `src/Wanxiangshu/Domain/MagicTodoObligationCodec.fs` | provider/blob wire codec；外部协议解码，不解释业务流程 | 002/024 |
+| Journal | `src/Wanxiangshu/Journal/MagicTodoProjection.fs` | **O(1) 增量积分**：Current、pending review locator、first plan commitment、latest/previous committed checkpoint、dedicated reviewer locator；append 后单步 fold | 010-021 |
+| Journal | `src/Wanxiangshu/Journal/MagicTodoFactCodec.fs` | typed fact codec；boot 时可从 event history 重建 projection，但普通业务查询不得 replay | 008/018 |
+| Application | `src/Wanxiangshu/Application/Manager/ObligationLedgerWorkflow.fs` | **Direct F# `task {}` CE**：读取当前 projection facts → `let!/match` → 调用具名 capabilities → append facts；恢复调用同一入口 | 007-014/018/022/025/026 |
+| Application | `src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs` | record-ready / ConsumableReview CE；只读当前投影与 reviewer evidence | 012-014 |
+| Application | `src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs` | dedicated reviewer physical session 的复用/恢复；不拥有 ledger stage | 020 |
+| Infrastructure | `src/Wanxiangshu/Infrastructure/OpenCode/**` | Host hook / schema / JS compatibility effect shell：decode、materialize、调用 Application workflow、回写 result；**不拥有 business sequencing** | 024-026 |
 
-## 2. 关键算法（非 normative 摘要）
+现有 `Application/Reconciliation/MagicTodoMembrane.fs` 同时混合 Host adapter、Journal I/O、admission 与业务顺序；本次重构目标是把业务 CE 提升到 `Application/Manager/ObligationLedgerWorkflow.fs`，让 Infrastructure hook 只做 effect-shell 适配。若文件名保留，也必须缩退到薄 adapter，不得继续成为第二个 workflow owner。
+
+## 2. Direct CE 与增量 projection 形状（非 normative 摘要）
+
+### Direct CE（STRUCTURED-WORKFLOW-001/009 交叉）
+
+目标调用形状直接使用宿主语言控制流，不构造 Command/Reply AST，也不保存执行位置：
+
+```fsharp
+let submitCheckpoint ports input = task {
+    let! observed = ports.ReadCurrentFacts input.ManagerSessionId
+    match decideAdmission observed input with
+    | Rejected reason -> return Rejected reason
+    | Replay receipt -> return Replay receipt
+    | Fresh plan ->
+        let! prepared = ports.PrepareDurably plan
+        let! physical = ports.ExecuteHostSink prepared
+        let! accepted = ports.AcceptDurably prepared physical
+        do! ports.EnsureReview accepted
+        return Accepted accepted
+}
+```
+
+崩溃恢复不恢复到 `Prepare/Execute/Accept` 的某个 stage；而是 Boot Fold 得到当前事实后再次调用普通入口。Prepared/Accepted identity 令入口自然走 Replay/repair 分支。
+
+### O(1) commitment / lag-1 projection（DURABLE-EVENTS-013 交叉）
+
+每个 Life 的 projection 至少维护以下**已发生事实的 locator**，每次 fold 只基于旧 projection + 当前 event O(1) 更新：
+
+```text
+CurrentObligationsRef
+FirstAcceptedCheckpoint?         // once-set: first Accepted; reviewer first-delivery identity
+LatestAcceptedCheckpoint?        // current review / previous-review locator
+PendingReviewCheckpoint?
+FirstPlanCommitment?             // once-set: first Accepted whose Prepared declared true
+LatestCommittedCheckpoint?      // after FirstPlanCommitment, every later Accepted is effective committed
+PreviousCommittedCheckpoint?    // lag-1 cutoff without scanning history
+DedicatedReviewer?
+ReviewerLifeBySession            // reviewer-session -> ManagerLifeId reverse locator
+```
+
+`isPlanCommitted`、T1 Opening anchor、Finality admission、review delivery identity、latest ConsumableReview、desired committed cutoff 均只读这些 locator；process reviewer 反向找所属 Life 直接读 `ReviewerLifeBySession`，不得 `Map.tryPick` 全部 `ByLife`。`AcceptedOrder` / `AcceptedIds` 不再需要承担 production query；本次大修优先删除它们。若未来仅为审计重新引入历史序列，也不得成为热路径业务事实源，更不得每次 `find/filter/rev` 重建 commitment 子链。
+
 
 ### Accepted supersession（OBLIGATION-LEDGER-010）
 
@@ -57,11 +93,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 ### commitment latch / desired cutoff（OBLIGATION-LEDGER-016/021）
 
-`TodoWritePrepared.PlanCompleteDeclared` 保存 provider 原始 bool；projection 从 Accepted checkpoints 找到
-第一个 `true`，不另写 phase fact。`effectivePlanComplete = historicalTrue || submittedTrue`。
-Pre-T1 false checkpoints 不派生 TodoCheckpoint rebase；从 T1 起的 effective-true Accepted 子链按
-`desiredCutoff(current) = Before(previous committed checkpoint tool-call)` 推导。下一 attempt seal 前再由
-既有 `PrefixRebaseCommitted(EvidenceKind=TodoCheckpoint)` 原子提交。
+`TodoWritePrepared.PlanCompleteDeclared` 保存 provider 原始 bool；旧 payload 缺字段按 `true` migration decode（旧协议本身即 complete-plan contract）。`foldAccepted` 在 `FirstPlanCommitment=None && declared=true` 时 once-set T1 locator。之后每次 Accepted O(1) 推进 `PreviousCommittedCheckpoint/LatestCommittedCheckpoint`，所以 provider 后续声明 false 也无需扫描历史即可得到 effective true。Pre-T1 false checkpoints 不进入 committed lag-1 cutoff；T1 自身无 prior；之后 cutoff 直接读 `PreviousCommittedCheckpoint`。
 
 ## 3. 历史与弃权
 
@@ -76,14 +108,14 @@ Pre-T1 false checkpoints 不派生 TodoCheckpoint rebase；从 T1 起的 effecti
 | 第二套 PrefixEpoch / 平行 LWR renderer | 单一 SSOT（TODO-009/012） |
 | Host 按 `plan` / `survey` / `placeholder` 等关键词分类 planning work | 语义改由显式 `planComplete` 表达；Host 只校验 bool/call-shape，不猜自然语言 |
 
-### HOW —— 当前实现形状，非永久需求
+### HOW —— 目标实现形状，非永久需求
 
 | 内容 | 说明 |
 |---|---|
 | Host TodoTable compatibility sink（`content=name: work` / `status=in_progress` / `priority=medium`；reviewing 降级 in_progress） | **compatibility 不写成永久需求**。它是当前 Host V1 的兼容 UI 投影（HOST-023，canary D/I 冻结）；未来 sink 可整体替换，canonical 语义不变。sink 永不反推 canonical（OBLIGATION-LEDGER-015 是永久命题；sink 字段形态是 HOW） |
 | `todowrite` schema / `planComplete` / `name`/`work` 字段名 / T1 文案具体 wording | 当前 authoring surface；`provider-language` 拥有本地化字节，本包拥有 commitment 语义 |
 | `ReviewFrontier` / `ReviewWorkStartCursor` 的具体 cursor 算法 | 与 `semantic-trace`（cursor 表示）、`work-record`（LWR 有界）、`review-assurance`（assignment 范围）交界；本包只引用 |
-| bridge / `TodoWritePrepared` 的具体字段 | 当前事实形态；语义合同以 WHAT 为准 |
+| bridge / `TodoWritePrepared` 的具体字段 | 当前事实形态；bridge 只可搬运一次 Host effect-shell 的 ephemeral 数据，不得保存业务 stage；语义合同以 WHAT 为准 |
 | `MagicTodoManagerGuideline` / Planning Table / T1 revelation 的逐字文案 | `provider-language` / SURFACE-004 拥有冻结字节；本包只拥有账本语义（OBLIGATION-LEDGER-023/016） |
 
 ### 与邻域包的交界（引用不复制）
@@ -94,3 +126,5 @@ Pre-T1 false checkpoints 不派生 TodoCheckpoint rebase；从 T1 起的 effecti
 - `work-record`：ProcessReviewLWR 物化、三段标题、coverage 分型 → 引用其命题。
 - `prefix-stability`：PrefixRebaseCommitted / ActivePrefixEpoch → 引用其命题。
 - `effect-accounting`：physical success 的 Requested/Accepted 分型 → 引用其命题。
+- `structured-workflow`：Direct CE、无第二 runtime、无 durable program counter、Boot Fold 后重入普通 workflow → 本包必须消费这些法则，不复制新的控制抽象。
+- `durable-events`：普通查询 O(1) projection、append/publish 成功后才 fold → commitment/current/pending-review locator 必须增量维护。

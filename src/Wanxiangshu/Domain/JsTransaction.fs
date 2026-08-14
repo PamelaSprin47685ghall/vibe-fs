@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel.Identity
+
 /// DSL-class: DurableFact — JS-012/JS-013/JS-015: one staged mutation in a
 /// js-* program. `Rewrite` edits an existing file; `Create` writes a missing
 /// one (JS-008/009). The set of all mutations is the WriteSet; it commits
@@ -130,6 +132,28 @@ type JsTransactionPrepared =
 /// DSL-class: DurableFact — JS-012: the durable commit fact. Its presence
 /// after a Prepared fact is what makes the transaction committed.
 type JsTransactionCommitted = { TransactionId: JsTransactionId }
+
+/// Incremental recovery Current owned by the canonical Integrator. Pending holds
+/// exactly Prepared facts not yet followed by their matching Committed fact;
+/// Head is the current EventStore stream parent for the next transaction fact.
+type JsTransactionProjection =
+    { Head: EventId option
+      Pending: Map<JsTransactionId, JsTransactionPrepared> }
+
+module JsTransactionProjection =
+    let empty =
+        { Head = None
+          Pending = Map.empty }
+
+    let prepared (eventId: EventId) (value: JsTransactionPrepared) (projection: JsTransactionProjection) =
+        { Head = Some eventId
+          Pending = Map.add value.TransactionId value projection.Pending }
+
+    let committed (eventId: EventId) (value: JsTransactionCommitted) (projection: JsTransactionProjection) =
+        { Head = Some eventId
+          Pending = Map.remove value.TransactionId projection.Pending }
+
+    let pending projection = projection.Pending |> Map.toList |> List.map snd
 
 module JsTransactionFacts =
 

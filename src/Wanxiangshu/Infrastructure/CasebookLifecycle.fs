@@ -65,7 +65,7 @@ module CasebookLifecycle =
                     | Some a ->
                         try
                             let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                            let raw, store = WorkspaceEventStore.acquire commonDir
+                            let store = WorkspaceEventStore.acquire commonDir
                             let observations = collector.Drain inspectorSessionId
 
                             let lastQ =
@@ -94,10 +94,10 @@ module CasebookLifecycle =
                                       Observations = observations
                                       LastAccessOrder = 0L }
 
-                                match! CasebookWorkflow.finalizeCase store raw case with
+                                match! CasebookWorkflow.finalizeCase store case with
                                 | Ok() ->
                                     CasebookIndex.invalidate ()
-                                    let! _ = CasebookIndex.refresh store raw 256
+                                    let! _ = CasebookIndex.refresh store 256
                                     return Ok()
                                 | Error err -> return Error err
                         with ex ->
@@ -113,12 +113,12 @@ module CasebookLifecycle =
             else
                 try
                     let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                    let raw, store = WorkspaceEventStore.acquire commonDir
+                    let store = WorkspaceEventStore.acquire commonDir
 
-                    match! CasebookWorkflow.touchCaseAccess store raw sessionId with
+                    match! CasebookWorkflow.touchCaseAccess store sessionId with
                     | Ok() ->
                         CasebookIndex.invalidate ()
-                        let! _ = CasebookIndex.refresh store raw 256
+                        let! _ = CasebookIndex.refresh store 256
                         return ()
                     | Error _ -> return ()
                 with _ ->

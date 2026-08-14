@@ -14,7 +14,7 @@
 扫描 `requirements/` 全树，五个断言：
 
 ```text
-1. INDEX 45 包 × 5 文档（README/WHY/WHAT/HOW/PROOF）齐备
+1. INDEX 46 包 × 5 文档（README/WHY/WHAT/HOW/PROOF）齐备
 2. 每个 WHAT.md 标题定义的 <PACKAGE>-NNN 命题 ID 在 PROOF.md 表格中有行
 3. 每个 PROOF.md 落点引用的测试文件真实存在
 4. requirements/ 下无 INDEX 外包目录
@@ -51,7 +51,7 @@ archive/docs/README.md 导航精确覆盖正式文件（navigationProblems）
 
 ### 3. 树入口导航
 
-`requirements/README.md` 是 45 包树入口（迁移期与 `archive/docs/README.md` 同构承担导航）；导航文件
+`requirements/README.md` 是 46 包树入口（迁移期与 `archive/docs/README.md` 同构承担导航）；导航文件
 只路由不定义条款（REQUIREMENT-SYSTEM-005/007）。
 
 ## 依赖与理由

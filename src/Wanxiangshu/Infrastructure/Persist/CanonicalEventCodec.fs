@@ -66,7 +66,7 @@ module CanonicalEventCodec =
         else Error(StorageInvalid.IdentityCollision left.EventId)
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
-    /// Used by EventStoreMergeSpec (Wave B oracle) and materializeSnapshot.
+    /// This is a pure identity utility; writer-stream ordering belongs to EventKWayMerge.
     let mergeByIdentity (events: EventEnvelope list) : Result<EventEnvelope list, StorageInvalid> =
         let rec loop remaining (acc: Map<string, EventEnvelope * string>) =
             match remaining with

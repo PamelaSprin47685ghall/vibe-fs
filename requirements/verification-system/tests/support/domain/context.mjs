@@ -153,7 +153,7 @@ export const magicTodo = (() => {
     'blindPlanOpeningBoundary',
     'effectiveOpeningFloor',
     'bloggerEffectiveStart',
-    'requireCheckpointBeforeFirstSuicide',
+    'requirePlanCommitmentBeforeFirstSuicide',
   ])
 
   return {
@@ -183,7 +183,7 @@ export const magicTodo = (() => {
       ),
     effectiveOpeningFloor: (
       hasOpenLife,
-      acceptedCount,
+      planCommitted,
       openingSequence,
       t1CallSequence,
       t1CallIdValue,
@@ -192,7 +192,7 @@ export const magicTodo = (() => {
     ) => {
       const floor = m.effectiveOpeningFloor(
         hasOpenLife,
-        acceptedCount,
+        planCommitted,
         { Sequence: BigInt(openingSequence) },
         t1CallSequence == null ? undefined : { Sequence: BigInt(t1CallSequence) },
         t1CallIdValue == null ? undefined : toolCallId(t1CallIdValue),
@@ -207,6 +207,7 @@ export const magicTodo = (() => {
       )
       return floor == null ? undefined : Number(floor.Sequence)
     },
+    requirePlanCommitmentBeforeFirstSuicide: (committed) => m.requirePlanCommitmentBeforeFirstSuicide(committed),
     bloggerEffectiveStart: (ingestedThrough, workRecordStartSequence) =>
       Number(
         m.bloggerEffectiveStart(
@@ -278,6 +279,7 @@ export const magicTodoJournal = (() => {
     TodoProcessReviewAssigned: MagicTodoFactsModule.TodoProcessReviewAssigned,
     TodoReviewConcluded: MagicTodoFactsModule.TodoReviewConcluded,
     DedicatedTodoReviewerEnlisted: MagicTodoFactsModule.DedicatedTodoReviewerEnlisted,
+    DedicatedTodoReviewerReplaced: MagicTodoFactsModule.DedicatedTodoReviewerReplaced,
     LegacyTodoSeedAdopted: MagicTodoFactsModule.LegacyTodoSeedAdopted,
     XTraceCursor: XTraceModule.XTraceCursor,
   }
@@ -1397,8 +1399,8 @@ export const magicTodoMembrane = (() => {
   const m = bind(MagicTodoMembraneModule, 'MagicTodoMembrane', ['prepare', 'accept'])
 
   return {
-    prepare: async (journal, sessionIdValue, locality, inputDigest, obligations) =>
-      resultOf(await m.prepare(journal, sessionIdValue, locality, inputDigest, toList(obligations))),
+    prepare: async (journal, sessionIdValue, locality, inputDigest, planComplete, obligations) =>
+      resultOf(await m.prepare(journal, sessionIdValue, locality, inputDigest, planComplete, toList(obligations))),
     accept: async (journal, bridge, physicalEvidence, inputDigest, outputDigest) =>
       resultOf(await m.accept(journal, bridge, physicalEvidence, inputDigest, outputDigest)),
   }

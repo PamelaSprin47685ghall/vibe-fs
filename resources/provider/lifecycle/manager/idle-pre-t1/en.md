@@ -1,9 +1,7 @@
 The account is not yet ready to entrust.
 
-You have time.
-Make the road honest enough that another Manager would not have to guess what you omitted.
+You are still at the Planning Table. Keep the current planning work honest with `planComplete=false`: record the concrete investigation, analysis, decomposition, or decisions that still have to be closed before the road is trustworthy.
 
-Your first todowrite is the complete plan, not a schedule for making the plan.
-If you still need a plan of the plan, write that as text.
+Do not execute the road merely because planning has found executable work. Do not leave empty placeholders either.
 
-Write it with todowrite when it is ready.
+When the plan is genuinely complete enough to hand to another Manager, replace the account with the complete mission-debt road and set `planComplete=true`. That first accepted true is the irreversible commitment.

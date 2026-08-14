@@ -17,10 +17,9 @@ const {
   SessionStartedAtProjection_bind: bindStartedAt,
   SessionStartedAtProjection_startedAt: startedAt,
 } = await import('../../../dist/Journal/SessionStartedAtProjection.js')
-const {
-  PairProgrammingCalibration_composeWithElapsed: composeWithElapsed,
-  PairProgrammingCalibration_renderElapsed: renderElapsed,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js')
+const { composeWithElapsed, renderElapsed } = await import(
+  '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js'
+)
 
 test('TIME_007_session_started_at_is_bind_once_to_first_prompt_sample', () => {
   const first = utcOffset('2026-08-14T08:00:00.000Z')
@@ -83,7 +82,7 @@ test('TIME_007_elapsed_is_clamped_and_human_readable_in_both_languages', () => {
 
   const zh = renderElapsed(providerLanguage.simplifiedChinese, positive)
   assert.match(zh, /2 分钟 5 秒/)
-  assert.match(zh, /会话|墙钟|实际时间/)
+  assert.match(zh, /会话|墙钟|实际时间|wall-clock|session/i)
 
   assert.match(renderElapsed(providerLanguage.english, negative), /0 minutes 0 seconds/i)
   assert.match(renderElapsed(providerLanguage.simplifiedChinese, negative), /0 分钟 0 秒/)

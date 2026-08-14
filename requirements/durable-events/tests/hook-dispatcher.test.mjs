@@ -1,222 +1,83 @@
-// tests/unit/git/hook-dispatcher.test.mjs
-// Phase 3 Wave B — HookDispatcher: recursion guard + install ownership (§14/§15/§20/§21).
+// FROZEN — 2026-08-14. Rewritten for the shock-cut hook architecture.
+// Intentionally NOT executed before implementation.
+// DURABLE-EVENTS-018 / DURABLE-CONVERGENCE-008.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import test from 'node:test'
-import { caseOf, okResult, errorResult, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
+import { caseOf } from '../../verification-system/tests/support/domain.mjs'
+
 const Hook = await import('../../../dist/Infrastructure/Git/HookDispatcher.js')
-
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
-const SYNC_ENV = 'WANXIANG_GIT_SYNC_ACTIVE'
 const MARKER = 'wanxiang-hook-dispatcher'
-const OID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-const ZERO = '0000000000000000000000000000000000000000'
-
-const snapshot = (oid = OID) =>
-  new Persist.StoreSnapshot(Persist.RootOidModule_create(Persist.GitObjectIdModule_create(oid)))
-
-const update = ({
-  refName = Persist.StoreRef_remoteTracking('origin'),
-  oldOid = ZERO,
-  newOid = OID,
-  isCommitted = true,
-} = {}) => new Hook.ReferenceUpdate(refName, oldOid, newOid, isCommitted)
-
-const counters = () => {
-  const state = { full: 0, observed: 0, lastFullRemote: undefined, lastObserved: undefined }
-  const convergeFull = async (remote) => {
-    state.full += 1
-    state.lastFullRemote = remote
-    return okResult(snapshot('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'))
-  }
-  const convergeObserved = async (remote, observed) => {
-    state.observed += 1
-    state.lastObserved = { remote, oid: Persist.GitObjectIdModule_value(Persist.RootOidModule_value(observed.RootOid)) }
-    return okResult(snapshot('cccccccccccccccccccccccccccccccccccccccc'))
-  }
-  const deps = Hook.createDeps(convergeFull, convergeObserved, 'origin')
-  return { state, deps, convergeFull, convergeObserved }
-}
-
-const clearSyncEnv = () => {
-  delete process.env[SYNC_ENV]
-}
+const read = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
 const sandboxHooks = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hooks-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('GUARD_reference_transaction_noops_when_sync_active', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.withSyncActive(() =>
-    Hook.onReferenceTransaction(deps, toList([update()])),
-  )
-  assert.equal(caseOf(result), 'NoOp')
-  assert.equal(payloadOf(result), 'recursion guard')
-  assert.equal(state.full, 0)
-  assert.equal(state.observed, 0)
-  clearSyncEnv()
+test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
+  const source = read('src/Wanxiangshu/Infrastructure/Git/HookDispatcher.fs')
+  assert.match(source, /HookKind\.ReferenceTransaction/)
+  assert.match(source, /HookKind\.PrePush/)
+  assert.match(source, /remote\.%s\.fetch/)
+  assert.match(source, /StoreRef\.remoteTracking/)
+  assert.match(source, /let ensure .*Result<unit, string>/s)
+  assert.doesNotMatch(source, /WriterStreamSync|GitGateway\.converge|member _\.(Fetch|Pull|Push)/,
+    'startup ensure must install the membrane, not perform synchronization')
 })
 
-test('GUARD_pre_push_noops_when_sync_active', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.withSyncActive(() => Hook.onPrePush(deps, 'origin'))
-  assert.equal(caseOf(result), 'NoOp')
-  assert.equal(payloadOf(result), 'recursion guard')
-  assert.equal(state.full, 0)
-  assert.equal(state.observed, 0)
-  clearSyncEnv()
+test('HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
+  const dispatcher = read('src/Wanxiangshu/Infrastructure/Git/HookDispatcher.fs')
+  const sync = read('src/Wanxiangshu/Infrastructure/Git/HookSync.fs')
+  const runner = read('resources/git/wanxiang-hook.mjs')
+
+  assert.match(dispatcher, /resources\/git/)
+  assert.match(dispatcher, /WANXIANG_GIT_SYNC_ACTIVE/)
+  assert.match(sync, /runPrePush/)
+  assert.match(sync, /runReferenceTransaction/)
+  assert.match(sync, /converge remote None/)
+  assert.match(sync, /converge remote observed/)
+  assert.doesNotMatch(sync, /WorkspaceEventStore|CanonicalIntegrator|PluginHost|IEventStore/)
+  assert.match(runner, /reference-transaction/)
+  assert.match(runner, /pre-push/)
+  assert.doesNotMatch(runner, /WorkspaceEventStore|CanonicalIntegrator|PluginHost/)
 })
 
-test('REF_TX_matching_store_remote_tracking_calls_observed_only', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.onReferenceTransaction(deps, toList([update()]))
-  assert.equal(caseOf(result), 'Converged')
-  assert.equal(state.observed, 1)
-  assert.equal(state.full, 0)
-  assert.equal(state.lastObserved.remote, 'origin')
-  assert.equal(state.lastObserved.oid, OID)
-})
-
-test('REF_TX_unrelated_ref_is_noop', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.onReferenceTransaction(
-    deps,
-    toList([update({ refName: 'refs/heads/main' })]),
-  )
-  assert.equal(caseOf(result), 'NoOp')
-  assert.match(payloadOf(result), /no store remote-tracking/)
-  assert.equal(state.full, 0)
-  assert.equal(state.observed, 0)
-})
-
-test('REF_TX_uncommitted_state_is_ignored', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.onReferenceTransaction(
-    deps,
-    toList([update({ isCommitted: false })]),
-  )
-  assert.equal(caseOf(result), 'NoOp')
-  assert.equal(state.observed, 0)
-})
-
-test('PRE_PUSH_calls_full_only', async () => {
-  clearSyncEnv()
-  const { state, deps } = counters()
-  const result = await Hook.onPrePush(deps, 'origin')
-  assert.equal(caseOf(result), 'Converged')
-  assert.equal(state.full, 1)
-  assert.equal(state.observed, 0)
-  assert.equal(state.lastFullRemote, 'origin')
-})
-
-test('PRE_PUSH_maps_converge_error_to_Failed', async () => {
-  clearSyncEnv()
-  const cases = new Persist.ConvergeError(0, []).cases()
-  const err = new Persist.ConvergeError(cases.indexOf('Transport'), ['lease lost'])
-  const deps = Hook.createDeps(
-    async () => errorResult(err),
-    async () => okResult(snapshot()),
-    'origin',
-  )
-  const result = await Hook.onPrePush(deps, 'origin')
-  assert.equal(caseOf(result), 'Failed')
-  assert.equal(caseOf(payloadOf(result)), 'Transport')
-})
-
-test('CLASSIFY_absent_is_Installed', () => {
+test('HOOK_classification_preserves_foreign_hooks', () => {
   assert.equal(caseOf(Hook.classifyExistingHook(undefined)), 'Installed')
+  assert.equal(caseOf(Hook.classifyExistingHook(`# ${MARKER}\n`)), 'AlreadyOwned')
+  assert.equal(caseOf(Hook.classifyExistingHook('#!/bin/sh\necho foreign\n')), 'ForeignHook')
 })
 
-test('CLASSIFY_marker_is_AlreadyOwned', () => {
-  const body = readFileSync(join(FIXTURES, 'wanxiang-pre-push.sh'), 'utf8')
-  assert.ok(body.includes(MARKER))
-  assert.equal(caseOf(Hook.classifyExistingHook(body)), 'AlreadyOwned')
-})
-
-test('CLASSIFY_foreign_is_ForeignHook', () => {
-  const body = readFileSync(join(FIXTURES, 'foreign-pre-push.sh'), 'utf8')
-  assert.equal(body.includes(MARKER), false)
-  assert.equal(caseOf(Hook.classifyExistingHook(body)), 'ForeignHook')
-})
-
-test('INSTALL_absent_writes_shim', () => {
+test('HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
   const { dir, cleanup } = sandboxHooks()
   try {
-    const shim = readFileSync(join(FIXTURES, 'wanxiang-pre-push.sh'), 'utf8')
-    const verdict = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, shim)
-    assert.equal(caseOf(verdict), 'Installed')
-    const written = readFileSync(join(dir, 'pre-push'), 'utf8')
-    assert.ok(written.includes(MARKER))
-  } finally {
-    cleanup()
-  }
-})
+    const owned = `#!/bin/sh\n# ${MARKER}\nexit 0\n`
+    const installed = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, owned)
+    assert.equal(caseOf(installed), 'Installed')
+    assert.equal(readFileSync(join(dir, 'pre-push'), 'utf8'), owned)
 
-test('INSTALL_owned_is_idempotent_refresh', () => {
-  const { dir, cleanup } = sandboxHooks()
-  try {
-    const shim = readFileSync(join(FIXTURES, 'wanxiang-pre-push.sh'), 'utf8')
-    writeFileSync(join(dir, 'pre-push'), shim)
-    const refreshed = `${shim}\n# refreshed\n`
-    const verdict = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, refreshed)
-    assert.equal(caseOf(verdict), 'AlreadyOwned')
+    const refreshed = `${owned}# refreshed\n`
+    const refreshVerdict = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, refreshed)
+    assert.equal(caseOf(refreshVerdict), 'AlreadyOwned')
     assert.equal(readFileSync(join(dir, 'pre-push'), 'utf8'), refreshed)
+
+    const foreignDir = mkdtempSync(join(tmpdir(), 'wxs-hooks-foreign-'))
+    try {
+      const foreignPath = join(foreignDir, 'pre-push')
+      const foreign = '#!/bin/sh\necho foreign\n'
+      writeFileSync(foreignPath, foreign)
+      const verdict = Hook.installOrDiagnose(foreignDir, Hook.HookKind.PrePush, owned)
+      assert.equal(caseOf(verdict), 'ForeignHook')
+      assert.equal(readFileSync(foreignPath, 'utf8'), foreign)
+    } finally {
+      rmSync(foreignDir, { recursive: true, force: true })
+    }
   } finally {
     cleanup()
   }
-})
-
-test('INSTALL_foreign_diagnoses_incomplete_without_overwrite', () => {
-  const { dir, cleanup } = sandboxHooks()
-  try {
-    const foreign = readFileSync(join(FIXTURES, 'foreign-pre-push.sh'), 'utf8')
-    const path = join(dir, 'pre-push')
-    writeFileSync(path, foreign)
-    const shim = readFileSync(join(FIXTURES, 'wanxiang-pre-push.sh'), 'utf8')
-    const verdict = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, shim)
-    assert.equal(caseOf(verdict), 'DiagnoseIncomplete')
-    const reason = payloadOf(verdict)
-    assert.match(reason, /Git integration incomplete/)
-    assert.equal(reason.includes('acceleration disabled'), false)
-    assert.equal(readFileSync(path, 'utf8'), foreign)
-  } finally {
-    cleanup()
-  }
-})
-
-test('INSTALL_reference_transaction_absent', () => {
-  const { dir, cleanup } = sandboxHooks()
-  try {
-    const shim = readFileSync(join(FIXTURES, 'wanxiang-reference-transaction.sh'), 'utf8')
-    const verdict = Hook.installOrDiagnose(dir, Hook.HookKind.ReferenceTransaction, shim)
-    assert.equal(caseOf(verdict), 'Installed')
-    assert.ok(readFileSync(join(dir, 'reference-transaction'), 'utf8').includes(MARKER))
-  } finally {
-    cleanup()
-  }
-})
-
-test('SYNC_ENV_name_matches_shared_literal', () => {
-  clearSyncEnv()
-  assert.equal(Hook.isSyncActive(), false)
-  process.env[SYNC_ENV] = '1'
-  assert.equal(Hook.isSyncActive(), true)
-  clearSyncEnv()
-  assert.equal(Hook.isSyncActive(), false)
-  // Shared contract with GitGateway.SyncActiveEnv — same string, never rename alone.
-  assert.equal(SYNC_ENV, 'WANXIANG_GIT_SYNC_ACTIVE')
-  assert.ok(Hook.shimHeaderComment.includes(MARKER))
 })

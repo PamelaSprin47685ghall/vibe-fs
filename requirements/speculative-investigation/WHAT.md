@@ -242,3 +242,21 @@ features/score、cost estimate、promotion evidence 与 failure reason。Host-on
 投影规则 → `provider-projection`。
 
 **证据**：PROOF.md SPEC-INV-012 行（invisibility REUSE、projection-algebra REUSE）。
+
+## SPEC-INV-013：DryRun = 可见、真实、非阻塞、零 Promotion 的 shadow execution
+
+**规范陈述**：显式 DryRun 模式必须创建并运行真实 `StrengthReplica` physical child；该 child
+必须作为 OpenCode 中可观察的 attached/internal execution 出现在用户可见 session/transcript/tool
+activity 中。**owner 主路径不得等待 DryRun completion、budget deadline 或 terminal result**：
+Replica 成功启动后 owner provider transform 立即继续。DryRun 可真实执行 K1/K2 readonly provider/tool
+请求并记录 Host diagnostics，但其结果不得映射回 owner provider bytes，不得产生
+`StrengthCandidatePrepared` / `StrengthCandidatePromoted` / replay frame，也不得改变 owner fallback/
+repair/finality 状态。owner cancel/delete 仍级联取消该 child。
+
+**含义/动机**：Dry 的是 semantic influence，不是 physical execution。用户能直接观察 Strength 是否真的
+做了有价值的只读调查，同时一次 canary/实验永远不把 2500ms Replica deadline 加到 owner critical path。
+
+**边界**：Treatment 仍可因需要消费 Candidate 而等待有界结果；Shadow/K0 可完全不创建 Replica。
+OpenCode child 的可见性/attached ontology 归 `session-ontology`/Host，本命题只钉 Strength 对该能力的使用。
+
+**证据**：→ PROOF.md SPEC-INV-013。

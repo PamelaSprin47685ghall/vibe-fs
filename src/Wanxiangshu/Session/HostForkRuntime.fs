@@ -8,6 +8,7 @@ open Microsoft.FSharp.Control
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Host
 open Wanxiangshu.Process
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -59,6 +60,7 @@ type HostForkRuntime
     let ptyRuns = HashSet<string>()
     /// Provider TerminalName → PtyId. Occupied until Join delivers closure.
     let terminalByName = Dictionary<string, string>()
+    let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
@@ -84,6 +86,23 @@ type HostForkRuntime
     let childWorkRecordOf =
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
+    let convergedFissionWorkRecordOf (sessionId: SessionId) =
+        task {
+            match journal with
+            | None -> return None
+            | Some durable ->
+                match
+                    FissionProjection.tryLatestForOwner
+                        sessionId
+                        (AgentJournal.snapshot durable).AgentProjections.Fission
+                with
+                | Some { Terminal = FissionGroupTerminal.Converged(_, _, aggregateRef, aggregateDigest) } ->
+                    match! durable.Writer.BlobWriter.Read aggregateRef with
+                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value aggregateDigest -> return Some text
+                    | _ -> return None
+                | _ -> return None
+        }
+
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
@@ -106,7 +125,11 @@ type HostForkRuntime
                 // A PtyPort can be shared by multiple runtimes. Its sender fan-out
                 // must not turn another runtime's exit into this runtime's join.
                 runtime.PublishPtyCompletion item
-                runtime.UnregisterPty id)
+                runtime.UnregisterPty id
+
+                let observers = lock gate (fun () -> ptyCompletionObservers |> Seq.toList)
+                for observer in observers do
+                    try observer item with _ -> ())
     // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryWorkflow
     // RestoreHandles → HostForkRestart.restoreLinkedChildren is the sole path.
 
@@ -114,6 +137,26 @@ type HostForkRuntime
     member internal _.Children = children
     member internal _.PendingRuns = pendingRuns
     member internal _.PtyRuns = ptyRuns
+
+    /// Fission admission snapshot: existing external work belongs to the logical
+    /// owner and becomes broadcast completion sources. Snapshot identities only;
+    /// no completion is consumed here.
+    member _.SnapshotOutstandingAgentRuns() =
+        lock gate (fun () ->
+            pendingRuns.Values
+            |> Seq.filter (fun run -> not run.Finished)
+            |> Seq.map (fun run -> run.AgentId, run.ChildId)
+            |> Seq.toList)
+
+    member _.SnapshotOutstandingPtyRuns() =
+        lock gate (fun () -> ptyRuns |> Seq.toList)
+
+    member _.SubscribePtyCompletion(listener: PtyJoinItem -> unit) : IDisposable =
+        lock gate (fun () -> ptyCompletionObservers.Add listener)
+
+        { new IDisposable with
+            member _.Dispose() =
+                lock gate (fun () -> ptyCompletionObservers.Remove listener |> ignore) }
     member internal _.HandleOwnership = handleOwnership
     member internal _.DeferredFirstPrompts = deferredFirstPrompts
     member internal _.Clock = clockPort
@@ -217,7 +260,12 @@ type HostForkRuntime
         task {
             let! workRecord =
                 match outcome with
-                | TerminalOutcome.Completed _ -> childWorkRecordOf run.ChildId
+                | TerminalOutcome.Completed _ ->
+                    task {
+                        match! convergedFissionWorkRecordOf run.ChildId with
+                        | Some aggregate -> return Some aggregate
+                        | None -> return! childWorkRecordOf run.ChildId
+                    }
                 | _ -> Task.FromResult None
 
             do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord

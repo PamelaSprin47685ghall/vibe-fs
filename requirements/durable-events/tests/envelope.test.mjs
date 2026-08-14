@@ -297,6 +297,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'Blog',
     'BloggerCycles',
     'Companion',
+    'DelegatedToolEstimate',
     'Enforcement',
     'Fallback',
     'Guidelines',
@@ -306,6 +307,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'PromptAuthority',
     'ReviewGuard',
     'ReviewRequirements',
+    'SessionStartedAt',
     'TipDelivery',
     'XTrace',
   ])

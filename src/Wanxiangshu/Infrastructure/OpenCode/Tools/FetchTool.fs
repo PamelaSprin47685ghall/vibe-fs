@@ -72,11 +72,10 @@ module FetchTool =
         (language: ProviderLanguage)
         (workspaceRoot: string)
         (store: IEventStore)
-        (raw: IGitRawStore)
         (shelfmark: string)
         : System.Threading.Tasks.Task<string> =
         task {
-            match! CasebookIndex.resolve store raw 256 shelfmark with
+            match! CasebookIndex.resolve store 256 shelfmark with
             | Error _ -> return unavailable language
             | Ok None -> return noCase language
             | Ok(Some case) ->
@@ -88,9 +87,9 @@ module FetchTool =
                     do! CasebookLifecycle.touchAccess workspaceRoot sessionId
                     return fresh language case.A
                 | ReplayResult.Stale ->
-                    match! CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
+                    match! CasebookBookkeeper.refreshStale store workspaceRoot sessionId with
                     | Ok true ->
-                        match! CasebookWorkflow.fetchCase store raw 256 sessionId with
+                        match! CasebookWorkflow.fetchCase store 256 sessionId with
                         | Error _
                         | Ok None -> return stale language case.A
                         | Ok(Some updated) ->
@@ -105,7 +104,7 @@ module FetchTool =
                     | Error _ -> return stale language case.A
         }
 
-    let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) : ToolSpec =
+    let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
         { Name = "fetch"
           Description = prose (ProviderLanguageBinding.readGlobalPreference ()) Path.Description
           Arguments = [ "shelfmark", ToolHostCodec.stringSchema factory ]
@@ -126,7 +125,7 @@ module FetchTool =
                                     let work =
                                         task {
                                             try
-                                                return! runFetch language workspaceRoot store raw shelfmark
+                                                return! runFetch language workspaceRoot store shelfmark
                                             finally
                                                 lock fetchGate (fun () -> fetchInFlight.Remove shelfmark |> ignore)
                                         }

@@ -1061,13 +1061,9 @@ test('EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port', async (
       encoding: 'utf8',
     }).trim()
     const gitDirectory = isAbsolute(commonDirectory) ? commonDirectory : resolve(directory, commonDirectory)
-    // EventStore tip lives at refs/wanxiang/store — not wanxiangshu-next/*.ndjson.
-    const tip = execFileSync(
-      'git',
-      ['-C', gitDirectory, 'rev-parse', '--verify', '--quiet', 'refs/wanxiang/store'],
-      { encoding: 'utf8' },
-    ).trim()
-    assert.match(tip, /^[0-9a-f]{40}$/, 'EventStore canonical ref must be published')
+    // Runtime truth is process-local NDJSON under the Git common dir. A Git
+    // store ref is created only later by an external remote-operation hook.
+    assert.equal(existsSync(join(gitDirectory, 'wanxiang', 'events')), true)
     assert.equal(existsSync(join(gitDirectory, 'wanxiangshu-next', 'runtimes', `${runtime.runtimeId}.ndjson`)), false)
   })
 })

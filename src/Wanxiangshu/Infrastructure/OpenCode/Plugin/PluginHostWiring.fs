@@ -54,7 +54,7 @@ module PluginHostWiring =
                     match boot.Journal, workspaceDirectory with
                     | Some _, Some workspace ->
                         WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
-                        |> Option.map (fun (raw, store) -> StrengthDurability.create raw store)
+                        |> Option.map StrengthDurability.create
                     | _ -> None
 
                 // Causal wait bridge must stay on the root workspace so E2E

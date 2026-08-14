@@ -220,11 +220,11 @@ module FinalityTool =
 
                         let acceptSuicide (life: LifeProjection) =
                             task {
-                                let hasTodoWriteAccepted =
+                                let hasPlanCommitment =
                                     MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo
-                                    |> Option.exists (fun magic -> not (List.isEmpty magic.AcceptedOrder))
+                                    |> Option.exists MagicTodoProjection.isPlanCommitted
 
-                                match ManagerFinality.classifyEnding context.ToolCallId life hasTodoWriteAccepted with
+                                match ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment with
                                 | ManagerFinality.EndingDisposition.ContinuePlanning ->
                                     return refuse context Path.ContinueWorking
 

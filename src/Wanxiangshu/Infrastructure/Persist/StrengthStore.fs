@@ -230,29 +230,18 @@ module StrengthStore =
         | eventType when eventType = StrengthEventTypes.CandidateAbandoned -> decodeAbandoned envelope.Payload
         | other -> Error(sprintf "not a Strength event: %s" other)
 
-    /// Write raw bytes into the unified object database. The object may exist
-    /// before publication; it becomes durable semantic closure only once an
-    /// EventEnvelope PayloadRef reaches refs/wanxiang/store.
-    let storePayload (raw: IGitRawStore) (content: byte[]) : Task<PayloadRef> =
-        task {
-            let! oid = raw.WriteBlob content
-            return oid |> GitObjectId.value |> PayloadRef.create
-        }
-
-    let tryReadPayload (raw: IGitRawStore) (payloadRef: PayloadRef) : Task<byte[] option> =
-        raw.ReadObject(GitObjectId.create (PayloadRef.value payloadRef))
-
     let loadFrameBundle
-        (raw: IGitRawStore)
+        (store: IEventStore)
         (sha256: string -> string)
         (prepared: StrengthCandidatePrepared)
         : Task<Result<StrengthFrameBundle, string>> =
         task {
             match prepared.MaterialPayloads with
             | [ payloadRef ] ->
-                match! tryReadPayload raw payloadRef with
-                | None -> return Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
-                | Some bytes ->
+                match! store.ReadPayload payloadRef with
+                | Error error -> return Error error
+                | Ok None -> return Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
+                | Ok(Some bytes) ->
                     match decodeFrameBundlePayload sha256 bytes with
                     | Error error -> return Error error
                     | Ok bundle when bundle.Digest <> prepared.FrameDigest ->
@@ -268,95 +257,38 @@ module StrengthStore =
         (store: IEventStore)
         (sha256: string -> string)
         (event: StrengthEvent)
-        : Task<Result<StoreSnapshot, AppendError>> =
-        task {
-            let envelope = toEnvelope sha256 event
-            let! snapshot = store.OpenSnapshot()
-            return! store.Append(snapshot, [ envelope ])
-        }
+        : Task<Result<unit, AppendError>> =
+        store.Append [ toEnvelope sha256 event ]
 
-    /// PERSIST-002/007 + STRENGTH-006: construct opaque payload refs from bytes
-    /// without pre-writing them, then publish the complete payload closure and its
-    /// event in one unified-store candidate. The event builder receives only
-    /// Domain PayloadRefs; GitObjectId never crosses the Persist boundary.
+    /// STRENGTH-006: payload bytes become local content-addressed PayloadRefs
+    /// before the Prepared event is appended. Git object identity is absent from
+    /// the runtime path; remote sync blobifies these files later.
     let publishWithPayloads
         (store: IEventStore)
         (sha256: string -> string)
         (contents: byte[] list)
         (buildEvent: PayloadRef list -> StrengthEvent)
-        : Task<Result<StoreSnapshot * StrengthEvent, PublishError>> =
-        let preparedPayloads = contents |> List.map GitRawStore.preparePayload
-
-        let payloadRefs =
-            preparedPayloads
-            |> List.map (fun (oid, _) -> oid |> GitObjectId.value |> PayloadRef.create)
-            |> PayloadRefs.canonicalize
-
-        let event = buildEvent payloadRefs
-        let envelope = toEnvelope sha256 event
-
+        : Task<Result<StrengthEvent, PublishError>> =
         task {
-            let! baseSnapshot = store.OpenSnapshot()
+            let rec writePayloads remaining acc =
+                task {
+                    match remaining with
+                    | [] -> return Ok(List.rev acc |> PayloadRefs.canonicalize)
+                    | bytes :: tail ->
+                        match! store.WritePayload bytes with
+                        | Error error -> return Error(PublishError.PublishFailed error)
+                        | Ok payloadRef -> return! writePayloads tail (payloadRef :: acc)
+                }
 
-            let candidate =
-                { BaseSnapshot = baseSnapshot
-                  NewEvents = [ envelope ]
-                  NewPayloads = preparedPayloads }
-
-            match! store.Publish candidate with
-            | Ok snapshot -> return Ok(snapshot, event)
-            | Error err -> return Error err
-        }
-
-    let private loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
-        task {
-            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
-            | Ok events ->
-                return
-                    events
-                    |> List.filter (fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType)
-                    |> Ok
-        }
-
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<StrengthEvent list, string>> =
-        task {
-            match! loadEnvelopes raw snapshot with
+            match! writePayloads contents [] with
             | Error error -> return Error error
-            | Ok [] -> return Ok []
-            | Ok envelopes ->
-                match EventStoreFold.fold envelopes with
-                | Error(FoldError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
-                | Ok genericProjection when not (List.isEmpty genericProjection.Conflicts) ->
-                    return Error(sprintf "strength stream conflict: %A" genericProjection.Conflicts)
-                | Ok genericProjection ->
-                    let byId =
-                        envelopes
-                        |> List.map (fun envelope -> EventId.value envelope.EventId, envelope)
-                        |> Map.ofList
+            | Ok payloadRefs ->
+                let event = buildEvent payloadRefs
 
-                    let rec decode remaining acc =
-                        match remaining with
-                        | [] -> Ok(List.rev acc)
-                        | eventId :: tail ->
-                            match Map.tryFind (EventId.value eventId) byId with
-                            | None -> Error(sprintf "Strength fold order missing event: %s" (EventId.value eventId))
-                            | Some envelope ->
-                                match tryDecodeEnvelope envelope with
-                                | Error error -> Error error
-                                | Ok event -> decode tail (event :: acc)
-
-                    return decode genericProjection.FoldOrder []
-        }
-
-    let loadProjection (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<StrengthProjection, string>> =
-        task {
-            match! loadEvents raw snapshot with
-            | Error error -> return Error error
-            | Ok events ->
-                match StrengthProjection.fold events with
-                | Ok projection -> return Ok projection
-                | Error conflict -> return Error(sprintf "strength projection conflict: %A" conflict)
+                match! store.Append [ toEnvelope sha256 event ] with
+                | Ok() -> return Ok event
+                | Error(AppendError.StorageInvalid error) -> return Error(PublishError.StorageInvalid error)
+                | Error(AppendError.AppendFailed reason) -> return Error(PublishError.PublishFailed reason)
         }
 
     /// Small facades keep callers on the durable adapter rather than reaching

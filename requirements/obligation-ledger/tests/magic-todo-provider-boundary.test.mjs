@@ -13,32 +13,29 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('TODO-002/TODO-015 first todowrite is a finished mission account, never a meta-plan placeholder', () => {
+test('OBLIGATION-LEDGER-016 planning checkpoints are allowed until the first irreversible true commitment', () => {
   for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
-    assert.match(text, /first|第一次|首次/, `${label}: must identify the first todowrite boundary`)
-    assert.match(text, /complete|finished|完整|完成/, `${label}: first call must be a completed account`)
-    assert.match(text, /irreversible|不可逆|second first submission|第二次第一次提交/i, `${label}: T1 must feel like a one-shot initial commitment`)
-    assert.match(
-      text,
-      /make a plan|plan of the plan|meta-|先做计划|计划的计划|meta-item|meta-obligation/i,
-      `${label}: must reject planning-the-plan as an obligation`,
-    )
+    assert.match(text, /planComplete/i, `${label}: must expose the explicit commitment declaration`)
+    assert.match(text, /false/i, `${label}: must permit planning checkpoints before commitment`)
+    assert.match(text, /true/i, `${label}: must explain the commitment declaration`)
+    assert.match(text, /irreversible|不可逆|forever|永久|cannot.*return|不能.*回退/i, `${label}: first accepted true must be one-way`)
+    assert.match(text, /planning|计划|规划/i, `${label}: false checkpoints must be allowed to carry planning work`)
   }
 })
 
-test('TODO-002 Manager Role Law rejects meta-work without owning tool timing', () => {
+test('OBLIGATION-LEDGER-004 Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing', () => {
   for (const path of ['resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
     const text = read(path)
-    assert.match(text, /make a plan|analyze the request|先做计划|分析请求/i)
-    assert.match(text, /completion\s+counterfactual|完成反事实/i, `${path}: must distinguish cognition from mission debt semantically`)
-    assert.match(text, /investigation|调查/i, `${path}: investigative verbs must not hide planning`)
-    assert.match(text, /obligation|mission|债务/i)
-    assert.doesNotMatch(text, /\btodowrite\b/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
+    assert.match(text, /Planning Table|规划桌/i)
+    assert.match(text, /Entrusted Road|受托之路/i)
+    assert.match(text, /planning|计划|规划/i)
+    assert.match(text, /mission|obligation|使命|义务/i)
+    assert.doesNotMatch(text, /\btodowrite\b|planComplete/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
   }
 })
 
-test('TODO-002 placeholder obligation is rejected by handoff completeness, not just meta-work wording', () => {
+test('OBLIGATION-LEDGER-005 empty placeholders remain invalid while concrete planning work is legal before commitment', () => {
   const surfaces = [
     ...firstCheckpointSurfaces,
     ['obligation-name/en', 'resources/provider/lifecycle/magic-todo/obligation-name-description/en.md'],
@@ -49,37 +46,41 @@ test('TODO-002 placeholder obligation is rejected by handoff completeness, not j
 
   for (const [label, path] of surfaces) {
     const text = read(path)
-    assert.match(text, /handoff|可托付/i, `${label}: must require an obligation to be executable by handoff`)
+    assert.match(text, /handoff|可托付|close|闭环/i, `${label}: must require an obligation to carry concrete closable work`)
     assert.match(text, /placeholder|占位/i, `${label}: must reject slot-reserving entries`)
     assert.match(text, /TBD|deferred|延后|推迟/i, `${label}: must reject deferred substance`)
-  }
-
-  for (const [label, path] of firstCheckpointSurfaces) {
-    const text = read(path)
-    assert.match(text, /placeholder:\s*planning/i, `${label}: observed placeholder escape must be covered verbatim`)
   }
 
   const host = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
   assert.doesNotMatch(host, /placeholder:\s*planning|\bTBD\b/, 'Host must not classify natural-language placeholder keywords')
 })
 
-test('TODO-002 disguised investigative meta-todo is explicitly rejected before first checkpoint', () => {
-  const enPlanning = read('resources/provider/lifecycle/manager/planning-table/en.md')
-  const zhPlanning = read('resources/provider/lifecycle/manager/planning-table/zh-CN.md')
-  const enTool = read('resources/provider/lifecycle/magic-todo/todowrite-description/en.md')
-  const zhTool = read('resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md')
-
-  for (const [label, text] of [
-    ['planning-table/en', enPlanning],
-    ['planning-table/zh-CN', zhPlanning],
-    ['todowrite-description/en', enTool],
-    ['todowrite-description/zh-CN', zhTool],
-  ]) {
-    assert.match(text, /completion\s+counterfactual|完成反事实/i, `${label}: must use outcome-based classification, not keywords`)
-    assert.match(text, /survey-startup-and-complexity/i, `${label}: observed disguised meta-todo must be covered verbatim`)
-    assert.match(text, /O\(N\^2\)|hotspot|热点/i, `${label}: repository investigation disguise must be covered`)
-    assert.match(text, /deliverable|交付物/i, `${label}: exception must be tied to the user's actual deliverable`)
+test('OBLIGATION-LEDGER-004 committed mode rejects planning-only debt by consequence, not keywords', () => {
+  for (const [label, path] of firstCheckpointSurfaces) {
+    const text = read(path)
+    assert.match(text, /planComplete/i)
+    assert.match(text, /completion\s+counterfactual|完成反事实/i, `${label}: committed mode must classify by consequence`)
+    assert.match(text, /true/i)
+    assert.match(text, /mission|用户|deliverable|交付物/i)
   }
+
+  const host = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+  assert.doesNotMatch(host, /survey-startup-and-complexity|O\(N\^2\)|placeholder:\s*planning/, 'Host must not classify planning language')
+})
+
+test('OBLIGATION-LEDGER-012 process reviewer is told the effective planning-vs-mission relation', () => {
+  for (const path of [
+    'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/en.md',
+    'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/zh-CN.md',
+  ]) {
+    const text = read(path)
+    assert.match(text, /planComplete|plan complete|计划.*完备|计划.*完整/i, `${path}: reviewer must understand the commitment relation`)
+    assert.match(text, /false/i, `${path}: reviewer must allow planning-account review before commitment`)
+    assert.match(text, /true/i, `${path}: reviewer must switch to mission-debt review after commitment`)
+  }
+
+  const request = read('src/Wanxiangshu/Domain/MagicTodoProcessReview.fs')
+  assert.match(request, /EffectivePlanComplete/, 'typed process-review request must carry the effective relation')
 })
 
 test('TODO-005 provider wording says Accepted becomes Current without reviewer settlement', () => {

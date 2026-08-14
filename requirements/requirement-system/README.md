@@ -22,7 +22,7 @@ tests/      本包拥有的可执行 proof
 
 - **所有权元规则**（001–005）：唯一 semantic owner、包身份独立于物理布局、全部包同时为真、
   每个 executable proof 恰一个 owner、无裸规范权威。
-- **树结构合同**（006–007、016）：45 个包 × 5 份文档、无 INDEX 外目录、WHAT 是唯一
+- **树结构合同**（006–007、016）：46 个包 × 5 份文档、无 INDEX 外目录、WHAT 是唯一
   normative 合同、依赖声明 ⊆ INDEX 依赖骨架。
 - **条款治理**（008–009）：Clause ID 唯一且稳定、条款按层归属（行为→what、所有权→shape、
   算法→how、证明→proof、理由→why）。
@@ -40,7 +40,7 @@ tests/      本包拥有的可执行 proof
 2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：当前 archive/docs/changes 世界的
    条款唯一性、引用解析、生命周期目录与废止路径静态门（spec-rules 的纯规则回归在
    `tests/spec-rules.test.mjs`）。
-3. `requirements/README.md`：45 包树入口导航（当前由 archive/docs/README.md 同构承接导航职责）。
+3. `requirements/README.md`：46 包树入口导航（当前由 archive/docs/README.md 同构承接导航职责）。
 
 ## proof 概览
 
@@ -49,7 +49,7 @@ node --test requirements/requirement-system/tests/meta-verifier.test.mjs
 node --test requirements/requirement-system/tests/spec-rules.test.mjs
 ```
 
-- meta-verifier 迁移中途红是预期（45 包未全落地）；两个 META 包自身的结构检查现在必须绿。
+- meta-verifier 迁移中途红是预期（46 包未全落地）；两个 META 包自身的结构检查现在必须绿。
 - 每条 WHAT 命题的精确落点见 `PROOF.md`。
 
 ## 边界（DOES NOT OWN）

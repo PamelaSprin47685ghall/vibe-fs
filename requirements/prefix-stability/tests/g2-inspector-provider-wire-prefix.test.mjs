@@ -24,7 +24,7 @@ import {
 } from '../../../dist/Session/AttachedSessionRuntime.js'
 import {
   SyncDelegateRuntime,
-  SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
+  SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'

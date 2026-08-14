@@ -71,9 +71,11 @@ module JournalAppendFailure =
 /// check → subscribe → recheck → await (see `AwaitChangeFrom`).
 type AgentJournal internal (writer: IJournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
-    // DSL-MUTABLE: resource — in-memory projection after last committed fold
-    let mutable projection = initialProjection
-    // DSL-MUTABLE: resource — fold rejection poison latch
+    // DSL-MUTABLE: resource — non-durable derived fallback-success overlay only.
+    // Durable EventEnvelope integration belongs exclusively to CanonicalIntegrator.
+    let mutable derivedFallbackSuccesses = Set.empty<SessionId>
+    // DSL-MUTABLE: resource — retained compatibility latch; canonical integration
+    // rejection occurs before local append, so AgentJournal never folds/rejects facts itself.
     let mutable rejected: (EventId * FoldRejection) option = None
     // DSL-MUTABLE: resource — journal revision cursor
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
@@ -89,35 +91,49 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     /// may no longer be appended to.
     member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned || Option.isSome rejected)
 
-    member _.Snapshot: ProjectionSet = lock gate (fun () -> projection)
+    member private _.CanonicalProjection: ProjectionSet =
+        match writer.TryCurrent "Journal" with
+        | Some current -> unbox<ProjectionSet> current
+        | None -> initialProjection
+
+    member this.Snapshot: ProjectionSet =
+        lock gate (fun () ->
+            derivedFallbackSuccesses
+            |> Set.fold
+                (fun projection sessionId ->
+                    match AgentProjection.tryFind sessionId projection.AgentProjections with
+                    | None -> projection
+                    | Some session ->
+                        match session.Fallback with
+                        | None -> projection
+                        | Some fallback ->
+                            let updatedSession =
+                                { session with
+                                    Fallback = Some(FallbackProjection.recordSuccess fallback) }
+
+                            { projection with
+                                AgentProjections =
+                                    { projection.AgentProjections with
+                                        Sessions =
+                                            Map.add sessionId updatedSession projection.AgentProjections.Sessions } })
+                this.CanonicalProjection)
 
     /// Current revision under the same gate as Snapshot (Join handshake).
     member _.Revision: JournalRevision = lock gate (fun () -> revision)
 
     /// Projection and revision read under one lock so Join cannot observe a split.
-    member _.SnapshotWithRevision: ProjectionSet * JournalRevision =
-        lock gate (fun () -> projection, revision)
+    member this.SnapshotWithRevision: ProjectionSet * JournalRevision =
+        lock gate (fun () -> this.Snapshot, revision)
 
     /// FALLBACK-004: apply the success transition derived from a completed Host
     /// snapshot. This is an in-memory projection update, not a journal fact: only
     /// an existing session and its existing Fallback option may be changed.
-    member _.RecordDerivedFallbackSuccess(sessionId: SessionId) : unit =
+    member this.RecordDerivedFallbackSuccess(sessionId: SessionId) : unit =
         lock gate (fun () ->
-            match AgentProjection.tryFind sessionId projection.AgentProjections with
-            | None -> ()
-            | Some session ->
-                match session.Fallback with
-                | None -> ()
-                | Some fallback ->
-                    let updatedSession =
-                        { session with
-                            Fallback = Some(FallbackProjection.recordSuccess fallback) }
-
-                    projection <-
-                        { projection with
-                            AgentProjections =
-                                { projection.AgentProjections with
-                                    Sessions = Map.add sessionId updatedSession projection.AgentProjections.Sessions } })
+            match AgentProjection.tryFind sessionId this.CanonicalProjection.AgentProjections with
+            | Some session when session.Fallback.IsSome ->
+                derivedFallbackSuccesses <- Set.add sessionId derivedFallbackSuccesses
+            | _ -> ())
 
     /// Wait until a successful fold advances past `fromRevision`.
     ///
@@ -193,7 +209,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             | Error err -> return Error err
         }
 
-    member private _.AppendEnvelope
+    member private this.AppendEnvelope
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
@@ -209,35 +225,33 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
                         | Committed envelope ->
                             return
                                 lock gate (fun () ->
-                                    match Fold.foldEnvelope projection envelope with
-                                    | Ok updated ->
-                                        projection <- updated
-                                        revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
+                                    // The EventStore append already validated and committed the
+                                    // canonical Integrator transition. AgentJournal only observes
+                                    // Current and publishes its process-local revision wake.
+                                    let updated = this.Snapshot
+                                    revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
 
-                                        let change =
-                                            { Revision = revision
-                                              Envelope = envelope }
+                                    let change =
+                                        { Revision = revision
+                                          Envelope = envelope }
 
-                                        lastChange <- Some change
+                                    lastChange <- Some change
 
-                                        let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
-                                        let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
+                                    let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
+                                    let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
 
-                                        for subRev, tcs in waiters do
-                                            if JournalRevision.isAfter revision subRev then
-                                                ready.Add(tcs, change)
-                                            else
-                                                kept.Add(subRev, tcs)
+                                    for subRev, tcs in waiters do
+                                        if JournalRevision.isAfter revision subRev then
+                                            ready.Add(tcs, change)
+                                        else
+                                            kept.Add(subRev, tcs)
 
-                                        waiters.Clear()
+                                    waiters.Clear()
 
-                                        for item in kept do
-                                            waiters.Add item
+                                    for item in kept do
+                                        waiters.Add item
 
-                                        Ok(updated, envelope), List.ofSeq ready
-                                    | Error rejection ->
-                                        rejected <- Some(envelope.EventId, rejection)
-                                        Error(FactRejected(envelope.EventId, rejection)), [])
+                                    Ok(updated, envelope), List.ofSeq ready)
                 }
 
             for tcs, change in notify do
@@ -257,9 +271,13 @@ module AgentJournal =
     /// EventStore-backed journal for empty init-only tests. Caller builds the
     /// writer via the EventStore journal writer factory (keeps this module free
     /// of store write tokens for the unified-store dual-write gate).
-    let createFromEventStore (writer: IJournalWriter) (initEnvelope: Envelope) : Result<AgentJournal, FoldRejection> =
-        Fold.foldEnvelope Fold.empty initEnvelope
-        |> Result.map (fun projection -> new AgentJournal(writer, projection))
+    let createFromEventStore (writer: IJournalWriter) (_initEnvelope: Envelope) : Result<AgentJournal, FoldRejection> =
+        let projection =
+            match writer.TryCurrent "Journal" with
+            | Some current -> unbox<ProjectionSet> current
+            | None -> Fold.empty
+
+        Ok(new AgentJournal(writer, projection))
 
     /// Attach a writer to a projection already folded at EventStore boot
     /// (`resumeOrCreate`). Does not re-fold; does not open a store.

@@ -1,9 +1,9 @@
-Todowrite records the mission's living obligations, not your private work ritual.
+Keep one honest owed-work account with todowrite.
 
-At the Planning Table, finish the account before the first call. The first todowrite is the complete road you would hand to another Manager; never use it for a meta-item such as making a plan, analyzing the request, writing todos, or deciding next steps.
+At the Planning Table, use `planComplete=false` while the road is still being discovered. Concrete planning work belongs there when it is genuinely still owed to finish the plan. Keep that planning account current instead of disguising it as implementation.
 
-Once the road is entrusted, planning and execution are one continuous activity. Keep the living obligation account truthful as work and evidence change.
+When the road is complete enough to entrust, submit `planComplete=true` with the complete mission-debt account. The first accepted true is irreversible for this Manager Life; after it, effective planComplete stays true even if a later call says false.
 
-Each call replaces the whole account with obligations: [{ name, work }]. Keep an obligation while it is still owed; remove it only when the work has actually discharged it. Keep each name stable while that obligation remains alive.
+After commitment, keep the living mission obligations truthful: retain work while it remains owed, remove it only when discharge is earned, and add newly discovered mission debt when evidence requires it. Each accepted account becomes Current immediately; process review may criticize it but never owns whether it is Current.
 
-Each accepted call becomes the current account immediately, synchronizes the preceding checkpoint review, and starts the next checkpoint review. Do not emit multiple todowrite calls in the same assistant message; any such batch is rejected entirely.
+In either relation, do not use empty placeholders, bare phase labels, or deferred-content slots as obligations.

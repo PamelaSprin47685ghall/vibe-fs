@@ -139,14 +139,22 @@ module TodoProcessReviewProgram =
 
                 match AgentProjection.tryFind assignment.ReviewerSessionId snapshot.AgentProjections with
                 | None -> ProducerPresence.Absent "reviewer session missing"
-                | Some _ ->
+                | Some reviewer ->
+                    let verdictKnown =
+                        reviewer.ReviewGuard |> Option.bind processVerdict |> Option.isSome
+
                     match Map.tryFind assignment.ReviewerSessionId snapshot.AgentProjections.HandleByChildSession with
                     | Some record ->
                         match record.Lifecycle with
                         | HandleLifecycle.Active
                         | HandleLifecycle.CompletedAwaitingJoin _ -> ProducerPresence.Present
+                        | HandleLifecycle.Retired when verdictKnown ->
+                            // The reviewer has durably spoken. The remaining producer
+                            // is Journal/XTrace/LWR record-ready convergence, not the
+                            // retired Host work-unit.
+                            ProducerPresence.Present
                         | HandleLifecycle.Abandoned _
-                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle is abandoned or retired"
+                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle ended before durable verdict"
                     | None -> ProducerPresence.Present
             | _ -> ProducerPresence.Absent "assignment missing"
 

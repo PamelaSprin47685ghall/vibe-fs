@@ -132,7 +132,9 @@ module HorizonTool =
                 | Ok runtime ->
                     let agents, ptys = runtime.List()
                     let snapshot = AgentJournal.snapshot journal
-                    let parentSessionId = SessionId.create context.SessionId
+                    let parentSessionId =
+                        SessionId.create context.SessionId
+                        |> scope.LogicalOwnerFor
 
                     let durableHandles =
                         AgentProjection.tryFind parentSessionId snapshot.AgentProjections

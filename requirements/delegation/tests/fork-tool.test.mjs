@@ -16,6 +16,7 @@ import {
   forkChildPayload,
   lifecycleWorkRecordProjection,
   listItems,
+  promptDispatcher,
   sessionId,
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
@@ -67,6 +68,7 @@ const PARENT = sessionId('ses_fork')
 const fakeSessions = (behaviour = {}) => {
   const calls = []
   let childSeq = 0
+  let physicalSeq = 0
   return {
     calls,
     CreateChildSession: async (parentId, options) => {
@@ -81,7 +83,9 @@ const fakeSessions = (behaviour = {}) => {
     },
     SendPrompt: async (...args) => {
       calls.push(['SendPrompt', ...args])
-      return { tag: 0, fields: [] }
+      if (!behaviour.physicalAccept) return { tag: 0, fields: [] }
+      physicalSeq += 1
+      return promptDispatcher.admittedWithPhysicalMessage(`physical-${physicalSeq}`)
     },
     SendPromptAsync: async (...args) => {
       calls.push(['SendPromptAsync', ...args])
@@ -281,7 +285,7 @@ test('DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async (
 })
 
 test('DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral', async () => {
-  const live = await liveScope()
+  const live = await liveScope({ physicalAccept: true })
   const spec = managerSpec(factory, live.scope)
 
   assert.match(await runManager(spec, 'Ada', 'trace the retry path', { calling: 'coder' }), /Ada carries/)
@@ -318,7 +322,7 @@ test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
 })
 
 test('DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', async () => {
-  const live = await liveScope()
+  const live = await liveScope({ physicalAccept: true })
   const spec = managerSpec(factory, live.scope)
   const child = sessionId('child-1')
   const remaining = () => {

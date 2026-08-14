@@ -11,24 +11,13 @@ open Wanxiangshu.Kernel.Identity
 /// derive the commit payload without inventing a parallel SSOT.
 module MagicTodoPrefixEpoch =
 
-    /// desiredCutoff(Tk) covered-before id = previous Accepted (T1 → None).
-    let coveredBefore (acceptedInOrder: TodoWriteId list) (trigger: TodoWriteId) : TodoWriteId option =
-        let rec findPrev remaining =
-            match remaining with
-            | [] -> None
-            | [ _ ] -> None
-            | a :: b :: rest when TodoWriteId.value b = TodoWriteId.value trigger -> Some a
-            | _ :: rest -> findPrev rest
+    /// Build TodoCheckpoint EvidenceKind from the O(1) committed predecessor
+    /// locator maintained by MagicTodoProjection. T1 has no predecessor.
+    let todoCheckpointEvidence (trigger: TodoWriteId) (previousCommitted: TodoWriteId option) : PrefixEvidenceKind =
+        PrefixEvidenceKind.TodoCheckpoint(trigger, previousCommitted)
 
-        findPrev acceptedInOrder
-
-    /// Build TodoCheckpoint EvidenceKind for the next provider attempt seal.
-    let todoCheckpointEvidence (acceptedInOrder: TodoWriteId list) (trigger: TodoWriteId) : PrefixEvidenceKind =
-        PrefixEvidenceKind.TodoCheckpoint(trigger, coveredBefore acceptedInOrder trigger)
-
-    /// Whether a desired TodoCheckpoint rebase is mandatory after Accepted(Tk).
-    /// T1 → false (no prior). Tk (k≥2) → true.
-    let requiresLag1Rebase (acceptedInOrder: TodoWriteId list) : bool = List.length acceptedInOrder >= 2
+    /// Whether a desired TodoCheckpoint rebase exists for this committed checkpoint.
+    let requiresLag1Rebase (previousCommitted: TodoWriteId option) : bool = previousCommitted.IsSome
 
     /// Assemble speculative V2 commit payload. Caller supplies PrefixCoverage-
     /// proven Y bundle (never LWR RawGap) and snapshot fields.
@@ -37,7 +26,7 @@ module MagicTodoPrefixEpoch =
         (lifeId: ManagerLifeId)
         (previousEpoch: PrefixEpochId)
         (snapshot: PrefixSnapshot)
-        (acceptedInOrder: TodoWriteId list)
+        (previousCommitted: TodoWriteId option)
         (trigger: TodoWriteId)
         (yBundleRef: BlobRef)
         (yBundleDigest: BlobDigest)
@@ -47,7 +36,7 @@ module MagicTodoPrefixEpoch =
           ManagerLifeId = Some lifeId
           PreviousEpochId = previousEpoch
           NextEpochId = PrefixEpochId.next previousEpoch
-          EvidenceKind = todoCheckpointEvidence acceptedInOrder trigger
+          EvidenceKind = todoCheckpointEvidence trigger previousCommitted
           FrozenRecordPrefixRef = snapshot.FrozenRecordPrefixRef
           FrozenRecordPrefixDigest = snapshot.FrozenRecordPrefixDigest
           CutoffExclusive = snapshot.CutoffExclusive

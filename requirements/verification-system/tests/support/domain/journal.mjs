@@ -202,7 +202,17 @@ export const envelope = ({
 // Resolving both through `bind` means the facade never hard-codes which of the
 // two spellings a given file happened to produce.
 const Envelopes = bind(EnvelopeModule, 'Envelope', ['serialize', 'deserialize', 'compareSortKey'])
-const Folds = bind(FoldModule, 'Fold', ['empty', 'apply', 'foldEnvelope', 'foldAgentFact'])
+const Folds = bind(FoldModule, 'Fold', ['empty', 'foldEnvelope', 'foldAgentFact'])
+
+const foldSequence = (projection, envelopes) => {
+  let current = projection
+  for (const env of envelopes) {
+    const next = resultOf(Folds.foldEnvelope(current, env))
+    if (!next.ok) return next
+    current = next.value
+  }
+  return { ok: true, value: current }
+}
 
 export const journal = {
   serialize: (env) => Envelopes.serialize(env),
@@ -220,8 +230,8 @@ export const journal = {
 export const fold = {
   empty: Folds.empty,
 
-  /** `envelopes` may be a JS array; it is converted to an FSharpList here. */
-  apply: (projection, envelopes) => resultOf(Folds.apply(projection, requireList(toList(envelopes), 'fold.apply'))),
+  /** Test-only oracle: repeatedly call the production single-envelope rule; no production full-history API exists. */
+  apply: (projection, envelopes) => foldSequence(projection, listItems(requireList(toList(envelopes), 'fold.apply'))),
 
   one: (projection, env) => resultOf(Folds.foldEnvelope(projection, env)),
 
@@ -232,7 +242,7 @@ export const fold = {
       if (!result.ok) throw new Error(`envelope did not survive a round trip: ${result.error}`)
       return result.value
     })
-    return resultOf(Folds.apply(Folds.empty, toList(decoded)))
+    return foldSequence(Folds.empty, decoded)
   },
 
   /** Sessions map of a folded projection, keyed by session id string. */

@@ -50,15 +50,15 @@ last_words、ToolCallId、ProviderRun、无 outstanding/completed-awaiting-join 
 
 **证据** → PROOF.md 行 F-3。
 
-## FINALITY-004：零 checkpoint fail closed
+## FINALITY-004：无 plan commitment 时不得进入 Finality
 
-**规范**：`first unblessed suicide ∧ 本 Life 零 TodoWriteAccepted → fail closed`。
-T1 本身即该 Life 的第一次 accepted commitment，计入协议入口（TODO-010）。
+**规范**：`first unblessed suicide ∧ 本 Life 尚无 accepted planComplete=true → fail closed / ContinuePlanning`。
+Pre-T1 的 `planComplete=false` planning checkpoints 不构成终结资格；T1 是第一次 accepted true。
 
-**含义 / 动机**：证明 Manager 进入过必需 checkpoint 协议；不是机械要求 todos 全 completed
+**含义 / 动机**：证明 Manager 已明确完成计划并承担该 road，而不是机械要求 obligations 清空
 （与 FINALITY-007 区分）。
 
-**边界**：判定输入（Accepted 计数）来自 obligation-ledger 的投影；本包拥有门禁本身。
+**边界**：判定输入 `isPlanCommitted` 来自 obligation-ledger 的 durable projection；本包拥有门禁本身。
 
 **证据** → PROOF.md 行 F-4。
 
@@ -94,7 +94,7 @@ Manager 用后续 todowrite 修正（TODO-005/010）。
 
 ## FINALITY-007：无机械 terminal-todo completeness gate
 
-**规范**：「至少一次 TodoWriteAccepted」≠ 机械要求 obligations 清空。未完成项真实性交给过程
+**规范**：「已有 plan commitment」≠ 机械要求 obligations 清空。未完成项真实性交给过程
 PERFECT/REVISE，不另造机械 terminal-todo completeness gate（TODO-010）。
 
 **含义 / 动机**：机械全 completed 门与用户过程评审需求无关，且与 REVISE 续命冲突

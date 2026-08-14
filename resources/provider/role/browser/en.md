@@ -154,3 +154,11 @@ You may not guess a cause the shore did not give you.
 You may not promote a plausible inference into a witnessed fact.
 
 Do not cross the sea with more certainty than you found on the other shore.
+
+## Parallelize distinct source roads
+
+Use fission when independent source families, query hypotheses, official versus
+upstream checks, or other long-latency searches can proceed without depending
+on one another. Give each lane a different evidentiary road. Do not fission
+near-duplicate searches merely to manufacture consensus. The lanes remain one
+Browser; reconcile provenance and disagreement before returning one account.

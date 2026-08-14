@@ -32,37 +32,30 @@ module CasebookFeature =
 /// Result and the caller decides how to surface it.
 module CasebookWorkflow =
 
-    /// Archive one Inspector result as InspectorCaseCaptured (linear parent).
-    /// Q is the verbatim initial prompt, A the verbatim ToolResult body.
-    let archiveInspectorResult (store: IEventStore) (raw: IGitRawStore) (case: Case) : Task<Result<unit, string>> =
+    /// Archive one Inspector result. Structural parent selection belongs to the
+    /// canonical Integrator/store, not to a feature-owned history scan.
+    let archiveInspectorResult (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
-            let! snapshot = store.OpenSnapshot()
-
-            match! CasebookStore.loadEnvelopes raw snapshot with
+            match! CasebookStore.appendCaptured store case with
+            | Ok _ -> return Ok()
             | Error err -> return Error err
-            | Ok envelopes ->
-                let parents = CasebookStore.headOf envelopes |> Option.toList
-
-                match! CasebookStore.appendCaptured store parents case with
-                | Ok _ -> return Ok()
-                | Error err -> return Error err
         }
 
     /// Fetch one Case by session id (CASE-004).
     let fetchCase
         (store: IEventStore)
-        (raw: IGitRawStore)
         (capacity: int)
         (sessionId: string)
         : Task<Result<Case option, string>> =
         task {
-            let! snapshot = store.OpenSnapshot()
+            let cases =
+                match store.TryCurrent "Casebook" with
+                | None -> Map.empty
+                | Some current ->
+                    let state = unbox<CasebookProjection.State> current
+                    CasebookProjection.evict capacity state.Cases |> fst
 
-            match! CasebookStore.loadEvents raw snapshot with
-            | Error err -> return Error err
-            | Ok events ->
-                let cases = CasebookStore.project capacity events
-                return Ok(Map.tryFind sessionId cases)
+            return Ok(Map.tryFind sessionId cases)
         }
 
     /// CASE-004/005: freshness is a hint, never a proof — exact normalized
@@ -76,23 +69,15 @@ module CasebookWorkflow =
     /// Case intact — maintenance failure is never a fetch failure.
     let refreshCase
         (store: IEventStore)
-        (raw: IGitRawStore)
         (sessionId: string)
         (q: string)
         (a: string)
         (observations: Observation list)
         : Task<Result<unit, string>> =
         task {
-            let! snapshot = store.OpenSnapshot()
-
-            match! CasebookStore.loadEnvelopes raw snapshot with
+            match! CasebookStore.appendRefreshed store sessionId q a observations with
+            | Ok _ -> return Ok()
             | Error err -> return Error err
-            | Ok envelopes ->
-                let parents = CasebookStore.headOf envelopes |> Option.toList
-
-                match! CasebookStore.appendRefreshed store parents sessionId q a observations with
-                | Ok _ -> return Ok()
-                | Error err -> return Error err
         }
 
     /// CASE-006: the full refresh decision — fetch the Case, replay against
@@ -100,13 +85,12 @@ module CasebookWorkflow =
     /// needed (Stale) or the old answer still matches (Fresh / no-case).
     let needsRefresh
         (store: IEventStore)
-        (raw: IGitRawStore)
         (capacity: int)
         (sessionId: string)
         (root: string)
         : Task<Result<bool, string>> =
         task {
-            match! fetchCase store raw capacity sessionId with
+            match! fetchCase store capacity sessionId with
             | Error err -> return Error err
             | Ok None -> return Ok false
             | Ok(Some case) ->
@@ -121,7 +105,6 @@ module CasebookWorkflow =
     let drainCollectorAndArchive
         (collector: ObservationCollector)
         (store: IEventStore)
-        (raw: IGitRawStore)
         (sessionId: string)
         (q: string)
         (a: string)
@@ -135,31 +118,24 @@ module CasebookWorkflow =
               Observations = observations
               LastAccessOrder = 0L }
 
-        archiveInspectorResult store raw case
+        archiveInspectorResult store case
 
     /// CASE-010: exactly-one CaseFinalize — a reusable Inspector scope archives
     /// at most once (ReuseScope close → freeze draft → one finalize). A second
     /// finalize for the same session id is refused; unexpected SessionDeleted
     /// must not reconstruct a pending finalize (the caller just cleans up).
-    let finalizeCase (store: IEventStore) (raw: IGitRawStore) (case: Case) : Task<Result<unit, string>> =
+    let finalizeCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
-            match! fetchCase store raw 0 case.SessionId with
+            match! fetchCase store 0 case.SessionId with
             | Error err -> return Error err
             | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.SessionId)
-            | Ok None -> return! archiveInspectorResult store raw case
+            | Ok None -> return! archiveInspectorResult store case
         }
 
-    /// CASE-007: append InspectorCaseAccessed with the current stream head as parent.
-    let touchCaseAccess (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : Task<Result<unit, string>> =
+    /// CASE-007: append InspectorCaseAccessed; structural parent comes from Current.
+    let touchCaseAccess (store: IEventStore) (sessionId: string) : Task<Result<unit, string>> =
         task {
-            let! snapshot = store.OpenSnapshot()
-
-            match! CasebookStore.loadEnvelopes raw snapshot with
+            match! CasebookStore.appendAccessed store sessionId with
+            | Ok _ -> return Ok()
             | Error err -> return Error err
-            | Ok envelopes ->
-                let parents = CasebookStore.headOf envelopes |> Option.toList
-
-                match! CasebookStore.appendAccessed store parents sessionId with
-                | Ok _ -> return Ok()
-                | Error err -> return Error err
         }

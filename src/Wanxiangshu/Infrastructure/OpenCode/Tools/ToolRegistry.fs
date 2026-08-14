@@ -113,6 +113,7 @@ module ToolRegistry =
         (strengthRuntime: StrengthRuntime option)
         (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
+        (jsTransactionPersistence: IJsTransactionPersistence option)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
@@ -143,7 +144,7 @@ module ToolRegistry =
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
               yield HorizonTool.spec runtime
-              yield FissionTool.spec factory
+              yield FissionTool.spec factory runtime
               yield JudgeTool.spec factory runtime
               // GLORY-034/036: the Manager's end-of-life tool.
               yield FinalityTool.spec factory runtime
@@ -168,7 +169,8 @@ module ToolRegistry =
               // capability gets no js-* spec at all.
               for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
                   match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
-                  | Some surface -> yield JsToolSpec.create factory surface (defaultArg workspaceDirectory "") None
+                  | Some surface ->
+                      yield JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
                   | None -> () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on

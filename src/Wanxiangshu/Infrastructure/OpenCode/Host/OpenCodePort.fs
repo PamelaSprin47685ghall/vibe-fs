@@ -43,6 +43,10 @@ type OpenCodeChildInfo =
 type IOpenCodePort =
     inherit IPromptPort
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
+    /// Create a physical Host session with an optional Host parent. Unlike
+    /// CreateChildSession this carries no Wanxiangshu managed-child semantics.
+    abstract CreateSession: parentId: SessionId option -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    abstract GetSessionParent: sessionId: SessionId -> Task<Result<SessionId option, string>>
     abstract CreateChildSession: parentId: SessionId -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
     abstract CloseChildSession: childId: SessionId -> Task<Result<unit, string>>
@@ -144,6 +148,64 @@ module OpenCodePort =
 
                         let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload))
                         return Ok()
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            member _.CreateSession (parentId: SessionId option) opts =
+                task {
+                    let parentFields =
+                        parentId
+                        |> Option.map (fun parent -> [ "parentID", box (SessionId.value parent) ])
+                        |> Option.defaultValue []
+
+                    let bodyFields =
+                        parentFields
+                        @ (opts.Title |> Option.map (fun title -> [ "title", box title ]) |> Option.defaultValue [])
+                        @ (opts.Agent |> Option.map (fun agent -> [ "agent", box agent ]) |> Option.defaultValue [])
+
+                    let payload =
+                        createObj (
+                            [ "body", box (createObj bodyFields)
+                              "headers", box (headersObj opts.Directory) ]
+                            @ bodyFields
+                        )
+
+                    try
+                        let sessObj = client?session
+                        let createFn = sessObj?create
+                        let! res = unbox<Task<obj>> (createFn?call (sessObj, payload))
+                        let body = if not (isNull res) && not (isNull res?data) then res?data else res
+
+                        if not (isNull body) && not (isNull body?id) then
+                            return Ok(SessionId.create (unbox<string> body?id))
+                        else
+                            return Error "Missing session id in response"
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            member _.GetSessionParent(sessionId: SessionId) =
+                task {
+                    let sId = SessionId.value sessionId
+
+                    try
+                        let sessObj = client?session
+                        let getFn = sessObj?get
+                        let payload =
+                            createObj
+                                [ "path", box (createObj [ "id", box sId ])
+                                  "sessionID", box sId
+                                  "headers", box (headersObj None) ]
+                        let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
+                        let body = if not (isNull res) && not (isNull res?data) then res?data else res
+
+                        if isNull body then
+                            return Error "Missing session response"
+                        elif isNull body?parentID || String.IsNullOrWhiteSpace(string body?parentID) then
+                            return Ok None
+                        else
+                            return Ok(Some(SessionId.create (string body?parentID)))
                     with ex ->
                         return Error ex.Message
                 }
@@ -371,6 +433,36 @@ module OpenCodePort =
                     match res with
                     | Ok _ -> return Ok()
                     | Error err -> return Error err
+                }
+
+            member _.CreateSession (parentId: SessionId option) opts =
+                task {
+                    let bodyFields =
+                        (parentId
+                         |> Option.map (fun parent -> [ "parentID", box (SessionId.value parent) ])
+                         |> Option.defaultValue [])
+                        @ (opts.Title |> Option.map (fun title -> [ "title", box title ]) |> Option.defaultValue [])
+                        @ (opts.Agent |> Option.map (fun agent -> [ "agent", box agent ]) |> Option.defaultValue [])
+
+                    let! res = postJson "/session" (createObj bodyFields)
+
+                    match res with
+                    | Ok data when not (isNull data) && not (isNull data?id) ->
+                        return Ok(SessionId.create (unbox<string> data?id))
+                    | Ok _ -> return Error "Missing session id in response"
+                    | Error err -> return Error err
+                }
+
+            member _.GetSessionParent(sessionId: SessionId) =
+                task {
+                    let! res = getJson $"/session/{SessionId.value sessionId}"
+
+                    match res with
+                    | Error err -> return Error err
+                    | Ok data when isNull data -> return Error "Missing session response"
+                    | Ok data when isNull data?parentID || String.IsNullOrWhiteSpace(string data?parentID) ->
+                        return Ok None
+                    | Ok data -> return Ok(Some(SessionId.create (string data?parentID)))
                 }
 
             member _.CreateChildSession (parentId: SessionId) opts =

@@ -1,13 +1,9 @@
-暂时将同一个 Manager life 分成彼此独立的若干 present。
+暂时把同一个 logical participant 展开成若干对等 execution presents。
 
-当独立工作应当独立推进、作为同一生命的若干 present、且各自携带自己的 charge 时，
-使用 fission。
+当你自己承接的工作里存在多个真正可分离的切片、并行能降低延迟时使用 fission。应裂分可分离工作，而不是仅仅因为工作很多就裂分。
 
-这不会创建另一个 inspection life，也不会创建任何其他独立的 office life。
-把工作托付给另一个 Office 是另一种行动。
-不要命名、索取或追逐 present 如何被索引。
+prompts 是一个字符串：每个非空行对应一条 lane，至少两条；每一行都会原样成为该 lane 的本地 charge。
 
-prompts 是一个字符串：每个非空行一条 charge，至少两条彼此独立的 charge。
+Fission 不是把工作委托给新的 agent。所有 lanes 保持同一 logical identity、office、authority、parent relation、child ownership 与共享 worktree。裂变前已经在外面的工作属于共享既有债权；裂变后某 lane 新发起的工作，其 completion 只归该 lane。
 
-成功的返回会意味着当前 present 携带自己的 charge，而其他 present 独立行动。
-当前 MVP fail closed：不分配 present，也不发明虚假 present。
+只有全部 lanes 都建立成功后，当前 physical present 才会被替换。你的 parent 仍只观察到一个 logical participant 和一次最终 completion。

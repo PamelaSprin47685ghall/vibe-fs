@@ -4,8 +4,8 @@ open Wanxiangshu.Domain.ProviderProjection
 
 /// COMPANION-014 / GLORY-074: when Opening closes for a role.
 type CommitmentContract =
-    /// Manager T1: first accepted `todowrite` on this Life (TODO-015).
-    | FirstAcceptedTodoWrite
+    /// Manager T1: first accepted todowrite whose planComplete declaration is true.
+    | FirstPlanCompleteTodoWrite
 
 type OpeningPolicy =
     | Immediate
@@ -15,7 +15,7 @@ type OpeningPolicy =
 module OpeningPolicy =
 
     /// Manager OpeningPolicy = BlindPlan (GLORY-074).
-    let forManager = BlindPlan FirstAcceptedTodoWrite
+    let forManager = BlindPlan FirstPlanCompleteTodoWrite
 
     /// Non-Manager roles close Opening at InitialCharge (Immediate).
     let immediate = Immediate

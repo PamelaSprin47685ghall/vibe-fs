@@ -22,6 +22,7 @@ module MagicTodoProjection =
           ProposedTodoDigest: BlobDigest
           BaseTodoRef: BlobRef
           ProposedTodoRef: BlobRef
+          PlanCompleteDeclared: bool
           ProviderInputDigest: string
           ReviewFrontier: XTraceCursor
           SemanticVersion: string
@@ -43,10 +44,14 @@ module MagicTodoProjection =
             /// Canonical provider account: the latest Accepted checkpoint's Submitted account.
             /// None means a normal new Life before T1 (or no legacy seed).
             CurrentObligationsRef: (BlobRef * BlobDigest) option
-            /// Accepted chain, stored newest-first so replay cons is O(1).
-            /// `acceptedOrder` restores oldest-first (lag-1 desired cutoff source).
-            AcceptedOrder: TodoWriteId list
-            AcceptedIds: Set<string>
+            /// O(1) event-integral locators. These name facts that already
+            /// happened; none is a workflow program counter.
+            FirstAcceptedCheckpoint: TodoWriteId option
+            LatestAcceptedCheckpoint: TodoWriteId option
+            PendingReviewCheckpoint: TodoWriteId option
+            FirstPlanCommitment: TodoWriteId option
+            LatestCommittedCheckpoint: TodoWriteId option
+            PreviousCommittedCheckpoint: TodoWriteId option
             Checkpoints: Map<string, CheckpointRecord>
             Dedicated: DedicatedReviewerState option
             /// Upgrade-only canonical obligation seed locator.
@@ -54,7 +59,9 @@ module MagicTodoProjection =
         }
 
     type MagicTodoProjectionState =
-        { ByLife: Map<string, LifeMagicTodoState> }
+        { ByLife: Map<string, LifeMagicTodoState>
+          /// O(1) reverse locator for reviewer-session authority lookup.
+          ReviewerLifeBySession: Map<string, ManagerLifeId> }
 
     [<RequireQualifiedAccess>]
     type MagicTodoFoldRejection =
@@ -68,17 +75,25 @@ module MagicTodoProjection =
         | DedicatedMissingForAssign
         | DedicatedMissingForReplace
 
-    let empty: MagicTodoProjectionState = { ByLife = Map.empty }
+    let empty: MagicTodoProjectionState =
+        { ByLife = Map.empty
+          ReviewerLifeBySession = Map.empty }
 
     let private lifeKey (lifeId: ManagerLifeId) = ManagerLifeId.value lifeId
 
     let private writeKey (writeId: TodoWriteId) = TodoWriteId.value writeId
 
+    let private reviewerSessionKey (sessionId: SessionId) = SessionId.value sessionId
+
     let emptyLife (lifeId: ManagerLifeId) : LifeMagicTodoState =
         { LifeId = lifeId
           CurrentObligationsRef = None
-          AcceptedOrder = []
-          AcceptedIds = Set.empty
+          FirstAcceptedCheckpoint = None
+          LatestAcceptedCheckpoint = None
+          PendingReviewCheckpoint = None
+          FirstPlanCommitment = None
+          LatestCommittedCheckpoint = None
+          PreviousCommittedCheckpoint = None
           Checkpoints = Map.empty
           Dedicated = None
           LegacySeed = None }
@@ -94,32 +109,26 @@ module MagicTodoProjection =
         | Some life -> life, state
         | None ->
             let life = emptyLife lifeId
-            life, { ByLife = Map.add (lifeKey lifeId) life state.ByLife }
+            life, { state with ByLife = Map.add (lifeKey lifeId) life state.ByLife }
 
     let private putLife (life: LifeMagicTodoState) (state: MagicTodoProjectionState) =
-        { ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
+        { state with ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
 
-    /// Oldest-first accepted chain. The stored field is newest-first.
-    let acceptedOrder (life: LifeMagicTodoState) : TodoWriteId list = List.rev life.AcceptedOrder
+    let isPlanCommitted (life: LifeMagicTodoState) : bool = life.FirstPlanCommitment.IsSome
 
-    /// Pending process-review obligation: Accepted ∧ ¬Concluded.
+    let isFirstAcceptedCheckpoint (life: LifeMagicTodoState) (writeId: TodoWriteId) : bool =
+        life.FirstAcceptedCheckpoint = Some writeId
+
+    /// Pending process-review obligation: the protocol admits at most one.
     let pendingReviewObligation (life: LifeMagicTodoState) : CheckpointRecord option =
-        acceptedOrder life
-        |> List.tryFind (fun writeId ->
-            match Map.tryFind (writeKey writeId) life.Checkpoints with
-            | Some cp when cp.Accepted && cp.Concluded.IsNone -> true
-            | _ -> false)
+        life.PendingReviewCheckpoint
         |> Option.bind (fun writeId -> Map.tryFind (writeKey writeId) life.Checkpoints)
 
     /// Next todowrite / suicide may consume only when Concluded exists for latest Accepted.
     let consumablePreviousReview (life: LifeMagicTodoState) : TodoReviewConcluded option =
-        match life.AcceptedOrder with
-        | [] -> None
-        | writeId :: _ ->
-            match Map.tryFind (writeKey writeId) life.Checkpoints with
-            | Some { Concluded = Some concluded } -> Some concluded
-            | Some { Accepted = true; Concluded = None } -> None
-            | _ -> None
+        life.LatestAcceptedCheckpoint
+        |> Option.bind (fun writeId -> Map.tryFind (writeKey writeId) life.Checkpoints)
+        |> Option.bind (fun checkpoint -> checkpoint.Concluded)
 
     /// True when a new TodoWritePrepared may proceed past lag-1 await.
     /// `AwaitingConsumableReview` is the wait signal for deferred prepare / suicide
@@ -136,20 +145,13 @@ module MagicTodoProjection =
         (reviewerSessionId: SessionId)
         (state: MagicTodoProjectionState)
         : CheckpointRecord option =
-        state.ByLife
-        |> Map.tryPick (fun _ life ->
-            match life.Dedicated with
-            | Some dedicated when dedicated.ReviewerSessionId = reviewerSessionId ->
-                // Accepted ∧ ¬Concluded on this Life's dedicated reviewer is
-                // typed TodoProcessReview authority even before Assigned lands.
-                pendingReviewObligation life
-            | _ -> None)
+        state.ReviewerLifeBySession
+        |> Map.tryFind (reviewerSessionKey reviewerSessionId)
+        |> Option.bind (fun lifeId -> tryLife lifeId state)
+        |> Option.bind pendingReviewObligation
 
-    /// Desired lag-1 cutoff from Accepted chain (no Requested fact).
-    let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
-        match life.AcceptedOrder with
-        | _ :: lag1 :: _ -> Some lag1
-        | _ -> None
+    /// Desired committed lag-1 cutoff. Pre-T1 planning checkpoints never enter it.
+    let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option = life.PreviousCommittedCheckpoint
 
     let foldPrepared
         (preparedFactRef: EventId)
@@ -165,6 +167,8 @@ module MagicTodoProjection =
                 Error(MagicTodoFoldRejection.IdentityCorruption "ManagerSessionId")
             elif existing.ToolCallId <> payload.ToolCallId then
                 Error(MagicTodoFoldRejection.IdentityCorruption "ToolCallId")
+            elif existing.PlanCompleteDeclared <> payload.PlanCompleteDeclared then
+                Error(MagicTodoFoldRejection.IdentityCorruption "PlanCompleteDeclared")
             elif existing.ProviderInputDigest <> payload.ProviderInputDigest then
                 Error(MagicTodoFoldRejection.IdentityCorruption "ProviderInputDigest")
             elif existing.BaseTodoDigest <> payload.BaseTodoDigest then
@@ -197,6 +201,7 @@ module MagicTodoProjection =
                       ProposedTodoDigest = payload.ProposedTodoDigest
                       BaseTodoRef = payload.BaseTodoRef
                       ProposedTodoRef = payload.ProposedTodoRef
+                      PlanCompleteDeclared = payload.PlanCompleteDeclared
                       ProviderInputDigest = payload.ProviderInputDigest
                       ReviewFrontier = payload.ReviewFrontier
                       SemanticVersion = payload.SemanticVersion
@@ -246,18 +251,29 @@ module MagicTodoProjection =
                     InputDigest = Some payload.InputDigest
                     OutputDigest = Some payload.OutputDigest }
 
-            let nextOrder, nextIds =
-                if Set.contains key life.AcceptedIds then
-                    life.AcceptedOrder, life.AcceptedIds
-                else
-                    payload.TodoWriteId :: life.AcceptedOrder, Set.add key life.AcceptedIds
+            let firstAccepted =
+                match life.FirstAcceptedCheckpoint with
+                | Some existing -> Some existing
+                | None -> Some payload.TodoWriteId
+
+            let firstCommitment, previousCommitted, latestCommitted =
+                match life.FirstPlanCommitment with
+                | None when cp.PlanCompleteDeclared ->
+                    Some payload.TodoWriteId, None, Some payload.TodoWriteId
+                | None -> None, None, None
+                | Some first ->
+                    Some first, life.LatestCommittedCheckpoint, Some payload.TodoWriteId
 
             Ok(
                 putLife
                     { life with
                         Checkpoints = Map.add key cp life.Checkpoints
-                        AcceptedOrder = nextOrder
-                        AcceptedIds = nextIds
+                        FirstAcceptedCheckpoint = firstAccepted
+                        LatestAcceptedCheckpoint = Some payload.TodoWriteId
+                        PendingReviewCheckpoint = Some payload.TodoWriteId
+                        FirstPlanCommitment = firstCommitment
+                        PreviousCommittedCheckpoint = previousCommitted
+                        LatestCommittedCheckpoint = latestCommitted
                         CurrentObligationsRef = Some(cp.ProposedTodoRef, cp.ProposedTodoDigest) }
                     state
             )
@@ -320,39 +336,55 @@ module MagicTodoProjection =
                 else
                     let cp = { cp with Concluded = Some payload }
 
-                    Ok(
-                        putLife
-                            { life with
-                                Checkpoints = Map.add key cp life.Checkpoints }
-                            state
-                    )
+                    if life.PendingReviewCheckpoint <> Some payload.TodoWriteId then
+                        Error(MagicTodoFoldRejection.IdentityCorruption "PendingReviewCheckpoint")
+                    else
+                        Ok(
+                            putLife
+                                { life with
+                                    Checkpoints = Map.add key cp life.Checkpoints
+                                    PendingReviewCheckpoint = None }
+                                state
+                        )
 
     let foldDedicatedEnlisted (payload: DedicatedTodoReviewerEnlisted) (state: MagicTodoProjectionState) =
         let life, state = ensureLife payload.ManagerLifeId state
+        let reviewerKey = reviewerSessionKey payload.ReviewerSessionId
 
-        match life.Dedicated with
-        | Some d when
-            d.DedicatedReviewerId = payload.DedicatedReviewerId
-            && d.ReviewerSessionId = payload.ReviewerSessionId
-            ->
-            Ok state
-        | Some d when d.DedicatedReviewerId = payload.DedicatedReviewerId ->
-            // Same logical id, physical session change must go through Replaced.
-            Error(MagicTodoFoldRejection.IdentityCorruption "ReviewerSessionId")
-        | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "DedicatedReviewerId")
-        | None ->
-            Ok(
-                putLife
-                    { life with
-                        Dedicated =
-                            Some
-                                { DedicatedReviewerId = payload.DedicatedReviewerId
-                                  ReviewerSessionId = payload.ReviewerSessionId } }
-                    state
-            )
+        match Map.tryFind reviewerKey state.ReviewerLifeBySession with
+        | Some indexedLife when indexedLife <> payload.ManagerLifeId ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "ReviewerLifeBySession")
+        | _ ->
+            let indexedState =
+                { state with
+                    ReviewerLifeBySession =
+                        Map.add reviewerKey payload.ManagerLifeId state.ReviewerLifeBySession }
+
+            match life.Dedicated with
+            | Some d when
+                d.DedicatedReviewerId = payload.DedicatedReviewerId
+                && d.ReviewerSessionId = payload.ReviewerSessionId
+                ->
+                Ok indexedState
+            | Some d when d.DedicatedReviewerId = payload.DedicatedReviewerId ->
+                // Same logical id, physical session change must go through Replaced.
+                Error(MagicTodoFoldRejection.IdentityCorruption "ReviewerSessionId")
+            | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "DedicatedReviewerId")
+            | None ->
+                Ok(
+                    putLife
+                        { life with
+                            Dedicated =
+                                Some
+                                    { DedicatedReviewerId = payload.DedicatedReviewerId
+                                      ReviewerSessionId = payload.ReviewerSessionId } }
+                        indexedState
+                )
 
     let foldDedicatedReplaced (payload: DedicatedTodoReviewerReplaced) (state: MagicTodoProjectionState) =
         let life, state = ensureLife payload.ManagerLifeId state
+        let oldKey = reviewerSessionKey payload.OldSessionId
+        let newKey = reviewerSessionKey payload.NewSessionId
 
         match life.Dedicated with
         | None -> Error MagicTodoFoldRejection.DedicatedMissingForReplace
@@ -361,15 +393,30 @@ module MagicTodoProjection =
         | Some d when d.ReviewerSessionId <> payload.OldSessionId ->
             Error(MagicTodoFoldRejection.IdentityCorruption "OldSessionId")
         | Some _ ->
-            Ok(
-                putLife
-                    { life with
-                        Dedicated =
-                            Some
-                                { DedicatedReviewerId = payload.DedicatedReviewerId
-                                  ReviewerSessionId = payload.NewSessionId } }
-                    state
-            )
+            match Map.tryFind oldKey state.ReviewerLifeBySession with
+            | Some indexedLife when indexedLife <> payload.ManagerLifeId ->
+                Error(MagicTodoFoldRejection.IdentityCorruption "OldReviewerLifeBySession")
+            | _ ->
+                match Map.tryFind newKey state.ReviewerLifeBySession with
+                | Some indexedLife when indexedLife <> payload.ManagerLifeId ->
+                    Error(MagicTodoFoldRejection.IdentityCorruption "NewReviewerLifeBySession")
+                | _ ->
+                    let indexedState =
+                        { state with
+                            ReviewerLifeBySession =
+                                state.ReviewerLifeBySession
+                                |> Map.remove oldKey
+                                |> Map.add newKey payload.ManagerLifeId }
+
+                    Ok(
+                        putLife
+                            { life with
+                                Dedicated =
+                                    Some
+                                        { DedicatedReviewerId = payload.DedicatedReviewerId
+                                          ReviewerSessionId = payload.NewSessionId } }
+                            indexedState
+                    )
 
     let foldLegacySeed
         (payload: LegacyTodoSeedAdopted)

@@ -361,9 +361,10 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   assert.equal(birth.parts[0].synthetic, false)
   assert.equal(birth.parts[1].synthetic, true)
   assert.ok(birth.parts[1].text.includes('# The Planning Table'))
-  assert.ok(birth.parts[1].text.includes('write it with todowrite'))
-  assert.ok(birth.parts[1].text.includes('Your first todowrite is the complete submission of that plan.'))
-  assert.ok(birth.parts[1].text.includes('If you need a plan of the plan, write it as text.'))
+  assert.ok(birth.parts[1].text.includes('planComplete=false'))
+  assert.ok(birth.parts[1].text.includes('planning work'))
+  assert.ok(birth.parts[1].text.includes('planComplete=true'))
+  assert.ok(birth.parts[1].text.match(/irreversible|cannot be undone|never returns to false/i))
   assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
 })
 
@@ -391,6 +392,7 @@ test('GLORY_019_activation_golden_bytes', async () => {
 test('GLORY_029_idle_encouragement_golden_bytes', async () => {
   const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
+  assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('planComplete=false'))
   assert.ok(managerLifecyclePrompt.idleEncouragementPostT1().includes('# You have done useful work'))
 })
 

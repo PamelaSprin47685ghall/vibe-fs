@@ -126,18 +126,25 @@ module HostSignalBootstrap =
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
-                    // HOST-027: an exact NEEDHELP armed mark means this abort was
-                    // requested by Assistance itself. Do not revoke that attempt's
-                    // idle right: the following SessionIdle is the causal proof that
-                    // permits the deep consultation. Ordinary operator aborts remain
-                    // fail-closed and revoke before reconciliation.
-                    if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
-                        scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+                    // Fission retires only the replaced physical present. It is not
+                    // an owner cancellation: do not revoke owner resources or cancel
+                    // speculation/children here. OrdinaryTurnWorkflow consumes the
+                    // same typed mark and suppresses parent terminal publication.
+                    if FissionRuntime.isSilentInterrupt sessionId then
+                        reconciler.Signal signal
+                    else
+                        // HOST-027: an exact NEEDHELP armed mark means this abort was
+                        // requested by Assistance itself. Do not revoke that attempt's
+                        // idle right: the following SessionIdle is the causal proof that
+                        // permits the deep consultation. Ordinary operator aborts remain
+                        // fail-closed and revoke before reconciliation.
+                        if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
+                            scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
 
-                    scope.Strength.StrengthReplicaRuntime
-                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
+                        scope.Strength.StrengthReplicaRuntime
+                        |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
-                    reconciler.Signal signal
+                        reconciler.Signal signal
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
                     (emitJsExpr
                         (HostSessionDeletion.handle
@@ -290,6 +297,18 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
+
+            match journal with
+            | None -> ()
+            | Some durable ->
+                do!
+                    FissionHost.recoverGroups
+                        sessionPort
+                        eventPort
+                        durable
+                        (fun sessionId -> registerOwned (SessionId.value sessionId))
+                        bindActiveRun
+                        (fun _ -> workspaceDirectory)
 
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with

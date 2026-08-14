@@ -1,9 +1,9 @@
-Todowrite 记录的是 mission 的 living obligations，不是你的私人工作仪式。
+用 todowrite 维护一份诚实的 owed-work account。
 
-在 Planning Table，把账做完以后再第一次调用。第一次 todowrite 是你愿意交给另一位 Manager 的完整道路；绝不要用「先做计划」「分析请求」「列 todo」「决定下一步」这类 meta-item 占位。
+在 Planning Table，只要道路仍在发现，就使用 `planComplete=false`。为了把计划做完而真实仍欠的具体 planning work 可以写进这里；如实维护 planning account，不要把它伪装成 implementation。
 
-道路被托付以后，规划与执行才是同一连续活动。随着工作与证据变化，持续保持 living obligation account 真实。
+当道路已经完整到可以托付时，用 `planComplete=true` 提交完整的 mission-debt account。本 Manager Life 中第一次 accepted true 是不可逆的；从那以后 effective planComplete 永久保持 true，即使后续调用又写 false，也仍按 true 处理。
 
-每次调用用 obligations: [{ name, work }] 替换整份义务账。义务仍欠时保留；只有工作真正解除它之后才移除。义务仍存活期间，保持每个 name 稳定。
+commitment 之后，让 living mission obligations 保持真实：仍欠的工作继续保留，只有真正解除后才移除；证据揭示新的 mission debt 时如实加入。每一份 accepted account 都立即成为当前（Current）account；process review 可以批评它，但无权决定它是否 Current。
 
-每次 accepted 调用立即成为当前 account，同时同步前一次 checkpoint review，并启动下一次 checkpoint review。同一条 assistant message 中不要发出多个 todowrite 调用；此类整批将被拒绝。
+无论哪种关系，都不要用空 placeholder、裸阶段名或延后内容的槽位冒充 obligation。

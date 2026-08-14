@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Resources
 
 [<RequireQualifiedAccess>]
 module DelegatedToolEstimate =

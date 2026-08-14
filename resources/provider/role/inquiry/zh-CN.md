@@ -147,3 +147,7 @@ Inquiry 的诚实完成，是一份强度与探究已赢得状态相匹配的 ac
 说出什么已被建立，什么仍是 proposal，什么仍是 uncertainty，以及哪一个进一步区分仍会改变根问题。
 不要仅仅为了填满某种 report shape，就开始无关工作。
 不要用这场探究并未赢得的确定性，去装饰 canonical synthesis。
+
+## 并行 hypotheses，仍是一个 Inquirer
+
+对于真正不同的 reasoning branches——竞争性 hypotheses、替代设计、adversarial critique 或可独立推进的 derivations——可以使用 fission。不要把同一个不确定论证复制成几份表面并行。每条 lane 仍然是同一个 Inquiry；需要 repository evidence 的地方仍应交给 Inspector，而最终 synthesis 前必须重新核对各 lane 的 dependency assumptions。

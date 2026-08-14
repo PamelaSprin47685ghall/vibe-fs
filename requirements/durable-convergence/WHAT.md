@@ -19,27 +19,26 @@
 
 ## DURABLE-CONVERGENCE-002 —— k-way merge 是统一 primitive
 
-**规范陈述**：`KWayMerge(snapshot[])` 满足 associative / commutative / idempotent /
+**规范陈述**：`KWayMerge(writerStreams[])` 满足 associative / commutative / idempotent /
 deterministic：`merge(A, merge(B,C)) = merge(merge(A,B), C)`、`merge(A,B) = merge(B,A)`、
-`merge(A,A) = A`、同一组输入无论枚举顺序/由哪个 process 执行都产生相同 canonical
-result。输入可同时来自当前 process、其它本地 process、remote tracking、hook 观察、
-recovery。
+`merge(A,A) = A`、同一组有序 writer streams 无论枚举顺序/由哪个 process/哪台 machine 执行都产生
+相同 canonical event order。输入可来自当前 process、其它本地 process、remote snapshot、recovery。
 
-**含义/动机**：统一 primitive 是并发模型的地基——任何同步入口（local append、外部
-fetch/pull/push、bootstrap、recovery）都汇入同一个 merge，不各自实现同步协议。
-**边界**：merge 的物理实现（structural tree merge 与 oracle 的一致性）见 003。
+**含义/动机**：统一 primitive 是并发模型的地基——boot/recovery 和 remote sync 共用同一个 k-way
+ordering/identity primitive；ordinary local append 只延长自己的单 writer file，不需要先全局 merge。
+**边界**：writer file / blob 的物理映射见 003 与 `durable-events` 005/011/018。
 **证据**：→ PROOF.md 002。
 
-## DURABLE-CONVERGENCE-003 —— 生产 structural merge ≡ union oracle
+## DURABLE-CONVERGENCE-003 —— 生产 writer-stream k-way merge ≡ union oracle
 
-**规范陈述**：生产 merge 必须与 set-union spec oracle 等价：`merge(snapshots)` 的结果
-与 `materialize(union(events))` 相同（相同 canonical root）。实现优先 structural tree
-merge（EventId 分片路径直接 union），不得在每次 append/fetch 读全量 events 做 O(N)
-set-union；`union(allEvents)` 保留为契约 oracle，不作为生产算法指导。
+**规范陈述**：生产 merge 必须与 set-union spec oracle 等价：本地每个
+`.git/wanxiang/events/<WriterId>.ndjson` 与远端每个 WriterId blob 都是一个完整有序流；读取这些流执行
+k-way merge + EventId identity dedupe，结果必须等价于 `union(all events)`。不得引入 segment/chunk、
+EventId→blob index、Git structural merge 或 delta protocol。
 
-**含义/动机**：structural merge 让复杂度与 delta/tree-path 相关；oracle 等价保证
-「集合相同 → root 相同」不因实现漂移。
-**边界**：同 EventId 异 OID 时读 bytes 校验 identity collision → `durable-events`。
+**含义/动机**：一个 process 一个完整文件让单机多进程与多机完全同构；生产算法只处理 k 个顺序流，
+而不是 Git tree 的物理偶然结构。
+**边界**：same EventId 异 canonical bytes → identity collision；业务含义只由 canonical Integrator 解释。
 **证据**：→ PROOF.md 003。
 
 ## DURABLE-CONVERGENCE-004 —— 合法并发 fork → DomainConflict，非 StorageInvalid
@@ -80,29 +79,34 @@ replication 规则。
 **边界**：Casebook 对象层面的禁 LWW 语义归 `knowledge-reuse`；本命题钉 general merge 律。
 **证据**：→ PROOF.md 006。
 
-## DURABLE-CONVERGENCE-007 —— 相同 merged snapshot → 相同 projection
+## DURABLE-CONVERGENCE-007 —— 相同 merged history → 同一个 Integrator Current
 
-**规范陈述**：收敛公式是 `Projection(KWayMerge(S1..Sk)) = Fold(Union(Events(S1..Sk)))`，
-不是 `Merge(Projection(S1), Projection(S2))`。相同 merged snapshot 必须得到相同
-projection（确定性 fold 由 `durable-events` 014 保证）。
+**规范陈述**：收敛公式是 `Current = CanonicalIntegrator(KWayMerge(writerStreams))`，不是
+`Merge(CurrentA, CurrentB)`，也不是各业务模块各自重扫历史。相同 writer histories 必须得到相同
+Current；唯一 Integrator 与注册规则由 `durable-events` 014/019 保证。
 
-**含义/动机**：投影不是第二真相源；它只是「从完整历史折叠出的当下」。replica 收敛的
-终点是「相同事件集合 → 相同世界」。
-**边界**：fold 本身的确定性机制 → `durable-events`。
+**含义/动机**：Current 不是第二真相源；它只是唯一正规积分器对完整事实历史的最终积分状态。
+**边界**：业务 integration rule 的语义归各 domain owner。
 **证据**：→ PROOF.md 007。
 
-## DURABLE-CONVERGENCE-008 —— Converge 永远双向；无单向 API
+## DURABLE-CONVERGENCE-008 —— startup ensure hooks；用户 Git 进程独立触发双向 sync
 
-**规范陈述**：唯一同步 primitive 是 `ConvergeStore(remote)`：fetch remote store ref →
-merge append-only event sets → validate merged history → CAS local → lease-push merged
-root to remote。禁止提供 `PullStore`/`PushStore`/`DownloadStore`/`UploadStore` 这类可被
-调用方选成单向复制的 API。offline 时允许 local 已 committed、remote 尚未收敛——但那是
-replication pending，不是合法的 local-only 同步模式；下一次同步机会必须重做完整双向。
+**规范陈述**：Wanxiangshu 不提供 timer/background/event-count 同步器，也不从 OpenCode/Wanxiangshu 产品进程
+主动调用 fetch/pull/push。Wanxiangshu 启动时必须 ensure `reference-transaction` / `pre-push` hook 以及各已知
+remote 的 Wanxiang store fetch-refspec 正确安装；无法安全安装时 fail fast/明确诊断，不得静默降级。之后同步由
+**用户自己的 Git 进程启动的 hook 子进程**执行，即使 OpenCode/Wanxiangshu 已退出也必须可工作：读取 local writer
+files + remote writer blobs → k-way merge/validate → 直接替换本地同步后的 writer-file 集合 → 将每个完整 writer
+file 编码为一个 blob 并发布 remote snapshot。成功终态必须 local/remote 表示同一 event history；不得提供可成功的
+Store-only 单向 Download/Upload 模式。
 
-**含义/动机**：`Local={A,B}, Remote={A,C}` 的任何成功同步终态都必须是
-`Local=Remote={A,B,C}`。没有成功的单向 Store synchronization。
-**边界**：transport 物理故障（offline/auth/lease contention）的失败形态 → `host-boundary`
-与具体 transport；本命题钉协议方向。
+`reference-transaction` 消费用户 fetch/pull 已更新的 Wanxiang remote-tracking ref后，**仍执行完整双向收敛**：
+以该 observed remote root 为输入，local+remote k-way merge，替换本地 writer truth，并把统一后的 Wanxiang store ref 发布回
+remote；`pre-push` 也在用户 push 真正发送普通 refs 前执行同一完整双向收敛。两者差别只在 remote root 的发现方式，
+不是同步方向。hook 内部为完成该次用户操作而进行的 store-ref fetch/push 使用递归 guard，不构成产品进程主动同步。
+
+**含义/动机**：`Local={A,B}, Remote={A,C}` 成功后都是 `{A,B,C}`；`git push` 可能发生在 Wanxiangshu 完全未运行时，
+因此同步执行权必须属于已安装 hook，而不是某个 process-local EventStore/GitGateway object。
+**边界**：transport 物理故障（offline/auth/lease contention）可使 remote pending，但不得撤销已本地 committed facts。
 **证据**：→ PROOF.md 008。
 
 ## DURABLE-CONVERGENCE-009 —— dumb remote 无 domain 逻辑

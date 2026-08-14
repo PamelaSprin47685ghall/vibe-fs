@@ -153,8 +153,8 @@ const HOOK_FIXTURES = {
       jsonSchema: { type: 'object', properties: {} },
     },
     assert: (output) => {
-      assert.equal(output.parameters.required[0], 'obligations')
-      assert.equal(output.jsonSchema.required[0], 'obligations')
+      assert.deepEqual(output.parameters.required, ['planComplete', 'obligations'])
+      assert.deepEqual(output.jsonSchema.required, ['planComplete', 'obligations'])
     },
   },
 

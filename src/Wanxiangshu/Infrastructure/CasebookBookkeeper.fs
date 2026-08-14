@@ -14,16 +14,15 @@ module CasebookBookkeeper =
     /// stability-verify failure — the old Case is left intact.
     let refreshStale
         (store: IEventStore)
-        (raw: IGitRawStore)
         (root: string)
         (sessionId: string)
         : Task<Result<bool, string>> =
         task {
-            match! CasebookWorkflow.needsRefresh store raw 256 sessionId root with
+            match! CasebookWorkflow.needsRefresh store 256 sessionId root with
             | Error err -> return Error err
             | Ok false -> return Ok false
             | Ok true ->
-                match! CasebookWorkflow.fetchCase store raw 256 sessionId with
+                match! CasebookWorkflow.fetchCase store 256 sessionId with
                 | Error err -> return Error err
                 | Ok None -> return Ok false
                 | Ok(Some case) ->
@@ -46,10 +45,10 @@ module CasebookBookkeeper =
                         | ReplayResult.Stale ->
                             return Error "casebook synthesis unstable: worktree changed during bookkeeper transaction"
                         | ReplayResult.Fresh ->
-                            match! CasebookWorkflow.refreshCase store raw sessionId q' a' freeze with
+                            match! CasebookWorkflow.refreshCase store sessionId q' a' freeze with
                             | Ok() ->
                                 CasebookIndex.invalidate ()
-                                let! _ = CasebookIndex.refresh store raw 256
+                                let! _ = CasebookIndex.refresh store 256
                                 return Ok true
                             | Error err -> return Error err
         }

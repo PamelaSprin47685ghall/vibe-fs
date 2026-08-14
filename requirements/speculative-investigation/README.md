@@ -13,7 +13,7 @@ Replica 先猜、先查，可以省成本；但代价是引入一次「干预」
 **不是历史**；被消费后，它**就是真实因果历史**，重启后不能消失。本包定义这条
 Candidate → Promotion 边界，以及让投机永远不改变「没有 Strength 时世界会怎样」的全部约束。
 
-## WHAT 概览（12 条命题，见 WHAT.md）
+## WHAT 概览（13 条命题，见 WHAT.md）
 
 | # | 命题 | 一句话 |
 |---|---|---|
@@ -29,12 +29,14 @@ Candidate → Promotion 边界，以及让投机永远不改变「没有 Strengt
 | SPEC-INV-010 | Predictor 与 control | 干预数据永不冒充「无干预时 primary 会怎样」的 label |
 | SPEC-INV-011 | 失败、取消与熔断 | 普通失败 fail-open K0；durable 歧义 fail-closed |
 | SPEC-INV-012 | 模型不可见、系统可审计 | 机制 provenance 不进模型字节，诊断事实保留 |
+| SPEC-INV-013 | DryRun visible nonblocking shadow | 真 Replica 在 OpenCode 可见，但 owner 不等待且结果零 Promotion |
 
 ## HOW 概览（见 HOW.md）
 
 实现落在 `src/Wanxiangshu/{Domain,Application,Session,Infrastructure}` 的 `Strength*` 模块。
-两段式主 transform：`StrengthReplay`（重放已 Promoted 帧）→ `StrengthSpeculate`（为当前
-唯一 TargetProviderRun 准备 Candidate）。durable 事实只有四条事件
+两段式主 transform：`StrengthReplay`（重放已 Promoted 帧）→ `StrengthSpeculate`。Treatment 可为当前
+TargetProviderRun 准备 Candidate；显式 DryRun 只启动真实、OpenCode 可见的 attached Replica 后立即让 owner
+继续，不等待 terminal/deadline，也不映射结果。durable 事实只有四条事件
 `StrengthCandidatePrepared / Promoted / FramesTraced / CandidateAbandoned`，大 material
 只经 EventStore `payload_refs`。默认 **Shadow/K0**；K1/K2 treatment 永不因架构闭环而启用。
 
@@ -55,7 +57,7 @@ Candidate → Promotion 边界，以及让投机永远不改变「没有 Strengt
 ## 阅读顺序
 
 1. `WHY.md` —— 为什么只投机只读调查、为什么 Candidate 不能直接成为历史、被拒方向。
-2. `WHAT.md` —— 唯一 normative 合同：12 条编号命题 + 每条边界。
+2. `WHAT.md` —— 唯一 normative 合同：13 条编号命题 + 每条边界。
 3. `HOW.md` —— 实现模型：模块地图、决策管线、崩溃矩阵、历史与弃权。
 4. `PROOF.md` —— 每条命题的测试落点表、anchor id、cutover 待办。
 

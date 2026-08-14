@@ -41,36 +41,39 @@ key 顺序、数字格式、Unicode escaping 不冻结，重放身份就会漂�
 **边界**：merge 层如何用 identity 做 set-union 见 `durable-convergence`。
 **证据**：→ PROOF.md 003。
 
-## DURABLE-EVENTS-004 —— CAS 是唯一提交原语；无部分写入
+## DURABLE-EVENTS-004 —— local append 的提交原语 = 完整 NDJSON 行
 
-**规范陈述**：`Append`/`Publish` 以 canonical ref 的 CAS 为唯一提交原语：
-`CAS(refs/wanxiang/store, expected = Absent | R0, new = R1)`。成功 → 新 `StoreSnapshot`
-（Committed）。不存在「部分写入」的权威历史：one event = one immutable blob；半条 NDJSON
-不得进入 canonical root。禁止独立 `CreateRef` / 第二套首次 bootstrap 协议。
+**规范陈述**：`Append`/`Publish` 的本地 durable witness 是当前 process writer 文件末尾出现
+完整 canonical `JSON+LF` 行；成功返回前必须完成该行写入。运行时 append **不得**创建 Git blob、
+Git tree、Git ref 或执行 Git CAS，也不得因为历史长度重写既有 bytes。半行、截断行、原地改写既有
+canonical 行均非法。
 
-**含义/动机**：物理 authority 的原子性是「提交」的唯一定义；多进程并发 append 由 CAS
-裁决，不需要 leader/锁。
-**边界**：CAS 冲突后的重试语义见 005。
+**含义/动机**：本地事件真相就是裸 append-only 文件；Git 是同步编码，不是在线数据库。
+一次事实提交的物理成本只与新事实 bytes 有关，不再与 Git object/tree/index 数量有关。
+**边界**：remote Git 操作触发的 blobification / remote ref publish 见 018 与 `durable-convergence`。
 **证据**：→ PROOF.md 004。
 
-## DURABLE-EVENTS-005 —— CAS 冲突：先查 EventId，再 bounded retry
+## DURABLE-EVENTS-005 —— Process = single writer；一个进程一个永久增长文件
 
-**规范陈述**：CAS 冲突 → 重新观察 root → 若 EventId 已在 store 中则视为已 Committed；
-否则基于新 snapshot 重建 append 并 bounded retry。retry 耗尽且 EventId 仍不在 store →
-显式失败（fail closed），绝不假装已提交。
+**规范陈述**：每个 EventStore process instance 创建一个全局唯一 `WriterId`，并且只追加
+`.git/wanxiang/events/<WriterId>.ndjson`。该文件**不按大小、event 数或时间切片**：就该多大多大。
+进程结束后该 writer 文件永久封存；新进程必须创建新的 WriterId，不接管旧 writer 文件。
+业务 `stream_id`、machine identity、role/agent identity 都不得参与物理 writer ownership。
 
-**含义/动机**：崩溃在 CAS 附近时，恢复只问「canonical store 中是否已存在这个 EventId？」
-——存在即 Committed，不存在即 NotCommitted，不靠「函数有没有返回成功」猜。
-**边界**：提交结局的 witness 定义见 006。
+**含义/动机**：single-writer append 本身已经消除了本地多进程写冲突；机器只是 transport
+位置，不是事件模型的一层。多进程与多机都只是若干互不共享 WriterId 的有序输入流。
+**边界**：这些 writer streams 如何汇合见 `durable-convergence` k-way merge。
 **证据**：→ PROOF.md 005。
 
-## DURABLE-EVENTS-006 —— 提交结局的 durable witness = canonical root
+## DURABLE-EVENTS-006 —— commit outcome 只由本地事实存在性判定
 
-**规范陈述**：提交结局的 durable witness 是 canonical root（是否已包含该 `event_id`），
-不得用「再请求一次模型」、内存猜测或进程退出码代替。CAS 未见证 EventId → 不得假装已提交。
+**规范陈述**：提交结局的 durable witness 是 canonical EventId 是否已经以相同 canonical bytes
+存在于本地 writer/history truth 中；不得用 Git ref、内存猜测、模型重试或进程退出码代替。
+同 EventId + 不同 bytes → IdentityCollision；同 EventId + 同 bytes → 已提交/幂等成功。
 
-**含义/动机**：CommitUnknown 不是终点：root 本身可回答「这件事发生了没有」。
-**边界**：结局未知时**如何重试/reconcile** 归 `effect-accounting`；本包只保证判定手段。
+**含义/动机**：remote 是否同步成功与“本地事实有没有发生”是两件事。把 Git ref 当 commit
+witness 会把网络/remote 可用性重新塞回本地 critical path。
+**边界**：remote publication failure 归同步层；外部效果的 outcome-unknown policy 归 `effect-accounting`。
 **证据**：→ PROOF.md 006。
 
 ## DURABLE-EVENTS-007 —— StorageInvalid 全局 fail closed
@@ -95,76 +98,77 @@ competing facts，绝不因自然 fork 把 store 永久打成不可恢复。禁�
 **边界**：DomainConflict 的确定性表达、resolution 收敛 → `durable-convergence`。
 **证据**：→ PROOF.md 008。
 
-## DURABLE-EVENTS-009 —— 无 schema/store/migration generation；leave-unread
+## DURABLE-EVENTS-009 —— 无 schema/store generation；所有旧物理布局 shock cutover
 
-**规范陈述**：Store 不维护 schema/store/migration generation。旧 Journal NDJSON、
-RuntimePath `blobs/`、Student QA 私有文件、feature-owned ref：不要求可读、不要求可迁、
-不进入新 active domain projection、不作为 ongoing vocabulary、不要求
-LegacyProjection ≡ NewProjection；runtime 永不打开（leave-unread）。禁止 dual-write、
-legacy reader/importer、fallback-to-old-store shim。
+**规范陈述**：Store 不维护 schema/store/migration generation。旧 Journal NDJSON、RuntimePath
+`blobs/`、Student QA 私有文件、feature-owned ref，以及曾发布过的 one-event-per-blob
+`events/<hex>/<EventId>.jsonl`、`logs/<ReplicaId>/<segment>.ndjson + index/` 等 Git roots，全部
+**完全 leave-unread**：runtime/sync 不判旧 shape、不枚举旧 body、不 reset 旧 root、不迁移、不双读。
+禁止 dual-write、legacy event importer、projection-equivalence migrator、fallback-to-old-store shim。
 
-**含义/动机**：clean-break 是「无版本」严谨性的来源；旧档的兼容负担在迁移期一次结清，
-不进入运行时。
-**边界**：迁移工具本身是 one-shot（`no-migrator` 门禁见 PROOF），不是本包 runtime 面。
+**含义/动机**：这是明确的数据休克切换：允许丢弃旧 durable history，换取零永久兼容路径、
+零旧布局启动扫描。旧 Git objects 是否继续存在只由普通 Git object reachability/GC 决定，新代码不认识它们。
+**边界**：只有新 `.git/wanxiang/events|payloads` 与新 remote `writers/`/`payloads/` snapshot 属当前协议。
 **证据**：→ PROOF.md 009。
 
-## DURABLE-EVENTS-010 —— 单一 durable substrate；唯一 canonical ref
+## DURABLE-EVENTS-010 —— 单一 universal durable substrate = `.git` 内本地事件文件
 
-**规范陈述**：动态 durable state 的唯一物理介质是 Git raw object database；唯一 canonical
-ref 是 `refs/wanxiang/store`（指向 root tree，不是 commit）。feature-owned
-`refs/wanxiang/<feature-…>`、平行 journal/blob/store 非法。AgentJournal 只是 EventStore
-上的适配表面，不是平行存储；旧 NDJSON 路径不得再作为生产写入口。
+**规范陈述**：动态 durable event truth 的运行时物理介质只能是 `.git/wanxiang/events/*.ndjson`
+与它们引用的 `.git/wanxiang/payloads/*`；所有 `EventEnvelope`——AgentJournal、Job、Casebook、
+Strength、JsTransaction 或未来 domain——都进入这套 universal writer files。feature-owned
+journal/blob/store/ref、按 domain 拆 backend 非法。业务 `stream_id` 不决定物理文件；WriterId 决定。
 
-**含义/动机**：一个 canonical ref、一个 object database、一套 append 协议——多进程与
-dumb remote 才能共享同一套 merge/CAS/恢复。
-**边界**：静态人工维护的 repository content（resources/、docs、Change 文件）不是
-EventStore，仍走普通 Git。
+**含义/动机**：用户 working tree 看不见运行态证据，同时运行时仍只是普通 append-only 文件；
+不用 Git object graph 承担数据库职责。
+**边界**：静态 repository content（resources/docs/Change）仍走普通 Git；remote 编码见 011/018。
 **证据**：→ PROOF.md 010。
 
-## DURABLE-EVENTS-011 —— Git raw 是唯一物理介质；无 commit/branch/tag 历史
+## DURABLE-EVENTS-011 —— Git blob 只存在于 remote sync 边界；一 writer 文件 = 一 blob
 
-**规范陈述**：Git 只作为 content-addressed object store / tree store / atomic ref CAS /
-object transport。**不使用** commit history/branch/tag/merge commit 表达 EventStore 历史；
-canonical ref 直接指向 root tree；树内只有 `events/<hex-prefix>/<EventId>.jsonl` 分片
-与 `payloads/`；禁止 ordinal/sequence 命名。历史来自 event DAG，不来自 Git commit graph。
+**规范陈述**：Git object database 不是运行时 event store。仅当用户自己的 Git 进程执行 remote
+操作并进入 Wanxiangshu 安装的 Git hook 时，当前每个完整本地 writer NDJSON 文件才按其**全部 bytes**编码为
+**恰好一个 Git blob**；不得切 chunk/segment、不得维护 EventId index tree、不得设计 delta protocol。
+Wanxiangshu/OpenCode 主进程不主动发起 fetch/pull/push，也不是 sync 的运行宿主。
+下一次 sync 同一 writer 文件增长后，可得到新的 blob OID；旧 blob 只是不可达传输产物。
 
-**含义/动机**：Store 不制造产品意义上的 Git history；root tree 只回答「当前完整
-append-only event set 是什么」。
-**边界**：普通 repository source history 仍走 Git commits——那是另一条语义线。
+**含义/动机**：本地文件是身份稳定的真相，blob OID 只是某次同步快照的内容寻址编码。
+Wanxiangshu 不参与 Git pack/delta 优化，也不让它反向污染 append hot path。
+**边界**：remote root 如何列出 writer→blob 与双方替换见 `durable-convergence`。
 **证据**：→ PROOF.md 011。
 
-## DURABLE-EVENTS-012 —— PayloadRef 与 payload closure
+## DURABLE-EVENTS-012 —— PayloadRef 与本地 payload closure
 
-**规范陈述**：大正文经 `payload bytes → Git blob → GitObjectId → Domain PayloadRef
-（opaque）→ envelope.payload_refs`。committed root 的 `payloads/` 恰好等于全部 committed
-events 的 `payload_refs` 并集（closure）：dangling ref → StorageInvalid；未引用 payload
-不得进入 committed root。Domain 只见 opaque `PayloadRef`，不得操作 Git OID。
+**规范陈述**：大正文先以 content digest 形成 opaque `PayloadRef`，bytes 保存在
+`.git/wanxiang/payloads/<PayloadRef>`；event 成功 append 前，所有新增 payload refs 必须已经存在且
+bytes/digest 一致。Integrator 可见的当前 truth 必须满足全部 committed events 的 payload closure；
+dangling ref → StorageInvalid。remote sync 时 payload 文件才编码为 Git blob。Domain 不得操作 Git OID。
 
-**含义/动机**：closure 使「相同 event 集合 → 相同 canonical root」成立（merge 纯函数性）；
-Git object id 即物理 content identity，不再维护第二套 blob 约定。
-**边界**：BlobRef/BlobDigest 的兼容映射是 AgentJournal 适配细节（HOW）。
+**含义/动机**：payload 与 event 一样先是本地 durable truth，Git 只是同步载体；同时保持大正文
+内容寻址与去重，不把正文塞回 NDJSON。
+**边界**：digest 算法与 remote tree layout 是 HOW；业务只见 opaque PayloadRef。
 **证据**：→ PROOF.md 012。
 
-## DURABLE-EVENTS-013 —— 查询从 projection 读；O(1) 积分；先 commit 后 fold
+## DURABLE-EVENTS-013 —— 查询只读正规 Integrator 的 Current；先 commit 后 integrate
 
-**规范陈述**：Projection 查询不得扫描完整历史，必须以 O(1) 积分状态回答当前
-epoch/frames/coverage/XTrace 锚点/effect 窗口。Projection 不是第二真相源：禁止先改投影
-再补 event；必须 append/publish 见证成功后再 fold 权威内存 projection。
+**规范陈述**：任何当前状态查询不得扫描/过滤/手动 fold 历史，只能读取唯一 canonical Integrator
+维护的 `Current` 积分态。`Current` 不是第二真相源：禁止先改 Current 再补 event；必须先完成本地
+canonical 行 append/payload closure，再把同一 EventEnvelope 交给 Integrator。进程重启时 Current
+只能由 Integrator 对历史执行同一套 integration rules 重建。
 
-**含义/动机**：把「查询」变成「重放成本」是拒绝的方案；把「先改内存再补盘」变成
-「内存看见无证据的未来」。投影可随时丢弃并从 event history 重建。
-**边界**：各 domain projection 的字段语义归各 domain owner。
+**含义/动机**：历史只有一个解释权，避免 Journal/Strength/Casebook/JsTransaction 各写一套
+“load history → project”的隐性第二积分器。
+**边界**：Integrator 的注册模型见 019；各业务状态字段意义归对应 domain owner。
 **证据**：→ PROOF.md 013。
 
-## DURABLE-EVENTS-014 —— 确定性 fold
+## DURABLE-EVENTS-014 —— k-way 输入顺序 + 确定性积分
 
-**规范陈述**：投影按 `parents` 做 deterministic topological fold：任一 event 只有其全部
-parents 已 fold 才可 fold；`parents` 未知/缺失/成环 → StorageInvalid。拓扑排序用 EventId
-字典序作物理 tie-breaker（永不作为业务时序）。相同 merged snapshot 必须得到相同
-projection。
+**规范陈述**：每个 WriterId 文件内部按 append 顺序有序；多个 writer history 的统一输入顺序由
+既有 deterministic k-way merge 产生。Integrator 必须按该 canonical order 一次处理每个 EventEnvelope；
+相同 writer streams 集合必须得到相同 Current。same EventId+same bytes 去重；same EventId+different
+bytes fail closed。业务模块不得自行重排历史。
 
-**含义/动机**：同输入同输出是重放与审计的根基；EventId 排序只是物理 canonicalization。
-**边界**：相同 event set 如何被 merge 出来 → `durable-convergence`。
+**含义/动机**：单机多进程和多机分布式没有两套算法——都是若干有序 writer streams 的 k-way merge。
+**边界**：k-way merge 的代数/transport 收敛归 `durable-convergence`；业务积分只消费其输出。
 **证据**：→ PROOF.md 014。
 
 ## DURABLE-EVENTS-015 —— 恢复 fold 不变量 owner（PERSIST-010）
@@ -186,11 +190,49 @@ fold 拒绝、writer 中毒、fail closed——不产生任何 writer 不可能�
 
 ## DURABLE-EVENTS-016 —— 所有权红线：Git 物理概念不外泄
 
-**规范陈述**：`GitObjectId`/`RootOid`/`StoreSnapshot`/`AppendCandidate` 等物理概念只属于
-Persist 层；`refs/wanxiang/store` 只允许出现在 Persist/Git infrastructure。Domain 层
+**规范陈述**：`GitObjectId`/`RootOid`/`StoreSnapshot`/`TreeEntry`/`IGitRawStore` 等 remote-sync
+物理概念只属于 Persist/Git infrastructure；`refs/wanxiang/store` 只允许出现在该 infrastructure。Domain 层
 不得 `open Infrastructure` 或引用这些类型；Domain 只见 `EventEnvelope` 与 opaque
 `PayloadRef`。
 
 **含义/动机**：把「事实的语义」与「事实的物理存放」隔离；领域语义不随存储机制漂移。
 **边界**：这条红线的静态门禁与 fixture 见 PROOF 016。
 **证据**：→ PROOF.md 016。
+
+## DURABLE-EVENTS-017 —— local append 复杂度不得依赖 history / Git
+
+**规范陈述**：追加一个新 EventEnvelope 时，运行时 Git object/tree/ref 操作数必须为 **0**；不得读取或
+重写任何既有 writer file bytes，新增写入量只与该 event canonical bytes（及显式新 payload bytes）相关。
+EventId 分布、历史 event 数、writer 文件当前大小都不得改变 append 所需 Git work，因为 append 路径没有 Git work。
+
+**含义/动机**：这是对本次性能根因的结构性封口；不能再用 index/tree 优化去修一个本不该存在的在线 Git 数据库。
+**边界**：OS flush/fsync policy 是 HOW；remote sync 成本不属于 local append latency。
+**证据**：→ PROOF.md 017。
+
+## DURABLE-EVENTS-018 —— remote 操作才同步；同步替换 local + remote truth snapshot
+
+**规范陈述**：Wanxiangshu 不运行 timer/background uploader/event-count sync，也不从产品进程主动调用
+fetch/pull/push。Wanxiangshu 启动时只负责 **ensure Git hook + remote store refspec 正确安装**；之后只有用户自己的
+Git remote 操作触发独立 hook 进程同步 EventStore。hook 必须在 OpenCode/Wanxiangshu 完全未运行时仍可独立读取
+本地 writer files 与远端 writer blobs，按 `durable-convergence` 的 k-way merge/identity law 得到统一 history，
+直接 materialize/replace 本地 writer truth 与 remote snapshot；不设计 delta/chunk/增量 object protocol。
+
+**含义/动机**：同步是用户 Git 操作的副作用，不是 Wanxiangshu runtime 的第二个生命周期。`git push` 可以发生在
+OpenCode 已退出以后，仍必须同步成功。全量文件很大也先保持 KISS；优化必须由真实 profiling 重新证明需要。
+**边界**：remote ref/lease/transport failures 归 `durable-convergence`；本命题只钉 trigger 与物理粒度。
+**证据**：→ PROOF.md 018。
+
+## DURABLE-EVENTS-019 —— 唯一 canonical Integrator；业务只注册 integration oracle
+
+**规范陈述**：生产代码中只有一个 canonical F# CE Integrator 可以把历史 writer streams **解释/积分为 Current**；
+它拥有 boot/recovery 的 history iteration、共享 `EventKWayMerge` 输入与 integration frontier。每个业务模块只能向该
+Integrator **注册**单 EventEnvelope 的 integration oracle/rule；业务模块不得获得 history-reader capability，不得自行
+`loadEvents` / `scan history` / `fold list` /“从 EventStore 重建 projection”。启动 replay 与在线 append 必须调用同一个
+CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物理 union/identity validation**读取 writer streams 并调用
+同一个 `EventKWayMerge`，但它不得产生/修改任何业务 Current。
+
+**含义/动机**：event sourcing 只有一个解释器；模块拥有规则，不拥有重放循环。这样 Current 的积分逻辑
+不会因恢复/在线/feature helper 分裂成多个状态机或手写 fold。
+**边界**：业务 rule 内部可维护自己被分配的 Current 槽位，但 orchestration/registration/history iteration
+只属于 Integrator；实现必须使用 F# CE DSL，不引入事件状态机。
+**证据**：→ PROOF.md 019。

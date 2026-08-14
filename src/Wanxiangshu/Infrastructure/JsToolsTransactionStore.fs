@@ -6,11 +6,16 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Kernel.Identity
 
+/// Narrow durable capability exposed to js-* workflow/tool wiring. The Host
+/// registry never owns both AgentJournal and the raw EventStore capability.
+type IJsTransactionPersistence =
+    abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, string>>
+    abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, string>>
+
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
 /// / feature store). A transaction is Prepared before any filesystem effect
-/// and Committed after; recovery scans for Prepared-without-Committed and
-/// undoes only what we provably wrote.
+/// and Committed after; recovery consumes canonical Integrator Current.
 module JsToolsTransactionStore =
 
     /// Single linear stream for transaction facts.
@@ -58,109 +63,86 @@ module JsToolsTransactionStore =
 
     // ---- append -----------------------------------------------------------
 
-    /// Append the Prepared fact. `parents` = the current head of the
-    /// transaction stream (linear chain; empty on first use).
+    let isTransactionEventType eventType =
+        eventType = PreparedEventType || eventType = CommittedEventType
+
+    type DecodedTransactionEvent =
+        | Prepared of JsTransactionPrepared
+        | Committed of JsTransactionCommitted
+
+    /// Single-event integration decoder. History iteration belongs exclusively
+    /// to CanonicalIntegrator.
+    let tryDecodeEnvelope (envelope: EventEnvelope) : Result<DecodedTransactionEvent, string> =
+        match envelope.EventType with
+        | eventType when eventType = PreparedEventType ->
+            Decode.fromValue "$" decodePrepared envelope.Payload |> Result.map Prepared
+        | eventType when eventType = CommittedEventType ->
+            Decode.fromValue "$" decodeCommitted envelope.Payload |> Result.map Committed
+        | other -> Error(sprintf "not a JsTransaction event: %s" other)
+
+    /// Append the Prepared fact using the Integrator-owned structural head.
     let appendPrepared
         (store: IEventStore)
-        (parents: EventId list)
         (prepared: JsTransactionPrepared)
         : Task<Result<EventId, string>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+            let streamId = EventStreamId.create TransactionStream
 
             let envelope =
                 EventEnvelope.normalize
                     { EventId = eventId
-                      StreamId = EventStreamId.create TransactionStream
+                      StreamId = streamId
                       EventType = PreparedEventType
-                      Parents = parents
+                      Parents = store.TryHead streamId |> Option.toList
                       Payload = payload (encodePrepared prepared)
                       PayloadRefs = [] }
 
-            let! snapshot = store.OpenSnapshot()
-
-            match! store.Append(snapshot, [ envelope ]) with
-            | Ok _ -> return Ok eventId
+            match! store.Append [ envelope ] with
+            | Ok() -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionPrepared append failed: %A" err)
         }
 
     /// Append the Committed fact for a prepared transaction.
     let appendCommitted
         (store: IEventStore)
-        (parents: EventId list)
         (transactionId: JsTransactionId)
         : Task<Result<EventId, string>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+            let streamId = EventStreamId.create TransactionStream
 
             let envelope =
                 EventEnvelope.normalize
                     { EventId = eventId
-                      StreamId = EventStreamId.create TransactionStream
+                      StreamId = streamId
                       EventType = CommittedEventType
-                      Parents = parents
+                      Parents = store.TryHead streamId |> Option.toList
                       Payload = payload (encodeCommitted { TransactionId = transactionId })
                       PayloadRefs = [] }
 
-            let! snapshot = store.OpenSnapshot()
-
-            match! store.Append(snapshot, [ envelope ]) with
-            | Ok _ -> return Ok eventId
+            match! store.Append [ envelope ] with
+            | Ok() -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionCommitted append failed: %A" err)
         }
 
-    // ---- load / scan ------------------------------------------------------
+    let createPersistence (store: IEventStore) : IJsTransactionPersistence =
+        { new IJsTransactionPersistence with
+            member _.AppendPrepared(prepared) = appendPrepared store prepared
+            member _.AppendCommitted(transactionId) = appendCommitted store transactionId }
 
-    /// All transaction-stream events from a snapshot, in causal order.
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
-        task {
-            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
-            | Ok events ->
-                return
-                    events
-                    |> List.filter (fun e -> e.EventType = PreparedEventType || e.EventType = CommittedEventType)
-                    |> Ok
-        }
+    /// JS-015: crash recovery consumes only the canonical Integrator Current.
+    /// No transaction code is allowed to enumerate durable history itself.
+    let recoverCurrent (store: IEventStore) : unit =
+        match store.TryCurrent "JsTransaction" with
+        | None -> ()
+        | Some current ->
+            let projection = unbox<JsTransactionProjection> current
 
-    /// The stream head EventId (last event on the transaction stream), for
-    /// linear-parent appends.
-    let streamHead (events: EventEnvelope list) : EventId option =
-        events |> List.tryLast |> Option.map (fun e -> e.EventId)
-
-    let private tryDecodePrepared (envelope: EventEnvelope) : JsTransactionPrepared option =
-        match Decode.fromValue "$" decodePrepared envelope.Payload with
-        | Ok prepared -> Some prepared
-        | Error _ -> None
-
-    let private tryDecodeCommitted (envelope: EventEnvelope) : JsTransactionId option =
-        match Decode.fromValue "$" decodeCommitted envelope.Payload with
-        | Ok committed -> Some committed.TransactionId
-        | Error _ -> None
-
-    /// Prepared transactions with no matching Committed fact (JS-015:
-    /// crash recovery candidates).
-    let scanUncommitted (events: EventEnvelope list) : JsTransactionPrepared list =
-        let committed =
-            events
-            |> List.choose (fun e ->
-                if e.EventType = CommittedEventType then
-                    tryDecodeCommitted e
-                else
-                    None)
-            |> Set.ofList
-
-        events
-        |> List.choose (fun e ->
-            if e.EventType = PreparedEventType then
-                tryDecodePrepared e
-                |> Option.filter (fun p -> not (Set.contains p.TransactionId committed))
-            else
-                None)
-
-    /// JS-015: crash recovery — undo each uncommitted transaction's mutations,
-    /// but only where the disk still holds exactly the text we wrote.
-    let recover (root: string) (pending: JsTransactionPrepared list) : unit =
-        for prepared in pending do
-            for mutation in prepared.Mutations do
-                JsMutationFs.undoIfMatches root mutation.Path mutation.NewText mutation.OriginalText
+            for prepared in JsTransactionProjection.pending projection do
+                for mutation in prepared.Mutations do
+                    JsMutationFs.undoIfMatches
+                        prepared.WorkspaceRoot
+                        mutation.Path
+                        mutation.NewText
+                        mutation.OriginalText

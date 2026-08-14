@@ -5,8 +5,10 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Git
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 
@@ -60,6 +62,16 @@ module PluginBoot =
             // worktree release at publish. First boot wins: the main workspace
             // instance starts before the manager worktree instances.
             let workspaceDirectory = PluginHost.workspaceDirectory input
+
+            // DURABLE-CONVERGENCE-008: startup only ensures the external Git-hook
+            // membrane. Actual sync runs later in the user's Git hook process and
+            // must not depend on this OpenCode/Wanxiangshu process remaining alive.
+            match workspaceDirectory with
+            | None -> ()
+            | Some workspace ->
+                match HookDispatcher.ensure workspace with
+                | Ok() -> ()
+                | Error error -> raise (InvalidOperationException error)
 
             let gitTreePort =
                 match PluginHost.gitTreePortFromInput input with

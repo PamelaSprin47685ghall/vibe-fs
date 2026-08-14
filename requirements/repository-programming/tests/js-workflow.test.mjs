@@ -18,6 +18,8 @@ import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { FsSet } from '../../verification-system/tests/support/domain.mjs'
 import { parse as parseToml } from 'smol-toml'
 import { caseOf, listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
+import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
+import { JsTransactionProjectionModule_pending as pendingTransactions } from '../../../dist/Domain/JsTransaction.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
@@ -144,10 +146,10 @@ test('JS085_workflow_program_error_fails_without_commit', async () => {
 
 test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
   const { dir, cleanup } = sandbox()
+  const local = createLocalEventStore()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const raw = (await import('../../../dist/Infrastructure/Persist/GitRawStore.js')).GitRawStore_createInMemory()
-    const store = (await import('../../../dist/Infrastructure/Persist/EventStore.js')).EventStore_create(raw)
+    const store = local.store
     const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
@@ -156,17 +158,14 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     return { done: true };
   }
 }`
-    // F# option Some(tuple) → the tuple array itself
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, [store, raw])
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, store)
     assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
 
-    const storeModule = await import('../../../dist/Infrastructure/JsToolsTransactionStore.js')
-    const events = resultOf(await storeModule.loadEvents(raw, await store.OpenSnapshot()))
-    assert.equal(events.ok, true)
-    assert.deepEqual(listItems(events.value).map((e) => e.EventType).sort(), ['JsTransactionCommitted', 'JsTransactionPrepared'])
-    assert.deepEqual(listItems(storeModule.scanUncommitted(events.value)), [], 'no uncommitted after commit fact')
+    const projection = store.TryCurrent('JsTransaction')
+    assert.deepEqual(listItems(pendingTransactions(projection)), [], 'no uncommitted transaction remains in Integrator Current')
   } finally {
+    local.close()
     cleanup()
   }
 })

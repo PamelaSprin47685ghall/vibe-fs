@@ -5,63 +5,89 @@
 
 ## 核心机制（逐概念）
 
-### 1. K-way merge（`Infrastructure/Persist/EventStoreMerge.fs`）
+### 1. K-way merge（`Infrastructure/Persist/CanonicalIntegrator.fs` / sync support）
 
 ```text
-EventStoreMergeSpec（契约 oracle，测试对照）：
-  mergeEvents = mergeByIdentity（set union + identity dedupe；同 id 异 bytes → IdentityCollision）
-  merge(store, MergeInput) = 逐 snapshot loadEventEnvelopes → mergeEvents
-EventStoreMerge（生产）：
-  collisionAt：同 EventId 路径 blob OID 不同 → IdentityCollision
-  mergeEntryLists：identical bytes → 复用 OID；events/ 下异 bytes → IdentityCollision；
-                   payloads/ 等其它路径冲突 → NonCanonical；missing → MalformedEnvelope
-  merge：[] → empty；[only] → as-is；many → K-way（结构性 union，非 O(N) 全量反序列化）
+inputs:
+  .git/wanxiang/events/<WriterId>.ndjson   // one process = one ordered stream
+  remote WriterId blob                    // same full-file bytes at remote snapshot
+
+KWayMerge:
+  one cursor per writer stream
+  compare canonical event sort key
+  same EventId + same bytes → dedupe
+  same EventId + different bytes → IdentityCollision
+  output independent of stream enumeration / process / machine
+
+boot/recovery: KWayMerge(local streams) → CanonicalIntegrator CE
+remote sync:   KWayMerge(local + remote streams) → local replacement + remote materialization
+ordinary local Append: no global merge; append only own WriterId file then Integrator integrates that one event
 ```
 
-### 2. DomainConflict 表达（`Infrastructure/Persist/EventStoreFold.fs` + `StoreTypes.fs`）
+### 2. DomainConflict / structural frontier（`IntegrationKernel.fs` + `CanonicalIntegrator.fs`）
 
 ```text
-StoreTypes.DomainConflict = ConcurrentHeads of streamId * heads（RequireQualifiedAccess）
-EventStoreFold.StreamHeadState = Empty | Unique of head | Conflict of DomainConflict
-applyStream：新 event 与既有 head 并发（非其后继）→ Conflict；
-isResolution：event_type EndsWith "ConflictResolved" | "Resolved"
-resolution 覆盖全部 prior heads → 收敛为单一 head；仅当 resolution + 全部 parents 已 fold
-projection 才离开 conflict state
-fold：validateVocabulary → validateParents → topologicalOrder（Kahn + EventId tie-break）
-      → applyStream → { Streams; FoldOrder; Conflicts }
+StructuralProjection.Heads : stream_id → Set<EventId>
+StructuralIntegration.rule : accepts every EventEnvelope
+
+apply one event:
+  prior = Heads[stream]
+  next  = (prior - event.parents) + event.id
+
+|next| = 0  → empty
+|next| = 1  → unique structural head
+|next| > 1  → DomainConflict frontier（合法 concurrent fork；非 StorageInvalid）
+
+resolution event 只有在 parents 覆盖全部 competing heads 时才把 set 收敛为自己的单 head。
+StructuralIntegration 与 Journal/Strength/Casebook/JsTransaction business rules 一样注册进
+同一个 CanonicalIntegrator CE；同一 event 可以同时更新 structural slot + 一个 business slot，
+不存在第二个 full-history projector。
 ```
 
-### 3. Converge 永远双向（`Infrastructure/Git/GitGateway.fs` + `Infrastructure/Persist/EventStore.fs`）
+### 3. Remote-only 双向 sync（独立 Git hook 进程）
 
 ```text
-IEventStore.Converge(remote) → 经绑定的 GitGateway
-convergeLoop：
-  1. fetchStoreRef：git fetch <remote> +refs/wanxiang/store:refs/wanxiang/remotes/<remote>/store
-     （缺 remote ref → Ok Absent lease）
-  2. EventStoreMerge.merge [local; remoteSnap]
-  3. validateMerged：EventStoreMergeSpec.merge → EventStoreFold.validate → PayloadClosure.validatePresent
-  4. CAS local canonical ref
-  5. leasePush：git push --force-with-lease=refs/wanxiang/store:<expected> <remote> <oid>:refs/wanxiang/store
-  race → 重新 fetch → loop（ConvergeCasRejected / ConvergeRetryExhausted at exhaustion）
-convergeStoreWithObservedRemote：hook 路径复用已 fetch 的 observedRemoteSnapshot，不重复 fetch
-SyncActiveEnv = "WANXIANG_GIT_SYNC_ACTIVE" + syncActiveDepth：嵌套 ConvergeStore 直接返回 local snapshot
+Wanxiangshu/OpenCode startup:
+  ensure reference-transaction + pre-push hooks
+  ensure remote Wanxiang store fetch-refspec
+  stop — 产品进程不主动 fetch/pull/push
+
+user Git process → hook child process:
+  1. obtain remote EventStore root
+     - reference-transaction: use the just-observed remote-tracking root
+     - pre-push: fetch/read the remote store root
+  2. decode each remote writer blob as one full canonical NDJSON stream
+  3. read local .git/wanxiang/events/*.ndjson streams
+  4. KWayMerge + identity/structural validation + payload closure
+  5. replace local synchronized writer-file set
+  6. encode each complete synchronized WriterId file as exactly one Git blob
+  7. materialize remote root + lease-push
+  race → refetch and repeat boundedly
+
+reference-transaction and pre-push are both full bidirectional convergence;
+they differ only in how the initial remote root is obtained.
+No Integrator/WorkspaceEventStore dependency exists in the hook process.
+No timer/background uploader/event-count trigger.
+No segment/chunk/index/delta protocol.
+WANXIANG_GIT_SYNC_ACTIVE prevents Git operations performed by the hook from recursively entering sync.
 ```
 
 ### 4. Dumb remote 与 hook（`Infrastructure/Git/HookDispatcher.fs`）
 
 ```text
 remote = 普通 bare Git repo：objects / refs / fetch / push / lease(CAS) / auth
-HookDispatcher：reference-transaction（store remote-tracking ref 变化 → 触发收敛）+
-                pre-push shim（fetch remote store → merge → CAS local → lease push → 继续原 push）
+HookDispatcher：reference-transaction（observed store root → full bidirectional converge）+
+                pre-push shim（discover/fetch store root → full bidirectional converge → 继续原 push）
+startup ensure：Wanxiangshu 启动时确保 hook + refspec；同步执行本身不要求 Wanxiangshu 正在运行
 安装规则：不覆盖/不删除用户 hook、不改写无法证明 ownership 的 hook、安全 chain/dispatcher、
          无法安全集成时明确诊断 Git integration incomplete（不得静默降级）
-递归 guard：WANXIANG_GIT_SYNC_ACTIVE=1 → 内部 Git 操作不再触发收敛
+递归 guard：WANXIANG_GIT_SYNC_ACTIVE=1 → hook 内部 Git 操作不再触发收敛
 ```
 
 ## 边界与相关实现
 
-- single-store 的 append/CAS/canonical identity/fold 机制全部在 `durable-events`
-  （`CanonicalEventCodec`/`EventStore`/`GitRawStore`/`StoreTypes`/`EventStoreFold`）。
+- single-store 的 local append/canonical identity/Integrator 机制全部在 `durable-events`
+  （`CanonicalEventCodec`/`ProcessEventLog`/`EventStore`/`CanonicalIntegrator`）。Git raw 只在本包 remote sync materialization 使用。
 - `Converge` 的 transport 失败（offline/auth/lease contention）由 `GitGateway` 的
   `GitError = Transport | Failed` 表达；物理能力合同归 `host-boundary`。
 - Casebook 的 `revision/wall_clock deterministic tie` 只允许在 **CasebookProjection**
@@ -79,8 +105,8 @@ HookDispatcher：reference-transaction（store remote-tracking ref 变化 → �
 3. **multi-remote CRDT —— 弃权（future work）**：storage.md §22 首版一个 remote 一个
    同步算法；多 remote、Repository Identity + Session Portability（§42.6）由未来
    Proposal 定义，当前不承诺。
-4. **Process Registry / MergeStateMachine —— 弃权**：storage.md §10.7/10.8 禁止；
-   并发知识只通过 snapshot/root/CAS/remote-tracking 显现。
+4. **Process Registry / MergeStateMachine —— 弃权**：不维护 machine/process registry、lease 或同步状态机；
+   WriterId 只作为 single-writer stream identity。进程死后 writer 自然封存，新进程开新 WriterId。
 5. **「非法 fork → fail closed」的旧解释 —— 弃权**：storage.md §5.3 Amendment 把
    Storage 层永不因自然 fork 不可恢复；「forbidden fork」= DomainConflict 业务不可
    接受态，由 projection + resolution 收敛。

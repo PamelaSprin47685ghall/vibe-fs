@@ -4,6 +4,7 @@ open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
+open Wanxiangshu.Resources
 
 [<RequireQualifiedAccess>]
 module PairProgrammingCalibration =
@@ -14,7 +15,7 @@ module PairProgrammingCalibration =
     [<Literal>]
     let ElapsedPath = "host/pair-programming-elapsed"
 
-    let private nonBlank value =
+    let private nonBlank (value: string option) =
         value
         |> Option.map (fun text -> text.Trim())
         |> Option.filter (String.IsNullOrWhiteSpace >> not)

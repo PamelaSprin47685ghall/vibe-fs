@@ -199,6 +199,52 @@ module DedicatedTodoReviewerRuntime =
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
+    /// A dedicated reviewer session spans checkpoints, but its Host-owned work-unit
+    /// handle may legitimately finish after each assignment. New assignments reuse
+    /// the logical/physical reviewer by durably writing a fresh HandleLinked edge;
+    /// already-assigned checkpoints never call this helper.
+    let private ensureReusableReviewerWorkUnit
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (agentId: string)
+        (reviewerSessionId: SessionId)
+        (fallbackAgentName: string)
+        (allowRelink: bool)
+        : Task<Result<unit, string>> =
+        let snapshot = AgentJournal.snapshot journal
+
+        if not allowRelink then
+            Task.FromResult(Ok())
+        else
+            match Map.tryFind reviewerSessionId snapshot.AgentProjections.HandleByChildSession with
+            | Some record ->
+                match record.Lifecycle with
+                | HandleLifecycle.Active -> Task.FromResult(Ok())
+                | HandleLifecycle.Abandoned _ ->
+                    Task.FromResult(Error "dedicated reviewer work-unit is abandoned")
+                | HandleLifecycle.CompletedAwaitingJoin _
+                | HandleLifecycle.Retired ->
+                    // HandleController.linkNamed is the sole HandleLinked writer.
+                    HandleController.linkNamed
+                        (Some journal)
+                        managerSessionId
+                        agentId
+                        reviewerSessionId
+                        record.TargetAgent
+                        record.Byname
+                        Role.Reviewer
+                        HandleOwnership.HostOwnedHidden
+            | None ->
+                HandleController.linkNamed
+                    (Some journal)
+                    managerSessionId
+                    agentId
+                    reviewerSessionId
+                    fallbackAgentName
+                    fallbackAgentName
+                    Role.Reviewer
+                    HandleOwnership.HostOwnedHidden
+
     let private appendAssigned
         (journal: AgentJournal)
         (managerSessionId: SessionId)
@@ -303,12 +349,22 @@ module DedicatedTodoReviewerRuntime =
                         match enlistedResult with
                         | Error reason -> return Error reason
                         | Ok enlisted ->
-                            match checkpoint.Assignment with
-                            | Some _ ->
+                            let! reusableResult =
+                                ensureReusableReviewerWorkUnit
+                                    journal
+                                    managerSessionId
+                                    handleId
+                                    enlisted.ReviewerSessionId
+                                    agentName
+                                    checkpoint.Assignment.IsNone
+
+                            match reusableResult, checkpoint.Assignment with
+                            | Error reason, _ -> return Error reason
+                            | Ok(), Some _ ->
                                 match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
                                 | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
                                 | _ -> return Ok()
-                            | None ->
+                            | Ok(), None ->
                                 let prepared: TodoWritePrepared =
                                     { ManagerSessionId = managerSessionId
                                       ManagerLifeId = lifeId
@@ -319,6 +375,7 @@ module DedicatedTodoReviewerRuntime =
                                       BaseTodoDigest = checkpoint.BaseTodoDigest
                                       ProposedTodoRef = checkpoint.ProposedTodoRef
                                       ProposedTodoDigest = checkpoint.ProposedTodoDigest
+                                      PlanCompleteDeclared = checkpoint.PlanCompleteDeclared
                                       ProviderInputDigest = checkpoint.ProviderInputDigest
                                       ReviewFrontier = checkpoint.ReviewFrontier
                                       SemanticVersion = checkpoint.SemanticVersion }
@@ -363,6 +420,7 @@ module DedicatedTodoReviewerRuntime =
                                                   ManagerLifeId = lifeId
                                                   OpeningRaw = opening
                                                   ManagerCheckpointLwr = checkpointLwr
+                                                  EffectivePlanComplete = MagicTodoProjection.isPlanCommitted life
                                                   OldTodo = oldItems
                                                   ProposedTodo = proposed }
 
@@ -384,9 +442,7 @@ module DedicatedTodoReviewerRuntime =
                                                 |> Option.isSome
 
                                             let isFirstAcceptedWrite =
-                                                match life.AcceptedOrder with
-                                                | [ only ] when only = writeId -> true
-                                                | _ -> false
+                                                MagicTodoProjection.isFirstAcceptedCheckpoint life writeId
 
                                             let delivery =
                                                 MagicTodoAfter.assignmentDelivery hasActiveProfile isFirstAcceptedWrite

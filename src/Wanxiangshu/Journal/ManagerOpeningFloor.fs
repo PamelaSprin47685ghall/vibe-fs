@@ -18,12 +18,9 @@ module ManagerOpeningFloor =
               ToolCallId = part.ToolCallId })
 
     let private t1Anchor (magic: MagicTodoProjection.LifeMagicTodoState) : (XTraceCursor * ToolCallId) option =
-        match MagicTodoProjection.acceptedOrder magic with
-        | [] -> None
-        | firstId :: _ ->
-            match Map.tryFind (TodoWriteId.value firstId) magic.Checkpoints with
-            | Some cp -> Some(cp.ReviewFrontier, cp.ToolCallId)
-            | None -> None
+        magic.FirstPlanCommitment
+        |> Option.bind (fun writeId -> Map.tryFind (TodoWriteId.value writeId) magic.Checkpoints)
+        |> Option.map (fun cp -> cp.ReviewFrontier, cp.ToolCallId)
 
     /// WorkRecordStart when Post-T1; None while Pre-T1 (Opening still open).
     let workRecordStart
@@ -33,7 +30,7 @@ module ManagerOpeningFloor =
         : XTraceCursor option =
         match magic with
         | None -> None
-        | Some state when List.isEmpty state.AcceptedOrder -> None
+        | Some state when not (MagicTodoProjection.isPlanCommitted state) -> None
         | Some state ->
             match t1Anchor state with
             | Some(callCursor, callId) ->
@@ -52,10 +49,8 @@ module ManagerOpeningFloor =
         | Some current ->
             let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
 
-            let acceptedCount =
-                magic
-                |> Option.map (fun state -> List.length state.AcceptedOrder)
-                |> Option.defaultValue 0
+            let planCommitted =
+                magic |> Option.exists MagicTodoProjection.isPlanCommitted
 
             let callCursor, callId =
                 match magic |> Option.bind t1Anchor with
@@ -64,7 +59,7 @@ module ManagerOpeningFloor =
 
             MagicTodo.effectiveOpeningFloor
                 true
-                acceptedCount
+                planCommitted
                 current.OpeningCursor
                 callCursor
                 callId

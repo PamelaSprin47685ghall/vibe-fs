@@ -3,10 +3,9 @@ import test from 'node:test'
 
 import { providerLanguage } from '../../verification-system/tests/support/domain.mjs'
 
-const {
-  PairProgrammingCalibration_compose: compose,
-  PairProgrammingCalibration_renderToolEstimate: renderToolEstimate,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js')
+const { compose, renderToolEstimate } = await import(
+  '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js'
+)
 
 test('GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
   const guideline = 'canonical pair guideline'

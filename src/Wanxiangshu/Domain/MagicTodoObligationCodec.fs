@@ -5,7 +5,7 @@ open Wanxiangshu.Domain.MagicTodo
 
 /// Sole durable/provider JSON codec for the GrandRewrite obligation account.
 /// Blob bodies are `[{name,work}]`; provider calls are
-/// `{obligations:[{name,work}]}`. No legacy id/status/progress vocabulary is
+/// `{planComplete:bool,obligations:[{name,work}]}`. No legacy id/status/progress vocabulary is
 /// accepted here.
 module MagicTodoObligationCodec =
 
@@ -23,10 +23,14 @@ module MagicTodoObligationCodec =
         with error ->
             Error error.Message
 
-    /// Decode the provider-facing call object explicitly; snapshot locality must
-    /// never compare an account object through the blob-list decoder.
-    let tryDecodeAccount (json: string) : Result<ObligationList, string> =
+    /// Decode the provider-facing call object explicitly; snapshot locality binds
+    /// the raw commitment declaration and the obligation account together.
+    let tryDecodeInput (json: string) : Result<TodoWriteInput, string> =
         try
-            Decode.fromString (Decode.field "obligations" (Decode.list obligationDecoder)) json
+            Decode.fromString
+                (Decode.object (fun get ->
+                    { PlanComplete = get.Required.Field "planComplete" Decode.bool
+                      Obligations = get.Required.Field "obligations" (Decode.list obligationDecoder) }))
+                json
         with error ->
             Error error.Message

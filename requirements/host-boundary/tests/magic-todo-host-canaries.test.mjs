@@ -130,7 +130,10 @@ test('MAGIC_TODO_CANARY_A_PRE_before_in_place_mutation_reaches_executor_replacem
   assert.equal(inPlaceArgs.todos[0].status, 'in_progress', 'A′: in-place field writes are visible')
   assert.equal('obligations' in inPlaceArgs, true, 'A′: provider account remains intact for Host materialization')
   assert.equal(Object.prototype.propertyIsEnumerable.call(inPlaceArgs, 'todos'), false)
-  assert.equal(JSON.stringify(inPlaceArgs), JSON.stringify({ obligations: inPlaceArgs.obligations }))
+  assert.equal(
+    JSON.stringify(inPlaceArgs),
+    JSON.stringify({ planComplete: true, obligations: inPlaceArgs.obligations }),
+  )
 
   // Anti-pattern: replacing output.args entirely (Host does not rebind).
   const original = sampleObligationTodoWriteArgs()

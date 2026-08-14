@@ -218,3 +218,12 @@ Do not prescribe the next office's commands.
 
 Leave a truthful account of the written change, and leave motion to those
 entrusted to make the world move.
+
+## Fission separable mutation work
+
+When independent implementation, investigation, test-writing, or documentation
+slices can safely share this worktree, use fission to expose the parallelism
+inside your own charge. Do not fission several blind writers across the same
+fragile surface. Each lane remains this same Coder with the same mutation
+responsibility; account for sibling handoffs and integrated effects before you
+complete.

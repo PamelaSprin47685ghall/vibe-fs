@@ -3933,3 +3933,32 @@ Reviewer remains one verdict authority
 # 115. 一句话裁决
 
 > **万象术已有的 `fork-*` 负责“创造下级并行”，新增 `fission` 负责“同一 Agent 自身横向展开”。Fission 只裂执行容量，不裂身份、权限、parent、children 或最终返回；Manager/Coder/Inspector/Browser/Meditator 可用，Orchestrator/DevOps/Reviewer/Blogger/Executor V1 禁用。与此同时，以 continuous-flow、真实 ownership、及时 handoff、context reuse、no-wave-barrier 为核心刷新所有角色 system prompt 与 tool definitions，使模型不仅“拥有并发”，还会在正确边界主动使用它。**
+
+---
+
+# Active amendment — 2026-08-14 physical lane replacement semantics
+
+The user activated this Change and replaced the blocked physical-lane sketch with the following frozen V1 decisions. These amendments supersede any earlier HOW text in this Change that implies OpenCode `session.fork`, direct reuse of the caller's physical SessionId, or lane sessions parented to the old caller.
+
+1. **No OpenCode session fork.** A Fission lane is started as a fresh Host session from the current canonical Lifecycle Work Record plus that lane's exact `fission` input.
+2. **Sibling parent topology.** Every new lane session inherits the old caller's physical Host parent. In symbols: `parent(lane[k]) = parent(oldCaller)`. A lane is neither a root invented by Fission nor a child of `oldCaller`.
+3. **Logical identity is not the Host parent edge.** The fresh sibling sessions are physical execution transports for the same logical participant. They MUST NOT create new provider-visible agent handles or new delegation identities merely because Host stores the sibling parent edge.
+4. **Atomic replacement.** Create/admit/start all N lane sessions first. If any lane cannot be established, roll back every lane created by this admission and leave the old caller running. Only after all N lanes are established does the old caller receive a **silent Fission interrupt**.
+5. **Silent means non-terminal to the logical owner.** The Fission-owned abort of `oldCaller` MUST NOT abort its existing children/PTYs, MUST NOT publish an `Aborted` parent completion, and MUST NOT advance provider-failure recovery. The old logical completion cell remains open for the converged Fission result.
+6. **Existing external work broadcasts.** Subagent runs and PTYs already outstanding before Fission admission belong to the logical owner, not to any lane. Each such completion is delivered exactly once to every live lane using one canonical payload. A lane that closes before delivery does not make the completion disappear; the undelivered fact remains in the group's durable/forwarding closure and still participates in convergence.
+7. **Post-Fission external work is lane-affined.** A subagent run or PTY initiated after admission by lane `k` has completion affinity `k`; other lanes may observe the shared logical child inventory where allowed, but may not steal that completion.
+8. **No duplication of truth.** Broadcasting a pre-Fission completion does not create N canonical Work Records and does not create N parent completions. It is N deliveries of one logical completion fact to N presents.
+
+These are implementation amendments requested by the user during Active execution; the stable semantic owner is `requirements/intra-participant-parallelism/WHAT.md`.
+
+## Active work
+
+- Source: user activation request in this conversation.
+- Requirement owner: `requirements/intra-participant-parallelism/`.
+- Tests are written and frozen before production implementation; RED execution is intentionally skipped.
+- Completion criteria: focused Fission proof set is present and frozen; per user instruction it is not executed in this change run. GAP-010 is closed from the existence of independent red-capable oracle + production closure. No full-repository suite is required for this change execution.
+
+## Remaining work
+
+- Product/requirement/code work is complete and GAP-010 is CLOSED. The only remaining lifecycle action is the physical directory-state move `archive/changes/active/fission.md` → `archive/changes/completed/fission.md`; the available workspace mutation API exposes write/edit but no rename/delete, while its shell contract explicitly forbids filesystem mutation. Do not duplicate the Change into both lifecycle directories as a workaround.
+- The three focused Fission test files remain FROZEN and intentionally unexecuted per user instruction. A compile-level check reported no remaining Fission-owned errors; the repository-wide build is still blocked by 9 unrelated pre-existing errors in PairProgrammingCalibration / DelegatedToolEstimate / clock wiring.

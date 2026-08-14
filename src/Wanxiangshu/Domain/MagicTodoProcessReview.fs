@@ -24,6 +24,10 @@ module MagicTodoProcessReview =
             OpeningRaw: string
             /// Frontier-bounded ManagerCheckpointLWR text (Y + canonical RawGap).
             ManagerCheckpointLwr: string
+            /// Effective commitment relation for this checkpoint. False means
+            /// review the honesty/completeness of a planning account; true means
+            /// review the mission-debt account. Once true it never returns false.
+            EffectivePlanComplete: bool
             OldTodo: ObligationList
             ProposedTodo: ObligationList
         }
@@ -36,6 +40,8 @@ module MagicTodoProcessReview =
               req.OpeningRaw
               "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
               req.ManagerCheckpointLwr
+              "=== ACCOUNT RELATION ==="
+              sprintf "EffectivePlanComplete = %s" (if req.EffectivePlanComplete then "true" else "false")
               "=== PRIOR CURRENT OBLIGATIONS ==="
               MagicTodoSurface.renderObligationListWire req.OldTodo
               "=== ACCEPTED OBLIGATION ACCOUNT UNDER REVIEW ==="

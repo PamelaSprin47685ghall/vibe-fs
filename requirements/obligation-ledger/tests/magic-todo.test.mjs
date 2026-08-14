@@ -134,8 +134,8 @@ test('TODO-005 fresh admission freezes Base and Submitted without a merge previe
   assert.equal(prepared.ProposedDigest, magicTodo.obligationListDigest(sha256, submitted))
 })
 
-test('TODO-014 blocks first unblessed suicide without an accepted checkpoint', () => {
-  const missing = error(magicTodo.requireCheckpointBeforeFirstSuicide(0))
+test('OBLIGATION-LEDGER-022 blocks Finality until plan commitment, not merely until any checkpoint', () => {
+  const missing = error(magicTodo.requirePlanCommitmentBeforeFirstSuicide(false))
   assert.equal(missing.cases()[missing.tag], 'FirstSuicideWithoutCheckpoint')
-  assert.equal(ok(magicTodo.requireCheckpointBeforeFirstSuicide(1)), undefined)
+  assert.equal(ok(magicTodo.requirePlanCommitmentBeforeFirstSuicide(true)), undefined)
 })

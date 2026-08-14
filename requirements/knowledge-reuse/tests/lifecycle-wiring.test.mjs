@@ -1,5 +1,5 @@
-// tests/unit/casebook/lifecycle-wiring.test.mjs — G6: CasebookLifecycle
-// session wiring (draft Q/A → finalize once; cleanup never publishes).
+// FROZEN — 2026-08-14. Lifecycle wiring observes canonical Casebook Current only.
+// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -8,37 +8,14 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import {
-  collector,
-  setEnabled,
-  notePrompt,
-  noteAnswer,
-  tryFinalizeInspector,
-  cleanupInspector,
-  touchAccess,
-} from '../../../dist/Infrastructure/CasebookLifecycle.js'
-import {
-  CasebookWorkflow_fetchCase as fetchCase,
-  CasebookWorkflow_touchCaseAccess as touchCaseAccess,
-} from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import {
-  ObservationCollector__Collect_Z15AE2BE0 as collect,
-  ObservationCollector__Count_Z721C83C5 as count,
-} from '../../../dist/Infrastructure/ObservationCollector.js'
-import { loadEvents, project } from '../../../dist/Infrastructure/CasebookStore.js'
+import { collector, setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cleanupInspector, touchAccess } from '../../../dist/Infrastructure/CasebookLifecycle.js'
+import { CasebookWorkflow_fetchCase as fetchCase, CasebookWorkflow_touchCaseAccess as touchCaseAccess } from '../../../dist/Infrastructure/CasebookWorkflow.js'
+import { ObservationCollector__Collect_Z15AE2BE0 as collect, ObservationCollector__Count_Z721C83C5 as count } from '../../../dist/Infrastructure/ObservationCollector.js'
 import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
-import { caseOf, listItems, mapEntries, resultOf } from '../../verification-system/tests/support/domain.mjs'
-import {
-  CANONICAL_A,
-  CANONICAL_Q,
-  scriptedBookkeeperPort,
-} from './bookkeeper-session.test.mjs'
-import {
-  BookkeeperRuntime_setSessionPort as setSessionPort,
-  BookkeeperRuntime_resetSessionPort as resetSessionPort,
-} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
-
+import { listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
+import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
@@ -46,12 +23,7 @@ const sandbox = () => {
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
-
-const envelopeTypes = async (raw, store) => {
-  const events = resultOf(await loadEvents(raw, await store.OpenSnapshot()))
-  assert.equal(events.ok, true, `loadEvents ok, got ${JSON.stringify(events.error)}`)
-  return listItems(events.value).map((e) => caseOf(e))
-}
+const currentCases = (store) => store.TryCurrent('Casebook')?.Cases ?? new Map()
 
 test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
   const { dir, cleanup } = sandbox()
@@ -59,38 +31,26 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () =
     setEnabled(dir)
     const { port } = scriptedBookkeeperPort()
     setSessionPort(port)
-    const sessionId = 'insp-finalize-1'
-    notePrompt(sessionId, 'What owns PromptAuthority?')
-    collect(collector, sessionId, 'read', { path: 'a.txt' }, 'hello')
+    const key = 'insp-finalize-1'
+    notePrompt(key, 'What owns PromptAuthority?')
+    collect(collector, key, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'PromptAuthority is owned by the Host.'
-    noteAnswer(sessionId, rawA)
+    noteAnswer(key, rawA)
+    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
 
-    const first = resultOf(await tryFinalizeInspector(dir, sessionId))
-    assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
-
-    const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    const fetched = resultOf(await fetchCase(store, raw, 10, sessionId))
-    assert.equal(fetched.ok, true)
-    assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'case present after finalize')
+    const store = acquire(gitCommonDir(dir))
+    const fetched = resultOf(await fetchCase(store, 10, key))
     assert.equal(fetched.value.Q, CANONICAL_Q)
-    assert.notEqual(fetched.value.Q, 'What owns PromptAuthority?')
-    assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A (not raw noteAnswer)')
+    assert.notEqual(fetched.value.A, rawA)
     assert.equal(fetched.value.A, CANONICAL_A)
-    assert.equal(fetched.value.A.includes('evidence:'), false)
     assert.equal(listItems(fetched.value.Observations).length, 1)
-
     const publishedA = fetched.value.A
-
-    // Re-seed and finalize again — finalizeCase refuses the second publication.
-    notePrompt(sessionId, 'Q2')
-    noteAnswer(sessionId, 'A2')
-    const second = resultOf(await tryFinalizeInspector(dir, sessionId))
-    assert.equal(second.ok, false, 'second finalize must be refused')
-    assert.equal(String(second.error).includes('already finalized'), true)
-
-    const still = resultOf(await fetchCase(store, raw, 10, sessionId))
-    assert.equal(still.value.A, publishedA, 'original synthesized case retained')
+    notePrompt(key, 'Q2')
+    noteAnswer(key, 'A2')
+    const second = resultOf(await tryFinalizeInspector(dir, key))
+    assert.equal(second.ok, false)
+    assert.match(String(second.error), /already finalized/)
+    assert.equal(resultOf(await fetchCase(store, 10, key)).value.A, publishedA)
   } finally {
     resetSessionPort()
     setEnabled(undefined)
@@ -98,32 +58,22 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () =
   }
 })
 
-test('lifecycle_cleanupInspector_never_writes_eventstore', async () => {
+test('lifecycle_cleanupInspector_never_publishes_case', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
-    const sessionId = 'insp-cleanup-1'
-    notePrompt(sessionId, 'Q cleanup')
-    collect(collector, sessionId, 'read', { path: 'b.txt' }, 'body')
-    noteAnswer(sessionId, 'A cleanup')
-    assert.equal(count(collector, sessionId) > 0, true)
-
-    cleanupInspector(sessionId)
-    assert.equal(count(collector, sessionId), 0, 'collector buffer drained')
-
-    const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    const types = await envelopeTypes(raw, store)
-    assert.equal(types.length, 0, 'cleanup must not append Casebook events')
-
-    const fetched = resultOf(await fetchCase(store, raw, 10, sessionId))
-    assert.equal(fetched.ok, true)
-    assert.equal(fetched.value === undefined || fetched.value === null, true, 'no case after cleanup')
-
-    // A later finalize after cleanup alone (no re-seed) is a no-op Ok.
-    const after = resultOf(await tryFinalizeInspector(dir, sessionId))
-    assert.equal(after.ok, true)
-    assert.equal((await envelopeTypes(raw, store)).length, 0)
+    const key = 'insp-cleanup-1'
+    notePrompt(key, 'Q cleanup')
+    collect(collector, key, 'read', { path: 'b.txt' }, 'body')
+    noteAnswer(key, 'A cleanup')
+    assert.equal(count(collector, key) > 0, true)
+    cleanupInspector(key)
+    assert.equal(count(collector, key), 0)
+    const store = acquire(gitCommonDir(dir))
+    assert.equal(currentCases(store).size, 0)
+    assert.equal(resultOf(await fetchCase(store, 10, key)).value == null, true)
+    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    assert.equal(currentCases(store).size, 0)
   } finally {
     setEnabled(undefined)
     cleanup()
@@ -134,47 +84,34 @@ test('lifecycle_missing_answer_is_noop_finalize', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
-    const sessionId = 'insp-no-a'
-    notePrompt(sessionId, 'Q only')
-    const r = resultOf(await tryFinalizeInspector(dir, sessionId))
-    assert.equal(r.ok, true)
-
-    const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    assert.equal((await envelopeTypes(raw, store)).length, 0)
+    const key = 'insp-no-a'
+    notePrompt(key, 'Q only')
+    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    assert.equal(currentCases(acquire(gitCommonDir(dir))).size, 0)
   } finally {
     setEnabled(undefined)
     cleanup()
   }
 })
 
-test('lifecycle_touchAccess_and_touchCaseAccess_append_accessed', async () => {
+test('lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
     const { port } = scriptedBookkeeperPort()
     setSessionPort(port)
-    const sessionId = 'insp-access-1'
-    notePrompt(sessionId, 'Q')
-    noteAnswer(sessionId, 'A')
-    assert.equal(resultOf(await tryFinalizeInspector(dir, sessionId)).ok, true)
-
-    const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-
-    // Direct workflow helper (in-memory-compatible path).
-    const touched = resultOf(await touchCaseAccess(store, raw, sessionId))
-    assert.equal(touched.ok, true, `touchCaseAccess ok, got ${JSON.stringify(touched.error)}`)
-
-    // Host-side helper (acquires WorkspaceEventStore for workspace).
-    await touchAccess(dir, sessionId)
-
-    const types = await envelopeTypes(raw, store)
-    assert.equal(types.includes('CaseCaptured'), true)
-    assert.equal(types.filter((t) => t === 'CaseAccessed').length >= 1, true)
-
-    const cases = project(10, resultOf(await loadEvents(raw, await store.OpenSnapshot())).value)
-    assert.equal(mapEntries(cases).some(([k]) => k === sessionId), true)
+    const key = 'insp-access-1'
+    notePrompt(key, 'Q')
+    noteAnswer(key, 'A')
+    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    const store = acquire(gitCommonDir(dir))
+    const initial = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
+    assert.equal(resultOf(await touchCaseAccess(store, key)).ok, true)
+    const direct = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
+    assert.ok(direct >= initial)
+    await touchAccess(dir, key)
+    const host = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
+    assert.ok(host >= direct)
   } finally {
     resetSessionPort()
     setEnabled(undefined)
@@ -186,17 +123,12 @@ test('lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
-    // no .wanxiang/casebook marker
     setEnabled(dir)
-    const sessionId = 'insp-off'
-    notePrompt(sessionId, 'Q')
-    noteAnswer(sessionId, 'A')
-    const r = resultOf(await tryFinalizeInspector(dir, sessionId))
-    assert.equal(r.ok, true)
-
-    const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    assert.equal((await envelopeTypes(raw, store)).length, 0)
+    const key = 'insp-off'
+    notePrompt(key, 'Q')
+    noteAnswer(key, 'A')
+    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    assert.equal(currentCases(acquire(gitCommonDir(dir))).size, 0)
   } finally {
     setEnabled(undefined)
     rmSync(dir, { recursive: true, force: true })

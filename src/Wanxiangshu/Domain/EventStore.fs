@@ -22,7 +22,7 @@ module EventStreamId =
     let value (EventStreamId v) = v
 
 /// Versionless causal event envelope (storage.md §5 / Phase 2 §2.1).
-/// Forbidden here: GitObjectId / RootOid / StoreSnapshot / AppendCandidate.
+/// Forbidden here: GitObjectId / RootOid / StoreSnapshot or any Git sync type.
 type EventEnvelope =
     {
         EventId: EventId

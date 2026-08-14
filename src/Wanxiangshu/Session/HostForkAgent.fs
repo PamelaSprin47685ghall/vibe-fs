@@ -423,36 +423,43 @@ module HostForkAgent =
                                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
                                 |> Option.defaultValue agentName
 
-                            // Re-open a joined (Retired) handle before the new send so
-                            // the next completion has an Active cell to claim.
-                            match!
-                                HandleController.linkNamed
-                                    this.Journal
-                                    this.ParentId
-                                    agentId
-                                    childId
-                                    agentName
-                                    providerByname
-                                    role
-                                    this.HandleOwnership
-                            with
-                            | Error linkError -> return Error linkError
-                            | Ok() ->
-                                // A reuse after join is a new work unit on the same
-                                // child session — same first-prompt envelope a brand-new
-                                // fork would receive (ARCH-010). Busy-nudge continues
-                                // still go through sendToExistingChild's active-run path
-                                // with the raw prompt when a run is already live.
-                                let activeRun =
-                                    lock this.Gate (fun () ->
-                                        match this.PendingRuns.TryGetValue agentId with
-                                        | true, _ -> true
-                                        | false, _ -> false)
+                            let activeRun =
+                                lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
 
-                                let! enriched =
-                                    if activeRun then
-                                        Task.FromResult None
-                                    else
+                            if activeRun then
+                                return!
+                                    HostForkChildDispatch.sendToExistingChild
+                                        this.Gate
+                                        this.PendingRuns
+                                        this.Journal
+                                        this.ParentId
+                                        this.Sessions
+                                        this.ChildWorkRecordOf
+                                        this.Runtime
+                                        this.SendChildPrompt
+                                        this.SendBusyNudge
+                                        (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
+                                        agentId
+                                        childId
+                                        role
+                                        prompt
+                                        agentName
+                                        None
+                            else
+                                match!
+                                    HandleController.linkNamed
+                                        this.Journal
+                                        this.ParentId
+                                        agentId
+                                        childId
+                                        agentName
+                                        providerByname
+                                        role
+                                        this.HandleOwnership
+                                with
+                                | Error linkError -> return Error linkError
+                                | Ok() ->
+                                    let! enriched =
                                         match renderedPrompt with
                                         | Some rendered -> Task.FromResult(Some rendered)
                                         | None ->
@@ -471,22 +478,22 @@ module HostForkAgent =
                                                     )
                                             }
 
-                                return!
-                                    HostForkChildDispatch.sendToExistingChild
-                                        this.Gate
-                                        this.PendingRuns
-                                        this.Journal
-                                        this.ParentId
-                                        this.Sessions
-                                        this.ChildWorkRecordOf
-                                        this.Runtime
-                                        this.SendChildPrompt
-                                        this.SendBusyNudge
-                                        (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                        agentId
-                                        childId
-                                        role
-                                        prompt
-                                        agentName
-                                        enriched
+                                    return!
+                                        HostForkChildDispatch.sendToExistingChild
+                                            this.Gate
+                                            this.PendingRuns
+                                            this.Journal
+                                            this.ParentId
+                                            this.Sessions
+                                            this.ChildWorkRecordOf
+                                            this.Runtime
+                                            this.SendChildPrompt
+                                            this.SendBusyNudge
+                                            (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
+                                            agentId
+                                            childId
+                                            role
+                                            prompt
+                                            agentName
+                                            enriched
             }

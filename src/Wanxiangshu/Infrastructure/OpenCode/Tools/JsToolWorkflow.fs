@@ -138,8 +138,8 @@ module JsToolWorkflow =
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.
     /// deadlineMs bounds the sandbox; outputBoundBytes bounds the result.
-    /// `persistence` enables the durable prepare/commit facts (JS-012): the
-    /// IEventStore appends facts; the IGitRawStore reads them back (merge).
+    /// `persistence` enables durable prepare/commit facts (JS-012). Current and
+    /// transaction head are owned by the canonical Integrator; no history reader is exposed here.
     let run
         (root: string)
         (baseClassSource: string)
@@ -147,7 +147,7 @@ module JsToolWorkflow =
         (deadlineMs: int)
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
-        (persistence: (IEventStore * IGitRawStore) option)
+        (persistence: IJsTransactionPersistence option)
         : Task<JsToolOutcome> =
         task {
             // 1. sandbox execution with staged-only bindings
@@ -207,17 +207,8 @@ module JsToolWorkflow =
                                         | JsStagedMutation.Rewrite _ -> None)
 
                                 return Succeeded(value, written, created)
-                        | Some(eventStore, raw) ->
-                            let! snapshot = eventStore.OpenSnapshot()
-
-                            let! head =
-                                task {
-                                    match! JsToolsTransactionStore.loadEvents raw snapshot with
-                                    | Ok events -> return JsToolsTransactionStore.streamHead events
-                                    | Error _ -> return None
-                                }
-
-                            match! JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
+                        | Some durable ->
+                            match! durable.AppendPrepared prepared with
                             | Error _ -> return Failed JsFailure.TransactionPrepareFailed
                             | Ok preparedEventId ->
                                 // 4. commit: all-or-nothing
@@ -227,10 +218,7 @@ module JsToolWorkflow =
                                     // 5. the commit fact (JS-012): its absence after
                                     // Prepared is what recovery uses to undo
                                     match!
-                                        JsToolsTransactionStore.appendCommitted
-                                            eventStore
-                                            [ preparedEventId ]
-                                            prepared.TransactionId
+                                        durable.AppendCommitted prepared.TransactionId
                                     with
                                     | Error _ -> return Failed JsFailure.TransactionCommitFailed
                                     | Ok _ ->

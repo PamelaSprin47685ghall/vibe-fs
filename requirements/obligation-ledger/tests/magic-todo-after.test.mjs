@@ -15,21 +15,21 @@ const runtimeSource = join(
   '../../../src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs',
 )
 
-test('HOST-021 T1 assignment is AgentOwnerRoot, never a busy nudge', () => {
+test('HOST-021 first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {
   assert.equal(caseOf(assignmentDelivery(false, true)), 'OwnerRoot')
   assert.equal(caseOf(assignmentDelivery(false, false)), 'OwnerRoot')
   assert.equal(assignmentDelivery(false, true), AssignmentDelivery.OwnerRoot)
 })
 
-test('HOST-021 T1 retry after claim waits for XTrace head instead of sending twice', () => {
+test('HOST-021 first reviewer assignment retry after claim waits for XTrace head instead of sending twice', () => {
   assert.equal(caseOf(assignmentDelivery(true, true)), 'AwaitHead')
 })
 
-test('HOST-021 T2+ assignment continues the dedicated reviewer', () => {
+test('HOST-021 later checkpoint assignment continues the dedicated reviewer', () => {
   assert.equal(caseOf(assignmentDelivery(true, false)), 'Continuation')
 })
 
-test('HOST-021 T1 must not second-Fork assignment onto a deferSend pending run', () => {
+test('HOST-021 first assignment must not second-Fork onto a deferSend pending run', () => {
   const source = readFileSync(runtimeSource, 'utf8')
   assert.equal(
     source.includes('renderedPrompt = assignmentText'),
@@ -38,4 +38,12 @@ test('HOST-021 T1 must not second-Fork assignment onto a deferSend pending run',
   )
   assert.match(source, /DiscardDeferredFirstPrompt/)
   assert.match(source, /assignmentDelivery/)
+})
+
+test('OBLIGATION-LEDGER-020 a new checkpoint reactivates a retired reviewer work-unit without replacing the logical reviewer', () => {
+  const source = readFileSync(runtimeSource, 'utf8')
+  assert.match(source, /ensureReusableReviewerWorkUnit/, 'runtime must name the work-unit reactivation promise')
+  assert.match(source, /HandleLifecycle\.Retired/, 'retired previous work-unit is a handled reuse case')
+  assert.match(source, /HandleLinked/, 'reactivation must be durable, not only AdoptChild process memory')
+  assert.match(source, /checkpoint\.Assignment[\s\S]*Some _[\s\S]*tryConclude/, 'already-assigned checkpoints must converge; they must not be reopened')
 })

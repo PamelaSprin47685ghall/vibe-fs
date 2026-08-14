@@ -21,7 +21,7 @@ module ManagerIdle =
                 let snapshot = AgentJournal.snapshot durable
 
                 Map.tryFind (ManagerLifeId.value life.LifeId) snapshot.AgentProjections.MagicTodo.ByLife
-                |> Option.map (fun todoLife -> List.isEmpty todoLife.AcceptedOrder)
+                |> Option.map (MagicTodoProjection.isPlanCommitted >> not)
                 |> Option.defaultValue true
 
         let path =

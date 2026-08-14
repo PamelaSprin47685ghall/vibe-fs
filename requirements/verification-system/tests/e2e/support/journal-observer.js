@@ -1,9 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-
-const STORE_REF = 'refs/wanxiang/store';
 
 const commonDirCache = new Map(); // workDir -> git common dir (immutable per checkout)
 
@@ -18,65 +16,21 @@ const gitCommonDir = (workDir) => {
   return resolved;
 };
 
-const storeRefPath = (workDir) => path.join(gitCommonDir(workDir), 'refs', 'wanxiang', 'store');
+const eventsDir = (workDir) => path.join(gitCommonDir(workDir), 'wanxiang', 'events');
+const payloadsDir = (workDir) => path.join(gitCommonDir(workDir), 'wanxiang', 'payloads');
 
 /**
- * A loose Git object's body, read in this process, or null when it is packed / absent.
- *
- * `zlib(<type> <len>\0<body>)` at `objects/xx/yyyy` is the same format production now writes,
- * and reading it here removes one `git cat-file` spawn per observed blob — measured 60 spawns
- * (~127ms) in a single canary, paid by the observer while it polled for facts.
- */
-const looseObjectBody = (workDir, oid) => {
-  const file = path.join(gitCommonDir(workDir), 'objects', oid.slice(0, 2), oid.slice(2));
-  if (!fs.existsSync(file)) return null;
-  const framed = zlib.inflateSync(fs.readFileSync(file));
-  const separator = framed.indexOf(0);
-  return separator < 0 ? null : framed.subarray(separator + 1);
-};
-
-/**
- * Read UTF-8 content for a journal BlobRef (`blobs/<gitOid>` or bare OID).
- * Bodies live in the Git ODB after Phase 5 — never under wanxiangshu-next/.
- *
- * One pattern owns the whole token shape. Splitting it into a `startsWith('blobs/')`
- * test plus a separate OID regex also reads as a repo-path criterion to the harness
- * gate, which then reports a prefix that names nothing on disk — `blobs/` is a
- * BlobRef namespace, not a directory.
+ * Read UTF-8 content for a journal BlobRef (`blobs/<PayloadRef>` or bare PayloadRef).
+ * Runtime payload truth is local and content-addressed under `.git/wanxiang/payloads`;
+ * Git OIDs only exist later at the independent remote-sync hook boundary.
  */
 export function readBlobRef(workDir, blobRef) {
   const raw = Array.isArray(blobRef) ? blobRef.at(-1) : blobRef;
   const token = String(raw ?? '');
-  const oid = /^(?:blobs\/)?([0-9a-f]{40})$/i.exec(token)?.[1];
-  if (!oid) {
-    throw new Error(`invalid BlobRef OID: ${token}`);
-  }
-  const loose = looseObjectBody(workDir, oid);
-  if (loose !== null) return loose.toString('utf8');
-  return execFileSync('git', ['-C', workDir, 'cat-file', '-p', oid], {
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-  });
+  const digest = /^(?:blobs\/)?([0-9a-f]{64})$/i.exec(token)?.[1];
+  if (!digest) throw new Error(`invalid local BlobRef payload digest: ${token}`);
+  return fs.readFileSync(path.join(payloadsDir(workDir), digest), 'utf8');
 }
-
-/** Current EventStore tip OID, or null when the canonical ref is absent. */
-export function storeTip(workDir) {
-  try {
-    const tip = execFileSync(
-      'git',
-      ['-C', workDir, 'rev-parse', '--verify', '--quiet', STORE_REF],
-      { encoding: 'utf8' },
-    ).trim();
-    return tip || null;
-  } catch {
-    return null;
-  }
-}
-
-const tipSnapshotCache = new Map(); // `${workDir}\0${tip}` -> { lines, factCounts }
-const blobTextCache = new Map(); // git blob oid -> utf8 text
-
-const eventShardPrefix = ['events', ''].join('/'); // tip-tree prefix, not a repo-root path
 
 /** Journal Envelope object nested under EventStore `payload`, or null. */
 export function journalEnvelopeFromEventText(text) {
@@ -85,7 +39,6 @@ export function journalEnvelopeFromEventText(text) {
     if (event && typeof event === 'object' && event.payload && typeof event.payload === 'object') {
       return event.payload;
     }
-    // Pre-EventStore / harness shapes already look like Envelope.
     if (event && typeof event === 'object' && Object.prototype.hasOwnProperty.call(event, 'Fact')) {
       return event;
     }
@@ -95,69 +48,61 @@ export function journalEnvelopeFromEventText(text) {
   }
 }
 
-const loadBlobText = (workDir, oid) => {
-  const cached = blobTextCache.get(oid);
-  if (cached !== undefined) return cached;
-  const loose = looseObjectBody(workDir, oid);
-  const text = loose !== null
-    ? loose.toString('utf8')
-    : execFileSync('git', ['-C', workDir, 'cat-file', 'blob', oid], {
-      encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
-    });
-  blobTextCache.set(oid, text);
-  return text;
-};
-
 const tallyFactNames = (fact, counts) => {
   if (Array.isArray(fact)) {
-    if (typeof fact[0] === 'string') {
-      counts.set(fact[0], (counts.get(fact[0]) ?? 0) + 1);
-    }
+    if (typeof fact[0] === 'string') counts.set(fact[0], (counts.get(fact[0]) ?? 0) + 1);
     for (const child of fact) tallyFactNames(child, counts);
   } else if (fact && typeof fact === 'object') {
     for (const child of Object.values(fact)) tallyFactNames(child, counts);
   }
 };
 
-const snapshotForTip = (workDir, tip) => {
-  const key = `${workDir}\0${tip}`;
-  const hit = tipSnapshotCache.get(key);
-  if (hit) return hit;
+const readLocalSnapshot = (workDir) => {
+  const directory = eventsDir(workDir);
+  if (!fs.existsSync(directory)) return { lines: [], factCounts: new Map(), token: null };
 
-  let listing = '';
-  try {
-    listing = execFileSync('git', ['-C', workDir, 'ls-tree', '-r', tip], {
-      encoding: 'utf8',
-    });
-  } catch {
-    const empty = { lines: [], factCounts: new Map() };
-    tipSnapshotCache.set(key, empty);
-    return empty;
-  }
+  const byEventId = new Map();
+  const files = fs.readdirSync(directory)
+    .filter((name) => name.endsWith('.ndjson'))
+    .sort();
 
-  const lines = [];
-  for (const row of listing.split('\n')) {
-    if (row === '') continue;
-    // "100644 blob <oid>\t<path>"
-    const tab = row.indexOf('\t');
-    if (tab < 0) continue;
-    const meta = row.slice(0, tab);
-    const pathName = row.slice(tab + 1);
-    if (!pathName.startsWith(eventShardPrefix) || !pathName.endsWith('.jsonl')) continue;
-    const parts = meta.split(/\s+/);
-    const oid = parts[2];
-    if (!oid) continue;
+  for (const name of files) {
+    const file = path.join(directory, name);
+    let text;
     try {
-      const text = loadBlobText(workDir, oid);
-      for (const line of text.split('\n')) {
-        const trimmed = line.trim();
-        if (trimmed !== '') lines.push(trimmed);
-      }
+      text = fs.readFileSync(file, 'utf8');
     } catch {
-      // ignore unreadable blob
+      // A concurrently created writer may disappear only under test cleanup.
+      // Observation is best-effort; the next directory wake retries.
+      continue;
+    }
+
+    const completeLength = text.endsWith('\n') ? text.length : text.lastIndexOf('\n') + 1;
+    const complete = completeLength > 0 ? text.slice(0, completeLength) : '';
+
+    for (const line of complete.split('\n')) {
+      if (line === '') continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        // A production durable writer only publishes canonical complete lines.
+        // If an observer catches bytes during an OS write, retry on the next wake.
+        continue;
+      }
+      const eventId = parsed?.event_id;
+      if (typeof eventId !== 'string' || eventId.length === 0) continue;
+      const existing = byEventId.get(eventId);
+      if (existing !== undefined && existing !== line) {
+        throw new Error(`journal observer saw EventId identity collision: ${eventId}`);
+      }
+      byEventId.set(eventId, line);
     }
   }
+
+  const lines = [...byEventId.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, text]) => text);
 
   const factCounts = new Map();
   for (const line of lines) {
@@ -165,22 +110,23 @@ const snapshotForTip = (workDir, tip) => {
     if (envelope?.Fact !== undefined) tallyFactNames(envelope.Fact, factCounts);
   }
 
-  const snap = { lines, factCounts };
-  tipSnapshotCache.set(key, snap);
-  // Keep only the latest tip snapshot per workDir (tips are append-only CAS).
-  for (const existing of tipSnapshotCache.keys()) {
-    if (existing.startsWith(`${workDir}\0`) && existing !== key) tipSnapshotCache.delete(existing);
-  }
-  return snap;
+  const token = lines.length === 0
+    ? null
+    : createHash('sha256').update(lines.join('\n')).digest('hex');
+
+  return { lines, factCounts, token };
 };
 
-/** Canonical event JSON texts under refs/wanxiang/store (one string per jsonl event line). */
-export const journalEventLines = (workDir) => {
-  const tip = storeTip(workDir);
-  if (!tip) return [];
-  return snapshotForTip(workDir, tip).lines;
-};
+/**
+ * Local durable snapshot token used only by the E2E observer diagnostics/wake logic.
+ * It is deliberately NOT a Git object/ref identity.
+ */
+export function storeTip(workDir) {
+  return readLocalSnapshot(workDir).token;
+}
 
+/** Canonical event JSON texts from every local process writer file. */
+export const journalEventLines = (workDir) => readLocalSnapshot(workDir).lines;
 const journalEventTexts = journalEventLines;
 
 /**
@@ -214,9 +160,7 @@ export function factPayloads(workDirOrLines, caseName) {
 
 export const countFactCase = (workDirOrLines, caseName) => {
   if (typeof workDirOrLines === 'string') {
-    const tip = storeTip(workDirOrLines);
-    if (!tip) return 0;
-    return snapshotForTip(workDirOrLines, tip).factCounts.get(caseName) ?? 0;
+    return readLocalSnapshot(workDirOrLines).factCounts.get(caseName) ?? 0;
   }
   return factPayloads(workDirOrLines, caseName).length;
 };
@@ -235,7 +179,6 @@ const factLabelFromEvent = (text) => {
     const envelope = journalEnvelopeFromEventText(text);
     const label = digFactLabel(envelope?.Fact);
     if (label) return label;
-    // Fall back to scanning nested AgentFact case names.
     const match = text.match(
       /"(?:Plugin|Prompt|Fallback|Review|Execution|Orchestrator|Companion|Context|Host|Runtime|Life|Handle|Pair)[A-Za-z0-9]+"/,
     );
@@ -246,51 +189,43 @@ const factLabelFromEvent = (text) => {
 };
 
 export function readJournal(workDir, factName, renewOn = []) {
-  const tip = storeTip(workDir);
-  if (!tip) return { named: 0, total: 0, renew: 0, tip: null };
-  const snap = snapshotForTip(workDir, tip);
+  const snap = readLocalSnapshot(workDir);
   const texts = snap.lines;
   let named = 0;
   if (factName !== undefined) {
     named = snap.factCounts.get(factName) ?? 0;
-    if (named === 0) {
-      // Harness / non-Envelope plantings (e.g. payload.type) still match by substring.
-      named = texts.filter((text) => text.includes(factName)).length;
-    }
+    if (named === 0) named = texts.filter((text) => text.includes(factName)).length;
   }
   let renew = 0;
-  const renewNames = renewOn.length > 0 ? new Set(renewOn) : null;
-  if (renewNames !== null) {
-    for (const name of renewNames) {
+  if (renewOn.length > 0) {
+    for (const name of new Set(renewOn)) {
       const counted = snap.factCounts.get(name) ?? 0;
-      if (counted > 0) {
-        renew += counted;
-        continue;
-      }
-      renew += texts.filter((text) => text.includes(name)).length;
+      renew += counted > 0 ? counted : texts.filter((text) => text.includes(name)).length;
     }
   }
-  return { named, total: texts.length, renew, tip };
+  return { named, total: texts.length, renew, tip: snap.token };
 }
 
 export function journalFactTail(workDir, limit) {
-  const tip = storeTip(workDir) ?? 'missing-tip';
+  const tip = storeTip(workDir) ?? 'missing-local-truth';
   return journalEventTexts(workDir)
     .slice(-limit)
     .map((text, index) => `${tip}:${index}:${factLabelFromEvent(text)}`);
 }
 
-/** Watch EventStore tip (`refs/wanxiang/store`); onChange debounced per tick. Returns stop(). */
+/**
+ * Watch `.git/wanxiang/events` directly. The directory may not exist at watcher
+ * creation time, so attach upward and descend when runtime truth appears.
+ */
 export function watchJournal(workDir, onChange) {
   let closed = false;
-  let refWatcher = null;
+  let eventsWatcher = null;
   let parentWatcher = null;
   let debounce = null;
   let lastTip = storeTip(workDir);
 
   const notify = () => {
-    if (closed) return;
-    if (debounce !== null) return;
+    if (closed || debounce !== null) return;
     debounce = setImmediate(() => {
       debounce = null;
       if (closed) return;
@@ -298,54 +233,42 @@ export function watchJournal(workDir, onChange) {
       if (tip !== lastTip) {
         lastTip = tip;
         onChange();
-      } else if (tip != null) {
-        // Tip file rewrite with same OID is rare; still surface a wake for append CAS races.
+      } else {
+        // Directory/file watchers can coalesce or race an append. Surface the wake;
+        // expectation code rechecks durable facts and remains the correctness owner.
         onChange();
       }
     });
   };
 
-  const stopRef = () => {
-    try { refWatcher?.close(); } catch {}
-    refWatcher = null;
+  const stopEvents = () => {
+    try { eventsWatcher?.close(); } catch {}
+    eventsWatcher = null;
   };
 
-  const startRef = (refPath) => {
-    stopRef();
+  const attachEvents = () => {
+    if (closed || eventsWatcher !== null) return;
+    const directory = eventsDir(workDir);
+    if (!fs.existsSync(directory)) return;
     try {
-      refWatcher = fs.watch(refPath, () => notify());
-      refWatcher.on('error', () => {});
-    } catch {
-      // caller falls back to short guard slice
-    }
-  };
-
-  const refPath = storeRefPath(workDir);
-  if (fs.existsSync(refPath)) {
-    startRef(refPath);
-  } else {
-    const parent = path.dirname(refPath);
-    const wanxiangParent = path.dirname(parent);
-    const tryAttach = () => {
-      if (closed) return;
-      if (!fs.existsSync(refPath)) return;
+      eventsWatcher = fs.watch(directory, notify);
+      eventsWatcher.on('error', () => {});
       try { parentWatcher?.close(); } catch {}
       parentWatcher = null;
-      startRef(refPath);
       notify();
-    };
-    try {
-      const watchRoot = fs.existsSync(parent)
-        ? parent
-        : fs.existsSync(wanxiangParent)
-          ? wanxiangParent
-          : gitCommonDir(workDir);
-      if (fs.existsSync(watchRoot)) {
-        parentWatcher = fs.watch(watchRoot, tryAttach);
-        parentWatcher.on('error', () => {});
-      }
     } catch {}
-    tryAttach();
+  };
+
+  attachEvents();
+  if (eventsWatcher === null) {
+    const common = gitCommonDir(workDir);
+    const wanxiang = path.join(common, 'wanxiang');
+    const watchRoot = fs.existsSync(wanxiang) ? wanxiang : common;
+    try {
+      parentWatcher = fs.watch(watchRoot, attachEvents);
+      parentWatcher.on('error', () => {});
+    } catch {}
+    attachEvents();
   }
 
   return () => {
@@ -354,7 +277,7 @@ export function watchJournal(workDir, onChange) {
       clearImmediate(debounce);
       debounce = null;
     }
-    stopRef();
+    stopEvents();
     try { parentWatcher?.close(); } catch {}
     parentWatcher = null;
   };

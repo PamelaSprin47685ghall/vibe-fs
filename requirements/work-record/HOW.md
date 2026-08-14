@@ -16,7 +16,7 @@ type LifecycleWorkRecord =
       Gap: XTraceItem list }            // Recent work = 未覆盖 suffix（须已 forWorkRecord）
 ```
 
-- `OpeningPolicy.immediate` / `forManager = BlindPlan FirstAcceptedTodoWrite`（GLORY-074）。
+- `OpeningPolicy.immediate` / `forManager = BlindPlan FirstPlanCompleteTodoWrite`；Manager Opening 只在第一次 accepted `planComplete=true` 后关闭。
 - `render includeOpening record`：三段纯文本 Markdown；空段整段省略；`includeOpening=false`
   省略 Opening；段标题为纯文本 `Opening` / `Chronicle` / `Recent work`，`# ` 仅由
   `SyntheticToml.comment` 在 wire 注入（避免 `# # Chronicle`）。
@@ -49,7 +49,7 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 ### 1.4 floor（`src/Wanxiangshu/Journal/ManagerOpeningFloor.fs`）
 
 - `workRecordStart life magic xTrace`：Post-T1 = `MagicTodo.blindPlanOpeningBoundary`
-  （T1 call cursor + callId + part anchors）；Pre-T1 = `MagicTodo.workRecordStart`。
+  （首次 true 的 T1 call cursor + callId + part anchors）；此前任意 false planning checkpoints 仍属于 Pre-T1 Opening。
 - `effectiveOpeningFloor`：Life 未开 / 已 Completed → None；否则按 acceptedCount 与 T1 anchor
   推导。**从不读** `WorkActivated` / `ProtectedPrefixEnd`（TODO-001 考古）。
 - `floorSequence`：session helper，供 BloggerCoordinator / CompanionTransform 的

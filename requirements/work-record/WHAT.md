@@ -128,17 +128,18 @@ trace 区间事实归 `semantic-trace`（SEMANTIC-TRACE-010）；本命题拥有
 
 ---
 
-## WORK-RECORD-009：BlindPlan 下 T1 commitment 属 constitutive Opening
+## WORK-RECORD-009：BlindPlan 下首次 planComplete=true commitment 属 constitutive Opening
 
 **规范**：BlindPlan（Manager）的 Opening = InitialCharge + pre-commitment reasoning /
-investigation / delegated returns / user clarifications + commitment call + canonical accepted
-commitment result。T1 `todowrite` call + canonical accepted result 是 **constitutive**
+investigation / delegated returns / user clarifications + 任意 accepted `planComplete=false` planning checkpoints
++ T1 commitment call + canonical accepted commitment result。T1 = 第一次 accepted `planComplete=true`；其
+`todowrite` call + canonical accepted result 是 **constitutive**
 Opening material（COMPANION-014 / TODO-015）：`XTrace.forOpening` 保留，不得当 incidental
 tool 滤入 Recent work。
 
 **含义/动机**：交托本身是 Opening 的结尾；滤掉 T1 的 call/result，Opening 就缺了「承诺发生」的证据。
 
-**边界**：T1 的 Accepted 语义归 `obligation-ledger`（TODO-015）；本命题拥有「这些材料
+**边界**：T1 / 单调 plan commitment 语义归 `obligation-ledger`；本命题拥有「这些材料
 在 record 里属于 Opening 区间」。
 
 **证据**：COMPANION-014 ⑨；TODO-015；`Domain/LifecycleWorkRecord.fs` `withConstitutive`；

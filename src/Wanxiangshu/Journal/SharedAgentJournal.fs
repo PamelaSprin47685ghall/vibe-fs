@@ -32,7 +32,7 @@ module SharedAgentJournal =
     ///
     /// `openJournal` is supplied by the composition root (EventStore boot port +
     /// `AgentJournal.createFromProjection`). This module stays free of
-    /// `IEventStore` / `AppendCandidate` / `EventStore.create*` tokens.
+    /// local EventStore construction tokens.
     let acquire
         (directory: string)
         (processId: int)

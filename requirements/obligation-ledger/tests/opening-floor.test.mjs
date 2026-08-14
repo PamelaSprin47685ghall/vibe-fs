@@ -14,7 +14,7 @@ import { lifecycleWorkRecord, magicTodo, xTrace } from '../../verification-syste
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 test('AC15 Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enters Y)', () => {
-  const floor = magicTodo.effectiveOpeningFloor(true, 0, 1, undefined, undefined, 7, [
+  const floor = magicTodo.effectiveOpeningFloor(true, false, 1, undefined, undefined, 7, [
     { sequence: 1, kind: 'text' },
     { sequence: 7, kind: 'text' },
   ])
@@ -24,10 +24,10 @@ test('AC15 Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enter
 })
 
 test('AC15 Pre-T1: no CurrentLife → no floor', () => {
-  assert.equal(magicTodo.effectiveOpeningFloor(false, 0, 1, undefined, undefined, 4, []), undefined)
+  assert.equal(magicTodo.effectiveOpeningFloor(false, false, 1, undefined, undefined, 4, []), undefined)
 })
 
-test('AC15/AC16 Post-T1: WorkRecordStart nails after T1 call+result', () => {
+test('AC15 false planning checkpoints do not close Opening; first true commitment nails WorkRecordStart', () => {
   const callId = 't1-call'
   const parts = [
     { sequence: 1, kind: 'text' },
@@ -38,7 +38,10 @@ test('AC15/AC16 Post-T1: WorkRecordStart nails after T1 call+result', () => {
   const boundary = magicTodo.blindPlanOpeningBoundary(1, 5, callId, parts)
   assert.equal(boundary, 7) // exclusive end after result at 6
 
-  const floor = magicTodo.effectiveOpeningFloor(true, 1, 1, 5, callId, 9, parts)
+  const stillPlanning = magicTodo.effectiveOpeningFloor(true, false, 1, undefined, undefined, 9, parts)
+  assert.equal(stillPlanning, 9, 'accepted planComplete=false checkpoints remain inside dynamic Opening')
+
+  const floor = magicTodo.effectiveOpeningFloor(true, true, 1, 5, callId, 9, parts)
   assert.equal(floor, 7)
   // Material after OpeningBoundary may enter Y; Opening itself stays floored.
   assert.equal(magicTodo.bloggerEffectiveStart(7, floor), 7)
@@ -51,7 +54,7 @@ test('AC16: T1 constitutive body renders in Opening, not Recent', () => {
     xTrace.item({
       sequence: 5,
       role: 'assistant',
-      part: xTrace.toolCall('todowrite', '{"obligations":[]}'),
+      part: xTrace.toolCall('todowrite', '{"planComplete":true,"obligations":[]}'),
     }),
     xTrace.item({
       sequence: 6,

@@ -20,7 +20,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 45 包索引
+## 46 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -68,6 +68,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 | Package | 一句话 WHY |
 |---|---|
 | [delegation](delegation/README.md) | 语义工作转交时 authority、charge、owner 与返回后果明确。 |
+| [intra-participant-parallelism](intra-participant-parallelism/README.md) | 同一 participant 可展开多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | [process-execution](process-execution/README.md) | 真实进程/PTY 有 bounded、可终止、物理完成可信的 execution semantics。 |
 | [output-distillation](output-distillation/README.md) | 大输出有损但诚实地压缩；fragment 不能冒充整体成功或发明因果。 |
 | [change-integration](change-integration/README.md) | 独立 Git road 只在短原子门内发布，长 review/repair 不全局串行化。 |

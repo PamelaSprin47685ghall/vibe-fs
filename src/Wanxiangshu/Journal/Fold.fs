@@ -28,6 +28,7 @@ module Fold =
         | AgentFact.Companion companion -> CompanionFactFold.fold projection companion
         | AgentFact.Context context -> ContextFactFold.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
+        | AgentFact.Fission fission -> FissionFactFold.fold projection fission
         | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
@@ -121,11 +122,6 @@ module Fold =
                 { Fact = "ManagerLifecycle"
                   Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
 
-    /// Fold a journal. PERSIST-004: the first impossible line stops the fold and
-    /// reports which fact and why, rather than producing a partially replayed
-    /// state that no writer could have produced.
-    let apply (projection: ProjectionSet) (envelopes: Envelope list) : Result<ProjectionSet, FoldRejection> =
-        envelopes
-        |> List.fold
-            (fun state envelope -> state |> Result.bind (fun current -> foldEnvelope current envelope))
-            (Ok projection)
+    // Historical enumeration intentionally has no Journal-owned API. Boot and
+    // live facts both enter through CanonicalIntegrator, which invokes only
+    // foldEnvelope for one already-ordered durable event at a time.

@@ -1,83 +1,82 @@
 # durable-convergence
 
-> 多个各自合法发展的 durable replicas 必须按**对象语义收敛**，而不是靠 wall-clock/LWW
-> 猜赢家；否则同步会静默丢掉合法分支，相同 object set 在不同 replica 上折叠成不同世界。
+> 多个 process/machine 的 durable writer streams 使用同一个 k-way primitive 收敛；Git remote 只是 dumb transport。
 
-## 这是什么包
-
-`durable-convergence` 拥有「多个 replica 之间的事实交换与收敛」语义。它规定：
+## 当前模型
 
 ```text
-merge        = append-only set union + identity dedupe（永不丢事实）
-并发 fork    = DomainConflict，不是 StorageInvalid（永不把 store 打成不可恢复）
-收敛         = Projection(Fold(Union(Events)))，不是 Merge(Projection1, Projection2)
-同步         = 永远双向 Converge（fetch → merge → validate → CAS local → lease push）
-dumb remote  = 只交换 objects/refs/CAS/auth，不拥有 domain policy
-禁制         = wall_clock / revision LWW、单向 Pull/Push、server-side reducer
+writer A: .git/wanxiang/events/<WriterA>.ndjson
+writer B: .git/wanxiang/events/<WriterB>.ndjson
+...
+
+EventKWayMerge(writer streams)
+  = deterministic causal k-way union
+  + same EventId/same bytes dedupe
+  + same EventId/different bytes fail closed
+
+CanonicalIntegrator(EventKWayMerge(...)) → Current
 ```
 
-物理 substrate（单 store 的 append/CAS/canonical identity/fold 机制）由
-`durable-events` 提供；本包只回答「多个 store 之间发生什么」。
+machine 不进入模型；单机多进程和多机只是 writer stream 来源不同。
+
+## Remote sync
 
 ```text
-README.md   ← 你在这里
-WHY.md      为什么不能靠时间戳猜赢家（被拒方案考古）
-WHAT.md     唯一 normative 合同：9 条命题（DURABLE-CONVERGENCE-001..009）
-HOW.md      实现模型：k-way merge、DomainConflict、Converge、dumb server；历史与弃权
-PROOF.md    每条命题的测试落点
-tests/      本包拥有的可执行 proof（1 个 NEW 文件，5 断言）
+Wanxiangshu startup:
+  HookDispatcher.ensure(reference-transaction, pre-push, remote store fetch-refspec)
+  // no fetch/pull/push here
+
+later user git fetch/pull:
+  reference-transaction hook
+  → observed remote store root
+  → FULL bidirectional converge
+
+later user git push:
+  pre-push hook
+  → discover/fetch remote store root
+  → SAME FULL bidirectional converge
+
+FULL converge:
+  local writer files + remote writer blobs
+  → EventKWayMerge / identity + payload validation
+  → import remote writer truth locally
+  → each complete WriterId.ndjson exactly one Git blob
+  → lease-push unified refs/wanxiang/store
 ```
 
-## WHAT 概览（按命题组）
+两种 hook 差别只有 initial remote root discovery。同步执行者是**用户 Git 进程启动的独立 hook 子进程**；
+OpenCode/Wanxiangshu 可以完全不在运行。hook runtime 不依赖 `WorkspaceEventStore`、`CanonicalIntegrator` 或 PluginHost。
 
-- **merge 律**（001–003）：set union 永不丢事实；k-way merge 满足
-  associative/commutative/idempotent/deterministic；生产 structural merge ≡ union oracle。
-- **并发分叉**（004–005）：合法 fork → DomainConflict（非 StorageInvalid），以全部 heads
-  为 parents 的 resolution event 收敛。
-- **无 LWW**（006）：merge 是 event 集合的函数，与 wall-clock/到达顺序无关。
-- **确定性**（007）：相同 merged snapshot 折叠为相同 projection。
-- **同步**（008–009）：永远双向 Converge；dumb remote 无 domain 逻辑。
+## 红线
 
-## HOW 概览
+- 不用 wall-clock/revision LWW 删除事实。
+- 不造 machine registry / leader / distributed lock / sync state machine。
+- 不做 segment/chunk/EventId→blob index/custom delta。
+- 不提供 product-process `Fetch/Pull/Push` API。
+- remote 是普通 bare/GitHub/GitLab/Gitea-style Git objects/refs/auth，不运行 Wanxiang domain code。
+- `reference-transaction` 不是 download-only；它与 `pre-push` 一样完整双向收敛。
 
-```text
-EventStoreMergeSpec（oracle）：mergeEvents = set union + identity dedupe
-EventStoreMerge（生产）：structural tree merge —— EventId 分片路径直接 union，
-        同 EventId 异 OID 才读 bytes 校验 IdentityCollision
-ConvergeStore(remote)：fetch store ref → merge → EventStoreFold.validate →
-        PayloadClosure.validatePresent → CAS local → lease push（永远双向）
-HookDispatcher：reference-transaction / pre-push shim + WANXIANG_GIT_SYNC_ACTIVE guard
-```
-
-核心文件（精确到符号）：
+## 核心文件
 
 | 概念 | 文件 |
 |---|---|
-| merge oracle + production | `src/Wanxiangshu/Infrastructure/Persist/EventStoreMerge.fs`（`EventStoreMergeSpec.mergeEvents` / `EventStoreMerge.merge`） |
-| DomainConflict 类型 | `Infrastructure/Persist/StoreTypes.fs`（`DomainConflict.ConcurrentHeads`） |
-| 确定性 fold 的冲突表达 | `Infrastructure/Persist/EventStoreFold.fs`（`StreamHeadState` / `applyStream` / `isResolution`） |
-| Converge / 双向同步 | `Infrastructure/Persist/EventStore.fs`（`IEventStore.Converge`）+ `Infrastructure/Git/GitGateway.fs`（`convergeLoop` / `leasePush` / `fetchStoreRef`） |
-| hook 收敛注入 | `Infrastructure/Git/HookDispatcher.fs` |
+| one k-way primitive | `Infrastructure/Persist/EventKWayMerge.fs` |
+| structural frontier / DomainConflict Current | `Infrastructure/Persist/IntegrationKernel.fs` + `CanonicalIntegrator.fs` |
+| one writer file ↔ one blob encoding | `Infrastructure/Persist/WriterStreamSync.fs` |
+| hook-process Git transport / lease retry | `Infrastructure/Git/GitGateway.fs` |
+| independent sync entry | `Infrastructure/Git/HookSync.fs` |
+| startup hook/refspec ensure | `Infrastructure/Git/HookDispatcher.fs` |
+| packaged runner | `resources/git/wanxiang-hook.mjs` |
 
-## proof 概览
+## 文档 / proof
+
+`WHAT.md` 定义 DURABLE-CONVERGENCE-001..009；`HOW.md` 描述实现；`PROOF.md` 给 executable landing。
+本轮相关测试按用户要求 **FROZEN 未执行**：
 
 ```bash
-node --test requirements/durable-convergence/tests/replica-merge-laws.test.mjs
-# 物理律的既有证明（REUSE，留在原处）：
 node --test requirements/durable-convergence/tests/event-store-merge.test.mjs
+node --test requirements/durable-convergence/tests/replica-merge-laws.test.mjs
+node --test requirements/durable-convergence/tests/writer-stream-sync.test.mjs
 node --test requirements/durable-convergence/tests/event-store-converge.test.mjs
 node --test requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs
 ```
-
-## DEPENDS ON `durable-events`
-
-merge/fold 的 canonical identity、CAS、确定性 fold 机制由 `durable-events` 提供，
-本包在其上定义 replica 之间的律。
-
-## 边界（DOES NOT OWN）
-
-- 单一 store 的 append/CAS/identity/fail-closed → `durable-events`。
-- Casebook/Orchestrator 等 domain-specific 的冲突裁决语义 → 各 domain owner
-  （Casebook 对象语义 → `knowledge-reuse`）。
-- network transport / provider → `host-boundary` / 具体 transport 实现。
-- wall-clock 本身的时间能力 → `time-capability`。

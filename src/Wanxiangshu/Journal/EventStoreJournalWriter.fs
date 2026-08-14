@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Journal
 
 open System
-open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
 open Wanxiangshu.Domain
@@ -12,31 +11,26 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Outcome
 
-/// Store-backed blob writer for EventStore journals.
-///
-/// BlobRef mapping (documented contract for AgentJournal.WriteBlob callers):
-/// - Scheme prefix remains `blobs/<handle>` so existing readers that strip
-///   `blobs/` keep working.
-/// - Under EventStore, `<handle>` is the Git blob OID hex returned by
-///   `IGitRawStore.WriteBlob` (same text as Domain `PayloadRef` / Persist oid).
-/// - `BlobDigest` remains SHA-256 of the UTF-8 content bytes (HostDigest), used
-///   for integrity checks — it is not the Git OID.
-/// - MUST NOT create a `blobs/` directory on disk; bodies live in the Git ODB.
-type EventStoreBlobWriter private (raw: IGitRawStore) =
+/// Local payload writer for EventStore journals.
+/// `BlobRef` keeps the long-standing `blobs/<handle>` application shape, while
+/// `<handle>` is now the local content-addressed PayloadRef. Git OIDs do not
+/// participate in runtime durability.
+type EventStoreBlobWriter private (store: IEventStore) =
     member _.Write(content: string) : Task<Result<BlobWriteReceipt, string>> =
         task {
             try
                 let digest = BlobDigest.create (HostDigest.sha256Hex content)
                 let bytes = Encoding.UTF8.GetBytes content
-                let! oid = raw.WriteBlob bytes
-                let blobRef = BlobRef.create ("blobs/" + GitObjectId.value oid)
 
-                return
-                    Ok
-                        { BlobRef = blobRef
-                          BlobDigest = digest }
+                match! store.WritePayload bytes with
+                | Error error -> return Error error
+                | Ok payloadRef ->
+                    return
+                        Ok
+                            { BlobRef = BlobRef.create ("blobs/" + PayloadRef.value payloadRef)
+                              BlobDigest = digest }
             with ex ->
-                return Error(sprintf "event-store blob write failed: %s" ex.Message)
+                return Error(sprintf "event-store payload write failed: %s" ex.Message)
         }
 
     member _.Read(blobRef: BlobRef) : Task<Result<string, string>> =
@@ -47,259 +41,147 @@ type EventStoreBlobWriter private (raw: IGitRawStore) =
             if not (relative.StartsWith(prefix, StringComparison.Ordinal)) then
                 return Error(sprintf "invalid blob reference: %s" relative)
             else
-                let oidHex = relative.Substring(prefix.Length)
+                let handle = relative.Substring(prefix.Length)
 
-                if String.IsNullOrWhiteSpace oidHex || oidHex.Contains "/" then
+                if String.IsNullOrWhiteSpace handle || handle.Contains "/" then
                     return Error(sprintf "invalid blob reference: %s" relative)
                 else
-                    match! raw.ReadObject(GitObjectId.create oidHex) with
-                    | None -> return Error(sprintf "event-store blob missing: %s" oidHex)
-                    | Some bytes ->
+                    match! store.ReadPayload(PayloadRef.create handle) with
+                    | Error error -> return Error error
+                    | Ok None -> return Error(sprintf "event-store payload missing: %s" handle)
+                    | Ok(Some bytes) ->
                         try
                             return Ok(Encoding.UTF8.GetString bytes)
                         with ex ->
-                            return Error(sprintf "event-store blob read failed: %s" ex.Message)
+                            return Error(sprintf "event-store payload read failed: %s" ex.Message)
         }
 
     interface IBlobWriter with
         member this.Write(content) = this.Write content
         member this.Read(blobRef) = this.Read blobRef
 
-    static member Create(raw: IGitRawStore) : IBlobWriter =
-        EventStoreBlobWriter(raw) :> IBlobWriter
+    static member Create(store: IEventStore) : IBlobWriter =
+        EventStoreBlobWriter(store) :> IBlobWriter
 
-type private UnavailableBlobWriter() =
-    interface IBlobWriter with
-        member _.Write(_content) =
-            Task.FromResult(Error "EventStore journal writer has no IGitRawStore for blobs")
-
-        member _.Read(_blobRef) =
-            Task.FromResult(Error "EventStore journal writer has no IGitRawStore for blobs")
-
-/// EventStore-backed journal writer (W1). Success path never writes NDJSON or
-/// `blobs/<sha>` files — only `IEventStore` / `IGitRawStore`.
+/// Journal writer backed by the local process EventStore.
+/// It never enumerates history and never folds facts itself. CanonicalIntegrator
+/// owns both boot replay and live integration; this type only assigns journal
+/// envelope identity/sequence and appends one universal EventEnvelope.
 type EventStoreJournalWriter
     private
     (
         runtimeId: RuntimeId,
         blobWriter: IBlobWriter,
         store: IEventStore,
-        initialSnapshot: StoreSnapshot,
-        initialLastByStream: IDictionary<string, EventId>,
         initialCurrentSeq: int64
     ) =
     let gate = obj ()
-    // DSL-MUTABLE: resource — next local sequence number under writer gate
+    // DSL-MUTABLE: resource — next LocalSeq for this fresh RuntimeId only.
     let mutable currentSeq = initialCurrentSeq
-    // DSL-MUTABLE: resource — writer poison latch after write failure
+    // DSL-MUTABLE: resource — local append poison latch.
     let mutable poisoned = false
-    // DSL-MUTABLE: resource — writer dispose latch
+    // DSL-MUTABLE: resource — dispose latch.
     let mutable disposed = false
-    // DSL-MUTABLE: resource — CAS base StoreSnapshot after last successful append
-    let mutable baseSnapshot = initialSnapshot
-    // DSL-MUTABLE: resource — last EventId per EventStreamId for parents
-    let lastByStream = initialLastByStream
+    // DSL-MUTABLE: resource — serialized process writer operations.
     let mutable serial = Task.FromResult(())
-    /// No NDJSON path on the EventStore success path (field kept for IJournalWriter / test helpers).
-    let filePath = ""
 
     member _.RuntimeId = runtimeId
     member _.BlobWriter = blobWriter
-    member _.FilePath = filePath
-    member this.LocalSeq = lock gate (fun () -> currentSeq)
-    member this.LastCommittedLocalSeq = lock gate (fun () -> currentSeq - 1L)
-    member this.IsPoisoned = lock gate (fun () -> poisoned)
-    member _.StoreSnapshot = lock gate (fun () -> baseSnapshot)
+    member _.FilePath = ""
+    member _.LocalSeq = lock gate (fun () -> currentSeq)
+    member _.LastCommittedLocalSeq = lock gate (fun () -> currentSeq - 1L)
+    member _.IsPoisoned = lock gate (fun () -> poisoned)
+    member _.TryCurrent(key: string) = store.TryCurrent key
 
     static member private formatAppendError(error: AppendError) : string =
         match error with
         | AppendError.StorageInvalid detail -> sprintf "storage invalid: %A" detail
-        | AppendError.AppendCasRejected -> "append CAS rejected"
-        | AppendError.AppendRetryExhausted -> "append retry exhausted"
-
-    static member private streamKey(stream: StreamId) : string =
-        EventStreamId.value (EventStoreJournalCodec.encodeStreamId stream)
+        | AppendError.AppendFailed reason -> "append failed: " + reason
 
     static member private commitEnvelope
         (store: IEventStore)
-        (baseSnapshot: StoreSnapshot)
-        (lastByStream: IDictionary<string, EventId>)
         (envelope: Envelope)
-        : Task<Result<StoreSnapshot, AppendError>> =
-        let key = EventStoreJournalWriter.streamKey envelope.Stream
-
-        let parents =
-            match lastByStream.TryGetValue key with
-            | true, prev -> [ prev ]
-            | false, _ -> []
-
+        : Task<Result<unit, AppendError>> =
+        let streamId = EventStoreJournalCodec.encodeStreamId envelope.Stream
+        let parents = store.TryHead streamId |> Option.toList
         let encoded = EventStoreJournalCodec.encode parents [] envelope
-        store.Append(baseSnapshot, [ encoded ])
+        store.Append [ encoded ]
 
-    /// Load journal envelopes from a store snapshot (W1-boot).
-    /// Non-journal EventTypes (Job*, etc.) are skipped; decode failures fail closed.
-    ///
-    /// Walks `events/` linearly via GitRawStore.loadEventEnvelopes. Must not
-    /// go through EventStoreMergeSpec — that module is the contract-test
-    /// set-union oracle, and its previous list-append decoder was O(|history|²).
-    static member loadJournalEnvelopes
-        (raw: IGitRawStore)
-        (snapshot: StoreSnapshot)
-        : Task<Result<Envelope list, string>> =
-        task {
-            match! GitRawStore.loadEventEnvelopes raw snapshot.RootOid with
-            | Error detail -> return Error(sprintf "storage invalid: %A" detail)
-            | Ok events ->
-                let rec decodeAll remaining acc =
-                    match remaining with
-                    | [] -> Ok(List.rev acc)
-                    | head :: tail ->
-                        if head.EventType <> EventStoreJournalCodec.JournalEnvelopeEventType then
-                            decodeAll tail acc
-                        else
-                            match EventStoreJournalCodec.tryDecode head with
-                            | Error err -> Error err
-                            | Ok env -> decodeAll tail (env :: acc)
+    static member private currentJournalProjection(store: IEventStore) : Result<ProjectionSet, FoldRejection> =
+        match store.TryCurrent "Journal" with
+        | Some current -> Ok(unbox<ProjectionSet> current)
+        | None -> Ok Fold.empty
 
-                match decodeAll events [] with
-                | Error err -> return Error err
-                | Ok envelopes -> return Ok(List.sortWith Envelope.compareSortKey envelopes)
-        }
+    static member private initEnvelope
+        (runtimeId: RuntimeId)
+        (processId: int)
+        (startedAt: DateTimeOffset)
+        : Envelope =
+        { RuntimeId = runtimeId
+          LocalSeq = LocalSeq.create 1L
+          ObservedAt = startedAt
+          EventId = EventId.create (Guid.NewGuid().ToString("N"))
+          Stream = StreamId.Workspace
+          ProviderRun = None
+          Fact =
+            Fact.Runtime(
+                RuntimeStarted
+                    {| RuntimeId = runtimeId
+                       ProcessId = processId
+                       StartedAt = startedAt |}
+            ) }
 
-    /// create(runtimeId, processId, startedAt, store, raw) → writer * RuntimeStarted envelope.
-    /// Pass `None` for raw when blob writes are unavailable (tests that only append facts).
+    /// Fresh runtime: every process receives a fresh RuntimeId and therefore
+    /// LocalSeq starts at 1. Prior history is already in CanonicalIntegrator.Current.
     static member create
-        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore option) : Task<
-                                                                                                                              IJournalWriter *
-                                                                                                                              Envelope
-                                                                                                                           >
-        =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore)
+        : Task<IJournalWriter * Envelope> =
         task {
-            let blobWriter =
-                match raw with
-                | Some gitRaw -> EventStoreBlobWriter.Create gitRaw
-                | None -> UnavailableBlobWriter() :> IBlobWriter
+            let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
 
-            let initEventId = EventId.create (Guid.NewGuid().ToString("N"))
-
-            let initFact =
-                Fact.Runtime(
-                    RuntimeStarted
-                        {| RuntimeId = runtimeId
-                           ProcessId = processId
-                           StartedAt = startedAt |}
-                )
-
-            let initEnvelope: Envelope =
-                { RuntimeId = runtimeId
-                  LocalSeq = LocalSeq.create 1L
-                  ObservedAt = startedAt
-                  EventId = initEventId
-                  Stream = StreamId.Workspace
-                  ProviderRun = None
-                  Fact = initFact }
-
-            let! baseSnapshot = store.OpenSnapshot()
-            let lastByStream = Dictionary<string, EventId>() :> IDictionary<string, EventId>
-
-            match! EventStoreJournalWriter.commitEnvelope store baseSnapshot lastByStream initEnvelope with
-            | Error err ->
+            match! EventStoreJournalWriter.commitEnvelope store init with
+            | Error error ->
                 return
                     failwith (
                         sprintf
-                            "EventStore journal create failed to publish RuntimeStarted: %s"
-                            (EventStoreJournalWriter.formatAppendError err)
+                            "EventStore journal create failed to append RuntimeStarted: %s"
+                            (EventStoreJournalWriter.formatAppendError error)
                     )
-            | Ok published ->
-                lastByStream.[EventStoreJournalWriter.streamKey initEnvelope.Stream] <- initEnvelope.EventId
-
+            | Ok() ->
                 let writer =
-                    new EventStoreJournalWriter(runtimeId, blobWriter, store, published, lastByStream, 2L)
+                    EventStoreJournalWriter(runtimeId, EventStoreBlobWriter.Create store, store, 2L)
 
-                return writer :> IJournalWriter, initEnvelope
+                return writer :> IJournalWriter, init
         }
 
-    /// Resume from an existing store snapshot, or boot empty like `create`.
-    /// Replays prior journal envelopes, publishes a fresh RuntimeStarted, and
-    /// returns writer + init envelope + folded projection.
+    /// Boot never reads history here. WorkspaceEventStore already replayed every
+    /// process writer stream through CanonicalIntegrator before this call.
     static member resumeOrCreate
-        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore) : Task<
-                                                                                                                       Result<
-                                                                                                                           IJournalWriter *
-                                                                                                                           Envelope *
-                                                                                                                           ProjectionSet,
-                                                                                                                           FoldRejection
-                                                                                                                        >
-                                                                                                                    >
-        =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore)
+        : Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>> =
         task {
-            let blobWriter = EventStoreBlobWriter.Create raw
-            let! baseSnapshot = store.OpenSnapshot()
+            let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
 
-            match! EventStoreJournalWriter.loadJournalEnvelopes raw baseSnapshot with
-            | Error msg -> return Error { Fact = "Boot"; Reason = msg }
-            | Ok prior ->
-                match Fold.apply Fold.empty prior with
+            match! EventStoreJournalWriter.commitEnvelope store init with
+            | Error error ->
+                return
+                    failwith (
+                        sprintf
+                            "EventStore journal resumeOrCreate failed to append RuntimeStarted: %s"
+                            (EventStoreJournalWriter.formatAppendError error)
+                    )
+            | Ok() ->
+                match EventStoreJournalWriter.currentJournalProjection store with
                 | Error rejection -> return Error rejection
-                | Ok replayed ->
-                    let lastByStream = Dictionary<string, EventId>() :> IDictionary<string, EventId>
+                | Ok projection ->
+                    let writer =
+                        EventStoreJournalWriter(runtimeId, EventStoreBlobWriter.Create store, store, 2L)
 
-                    for env in prior do
-                        lastByStream.[EventStoreJournalWriter.streamKey env.Stream] <- env.EventId
-
-                    let nextLocalSeq =
-                        if List.isEmpty prior then
-                            1L
-                        else
-                            (prior |> List.map (fun e -> LocalSeq.value e.LocalSeq) |> List.max) + 1L
-
-                    let initEventId = EventId.create (Guid.NewGuid().ToString("N"))
-
-                    let initFact =
-                        Fact.Runtime(
-                            RuntimeStarted
-                                {| RuntimeId = runtimeId
-                                   ProcessId = processId
-                                   StartedAt = startedAt |}
-                        )
-
-                    let initEnvelope: Envelope =
-                        { RuntimeId = runtimeId
-                          LocalSeq = LocalSeq.create nextLocalSeq
-                          ObservedAt = startedAt
-                          EventId = initEventId
-                          Stream = StreamId.Workspace
-                          ProviderRun = None
-                          Fact = initFact }
-
-                    match! EventStoreJournalWriter.commitEnvelope store baseSnapshot lastByStream initEnvelope with
-                    | Error err ->
-                        return
-                            failwith (
-                                sprintf
-                                    "EventStore journal resumeOrCreate failed to publish RuntimeStarted: %s"
-                                    (EventStoreJournalWriter.formatAppendError err)
-                            )
-                    | Ok published ->
-                        lastByStream.[EventStoreJournalWriter.streamKey initEnvelope.Stream] <- initEnvelope.EventId
-
-                        let writer =
-                            new EventStoreJournalWriter(
-                                runtimeId,
-                                blobWriter,
-                                store,
-                                published,
-                                lastByStream,
-                                nextLocalSeq + 1L
-                            )
-
-                        return
-                            Fold.foldEnvelope replayed initEnvelope
-                            |> Result.map (fun projection -> writer :> IJournalWriter, initEnvelope, projection)
+                    return Ok(writer :> IJournalWriter, init, projection)
         }
 
-    member private this.AppendLocked
-        (streamKind: StreamId)
+    member private _.AppendLocked
+        (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
         : Task<CommitResult<Envelope>> =
@@ -309,58 +191,49 @@ type EventStoreJournalWriter
             if poisoned || disposed then
                 return CommitUnknown(eventId, WriteFailed "Writer is poisoned or disposed")
             else
-                let env: Envelope =
+                let envelope: Envelope =
                     { RuntimeId = runtimeId
                       LocalSeq = LocalSeq.create currentSeq
                       ObservedAt = DateTimeOffset.UtcNow
                       EventId = eventId
-                      Stream = streamKind
+                      Stream = stream
                       ProviderRun = providerRun
                       Fact = fact }
 
-                match! EventStoreJournalWriter.commitEnvelope store baseSnapshot lastByStream env with
-                | Ok published ->
-                    baseSnapshot <- published
-                    lastByStream.[EventStoreJournalWriter.streamKey env.Stream] <- env.EventId
+                match! EventStoreJournalWriter.commitEnvelope store envelope with
+                | Ok() ->
                     currentSeq <- currentSeq + 1L
-                    return Committed env
-                | Error err ->
+                    return Committed envelope
+                | Error error ->
                     poisoned <- true
-                    return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError err))
+                    return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError error))
         }
 
-    member private this.Enqueue(work: unit -> Task<'T>) : Task<'T> =
+    member private _.Enqueue(work: unit -> Task<'T>) : Task<'T> =
         lock gate (fun () ->
-            let prev = serial
+            let previous = serial
 
             let running =
                 task {
-                    do! prev
+                    do! previous
                     return! work ()
                 }
 
-            serial <-
-                task {
-                    try
-                        let! _ = running
-                        return ()
-                    with _ ->
-                        return ()
-                }
-
+            serial <- task { let! _ = running in return () }
             running)
 
     member this.Append
-        (streamKind: StreamId)
+        (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
         : Task<CommitResult<Envelope>> =
-        this.Enqueue(fun () -> this.AppendLocked streamKind providerRun fact)
+        this.Enqueue(fun () -> this.AppendLocked stream providerRun fact)
 
-    member private this.DisposeInternal() =
-        lock gate (fun () ->
-            if not disposed then
-                disposed <- true)
+    member _.Release() = lock gate (fun () -> disposed <- true)
+
+    member this.ReleaseAsync() =
+        this.Release()
+        ValueTask()
 
     interface IJournalWriter with
         member this.RuntimeId = this.RuntimeId
@@ -369,17 +242,7 @@ type EventStoreJournalWriter
         member this.LocalSeq = this.LocalSeq
         member this.LastCommittedLocalSeq = this.LastCommittedLocalSeq
         member this.IsPoisoned = this.IsPoisoned
-        member this.Append streamKind providerRun fact = this.Append streamKind providerRun fact
-        member this.Release() = this.DisposeInternal()
-
-        member this.ReleaseAsync() =
-            this.DisposeInternal()
-            Fable.Core.JS.Constructors.Promise.resolve () |> unbox<ValueTask>
-
-    interface IDisposable with
-        member this.Dispose() = this.DisposeInternal()
-
-    interface IAsyncDisposable with
-        member this.DisposeAsync() =
-            this.DisposeInternal()
-            Fable.Core.JS.Constructors.Promise.resolve () |> unbox<ValueTask>
+        member this.TryCurrent(key) = this.TryCurrent key
+        member this.Append stream providerRun fact = this.Append stream providerRun fact
+        member this.Release() = this.Release()
+        member this.ReleaseAsync() = this.ReleaseAsync()

@@ -28,7 +28,7 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
-  SyncDelegateRuntime__InvokePrepared_525D15CD as invokePrepared,
+  SyncDelegateRuntime__InvokePrepared_Z13135FAE as invokePrepared,
   SyncDelegateRuntime__Dispose as disposeRuntime,
   SyncDelegateRuntime__TryFind_636E3F87 as tryFind,
 } from '../../../dist/Session/SyncDelegateRuntime.js'

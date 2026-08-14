@@ -72,6 +72,7 @@ const prepared = new magicTodoJournal.TodoWritePrepared(
   blobDigest('base-digest'),
   blobRef('proposal-list'),
   blobDigest('proposal-digest'),
+  true,
   'provider-input-digest',
   cursor(10),
   'magic-v1',
@@ -431,6 +432,110 @@ test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedA
 
     const presence = await producerPresence(journal, life, write)
     assert.equal(caseOf(presence), 'Present', 'CompletedAwaitingJoin handle must be Present, not Absent')
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('REVIEW_017 durable verdict keeps record-ready producer present after the reviewer work-unit is Retired', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-retired-verdict-presence-'))
+  const created = await agentJournal.create({ directory, runtime: 'rt_retired_verdict_presence' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  try {
+    const journal = created.journal
+    const retiredReviewerSession = sessionId('ses-retired-verdict-reviewer')
+    const barrier = reviewBarrierId(review.fields[0])
+    const retiredAssigned = new magicTodoJournal.TodoProcessReviewAssigned(
+      life,
+      write,
+      review,
+      reviewer,
+      retiredReviewerSession,
+      cursor(4),
+      cursor(10),
+    )
+
+    const append = async (caseName, payload) => {
+      const appended = await agentJournal.appendMagicTodo(
+        stream.session(managerSession),
+        undefined,
+        magicFact(caseName, payload),
+        journal,
+      )
+      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+      return appended.value.EventId
+    }
+    const appendAgent = async (session, payload) => {
+      const appended = await agentJournal.appendAgent(stream.session(session), undefined, payload, journal)
+      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+    }
+
+    const preparedRef = await append('TodoWritePrepared', prepared)
+    await append('TodoWriteAccepted', new magicTodoJournal.TodoWriteAccepted(
+      life,
+      write,
+      call,
+      preparedRef,
+      'provider-input-digest',
+      'output-digest',
+      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+      'magic-v1',
+    ))
+    await append('DedicatedTodoReviewerEnlisted', new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, retiredReviewerSession))
+    await append('TodoProcessReviewAssigned', retiredAssigned)
+
+    await appendAgent(retiredReviewerSession, agentFact('AuthorityRootAccepted', {
+      SessionId: retiredReviewerSession,
+      LogicalRunId: logicalRunId('run-retired-reviewer'),
+      AuthorityRootUserMessageId: authorityRoot('root-retired-reviewer'),
+      AuthorityKind: 'ChildRoot',
+      SelectedAgent: 'fast-reviewer',
+      PeerAgent: 'deep-reviewer',
+      CanonicalRole: 'Reviewer',
+      SelectedTier: 'fast',
+    }))
+    await appendAgent(managerSession, agentFact('HandleLinked', {
+      ParentSessionId: managerSession,
+      Handle: handleId.agent('h_retired_verdict'),
+      TargetAgent: 'fast-reviewer',
+      ChildSessionId: retiredReviewerSession,
+      CanonicalRole: roles.of('Reviewer'),
+      Ownership: HandleOwnership.HostOwnedHidden,
+    }))
+    await appendAgent(retiredReviewerSession, agentFact('ReviewBarrierStarted', {
+      ReviewerSessionId: retiredReviewerSession,
+      ManagerSessionId: managerSession,
+      BarrierId: barrier,
+      GitTreeHash: gitTreeHash('tree-retired-verdict'),
+    }))
+    await appendAgent(retiredReviewerSession, agentFact('ReviewVerdictRecorded', {
+      ReviewerSessionId: retiredReviewerSession,
+      ManagerSessionId: managerSession,
+      BarrierId: barrier,
+      GitTreeHash: gitTreeHash('tree-retired-verdict'),
+      ProviderRun: providerRun('run-retired-verdict'),
+      ToolCallId: toolCallId('judge-retired-verdict'),
+      Verdict: verdict.perfect,
+    }))
+    await appendAgent(managerSession, agentFact('HandleCompleted', {
+      ParentSessionId: managerSession,
+      Handle: handleId.agent('h_retired_verdict'),
+      ChildSessionId: retiredReviewerSession,
+      CompletionKind: HandleCompletionKind.Terminal,
+      CompletionRef: undefined,
+      CompletionDigest: undefined,
+    }))
+    await appendAgent(managerSession, agentFact('HandleRetired', {
+      ParentSessionId: managerSession,
+      Handle: handleId.agent('h_retired_verdict'),
+    }))
+
+    const conclude = await tryConclude(journal, life, write)
+    assert.equal(caseOf(conclude), 'Pending', 'verdict exists but LWR is intentionally not record-ready')
+    const presence = await producerPresence(journal, life, write)
+    assert.equal(caseOf(presence), 'Present', 'Retired after a durable verdict must keep waiting for Journal/XTrace record-ready convergence')
   } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })

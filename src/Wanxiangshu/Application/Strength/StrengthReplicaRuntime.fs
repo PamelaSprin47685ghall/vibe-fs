@@ -29,6 +29,10 @@ type StrengthReplicaOutcome =
       Batches: StrengthRequestBatch list
       Terminal: StrengthReplicaTerminal }
 
+type StrengthDryRunStart =
+    { ReplicaSessionId: SessionId
+      Completion: Task<StrengthReplicaOutcome> }
+
 type private StrengthReplicaDecisionState =
     { Owner: SessionId
       Replica: SessionId
@@ -216,7 +220,30 @@ type StrengthReplicaRuntime
                     do! abortReplica state
         }
 
-    member _.StartDecision
+    member private _.ObserveDryRun(state: StrengthReplicaDecisionState) =
+        task {
+            try
+                let deadline = timer.Delay latencyMs
+                let completionTask = state.Completion.Task
+                let! completed = completionWins completionTask deadline
+
+                if completed then
+                    deadline.Cancel()
+                else
+                    let current = tryState state.Replica |> Option.defaultValue state
+                    complete StrengthReplicaTerminal.TimedOut current
+                    do! abortReplica current
+
+                let! _ = completionTask
+                removeState state
+            with ex ->
+                let current = tryState state.Replica |> Option.defaultValue state
+                complete (StrengthReplicaTerminal.Failed ex.Message) current
+                do! abortReplica current
+                removeState state
+        }
+
+    member this.StartDryRun
         (
             owner: SessionId,
             decisionId: StrengthDecisionId,
@@ -225,7 +252,39 @@ type StrengthReplicaRuntime
             fastAgent: string,
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
-        ) : Task<Result<StrengthReplicaOutcome, string>> =
+        ) : Task<Result<StrengthDryRunStart, string>> =
+        task {
+            match!
+                this.StartReplica(
+                    owner,
+                    decisionId,
+                    targetProviderRun,
+                    budget,
+                    fastAgent,
+                    localizedMirror,
+                    mirrorSemanticDigest
+                )
+            with
+            | Error error -> return Error error
+            | Ok state ->
+                this.ObserveDryRun state |> ignore
+
+                return
+                    Ok
+                        { ReplicaSessionId = state.Replica
+                          Completion = state.Completion.Task }
+        }
+
+    member private _.StartReplica
+        (
+            owner: SessionId,
+            decisionId: StrengthDecisionId,
+            targetProviderRun: ProviderRunIdentity,
+            budget: StrengthBudget,
+            fastAgent: string,
+            localizedMirror: WireMessage list,
+            mirrorSemanticDigest: string
+        ) : Task<Result<StrengthReplicaDecisionState, string>> =
         task {
             if StrengthBudget.requestLimit budget = 0 then
                 return Error "StrengthReplica cannot start with K0"
@@ -317,27 +376,59 @@ type StrengthReplicaRuntime
                                         | Error error -> complete (StrengthReplicaTerminal.Failed error) state
                                         | Ok _ -> ()
 
-                                        let deadline = timer.Delay latencyMs
-                                        let completionTask = state.Completion.Task
-                                        let! completed = completionWins completionTask deadline
-
-                                        if completed then
-                                            deadline.Cancel()
-                                        else
-                                            let current = tryState replica |> Option.defaultValue state
-                                            complete StrengthReplicaTerminal.TimedOut current
-                                            do! abortReplica current
-
-                                        let! result = completionTask
-                                        removeState state
-                                        return Ok result
+                                        return Ok state
                                     with ex ->
-                                        let current = tryState replica |> Option.defaultValue state
-                                        complete (StrengthReplicaTerminal.Failed ex.Message) current
-                                        do! abortReplica current
-                                        let! result = state.Completion.Task
-                                        removeState state
-                                        return Ok result
+                                        complete (StrengthReplicaTerminal.Failed ex.Message) state
+                                        do! abortReplica state
+                                        return Ok state
+        }
+
+    member this.StartDecision
+        (
+            owner: SessionId,
+            decisionId: StrengthDecisionId,
+            targetProviderRun: ProviderRunIdentity,
+            budget: StrengthBudget,
+            fastAgent: string,
+            localizedMirror: WireMessage list,
+            mirrorSemanticDigest: string
+        ) : Task<Result<StrengthReplicaOutcome, string>> =
+        task {
+            match!
+                this.StartReplica(
+                    owner,
+                    decisionId,
+                    targetProviderRun,
+                    budget,
+                    fastAgent,
+                    localizedMirror,
+                    mirrorSemanticDigest
+                )
+            with
+            | Error error -> return Error error
+            | Ok state ->
+                try
+                    let deadline = timer.Delay latencyMs
+                    let completionTask = state.Completion.Task
+                    let! completed = completionWins completionTask deadline
+
+                    if completed then
+                        deadline.Cancel()
+                    else
+                        let current = tryState state.Replica |> Option.defaultValue state
+                        complete StrengthReplicaTerminal.TimedOut current
+                        do! abortReplica current
+
+                    let! result = completionTask
+                    removeState state
+                    return Ok result
+                with ex ->
+                    let current = tryState state.Replica |> Option.defaultValue state
+                    complete (StrengthReplicaTerminal.Failed ex.Message) current
+                    do! abortReplica current
+                    let! result = state.Completion.Task
+                    removeState state
+                    return Ok result
         }
 
     member _.Dispose() =

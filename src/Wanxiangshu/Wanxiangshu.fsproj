@@ -109,6 +109,7 @@
     <Compile Include="Domain/SyncDelegatePrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
+    <Compile Include="Domain/Fission.fs"/>
     <Compile Include="Domain/AttemptPlanner.fs"/>
     <Compile Include="Domain/EventStore.fs"/>
     <Compile Include="Domain/StrengthEvents.fs"/>
@@ -125,14 +126,16 @@
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
     <Compile Include="Infrastructure/Persist/CanonicalEventCodec.fs"/>
-    <Compile Include="Infrastructure/Persist/GitRawStore.fs"/>
-    <Compile Include="Infrastructure/Persist/EventStoreMerge.fs"/>
-    <Compile Include="Infrastructure/Persist/EventStoreFold.fs"/>
+    <Compile Include="Infrastructure/Persist/EventVocabulary.fs"/>
+    <Compile Include="Infrastructure/Persist/ProcessEventLog.fs"/>
+    <Compile Include="Infrastructure/Persist/EventKWayMerge.fs"/>
+    <Compile Include="Infrastructure/Persist/IntegrationKernel.fs"/>
     <Compile Include="Infrastructure/Persist/EventStore.fs"/>
     <Compile Include="Infrastructure/Persist/StrengthStore.fs"/>
     <Compile Include="Infrastructure/Persist/StrengthDurability.fs"/>
     <Compile Include="Infrastructure/Persist/GitObjectDatabase.fs"/>
     <Compile Include="Infrastructure/Persist/ProcessGitRawStore.fs"/>
+    <Compile Include="Infrastructure/Persist/WriterStreamSync.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
@@ -153,6 +156,7 @@
     <Compile Include="Journal/BloggerCycleProjection.fs"/>
     <Compile Include="Journal/GuidelineProjection.fs"/>
     <Compile Include="Journal/TipDeliveryProjection.fs"/>
+    <Compile Include="Journal/FissionProjection.fs"/>
     <Compile Include="Journal/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Journal/SessionStartedAtProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
@@ -164,6 +168,7 @@
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/ProjectionState.fs"/>
     <Compile Include="Journal/FoldRejection.fs"/>
+    <Compile Include="Journal/FissionFactFold.fs"/>
     <Compile Include="Journal/ProjectionUpdate.fs"/>
     <Compile Include="Journal/PromptFactFold.fs"/>
     <Compile Include="Journal/FallbackFactFold.fs"/>
@@ -205,6 +210,8 @@
     <Compile Include="Session/StrengthRuntime.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
+    <Compile Include="Session/FissionAdmission.fs"/>
+    <Compile Include="Session/FissionRuntime.fs"/>
     <Compile Include="Application/Recovery/FallbackEvidence.fs"/>
     <Compile Include="Application/Review/Ports.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
@@ -236,6 +243,7 @@
     <Compile Include="Application/Orchestration/Runtime.fs"/>
     <Compile Include="Infrastructure/Git/GitOperations.fs"/>
     <Compile Include="Infrastructure/Git/GitGateway.fs"/>
+    <Compile Include="Infrastructure/Git/HookSync.fs"/>
     <Compile Include="Infrastructure/Git/HookDispatcher.fs"/>
     <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
@@ -292,6 +300,7 @@
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
     <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
     <Compile Include="Application/Reconciliation/MagicTodoLocality.fs"/>
+    <Compile Include="Application/Manager/ObligationLedgerWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/MagicTodoMembrane.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
     <Compile Include="Application/Prompting/ChildPromptAuthority.fs"/>
@@ -388,6 +397,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Application/Reconciliation/XWire.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TurnRuntimePreparation.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/FissionHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionObserver.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionDeletion.fs"/>
@@ -437,6 +447,7 @@
     <Compile Include="Infrastructure/CasebookIndex.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>
+    <Compile Include="Infrastructure/Persist/CanonicalIntegrator.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolWorkflow.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolHost.fs"/>

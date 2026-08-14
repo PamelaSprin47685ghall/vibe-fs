@@ -103,6 +103,7 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
     const hooks = MagicTodoHostHooks_create(created.journal, snapshot, reviewRuntimeStub)
     const output = {
       args: {
+        planComplete: false,
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
       },
     }
@@ -144,6 +145,7 @@ test('TODO-004 malformed obligation shape is the provider-red class', async () =
           { tool: 'todowrite', sessionID: 'ses-syntax-red', callID: 'call-syntax-red' },
           {
             args: {
+              planComplete: false,
               obligations: [
                 { name: 'same', work: 'first' },
                 { name: 'same', work: 'second' },
@@ -180,7 +182,7 @@ test('TODO-004 missing process-review runtime is infrastructure-fatal, not provi
       () =>
         hooks.Before(
           { tool: 'todowrite', sessionID: 'ses-runtime-fatal', callID: 'call-runtime-fatal' },
-          { args: { obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
+          { args: { planComplete: true, obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
         ),
       (error) => {
         const message = String(error && error.message ? error.message : error)
@@ -207,6 +209,7 @@ test('HOST-019 prepare rejects a pending ToolPart whose provider input is still 
       session,
       locality({ call, inputCanonical: '{}' }),
       'provider-input-digest',
+      false,
       [new Obligation('diagnose', 'Fix the todowrite snapshot race.')],
     )
 
@@ -239,9 +242,12 @@ const snapshotMessage = (call, inputCanonical) =>
     ],
   )
 
-test('HOST-019 before materializes the exact provider input', () => {
+test('HOST-019 before materializes the exact provider input including planComplete', () => {
   const call = toolCallId('call-magic-todo-await-input')
-  const expected = '{"obligations":[{"name":"diagnose","work":"Fix the todowrite snapshot race."}]}'
+  const expected = magicTodoHost.canonicalInput({
+    planComplete: false,
+    obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
+  })
 
   const result = materializeInput(
     locality({ call, inputCanonical: '{}' }),
@@ -258,10 +264,16 @@ test('HOST-019 materialization fails closed when the provider input differs', ()
   const result = materializeInput(
     locality({
       call,
-      inputCanonical: '{"obligations":[{"name":"other","work":"Different provider input."}]}',
+      inputCanonical: magicTodoHost.canonicalInput({
+        planComplete: false,
+        obligations: [{ name: 'other', work: 'Different provider input.' }],
+      }),
       state: new SnapshotToolPartState(1, []),
     }),
-    '{"obligations":[{"name":"diagnose","work":"Fix the todowrite snapshot race."}]}',
+    magicTodoHost.canonicalInput({
+      planComplete: false,
+      obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
+    }),
   )
 
   assert.equal(result.tag, 1)
@@ -280,9 +292,13 @@ test('HOST-019 materialized snapshot input must still match tool.execute.before 
       session,
       locality({
         call,
-        inputCanonical: '{"obligations":[{"name":"other","work":"Different provider input."}]}',
+        inputCanonical: magicTodoHost.canonicalInput({
+          planComplete: false,
+          obligations: [{ name: 'other', work: 'Different provider input.' }],
+        }),
       }),
       'provider-input-digest',
+      false,
       [new Obligation('diagnose', 'Fix the todowrite snapshot race.')],
     )
 
@@ -294,9 +310,9 @@ test('HOST-019 materialized snapshot input must still match tool.execute.before 
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-const checkpoint = async (journal, session, callText, obligations) => {
+const checkpoint = async (journal, session, callText, obligations, planComplete = true) => {
   const call = toolCallId(callText)
-  const args = { obligations }
+  const args = { planComplete, obligations }
   const inputCanonical = magicTodoHost.canonicalInput(args)
   const digest = magicTodoHost.canonicalInputDigest(sha256Hex, args)
   const submitted = obligations.map((row) => new Obligation(row.name, row.work))
@@ -307,10 +323,44 @@ const checkpoint = async (journal, session, callText, obligations) => {
       session,
       locality({ call, inputCanonical }),
       digest,
+      planComplete,
       submitted,
     ),
   }
 }
+
+test('OBLIGATION-LEDGER-016 first accepted planComplete=false stays at the Planning Table without T1 revelation', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-planning-false')
+    const life = managerLifeId('life-magic-todo-planning-false')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const planning = await checkpoint(journal, session, 'call-magic-todo-planning-false', [
+        { name: 'inspect-startup', work: 'Inspect startup paths so the implementation plan can be completed.' },
+      ], false)
+      assert.equal(planning.result.ok, true, planning.result.ok ? '' : planning.result.error.cases()[planning.result.error.tag])
+
+      const accepted = await magicTodoMembrane.accept(
+        journal,
+        planning.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        planning.digest,
+        sha256Hex('planning-false-physical-output'),
+      )
+      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+      assert.doesNotMatch(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
+
+      const lifeState = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life-magic-todo-planning-false')
+      assert.equal(lifeState.FirstPlanCommitment, undefined)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
 
 test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-closed Admission', async () => {
   await withJournal(async (journal) => {
@@ -337,6 +387,7 @@ test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-cl
       assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
       assert.equal(accepted.value.NeedsEnsureReview, true)
       assert.equal(accepted.value.NeedsDedicatedEnlist, true)
+      assert.match(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
 
       const snap = agentJournal.snapshot(journal)
       const lifeState = snap.AgentProjections.MagicTodo.ByLife.get('life-magic-todo-t1-t2-lag1')
@@ -616,6 +667,7 @@ test('HOST-021 snapshot infrastructure failure takes the process-fatal path, nev
     const hooks = MagicTodoHostHooks_create(created.journal, snapshot, reviewRuntimeStub)
     const output = {
       args: {
+        planComplete: false,
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
       },
       output: 'builtin executor succeeded',

@@ -96,6 +96,7 @@ module MagicTodoFactCodec =
                       "BaseTodoDigest", Encode.string (BlobDigest.value p.BaseTodoDigest)
                       "ProposedTodoRef", Encode.string (BlobRef.value p.ProposedTodoRef)
                       "ProposedTodoDigest", Encode.string (BlobDigest.value p.ProposedTodoDigest)
+                      "PlanCompleteDeclared", Encode.bool p.PlanCompleteDeclared
                       "ProviderInputDigest", Encode.string p.ProviderInputDigest
                       "ReviewFrontier", cursorEncoder p.ReviewFrontier
                       "SemanticVersion", Encode.string p.SemanticVersion ]
@@ -210,6 +211,11 @@ module MagicTodoFactCodec =
                           ProposedTodoRef = BlobRef.create (get.Required.Field "ProposedTodoRef" Decode.string)
                           ProposedTodoDigest =
                             BlobDigest.create (get.Required.Field "ProposedTodoDigest" Decode.string)
+                          // Legacy Magic Todo payloads predate planComplete; that
+                          // protocol defined every accepted checkpoint as the
+                          // complete plan, so absence migrates to true.
+                          PlanCompleteDeclared =
+                            get.Optional.Field "PlanCompleteDeclared" Decode.bool |> Option.defaultValue true
                           ProviderInputDigest = get.Required.Field "ProviderInputDigest" Decode.string
                           ReviewFrontier = get.Required.Field "ReviewFrontier" cursorDecoder
                           SemanticVersion = get.Required.Field "SemanticVersion" Decode.string }

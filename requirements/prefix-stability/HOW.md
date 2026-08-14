@@ -72,8 +72,9 @@ type ActivePrefixEpoch =
 
 ### 1.6 TodoCheckpoint（`Domain/MagicTodoPrefixEpoch.fs`）
 
-- `desiredCutoff(Tk) = Before(T(k-1))`（纯函数，无 Requested 事实）：`coveredBefore`
-  返回 previous Accepted（T1 → None）；`requiresLag1Rebase`：k≥2。
+- 输入只接受 obligation-ledger 投影出的 committed Accepted 子链：Pre-T1 `planComplete=false` checkpoints
+  不进入 prefix rebase。`desiredCutoff(T1)=None`；后续 committed checkpoint 返回 previous committed Accepted；
+  `requiresLag1Rebase` 在 committed 子链长度 ≥2 时为真。
 - `buildTodoCheckpointCommit`：与 probe 共用 `PrefixRebaseCommittedV2` 形状，
   `EvidenceKind = TodoCheckpoint(Tk, coveredBefore)`；`SolvingProviderRun = None`
   （seal 前提交，provider 结局无关）。
@@ -85,7 +86,7 @@ type ActivePrefixEpoch =
 | candidate 何时有资格（CTX-011） | context-compression |
 | 压缩结果如何渲染（TOML / wire） | provider-projection |
 | 何时观察到 compaction（containment 决策） | context-compression（HOST-006 收容层） |
-| desired cutoff 的 Accepted 链 | obligation-ledger |
+| desired cutoff 的 committed Accepted 子链（从首次 accepted planComplete=true 起） | obligation-ledger |
 | system prompt / Persona 内容 | participant-identity / provider-language |
 
 ## 3. 已知非目标（HOW 层）

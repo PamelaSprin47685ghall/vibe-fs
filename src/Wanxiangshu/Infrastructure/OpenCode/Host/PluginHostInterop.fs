@@ -7,6 +7,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -63,6 +64,11 @@ module PluginHostInterop =
         (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
         : ToolRegistration =
+        let jsTransactionPersistence =
+            workspaceDirectory
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
+            |> Option.map JsToolsTransactionStore.createPersistence
+
         let registration =
             ToolRegistry.create
                 toolModule
@@ -85,6 +91,7 @@ module PluginHostInterop =
                 (Some scope.Strength.StrengthRuntime)
                 finalityReviewerTimeoutMs
                 casebookToolSpecs
+                jsTransactionPersistence
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)

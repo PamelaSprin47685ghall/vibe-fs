@@ -1,0 +1,71 @@
+// FROZEN — 2026-08-14. Written before implementation by explicit user request.
+// Intentionally NOT executed before implementation.
+//
+// SPEC-INV-013: DryRun is real + OpenCode-visible + nonblocking + zero semantic promotion.
+
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import test from 'node:test'
+
+const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
+
+const branch = (source, start, end) => {
+  const from = source.indexOf(start)
+  assert.ok(from >= 0, `missing branch ${start}`)
+  const to = source.indexOf(end, from + start.length)
+  assert.ok(to > from, `missing end branch ${end}`)
+  return source.slice(from, to)
+}
+
+test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
+  const source = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+  const dry = branch(source, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
+
+  assert.match(dry, /StartDryRun/)
+  assert.doesNotMatch(dry, /let!\s+outcome\s*=\s*runtime\.StartDecision/)
+  assert.doesNotMatch(dry, /StrengthCandidatePrepared|PublishPrepared|renderCandidate/)
+  assert.doesNotMatch(dry, /StrengthCandidatePromoted|Promoted/)
+})
+
+test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
+  const source = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
+  const start = source.indexOf('member this.StartDryRun')
+  assert.ok(start >= 0, 'runtime must expose a distinct StartDryRun capability')
+  const dry = source.slice(start)
+
+  assert.match(dry, /this\.StartReplica/)
+  assert.match(source, /CreateChildSession/)
+  assert.match(source, /registerReplica/)
+  assert.match(source, /SendAgentOwnerRootWithTools/)
+  assert.match(source, /Detached/)
+  assert.match(source, /ObserveDryRun/)
+
+  // The returned start capability may await physical child creation/bootstrap, but not the 2500ms terminal race.
+  const returnBoundary = dry.indexOf('return Ok')
+  assert.ok(returnBoundary > 0, 'StartDryRun must return a start handle/result')
+  const beforeReturn = dry.slice(0, returnBoundary)
+  assert.doesNotMatch(beforeReturn, /completionWins|deadline\.Delay|let!\s+result\s*=\s*.*Completion\.Task/)
+})
+
+test('SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
+  const runtime = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
+  assert.match(runtime, /TimedOut/)
+  assert.match(runtime, /CancelOwner/)
+  assert.match(runtime, /AbortSession/)
+
+  const host = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+  const dry = branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
+  assert.doesNotMatch(dry, /HostMessageProjection\.replaceMessagesInPlace/)
+  assert.doesNotMatch(dry, /TripStrengthFuse\([^)]*TimedOut/i)
+})
+
+test('SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
+  const runtime = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
+  const host = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+
+  assert.match(runtime, /CreateChildSession/)
+  assert.match(runtime, /StrengthReplicaBinding/)
+  assert.match(runtime, /registerReplica/)
+  assert.match(host, /StrengthRolloutMode\.DryRun/)
+  assert.doesNotMatch(branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->'), /fake|simulate|synthetic replica/i)
+})

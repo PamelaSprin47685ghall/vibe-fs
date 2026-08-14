@@ -209,7 +209,7 @@ account，而不是由系统回滚（why「CurrentObligations：Accepted superse
 
 **规范**：`TodoWriteAccepted` 是 checkpoint 与过程评审义务的唯一事实源。
 `TodoWritePrepared` 单独不派生 Rk；Host store 已写 ≠ Accepted（TODO-004/006）。
-Accepted ↔ obligation 一一对应；被拒/非 admission 不建 review。
+Accepted ↔ obligation 一一对应；被拒/非 admission 不建 review。每个 Rk 的 reviewer assignment 必须携带该 checkpoint 的 **effective plan commitment relation**：T1 前为 false；T1 及其后永久为 true，即使后续 provider raw bool 又写 false。Reviewer 因此能用同一过程评审协议分别判断 planning-account honesty 与 committed mission-debt honesty，而不是用旧 meta-todo 规则反向否定合法的 Pre-T1 planning account。
 
 **含义 / 动机**：Rk 的派生必须锚定在 durable Accepted 上；Prepared 只是 admission 中间态，
 不能成为评审义务的源头。
@@ -344,10 +344,13 @@ Opening 永久 raw 的保护语义属 `work-record`。
 
 ## OBLIGATION-LEDGER-018：恢复只从 durable facts；禁止程序计数器与平行证据
 
-**规范**：恢复只从 durable facts 重建（`TodoWritePrepared.planComplete` / `TodoWriteAccepted` live-or-recovery /
-physical ToolPart / `VerdictKnown` / `TodoReviewConcluded` 等），不靠内存 Stage、独立 phase bool、
-时间猜测或「下次还应发生」。`effectivePlanComplete` 是 Accepted Prepared 声明的单调 OR 投影，属于
-业务事实，不是程序计数器。不得新增或恢复为控制状态：
+**规范**：恢复只从 durable facts 经 **Boot Fold** 重建 O(1) projection facts，再重入普通 F# CE workflow；禁止在业务查询或每次 workflow 入口扫描/重放完整 Journal。`TodoWritePrepared.planComplete` / `TodoWriteAccepted` live-or-recovery / physical ToolPart / `VerdictKnown` / `TodoReviewConcluded` 等只记录已发生事实，不记录“下一步去哪”。
+
+`planComplete` 的单调性必须用增量 projection evidence 表达：每个 Accepted append 至多 O(1) 更新 `FirstPlanCommitment`（首次 accepted true 的 checkpoint identity，Once-set）与最近 committed checkpoint locator；查询 `isPlanCommitted` / T1 anchor / committed lag-1 predecessor 均为 O(1)。Dedicated reviewer 的反向定位同样必须由增量 keyed locator 回答：enlist/replacement 时维护 `ReviewerLifeBySession`，按 reviewer session 查询 process-review authority 时不得扫描全部 Life。**不得**通过 `AcceptedOrder |> scan/find/filter` 或 `ByLife |> Map.tryPick` 在热路径重新求当前业务事实；完整历史/全表扫描只可用于离线审计，不是业务查询 API。
+
+升级兼容：旧 `TodoWritePrepared` payload 没有 `PlanCompleteDeclared` 时必须 decode 为 **true**。理由不是猜测，而是旧协议的 provider contract 已把任何 accepted todowrite 定义为 complete-plan checkpoint；把缺字段解释为 false 会在升级后逆转既有 T1。新 semantic version 的 payload 则必须显式携带 bool，不得省略。
+
+这些字段表达“某 commitment 已经发生”与“最近哪次 committed checkpoint 已发生”，属于领域证据，不是 Stage/Phase/program counter。不得新增或恢复为控制状态：
 
 ```text
 TodoPlanningStage / ReviewStage / AwaitingReview bool
@@ -365,11 +368,9 @@ kind/id/status/priority/reviewing provider 冷状态
 
 （TODO-012；后三项分别归 finality / participant-identity / 本包 001）
 
-**含义 / 动机**：事实 + CE 是唯一合法恢复路径；程序计数器是「君子不立危墙」的反面——
-崩溃后无法重建。
+**含义 / 动机**：事实 + 增量 projection + Direct CE 是唯一合法恢复路径。全量 replay 查询把历史长度变成运行成本；程序计数器则把宿主语言调用栈复制成第二 runtime。两者都违反总纲。
 
-**边界**：无持久程序计数器的一般法则属 `structured-workflow`；durable substrate 属
-`durable-events`；平行 LWR 禁令的 LWR 侧属 `work-record`。
+**边界**：Direct CE / 无持久程序计数器的一般法则属 `structured-workflow`；O(1) projection 查询、先 commit 后 fold 属 `durable-events`；本包只定义哪些 obligation facts 必须被增量投影。平行 LWR 禁令的 LWR 侧属 `work-record`。
 
 **证据** → PROOF.md 行 O-18。
 
@@ -401,7 +402,7 @@ adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（
 **规范**：每个 Manager Life 复用**一个** logical `DedicatedTodoReviewer`（REVIEW-015/TODO-008）：
 
 - 首次 `TodoWriteAccepted` 时若尚不存在 → Host-owned hidden session 创建并 durable enlist；
-- 后续 checkpoint：同一 logical reviewer，优先同一 physical session；
+- 后续 checkpoint：同一 logical reviewer，优先同一 physical session；上一轮 Host-owned work-unit handle 已 `CompletedAwaitingJoin/Retired` 不等于 logical reviewer 丢失；在**新 assignment 尚未 durable**时必须为同一 physical reviewer 取得新的 Active work-unit/link，再发送 continuation；已 assigned 的旧 checkpoint 不得为掩盖 record-ready 缺口而复活 handle；
 - 仅 proven permanent loss 后 `DedicatedTodoReviewerReplaced`（logical id 不变）；不确定 → fail closed；
 - **Finality cohort membership 可 graduate，process-review duty / session 至少保留到
   `LifeCompleted`**——Blessing 或 Finality REVISE 不 Dispose、不丢过程历史（TODO-008/010）。

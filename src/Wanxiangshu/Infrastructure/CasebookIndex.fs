@@ -82,26 +82,24 @@ module CasebookIndex =
     let private publicEntries (cases: Map<string, Case>) =
         resolvedEntries cases |> List.map (fun entry -> entry.Public)
 
-    let private project (store: IEventStore) (raw: IGitRawStore) (capacity: int) =
-        task {
-            let! snapshot = store.OpenSnapshot()
-
-            match! CasebookStore.loadEvents raw snapshot with
-            | Error error -> return Error error
-            | Ok events -> return Ok(CasebookStore.project capacity events)
-        }
+    let private project (store: IEventStore) (capacity: int) : Result<Map<string, Case>, string> =
+        match store.TryCurrent "Casebook" with
+        | None -> Ok Map.empty
+        | Some current ->
+            let state = unbox<CasebookProjection.State> current
+            let cases = CasebookProjection.evict capacity state.Cases |> fst
+            Ok cases
 
     /// Resolve a public shelfmark to its internal Case without exposing the
     /// durable session key. The generated shelfmark is collision-free for the
     /// process identity inputs because it carries the full 32-bit discriminator.
     let resolve
         (store: IEventStore)
-        (raw: IGitRawStore)
         (capacity: int)
         (shelfmark: string)
         : Task<Result<Case option, string>> =
         task {
-            match! project store raw capacity with
+            match project store capacity with
             | Error error -> return Error error
             | Ok cases ->
                 return
@@ -114,9 +112,9 @@ module CasebookIndex =
 
     /// Rebuild from the unified EventStore projection. Epoch advances when the
     /// provider-visible index changes or an explicit invalidation occurred.
-    let refresh (store: IEventStore) (raw: IGitRawStore) (capacity: int) : Task<Snapshot> =
+    let refresh (store: IEventStore) (capacity: int) : Task<Snapshot> =
         task {
-            let! projected = project store raw capacity
+            let projected = project store capacity
 
             return
                 lock gate (fun () ->

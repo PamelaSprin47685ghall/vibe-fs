@@ -139,13 +139,5 @@ module StrengthProjection =
                     { ByDecision = Map.add dkey { view with Abandoned = true } projection.ByDecision
                       ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
 
-    let fold (events: StrengthEvent list) : Result<StrengthProjection, StrengthProjectionError> =
-        let rec loop projection remaining =
-            match remaining with
-            | [] -> Ok projection
-            | head :: tail ->
-                match apply projection head with
-                | Ok next -> loop next tail
-                | Error error -> Error error
-
-        loop empty events
+    // No history-fold API by design. CanonicalIntegrator is the sole history
+    // enumerator and registers `apply` as this module's one-event oracle.

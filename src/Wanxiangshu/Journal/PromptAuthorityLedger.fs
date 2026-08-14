@@ -169,12 +169,16 @@ module PromptAuthorityLedger =
         Map.tryFind sessionId agentProjections.Sessions
         |> Option.bind (fun session -> session.PromptAuthority)
 
+    let private profileOwner (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
+        FissionProjection.tryOwnerOfLane sessionId agentProjections.Fission
+        |> Option.defaultValue sessionId
+
     let activeProfile (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
-        projectionFor sessionId agentProjections
+        projectionFor (profileOwner sessionId agentProjections) agentProjections
         |> Option.bind (fun authority -> authority.ActiveLogicalRun)
 
     let lastAuthorityProfile (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
-        projectionFor sessionId agentProjections
+        projectionFor (profileOwner sessionId agentProjections) agentProjections
         |> Option.bind (fun authority -> authority.LastAuthorityProfile)
 
     let pendingClaim (sessionId: SessionId) (promptKey: PromptKey) (agentProjections: AgentProjectionSet) =

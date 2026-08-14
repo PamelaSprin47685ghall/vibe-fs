@@ -97,46 +97,57 @@ module Observations =
 /// later resolution/refresh/evict events — never via revision/wall_clock LWW.
 module CasebookProjection =
 
-    let empty: Map<string, Case> = Map.empty
+    /// Incremental Current owned by the canonical Integrator. The access counter
+    /// is part of the derived state so boot replay and live integration use the
+    /// exact same single-event rule.
+    type State =
+        { AccessCounter: int64
+          Cases: Map<string, Case> }
 
-    let fold (events: CasebookEvent list) : Map<string, Case> =
-        let rec go
-            (accessCounter: int64)
-            (cases: Map<string, Case>)
-            (remaining: CasebookEvent list)
-            : Map<string, Case> =
-            match remaining with
-            | [] -> cases
-            | CasebookEvent.CaseCaptured case :: rest ->
-                let withAccess =
-                    { case with
-                        LastAccessOrder = accessCounter }
+    let emptyState: State =
+        { AccessCounter = 0L
+          Cases = Map.empty }
 
-                go (accessCounter + 1L) (Map.add case.SessionId withAccess cases) rest
-            | CasebookEvent.CaseRefreshed(sessionId, q, a, observations) :: rest ->
-                match Map.tryFind sessionId cases with
-                | Some existing ->
-                    let updated =
-                        { existing with
-                            Q = q
-                            A = a
-                            Observations = Observations.normalize observations
-                            LastAccessOrder = accessCounter }
+    let empty: Map<string, Case> = emptyState.Cases
 
-                    go (accessCounter + 1L) (Map.add sessionId updated cases) rest
-                | None -> go accessCounter cases rest
-            | CasebookEvent.CaseAccessed sessionId :: rest ->
-                match Map.tryFind sessionId cases with
-                | Some existing ->
-                    let touched =
-                        { existing with
-                            LastAccessOrder = accessCounter }
+    let apply (state: State) (event: CasebookEvent) : State =
+        match event with
+        | CasebookEvent.CaseCaptured case ->
+            let withAccess =
+                { case with
+                    LastAccessOrder = state.AccessCounter }
 
-                    go (accessCounter + 1L) (Map.add sessionId touched cases) rest
-                | None -> go accessCounter cases rest
-            | CasebookEvent.CaseEvicted sessionId :: rest -> go accessCounter (Map.remove sessionId cases) rest
+            { AccessCounter = state.AccessCounter + 1L
+              Cases = Map.add case.SessionId withAccess state.Cases }
+        | CasebookEvent.CaseRefreshed(sessionId, q, a, observations) ->
+            match Map.tryFind sessionId state.Cases with
+            | Some existing ->
+                let updated =
+                    { existing with
+                        Q = q
+                        A = a
+                        Observations = Observations.normalize observations
+                        LastAccessOrder = state.AccessCounter }
 
-        go 0L empty events
+                { AccessCounter = state.AccessCounter + 1L
+                  Cases = Map.add sessionId updated state.Cases }
+            | None -> state
+        | CasebookEvent.CaseAccessed sessionId ->
+            match Map.tryFind sessionId state.Cases with
+            | Some existing ->
+                let touched =
+                    { existing with
+                        LastAccessOrder = state.AccessCounter }
+
+                { AccessCounter = state.AccessCounter + 1L
+                  Cases = Map.add sessionId touched state.Cases }
+            | None -> state
+        | CasebookEvent.CaseEvicted sessionId ->
+            { state with
+                Cases = Map.remove sessionId state.Cases }
+
+    // No history-fold API by design. CanonicalIntegrator is the sole history
+    // enumerator and registers `apply` as this module's one-event oracle.
 
     /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
     /// Cases; the evicted session ids are returned so the caller can append

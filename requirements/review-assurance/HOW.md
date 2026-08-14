@@ -44,7 +44,7 @@
 ### 5. record-ready 与消费（Application/Review/TodoProcessReviewProgram.fs）
 
 - `tryConclude`：**同一 snapshot** 读 checkpoint + reviewer guard；VerdictKnown（ObservedAttemptKeys 非空）后以冻结 range `[ReviewWorkStartCursor, ReviewerRecordFrontier)` 物化 canonical ProcessReviewLWR；非空 report + judge identity 存在 → writeBlob → append `TodoReviewConcluded`。任何不足 → `Pending`（等待信号，不是 provider 红字）。
-- `producerPresence`：Journal wait 合法仅当 process-review producer 存在（handle Active 或 CompletedAwaitingJoin）；否则 `Absent`。
+- `producerPresence`：无 durable verdict 时，只有 reviewer work-unit 仍可继续（Active/CompletedAwaitingJoin）才允许等待；durable process verdict 已存在后，handle `CompletedAwaitingJoin`/`Retired` 不再代表 producer loss，剩余 producer 是 Journal/XTrace/LWR 的 record-ready 收敛。无 verdict 且 Abandoned/Retired 才 `Absent`。
 - `awaitConsumableReview`：事件驱动递归——`tryConclude` → Pending → producer 存在 → `awaitChangeFrom revision` → 重判；producer 缺失 → Error fail closed（REVIEW-017/018）。无 total-review deadline（活着的 reviewer 写多久等多久）。
 
 ### 6. 数据流

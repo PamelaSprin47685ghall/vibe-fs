@@ -67,7 +67,8 @@ const hasOwn = (obj, key) => obj != null && Object.prototype.hasOwnProperty.call
 const legacyProviderFields = ['id', 'kind', 'status', 'priority', 'content'];
 
 const argsCarryObligations = (args) =>
-  Array.isArray(args?.obligations)
+  typeof args?.planComplete === 'boolean'
+  && Array.isArray(args?.obligations)
   && args.obligations.length > 0
   && args.obligations.every((row) =>
     row
@@ -421,7 +422,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!before) throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
   if (!after) throw new Error('HOST_CANARY_E/G/H: missing after.json (todowrite after never observed)');
   if (definition.advertisesObligations !== true || definition.leaksLegacyProviderFields === true) {
-    throw new Error(`HOST_CANARY_B: production definition must expose obligations{name,work} only: ${JSON.stringify(definition)}`);
+    throw new Error(`HOST_CANARY_B: production definition must expose planComplete:boolean plus obligations{name,work}: ${JSON.stringify(definition)}`);
   }
 
   // ── A: durable provider obligations vs executor compatibility args ────────
@@ -432,7 +433,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
     throw new Error('HOST_CANARY_A: production before must mutate the original args object in place');
   }
   if (!argsCarryObligations(before.preBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: pre-before args must carry only provider obligations{name,work}');
+    throw new Error('HOST_CANARY_A: pre-before args must carry planComplete plus provider obligations{name,work}');
   }
   if (
     !argsCarryObligations(before.postBeforeArgs)
@@ -593,7 +594,9 @@ export default {
             hasJsonSchema: hookOutput?.jsonSchema != null,
             advertisesObligations:
               Array.isArray(hookOutput?.parameters?.required)
+              && hookOutput.parameters.required.includes('planComplete')
               && hookOutput.parameters.required.includes('obligations')
+              && hookOutput?.parameters?.properties?.planComplete?.type === 'boolean'
               && Array.isArray(item?.required)
               && item.required.includes('name')
               && item.required.includes('work'),

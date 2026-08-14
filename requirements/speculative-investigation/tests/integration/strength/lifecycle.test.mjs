@@ -3,8 +3,7 @@ import test from 'node:test'
 
 import * as Lifecycle from '../../../../../dist/Application/Strength/StrengthLifecycle.js'
 import * as Durability from '../../../../../dist/Infrastructure/Persist/StrengthDurability.js'
-import * as PersistStore from '../../../../../dist/Infrastructure/Persist/EventStore.js'
-import * as Raw from '../../../../../dist/Infrastructure/Persist/GitRawStore.js'
+import { createLocalEventStore } from '../../../../verification-system/tests/support/local-event-store.mjs'
 import * as WireDecode from '../../../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js'
 import * as WireCapture from '../../../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
 import * as MessageEdit from '../../../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
@@ -55,9 +54,9 @@ const rawMessages = (sessionId, messages, ids) => {
 }
 
 test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
-  const raw = Raw.GitRawStore_createInMemory()
-  const store = PersistStore.EventStore_create(raw)
-  const durability = Durability.create(raw, store)
+  const local = createLocalEventStore()
+  const store = local.store
+  const durability = Durability.create(store)
   const owner = session('owner')
   const target = run('run-1')
   const id = decision('decision-1')
@@ -115,7 +114,7 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   assert.equal(resultOf(await durability.Append(promotion)).ok, true)
 
   // Restart view: reconstruct only from the unified EventStore + payload closure.
-  const restarted = Durability.create(raw, store)
+  const restarted = Durability.create(store)
   projection = resultOf(await restarted.LoadProjection()).value
   assert.equal(StrengthProjection.StrengthProjectionModule_isPromoted(id, projection), true)
 
@@ -157,4 +156,5 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   const [traced] = listItems(tracedPlans)
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(22n, traced), true)
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(23n, traced), false)
+  local.close()
 })

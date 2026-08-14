@@ -39,7 +39,7 @@ module MagicTodo =
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
-    let SemanticVersion = "magic-todo.v2"
+    let SemanticVersion = "magic-todo.v3"
 
     // ── Provider account ───────────────────────────────────────────────────
 
@@ -47,6 +47,12 @@ module MagicTodo =
     type Obligation = { Name: string; Work: string }
 
     type ObligationList = Obligation list
+
+    /// Provider-visible checkpoint input. The bool is a declaration about the
+    /// road being complete enough to entrust, not a workflow stage.
+    type TodoWriteInput =
+        { PlanComplete: bool
+          Obligations: ObligationList }
 
     [<RequireQualifiedAccess>]
     type ProcessReviewVerdict =
@@ -208,9 +214,10 @@ module MagicTodo =
             minimum
 
     /// Pre-T1 uses the dynamic XTrace head; post-T1 uses the constitutive T1 boundary.
+    /// Accepted planning checkpoints do not close Opening.
     let effectiveOpeningFloor
         (hasOpenLife: bool)
-        (todoWriteAcceptedCount: int)
+        (planCommitted: bool)
         (openingCursor: XTraceCursor)
         (t1CallCursor: XTraceCursor option)
         (t1ToolCallId: ToolCallId option)
@@ -219,7 +226,7 @@ module MagicTodo =
         : XTraceCursor option =
         if not hasOpenLife then
             None
-        elif todoWriteAcceptedCount < 1 then
+        elif not planCommitted then
             Some { Sequence = xTraceHeadSequence }
         else
             match t1CallCursor, t1ToolCallId with
@@ -232,9 +239,6 @@ module MagicTodo =
         else
             workRecordStartCursor
 
-    /// First unblessed suicide must not bypass the checkpoint protocol.
-    let requireCheckpointBeforeFirstSuicide (acceptedCount: int) : Result<unit, MagicTodoReject> =
-        if acceptedCount < 1 then
-            Error MagicTodoReject.FirstSuicideWithoutCheckpoint
-        else
-            Ok()
+    /// First unblessed suicide must not bypass the plan commitment protocol.
+    let requirePlanCommitmentBeforeFirstSuicide (planCommitted: bool) : Result<unit, MagicTodoReject> =
+        if planCommitted then Ok() else Error MagicTodoReject.FirstSuicideWithoutCheckpoint

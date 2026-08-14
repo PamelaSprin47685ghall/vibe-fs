@@ -59,13 +59,14 @@ test('MAGIC_TODO_CANARY_B_definition_replaces_description_parameters_jsonSchema_
 
   // Provider-facing advertisement is the clean-break account; legacy sink
   // fields do not cross the horizon. The original executor decoder stays V1.
+  assert.equal(defined.parameters.properties.planComplete.type, 'boolean')
   const providerItem = defined.parameters.properties.obligations.items
   assert.deepEqual(providerItem.required, ['name', 'work'])
   assert.equal(providerItem.properties.id, undefined)
   assert.equal(providerItem.properties.kind, undefined)
   assert.equal(providerItem.properties.status, undefined)
   assert.equal(providerItem.properties.priority, undefined)
-  assert.deepEqual(defined.jsonSchema.required, ['obligations'])
+  assert.deepEqual(defined.jsonSchema.required, ['planComplete', 'obligations'])
 
   const v1Row = {
     todos: [{ content: 'only-v1', status: 'pending', priority: 'low' }],
@@ -142,7 +143,7 @@ test('MAGIC_TODO_CANARY_C_projection_helper_mutates_original_args_in_place', () 
   assert.equal(result, originalArgs, 'C: projection mutates the args object in place')
   assert.equal('obligations' in args, true)
   assert.equal(Object.prototype.propertyIsEnumerable.call(args, 'todos'), false)
-  assert.equal(JSON.stringify(args), JSON.stringify({ obligations: originalObligations }))
+  assert.equal(JSON.stringify(args), JSON.stringify({ planComplete: true, obligations: originalObligations }))
   assert.equal(args.todos.length, originalObligations.length)
   assert.equal(args.todos.every((t) => t.status === 'in_progress' && t.priority === 'medium'), true)
 })

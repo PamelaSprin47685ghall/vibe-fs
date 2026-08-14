@@ -118,7 +118,7 @@ module JsToolSpec =
         (factory: HostToolFactory)
         (surface: JsSurface)
         (workspaceRoot: string)
-        (persistence: (IEventStore * IGitRawStore) option)
+        (persistence: IJsTransactionPersistence option)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 

@@ -67,6 +67,8 @@ type AgentProjectionSet =
         /// three handle facts (link / complete / retire), and retired records stay
         /// — the tombstone is permanent (EXEC-009).
         HandleByChildSession: Map<SessionId, HandleRecord>
+        /// Same-participant multi-present groups and physical lane aliases.
+        Fission: FissionProjectionState
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
 
@@ -102,6 +104,7 @@ module AgentProjection =
           Associations = SessionAssociationProjection.empty
           Orchestrator = OrchestratorProjection.empty
           HandleByChildSession = Map.empty
+          Fission = FissionProjection.empty
           MagicTodo = MagicTodoProjection.empty
           RuntimeStartCount = 0 }
 

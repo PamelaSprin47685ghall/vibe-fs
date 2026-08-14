@@ -6,28 +6,42 @@
 ## 生产装配链
 
 ```text
-ProcessGitRawStore(commonDir)             // Infrastructure/Persist/ProcessGitRawStore.fs
-  → EventStore.create / createWithRetries(+Converge)   // Infrastructure/Persist/EventStore.fs
+ProcessEventLog(commonDir, WriterId)         // Infrastructure/Persist/ProcessEventLog.fs
+  → .git/wanxiang/events/<WriterId>.ndjson   // one process = one file; never sliced
+  → CanonicalIntegrator CE                   // the only history consumer
+  → EventStore.createLocal                   // append + payload closure + Current
   → WorkspaceEventStore.acquire（process-local refcount）
   → IJournalEventStoreBoot.ResumeOrCreate / EventStoreJournalWriter
   → AgentJournal.createFromEventStore | createFromProjection
+
+Wanxiangshu/OpenCode startup
+  → HookDispatcher.ensure：install/refresh reference-transaction + pre-push
+  → ensure each remote fetches refs/wanxiang/store into remote-tracking ref
+  → stop（产品进程不主动 fetch/pull/push）
+
+later, user Git process (Wanxiangshu may be absent)
+  → installed hook launches resources/git/wanxiang-hook.mjs
+  → HookSync + GitGateway physical transport
+  → local writer files + remote writer blobs
+  → EventKWayMerge
+  → one local writer file = one Git blob snapshot
+  → replace local truth + publish remote EventStore snapshot
 ```
 
-Git 传输唯一入口是 `Infrastructure/Git/GitGateway.fs`（Fetch/Pull/Push/ConvergeStore）。
-`HookDispatcher` 提供 `reference-transaction` / `pre-push` shim + recursion guard
-（`WANXIANG_GIT_SYNC_ACTIVE`），hook 自身不 fetch/merge，只把「store ref 变化」转成收敛机会。
+运行时 append/replay 不调用 Git object API。`HookDispatcher` 只在 startup ensure hook/refspec；
+`HookSync` 才是独立 Git hook 子进程的同步入口，并以 `WANXIANG_GIT_SYNC_ACTIVE` 防递归。
 
 ## 分层与所有权（shape/persist.md PERSIST-006 / storage.md §45）
 
 | 层 | 拥有 | 不得拥有 |
 |---|---|---|
-| Domain | `EventEnvelope` / `PayloadRef` / 因果与业务语义 | `GitObjectId` / `RootOid` / `StoreSnapshot` / `AppendCandidate` / Git 操作 |
-| Persist | canonical JSON、CAS publish、`StoreSnapshot`、merge/fold、payload closure | 领域 event vocabulary、feature ref |
-| GitGateway / HookDispatcher | Wanxiang-initiated Git transport、store converge、hook shim | Domain reducer、第二套 merge 运行时 |
-| AgentJournal | 应用侧 journal 适配表面（append fact / fold projection） | 平行 NDJSON/Blob 后端、独立 canonical ref |
+| Domain | `EventEnvelope` / `PayloadRef` / 因果与业务语义 | `GitObjectId` / `RootOid` / `StoreSnapshot` / Git 操作 |
+| Persist | canonical JSON、本地 process NDJSON、payload closure、k-way input、唯一 `CanonicalIntegrator` CE、sync materialization | 领域业务判断、feature-owned history reader、按 domain 拆 backend |
+| HookDispatcher / HookSync / GitGateway | startup hook/refspec ensure；独立 Git-hook 进程 transport、writer-file blobification、remote snapshot replace | 产品进程主动 fetch/pull/push、Domain reducer、后台同步状态机、第二套业务积分器 |
+| AgentJournal / Strength / Casebook / JsTransaction | EventEnvelope producer + 向 Integrator 注册单-event rule + 读取 Current | 历史枚举、独立 replay/fold/project loop、physical journal/backend |
 
-红线：`src/Wanxiangshu/Domain/EventStore.fs` 不引用 `Infrastructure`；`StoreSnapshot`/
-`AppendCandidate`/`RootOid`/`GitObjectId` 定义只在 `Infrastructure/Persist`。
+红线：`src/Wanxiangshu/Domain/EventStore.fs` 不引用 `Infrastructure`；Git object identity 只存在于
+sync membrane；业务模块不能取得 `IEventHistoryReader`/本地 writer 文件路径。
 
 ## 核心机制（逐概念）
 
@@ -42,76 +56,100 @@ mergeByIdentity：set-union by EventId，输出按 EventId 排序
 tryDecode：null/非单 LF/形状错/重编码不等 → StorageInvalid（NonCanonical | MalformedEnvelope）
 ```
 
-### 2. Store 类型（`StoreTypes.fs`）
+### 2. Store / local-log 类型（`StoreTypes.fs` / `ProcessEventLog.fs`）
 
 ```text
-GitObjectId / RootOid / StoreSnapshot { RootOid } / AppendCandidate { BaseSnapshot; NewEvents; NewPayloads }
-MergeInput = StoreSnapshot list；TreeEntry = { Mode; Name; Oid }
-StoreRef.canonical = "refs/wanxiang/store"；StoreRef.remoteTracking = "refs/wanxiang/remotes/<remote>/store"
+WriterId：process-start fresh globally-unique physical writer identity
+LocalFrontier：每个 WriterId 当前完整 byte length / last EventId（仅 Integrator/Persist 可见）
+StoreSnapshot：仅 remote-sync membrane 的 Git root snapshot；不是本地 Current/frontier witness
 StorageInvalid = IdentityCollision | NonCanonical | MalformedEnvelope | MissingParent
-              | CyclicParents | MissingPayload | UnknownEventType     // 全局 fail-closed
-DomainConflict = ConcurrentHeads of streamId * heads                  // 永不升级
-AppendError = StorageInvalid | AppendCasRejected | AppendRetryExhausted
-PublishError = ... | IncompletePayloadClosure；ConvergeError = StorageInvalid | Transport | ...
+              | CyclicParents | MissingPayload | UnknownEventType
+DomainConflict = ConcurrentHeads of streamId * heads
+GitObjectId / RootOid / StoreRef：只在 remote sync materialization/transport 使用
 ```
 
-### 3. Append / Publish（`EventStore.fs`）
+### 3. Local Append / Publish（`EventStore.fs` / `ProcessEventLog.fs`）
 
 ```text
-validateAppendSet：O(|new|) against tip（mergeByIdentity → vocabulary → checkIdentity → parents
-                   → intra-batch DAG），不重读全历史
-append：validate → materialize delta + structural merge → CompareAndSwapRef(canonical, expected, newOid)
-        CAS false → AppendCasRejected / 重读 tip：eventsAlreadyCommitted → Ok current（幂等）
-        否则基于新 tip 重建 → bounded retry（DefaultMaxRetries = 8）
-publish：先写 payload blobs（OID 失配 → IncompletePayloadClosure），PayloadClosure.validatePresent，
-         再走 append —— payload 先于引用它的 event 进入 ODB
+createLocal：生成 fresh WriterId；打开 .git/wanxiang/events/<WriterId>.ndjson（append-only）
+boot：CanonicalIntegrator 独占读取 .git/wanxiang/events/*.ndjson → k-way merge → Current
+validateAppendSet：只向 Integrator 查询 Current/indexed identity/parents；不自行扫描历史
+append：acquire cross-process `.git/wanxiang` physical gate
+        → canonical encode 新 events → append complete JSON+LF lines → durability barrier
+        → 同一批 events 交给 CanonicalIntegrator.integrateLive → 更新 Current/frontier → release gate
+publish：先在同一 physical gate 下把新增 payload bytes 写 .git/wanxiang/payloads/<PayloadRef>；
+        event append 再独立取得 gate、验证 closure 后提交
 ```
 
-### 4. Merge（`EventStoreMerge.fs`）
+同一 gate 也由 standalone Git-hook sync 在整个 local snapshot/import + remote publication 窗口持有，
+所以运行中的 writer 与外部 `git fetch/pull/push` 不会互相观察半截文件；它只是跨进程物理资源锁，
+不表达业务 stage/Current，也不构成状态机。运行时等待该物理资源不使用业务 10s watchdog。
+
+没有 `SegmentMaxBytes`、rotation、tail rewrite、EventId→blob index、Git tree/CAS retry。
+`WriterId.ndjson` 从进程开始一直增长到进程退出；新进程只创建新 WriterId。
+
+### 4. K-way merge / Sync（`EventKWayMerge.fs` / `CanonicalIntegrator.fs` / 独立 hook）
 
 ```text
-EventStoreMergeSpec（契约 oracle）：mergeEvents = mergeByIdentity（set union + identity dedupe）
-EventStoreMerge（生产）：structural tree merge——不同 EventId 路径直接 union；
-        同 EventId 且 blob OID 相同 → 复用；OID 不同 → 读 bytes 校验 IdentityCollision；
-        其它路径冲突 → NonCanonical。复杂度与 delta/tree-path 相关，非 O(N) 全量。
+local source：每个 WriterId 一个天然有序 NDJSON stream
+remote source：remote root 中每个 WriterId 对应一个完整-file Git blob
+merge：existing deterministic k-way merge over ordered streams
+       same EventId + same canonical bytes → dedupe
+       same EventId + different canonical bytes → IdentityCollision
+sync materialization：统一 history → 替换本地 writer-file snapshot + remote writer→blob snapshot
+reference-transaction：observed remote root → 同一个 full bidirectional converge
+pre-push：discover remote root → 同一个 full bidirectional converge
 ```
 
-### 5. Fold（`EventStoreFold.fs`）
+单机多进程与多机没有不同算法；machine 不进入 identity。hook 进程不拥有 Integrator/Current；
+sync 可以重写本地**同步快照文件集合**，
+但不能修改已经存在 event 的 canonical bytes，也不能把业务 state 计算塞进 sync。
+
+### 5. 唯一 Canonical Integrator CE（`CanonicalIntegrator.fs`）
 
 ```text
-AuthoritativeEventTypes：store 层合法 vocabulary（JournalEnvelope、Job*、JsTransaction*、
-        InspectorCase*、Strength*……）；isResolution = EndsWith("ConflictResolved"|"Resolved")
-StreamHeadState = Empty | Unique of head | Conflict of DomainConflict
-topologicalOrder：Kahn + EventId 字典序 tie-break；缺 parent/成环 → StorageInvalid
-applyStream：resolution event（parents 覆盖全部 prior heads）→ 收敛为单一 head
-fold：validateVocabulary → validateParents → topologicalOrder → applyStream → { Streams; FoldOrder; Conflicts }
+integrator {
+    register JournalIntegration.rule
+    register StrengthIntegration.rule
+    register CasebookIntegration.rule
+    register JsTransactionIntegration.rule
+    register ...future business rules
+}
+
+boot:  history streams → k-way merge → Integrator CE → Current
+live:  newly committed EventEnvelope     → same Integrator CE → Current'
 ```
 
-### 6. Git raw 物理层（`GitRawStore.fs` / `ProcessGitRawStore.fs` / `GitObjectDatabase.fs`）
+Integrator 拥有：history reader、k-way frontier、identity dedupe、parent/vocabulary structural validation、
+Current。注册 rule 只接受“当前槽位 + 单个 EventEnvelope”，返回更新后的槽位/拒绝；rule 不得读取文件、
+不得枚举历史、不得自己建立 replay loop。`Journal/Fold.fs` 的各 domain fold 变成 Journal rule 内部的
+单-event integration primitives，而不是另一个 history owner。
+
+### 6. Local files 与 remote Git 编码
 
 ```text
-EventIdShard：PrefixLength=2、Extension=".jsonl"、布局 events/<2-hex>/<EventId>.jsonl
-StoreTree：events/ + payloads/；canonicalOrder（目录按 name + "/" 排序）
-PayloadClosure：§7.1 —— root payloads/ == ⋃ events.payload_refs；dangling → MissingPayload；
-                 extras → NonCanonical
-ProcessGitRawStore：memoized 对象/树缓存（content-addressed 使 memoization 精确；缺席不缓存）
-CompareAndSwapRef：lockfile CAS（<ref>.lock via wx → 验证 current → rename），None 用 zeroOid
-loadEventEnvelopes：一次 events/ 树遍历 + 每 blob 一次读取，O(|events|)；路径 EventId 与
-                    envelope 不一致 → NonCanonical
+.git/wanxiang/events/<WriterId>.ndjson      // runtime truth; one process, one unbounded file
+.git/wanxiang/payloads/<PayloadRef>          // local content-addressed large material
+
+remote sync only:
+  each <WriterId>.ndjson full bytes → exactly one Git blob
+  each payload file                 → Git blob
+  remote root                       → writer name / payload ref to blob OID
 ```
 
-### 7. Journal 适配（`Journal/EventStoreJournal{Codec,Writer}.fs`、`AgentJournal.fs`）
+Wanxiangshu 不创建 event chunk/segment DAG，不维护 EventId→Git OID index，不自己做 delta。
+Git pack/delta 是 Git 内部优化；sync 每次可以为增长后的 writer file 产生新 OID，旧 OID 不具有领域意义。
+
+### 7. Journal / feature 适配
 
 ```text
-EventStoreJournalCodec：JournalEnvelopeEventType = "JournalEnvelope"；encodeStreamId =
-        journal/workspace | journal/session/<id> | journal/child/<id> | journal/process/<id>
-EventStoreJournalWriter：filePath = ""（成功路径无 NDJSON）；serialized append；
-        commitEnvelope 的 parents = [lastByStream[key]]；poisoned → 后续 Append 拒绝
-AgentJournal.AppendEnvelope：commit → fold；fold 拒绝 → poison + FactRejected（line 保持 durable）；
-        写失败 → JournalAppendFailure.WriteUnknown —— 结局未知，runtime 必须 reconcile
-        （outcome-unknown 语义归 effect-accounting）
-Journal/Fold.fs apply：PERSIST-004 —— 第一个不可能的行即停，不产生 writer 不可能产生的部分重放
+EventStoreJournalWriter：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
+                         boot projection 直接读取 CanonicalIntegrator.Current.Journal
+Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.rule、读取自己的 Current 槽位
+AgentJournal.AppendEnvelope：local commit → Integrator live integration；不额外 fold history
 ```
+
+任何 `loadEvents(raw,snapshot)` / `EventStoreMergeSpec.merge(...history...)` 出现在业务模块都属于结构性 RED。
 
 ## 恢复 fold 不变量（PERSIST-010）的实现落点
 
@@ -131,11 +169,11 @@ Journal/Fold.fs apply：PERSIST-004 —— 第一个不可能的行即停，不�
 
 ## 历史与弃权
 
-1. **旧 NDJSON journal / RuntimePath `blobs/` / Student QA 私有文件 —— GARBAGE（migration absence）**：
-   `PERSIST-011`（Student QA）编号永久空缺；`unified-store-gate` 的 `student-qa-revival` /
-   `no-migrator` / `dual-write` 扫描 + `leave-unread` 测试钉死「不读、不迁、不双写」。
-   已删除生产 `Boot.fs`、NDJSON `JournalWriter`、目录 `BlobWriter`、`AgentJournal.createFromBoot`。
-2. **`events/<hex-prefix>/<EventId>.jsonl` 分片路径 —— HOW**：物理布局，非领域事实。
+1. **所有旧物理布局 —— shock cutover / migration absence**：pre-unified `.git/wanxiangshu-next`、
+   RuntimePath blobs、Student QA 私有文件，以及 unified-store 曾经写出的 `events/<hex>/<EventId>.jsonl`
+   都不迁移、不双读、不识别 shape、不 reset/CAS。旧布局完全 leave-unread；这个切换明确丢历史。
+2. **`logs/<ReplicaId>/<segment>.ndjson` + `index/` —— GARBAGE**：这是本次性能根因对应的在线 Git
+   物理布局；新实现不读、不迁、不双写。新 runtime truth 只有 `.git/wanxiang/events/<WriterId>.ndjson`。
 3. **`CommitUnknown → 永久无法确定` —— 弃权**：storage.md §9 重审为「canonical root 即 durable
    witness」，被 WHAT 005/006 取代。
 4. **migration 的 bytes 级确定性 —— HOW/迁移期**：`LegacyProjection == NewProjection` 且

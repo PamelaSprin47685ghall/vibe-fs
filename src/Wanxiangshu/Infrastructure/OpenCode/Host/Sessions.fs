@@ -23,7 +23,16 @@ type ISessionHostPort =
     abstract SendPrompt: sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
 
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
+    /// Fission replacement interrupt: abort only this physical Host session.
+    /// Unlike AbortSession, this does not detach/cancel the logical owner's
+    /// managed children. The later TurnAborted is classified by FissionRuntime.
+    abstract InterruptSessionOnly: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
+    /// Fission-only physical sibling creation. `physicalParentId` is the old
+    /// caller's Host parent; no managed-child registry/linkage is created.
+    abstract CreateSiblingSession:
+        ownerSessionId: SessionId * physicalParentId: SessionId option * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    abstract TryGetParentSession: sessionId: SessionId -> Task<Result<SessionId option, string>>
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
 
@@ -174,6 +183,17 @@ type InjectedSessionPort
                             return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
             }
 
+        member _.InterruptSessionOnly(sessionId) =
+            task {
+                Diagnostic.emit
+                    "session-fission-interrupt"
+                    [ "session_id", SessionId.value sessionId ]
+
+                match underlyingPort with
+                | Some port -> return! port.AbortSession sessionId
+                | None -> return Error "No Host transport: cannot interrupt session"
+            }
+
         member me.AbortSession(sessionId) =
             task {
                 // Who killed a turn is the first question a stalled run raises, and the answer used
@@ -192,6 +212,28 @@ type InjectedSessionPort
 
                 return Ok()
             }
+
+        member _.CreateSiblingSession(ownerSessionId, physicalParentId, options) =
+            task {
+                match underlyingPort with
+                | None -> return Error "No Host transport: cannot create a sibling session"
+                | Some port ->
+                    match! port.CreateSession physicalParentId options with
+                    | Error error -> return Error error
+                    | Ok laneId ->
+                        try
+                            SessionExecutionBinding.bindInternalRoot laneId options.Agent
+                            ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
+                            return Ok laneId
+                        with ex ->
+                            let! _ = port.AbortSession laneId
+                            return Error ex.Message
+            }
+
+        member _.TryGetParentSession(sessionId) =
+            match underlyingPort with
+            | None -> Task.FromResult(Error "No Host transport: cannot read session parent")
+            | Some port -> port.GetSessionParent sessionId
 
         member me.CreateChildSession(parentId, options) =
             task {

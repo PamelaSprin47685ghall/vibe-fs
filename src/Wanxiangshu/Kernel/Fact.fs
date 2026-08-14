@@ -648,6 +648,58 @@ module Fact =
             {| SessionId: SessionId
                ToolCallId: ToolCallId |}
 
+    /// INTRA-PARTICIPANT-PARALLELISM: durable facts for one logical participant
+    /// temporarily executing through several coequal physical presents. Physical
+    /// lane SessionIds are recovery identities only; they never become public handles.
+    [<RequireQualifiedAccess>]
+    type FissionFactCases =
+        | FissionAdmitted of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               ParentSessionId: SessionId option
+               OriginToolCallId: ToolCallId
+               LaneCount: int
+               LaneSessions: SessionId list
+               LanePrompts: string list
+               OwnerWorkRecordRef: BlobRef
+               OwnerWorkRecordDigest: BlobDigest
+               PreFissionCompletionIds: string list |}
+        | FissionLaneMaterialized of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               LaneIndex: int
+               LaneSessionId: SessionId
+               ProviderRun: ProviderRunIdentity
+               WorkRecordRef: BlobRef
+               WorkRecordDigest: BlobDigest |}
+        | FissionCompletionCaptured of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               CompletionId: string
+               PayloadRef: BlobRef
+               PayloadDigest: BlobDigest |}
+        | FissionCompletionDelivered of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               CompletionId: string
+               LaneIndex: int |}
+        | FissionExternalAffinityBound of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               ExternalId: string
+               LaneIndex: int |}
+        | FissionConverged of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               TerminalLaneSessionId: SessionId
+               TerminalProviderRun: ProviderRunIdentity
+               AggregateWorkRecordRef: BlobRef
+               AggregateWorkRecordDigest: BlobDigest |}
+        | FissionFailed of
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               Reason: string |}
+
     // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
     // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
     // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
@@ -668,6 +720,7 @@ module Fact =
         | Companion of CompanionFactCases
         | Context of ContextFactCases
         | Host of HostFactCases
+        | Fission of FissionFactCases
         | Delegation of DelegationFactCases
 
     module DelegationFact =
@@ -676,6 +729,28 @@ module Fact =
 
         let inline DelegatedToolCallObserved payload =
             AgentFact.Delegation(DelegationFactCases.DelegatedToolCallObserved payload)
+
+    module FissionFact =
+        let inline FissionAdmitted payload =
+            AgentFact.Fission(FissionFactCases.FissionAdmitted payload)
+
+        let inline FissionLaneMaterialized payload =
+            AgentFact.Fission(FissionFactCases.FissionLaneMaterialized payload)
+
+        let inline FissionCompletionCaptured payload =
+            AgentFact.Fission(FissionFactCases.FissionCompletionCaptured payload)
+
+        let inline FissionCompletionDelivered payload =
+            AgentFact.Fission(FissionFactCases.FissionCompletionDelivered payload)
+
+        let inline FissionExternalAffinityBound payload =
+            AgentFact.Fission(FissionFactCases.FissionExternalAffinityBound payload)
+
+        let inline FissionConverged payload =
+            AgentFact.Fission(FissionFactCases.FissionConverged payload)
+
+        let inline FissionFailed payload =
+            AgentFact.Fission(FissionFactCases.FissionFailed payload)
 
     /// HOST-013 constructor surface.
     module HostFact =

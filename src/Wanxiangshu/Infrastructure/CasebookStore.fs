@@ -88,39 +88,72 @@ module CasebookStore =
               Observations = get.Required.Field "observations" (Decode.list decodeObservation)
               LastAccessOrder = 0L })
 
+    // ---- single-event integration codec ----------------------------------
+
+    let isCasebookEventType eventType =
+        eventType = CapturedEventType
+        || eventType = RefreshedEventType
+        || eventType = AccessedEventType
+        || eventType = EvictedEventType
+
+    let private decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
+        let decoder =
+            Decode.object (fun get ->
+                (get.Required.Field "session_id" Decode.string,
+                 get.Required.Field "q" Decode.string,
+                 get.Required.Field "a" Decode.string,
+                 get.Required.Field "observations" (Decode.list decodeObservation)))
+
+        Decode.fromValue "$" decoder payload
+        |> Result.map (fun (sessionId, q, a, observations) ->
+            CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
+
+    /// Integration oracle input decoder. It accepts exactly one EventEnvelope;
+    /// history ordering/iteration belongs to CanonicalIntegrator.
+    let tryDecodeEnvelope (envelope: EventEnvelope) : Result<CasebookEvent, string> =
+        match envelope.EventType with
+        | eventType when eventType = CapturedEventType ->
+            Decode.fromValue "$" decodeCase envelope.Payload |> Result.map CasebookEvent.CaseCaptured
+        | eventType when eventType = RefreshedEventType -> decodeRefreshed envelope.Payload
+        | eventType when eventType = AccessedEventType ->
+            Decode.fromValue "$" (Decode.field "session_id" Decode.string) envelope.Payload
+            |> Result.map CasebookEvent.CaseAccessed
+        | eventType when eventType = EvictedEventType ->
+            Decode.fromValue "$" (Decode.field "session_id" Decode.string) envelope.Payload
+            |> Result.map CasebookEvent.CaseEvicted
+        | other -> Error(sprintf "not a Casebook event: %s" other)
+
     // ---- append -----------------------------------------------------------
 
     let private appendEvent
         (store: IEventStore)
-        (parents: EventId list)
         (eventType: string)
         (payload: JsonValue)
         : Task<Result<EventId, string>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+            let streamId = EventStreamId.create CasebookStream
+            let parents = store.TryHead streamId |> Option.toList
 
             let envelope =
                 EventEnvelope.normalize
                     { EventId = eventId
-                      StreamId = EventStreamId.create CasebookStream
+                      StreamId = streamId
                       EventType = eventType
                       Parents = parents
                       Payload = payload
                       PayloadRefs = [] }
 
-            let! snapshot = store.OpenSnapshot()
-
-            match! store.Append(snapshot, [ envelope ]) with
-            | Ok _ -> return Ok eventId
+            match! store.Append [ envelope ] with
+            | Ok() -> return Ok eventId
             | Error err -> return Error(sprintf "%s append failed: %A" eventType err)
         }
 
-    let appendCaptured (store: IEventStore) (parents: EventId list) (case: Case) : Task<Result<EventId, string>> =
-        appendEvent store parents CapturedEventType (encodeCase case)
+    let appendCaptured (store: IEventStore) (case: Case) : Task<Result<EventId, string>> =
+        appendEvent store CapturedEventType (encodeCase case)
 
     let appendRefreshed
         (store: IEventStore)
-        (parents: EventId list)
         (sessionId: string)
         (q: string)
         (a: string)
@@ -133,118 +166,10 @@ module CasebookStore =
                   "a", Encode.string a
                   "observations", Encode.list (List.map encodeObservation observations) ]
 
-        appendEvent store parents RefreshedEventType payload
+        appendEvent store RefreshedEventType payload
 
-    let appendAccessed
-        (store: IEventStore)
-        (parents: EventId list)
-        (sessionId: string)
-        : Task<Result<EventId, string>> =
-        appendEvent store parents AccessedEventType (Encode.object [ "session_id", Encode.string sessionId ])
+    let appendAccessed (store: IEventStore) (sessionId: string) : Task<Result<EventId, string>> =
+        appendEvent store AccessedEventType (Encode.object [ "session_id", Encode.string sessionId ])
 
-    let appendEvicted (store: IEventStore) (parents: EventId list) (sessionId: string) : Task<Result<EventId, string>> =
-        appendEvent store parents EvictedEventType (Encode.object [ "session_id", Encode.string sessionId ])
-
-    // ---- load / project ---------------------------------------------------
-
-    /// Causal order: parents before children (merge returns tree order, not
-    /// application order — the fold must see Captured before Refreshed of the
-    /// same Case regardless of physical tree layout).
-    let topoSort (envelopes: EventEnvelope list) : EventEnvelope list =
-        let byId = envelopes |> List.map (fun e -> e.EventId, e) |> Map.ofList
-
-        let rec visit
-            (e: EventEnvelope)
-            (visited: Set<EventId>)
-            (acc: EventEnvelope list)
-            : Set<EventId> * EventEnvelope list =
-            if Set.contains e.EventId visited then
-                visited, acc
-            else
-                let visitedAfterParents, accAfterParents =
-                    e.Parents
-                    |> List.filter (fun p -> Map.containsKey p byId)
-                    |> List.fold (fun (v, a) p -> visit byId[p] v a) (visited, acc)
-
-                Set.add e.EventId visitedAfterParents, e :: accAfterParents
-
-        (Set.empty, [])
-        |> fun (v, a) -> List.fold (fun (v, a) e -> visit e v a) (v, a) envelopes
-        |> snd
-        |> List.rev
-
-    let loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<EventEnvelope list, string>> =
-        task {
-            match! EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
-            | Error(MergeError.StorageInvalid detail) -> return Error(sprintf "storage invalid: %A" detail)
-            | Ok events ->
-                return
-                    events
-                    |> List.filter (fun e ->
-                        e.EventType = "InspectorCaseCaptured"
-                        || e.EventType = "InspectorCaseRefreshed"
-                        || e.EventType = "InspectorCaseAccessed"
-                        || e.EventType = "InspectorCaseEvicted")
-                    |> Ok
-        }
-
-    let headOf (envelopes: EventEnvelope list) : EventId option =
-        envelopes |> List.tryLast |> Option.map (fun e -> e.EventId)
-
-    let loadEvents (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<CasebookEvent list, string>> =
-        task {
-            match! loadEnvelopes raw snapshot with
-            | Error err -> return Error err
-            | Ok envelopes ->
-                let ordered = topoSort envelopes
-
-                let decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
-                    let decoder =
-                        Decode.object (fun get ->
-                            (get.Required.Field "session_id" Decode.string,
-                             get.Required.Field "q" Decode.string,
-                             get.Required.Field "a" Decode.string,
-                             get.Required.Field "observations" (Decode.list decodeObservation)))
-
-                    match Decode.fromValue "$" decoder payload with
-                    | Ok(sessionId, q, a, observations) ->
-                        Ok(CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
-                    | Error err -> Error err
-
-                let rec decodeAll
-                    (remaining: EventEnvelope list)
-                    (acc: CasebookEvent list)
-                    : Result<CasebookEvent list, string> =
-                    match remaining with
-                    | [] -> Ok(List.rev acc)
-                    | head :: tail ->
-                        match head.EventType with
-                        | "InspectorCaseCaptured" ->
-                            match Decode.fromValue "$" decodeCase head.Payload with
-                            | Ok case -> decodeAll tail (CasebookEvent.CaseCaptured case :: acc)
-                            | Error err -> Error err
-                        | "InspectorCaseRefreshed" ->
-                            match decodeRefreshed head.Payload with
-                            | Ok event -> decodeAll tail (event :: acc)
-                            | Error err -> Error err
-                        | "InspectorCaseAccessed" ->
-                            match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
-                            | Ok sessionId -> decodeAll tail (CasebookEvent.CaseAccessed sessionId :: acc)
-                            | Error err -> Error err
-                        | "InspectorCaseEvicted" ->
-                            match Decode.fromValue "$" (Decode.field "session_id" Decode.string) head.Payload with
-                            | Ok sessionId -> decodeAll tail (CasebookEvent.CaseEvicted sessionId :: acc)
-                            | Error err -> Error err
-                        | _ -> decodeAll tail acc
-
-                return decodeAll ordered []
-        }
-
-    /// The stream head EventId — use loadEnvelopes + headOf instead (this
-    /// function drops EventIds by design).
-    let streamHead (_events: CasebookEvent list) : EventId option = None
-
-    /// Full projection: fold all events, then apply LRU capacity.
-    let project (capacity: int) (events: CasebookEvent list) : Map<string, Case> =
-        let cases = CasebookProjection.fold events
-        CasebookProjection.evict capacity cases |> fst
+    let appendEvicted (store: IEventStore) (sessionId: string) : Task<Result<EventId, string>> =
+        appendEvent store EvictedEventType (Encode.object [ "session_id", Encode.string sessionId ])

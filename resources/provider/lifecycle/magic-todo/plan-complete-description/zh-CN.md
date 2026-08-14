@@ -1,0 +1,1 @@
+表示当前计划是否已经完整到可以托付。仍在发现、调查、分解或决定计划时填 false；这时 obligations 可以诚实记录仍欠的具体 planning work。只有当你愿意承诺这条完整道路时才填 true。本 Manager Life 中第一次 accepted true 是不可逆的：从那以后，即使后续调用又填 false，系统也永久按 planComplete=true 处理。commitment 之后，obligations 必须描述 mission debt 与 closure evidence，而不能再用只为了把计划做完的工作占据账本。

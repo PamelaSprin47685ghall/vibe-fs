@@ -2,8 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import * as Durability from '../../../dist/Infrastructure/Persist/StrengthDurability.js'
-import * as Raw from '../../../dist/Infrastructure/Persist/GitRawStore.js'
-import * as PersistStore from '../../../dist/Infrastructure/Persist/EventStore.js'
+import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import * as Events from '../../../dist/Domain/StrengthEvents.js'
 import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as Projection from '../../../dist/Domain/StrengthProjection.js'
@@ -29,9 +28,8 @@ const frame = () => resultOf(Frame.StrengthFrame_tryBuild(
 )).value
 
 test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
-  const raw = Raw.GitRawStore_createInMemory()
-  const store = PersistStore.EventStore_create(raw)
-  const durability = Durability.create(raw, store)
+  const local = createLocalEventStore()
+  const durability = Durability.create(local.store)
   const bundle = frame()
 
   const published = await durability.PublishPrepared({
@@ -68,12 +66,12 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   const range = Projection.StrengthProjectionModule_tryTraceRange(decision('d1'), projection.value)
   assert.equal(range.StartInclusive, 5n)
   assert.equal(range.EndExclusive, 7n)
+  local.close()
 })
 
 test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
-  const raw = Raw.GitRawStore_createInMemory()
-  const store = PersistStore.EventStore_create(raw)
-  const durability = Durability.create(raw, store)
+  const local = createLocalEventStore()
+  const durability = Durability.create(local.store)
   const first = frame()
 
   assert.equal(caseOf(await durability.PublishPrepared({
@@ -102,4 +100,5 @@ test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async
     Bundle: other,
   })
   assert.equal(caseOf(conflict), 'StorageInvalid')
+  local.close()
 })

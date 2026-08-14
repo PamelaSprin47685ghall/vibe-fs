@@ -9,6 +9,7 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Session
 
 /// Manager fork / Orchestrator commission. Each public tool has its own typed
@@ -284,6 +285,29 @@ module ForkTool =
         else
             request.Name.Trim()
 
+    let private recordFissionAffinity (scope: ToolRuntimeScope) (context: HostToolContext) handleId =
+        task {
+            if String.IsNullOrWhiteSpace context.SessionId then
+                return Ok()
+            else
+                match FissionRuntime.tryLane (SessionId.create context.SessionId), scope.Journal with
+                | Some lane, Some durable ->
+                    match!
+                        AgentJournal.appendAgent
+                            (StreamId.Session lane.OwnerSessionId)
+                            context.ProviderRunId
+                            (FissionFact.FissionExternalAffinityBound
+                                {| GroupId = lane.GroupId
+                                   OwnerSessionId = lane.OwnerSessionId
+                                   ExternalId = FissionExternalId.agent handleId
+                                   LaneIndex = lane.LaneIndex |})
+                            durable
+                    with
+                    | Ok _ -> return Ok()
+                    | Error failure -> return Error(JournalAppendFailure.describe failure)
+                | _ -> return Ok()
+        }
+
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             let language = lang context
@@ -301,7 +325,8 @@ module ForkTool =
                     let handles =
                         match scope.Journal with
                         | Some journal when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                            Some(AgentJournal.handleProjection journal (SessionId.create context.SessionId))
+                            let owner = scope.LogicalOwnerFor(SessionId.create context.SessionId)
+                            Some(AgentJournal.handleProjection journal owner)
                         | _ -> None
 
                     let existingByname =
@@ -355,10 +380,22 @@ module ForkTool =
 
                                         match forkResult with
                                         | Ok _ ->
-                                            return
-                                                successInstruction (
-                                                    namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
-                                                )
+                                            match! recordFissionAffinity scope context handleId with
+                                            | Error _ ->
+                                                return consequence (prose language Path.Fork.ChargeNotPlaced)
+                                            | Ok() ->
+                                                runtime.TryFindAgent handleId
+                                                |> Option.bind (fun created -> created.ChildSessionId)
+                                                |> Option.iter (fun childId ->
+                                                    FissionRuntime.notifyChildCreated
+                                                        (SessionId.create context.SessionId)
+                                                        handleId
+                                                        childId)
+
+                                                return
+                                                    successInstruction (
+                                                        namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                    )
                                         | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
                     else
                         match existingByname with
@@ -431,10 +468,22 @@ module ForkTool =
                                             | Error _ ->
                                                 return consequence (prose language Path.Fork.PersonCannotTakeCharge)
                                             | Ok _ ->
-                                                return
-                                                    successInstruction (
-                                                        namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
-                                                    )
+                                                match! recordFissionAffinity scope context agentId with
+                                                | Error _ ->
+                                                    return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+                                                | Ok() ->
+                                                    runtime.TryFindAgent agentId
+                                                    |> Option.bind (fun updated -> updated.ChildSessionId)
+                                                    |> Option.iter (fun childId ->
+                                                        FissionRuntime.notifyChildCreated
+                                                            (SessionId.create context.SessionId)
+                                                            agentId
+                                                            childId)
+
+                                                    return
+                                                        successInstruction (
+                                                            namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                        )
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =

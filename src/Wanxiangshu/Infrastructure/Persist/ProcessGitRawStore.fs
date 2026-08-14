@@ -12,7 +12,7 @@ open Wanxiangshu.Kernel
 type GitRawRunner = string list * byte[] option -> Task<int * byte[] * string>
 
 module private ProcessGitTree =
-    let sortEntries (entries: TreeEntry list) : TreeEntry list = StoreTree.canonicalOrder entries
+    let sortEntries (entries: TreeEntry list) : TreeEntry list = GitTree.canonicalOrder entries
 
 module private ProcessGitTreeHash =
     [<Import("createHash", "node:crypto")>]
@@ -152,12 +152,12 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                     sorted
                     |> List.map (fun entry ->
                         let mode =
-                            if StoreTree.isTreeMode entry.Mode then
+                            if GitTree.isTreeMode entry.Mode then
                                 "040000"
                             else
                                 entry.Mode
 
-                        let objectType = if StoreTree.isTreeMode entry.Mode then "tree" else "blob"
+                        let objectType = if GitTree.isTreeMode entry.Mode then "tree" else "blob"
 
                         sprintf "%s %s %s\t%s" mode objectType (GitObjectId.value entry.Oid) entry.Name)
                     |> String.concat "\n"
@@ -266,7 +266,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                                         match parts with
                                         | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
                                             Some
-                                                { Mode = StoreTree.normalizeMode mode
+                                                { Mode = GitTree.normalizeMode mode
                                                   Name = name
                                                   Oid = GitObjectId.create oidText }
                                         | _ -> None)

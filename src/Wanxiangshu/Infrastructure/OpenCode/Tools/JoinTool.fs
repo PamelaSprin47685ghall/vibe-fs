@@ -77,7 +77,7 @@ module JoinTool =
                     { new IDisposable with
                         member _.Dispose() = detachAbort () }
 
-                let root = sessionId
+                let root = scope.LogicalOwnerFor sessionId
                 let! recovery = scope.RequireFamilyRecovery root
 
                 match recovery with
@@ -153,17 +153,36 @@ module JoinTool =
                                       WaitEscape.SessionLifetime ]
                                     "JoinTool.joinAvailable"
 
+                            let fissionMembership =
+                                FissionRuntime.tryLane sessionId
+                                |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
+                                |> Option.orElseWith (fun () ->
+                                    scope.Journal
+                                    |> Option.bind (fun durable ->
+                                        FissionProjection.tryMembershipOfLane
+                                            sessionId
+                                            (AgentJournal.snapshot durable).AgentProjections.Fission
+                                        |> Option.map (fun (group, laneIndex) -> group.GroupId, laneIndex)))
+
+                            let joinTask =
+                                match fissionMembership with
+                                | Some(groupId, laneIndex) ->
+                                    HostForkJoin.joinAvailableForFissionLane
+                                        runtime
+                                        groupId
+                                        laneIndex
+                                        JoinBatch.Max
+                                        waitTask
+                                | None -> Join.joinAvailable runtime permit JoinBatch.Max waitTask
+
                             let! joined =
-                                CausalAwait.awaitTask
-                                    CausalWaitHub.observer
-                                    joinDescriptor
-                                    (Join.joinAvailable runtime permit JoinBatch.Max waitTask)
+                                CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
 
                             let resolveAgentName agentId =
                                 let durableByname =
                                     scope.Journal
                                     |> Option.bind (fun journal ->
-                                        AgentJournal.handleProjection journal sessionId
+                                        AgentJournal.handleProjection journal root
                                         |> HandleProjection.tryFind (HandleController.agentHandle agentId))
                                     |> Option.map (fun handle -> handle.Byname)
                                     |> Option.filter (String.IsNullOrWhiteSpace >> not)

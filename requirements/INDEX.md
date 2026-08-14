@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **45 张 boundary card**。45 不是目标，也不是稳定 API；它只是本轮按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **46 张 boundary card**。46 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -54,6 +54,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `delegation` | 一项语义工作交给另一 participant 时，authority、charge、owner 与返回后果必须明确而不泄漏 runtime topology。 |
+| `intra-participant-parallelism` | 同一个 participant 可拥有多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | `process-execution` | participant 控制真实进程/PTY 时必须得到有界、可终止、物理完成可信的 execution semantics。 |
 | `output-distillation` | 过大执行输出需要有损但诚实地压成可继续使用的观察，而不能把 fragment 当整体成功或发明因果。 |
 | `change-integration` | 独立 Git 工作道路进入共享 ref 时必须在短原子门内发布，长 review/repair 不应被全局串行化。 |
@@ -129,7 +130,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是 Phase E 重画后的完整邻接清单（87 edges，0 cycle）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（97 edges，0 cycle；Fission 激活后新增 10 条 semantic prerequisite）。
 
 ```text
 requirement-system       → 无
@@ -155,6 +156,7 @@ effect-accounting        → durable-events
 durable-events           → 无
 durable-convergence      → durable-events
 delegation               → office-capability, session-ontology, managed-session-lifecycle, participant-horizon
+intra-participant-parallelism → participant-identity, session-ontology, managed-session-lifecycle, office-capability, capability-enforcement, participant-horizon, work-record, process-execution, durable-events, crash-reconciliation
 process-execution        → time-capability, host-boundary, participant-horizon
 output-distillation      → process-execution, participant-horizon
 change-integration       → effect-accounting, durable-events, crash-reconciliation
@@ -188,4 +190,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-其余 87 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。
+其余 97 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。

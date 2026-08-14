@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
+open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.OpenCode
@@ -248,6 +249,107 @@ module HostForkJoin =
                 finally
                     runtime.ReleaseJoin()
             }
+
+    /// Fission lane join. The lane shares the logical owner's HostForkRuntime,
+    /// but its completion drain is affinity-filtered and waits on durable journal
+    /// change rather than the owner's shared wake token. That permits sibling
+    /// lanes to join distinct handles concurrently without stealing each other's
+    /// mailbox wake or completion cell.
+    let joinAvailableForFissionLane
+        (runtime: HostForkRuntime)
+        (groupId: string)
+        (laneIndex: int)
+        (maxCount: int)
+        (interrupt: Task<JoinInterruptReason>)
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
+        let cap = min (max 0 maxCount) JoinBatch.Max
+
+        match runtime.Journal with
+        | None -> Task.FromResult(Error(ForkError.NotFound "Fission lane join requires durable journal"))
+        | Some durable ->
+            let allowed (record: HandleRecord) =
+                match HandleId.tryAgent record.Handle with
+                | None -> false
+                | Some handleId ->
+                    let externalId =
+                        FissionExternalId.agent (AgentHandleId.value handleId)
+
+                    match
+                        FissionProjection.tryGroup
+                            groupId
+                            (AgentJournal.snapshot durable).AgentProjections.Fission
+                    with
+                    | Some group -> Map.tryFind externalId group.ExternalAffinities = Some laneIndex
+                    | None -> false
+
+            let hasWork () =
+                AgentJournal.handleProjection durable runtime.ParentId
+                |> fun projection ->
+                    projection.Handles
+                    |> Map.exists (fun _ record ->
+                        allowed record
+                        && match record.Lifecycle with
+                           | HandleLifecycle.Retired -> false
+                           | _ -> true)
+
+            let tryDrain () =
+                task {
+                    match!
+                        JoinDrain.drainFromJournalWhere
+                            durable
+                            runtime.ParentId
+                            cap
+                            (runtime.Clock.UtcNow())
+                            allowed
+                    with
+                    | Error error -> return Some(Error error)
+                    | Ok items ->
+                        let joined = items |> List.map JoinItem.ofAgentRunCompletion
+
+                        match NonEmptyBatch.tryOfList joined with
+                        | Some batch -> return Some(Ok(ResultsAvailable batch))
+                        | None -> return None
+                }
+
+            let rec loop () =
+                task {
+                    match! tryDrain () with
+                    | Some result -> return result
+                    | None when not (hasWork ()) -> return Error ForkError.NothingToJoin
+                    | None ->
+                        let _, fromRevision = durable.SnapshotWithRevision
+
+                        match! tryDrain () with
+                        | Some result -> return result
+                        | None ->
+                            let changeTask: Task<obj> =
+                                emitJsExpr
+                                    (durable.AwaitChangeFrom fromRevision)
+                                    "$0.then(function () { return { kind: 0 }; })"
+
+                            let interruptTask: Task<obj> =
+                                emitJsExpr interrupt "$0.then(function (reason) { return { kind: 1, reason: reason }; })"
+
+                            let! winner =
+                                emitJsExpr (changeTask, interruptTask) "Promise.race([$0, $1])"
+                                : Task<obj>
+
+                            match! tryDrain () with
+                            | Some result -> return result
+                            | None ->
+                                let kind: int = emitJsExpr winner "$0.kind"
+
+                                if kind = 1 then
+                                    let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
+                                    return Ok(Interrupted reason)
+                                else
+                                    return! loop ()
+                }
+
+            if cap <= 0 then
+                Task.FromResult(Error ForkError.Empty)
+            else
+                loop ()
 
     /// Compatibility single-result join (Executor map/reduce agent path).
     /// None is unbounded; Some is an explicit internal waiter budget.

@@ -28,6 +28,9 @@ type IJournalWriter =
     abstract LocalSeq: int64
     abstract LastCommittedLocalSeq: int64
     abstract IsPoisoned: bool
+    /// Read one canonical Integrator Current slot. The writer exposes the store's
+    /// read-only projection surface without giving AgentJournal a history reader.
+    abstract TryCurrent: key: string -> obj option
     abstract Append: StreamId -> ProviderRunIdentity option -> Fact -> Task<CommitResult<Envelope>>
     /// Release durable resources (fd / latches). Prefer over IDisposable on the
     /// interface so Fable does not collide with System.IDisposable.Dispose.

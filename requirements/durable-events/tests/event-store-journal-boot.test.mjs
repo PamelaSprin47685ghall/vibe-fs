@@ -1,285 +1,60 @@
-// tests/unit/journal/event-store-journal-boot.test.mjs
-// W1-boot: resumeOrCreate + createFromProjection (no NDJSON / no blobs/ dir).
+// FROZEN — 2026-08-14. Boot replay is owned by CanonicalIntegrator over local writer files.
+// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
-  agentFact,
-  caseOf,
-  eventId,
-  fact,
-  fold,
-  idValue,
-  isSome,
-  listItems,
-  payloadOf,
-  runtimeId,
-  sessionId,
-  stream,
-  toList,
-  utcOffset,
-} from '../../verification-system/tests/support/domain.mjs'
+import { agentFact, caseOf, fold, idValue, payloadOf, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
+import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')
-const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
 const EsWriter = await import('../../../dist/Journal/EventStoreJournalWriter.js')
-const AgentJournalMod = await import('../../../dist/Journal/AgentJournal.js')
-
+const AgentJournal = await import('../../../dist/Journal/AgentJournal.js')
+const createFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_create'))?.[1]
+const resumeFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_resumeOrCreate'))?.[1]
 const SESSION = sessionId('ses_es_boot')
-const CLOSED_AGENT = agentFact('CompanionBloggerClosed', { SessionId: SESSION })
-const CLOSED_FACT = fact('CompanionBloggerClosed', { SessionId: SESSION })
+const CLOSED = agentFact('CompanionBloggerClosed', { SessionId: SESSION })
+const mustOk = (r) => { assert.equal(caseOf(r), 'Ok'); return payloadOf(r) }
 
-const oidValue = (rootOid) => Persist.GitObjectIdModule_value(Persist.RootOidModule_value(rootOid))
-const snapshotOid = (snapshot) => oidValue(snapshot.RootOid)
-
-const mustOk = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Ok', `${label} should be Ok, got ${caseOf(result)}: ${payloadOf(result)}`)
-  return payloadOf(result)
-}
-
-const resolveExport = (mod, prefixes) => {
-  for (const prefix of prefixes) {
-    const hit = Object.entries(mod).find(([name]) => name.startsWith(prefix))
-    if (hit) return hit[1]
-  }
-  return undefined
-}
-
-const createFn = () => {
-  const create =
-    EsWriter.EventStoreJournalWriter_create_Z10F3E7A9 ??
-    resolveExport(EsWriter, ['EventStoreJournalWriter_create'])
-  assert.equal(typeof create, 'function', 'EventStoreJournalWriter.create missing from dist')
-  return create
-}
-
-const resumeOrCreateFn = () => {
-  const resume =
-    EsWriter.EventStoreJournalWriter_resumeOrCreate_Z10F3E7A9 ??
-    resolveExport(EsWriter, ['EventStoreJournalWriter_resumeOrCreate'])
-  assert.equal(typeof resume, 'function', 'EventStoreJournalWriter.resumeOrCreate missing from dist')
-  return resume
-}
-
-const createPair = async (store, raw) => {
-  const pair = await createFn()(runtimeId('rt_es_boot'), 4242, utcOffset('2026-04-01T00:00:00Z'), store, raw ?? undefined)
-  return { writer: pair[0], init: pair[1] }
-}
-
-const resumeTriple = async (store, raw, overrides = {}) => {
-  const result = await resumeOrCreateFn()(
-    runtimeId(overrides.runtime ?? 'rt_es_boot_resume'),
-    overrides.pid ?? 5252,
-    utcOffset(overrides.startedAt ?? '2026-04-02T00:00:00Z'),
-    store,
-    raw,
-  )
-  const triple = mustOk(result, 'resumeOrCreate')
-  return { writer: triple[0], init: triple[1], projection: triple[2], result }
-}
-
-const appendWriter = async (writer, streamId, envelopeFact, run) => {
-  const result = await EsWriter.EventStoreJournalWriter__Append(writer, streamId, run, envelopeFact)
-  return caseOf(result) === 'Committed'
-    ? { committed: true, envelope: payloadOf(result) }
-    : {
-        committed: false,
-        eventId: idValue.event(result.fields[0]),
-        failure: caseOf(result.fields[1]),
-        reason: result.fields[1]?.fields?.[0],
-      }
-}
-
-const collectNdjson = (root) => {
-  const hits = []
-  const walk = (dir) => {
-    if (!existsSync(dir)) return
-    for (const name of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, name.name)
-      if (name.isDirectory()) walk(path)
-      else if (name.name.endsWith('.ndjson')) hits.push(path)
-    }
-  }
-  walk(root)
-  return hits
-}
-
-const streamId = (v) => Domain.EventStreamIdModule_create(v)
-
-test('resumeOrCreate_continues_LocalSeq_and_preserves_prior_projection', async () => {
-  const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-journal-boot-'))
+test('restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
+  const first = createLocalEventStore({ writerId: 'boot-writer-a' })
   try {
-    const raw = GitRaw.GitRawStore_createInMemory()
-    const store = Store.EventStore_create(raw)
-    const { writer, init } = await createPair(store, raw)
+    const [writer, init] = await createFn(runtimeId('rt_before'), 4242, utcOffset('2026-04-01T00:00:00Z'), first.store)
     assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
+    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
+    assert.equal(caseOf(await AgentJournal.AgentJournalModule_appendAgent(stream.session(SESSION), undefined, CLOSED, journal)), 'Ok')
+    journal.Dispose?.()
 
-    const appended = await appendWriter(writer, stream.session(SESSION), CLOSED_FACT)
-    assert.equal(appended.committed, true, appended.reason)
-    assert.equal(Number(idValue.localSeq(appended.envelope.LocalSeq)), 2)
-    assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(writer)), 2)
-    writer.Dispose()
-
-    const resumed = await resumeTriple(store, raw)
-    assert.equal(Number(idValue.localSeq(resumed.init.LocalSeq)), 3)
-    assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(resumed.writer)), 3)
-    assert.equal(caseOf(resumed.init.Stream), 'Workspace')
-    assert.equal(caseOf(resumed.init.Fact), 'Runtime')
-
-    // Prior CompanionBloggerClosed remains visible after boot fold + RuntimeStarted.
-    assert.ok(fold.session(resumed.projection, 'ses_es_boot'), 'projection should contain prior session fact')
-
-    const journal = mustOk(
-      AgentJournalMod.AgentJournalModule_createFromProjection(resumed.writer, resumed.projection),
-      'createFromProjection',
-    )
-    const snap = AgentJournalMod.AgentJournalModule_snapshot(journal)
-    assert.ok(fold.session(snap, 'ses_es_boot'), 'journal snapshot should retain prior fact')
-
-    const next = await AgentJournalMod.AgentJournalModule_appendAgent(
-      stream.session(SESSION),
-      undefined,
-      CLOSED_AGENT,
-      journal,
-    )
-    assert.equal(caseOf(next), 'Ok', payloadOf(next))
-    assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(resumed.writer)), 4)
-
-    assert.deepEqual(collectNdjson(workspace), [])
-    assert.equal(existsSync(join(workspace, 'blobs')), false)
-
-    journal.Dispose()
+    const restarted = createLocalEventStore({ commonDir: first.commonDir, writerId: 'boot-writer-b' })
+    const resumed = mustOk(await resumeFn(runtimeId('rt_after'), 5252, utcOffset('2026-04-02T00:00:00Z'), restarted.store))
+    const [nextWriter, nextInit, projection] = resumed
+    assert.equal(Number(idValue.localSeq(nextInit.LocalSeq)), 1, 'fresh RuntimeId owns a fresh LocalSeq domain')
+    assert.ok(fold.session(projection, 'ses_es_boot'), 'prior journal fact is rebuilt only through Integrator boot replay')
+    const nextJournal = mustOk(AgentJournal.AgentJournalModule_createFromProjection(nextWriter, projection))
+    assert.ok(fold.session(AgentJournal.AgentJournalModule_snapshot(nextJournal), 'ses_es_boot'))
+    nextJournal.Dispose?.()
   } finally {
-    rmSync(workspace, { recursive: true, force: true })
+    first.close()
   }
 })
 
-test('resumeOrCreate_empty_store_matches_create_plus_createFromProjection', async () => {
-  const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-journal-boot-empty-'))
+test('empty_boot_publishes_only_RuntimeStarted_into_local_writer_truth', async () => {
+  const local = createLocalEventStore({ writerId: 'boot-empty' })
   try {
-    const raw = GitRaw.GitRawStore_createInMemory()
-    const store = Store.EventStore_create(raw)
-
-    const resumed = await resumeTriple(store, raw, {
-      runtime: 'rt_es_boot_empty',
-      pid: 6001,
-      startedAt: '2026-05-01T00:00:00Z',
-    })
-    assert.equal(Number(idValue.localSeq(resumed.init.LocalSeq)), 1)
-    assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(resumed.writer)), 1)
-    assert.equal(caseOf(resumed.init.Fact), 'Runtime')
-
-    const journal = mustOk(
-      AgentJournalMod.AgentJournalModule_createFromProjection(resumed.writer, resumed.projection),
-      'createFromProjection empty',
-    )
-    assert.equal(idValue.runtime(AgentJournalMod.AgentJournalModule_runtimeId(journal)), 'rt_es_boot_empty')
-
-    const published = await raw.ReadRef(Persist.StoreRef_canonical)
-    assert.equal(isSome(published), true)
-    assert.equal(Persist.GitObjectIdModule_value(published), snapshotOid(await store.OpenSnapshot()))
-
-    const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, (await store.OpenSnapshot()).RootOid))
-    assert.equal(listItems(blobs).length, 1, 'empty resume should publish only RuntimeStarted')
-
-    assert.deepEqual(collectNdjson(workspace), [])
-    assert.equal(existsSync(join(workspace, 'blobs')), false)
-
-    journal.Dispose()
+    const resumed = mustOk(await resumeFn(runtimeId('rt_empty'), 6001, utcOffset('2026-05-01T00:00:00Z'), local.store))
+    assert.equal(Number(idValue.localSeq(resumed[1].LocalSeq)), 1)
+    assert.equal(caseOf(resumed[1].Fact), 'Runtime')
+    assert.ok(local.store.TryCurrent('Journal'))
+    resumed[0].Release?.()
   } finally {
-    rmSync(workspace, { recursive: true, force: true })
+    local.close()
   }
 })
 
-test('resumeOrCreate_malformed_journal_envelope_returns_Boot_FoldRejection', async () => {
-  const raw = GitRaw.GitRawStore_createInMemory()
-  const store = Store.EventStore_create(raw)
-
-  const bad = new Domain.EventEnvelope(
-    eventId('dddddddddddddddddddddddddddddddddddddddd'),
-    streamId('journal/workspace'),
-    'JournalEnvelope',
-    toList([]),
-    { not: 'a-journal-envelope' },
-    toList([]),
-  )
-  mustOk(await store.Append(await store.OpenSnapshot(), toList([bad])), 'seed malformed JournalEnvelope')
-
-  const result = await resumeOrCreateFn()(
-    runtimeId('rt_es_boot_bad'),
-    7001,
-    utcOffset('2026-06-01T00:00:00Z'),
-    store,
-    raw,
-  )
-  assert.equal(caseOf(result), 'Error', 'malformed journal payload must fail closed')
-  const rejection = payloadOf(result)
-  assert.equal(rejection.Fact, 'Boot')
-  assert.equal(typeof rejection.Reason, 'string')
-  assert.ok(rejection.Reason.length > 0)
-})
-
-test('resumeOrCreate_skips_non_journal_Job_events', async () => {
-  const raw = GitRaw.GitRawStore_createInMemory()
-  const store = Store.EventStore_create(raw)
-
-  const job = new Domain.EventEnvelope(
-    eventId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
-    streamId('job/main'),
-    'JobRequested',
-    toList([]),
-    { status: 'open' },
-    toList([]),
-  )
-  mustOk(await store.Append(await store.OpenSnapshot(), toList([job])), 'seed JobRequested')
-
-  const resumed = await resumeTriple(store, raw, { runtime: 'rt_es_boot_job', pid: 8001 })
-  assert.equal(Number(idValue.localSeq(resumed.init.LocalSeq)), 1)
-  assert.equal(Number(EsWriter.EventStoreJournalWriter__get_LastCommittedLocalSeq(resumed.writer)), 1)
-
-  const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, (await store.OpenSnapshot()).RootOid))
-  assert.equal(listItems(blobs).length, 2, 'JobRequested + RuntimeStarted')
-
-  resumed.writer.Dispose()
-})
-
-test('resumeOrCreate_replays_many_prior_journal_envelopes', async () => {
-  const workspace = mkdtempSync(join(tmpdir(), 'wxs-es-journal-boot-many-'))
-  try {
-    const raw = GitRaw.GitRawStore_createInMemory()
-    const store = Store.EventStore_create(raw)
-    const { writer } = await createPair(store, raw)
-
-    const count = 40
-    for (let i = 0; i < count; i++) {
-      const id = `ses_es_boot_many_${String(i).padStart(2, '0')}`
-      const sid = sessionId(id)
-      const closed = fact('CompanionBloggerClosed', { SessionId: sid })
-      const appended = await appendWriter(writer, stream.session(sid), closed)
-      assert.equal(appended.committed, true, appended.reason)
-    }
-    writer.Dispose()
-
-    const resumed = await resumeTriple(store, raw, { runtime: 'rt_es_boot_many', pid: 9001 })
-    for (let i = 0; i < count; i++) {
-      const id = `ses_es_boot_many_${String(i).padStart(2, '0')}`
-      assert.ok(fold.session(resumed.projection, id), `projection should contain ${id}`)
-    }
-
-    const snapshot = await store.OpenSnapshot()
-    const blobs = mustOk(await GitRaw.GitRawStore_listEventBlobs(raw, snapshot.RootOid))
-    assert.equal(listItems(blobs).length, count + 2, 'prior RuntimeStarted + 40 facts + resume RuntimeStarted')
-
-    const loaded = mustOk(await GitRaw.GitRawStore_loadEventEnvelopes(raw, snapshot.RootOid))
-    assert.equal(listItems(loaded).length, count + 2)
-
-    resumed.writer.Dispose()
-  } finally {
-    rmSync(workspace, { recursive: true, force: true })
-  }
+test('boot_and_live_use_one_CanonicalIntegrator_program', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const integrator = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/CanonicalIntegrator.fs', import.meta.url), 'utf8')
+  const writer = await readFile(new URL('../../../src/Wanxiangshu/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
+  assert.match(integrator, /EventKWayMerge\.merge/)
+  assert.match(integrator, /integrateOne/)
+  assert.match(integrator, /integrateLive/)
+  assert.doesNotMatch(writer, /readStreams|loadEvent|Fold\.apply|OpenSnapshot/)
 })

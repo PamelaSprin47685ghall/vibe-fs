@@ -1,10 +1,13 @@
-Replace the mission's entire living obligation account with {"obligations":[{"name":"stable human-readable name","work":"what must still become true for the user's request, including the evidence needed to know it is true"}]}.
-Each obligation requires a non-empty name unique within this account and specific owed work.
-Each obligation must also be handoff-complete: from its name and work, another competent Manager must be able to tell what outcome is owed and what evidence would close it without inventing missing substance. A slot-reserving label, phase name, or deferred decision such as `placeholder: planning`, `TBD`, or `plan later` is not an obligation; these examples illustrate the forbidden semantic shape rather than an exhaustive keyword list.
-An obligation is mission debt, not a note about your own thinking. Do not write meta-obligations such as "make a plan", "analyze the request", "write todos", or "decide next steps"; perform that thinking directly.
-Disguising planning as investigation does not make it mission debt. If "survey the repository", "trace startup", "find hotspots", "understand the architecture", "inventory risks", or similar work is being done only to discover what the real obligations should be, do that before this call rather than putting it in the account.
-Use the completion counterfactual: if an item could be completed perfectly while the user's requested world or deliverable stayed otherwise unchanged, and the only result were more understanding, a list, a plan, or a next-step decision, the item is not an obligation. Investigation/analysis is an obligation only when that investigation/analysis/report is itself part of the user's requested deliverable; otherwise name the end state and the evidence that will prove it.
-If this is the first todowrite of a new Manager life, it is the complete plan prepared at the Planning Table. Treat that first submission as the one irreversible examination of your initial judgment: later updates may reflect changed reality or new evidence, but there is no second first submission. Leave no placeholder, phase label, or deferred decision in it. Do not call todowrite merely to announce that you will now plan, even under an investigative name such as "survey-startup-and-complexity".
-Keep an obligation while it remains owed and remove it only after the work has actually discharged it.
-Each accepted call becomes the current obligation account immediately, synchronizes the preceding process review, and starts the next checkpoint review.
+Replace the Manager's entire current owed-work account with `planComplete` plus stable `{name,work}` obligations.
+
+Use `planComplete=false` while the road is still being planned. In that relation, obligations may honestly describe concrete planning work still owed: investigation, analysis, decomposition, or decisions needed to finish the plan. Do not disguise planning as mission work merely to satisfy the ledger.
+
+Set `planComplete=true` only when the road is complete enough to entrust and this submission is the complete mission-debt account you are willing to carry. The first accepted true is irreversible for this Manager Life: afterward the effective value stays true forever, even if a later call says false. There is no second first true.
+
+Once effective `planComplete=true`, obligations must describe what still has to become true for the user's request, including closure evidence. Apply the completion counterfactual then: work whose perfect completion would only improve your understanding, inventory, plan, or next-step decision is planning cognition, not mission debt, unless that investigation, analysis, audit, diagnosis, or report is itself the user's requested deliverable.
+
+In either relation, every obligation must be concrete and closable: another competent Manager must be able to tell what work is owed and what would close it. A slot-reserving label, bare phase name, `placeholder`, `TBD`, or deferred decision with no actual owed work is not an obligation. Each obligation requires a non-empty name unique within the account.
+
+Keep an obligation while it remains owed and remove it only after its work has actually been discharged. Each accepted call becomes the current account immediately. Later bookkeeping may record consequences, but it does not roll the accepted account back.
+
 Do not emit multiple todowrite calls in the same assistant message; any such batch is rejected entirely.

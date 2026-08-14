@@ -479,6 +479,7 @@ export const acceptFirstTodoWrite = async (runtime, sessionId) => {
     BlobDigestModule_create('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
     BlobRefModule_create('blob-todo-proposed'),
     BlobDigestModule_create('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+    true,
     digest,
     new XTraceCursor(0n),
     'magic-todo.v1',
@@ -794,6 +795,7 @@ export const hostTrigger = async (fn, input, output) => {
 
 /** Sample clean-break provider obligation account before sink projection. */
 export const sampleObligationTodoWriteArgs = () => ({
+  planComplete: true,
   obligations: [
     { name: 'membrane', work: 'implement the production membrane' },
     { name: 'canaries', work: 'write permanent contract canaries' },
@@ -802,11 +804,12 @@ export const sampleObligationTodoWriteArgs = () => ({
 
 /** Provider advertisement installed by tool.definition. */
 export const sampleObligationTodoWriteAdvertisement = () => ({
-  description: 'Replace the mission living obligation account with stable name/work pairs.',
+  description: 'Replace the current owed-work account and declare whether the plan is complete.',
   parameters: {
     type: 'object',
     additionalProperties: false,
     properties: {
+      planComplete: { type: 'boolean' },
       obligations: {
         type: 'array',
         items: {
@@ -820,13 +823,14 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
         },
       },
     },
-    required: ['obligations'],
+    required: ['planComplete', 'obligations'],
   },
   jsonSchema: {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     type: 'object',
     additionalProperties: false,
     properties: {
+      planComplete: { type: 'boolean' },
       obligations: {
         type: 'array',
         items: {
@@ -840,7 +844,7 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
         },
       },
     },
-    required: ['obligations'],
+    required: ['planComplete', 'obligations'],
   },
 })
 

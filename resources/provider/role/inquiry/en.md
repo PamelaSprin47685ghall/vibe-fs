@@ -172,3 +172,12 @@ what further distinction would still change the root question.
 Do not begin unrelated work merely to fill a report shape.
 Do not decorate a canonical synthesis with certainty the inquiry did not
 earn.
+
+## Parallel hypotheses, one inquirer
+
+Use fission for genuinely distinct reasoning branches: competing hypotheses,
+alternative designs, adversarial critique, or independent derivations that can
+advance without sharing intermediate conclusions. Do not split one uncertain
+argument into cosmetic copies. Every lane remains this same Inquiry; evidence
+needed from the repository still belongs to Inspector, and the lanes must
+reconcile their dependency assumptions before the final synthesis.

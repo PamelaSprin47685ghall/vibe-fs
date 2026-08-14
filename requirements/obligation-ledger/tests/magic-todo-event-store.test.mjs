@@ -16,9 +16,8 @@ import {
   toolCallId,
   utcOffset,
 } from '../../verification-system/tests/support/domain.mjs'
+import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
-const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')
 const EsWriter = await import('../../../dist/Journal/EventStoreJournalWriter.js')
 const AgentJournal = await import('../../../dist/Journal/AgentJournal.js')
 
@@ -33,22 +32,22 @@ const mustOk = (result, label) => {
   return payloadOf(result)
 }
 
-const createWriter = async (store, raw, runtime = 'rt_magic_todo') => {
+const createWriter = async (store, runtime = 'rt_magic_todo') => {
   const create = resolveExport(EsWriter, 'EventStoreJournalWriter_create')
-  const pair = await create(runtimeId(runtime), 4242, utcOffset('2026-08-11T00:00:00Z'), store, raw)
+  const pair = await create(runtimeId(runtime), 4242, utcOffset('2026-08-11T00:00:00Z'), store)
   return { writer: pair[0], init: pair[1] }
 }
 
-const resumeWriter = async (store, raw) => {
+const resumeWriter = async (store) => {
   const resume = resolveExport(EsWriter, 'EventStoreJournalWriter_resumeOrCreate')
-  const result = await resume(runtimeId('rt_magic_todo_recovery'), 4243, utcOffset('2026-08-11T00:01:00Z'), store, raw)
+  const result = await resume(runtimeId('rt_magic_todo_recovery'), 4243, utcOffset('2026-08-11T00:01:00Z'), store)
   return mustOk(result, 'resumeOrCreate')
 }
 
 test('TODO-012 persists typed prepared identity through AgentJournal and EventStore boot', async () => {
-  const raw = GitRaw.GitRawStore_createInMemory()
-  const store = Store.EventStore_create(raw)
-  const { writer, init } = await createWriter(store, raw)
+  const local = createLocalEventStore()
+  const store = local.store
+  const { writer, init } = await createWriter(store)
   const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init), 'createFromEventStore')
   const managerSession = sessionId('ses_magic_todo_manager')
   const life = managerLifeId('life_magic_todo')
@@ -64,6 +63,7 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
     blobDigest('digest:base'),
     blobRef('blobs/proposed'),
     blobDigest('digest:proposed'),
+    true,
     'digest:provider-input',
     new magicTodoJournal.XTraceCursor(7n),
     'magic-todo.v1',
@@ -103,21 +103,26 @@ test('TODO-012 persists typed prepared identity through AgentJournal and EventSt
     const live = AgentJournal.AgentJournalModule_snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life_magic_todo')
     assert.equal(live.Checkpoints.size, 1)
     assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).ProviderInputDigest, 'digest:provider-input')
+    assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).PlanCompleteDeclared, true)
     assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).Accepted, true)
+    assert.equal(magicTodo.todoWriteIdValue(live.FirstPlanCommitment), magicTodo.todoWriteIdValue(write))
   } finally {
     journal.Dispose()
   }
 
-  const resumed = await resumeWriter(store, raw)
+  const resumed = await resumeWriter(store)
   try {
     const recovered = resumed[2].AgentProjections.MagicTodo.ByLife.get('life_magic_todo')
     assert.ok(recovered, 'Magic Todo prepared fact must survive EventStore boot')
     const checkpoint = recovered.Checkpoints.get(magicTodo.todoWriteIdValue(write))
     assert.equal(checkpoint.ProviderInputDigest, 'digest:provider-input')
+    assert.equal(checkpoint.PlanCompleteDeclared, true)
     assert.equal(checkpoint.Accepted, true)
+    assert.equal(magicTodo.todoWriteIdValue(recovered.FirstPlanCommitment), magicTodo.todoWriteIdValue(write))
     assert.equal(idValue.toolCall(checkpoint.ToolCallId), 'call_magic_todo')
     assert.equal(Number(checkpoint.ReviewFrontier.Sequence), 7)
   } finally {
     resumed[0].Dispose()
+    local.close()
   }
 })

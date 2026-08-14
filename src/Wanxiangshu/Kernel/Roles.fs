@@ -28,7 +28,7 @@ type ToolPermission =
     | Horizon
     /// Manager-only living-obligation checkpoint surface.
     | TodoWrite
-    /// Manager-only one-line present-context split surface.
+    /// Same-participant multi-present execution consequence (eligible offices only).
     | Fission
     | Read
     | Write
@@ -77,21 +77,24 @@ module Roles =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Inspect
-                  ToolPermission.Fetch ]
+                  ToolPermission.Fetch
+                  ToolPermission.Fission ]
         | Role.Inspector ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Exec
-                  ToolPermission.Fetch ]
+                  ToolPermission.Fetch
+                  ToolPermission.Fission ]
         | Role.Browser ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Network ]
-        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx ]
+                  ToolPermission.Network
+                  ToolPermission.Fission ]
+        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx; ToolPermission.Fission ]
         | Role.Reviewer ->
             set
                 [ ToolPermission.Read

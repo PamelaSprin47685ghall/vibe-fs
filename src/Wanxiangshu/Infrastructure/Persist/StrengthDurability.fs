@@ -9,14 +9,15 @@ open Wanxiangshu.OpenCode
 [<RequireQualifiedAccess>]
 module StrengthDurability =
 
-    let create (raw: IGitRawStore) (store: IEventStore) : StrengthDurabilityPort =
+    let create (store: IEventStore) : StrengthDurabilityPort =
         let loadProjection () =
             task {
-                let! snapshot = store.OpenSnapshot()
-                return! StrengthStore.loadProjection raw snapshot
+                match store.TryCurrent "Strength" with
+                | Some value -> return Ok(unbox<StrengthProjection> value)
+                | None -> return Ok StrengthProjection.empty
             }
 
-        let loadFrameBundle = StrengthStore.loadFrameBundle raw HostDigest.sha256Hex
+        let loadFrameBundle = StrengthStore.loadFrameBundle store HostDigest.sha256Hex
 
         let publishPrepared request =
             task {

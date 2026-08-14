@@ -2,32 +2,24 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Journal
-open Wanxiangshu.Kernel.Identity
 
 /// Process-local EventStore owners keyed by git common-dir.
-///
-/// Follow-up: bind `IEventStore.Converge` via `GitGateway.bindEventStore` when a
-/// sync runner is available at host boot. Until then `EventStore.create` uses
-/// unbound Converge (local append/open only).
-///
-/// Intentionally free of AgentJournal / SharedAgentJournal / JournalWriter /
-/// `.ndjson` / `wanxiangshu-next` tokens (unified-store dual-write gate).
+/// One acquired entry owns exactly one WriterId.ndjson and one CanonicalIntegrator.
+/// No GitRawStore is created on the runtime append/replay path.
 module WorkspaceEventStore =
 
-    /// DSL-state-combination: physical — shared raw+store refcount resource
+    /// DSL-state-combination: physical — shared local writer + canonical Current.
     type private SharedEntry =
-        { Raw: IGitRawStore
-          Store: IEventStore
+        { Store: IEventStore
           mutable RefCount: int }
 
     let private gate = obj ()
     let private shared = Dictionary<string, SharedEntry>()
 
-    /// Acquire (or bump) the process-local store for `commonDir`.
-    /// Non-git / ProcessGitRawStore failures surface as exceptions — fail closed.
-    let acquire (commonDir: string) : IGitRawStore * IEventStore =
+    let acquire (commonDir: string) : IEventStore =
         if String.IsNullOrWhiteSpace commonDir then
             failwith "WorkspaceEventStore.acquire: commonDir is empty"
 
@@ -35,31 +27,29 @@ module WorkspaceEventStore =
             match shared.TryGetValue commonDir with
             | true, entry ->
                 entry.RefCount <- entry.RefCount + 1
-                entry.Raw, entry.Store
+                entry.Store
             | false, _ ->
-                let raw = ProcessGitRawStore.create commonDir
-                let store = EventStore.create raw
+                let writerId = Guid.NewGuid().ToString("N")
+                let integrator = CanonicalIntegrator.create ()
+                let store = EventStore.createLocal commonDir writerId integrator
+                JsToolsTransactionStore.recoverCurrent store
 
                 shared.[commonDir] <-
-                    { Raw = raw
-                      Store = store
+                    { Store = store
                       RefCount = 1 }
 
-                raw, store)
+                store)
 
     /// Borrow the already-owned process-local store without changing ownership.
-    /// Strength uses this only after AgentJournal boot has acquired the workspace;
-    /// `None` means durability is unavailable and new speculation must stay K0.
-    let tryCurrent (commonDir: string) : (IGitRawStore * IEventStore) option =
+    let tryCurrent (commonDir: string) : IEventStore option =
         if String.IsNullOrWhiteSpace commonDir then
             None
         else
             lock gate (fun () ->
                 match shared.TryGetValue commonDir with
-                | true, entry -> Some(entry.Raw, entry.Store)
+                | true, entry -> Some entry.Store
                 | false, _ -> None)
 
-    /// Drop one refcount for `commonDir`. No-op when unknown.
     let release (commonDir: string) =
         if String.IsNullOrWhiteSpace commonDir then
             ()
@@ -75,10 +65,9 @@ module WorkspaceEventStore =
                         entry.RefCount <- remaining
                 | false, _ -> ())
 
-    /// Boot port whose ResumeOrCreate resumes/creates via EventStoreJournalWriter.
     let bootPort (commonDir: string) : IJournalEventStoreBoot =
-        let raw, store = acquire commonDir
+        let store = acquire commonDir
 
         { new IJournalEventStoreBoot with
             member _.ResumeOrCreate(runtimeId, processId, startedAt) =
-                EventStoreJournalWriter.resumeOrCreate (runtimeId, processId, startedAt, store, raw) }
+                EventStoreJournalWriter.resumeOrCreate (runtimeId, processId, startedAt, store) }

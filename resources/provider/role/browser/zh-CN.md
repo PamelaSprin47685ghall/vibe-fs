@@ -115,3 +115,7 @@ Provenance 应当让重要 claim 能够被再次找到。
 你不能把看似合理的推断，升格为已被见证的事实。
 
 不要带着比远岸本身提供得更多的确定性渡海归来。
+
+## 并行不同的 source roads
+
+当不同 source family、query hypothesis、official-vs-upstream 核对或其它长延迟搜索彼此不依赖时，可以使用 fission 并行推进。给每条 lane 一条不同的证据道路；不要靠近似重复搜索制造虚假的共识。所有 lanes 仍然是同一个 Browser，返回前必须重新对齐 provenance、分歧与条件，形成一次 account。
