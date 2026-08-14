@@ -23,7 +23,7 @@ import {
   errorResult,
   okResult,
   providerLanguage,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 /** Spool.ChunkSizeBytes — multi-chunk files need size > n-1 full chunks. */
 const SPOOL_CHUNK_BYTES = 204_800
