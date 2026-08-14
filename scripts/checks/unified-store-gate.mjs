@@ -352,9 +352,8 @@ export const scanStudentQaRevival = (text, file = '<synthetic>') => {
   if (file !== '<synthetic>') {
     const n = norm(file)
     // Scope: production src/ tree (and synthetic/fixture paths used in unit tests).
-    // tests/scripts/docs mentions are out of scope here — student-teacher-absence covers
-    // StudentQa* tokens under src/ (+ prompts); this scanner owns storage-path revival.
-    if (n.startsWith('tests/') || n.startsWith('scripts/') || n.startsWith('archive/')) return []
+    // scripts/docs mentions are out of scope here; this scanner owns storage-path revival.
+    if (n.startsWith('scripts/') || n.startsWith('archive/')) return []
   }
 
   const lines = text.split('\n')
