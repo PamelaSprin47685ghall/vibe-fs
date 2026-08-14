@@ -1,6 +1,9 @@
-// tests/unit/session/host-fork-pty.test.mjs — HostForkRuntime PTY surface
-// (HostForkPty.fs): TrackPtyRun/RegisterPtySnapshot/UntrackPtyRun/OwnsPty/
-// IsPtyCompletion/ForkPty/TryPty/SendPty against a fake PtyPort.
+// Moved from tests/unit/session/host-fork-pty.test.mjs (cutover Wave 2a); owner: managed-session-lifecycle.
+//
+// HostForkRuntime PTY surface（HostForkPty.fs）：TrackPtyRun/
+// RegisterPtySnapshot/UntrackPtyRun/OwnsPty/IsPtyCompletion/ForkPty/TryPty/
+// SendPty against a fake PtyPort（Fork 族 PTY 集成；Process/Pty 机械归
+// process-execution）。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -8,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, sessionId, toList } from '../support/domain.mjs'
+import { agentJournal, caseOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const { PtyPort } = await import('../../../dist/Process/Pty.js')

@@ -1,8 +1,10 @@
-// tests/unit/session/host-fork-runtime.test.mjs — HostForkRuntime member
-// surface coverage: InstallRun/FailRun/MarkReady/CancelAgent/Join/JoinAvailable/
-// JoinWithPermit/JoinAvailableWithPermit/AwaitAgent/AwaitAgentWithPermit/
-// validatePermit error branches, plus the plain ForkRuntime surface
-// (Fork/AwaitAgent/CancelAgent/List/Cancel).
+// Split from tests/unit/session/host-fork-runtime.test.mjs (cutover Wave 2a); owner: managed-session-lifecycle.
+//
+// HostForkRuntime 成员面：InstallRun/FailRun/MarkReady/IsRetiredHandle/
+// CancelAgent（含 AbortSession 级联）+ plain ForkRuntime 面（Fork/AwaitAgent/
+// CancelAgent/List/Cancel）。join/await 调用代数已随 SPLIT@cutover 迁
+// requirements/delegation/tests/host-fork-join-algebra.test.mjs；permit 校验/
+// EXEC-023 迁 requirements/crash-reconciliation/tests/host-fork-runtime-permit.test.mjs。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -10,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, setItems, stringSet, toList } from '../support/domain.mjs'
+import { agentJournal, caseOf, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const {
@@ -20,21 +22,11 @@ const {
   HostForkRuntime__IsRetiredHandle_Z721C83C5: isRetiredHandle,
   HostForkRuntime__TryChildSession_Z721C83C5: tryChildSession,
   HostForkRuntime__AdoptChild_Z7BE1869F: adoptChild,
-  HostForkRuntime__List: listRuntime,
   HostForkRuntime__get_PendingRunCount: pendingRunCount,
-  HostForkRuntime__get_PendingCompletionCount: pendingCompletionCount,
   HostForkRuntime__get_IsCancelled: runtimeIsCancelled,
   HostForkRuntime__Cancel: cancelRuntime,
 } = await import('../../../dist/Session/HostForkRuntime.js')
-const {
-  join: joinAny,
-  joinAvailable,
-  joinWithPermit,
-  joinAvailableWithPermit,
-  awaitAgent,
-  awaitAgentWithPermit,
-  cancelAgent,
-} = await import('../../../dist/Session/HostForkJoin.js')
+const { joinAvailable, cancelAgent } = await import('../../../dist/Session/HostForkJoin.js')
 const {
   ForkRuntime,
   ForkRuntime__Fork_374A2FD6: forkRun,
@@ -43,20 +35,8 @@ const {
   ForkRuntime__List: forkList,
   ForkRuntime__Cancel: forkCancel,
   ForkRuntime__get_ActiveRunCount: forkActiveRunCount,
-  ForkRuntime__get_PendingCompletionCount: forkPendingCompletions,
 } = await import('../../../dist/Session/ForkRuntime.js')
-const { ForkError, AgentStatus } = await import('../../../dist/Session/ForkTypes.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
-const {
-  FamilyRecoveryPermit,
-  FamilyRecoveryPermitModule_missingFrom,
-  RecoveryClosureModule_members,
-} = await import('../../../dist/Domain/SessionRecovery.js')
-const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import(
-  '../../../dist/Journal/AgentJournal.js'
-)
-const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
-const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
 const { HandleController_link } = await import('../../../dist/Session/HandleController.js')
 const { HandleOwnership } = await import('../../../dist/Kernel/Fact.js')
 
@@ -101,18 +81,6 @@ const live = async (behaviour = {}) => {
 const link = async (j, agentId, child, agent = 'fast-coder', role = Role.Coder) => {
   const result = await HandleController_link(j, PARENT, agentId, child, agent, role, HandleOwnership.DurableParentHandle)
   assert.equal(result.tag, 0, result.tag === 1 ? result.fields[0] : '')
-}
-
-/** Permit that validates against the journal's CURRENT closure. */
-const closureOf = (j) => {
-  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(j))
-  return discover(PARENT, AgentJournalModule_snapshot(j).AgentProjections, sequence)
-}
-
-/** A permit over the family as it stands: its member set, which is what admission reads. */
-const validPermit = (j) => {
-  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(j))
-  return new FamilyRecoveryPermit(PARENT, sequence, RecoveryClosureModule_members(closureOf(j)))
 }
 
 const deferred = () => {
@@ -193,12 +161,12 @@ test('HFRT_is_retired_handle_reflects_durable_projection', async () => {
   assert.equal(isRetiredHandle(liveCtx.runtime, 'ag5'), false)
 
   // Retire the handle through the projection CAS path.
-  const { handleController, handleCompletionCodec, agentCompletion } = await import('../support/domain.mjs')
+  const { handleController, handleCompletionCodec, agentCompletion } = await import('../../verification-system/tests/support/domain.mjs')
   const sealed = agentCompletion.completedRun({ runId: 'run-ag5', agentId: 'ag5', agentName: 'fast-coder', workRecord: 'w' })
   const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
   const recorded = await handleController.recordCompletion(liveCtx.journal, PARENT, 'ag5', 'Terminal', body, sessionId('ses_c5'))
   assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
-  const consumed = await handleController.consume(liveCtx.journal, PARENT, await import('../support/domain.mjs').then((m) => m.handleId.agent('ag5')))
+  const consumed = await handleController.consume(liveCtx.journal, PARENT, await import('../../verification-system/tests/support/domain.mjs').then((m) => m.handleId.agent('ag5')))
   assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
   assert.equal(isRetiredHandle(liveCtx.runtime, 'ag5'), true)
   liveCtx.cleanup()
@@ -238,131 +206,6 @@ test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', asyn
   // is still aborted (the map retains the child until join retires it).
   cancelAgent(liveCtx.runtime, 'ag7')
   assert.deepEqual(liveCtx.sessions.calls.filter(([name]) => name === 'AbortSession'), [['AbortSession', 'ses_c7']])
-  liveCtx.cleanup()
-})
-
-// ── Join / JoinAvailable ─────────────────────────────────────────────────────
-
-test('HFRT_join_available_without_work_is_nothing_to_join', async () => {
-  const liveCtx = await live()
-  const result = await joinAvailable(liveCtx.runtime, 5, new Promise(() => {}))
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'NothingToJoin')
-  liveCtx.cleanup()
-})
-
-test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
-  const liveCtx = await live()
-  installRun(liveCtx.runtime, 'ag8', sessionId('ses_c8'), Role.Coder)
-
-  const result = await joinAvailable(liveCtx.runtime, 5, Promise.resolve('DeadlineExpired'))
-  assert.equal(result.tag, 0)
-  assert.equal(caseOf(result.fields[0]), 'Interrupted')
-  assert.equal(result.fields[0].fields[0], 'DeadlineExpired')
-  liveCtx.cleanup()
-})
-
-test('HFRT_join_single_times_out_when_no_completion_arrives', async () => {
-  const liveCtx = await live()
-  installRun(liveCtx.runtime, 'ag9', sessionId('ses_c9'), Role.Coder)
-
-  const result = await joinAny(liveCtx.runtime, [30])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'TimedOut')
-  liveCtx.cleanup()
-})
-
-test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
-  const liveCtx = await live()
-  cancelRuntime(liveCtx.runtime)
-  assert.equal(runtimeIsCancelled(liveCtx.runtime), true)
-  const result = await joinAny(liveCtx.runtime, [10])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'Cancelled')
-  liveCtx.cleanup()
-})
-
-// ── validatePermit branches (via JoinWithPermit / JoinAvailableWithPermit) ───
-
-test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
-  const liveCtx = await live()
-  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit, [])
-  assert.equal(result.tag, 1)
-  const err = result.fields[0]
-  assert.equal(caseOf(err), 'NotFound')
-  assert.match(err.fields[0], /family recovery permit root mismatch: permit=ses_other runtime=ses_hfrt/)
-  liveCtx.cleanup()
-})
-
-test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
-  const liveCtx = await live()
-  const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
-  const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit, [])
-  const err = result.fields[0]
-  assert.equal(caseOf(err), 'NotFound')
-  assert.match(err.fields[0], new RegExp(`family recovery permit journalSequence stale: permit=${current + 1000n}`))
-  liveCtx.cleanup()
-})
-
-test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => {
-  const liveCtx = await live()
-  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
-  // A member the family no longer has: recovery closed over something that has since vanished,
-  // which is the only thing that may invalidate a permit.
-  const permit = new FamilyRecoveryPermit(PARENT, sequence, stringSet(['W:ses_vanished']))
-  const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
-  const err = result.fields[0]
-  assert.equal(caseOf(err), 'NotFound')
-  assert.match(err.fields[0], /closure lost members: missing=W:ses_vanished/)
-  liveCtx.cleanup()
-})
-
-test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () => {
-  const liveCtx = await live()
-  const permit = validPermit(liveCtx.journal)
-
-  // A grandchild appearing mid-join grows the closure. It was created live, so it needed no
-  // recovery, and the permit must still admit the join: digest equality refused exactly this and
-  // made `temporal-ownership-unhappy-path` fail whenever the fork landed inside the window.
-  const grown = stringSet([
-    ...setItems(RecoveryClosureModule_members(closureOf(liveCtx.journal))),
-    'C:ses_child>ses_grandchild',
-  ])
-  assert.deepEqual(listItems(FamilyRecoveryPermitModule_missingFrom(grown, permit)), [])
-
-  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'growth must not revoke the permit')
-  liveCtx.cleanup()
-})
-
-test('HFRT_join_with_valid_permit_passes_validation', async () => {
-  const liveCtx = await live()
-  const permit = validPermit(liveCtx.journal)
-  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'valid permit must reach the join body')
-  liveCtx.cleanup()
-})
-
-// ── AwaitAgent ───────────────────────────────────────────────────────────────
-
-test('HFRT_await_agent_unknown_id_is_error', async () => {
-  const liveCtx = await live()
-  const result = await awaitAgent(liveCtx.runtime, 'ghost', [])
-  assert.equal(result.tag, 1)
-  assert.equal(result.fields[0], 'Unknown agent id: ghost')
-  liveCtx.cleanup()
-})
-
-test('HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
-  const liveCtx = await live()
-  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
-  const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9', [])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'NotFound')
   liveCtx.cleanup()
 })
 

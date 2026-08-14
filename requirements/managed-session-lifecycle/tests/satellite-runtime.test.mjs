@@ -1,8 +1,8 @@
-// tests/unit/session/satellite-runtime.test.mjs — HOST-014 / HOST-015
+// Split from tests/unit/session/satellite-runtime.test.mjs (cutover Wave 2a); owner: managed-session-lifecycle.
 //
-// Companion-only SatelliteRuntime proofs. Teacher is not a SatelliteKind;
-// SessionOwnership / SyncDelegate association helpers live in kernel +
-// context/session-association tests.
+// HOST-015 companion satellite recovery/reuse/replacement/fail-closed + HOST-014
+// single-flight/query-failure。HOST_014_SatelliteKind_is_Companion_only 已随
+// SPLIT@cutover 迁 requirements/session-ontology/tests/satellite-kind.test.mjs。
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -16,11 +16,7 @@ import {
 import { OpenCodeChildInfo } from '../../../dist/Infrastructure/OpenCode/Host/OpenCodePort.js'
 import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
 import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
-import { toList } from '../support/domain.mjs'
-import {
-  FSharpResult$2_Error$ as error,
-  FSharpResult$2_Ok as ok,
-} from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
+import { errorResult, okResult, toList } from '../../verification-system/tests/support/domain.mjs'
 
 // HOST-015: satellites are physically parented to the family root ('root'),
 // never to their logical owner ('work'). Ownership is proven by the
@@ -39,25 +35,20 @@ const spec = ({ restored, linked = [] } = {}) =>
     restored === undefined ? undefined : sessionId(restored),
     (owner, satellite, agent) => {
       linked.push([owner.fields[0], satellite.fields[0], agent])
-      return (async () => ok(undefined))()
+      return (async () => okResult(undefined))()
     },
-    async () => ok(undefined),
+    async () => okResult(undefined),
   )
 
 const host = (children, created = []) => ({
-  ListChildren: async () => ok(toList(children)),
+  ListChildren: async () => okResult(toList(children)),
   CreateChildSession: async () => {
     const id = sessionId(`created-${created.length + 1}`)
     created.push(id.fields[0])
-    return ok(id)
+    return okResult(id)
   },
-  AbortSession: async () => ok(undefined),
+  AbortSession: async () => okResult(undefined),
   FamilyRootOf: () => sessionId('root'),
-})
-
-test('HOST_014_SatelliteKind_is_Companion_only', () => {
-  assert.deepEqual(SatelliteKind.Companion.cases(), ['Companion'])
-  assert.equal('Teacher' in SatelliteKind, false)
 })
 
 test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
@@ -151,7 +142,7 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
     await createBarrier
     const id = sessionId(`created-${created.length + 1}`)
     created.push(id.fields[0])
-    return ok(id)
+    return okResult(id)
   }
   const runtime = createRuntime(sessions)
   const owner = sessionId('work')
@@ -172,7 +163,7 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
 test('HOST_014_children_query_failure_does_not_guess_or_create', async () => {
   const created = []
   const sessions = host([], created)
-  sessions.ListChildren = async () => error('children unavailable')
+  sessions.ListChildren = async () => errorResult('children unavailable')
   const runtime = createRuntime(sessions)
 
   const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-old' }))

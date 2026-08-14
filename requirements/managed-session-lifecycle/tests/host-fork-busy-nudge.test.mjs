@@ -1,5 +1,9 @@
-// HostForkBusyNudge must keep the handle's managed agent.
-// Following the fallback Peer on an in-flight nudge is a silent Deep → Fast.
+// Moved from tests/unit/session/host-fork-busy-nudge.test.mjs (cutover Wave 2a); owner: managed-session-lifecycle.
+//
+// HostForkBusyNudge 必须保持 handle 的 managed agent：fallback cursor 推进到
+// fast peer 后 in-flight nudge 也不静默 Deep→Fast（同 MANAGED-SESSION-005
+// HFA_existing_fork_keeps_deep_agent_when_caller_passes_fast 的语义族）；空 agent
+// 保持 SelectedAgent；显式 peer 仍被尊重。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -19,7 +23,7 @@ import {
   sessionId,
   stream,
   transportReceipt,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 import { send } from '../../../dist/Session/HostForkBusyNudge.js'
 

@@ -1,8 +1,11 @@
-// tests/unit/session/host-fork-restart.test.mjs — EXEC-009/GREEN-4 restart recovery
-// coverage: HostForkRestart.restoreLinkedChildren drives the durable handle
-// projection (HandleLinked facts + completion blobs in a REAL AgentJournal) and
-// re-enlists children into a live ForkRuntime. Journal-only entry
-// (restoreLinkedChildrenWithoutRuntime) exercises the same walk without a runtime.
+// Split from tests/unit/session/host-fork-restart.test.mjs (cutover Wave 2a); owner: crash-reconciliation.
+//
+// CRASH-002 / CRASH-015 恢复锚点：HostForkRestart.restoreLinkedChildren 从 durable
+// 事实重建世界（空 journal → NoLinkedHandles；terminal snapshot → 提交证明并
+// re-enlist；恢复等待/阻塞分支、legacy false abort 拒绝 + 确定性 replacement）。
+// handle 投影恢复（abandoned/retired/hidden/active 状态还原与 commit-failure block）
+// 已随 SPLIT@cutover 迁
+// requirements/managed-session-lifecycle/tests/host-fork-restart-lifecycle.test.mjs。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
@@ -23,7 +26,7 @@ import {
   roles,
   sessionId,
   toList,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { restoreLinkedChildren, restoreLinkedChildrenWithoutRuntime } = await import(
   '../../../dist/Session/HostForkRestart.js'
@@ -100,49 +103,6 @@ test('HFR_restart_empty_journal_yields_no_linked_handles', async () => {
   })
 })
 
-test('HFR_restart_abandoned_handle_recovered_abandoned', async () => {
-  await withJournal(async (j) => {
-    await linkDurable(j, 'ab1', CHILD, 'abandon-agent')
-    const abandoned = await handleController.recordAbandon(j, PARENT, 'ab1', 'DeadlineExceeded')
-    assert.equal(abandoned.ok, true, abandoned.ok ? '' : abandoned.error)
-
-    const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
-    const recovered = recoveredOf(result)
-    assert.equal(recovered.length, 1)
-    assert.equal(recovered[0].Kind, 'abandoned')
-    assert.equal(recovered[0].Handle.fields[0], 'ab1')
-    assert.equal(recovered[0].ChildSession.fields[0], CHILD.fields[0])
-  })
-})
-
-test('HFR_restart_retired_handle_recovered_retired', async () => {
-  await withJournal(async (j) => {
-    await linkDurable(j, 'rt1', CHILD, 'retire-agent')
-    await completeTerminal(j, 'rt1', CHILD)
-    // Retire via the production CAS consume path.
-    const projection = agentJournal.handleProjection(j, PARENT)
-    const record = handleProjection.tryFind(handleId.agent('rt1'), projection)
-    assert.ok(record, 'handle must be joinable')
-    const consumed = await handleController.consume(j, PARENT, handleId.agent('rt1'))
-    assert.equal(consumed.ok, true, consumed.ok ? '' : consumed.error)
-
-    const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
-    const recovered = recoveredOf(result)
-    assert.equal(recovered.length, 1)
-    assert.equal(recovered[0].Kind, 'retired')
-    assert.equal(recovered[0].Handle.fields[0], 'rt1')
-  })
-})
-
-test('HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
-  await withJournal(async (j) => {
-    await linkDurable(j, 'hidden1', CHILD, 'fast-reviewer', HandleOwnership.HostOwnedHidden)
-
-    const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
-    assert.equal(caseOf(result), 'NoLinkedHandles', 'host-owned handles must not re-enter the parent runtime')
-  })
-})
-
 // ── live-runtime walk: children re-enlisted, runtime restored ────────────────
 
 test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () => {
@@ -164,23 +124,6 @@ test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () =>
     assert.equal(listItems(agents).length, 1)
     assert.equal(listItems(agents)[0].AgentId, 'term1')
     assert.equal(listItems(agents)[0].Agent, 'deep-coder')
-  })
-})
-
-test('HFR_restart_active_handle_recovers_active', async () => {
-  await withJournal(async (j) => {
-    await linkDurable(j, 'act1', CHILD, 'fast-coder')
-
-    const live = runtimeAndChildren()
-    const result = await walk(j, live)
-    const recovered = recoveredOf(result)
-
-    assert.equal(recovered.length, 1)
-    assert.equal(recovered[0].Kind, 'active')
-    assert.equal(live.children.get('act1').fields[0], CHILD.fields[0])
-    assert.deepEqual(live.createdDirs, [['act1', CHILD.fields[0], 'dir-x']])
-    const [agents] = ForkRuntime__List(live.runtime)
-    assert.equal(listItems(agents)[0].AgentId, 'act1')
   })
 })
 
@@ -326,30 +269,4 @@ test('HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', 
     assert.equal(waits.length, 1)
     assert.equal(waits[0].Reason, 'awaiting terminal evidence')
   })
-})
-
-test('HFR_restart_recovery_commit_failure_blocks', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-restart-'))
-  const created = await agentJournal.create({ directory: dir })
-  assert.equal(created.ok, true)
-  const j = created.journal
-  try {
-    await linkDurable(j, 'blocked1', CHILD, 'fast-coder')
-    // A terminal snapshot proves the child finished; the commit then fails
-    // against a journal whose writer is gone → hard block, not a silent wait.
-    created.dispose()
-    const snapshot = reconcileSupervisor.createSnapshot([
-      { ok: true, messages: reconcileSupervisor.terminalTranscript() },
-    ])
-
-    const result = await restoreLinkedChildrenWithoutRuntime(snapshot, j, PARENT)
-    assert.equal(caseOf(result), 'HandlesBlocked')
-    const blocks = listItems(NonEmpty_toList(result.fields[0]))
-    assert.equal(blocks.length, 1)
-    assert.match(blocks[0].Reason, /Writer is poisoned or disposed/)
-  } finally {
-    try {
-      created.dispose()
-    } catch {}
-  }
 })

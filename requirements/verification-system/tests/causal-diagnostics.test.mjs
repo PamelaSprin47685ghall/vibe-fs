@@ -1,3 +1,10 @@
+// Split from tests/unit/session/causal-wait-bridge.test.mjs (cutover Wave 2a); owner: verification-system.
+//
+// E2E diagnostics 格式化 MECHANISM：gatherDiagnostics 读取 causal-waits.json、
+// formatDiagnostics/formatCausalSection 首屏顺序、scenario-parallel.js watchdog
+// onTimeout 的 frontier-before-tail 渲染。bridge 文件/registry 断言已随 SPLIT@cutover
+// 迁 requirements/causal-wait/tests/causal-wait-bridge.test.mjs。
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import fs from 'node:fs'
@@ -5,90 +12,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
-import {
-  CausalOwner_create,
-  CausalProducerRef,
-  DiagnosticWaitModule_create,
-  WaitEscape,
-} from '../../../dist/Kernel/CausalWait.js'
-import {
-  CausalWaitRegistry,
-  CausalWaitHub_setWorkspace,
-  CausalWaitHub_observer,
-  CausalWaitHub_writeToWorkspace,
-} from '../../../dist/Session/CausalWaitRegistry.js'
-import { writeSnapshot as CausalWaitBridge_writeSnapshot } from '../../../dist/Session/CausalWaitBridge.js'
-import { gatherDiagnostics } from '../../e2e/support/diagnostics-collect.js'
-import { formatDiagnostics } from '../../e2e/support/diagnostics-format.js'
-import { formatCausalSection } from '../../e2e/support/diagnostics-causal.js'
-
-const mkWait = (waitKind, ownerKind, subjectPairs, producer) =>
-  DiagnosticWaitModule_create(
-    waitKind,
-    CausalOwner_create(ownerKind, ofArray(subjectPairs.slice(0, 1))),
-    ofArray(subjectPairs),
-    producer,
-    ofArray([WaitEscape.ProcessLifetime]),
-    'causal-wait-bridge.test',
-  )
-
-const externalProducer = (kind, identity) => new CausalProducerRef(1, [kind, ofArray(identity)])
-
-test('CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
-  fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
-  const registry = new CausalWaitRegistry()
-  const wait = mkWait(
-    'provider-verdict',
-    'ReviewerWorkflow',
-    [['reviewer', 'R2'], ['barrier', 'B17']],
-    externalProducer('provider', [['run', 'P81']]),
-  )
-  const lease = registry.Enter(wait)
-  try {
-    CausalWaitBridge_writeSnapshot(workspace, registry)
-    const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
-    assert.equal(fs.existsSync(filePath), true)
-    const exclude = fs.readFileSync(path.join(workspace, '.git', 'info', 'exclude'), 'utf8')
-    assert.ok(exclude.includes('.wanxiangshu/'), 'diagnostic dir must be git-excluded')
-    const snap = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    assert.equal(typeof snap.pid, 'number')
-    assert.ok(String(snap.sequence).length > 0)
-    assert.equal(snap.active.length, 1)
-    assert.equal(snap.active[0].waitKind, 'provider-verdict')
-    assert.ok(Array.isArray(snap.history))
-    assert.ok(Array.isArray(snap.frontiers))
-    assert.ok(snap.frontiers.length >= 1)
-  } finally {
-    lease.Dispose()
-    fs.rmSync(workspace, { recursive: true, force: true })
-  }
-})
-
-test('CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-hub-'))
-  CausalWaitHub_setWorkspace(workspace)
-  const wait = mkWait(
-    'manager-job',
-    'OrchestratorWorkflow',
-    [['job', 'OJ7'], ['manager', 'M4']],
-    new CausalProducerRef(0, [CausalOwner_create('ManagerWorkflow', ofArray([['session', 'M4']]))]),
-  )
-  const lease = CausalWaitHub_observer.Enter(wait)
-  try {
-    const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
-    assert.equal(fs.existsSync(filePath), true)
-    const snap = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    assert.ok(snap.active.some((w) => w.waitKind === 'manager-job'))
-    CausalWaitHub_writeToWorkspace()
-    assert.equal(fs.existsSync(filePath), true)
-  } finally {
-    lease.Dispose()
-    CausalWaitHub_setWorkspace(undefined)
-    fs.rmSync(workspace, { recursive: true, force: true })
-  }
-})
+import { gatherDiagnostics } from './e2e/support/diagnostics-collect.js'
+import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
+import { formatCausalSection } from './e2e/support/diagnostics-causal.js'
 
 test('CAUSAL_DIAG_gather_reads_causal_waits_file', async () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-gather-'))
@@ -172,7 +98,7 @@ test('CAUSAL_DIAG_formatCausalSection_banner_is_first_line', () => {
 
 test('CAUSAL_WATCHDOG_onTimeout_prints_frontier_before_event_tail', () => {
   const source = fs.readFileSync(
-    fileURLToPath(new URL('../../e2e/support/scenario-parallel.js', import.meta.url)),
+    fileURLToPath(new URL('./e2e/support/scenario-parallel.js', import.meta.url)),
     'utf8',
   )
   const onTimeoutAt = source.indexOf('onTimeout: async () => {')

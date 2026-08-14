@@ -1,5 +1,9 @@
-// tests/unit/session/sync-delegate-ce-collapse.test.mjs — EXEC-026 / EXEC-027 / EXEC-031
-// SyncDelegate dispose + cancel without the deleted return/TextComplete channel.
+// Split from tests/unit/session/sync-delegate-ce-collapse.test.mjs (cutover Wave 2a); owner: delegation.
+//
+// EXEC-031 单栈断言：whitespace-normalized completion 经 bounded WorkRecord
+// Recent work 解析 invoke（无 deleted return/TextComplete 通道）。dispose/cancel
+// scope 断言已随 SPLIT@cutover 迁
+// requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -18,7 +22,6 @@ import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
-  SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
 import {
@@ -35,7 +38,7 @@ import {
   roles,
   sessionId,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const waitFor = async (predicate, message, ms = 2000) => {
   const deadline = Date.now() + ms
@@ -63,7 +66,7 @@ const turn = (delegateKey, role, text, runId = 'asst_turn') =>
 
 let activeJournal
 
-const withHarness = async (fn, { tier = 'Fast' } = {}) => {
+const withHarness = async (fn) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-ce-'))
   const opened = await agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
@@ -104,7 +107,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     dispatcher,
     opened.journal,
     attached,
-    (_owner) => roles.tier(tier),
+    (_owner) => roles.tier('Fast'),
     (_delegateSession, _agent) => {},
     quiescence,
     undefined,
@@ -129,41 +132,6 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     rmSync(base, { recursive: true, force: true })
   }
 }
-
-test('EXEC_027_dispose_fails_unsettled_sync_delegate_call_scope', async () => {
-  await withHarness(async ({ runtime, prompts, createCalls }) => {
-    const owner = 'ses_owner_dispose'
-    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'waiting to be disposed')
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
-
-    disposeRuntime(runtime)
-    const done = resultOf(await pending)
-    assert.equal(done.ok, false)
-    assert.match(done.error, /disposed/i)
-  })
-})
-
-test('EXEC_027_cancel_before_completion_fails_pending_invoke', async () => {
-  await withHarness(async ({ runtime, prompts, createCalls }) => {
-    const owner = 'ses_owner_cancel'
-    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'cancel before completion')
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
-
-    let invokeSettled = false
-    let invokeResult
-    pending.then((value) => {
-      invokeSettled = true
-      invokeResult = value
-    })
-
-    cancelSession(runtime, sessionId(owner))
-    await waitFor(() => invokeSettled, 'Invoke did not settle after CancelSession')
-
-    const done = resultOf(invokeResult)
-    assert.equal(done.ok, false)
-    assert.match(done.error, /cancelled/i)
-  })
-})
 
 test('EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {

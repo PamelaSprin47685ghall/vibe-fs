@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf } from '../support/domain.mjs'
+import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const { SessionIdModule_create: sid } = await import('../../../dist/Kernel/Identity.js')
 const {

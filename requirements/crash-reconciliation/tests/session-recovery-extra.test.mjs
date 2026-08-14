@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, resultOf, sessionRecovery, sessionId, setItems } from '../support/domain.mjs'
+import { caseOf, resultOf, sessionRecovery, sessionId, setItems, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   sessionRecoveryOfHandleFamily: ofHandleFamily,
@@ -36,8 +36,6 @@ const {
 } = await import('../../../dist/Domain/SessionRecovery.js')
 
 const { SessionIdModule_create: sid, AgentHandleIdModule_create: handleId, ManagerJobIdModule_create: jobId } = await import('../../../dist/Kernel/Identity.js')
-
-const { toList } = await import('../support/domain.mjs')
 
 test('MISC_recovery_of_handle_family_all_branches', () => {
   const s = sid('s1')

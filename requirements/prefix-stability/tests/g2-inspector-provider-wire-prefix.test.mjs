@@ -1,12 +1,11 @@
-// G2 Inspector canary: PREFIX LAW on a reused Inspector child.
+// Split from tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs (cutover Wave 2a); owner: prefix-stability.
 //
-// same PrefixEpoch: ProviderWire(n) is an exact prefix of ProviderWire(n+1)
-// Authority: Domain ProviderProjection.isAppendOnlyPrefix (via
-// tests/e2e/support/provider-wire.js wireOf / sealHolds — not a second prefix helper).
-//
-// sync-delegate-runtime.test.mjs G2_inspector_Q1_Q2_Q3_same_session_serial_reuse
-// records prompt text only and does NOT prove ProviderWire.
-// StrengthReplicaRuntime is InternalLeaf (FrozenMirror / K+1), not this G2 path.
+// PREFIX-STABILITY-001：PREFIX LAW on a reused Inspector child — ProviderWire(n)
+// 是 ProviderWire(n+1) 的 append-only prefix（sealHolds/isAppendOnlyPrefix 经
+// verification-system e2e support provider-wire.js + production
+// ProviderProjection.isAppendOnlyPrefix，非第二 prefix helper）。
+// SyncDelegate 生命周期（reuse/agent/model）已随 SPLIT@cutover 迁
+// requirements/delegation/tests/g2-inspector-prompt-model.test.mjs。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -33,7 +32,7 @@ import {
   isAppendOnlyPrefix,
   sealHolds,
   wireOf,
-} from '../../e2e/support/provider-wire.js'
+} from '../../verification-system/tests/e2e/support/provider-wire.js'
 import {
   agentJournal,
   authorityRoot,
@@ -51,7 +50,7 @@ import {
   roles,
   sessionId,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const SYNC_RETURN_COMPLETION = 'Sync delegate answer returned to caller.'
 const INSPECTOR_AGENT = 'fast-inspector'
@@ -370,42 +369,4 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
       'prefix must be directional: Q2 is not a prefix of Q1',
     )
   })
-})
-
-test('G2_inspector_promptModelFor_keeps_deep_and_fast_owners_on_their_own_models', async () => {
-  const FAST_MODEL = new OpencodeModel('g2-test-provider', 'g2-fast-inspector', undefined)
-  const DEEP_MODEL = new OpencodeModel('g2-test-provider', 'g2-deep-inspector', undefined)
-  const lookup = (agent) => {
-    if (agent === 'fast-inspector') return FAST_MODEL
-    if (agent === 'deep-inspector') return DEEP_MODEL
-    return undefined
-  }
-
-  const runOnce = async (tier, expectedAgent, expectedModelId) => {
-    await withHarness(
-      async (harness) => {
-        const { runtime, prompts, createCalls, captures } = harness
-        const inspector = roles.of('Inspector')
-        const q1 = invoke(runtime, 'ses_owner_model_for', SyncDelegateRole.Inspector, 'Q1')
-        await waitFor(() => createCalls.length === 1 && captures.length === 1, 'create/send missing')
-        assert.equal(createCalls[0].agent, expectedAgent)
-        assert.equal(prompts[0].agent, expectedAgent)
-        assert.equal(captures[0].agent, expectedAgent)
-        assert.equal(captures[0].modelId, expectedModelId)
-        assert.notEqual(
-          captures[0].modelId,
-          expectedModelId === 'g2-deep-inspector' ? 'g2-fast-inspector' : 'g2-deep-inspector',
-          'mixed Deep/Fast owners must not collapse onto the other tier\'s model',
-        )
-
-        await settlePendingInvoke(runtime, harness, createCalls[0].child, inspector, 'answer Q1', 'asst_q1')
-        const done = resultOf(await q1)
-        assert.equal(done.ok, true, done.error)
-      },
-      { tier, promptModel: undefined, promptModelFor: lookup },
-    )
-  }
-
-  await runOnce('Fast', 'fast-inspector', 'g2-fast-inspector')
-  await runOnce('Deep', 'deep-inspector', 'g2-deep-inspector')
 })
