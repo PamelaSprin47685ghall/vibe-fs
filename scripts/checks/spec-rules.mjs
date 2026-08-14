@@ -56,6 +56,18 @@ export const legacyWorkflowPathReferences = (text) => {
   return findings
 }
 
+/** Return references to the deleted archive/ tree (2026-08-14 cutover). */
+export const archivePathReferences = (text) => {
+  const findings = []
+
+  text.split('\n').forEach((content, index) => {
+    const match = /(?:^|[^A-Za-z])(archive\/[^\s`"')\]>]*)/.exec(content)
+    if (match) findings.push({ token: match[1], line: index + 1 })
+  })
+
+  return findings
+}
+
 /** Return forbidden implementation/spec dependencies on lifecycle history. */
 export const changeDependencyReferences = (text) => {
   const findings = []

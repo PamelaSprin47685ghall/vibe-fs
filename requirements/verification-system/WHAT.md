@@ -106,6 +106,41 @@ e2e top-level 测试不得直接调用 `watchdog.advance`（只经 support 因�
 
 **证据指针**：→ PROOF.md L13。
 
+### 禁止退化清单
+
+以下任一出现即为门禁退化，等同于发布 No-Go（VERIFICATION-SYSTEM-010 验收判据不可放宽）。
+
+机器解析锚点：下列 ```text 块内条目文本不得无故改写；解析器按整行绑定 id（`e2e/support/degradation-list.mjs`）。
+
+```text
+把 wall-clock 总超时当作唯一挂死判据
+让原始 SSE 或 provider 流量续期 watchdog
+让背景车道进展续期 watchdog
+删除 watchdog 的诊断转储，只保留退出码
+让 watchdog 计时器持有事件循环，使干净结束也要等满静默窗口
+存在只有总超时保护的时间窗
+声明了断言心跳但未接线
+用固定 sleep 代替因果 bark 交错启动
+就绪超时或就绪前退出被当作通过
+Release gate 变成「最多 N 轮」或「重跑直到通过」
+数量常量与清单各自维护
+静态门禁的路径判据指向不存在的目录
+延长静默窗口或测试超时以掩盖竞态
+```
+
+最后一条是最隐蔽的：调大超时永远能让红灯变绿，而它消灭的是发现问题的能力，不是问题。
+
+One World 目标态下，下列形状同样视为退化（与上文各目标节同义；待静态 ratchet 落地后可并入机器锚点，现以条款正文为准）：
+
+```text
+并行 multi-canary / worker pool 冒充证明覆盖面（违反 One Physical World）
+Long Stroke 内二次 spawn OpenCode（违反 Spawn Exactly Once）
+用真实 scheduler 碰巧顺序证明 semantic race（缺少 deterministic trace）
+Temporal 测试依赖真实墙钟推进语义（违反 Virtual Time）
+用 wall-clock / sleep 断言语义成立（违反 No Wall-Clock Semantic Assertion）
+Long Stroke 断言 production 私有状态或内部 helper 时序
+```
+
 ## VERIFICATION-SYSTEM-007：时间确定性
 
 **规范陈述**：proof 不依赖真实 wall-clock 偶然性。Temporal 层用虚拟时间/注入时钟

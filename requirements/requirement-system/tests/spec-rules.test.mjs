@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  archivePathReferences,
   changeDependencyReferences,
   clauseDefinitionHeadings,
   clauseReferences,
@@ -116,6 +117,21 @@ test('spec gate detects retired workflow paths', () => {
     [
       { token: 'docs/proposal/', line: 1 },
       { token: 'docs/status/', line: 2 },
+    ],
+  )
+})
+
+test('spec gate detects references to the deleted archive tree', () => {
+  assert.deepEqual(
+    archivePathReferences([
+      '// archive/docs/proof/verify.md is gone',
+      'no archive reference here',
+      'archive/ at line end without a path',
+      'prearchive/ is a different word',
+    ].join('\n')),
+    [
+      { token: 'archive/docs/proof/verify.md', line: 1 },
+      { token: 'archive/', line: 3 },
     ],
   )
 })

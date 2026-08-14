@@ -3,7 +3,7 @@
  *
  * W7 requires a failing test per forbidden degradation, and the completeness gate
  * that checks "per" needs to know what the items are. They live as prose inside
- * `docs/proof/verify.md` under `### 禁止退化清单`, so either a human retypes them here or this
+ * `requirements/verification-system/WHAT.md` under `### 禁止退化清单`, so either a human retypes them here or this
  * file reads them. W1 and W2 of this same package exist to delete two hand-kept
  * mirrors — a third would be the same defect wearing a new name.
  *
@@ -46,13 +46,13 @@ import { fileURLToPath } from 'node:url';
 /** The heading the list lives under. Exported so a failure message and the test agree. */
 export const ANCHOR = '### 禁止退化清单';
 
-export const SSOT_ORIGIN = 'archive/docs/proof/verify.md';
+export const SSOT_ORIGIN = 'requirements/verification-system/WHAT.md';
 
 /** Resolved from this module, not from `cwd`: two trees import it. */
-// e2e/support is now requirements/verification-system/tests/e2e/support, five
-// levels below the repo root where archive/ lives (support -> e2e -> tests ->
-// verification-system -> requirements -> root).
-const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', SSOT_ORIGIN);
+// e2e/support sits three levels below the clause file (support -> e2e -> tests ->
+// verification-system). The origin string stays repo-relative so messages and
+// the pin test name the same path.
+const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'WHAT.md');
 
 /**
  * Clause text → stable id.

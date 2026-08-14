@@ -72,7 +72,7 @@ fantomas → scripts/check.mjs（L0 静态门）
 ```
 
 - `npm pack --dry-run` 输出实际将被打包的文件清单（206KB JSON），是 artifact closure 的**终极 membership oracle**：integration/unit 层只做静态前置，真实 membership 以 pack 清单为准（DISTRIBUTION-007）。
-- 阶梯分层/晋级纪律/No-Go 红线（`repeat-until-pass` 永久禁止）归 `verification-system`（`archive/docs/proof/verify.md` VERIFY-001/002/006）。
+- 阶梯分层/晋级纪律/No-Go 红线（`repeat-until-pass` 永久禁止）归 `verification-system`（VERIFICATION-SYSTEM-001/003/010）。
 - 发布流程：`npm ci` → `dotnet tool restore` → `npm run format-build-test` → `npm pack --pack-destination artifacts/package`；Git 工作树须干净（`README.md` §发布）。
 
 ## 6. 依赖（DEPENDS ON — 特殊 edge）
@@ -103,12 +103,12 @@ distribution → 特殊：所有声明 runtime resource 的 semantic packages（
 
 | 源 | 信息 | 裁决 | 落点 |
 |---|---|---|---|
-| `archive/docs/why/enforcer.md`「分发：单一打包 vs dist 双副本/代码 fallback」 | 拒双副本（掩盖打包错误）；拒代码内 fallback catalog（坏包静默成功）；resource 随 npm pack 单份发布 | EVIDENCE | WHY.md 考古；DISTRIBUTION-005/006；本文件 §2/§3 |
-| `archive/docs/why/enforcer.md`「元数据：catalog.json vs 目录即清单」 | 拒 JSON 第二真相；lexical order 由扫描派生 | EVIDENCE | DISTRIBUTION-006；§3 |
-| `archive/changes/completed/repository-warm-start.md` §10 Resource bounds | `MaxKeywords=8 / TopKPerKeyword=4 / MaxHintsTotal=24 / MaxWarmStartBytes=64KiB`——warm-start **hint 预算**，非 artifact 资源闭包 | 弃权（GARBAGE 于本包） | 归 `repository-investigation`/`knowledge-reuse`；本包不拥有 |
-| `archive/docs/proof/verify.md` VERIFY-001/002 第 5 层、Release gate、VERIFY-006 | 分层结构、晋级纪律、`repeat-until-pass` 禁令、watchdog 治理 | 弃权（HOW 于本包，机制归 `verification-system`） | DISTRIBUTION-007 只取「release proof 覆盖 closure」 |
-| `archive/docs/shape/architecture.md` / `archive/docs/how/architecture.md` | 分层所有权、资源读取仅在 `Infrastructure/Resources/`、入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js` | HOW | §3 |
-| `README.md` §构建与打包/运行时资源/故障排查 | tarball = dist + resources + metadata；不得含 src/tests/scripts/archive/docs/artifacts；`resources/prompts/*` 已删 | HOW | §1/§2 |
+| 历史 why/enforcer「分发：单一打包 vs dist 双副本/代码 fallback」 | 拒双副本（掩盖打包错误）；拒代码内 fallback catalog（坏包静默成功）；resource 随 npm pack 单份发布 | EVIDENCE | WHY.md 考古；DISTRIBUTION-005/006；本文件 §2/§3 |
+| 历史 why/enforcer「元数据：catalog.json vs 目录即清单」 | 拒 JSON 第二真相；lexical order 由扫描派生 | EVIDENCE | DISTRIBUTION-006；§3 |
+| 历史 change（repository-warm-start）§10 Resource bounds | `MaxKeywords=8 / TopKPerKeyword=4 / MaxHintsTotal=24 / MaxWarmStartBytes=64KiB`——warm-start **hint 预算**，非 artifact 资源闭包 | 弃权（GARBAGE 于本包） | 归 `repository-investigation`/`knowledge-reuse`；本包不拥有 |
+| 历史 verify 条款（VERIFY-001/002 第 5 层、Release gate、VERIFY-006） | 分层结构、晋级纪律、`repeat-until-pass` 禁令、watchdog 治理 | 弃权（HOW 于本包，机制归 `verification-system`） | DISTRIBUTION-007 只取「release proof 覆盖 closure」 |
+| 历史 architecture 条款（ARCH-*，2026-08-14 归档） | 分层所有权、资源读取仅在 `Infrastructure/Resources/`、入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js` | HOW | §3 |
+| `README.md` §构建与打包/运行时资源/故障排查 | tarball = dist + resources + metadata；不得含 src/scripts/requirements/artifacts；`resources/prompts/*` 已删 | HOW | §1/§2 |
 | npm 必须永久是分发介质 | 当前实现用 npm package；换介质不改命题 | HOW（独立 change test 通过） | WHY.md |
 | `dist/`/`resources/` 路径名必须永久 | 现行 HOW/contract evidence；改名需同步全部测试与 README | HOW | §1 |
 | version bump / release cadence | 版本号、发布节奏是发布管理，非 closure 命题 | HOW | 不落命题 |

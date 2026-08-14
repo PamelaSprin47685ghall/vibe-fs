@@ -61,11 +61,11 @@ gate；gate 失败码被吞掉照样 exit 0；watchdog 靠总超时而不是因�
 
 | 来源 | 吸收为什么 |
 |---|---|
-| `archive/requirements-design/01-meta-programming.md`（boundary card） | proof ladder、禁止语义分支直跳 E2E、verifier 必须可红、dependency closure 验证、One World 共享、确定性证明原则 |
-| `archive/docs/proof/verify.md`（VERIFY-001..009 全部） | 五层金字塔、晋级阶梯、canary mock 剧本、因果推进门禁、Architecture Gates、No-Go、三种 projection、语言边界、覆盖门禁 |
-| `archive/changes/completed/test.md`（G4R） | One World / Pure Time：恰一个 Long Stroke、race 是代数不是调度彩票、watchdog 因果续期 |
-| `archive/changes/completed/canary-unbend.md` | canary 不可弯曲迎合生产；断言不得为绿削弱 |
-| `archive/changes/completed/orchestrator-e2e-timeout.md` | 先可解释再修根因；超时放大不是修复 |
+| 历史 boundary card（01-meta-programming） | proof ladder、禁止语义分支直跳 E2E、verifier 必须可红、dependency closure 验证、One World 共享、确定性证明原则 |
+| 历史 verify 条款（VERIFY-001..009，2026-08-14 归档） | 五层金字塔、晋级阶梯、canary mock 剧本、因果推进门禁、Architecture Gates、No-Go、三种投影、语言边界、覆盖门禁 → WHAT VERIFICATION-SYSTEM-001..012 |
+| 历史 G4R change（test.md） | One World / Pure Time：恰一个 Long Stroke、race 是代数不是调度彩票、watchdog 因果续期 |
+| 历史 change（canary-unbend） | canary 不可弯曲迎合生产；断言不得为绿削弱 |
+| 历史 change（orchestrator-e2e-timeout） | 先可解释再修根因；超时放大不是修复 |
 | `archive/changes/completed/waitfact-causal-renewal.md` | waitFact 续期因果归因；背景进展只记录不续期 |
 | `archive/changes/completed/fix.md` | 验收口径不缩水；静态门禁必须命中真实路径（伪门禁教训） |
 | `archive/requirements-design/PROOF-MAP.md` Phase D | gate/test family 的 MECHANISM 归属；missing oracle 3（proof ladder 可红） |
