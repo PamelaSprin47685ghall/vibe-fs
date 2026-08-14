@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, eventId, idValue, isSome, listItems, payloadOf, toList } from '../support/domain.mjs'
+import { caseOf, eventId, idValue, isSome, listItems, payloadOf, toList } from '../../../tests/unit/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
 const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')

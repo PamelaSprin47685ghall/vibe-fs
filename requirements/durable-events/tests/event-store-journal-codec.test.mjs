@@ -20,7 +20,7 @@ import {
   sessionId,
   stream,
   toList,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
 const Codec = await import('../../../dist/Journal/EventStoreJournalCodec.js')

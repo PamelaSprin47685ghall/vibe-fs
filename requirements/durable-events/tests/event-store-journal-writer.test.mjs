@@ -19,7 +19,7 @@ import {
   sessionId,
   stream,
   utcOffset,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
 const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')

@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, eventId, idValue, listItems, mapEntries, payloadOf, toList } from '../support/domain.mjs'
+import { caseOf, eventId, idValue, listItems, mapEntries, payloadOf, toList } from '../../../tests/unit/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
 const Fold = await import('../../../dist/Infrastructure/Persist/EventStoreFold.js')
