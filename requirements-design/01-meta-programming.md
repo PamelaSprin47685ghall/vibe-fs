@@ -147,7 +147,7 @@ RED = 业务结果可能仅因 wall-clock 环境、测试运行速度或隐藏 t
 ## `causal-wait`
 
 **WHY**  
-业务等待需要知道“正在等什么/为什么还没发生”，但诊断这一等待不能反过来成为 durable business fact、prompt authority 或决策真相源。
+业务等待需要知道“正在等什么/为什么还没发生”，但诊断这一等待不能反过来成为 durable business fact、prompt authority 或决策真相源——观察可以看程序，程序绝不可以看观察（同一不变量的两侧，不是两个独立 WHY）。
 
 **OWNS**
 - wait observation 的非权威性。

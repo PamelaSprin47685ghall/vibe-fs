@@ -242,6 +242,12 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 - 「failure-domain separation」（tool red / semantic REVISE / infra fatal）是三态各归 `capability-enforcement` / `review-judgement` / `host-boundary`+`crash-reconciliation` 的硬边界纪律，不构成第四个独立 WHY；`review-assurance` 的「infra failure 不伪装 REVISE」是其 review-side 本地负边界。
 - `INDEX.md` 依赖骨架是示意；精确 hard edge 以各 boundary card `DEPENDS ON` 为准（已加注），Phase E 统一重画。
 
+### 回写（WHY / DOES NOT OWN 强化，已落卡）
+
+- `review-assurance`：OWNS「infra failure 不伪装 REVISE」补三态分离交叉引用；DOES NOT OWN 补「tool red / infra fatal 分类本身不归本包」。
+- `guidance-delivery`：DOES NOT OWN 补「interaction authority 创建/继续权不归本包（delivery 不 mint authority）」。
+- `causal-wait`：WHY 补单侧不变量的闭式表述「观察可以看程序，程序绝不可以看观察」，显式回答 double-WHY 质疑。
+
 ## Phase C — Source / runtime evidence（已完）
 
 逐包映射六证据轴（canonical type / wiring / Host boundary / resource / durable fact / failure path）。完整 ledger 见 `EVIDENCE.md`。

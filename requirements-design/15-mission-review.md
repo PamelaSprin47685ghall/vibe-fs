@@ -74,7 +74,7 @@ OWNS:
 - reviewed object 变化使旧 witness 失效。
 - 对需要额外确认的 review，challenge 必须在第二次 judgement 的真实 input/seal 中被证明消费。
 - `VerdictKnown` 与 `ConsumableReview(record-ready)` 分型。
-- infrastructure failure 不伪装成 REVISE。
+- infrastructure failure 不伪装成 REVISE（review-side 本地负边界；三态分离：tool 语法红 → `capability-enforcement`、语义 REVISE → `review-judgement`、infra fatal fail-fast → `host-boundary`/`crash-reconciliation`）。
 - process review 与 terminal review 可以有不同 assurance strength；两者不得互相计数。
 
 DOES NOT OWN:
@@ -83,6 +83,7 @@ DOES NOT OWN:
 - Finality 是否需要什么 review cohort。
 - Host/provider identity acquisition HOW。
 - WorkRecord prose 的业务内容；只要求 bounded canonical source/coverage。
+- tool red / infra fatal 的分类本身（分属 `capability-enforcement` 与 `host-boundary`/`crash-reconciliation`）；本包只拥有 review-side 的“不把 infra 伪装成 REVISE”负边界。
 
 DEPENDS ON: `review-judgement`, `semantic-trace`, `durable-events`, `causal-wait`。
 
