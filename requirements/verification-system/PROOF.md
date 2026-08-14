@@ -7,7 +7,7 @@
 |---|---|---|---|
 | VERIFICATION-SYSTEM-001 | `requirements/verification-system/tests/proof-ladder.test.mjs`（test: VERIFY_001_format_build_test_ladder_pins_the_five_layers_in_order / VERIFY_001_checks_directory_is_wired_plus_allowlist_only） | NEW | node --test requirements/verification-system/tests/proof-ladder.test.mjs |
 | VERIFICATION-SYSTEM-002 | `requirements/verification-system/tests/proof-ladder.test.mjs`（test: VERIFY_001_l4_has_exactly_one_e2e_entry_in_the_ladder）；REUSE `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs`（sole-entry scope 回归；g4r-freeze 迁移期 ratchet 已退休 2026-08-14）；REUSE `requirements/verification-system/tests/e2e-event-ceiling.test.mjs`（long-stroke.toml declares theoretical exact event ceilings） | NEW+REUSE | node --test requirements/verification-system/tests/proof-ladder.test.mjs |
-| VERIFICATION-SYSTEM-003 | REUSE `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs`（case 天花板 0 的机器面：sole top-level entry、无 cases/ 通道；g4r-freeze 已退休）；REUSE `requirements/verification-system/tests/e2e-event-ceiling.test.mjs`（event 天花板精确）；「物理契约论证」人工裁决面由 VERIFY-002 文本 + review 承接 | REUSE | node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs |
+| VERIFICATION-SYSTEM-003 | REUSE `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs`（case 天花板 0 的机器面：sole top-level entry、无 cases/ 通道；g4r-freeze 已退休）；REUSE `requirements/verification-system/tests/e2e-event-ceiling.test.mjs`（event 天花板精确）；NEW `tests/physical-contract.test.mjs`（唯一 Long Stroke 入口必须声明不可模拟 physical contract；format-build-test 禁止 repeat-until-pass） | REUSE+NEW | node --test requirements/verification-system/tests/physical-contract.test.mjs |
 | VERIFICATION-SYSTEM-004 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs`（layer-0 gate 永久回归）；`requirements/verification-system/tests/proof-ladder.test.mjs`（fail-closed 传播）；交叉：`requirements/requirement-system/tests/spec-rules.test.mjs`（spec gate 可红 fixture） | MOVE+NEW | node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs |
 | VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/proof-ladder.test.mjs`（test: VERIFY_001_check_mjs_propagates_nonzero_fail_closed / VERIFY_005_fail_closed_propagates_a_failing_gate_exit_code / VERIFY_005_fail_closed_treats_an_unspawnable_gate_as_failure） | NEW | node --test requirements/verification-system/tests/proof-ladder.test.mjs |
 | VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs`（E2E_WATCHDOG_FEED_case_files_do_not_feed_watchdog_directly）；REUSE `requirements/verification-system/tests/verdict-feed.test.mjs`（VERIFY_004_a_verdict_renews_the_silence_window / VERIFY_004_bytes_moving_is_recorded_and_does_not_renew） | MOVE+REUSE | node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs |
@@ -35,5 +35,6 @@ advisory 承担。
   元测试）、`requirements/verification-system/tests/guide-contract.test.mjs`（VERIFY-005/008 契约面）按内容属
   verification-system；PROOF-MAP 曾将 verdict-feed 标 review-judgement、domain.meta 标
   requirement-system，本包以断言内容为准并在此显式记录差异。
-- 语义分支「禁止直跳 E2E」的人工裁决面：VERIFY-002 文本 + review 过程，无机器落点
-  （GAP@cutover 若需机器化再补；聚合台账见 `requirements/GAP.md` GAP-006）。
+- 语义分支「禁止直跳 E2E」：唯一入口必须声明不可模拟 physical contract
+  （`tests/physical-contract.test.mjs` + `tests/e2e/entry.test.mjs` PHYSICAL CONTRACTS 块）；
+  聚合台账见 `requirements/GAP.md` GAP-006 CLOSED。

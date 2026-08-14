@@ -121,6 +121,12 @@ test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () =>
   const continued = await continueManagerJob(live.host, managerJobId('hostfw8'), 'second pass')
   assert.equal(continued.ok, true, continued.ok ? '' : continued.error)
   assert.ok(continued.value, 'the continued job reports its worktree')
+
+  // The real engine owns a publication task after ForkManagerJob. Teardown must
+  // first consume that owned task's verdict; deleting the repo while it is still
+  // appending durable facts turns its physical store-lock acquisition into an
+  // orphaned retry loop.
+  await hostJoinPublished(live.host)
   live.cleanup()
 })
 

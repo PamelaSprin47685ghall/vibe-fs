@@ -173,8 +173,10 @@ Changes 不是规范正文。
 **含义/动机**：Active 是工作记录不是状态日志；Completed 是历史证据不是当前规范。两类文件
 的正文合同由人工评审把关（GOV-008）。
 
-**边界**：机器可红面当前为空（正文内容检查无 gate），由人工评审承接；cutover 后如建
-change-lifecycle verifier 再补机器落点。
+**边界**：Completed 不作当前依据的机器面由 `tests/change-lifecycle.test.mjs` +
+REQUIREMENT-SYSTEM-010 `changeDependencyReferences` 承接。Active 原文冻结与正文白名单
+仍由人工评审承接（检查器不读正文推断生命周期状态）。live `changes/active/` 若被重新启用，
+必须带 Original proposal / Work origin 标题。
 
 **证据指针**：→ PROOF.md L20。
 
@@ -187,7 +189,8 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **含义/动机**：执行者不是裁决者。把矛盾压下去或挑一边继续 = 把用户已经完成的裁决偷走。
 
 **边界**：本条是过程合同；与 `verification-system` 的「验收口径不缩水」互补（后者管判据，
-本条管流程）。
+本条管流程）。机器面锁 WHAT-014 四步原文（删步即红）；是否在一次实现中真正停下，仍由
+人工评审承接。
 
 **证据指针**：→ PROOF.md L21。
 
@@ -202,7 +205,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 
 **边界**：若工作已由用户指定 Change 启动，仍按单文件生命周期闭环。
 
-**证据指针**：→ PROOF.md L22。
+**证据指针**：→ PROOF.md L22。 AGENTS.md 文档生命周期节由 `tests/change-lifecycle.test.mjs` 锁定。
 
 ## REQUIREMENT-SYSTEM-016：依赖声明 ⊆ 骨架
 

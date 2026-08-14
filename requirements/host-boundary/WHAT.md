@@ -111,7 +111,8 @@ compaction / summary 路径 → 不写 seal。唯一性前提是单 actor 写 as
 PendingIdentity/Rejected），不赌同一身。
 
 **证据**：`ReviewSeal` / `TurnBinding`（消费因果读）；→ PROOF.md `HOST-BOUNDARY-008`
-（REUSE `review/*` + `host/` 相关 seal 测试；canary 见 `archive/docs/proof/host.md`）。
+（NEW `tests/host010-run-id-equivalence.test.mjs`：bindableRun id ≡ ToolContext.messageID
+encoding；共时 Host 穿线仍由 Long Stroke 物理契约承担）。
 
 ## HOST-BOUNDARY-009：Tool 身份两个半边；缺一 fail closed
 

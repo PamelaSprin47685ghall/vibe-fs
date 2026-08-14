@@ -17,9 +17,9 @@
 | REQUIREMENT-SYSTEM-010 | `requirements/requirement-system/tests/spec-rules.test.mjs`（legacyWorkflowPathReferences：废止路径；changeDependencyReferences：不依赖 proposed/completed 历史） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-011 | `requirements/requirement-system/tests/spec-rules.test.mjs`（changeDependencyReferences：proposed 非当前依赖）；人工评审承接（archive/docs/proof/document-governance.md 人工评审表：Agent 未经用户指定启动 Proposed） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-012 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：CHG-001 与产品条款区分）；人工评审承接（spec.mjs 三目录存在 / 同路径不并存机制，check 集成时执行） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
-| REQUIREMENT-SYSTEM-013 | 人工评审承接（archive/docs/proof/document-governance.md 人工评审表：Active 原文被反向改写 / Completed 被用作当前实现依据）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
-| REQUIREMENT-SYSTEM-014 | 人工评审承接（archive/docs/proof/document-governance.md 人工评审表 + GOV-009 blocker 协议）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
-| REQUIREMENT-SYSTEM-015 | 人工评审承接（AGENTS.md 文档生命周期节「普通小型修复不要求自动创建 Change」）；机器落点 GAP@cutover | REUSE | 人工评审（无机器命令） |
+| REQUIREMENT-SYSTEM-013 | `tests/change-lifecycle.test.mjs`（Completed 不作当前依据；live Active 必须声明冻结 origin）；Active 原文冻结 / 正文白名单仍人工评审（archive/docs/proof/document-governance.md） | NEW + 人工 | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+| REQUIREMENT-SYSTEM-014 | `tests/change-lifecycle.test.mjs`（WHAT-014 四步 blocker 协议；删步即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+| REQUIREMENT-SYSTEM-015 | `tests/change-lifecycle.test.mjs`（AGENTS.md「普通小型修复不要求创建 Change」；删句即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个包 README/WHY/WHAT 的 DEPENDS ON ⊆ INDEX 骨架断言） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（本测试自身即机器执行；删已存在包 PROOF 行必红） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 
@@ -35,6 +35,6 @@ anchor id**；本包的机器事实由 meta-verifier + spec-rules 承担。
   （meta-verifier 同步迁移）。
 - `archive/docs/README.md` 导航职责 → `requirements/README.md`。
 - spec gate 的 archive/docs/changes 检查面 → requirements/ 树治理（archive/docs/changes 归档后整体重写）。
-- WHAT-013/014/015 机器落点：change-lifecycle verifier（GAP@cutover 补；聚合台账见 `requirements/GAP.md` GAP-003/004/005）。
+- WHAT-013/014/015：`tests/change-lifecycle.test.mjs`（聚合台账 `requirements/GAP.md` GAP-003 PARTIAL / GAP-004 CLOSED / GAP-005 CLOSED）。Active 原文冻结仍人工。
 - PROOF-MAP「顶层 3 文件」归属分歧（verdict-feed / domain.meta / guide-contract 的
   assertion 级 owner）：见 `requirements/verification-system/PROOF.md`，cutover 按断言复核。

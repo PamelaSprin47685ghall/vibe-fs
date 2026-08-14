@@ -56,8 +56,9 @@ physical contract」，答不出则降回 Pure/Temporal/Adapter。
 「重跑直到通过」= 用运气代替证明。
 
 **边界**：禁止跨级的机器可红面 = case 天花板 0 + 唯一入口 + 精确 event 天花板（由
-e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）；「答不出物理契约」的人工
-裁决面由 VERIFY-002 文本 + review 过程承接。
+e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）+ 唯一 Long Stroke 入口必须
+声明不可模拟 physical contract（`tests/physical-contract.test.mjs`；删声明即红）。答不出
+则不得留在 e2e。
 
 **证据指针**：→ PROOF.md L10。
 

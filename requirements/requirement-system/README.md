@@ -13,7 +13,7 @@ journal 怎么存、review 怎么判都不归它），它拥有的是「这些�
 README.md   ← 你在这里
 WHY.md      不可替代的存在理由：为什么必须有一个包管「谁拥有什么」
 WHAT.md     唯一 normative 合同：16+1 条编号命题（REQUIREMENT-SYSTEM-001..017）
-HOW.md      实现模型：meta-verifier + spec gate；历史与弃权
+HOW.md      实现模型：meta-verifier + spec gate + change-lifecycle；历史与弃权
 PROOF.md    每条命题的测试落点
 tests/      本包拥有的可执行 proof
 ```
@@ -33,7 +33,7 @@ tests/      本包拥有的可执行 proof
 
 ## HOW 概览
 
-本包无 runtime 源码（META 包的正确形态）。机制由三部分组成：
+本包无 runtime 源码（META 包的正确形态）。机制由四部分组成：
 
 1. `requirements/requirement-system/tests/meta-verifier.test.mjs`：扫描 requirements/ 全树，
    断言 5 文档齐备、WHAT→PROOF 交叉、落点文件存在、无 INDEX 外目录、DEPENDS ON ⊆ 骨架。
@@ -41,12 +41,14 @@ tests/      本包拥有的可执行 proof
    条款唯一性、引用解析、生命周期目录与废止路径静态门（spec-rules 的纯规则回归在
    `tests/spec-rules.test.mjs`）。
 3. `requirements/README.md`：46 包树入口导航（当前由 archive/docs/README.md 同构承接导航职责）。
+4. `tests/change-lifecycle.test.mjs`：WHAT-013/014/015 机器面（Active 原文冻结仍人工）。
 
 ## proof 概览
 
 ```text
 node --test requirements/requirement-system/tests/meta-verifier.test.mjs
 node --test requirements/requirement-system/tests/spec-rules.test.mjs
+node --test requirements/requirement-system/tests/change-lifecycle.test.mjs
 ```
 
 - meta-verifier 迁移中途红是预期（46 包未全落地）；两个 META 包自身的结构检查现在必须绿。

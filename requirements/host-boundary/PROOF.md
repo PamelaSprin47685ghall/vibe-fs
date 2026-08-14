@@ -14,7 +14,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | HOST-BOUNDARY-005 | REUSE `requirements/host-boundary/tests/reconcile-idle-early.test.mjs`（因果重读 ≤3、无第二信号恢复）；REUSE `requirements/structured-workflow/tests/reconcile-program.test.mjs` | REUSE | `node --test requirements/host-boundary/tests/reconcile-idle-early.test.mjs` |
 | HOST-BOUNDARY-006 | `tests/session-snapshot-locality.test.mjs` `HOST-004 keeps failed session tool state consistent across Parts and ToolParts`（failed 不进 ToolCall） | MOVE | `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-007 | `tests/host-capability-observation.test.mjs` `HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off` / `HOST_006_first_turn_probe_is_the_only_startup_verdict` / `HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once` | NEW | `node --test requirements/host-boundary/tests/host-capability-observation.test.mjs` |
-| HOST-BOUNDARY-008 | REUSE `tests/unit/review/*`（seal 绑定）+ `archive/docs/proof/host.md` canary（`ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun` journal 代理等式）；REUSE `requirements/participant-identity/tests/session-execution-binding.test.mjs`（发送边界拒绝漂移） | REUSE | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs` |
+| HOST-BOUNDARY-008 | NEW `tests/host010-run-id-equivalence.test.mjs`（bindableRun id ≡ ToolContext.messageID encoding；0/≥2 无合法 run id）；REUSE `requirements/review-assurance/tests/seal-bind.test.mjs`（四条件 fail-closed）；REUSE `requirements/host-boundary/tests/session-execution-binding.test.mjs`（发送边界拒绝漂移）；共时 Host 穿线仍由 Long Stroke 物理契约承担 | NEW + REUSE | `node --test requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs` |
 | HOST-BOUNDARY-009 | REUSE `requirements/host-boundary/tests/tool-host-codec.test.mjs`（HOST-011：ToolContext 无 user message id、双半边）；`tests/session-snapshot-locality.test.mjs` `TODO-004 rejects a call id observed in more than one persisted ToolPart`（缺一半边 → Ambiguous） | REUSE + MOVE | `node --test requirements/host-boundary/tests/tool-host-codec.test.mjs` / `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-010 | REUSE `requirements/host-boundary/tests/shared-state.test.mjs` `SHARED_dictionaries_are_live_singletons_shared_across_importers` / `SHARED_root_workspace_atom_round_trips_and_restores`（HOST-012 共享面；`SHARED_pending_seal_record...` 归 review-assurance） | REUSE | `node --test requirements/host-boundary/tests/shared-state.test.mjs` |
 | HOST-BOUNDARY-011 | `tests/host-message-projection.test.mjs`（HOST_016 全 7 锚点：reasoning/thinking/ellipsis/hash/untouched/sanitizeMessages） | MOVE | `node --test requirements/host-boundary/tests/host-message-projection.test.mjs` |
@@ -30,13 +30,12 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 
 ## GAP 记录
 
-- 聚合台账见 `requirements/GAP.md`（GAP-007/008）。
-- `HOST-BOUNDARY-008` 的 HOST-010 因果读 canary（`archive/docs/proof/host.md`「绑定与身份」）目前主要靠
-  review 家族 + journal 代理等式（REUSE），transform 内存 id ≡ ToolContext.messageID 的共时等价
-  由 e2e canary 承担（不在 unit 范围）——GAP 标记为「e2e 承担」，cutover 时若 e2e 不迁移则需补
-  unit oracle。
+- 聚合台账见 `requirements/GAP.md`（GAP-007 CLOSED / GAP-008 OPEN）。
+- `HOST-BOUNDARY-008`：unit encoding 由 `tests/host010-run-id-equivalence.test.mjs` 承接
+  （bindableRun id ≡ ToolContext.messageID；0/≥2 无合法 run id）。共时 Host 穿线是不可模拟
+  physical contract，由 Long Stroke 入口声明（VERIFICATION-SYSTEM-003），不另立 unit GAP。
 - `HOST-BOUNDARY-019` 的 Magic Todo membrane canaries（`archive/docs/proof/host.md` A..R）尚未落地实现
-  （`tests/unit/host/magic-todo-membrane-canary*.test.mjs` 不存在）——GAP：release gate 清单，
+  （`tests/unit/host/magic-todo-membrane-canary*.test.mjs` 不存在）——GAP-008：release gate 清单，
   由 obligation-ledger 团队 + host-boundary 的 H（定位）/A（时序）/C（原地 mutation）在实现后补。
 
 ## 反向覆盖（OWNED / NEEDS-SPLIT clause → 本包命题）
