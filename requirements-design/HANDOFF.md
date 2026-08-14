@@ -620,8 +620,10 @@ repository-investigation ≠ external-investigation
 packages = 45
 unknown dependency refs = []
 dependency cycles = []
-dependency edges = 90
+dependency edges = 87
 ```
+
+Phase E 删 3 条 coupling edge（`structured-workflow`→`causal-wait`、`time-capability`→`causal-wait`、`guidance-delivery`→`provider-projection`）；`finality`→`participant-horizon` 经审计保留。
 
 所以当前 hard dependency graph 无环。
 
@@ -1253,7 +1255,7 @@ extra_cards=[]
 boundary_failures=[]
 unknown_dependency_refs=[]
 dependency_cycles=[]
-dependency_edges=90
+dependency_edges=87
 DESIGN_CHECK: OK
 ```
 
@@ -1289,6 +1291,7 @@ CURRENT EVIDENCE
 - ~~没有完成 Source/runtime evidence~~ —— 已完成（Phase C），见 `requirements-design/EVIDENCE.md`：43 REAL + 2 META、0 THIN、0 FANTASY；无文档幻想包；
 - ~~没有完成 Test/gate reverse coverage~~ —— 已完成（Phase D），见 `requirements-design/PROOF-MAP.md` Phase D 节：24 gates + 35 test families 逐项标 KEEP/SPLIT/MECHANISM/DELETE；family 级 0 ORPHAN、3 missing oracle 待补；
 - ~~没有完成 changes/ 逆向~~ —— 已完成，见 `requirements-design/CHANGES-AUDIT.md`：36 份 completed 全部命中（27 EVIDENCE + 5 GARBAGE-mixed + 3 GARBAGE-pure + 1 HOW）、0 份升级为 authority、无新 ORPHAN；
+- ~~没有完成 dependency audit~~ —— 已完成（Phase E）：删 3 条 coupling edge（`structured-workflow`/`time-capability`→`causal-wait`、`guidance-delivery`→`provider-projection`），保留 `finality`→`participant-horizon`；INDEX 骨架重画为完整邻接清单，90→87 edges、0 cycle、0 unknown ref；
 - 没有最终确定 45 是最终数量；
 - 没有决定正式 package manifest schema；
 - 没有执行 normative cutover；

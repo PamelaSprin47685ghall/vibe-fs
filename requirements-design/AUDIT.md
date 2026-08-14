@@ -265,6 +265,24 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 - GARBAGE 沉积与 Phase A 一致：Student/Teacher 删除（3 份）、ChatGPT/review transcript（5 份）、absence ratchet。
 - Active（GrandRewrite / fork-attach）= in-flight，非历史；blockedForNow（fission / Steward / Sphinx-wiki）= DEFERRED / 不立包 / HOW，与 HANDOFF §10 三个 WATCH/DEFERRED 一一对应。
 
+## Phase E — Dependency audit（已完）
+
+逐 edge 问「semantic prerequisite vs implementation/presentation/proof coupling」。结论：90→87 edges、0 cycle、0 unknown ref（INDEX 骨架已重画为完整邻接清单）。
+
+### 删 3 条 coupling edge
+
+- `structured-workflow`→`causal-wait`：CE builder 是实现耦合；「observation 非权威」不依赖「无程序计数器」。
+- `time-capability`→`causal-wait`：deadline 是 wait 的可选 escape（条件依赖），非定义前提。
+- `guidance-delivery`→`provider-projection`：渲染是下游机制；delivery 的 occurrence/coverage/dedupe 语义不依赖 renderer。
+
+### 保留 1 条（Phase B 曾标 weak，经审计确认）
+
+- `finality`→`participant-horizon`：hidden terminal mechanism = 信息准入边界，与 `delegation`→`participant-horizon` 同型（都定义 provider-visible surface 的准入），是 semantic prerequisite 非 coupling。
+
+### 决议 AUDIT open question #1
+
+- `managed-session-lifecycle`→`crash-reconciliation` 保留：lifecycle 的 restart re-location 消费 crash-reconciliation 的「restart 从 durable facts，不猜」通用保证；方向正确，不需拆两个更窄 guarantee。
+
 ## Phase C — Source / runtime evidence（已完）
 
 逐包映射六证据轴（canonical type / wiring / Host boundary / resource / durable fact / failure path）。完整 ledger 见 `EVIDENCE.md`。

@@ -129,69 +129,63 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee（本骨架为示意；精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准，Phase E 统一重画）：
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是 Phase E 重画后的完整邻接清单（87 edges，0 cycle）。
 
 ```text
-requirement-system ──→ verification-system
-
-time-capability ──→ causal-wait
-structured-workflow ──→ causal-wait
-
-a participant life / session substrate
-session-ontology ──→ managed-session-lifecycle
-session-ontology ──→ participant-identity ──→ office-capability ──→ capability-enforcement
-
-participant-identity ─┬─→ cognitive-environment
-                      ├─→ interaction-authority
-                      └─→ provider-attempt-recovery
-office-capability ─────┼─→ action-affordance
-participant-horizon ───┼─→ action-affordance
-provider-language ─────┤
-participant-horizon ───┴─→ provider-projection
-office-capability ────────→ external-investigation
-participant-horizon ──────→ external-investigation
-host-boundary ────────────→ external-investigation
-
-durable-events ──→ effect-accounting ──→ dispatch-protocol
-durable-events ──→ durable-convergence
-interaction-authority ──→ dispatch-protocol
-host-boundary ──────────→ dispatch-protocol
-
-session-ontology ───────────────┐
-managed-session-lifecycle ──────┼─→ delegation
-office-capability ──────────────┘
-
-time-capability ──→ process-execution ──→ output-distillation
-
-durable-events ────────────────┐
-effect-accounting ─────────────┼─→ change-integration
-crash-reconciliation ──────────┘
-
-semantic-trace ──→ work-record
-semantic-trace ──→ context-compression ──→ prefix-stability
-context-compression ──→ work-record
-provider-language ───────────────────────→ prefix-stability
-provider-projection ─────────────────────→ prefix-stability
-
-durable-events ──→ crash-reconciliation
-provider-attempt-recovery ──→ degeneration-guard
-
-obligation-ledger ──────┐
-review-judgement ───────┼─→ review-assurance ──→ finality
-work-record ────────────┘
-
-behavior-diagnosis ──→ guidance-delivery
-participant-horizon ─→ guidance-delivery
-
-repository-investigation ──→ knowledge-reuse
-repository-investigation ──→ speculative-investigation
-participant-identity ──────→ speculative-investigation
-participant-horizon ───────→ speculative-investigation
-
-epistemic-reasoning 只依赖 participant-horizon；需要新事实时消费 evidence-acquisition contracts，不 hard-depend 某一种 acquisition package。
-
-distribution 依赖所有需要随 artifact 运行时读取的 package resources；
-这不赋予 distribution 对这些资源语义的 ownership。
+requirement-system       → 无
+verification-system      → requirement-system
+structured-workflow      → 无
+time-capability          → 无
+causal-wait              → 无
+session-ontology         → 无
+managed-session-lifecycle→ session-ontology, crash-reconciliation
+host-boundary            → 无
+participant-identity     → session-ontology
+office-capability        → participant-identity
+capability-enforcement   → office-capability, participant-identity
+participant-horizon      → 无
+cognitive-environment    → participant-identity, office-capability
+action-affordance        → office-capability, participant-horizon
+provider-language        → session-ontology
+provider-projection      → participant-horizon, provider-language
+external-investigation   → office-capability, participant-horizon, host-boundary
+interaction-authority    → participant-identity, session-ontology
+dispatch-protocol        → interaction-authority, effect-accounting, host-boundary, durable-events
+effect-accounting        → durable-events
+durable-events           → 无
+durable-convergence      → durable-events
+delegation               → office-capability, session-ontology, managed-session-lifecycle, participant-horizon
+process-execution        → time-capability, host-boundary, participant-horizon
+output-distillation      → process-execution, participant-horizon
+change-integration       → effect-accounting, durable-events, crash-reconciliation
+semantic-trace           → durable-events
+work-record              → semantic-trace, context-compression, participant-horizon
+context-compression      → semantic-trace, provider-projection
+prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
+provider-attempt-recovery→ participant-identity, interaction-authority
+crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
+degeneration-guard       → provider-attempt-recovery, host-boundary
+obligation-ledger        → durable-events, effect-accounting, semantic-trace
+review-judgement         → cognitive-environment, participant-horizon
+review-assurance         → review-judgement, semantic-trace, durable-events, causal-wait
+finality                 → obligation-ledger, review-assurance, participant-horizon
+behavior-diagnosis       → semantic-trace
+guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events
+repository-investigation → office-capability, participant-horizon
+knowledge-reuse          → repository-investigation, durable-events, durable-convergence
+repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon
+speculative-investigation→ repository-investigation, participant-identity, participant-horizon, provider-projection, semantic-trace
+epistemic-reasoning      → participant-horizon
+distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
 ```
 
-依赖方向仍需在全仓 proof projection 后做 cycle audit；任何 cycle 都必须解释为真正的共同语义，否则继续拆边界。
+Phase E 审计结论：3 条 coupling edge 已删（见 `AUDIT.md` Phase E）：
+
+```text
+structured-workflow  → causal-wait         删（CE builder 是实现耦合，非定义前提）
+time-capability      → causal-wait         删（deadline 是可选 escape，条件依赖非 hard）
+guidance-delivery    → provider-projection 删（渲染是下游机制）
+finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
+```
+
+其余 87 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。

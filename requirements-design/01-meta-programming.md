@@ -163,9 +163,8 @@ RED = 业务结果可能仅因 wall-clock 环境、测试运行速度或隐藏 t
 - crash recovery；process-local observation 可在重启后安全消失。
 - Host snapshot 的业务事实定义。
 
-**DEPENDS ON**
-- `structured-workflow`
-- `time-capability`（当等待需要 deadline 时）
+**DEPENDS ON**  
+无。wait 的 deadline 是可选 escape（需要时消费 `time-capability`），event-driven wake 不依赖 `structured-workflow`——都是消费关系，非定义前提（Phase E 已审计删除两条 hard edge）。
 
 **PROVIDES**
 - 可诊断但无 authority 的 wait abstraction。

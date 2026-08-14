@@ -48,7 +48,7 @@ DOES NOT OWN:
 - 当前 `main.md/enforcer.md` 物理布局。
 - interaction authority 的创建/继续权（`interaction-authority` 拥有）；delivery 只经 projection 进 horizon，不 mint authority。
 
-DEPENDS ON: `behavior-diagnosis`, `participant-horizon`, `provider-projection`, `durable-events`。
+DEPENDS ON: `behavior-diagnosis`, `participant-horizon`, `durable-events`。
 
 PROVIDES: 同一 diagnosis 在 durable history 与当前 participant horizon 之间的可恢复 delivery guarantee。
 
