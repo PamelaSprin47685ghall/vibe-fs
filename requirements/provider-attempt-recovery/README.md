@@ -29,9 +29,9 @@
 ## Proof 概览
 
 `PROOF.md` 给出每条命题的测试落点：
-- MOVE：`tests/cursor.test.mjs`（原 `tests/unit/fallback/cursor.test.mjs`，34 断言）
+- MOVE：`tests/cursor.test.mjs`（原 `requirements/provider-attempt-recovery/tests/cursor.test.mjs`，34 断言）
 - NEW：`tests/fallback-ledger.test.mjs`（4 断言：NoActiveRun / 去重 / admission）
-- REUSE：`tests/unit/context/recovery-slot.test.mjs`（FALLBACK-008/011/012）、
+- REUSE：`requirements/context-compression/tests/recovery-slot.test.mjs`（FALLBACK-008/011/012）、
   `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（FALLBACK-013）、
   `tests/unit/invariants/prompt-stability.test.mjs`（FALLBACK-014）等，均含 SPLIT@cutover 计划
 

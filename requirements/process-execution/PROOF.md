@@ -9,7 +9,7 @@
 | PROC-005 Process Request 类型化；无效 estimate 拒绝 | `tests/unit/process/process-runner.test.mjs`（`EXEC_011_rejects_nan_runtime_estimate`、`EXEC_011_rejects_zero_and_negative_runtime_estimate`、`EXEC_011_rejects_negative_output_estimate`）；`tests/unit/tools/executor-tool.test.mjs`（`RUN_non_positive_deadline_is_rejected`、`RUN_invalid_output_budget_is_rejected`） | REUSE | `node --test tests/unit/process/process-runner.test.mjs tests/unit/tools/executor-tool.test.mjs` |
 | PROC-006 cancellation 收束资源 | `tests/unit/execution/process-wait.test.mjs` `EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit` | REUSE | `node --test tests/unit/execution/process-wait.test.mjs` |
 | PROC-007 continuing process ≠ one-shot | anchor `continuing-process`（devops 组）；`tests/pty-port.test.mjs` `PORT_close_requests_terminate_but_keeps_the_session_live`、`PORT_close_all_escalates_to_kill_after_grace` | MOVE | `node --test requirements/process-execution/tests/pty-port.test.mjs` |
-| PROC-008 完成事实双通道 | `tests/unit/execution/join-v2-mailbox.test.mjs` `EXEC_018_drain_available_returns_two_completions_in_publish_order`（PTY 队列 FIFO）；`tests/unit/session/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT：hidden handle→`managed-session-lifecycle`） | REUSE | `node --test tests/unit/execution/join-v2-mailbox.test.mjs` |
+| PROC-008 完成事实双通道 | `tests/unit/execution/join-v2-mailbox.test.mjs` `EXEC_018_drain_available_returns_two_completions_in_publish_order`（PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT：hidden handle→`managed-session-lifecycle`） | REUSE | `node --test tests/unit/execution/join-v2-mailbox.test.mjs` |
 | PROC-009 物理输出捕获有界；spool 是蒸馏输入 | `tests/unit/process/process-output.test.mjs`（`EXEC_011_collector_spools_when_byte_count_crosses_threshold`、`EXEC_011_collector_spool_accumulates_later_chunks`、`EXEC_011_spool_chunk_count_rounds_up`、`EXEC_011_spool_round_trips_bytes_through_temp_file`）；`tests/pty-session.test.mjs`（session 记录形状） | MOVE+REUSE | `node --test requirements/process-execution/tests/pty-session.test.mjs tests/unit/process/process-output.test.mjs` |
 | PROC-010 terminal/run 完成 = exit_code + 输出 | `tests/unit/execution/join-v2-wire.test.mjs` `EXEC_004_pty_completion_is_natural_language_plus_exit_code`；`tests/unit/tools/executor-tool.test.mjs` `RUN_completed_command_reports_exit_code_and_streams`、`RUN_nonzero_exit_is_reported_not_thrown` | REUSE | `node --test tests/unit/execution/join-v2-wire.test.mjs tests/unit/tools/executor-tool.test.mjs` |
 | PROC-011 run 是 DevOps 有界执行 | `tests/unit/tools/executor-tool.test.mjs`（`RUN_spec_exposes_command_and_budget_arguments`、`RUN_missing_command_is_rejected_before_spawn`、`RUN_blank_command_is_rejected_before_spawn`、`RUN_deadline_overrun_returns_the_fixed_timeout_consequence`、`RUN_world_lock_is_accepted`） | REUSE | `node --test tests/unit/tools/executor-tool.test.mjs` |
@@ -18,11 +18,11 @@
 
 | 源 | 目标 | 结果 |
 |----|------|------|
-| `tests/unit/process/pty-types.test.mjs` | `requirements/process-execution/tests/pty-types.test.mjs` | `node --test` 绿 |
-| `tests/unit/process/pty-api.test.mjs` | `requirements/process-execution/tests/pty-api.test.mjs` | `node --test` 绿 |
-| `tests/unit/process/pty-backend.test.mjs` | `requirements/process-execution/tests/pty-backend.test.mjs` | `node --test` 绿 |
-| `tests/unit/process/pty-port.test.mjs` | `requirements/process-execution/tests/pty-port.test.mjs` | `node --test` 绿 |
-| `tests/unit/process/pty-session.test.mjs` | `requirements/process-execution/tests/pty-session.test.mjs` | `node --test` 绿 |
+| `requirements/process-execution/tests/pty-types.test.mjs` | `requirements/process-execution/tests/pty-types.test.mjs` | `node --test` 绿 |
+| `requirements/process-execution/tests/pty-api.test.mjs` | `requirements/process-execution/tests/pty-api.test.mjs` | `node --test` 绿 |
+| `requirements/process-execution/tests/pty-backend.test.mjs` | `requirements/process-execution/tests/pty-backend.test.mjs` | `node --test` 绿 |
+| `requirements/process-execution/tests/pty-port.test.mjs` | `requirements/process-execution/tests/pty-port.test.mjs` | `node --test` 绿 |
+| `requirements/process-execution/tests/pty-session.test.mjs` | `requirements/process-execution/tests/pty-session.test.mjs` | `node --test` 绿 |
 
 （5 文件合计 69 断言全绿；import 深度已适配为 `../../../tests/unit/support` + `../../../dist`。）
 
@@ -38,7 +38,7 @@
 - `tests/unit/process/large-gate.test.mjs`：整文件 → `output-distillation`（EXEC-013）。
 - `tests/unit/execution/process-wait.test.mjs`：等待/退出断言归本包；deadline 分支 → `time-capability`。
 - `tests/unit/tools/executor-tool.test.mjs`：RUN_* 语义归本包；tool spec/registry → `capability-enforcement`。
-- `tests/unit/session/distiller-ownership.test.mjs`：Distiller 定向等待（AwaitAgentWithPermit）归本包
+- `requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`：Distiller 定向等待（AwaitAgentWithPermit）归本包
   交叉；`HostOwnedHidden` handle → `managed-session-lifecycle`；Assignment 不进工具面 →
   `participant-horizon`。
 

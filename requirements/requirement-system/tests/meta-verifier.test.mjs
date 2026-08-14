@@ -132,28 +132,55 @@ const propositionIds = (pkg) => {
 }
 
 /**
- * PROOF.md 中命中该命题 ID 的行。行首格接受两种形式（按包名 + ID 交叉检查）：
- * 完整 ID（`| REQUIREMENT-SYSTEM-001 |`）或裸编号（`| 001 |`，在该包自己的
- * 落点表内无歧义）。
+ * PROOF.md 中命中该命题 ID 的行。ID 可出现在行首格或第二格，接受多种形式：
+ * 完整 ID（`| REQUIREMENT-SYSTEM-001 |`、第二格 `DISPATCH-PROTOCOL-002/003`）、
+ * 裸编号（`| 006/007 |`，仅行首格，避免与测试锚点里的三位数字误配）。
  */
 const proofRowsFor = (pkg, id) => {
   const text = read(join(REQUIREMENTS, pkg, 'PROOF.md'))
-  const full = new RegExp(`\\|\\s*${id}\\b`)
-  const bare = new RegExp(`\\|\\s*${id.slice(-3)}\\s*\\|`)
+  const full = new RegExp(`\\b${id}\\b`)
+  const bare = new RegExp(`\\b${id.slice(-3)}\\b`)
+  // 第二格可能携带合并 ID 列表（`DISPATCH-PROTOCOL-002/003`、`005/006/010`），
+  // 按分隔符切 token 后逐 token 匹配；锚点里的 `_015_` 不产生词边界，不会误配。
+  const idTokens = (cell) => cell.split(/[\s/,–—]+/).filter(Boolean)
   const rows = []
   for (const line of text.split('\n')) {
-    if (line.startsWith('|') && (full.test(line) || bare.test(line))) rows.push(line)
+    if (!line.startsWith('|')) continue
+    const cells = line.split('|')
+    const cell1 = cells[1] ?? ''
+    const cell2 = cells[2] ?? ''
+    if (full.test(cell1) || bare.test(cell1)) {
+      rows.push(line)
+      continue
+    }
+    for (const token of idTokens(cell2)) {
+      if (full.test(token) || bare.test(token)) {
+        rows.push(line)
+        break
+      }
+    }
   }
   return rows
 }
 
-/** PROOF.md 落点单元格里的测试文件 token（requirements/|tests/|scripts/ 下）。 */
+/** 解析落点单元格里的测试文件 token（包内 `tests/…`、仓库 `tests/unit|eval|integration|e2e/…`、`requirements/…`、`scripts/…`）。 */
 const landingFileTokens = (row) => {
   const cells = row.split('|').map((cell) => cell.trim())
   const landing = cells[2] ?? ''
   return [...landing.matchAll(/(?:requirements\/|tests\/|scripts\/)[\w./-]+\.(?:test\.mjs|mjs)/g)].map(
     (m) => m[0],
   )
+}
+
+/** 落点 token 解析：包内 `tests/…` 相对本包目录；`tests/{unit,eval,integration,e2e}/…`、`requirements/…`、`scripts/…` 相对仓库根。 */
+const resolveLanding = (pkg, token) => {
+  const repo = join(ROOT, token)
+  if (existsSync(repo)) return repo
+  if (token.startsWith('tests/')) {
+    const local = join(REQUIREMENTS, pkg, token)
+    if (existsSync(local)) return local
+  }
+  return repo
 }
 
 /** 对单个「已迁移」包跑全部结构检查，返回失败消息数组。 */
@@ -176,7 +203,8 @@ const structuralFailures = (pkg, allNames, skeleton) => {
   for (const line of proofText.split('\n')) {
     if (!line.startsWith('|')) continue
     for (const token of landingFileTokens(line)) {
-      if (!existsSync(join(ROOT, token))) {
+      const resolved = resolveLanding(pkg, token)
+      if (!existsSync(resolved)) {
         failures.push(`${pkg}: PROOF landing file missing: ${token}`)
       }
     }

@@ -3,7 +3,7 @@
 ## 运行方式
 
 ```bash
-node --test requirements/dispatch-protocol/tests/fire-and-forget.test.mjs   # MOVE（原 tests/unit/prompt/fire-and-forget.test.mjs）
+node --test requirements/dispatch-protocol/tests/fire-and-forget.test.mjs   # MOVE（原 requirements/dispatch-protocol/tests/fire-and-forget.test.mjs）
 node --test requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs  # NEW
 node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs  # NEW
 # 全量：node tests/unit/run.mjs（自动包含 requirements/**/tests/*.test.mjs）
@@ -13,7 +13,7 @@ node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs  
 
 | 命题 | 落点测试（文件 + test 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
-| R1 | DISPATCH-PROTOCOL-002/003 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::DP_002_submit_records_the_receipt_without_resolving_the_claim` + `DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone` + `DP_002_claim_records_payload_digest_and_effective_agent` | NEW | `node --test requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
+| R1 | DISPATCH-PROTOCOL-002/003/004 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::DP_002_submit_records_the_receipt_without_resolving_the_claim` + `DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone` + `DP_002_claim_records_payload_digest_and_effective_agent` + `DP_003_receipt_shape_distinguishes_admission_from_physical_identity`（`accepted-*` 只是 admission，`msg_*` 才是物理证据；recovery 侧见 R4 `DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message`） | NEW | `node --test requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | R2 | DISPATCH-PROTOCOL-005/006/010 | `claim-lifecycle.test.mjs::DP_005_prompt_key_is_deterministic_and_moves_with_every_component` + `DP_005_claim_scope_names_exactly_session_run_origin_and_payload` + `DP_010_authority_root_profile_cannot_express_a_model` | NEW | 同上 |
 | R3 | DISPATCH-PROTOCOL-006 | `claim-lifecycle.test.mjs::DP_006_claim_sequence_advances_on_registration_not_on_resolution` + `DP_007_recovery_budget_is_folded_from_plugin_starts_not_written` | NEW | 同上 |
 | R4 | DISPATCH-PROTOCOL-007/008 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message`（StillPending 保持 + 绝不重发 + Proven）+ `DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending`（GaveUp） | NEW | `node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |

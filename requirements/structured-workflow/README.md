@@ -49,8 +49,8 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
 
 ## proof 概览（见 PROOF.md）
 
-- MOVE（3 文件，已单跑绿）：`tests/unit/verify/direct-ce-contract.test.mjs`、
-  `tests/unit/kernel/parallel.test.mjs`、`tests/unit/domain/reconcile-program.test.mjs`
+- MOVE（3 文件，已单跑绿）：`requirements/structured-workflow/tests/direct-ce-contract.test.mjs`、
+  `requirements/structured-workflow/tests/parallel.test.mjs`、`requirements/structured-workflow/tests/reconcile-program.test.mjs`
   → `requirements/structured-workflow/tests/`
 - NEW（3 文件，已单跑绿）：`workflow-surface.test.mjs`、`recovery-reentry.test.mjs`、
   `semantic-vocabulary.test.mjs`

@@ -32,8 +32,8 @@ GAP：    0
 
 | 源 | 目标 | 断言数 | 单跑结果 |
 |---|---|---|---|
-| `tests/unit/agent/repository-warm-start.test.mjs` | `requirements/repository-investigation/tests/repository-warm-start.test.mjs` | 6 pass | 绿 |
-| `tests/unit/agent/semble-mcp.test.mjs` | `requirements/repository-investigation/tests/semble-mcp.test.mjs` | 6 pass | 绿 |
+| `requirements/repository-investigation/tests/repository-warm-start.test.mjs` | `requirements/repository-investigation/tests/repository-warm-start.test.mjs` | 6 pass | 绿 |
+| `requirements/repository-investigation/tests/semble-mcp.test.mjs` | `requirements/repository-investigation/tests/semble-mcp.test.mjs` | 6 pass | 绿 |
 | （NEW） | `requirements/repository-investigation/tests/investigation-resource-laws.test.mjs` | 4 pass | 绿 |
 
 适配说明：`../support/domain.mjs` → `../../../tests/unit/support/domain.mjs`；`semble-mcp.test.mjs` 的 fixture 路径 `../support/semble-mcp-fixture.js` → `../../../tests/unit/support/semble-mcp-fixture.js`。无 `dist/fable_modules` 直接 import。
@@ -52,6 +52,6 @@ causal-readonly / existing-fact / evidence-funnel / locatability / no-invented-c
 
 | 现有文件 | 当前 owner 混合 | cutover 动作 |
 |---|---|---|
-| `tests/unit/agent/repository-warm-start.test.mjs` / `semble-mcp.test.mjs`（已移入本包） | 本包（低信任 orientation/evidence 边界）+ `knowledge-reuse`（AGENT-032 hit 复用交叉）+ `host-boundary`（launch 判定 HOW） | 已 **MOVE**；launch 判定断言属 HOW（本包测试保留，作为当前实现 proof） |
+| `requirements/repository-investigation/tests/repository-warm-start.test.mjs` / `semble-mcp.test.mjs`（已移入本包） | 本包（低信任 orientation/evidence 边界）+ `knowledge-reuse`（AGENT-032 hit 复用交叉）+ `host-boundary`（launch 判定 HOW） | 已 **MOVE**；launch 判定断言属 HOW（本包测试保留，作为当前实现 proof） |
 | `tests/unit/agent/inquiry-permissions.test.mjs` | `capability-enforcement`（Inquiry 工具面 gate）+ 本包（reasoning 不取证，REPOSITORY-INVESTIGATION-003 交叉） | 留在 `capability-enforcement`；本包 PROOF 只引用（REUSE） |
 | `tests/unit/agent/` 其余（catalog/sphinx-mcp/stealth-browser-mcp） | `participant-identity`（catalog）/`epistemic-reasoning`（sphinx MCP）/`external-investigation`（browser） | 归各自 owner；不在本包范围 |

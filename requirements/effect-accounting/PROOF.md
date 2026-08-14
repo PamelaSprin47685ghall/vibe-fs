@@ -52,7 +52,7 @@ node tests/unit/run.mjs                                                  # 全�
 2. `tests/unit/verify/p0-recovery-join-gate.test.mjs` + `scripts/checks/p0-recovery-join.mjs`：
    共享 checker；按规则 id 拆分——A 组（aborted≠terminal）归本包，B 组（recovery）归
    `crash-reconciliation`。cutover 时拆成两个 oracle，各自留在 owner 包。
-3. `tests/unit/execution/join-aborted-race.test.mjs` / `join-recovery-crash-matrix.test.mjs`：
+3. `requirements/crash-reconciliation/tests/join-aborted-race.test.mjs` / `join-recovery-crash-matrix.test.mjs`：
    已由 `crash-reconciliation` 迁移；其 aborted≠terminal 断言与 EA-007 交叉，按
    「恢复矩阵归 crash、false-finality 律归本包」互不复制命题。
 4. `requirements/change-integration/tests/job.test.mjs` PERSIST-009 小节、

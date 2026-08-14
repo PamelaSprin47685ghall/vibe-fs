@@ -31,7 +31,7 @@ provider cache 与认知连续性依赖「已呈现的过去不会无故重排�
 
 ## proof 概览（→ PROOF.md）
 
-- MOVE：`tests/unit/context/prefix-epoch.test.mjs` → `requirements/prefix-stability/tests/`
+- MOVE：`requirements/prefix-stability/tests/prefix-epoch.test.mjs` → `requirements/prefix-stability/tests/`
 - REUSE：`tests/unit/invariants/prompt-stability.test.mjs`（byte invariants）、
   `tests/unit/host/pair-thought-anchored.test.mjs`（HOST-013 前缀律端到端）、
   `tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs`（PREFIX LAW on reused child）

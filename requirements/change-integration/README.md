@@ -28,7 +28,7 @@ Accepted/Published（effect-accounting 边界）。详见 HOW.md。
 - 包内（MOVE）：`tests/integration-gate.test.mjs`、`tests/git-operations.test.mjs`、
   `tests/worktree-resource.test.mjs`、`tests/job.test.mjs`（合计 74 断言）。
 - REUSE（SPLIT@cutover）：`tests/unit/orchestrator/{host,runtime}.test.mjs`、
-  `tests/unit/git/hook-dispatcher.test.mjs`（store ref → `durable-events`）。
+  `requirements/durable-events/tests/hook-dispatcher.test.mjs`（store ref → `durable-events`）。
 - Semantic anchors（`scripts/checks/semantic-anchors.mjs`）拥有 orchestrator 组 `shared-gate`、
   `host-vs-orchestrator`。
 

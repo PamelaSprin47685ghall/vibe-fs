@@ -95,5 +95,5 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
   domain contracts 不变」是本包可独立变化点。
 - **各 domain 的恢复规则**（ORCH-007、magic-todo settle、managed-session replacement、
   publish reconcile）：归各 domain owner，本包只引用为本地应用示例。
-- **recoveryAction 的领域语义**（`tests/unit/orchestrator/job.test.mjs`）：归
+- **recoveryAction 的领域语义**（`requirements/change-integration/tests/job.test.mjs`）：归
   `change-integration`；本包 REUSE 其「从最后事实决定唯一动作」作为 CRASH-002 的域内实例。

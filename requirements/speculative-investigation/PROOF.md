@@ -24,7 +24,7 @@
 
 补充 REUSE 交叉引用（非本包命题落点，供追踪）：
 
-- `tests/unit/verify/session-ownership-ratchet.test.mjs`（`| StrengthReplica` 为允许 kind；
+- `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs`（`| StrengthReplica` 为允许 kind；
   StrengthReplica 是 `InternalLeaf × Attached` 的机械证明）→ owner `session-ontology`。
 - `tests/unit/verify/student-teacher-absence.test.mjs`（`| StrengthReplica` token absence ratchet）→
   GARBAGE ratchet，owner `session-ontology`。

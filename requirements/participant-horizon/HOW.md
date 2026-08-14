@@ -14,7 +14,7 @@
 | 008 | `Application/Reconciliation/CompanionTransform.fs`（`ProviderWireCapture.decodeMessageView |> ProviderProjection.toSemantic`）：wire→semantic 单向降级丢弃 call id | 语义投影只保留「交换意味着什么」，不留机器身份（provider-projection 消费） |
 | 009 | `Infrastructure/OpenCode/Tools/ForkTool.fs`（generic unavailable 文案）；`tests/unit/tools/fork-tool.test.mjs` | GLORY-032 |
 | 011 | `Infrastructure/OpenCode/Tools/HorizonTool.fs`（pull-only；名册按 Byname；最新 BlogFrame） | EXEC-005 |
-| 012/013 | `Session/RepositoryWarmStartPrompt.fs`（`RepositoryWarmStartSearch`）；`tests/unit/agent/repository-warm-start.test.mjs` | 准入 + data 标注 |
+| 012/013 | `Session/RepositoryWarmStartPrompt.fs`（`RepositoryWarmStartSearch`）；`requirements/repository-investigation/tests/repository-warm-start.test.mjs` | 准入 + data 标注 |
 
 ## 关键机制：Gate B 是反向 enforcement，不是正向律
 

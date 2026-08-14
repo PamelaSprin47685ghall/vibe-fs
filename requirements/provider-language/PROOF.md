@@ -12,7 +12,7 @@
 | PROVIDER-LANGUAGE-002（bind-once 不可变 + 异值 fail-closed） | 同上 `HOST_026_SessionProviderLanguage_bind_once_and_inherit`（同值 Ok、异值 `already bound` Error） | MOVE | 同上 |
 | PROVIDER-LANGUAGE-003（child 继承，不重读全局） | 同上 `HOST_026_SessionProviderLanguage_bind_once_and_inherit`（`inheritFromOwner` → child `tryGet` = owner 语言） | MOVE | 同上 |
 | PROVIDER-LANGUAGE-004（全局偏好只影响未来 session） | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs` `preference_change_only_affects_future_sessions`（NEW：绑定后改全局，旧 session 不变、新 session 取新值） | NEW | `node --test requirements/provider-language/tests/provider-prose-and-preference.test.mjs` |
-| PROVIDER-LANGUAGE-005（Class A/B/C 分类） | REUSE `tests/unit/verify/provider-prose-ownership.test.mjs` `gate_e_red_fixture_counts_english_and_chinese`（Class A 命中）+ `gate_e_heuristic_excludes_paths_and_identifiers`（Class B 路径/标识排除）；REUSE `tests/unit/verify/language-parity-gate.test.mjs` `ac20_identifier_parity_mismatch_reports_semantic_and_diff`（Class B 标识必须同形） | MOVE + REUSE | 见各文件行 |
+| PROVIDER-LANGUAGE-005（Class A/B/C 分类） | REUSE `requirements/provider-language/tests/provider-prose-ownership.test.mjs` `gate_e_red_fixture_counts_english_and_chinese`（Class A 命中）+ `gate_e_heuristic_excludes_paths_and_identifiers`（Class B 路径/标识排除）；REUSE `tests/unit/verify/language-parity-gate.test.mjs` `ac20_identifier_parity_mismatch_reports_semantic_and_diff`（Class B 标识必须同形） | MOVE + REUSE | 见各文件行 |
 | PROVIDER-LANGUAGE-006（locale 成对 + bound fail-closed） | REUSE `tests/unit/verify/language-parity-gate.test.mjs` `gate_c_parity_detects_missing_zh_cn` / `gate_c_parity_detects_missing_en` / `gate_c_repo_scan_is_green`；NEW `requirements/provider-language/tests/provider-prose-and-preference.test.mjs` `require_language_pair_fails_closed_on_missing_path` | REUSE + NEW | 见各文件行 |
 | PROVIDER-LANGUAGE-007（placeholder parity + 填值不译 + 未替换 fail-closed） | REUSE `tests/unit/verify/language-parity-gate.test.mjs` `gate_c_placeholder_parity_equal_sets_pass` / `gate_c_placeholder_parity_mismatch_reports_diff` / `gate_c_extract_placeholders`；NEW `provider-prose-and-preference.test.mjs` `substitute_replaces_values_and_fails_closed` | REUSE + NEW | 见各文件行 |
 | PROVIDER-LANGUAGE-008（tool prose 与 session 语言一致） | REUSE `tests/unit/verify/language-parity-gate.test.mjs` `gate_c_repo_scan_is_green`（全 semantic 面成对）+ MOVE `provider-language.test.mjs` `PROMPT_017_provider_resource_language_roots_present`（lang → locale leaf 装载映射） | REUSE + MOVE | 见各文件行 |
@@ -24,8 +24,8 @@
 
 | 源 → 目标 | 适配 | 验证 |
 |---|---|---|
-| `tests/unit/prompt/provider-language.test.mjs` → `requirements/provider-language/tests/provider-language.test.mjs` | `../support/domain.mjs` → `../../../tests/unit/support/domain.mjs` | `node --test` 4/4 绿 |
-| `tests/unit/verify/provider-prose-ownership.test.mjs` → `requirements/provider-language/tests/provider-prose-ownership.test.mjs` | import 深度不变（同级） | `node --test` 8/8 绿 |
+| `requirements/provider-language/tests/provider-language.test.mjs` → `requirements/provider-language/tests/provider-language.test.mjs` | `../support/domain.mjs` → `../../../tests/unit/support/domain.mjs` | `node --test` 4/4 绿 |
+| `requirements/provider-language/tests/provider-prose-ownership.test.mjs` → `requirements/provider-language/tests/provider-prose-ownership.test.mjs` | import 深度不变（同级） | `node --test` 8/8 绿 |
 
 ## SPLIT@cutover（REUSE 项拆 owner 计划）
 

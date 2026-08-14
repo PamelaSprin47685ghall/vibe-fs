@@ -39,5 +39,5 @@ ROLE_SEMANTIC_ANCHORS / TOOL_DESCRIPTION_ANCHORS / OFFICE_CAPABILITY_ANCHORS，
 - `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`、
   `enforcer-cycle-commit-branches.test.mjs`：convergence 生命周期部分随
   `context-compression` 迁移；本包锚点（BD-012/013/017）随文件迁移后更新路径。
-- `tests/unit/enforcer/observation-pair.test.mjs` 已在本轮 MOVE（fable-library
+- `requirements/behavior-diagnosis/tests/observation-pair.test.mjs` 已在本轮 MOVE（fable-library
   直连 import 已改为 support `toList`，test-boundary baseline 相应减 1 条）。

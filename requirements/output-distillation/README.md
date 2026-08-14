@@ -26,7 +26,7 @@
 
 - 包内（MOVE）：`tests/executor-summarize.test.mjs`（9 断言）；`tests/distiller-fragment-humility.test.mjs`（NEW，Oracle 2，1 断言）。
 - REUSE（SPLIT@cutover）：`tests/unit/process/large-gate.test.mjs`、`tests/unit/process/process-runner.test.mjs`
-  （gate 断言）、`tests/unit/session/distiller-ownership.test.mjs`、`tests/unit/plugin/tool-host-codec-full.test.mjs`
+  （gate 断言）、`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`、`tests/unit/plugin/tool-host-codec-full.test.mjs`
   （ToolResultBound 面）。
 - Semantic anchors（`scripts/checks/semantic-anchors.mjs`）拥有 distiller 组全部 5 个：`distinguishing` /
   `fragment-humility` / `merge-conflicts` / `locatable-to-unseen-reader` / `no-invented-causality`。

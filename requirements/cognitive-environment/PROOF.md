@@ -16,7 +16,7 @@
 | 006/007 | `tests/cognitive-environment.test.mjs::CE_prompt_016_library_ingress_teaches_knowledge_not_authority` | NEW | 同上 |
 | 008/009 | `tests/cognitive-environment.test.mjs::CE_prompt_016_office_library_closing_keeps_books_subordinate_to_assignment`（书从属于 assignment）；`CE_role_law_cognition_anchors_present_in_both_locales`（内容义务） | NEW | 同上 |
 | 010 | REUSE：`tests/unit/verify/language-parity-gate.test.mjs::gate_c_repo_scan_is_green`（lifecycle 资源成对，机制面）；语义面由 lifecycle 资源本身承载（无独立 runtime oracle） | REUSE | `node --test tests/unit/verify/language-parity-gate.test.mjs` |
-| 011 | REUSE：`tests/unit/prompt/session-persona.test.mjs::FALLBACK_014_system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 面归 `participant-identity`；本包取「身份由 office 决定」认知面）；`tests/unit/verify/provider-prose-ownership.test.mjs`（prose 不散落） | REUSE | `node --test tests/unit/prompt/session-persona.test.mjs` |
+| 011 | REUSE：`requirements/participant-identity/tests/session-persona.test.mjs::FALLBACK_014_system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 面归 `participant-identity`；本包取「身份由 office 决定」认知面）；`requirements/provider-language/tests/provider-prose-ownership.test.mjs`（prose 不散落） | REUSE | `node --test requirements/participant-identity/tests/session-persona.test.mjs` |
 | 012 | REUSE：`tests/unit/resources/prompt-semantic-depth.test.mjs::PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model`（Kernel self-model 面归 `epistemic-reasoning`）；Reviewer prompt 组合面由 `resources/provider/role/reviewer/*` 承载，无独立 runtime oracle | REUSE | `node --test tests/unit/resources/prompt-semantic-depth.test.mjs` |
 | 013 | `tests/cognitive-environment.test.mjs::CE_agent_031_pair_hint_teaches_needhelp_as_normal_collaboration` + `CE_pair_hint_teaches_parallel_wave_without_global_concurrency_number`；REUSE：`tests/unit/host/pair-thought-transform.test.mjs::PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N`（SPLIT@cutover：正文 craft → 本包；anchor/replay 机制 → `prefix-stability`/`provider-projection`） | NEW + REUSE | `node --test tests/unit/host/pair-thought-transform.test.mjs` |
 
@@ -40,7 +40,7 @@ tests/unit/verify/language-parity-gate.test.mjs
     → provider-language（结构 parity）+ office-capability（Gate F）+ action-affordance（tool anchors）+ 本包（role-law anchor parity）
 tests/unit/host/pair-thought-transform.test.mjs
     → 本包（PAIR_HINT_canonical_text...）+ prefix-stability + provider-projection
-tests/unit/prompt/session-persona.test.mjs
+requirements/participant-identity/tests/session-persona.test.mjs
     → participant-identity（FALLBACK_014）+ provider-language（bind-once）
 ```
 

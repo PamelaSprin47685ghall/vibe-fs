@@ -20,10 +20,10 @@
 
 | 源 | 目标 | 结果 |
 |----|------|------|
-| `tests/unit/git/integration-gate.test.mjs` | `requirements/change-integration/tests/integration-gate.test.mjs` | `node --test` 绿 |
-| `tests/unit/git/git-operations.test.mjs` | `requirements/change-integration/tests/git-operations.test.mjs` | `node --test` 绿 |
-| `tests/unit/git/worktree-resource.test.mjs` | `requirements/change-integration/tests/worktree-resource.test.mjs` | `node --test` 绿 |
-| `tests/unit/orchestrator/job.test.mjs` | `requirements/change-integration/tests/job.test.mjs` | `node --test` 绿 |
+| `requirements/change-integration/tests/integration-gate.test.mjs` | `requirements/change-integration/tests/integration-gate.test.mjs` | `node --test` 绿 |
+| `requirements/change-integration/tests/git-operations.test.mjs` | `requirements/change-integration/tests/git-operations.test.mjs` | `node --test` 绿 |
+| `requirements/change-integration/tests/worktree-resource.test.mjs` | `requirements/change-integration/tests/worktree-resource.test.mjs` | `node --test` 绿 |
+| `requirements/change-integration/tests/job.test.mjs` | `requirements/change-integration/tests/job.test.mjs` | `node --test` 绿 |
 
 （4 文件合计 74 断言全绿；import 深度已适配为 `../../../tests/unit/support` + `../../../dist`。）
 
@@ -34,7 +34,7 @@
   `managed-session-lifecycle`。
 - `tests/unit/orchestrator/runtime.test.mjs`：`NeedsReview` 保留 worktree 断言归本包；PERSIST-009
   事实顺序断言 → `effect-accounting`；恢复 → `crash-reconciliation`。
-- `tests/unit/git/hook-dispatcher.test.mjs`：整文件 → `durable-events`（store ref 的 pre-push /
+- `requirements/durable-events/tests/hook-dispatcher.test.mjs`：整文件 → `durable-events`（store ref 的 pre-push /
   reference-transaction hooks，非本包发布面）。
 - `tests/unit/execution/` join-recovery 系列：Orchestrator 恢复交叉断言 → `crash-reconciliation`
   （本包引用其 fold 结果，不复制命题）。

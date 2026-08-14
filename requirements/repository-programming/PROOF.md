@@ -44,17 +44,17 @@ GAP：    0
 
 | 源 | 目标 | 断言数 | 单跑结果 |
 |---|---|---|---|
-| `tests/unit/js-tools/js-surface.test.mjs` | `requirements/repository-programming/tests/js-surface.test.mjs` | 14 pass | `node --test` 绿 |
-| `tests/unit/js-tools/js-bindings.test.mjs` | `requirements/repository-programming/tests/js-bindings.test.mjs` | 7 pass | 绿 |
-| `tests/unit/js-tools/js-sandbox.test.mjs` | `requirements/repository-programming/tests/js-sandbox.test.mjs` | 8 pass | 绿 |
-| `tests/unit/js-tools/js-anchors.test.mjs` | `requirements/repository-programming/tests/js-anchors.test.mjs` | 3 pass | 绿 |
-| `tests/unit/js-tools/js-tools-fs.test.mjs` | `requirements/repository-programming/tests/js-tools-fs.test.mjs` | 10 pass | 绿 |
-| `tests/unit/js-tools/js-transaction.test.mjs` | `requirements/repository-programming/tests/js-transaction.test.mjs` | 5 pass | 绿 |
-| `tests/unit/js-tools/js-tools-transaction-store.test.mjs` | `requirements/repository-programming/tests/js-tools-transaction-store.test.mjs` | 4 pass | 绿 |
-| `tests/unit/js-tools/js-workflow.test.mjs` | `requirements/repository-programming/tests/js-workflow.test.mjs` | 14 pass | 绿 |
-| `tests/unit/js-tools/js-tool-host.test.mjs` | `requirements/repository-programming/tests/js-tool-host.test.mjs` | 3 pass | 绿 |
-| `tests/unit/tools/file-mutation-tools.test.mjs` | `requirements/repository-programming/tests/file-mutation-tools.test.mjs` | 11 pass | 绿 |
-| `tests/unit/verify/js-surface-gate.test.mjs` | `requirements/repository-programming/tests/js-surface-gate.test.mjs` | 3 pass | 绿 |
+| `requirements/repository-programming/tests/js-surface.test.mjs` | `requirements/repository-programming/tests/js-surface.test.mjs` | 14 pass | `node --test` 绿 |
+| `requirements/repository-programming/tests/js-bindings.test.mjs` | `requirements/repository-programming/tests/js-bindings.test.mjs` | 7 pass | 绿 |
+| `requirements/repository-programming/tests/js-sandbox.test.mjs` | `requirements/repository-programming/tests/js-sandbox.test.mjs` | 8 pass | 绿 |
+| `requirements/repository-programming/tests/js-anchors.test.mjs` | `requirements/repository-programming/tests/js-anchors.test.mjs` | 3 pass | 绿 |
+| `requirements/repository-programming/tests/js-tools-fs.test.mjs` | `requirements/repository-programming/tests/js-tools-fs.test.mjs` | 10 pass | 绿 |
+| `requirements/repository-programming/tests/js-transaction.test.mjs` | `requirements/repository-programming/tests/js-transaction.test.mjs` | 5 pass | 绿 |
+| `requirements/repository-programming/tests/js-tools-transaction-store.test.mjs` | `requirements/repository-programming/tests/js-tools-transaction-store.test.mjs` | 4 pass | 绿 |
+| `requirements/repository-programming/tests/js-workflow.test.mjs` | `requirements/repository-programming/tests/js-workflow.test.mjs` | 14 pass | 绿 |
+| `requirements/repository-programming/tests/js-tool-host.test.mjs` | `requirements/repository-programming/tests/js-tool-host.test.mjs` | 3 pass | 绿 |
+| `requirements/repository-programming/tests/file-mutation-tools.test.mjs` | `requirements/repository-programming/tests/file-mutation-tools.test.mjs` | 11 pass | 绿 |
+| `requirements/repository-programming/tests/js-surface-gate.test.mjs` | `requirements/repository-programming/tests/js-surface-gate.test.mjs` | 3 pass | 绿 |
 
 适配说明：4 个文件（`js-surface`/`js-bindings`/`js-tool-host`/`js-workflow`）原直接 `import { ofArray } from '../../../dist/fable_modules/.../Set.js'`——该直接 import 是 test-boundary 门（新增 requirements scope）禁止的遗留项；迁移时改写为经 sanctioned 适配层 `tests/unit/support/domain.mjs` 的 `FsSet.ofArray`（同一 comparer 语义），消除 4 条 baseline 遗留，门仍绿。`../support/domain.mjs` 深度修正为 `../../../tests/unit/support/domain.mjs`。
 

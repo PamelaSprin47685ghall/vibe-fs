@@ -30,7 +30,7 @@ completion，也不是下一动作的 authority（`docs/why/execution.md`、devo
 「物理世界状态」与「看到的文本」不可分。
 
 证据：anchors `act-vs-observation` / `signal-not-exit` / `mechanical-meaning`（devops 组）；REUSE
-`tests/unit/process/pty-port.test.mjs`（`PORT_send_term_kill_int_marks_abort_for_the_next_completion`——
+`requirements/process-execution/tests/pty-port.test.mjs`（`PORT_send_term_kill_int_marks_abort_for_the_next_completion`——
 signal 影响的是下一次 completion 的物化，不是立刻 exit）。
 
 ## PROC-003：physical completion 只由 backend exit 建立；kill ≠ exit
@@ -41,7 +41,7 @@ PTY completion **只**由 backend `onExit` 触发（EXEC-015）。禁止 stdout 
 
 含义/动机：onExit 是物理完成信号；kill 是控制动作。waiter 必须等 close/error handler 报告真实退出。
 
-证据：REUSE `tests/unit/process/pty-port.test.mjs`（`PORT_complete_*` 组：completion 经
+证据：REUSE `requirements/process-execution/tests/pty-port.test.mjs`（`PORT_complete_*` 组：completion 经
 `PtyPort.complete` 发布；`PORT_send_plain_signal_does_not_abort_the_completion`）；
 `tests/unit/execution/process-wait.test.mjs`（`EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill`）。
 
@@ -91,7 +91,7 @@ mid-wait cancellation：kill 进程组一次，然后拒绝等待方（`ProcessC
 
 含义/动机：caller 必须知道「这次 act 结束后进程是否还在」，否则无法决定下一次 act。
 
-证据：anchors `continuing-process`（devops 组）；REUSE `tests/unit/process/pty-port.test.mjs`
+证据：anchors `continuing-process`（devops 组）；REUSE `requirements/process-execution/tests/pty-port.test.mjs`
 （`PORT_close_requests_terminate_but_keeps_the_session_live`——close 请求 TERM 但 session 仍活到 exit）。
 
 ## PROC-008：完成事实双通道：agent Pulse vs PTY PublishPty
@@ -104,7 +104,7 @@ Mailbox 双通道：agent 完成路径只发 `Pulse`（结果读 Journal）；PT
 
 边界：Journal 的权威性与 fold → `durable-events`；permit 门重入 → `crash-reconciliation`。
 
-证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`tests/unit/session/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 PROOF.md）。
+证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 PROOF.md）。
 
 ## PROC-009：物理输出捕获有界；spool 是蒸馏输入
 

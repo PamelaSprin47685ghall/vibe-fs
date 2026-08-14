@@ -29,7 +29,7 @@ Manager 的「当前还欠用户什么」必须有一个持续诚实、可恢复
 
 ## proof 概览（→ PROOF.md）
 
-- MOVE（6 文件，38 断言全绿）：`tests/unit/domain/magic-todo*.test.mjs`（3）、`tests/unit/journal/magic-todo-event-store.test.mjs`、`tests/unit/invariants/magic-todo-provider-boundary.test.mjs`、`tests/unit/glory/opening-floor.test.mjs` → `requirements/obligation-ledger/tests/`
+- MOVE（6 文件，38 断言全绿）：`tests/unit/domain/magic-todo*.test.mjs`（3）、`requirements/obligation-ledger/tests/magic-todo-event-store.test.mjs`、`requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs`、`requirements/obligation-ledger/tests/opening-floor.test.mjs` → `requirements/obligation-ledger/tests/`
 - REUSE：`tests/unit/reconciliation/magic-todo-membrane.test.mjs`（admission/Accepted 双路径/REVISE 回灌；跨 effect-accounting/host-boundary）、`tests/integration/plugin/magic-todo-sink-canary.test.mjs`（compatibility sink 冻结）、`tests/unit/glory/lifecycle.test.mjs`（GLORY_074 T1 交叉）
 - NEW：无（命题全部已有可执行落点）
 

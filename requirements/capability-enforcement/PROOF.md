@@ -24,9 +24,9 @@
 
 | 源 | 目标 | 结果 |
 |----|------|------|
-| `tests/unit/verify/capability-isomorphism-gate.test.mjs` | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` | 7 pass / 0 fail |
-| `tests/unit/host/managed-agent-config.test.mjs` | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | 15 pass / 0 fail |
-| `tests/unit/plugin/agent-permission-gate.test.mjs` | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` | 9 pass / 0 fail |
+| `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` | 7 pass / 0 fail |
+| `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | 15 pass / 0 fail |
+| `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` | 9 pass / 0 fail |
 
 ## 计数
 

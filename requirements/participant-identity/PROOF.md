@@ -22,8 +22,8 @@
 
 | 源 | 目标 | 结果 |
 |----|------|------|
-| `tests/unit/agent/catalog.test.mjs` | `requirements/participant-identity/tests/catalog.test.mjs` | 5 pass / 0 fail |
-| `tests/unit/prompt/session-persona.test.mjs` | `requirements/participant-identity/tests/session-persona.test.mjs` | 3 pass / 0 fail |
+| `requirements/participant-identity/tests/catalog.test.mjs` | `requirements/participant-identity/tests/catalog.test.mjs` | 5 pass / 0 fail |
+| `requirements/participant-identity/tests/session-persona.test.mjs` | `requirements/participant-identity/tests/session-persona.test.mjs` | 3 pass / 0 fail |
 
 ## 计数
 

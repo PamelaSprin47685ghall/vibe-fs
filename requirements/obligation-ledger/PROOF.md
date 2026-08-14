@@ -8,13 +8,13 @@
 
 | 文件 | 来源 | 类型 | 断言数 |
 |---|---|---|---|
-| `magic-todo.test.mjs` | MOVE `tests/unit/domain/magic-todo.test.mjs` | domain 纯函数 | 7 |
-| `magic-todo-after.test.mjs` | MOVE `tests/unit/domain/magic-todo-after.test.mjs` | domain 纯函数 + static | 4 |
-| `magic-todo-projection.test.mjs` | MOVE `tests/unit/domain/magic-todo-projection.test.mjs` | fold 代数 | 12 |
-| `magic-todo-event-store.test.mjs` | MOVE `tests/unit/journal/magic-todo-event-store.test.mjs` | EventStore 恢复 | 1 |
-| `magic-todo-provider-boundary.test.mjs` | MOVE `tests/unit/invariants/magic-todo-provider-boundary.test.mjs` | static（provider surface / 源码） | 8 |
-| `magic-todo-host-codec.test.mjs` | MOVE `tests/unit/plugin/magic-todo-host-codec.test.mjs` | codec / definition | 3 |
-| `opening-floor.test.mjs` | MOVE `tests/unit/glory/opening-floor.test.mjs` | T1 / Opening floor | 6 |
+| `magic-todo.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo.test.mjs` | domain 纯函数 | 7 |
+| `magic-todo-after.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo-after.test.mjs` | domain 纯函数 + static | 4 |
+| `magic-todo-projection.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` | fold 代数 | 12 |
+| `magic-todo-event-store.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo-event-store.test.mjs` | EventStore 恢复 | 1 |
+| `magic-todo-provider-boundary.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` | static（provider surface / 源码） | 8 |
+| `magic-todo-host-codec.test.mjs` | MOVE `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` | codec / definition | 3 |
+| `opening-floor.test.mjs` | MOVE `requirements/obligation-ledger/tests/opening-floor.test.mjs` | T1 / Opening floor | 6 |
 | `prefix-epoch-cutoff.test.mjs` | NEW | desired cutoff 纯推导 | 2 |
 
 合计 43 断言；每个文件 `node --test` 单独跑绿。

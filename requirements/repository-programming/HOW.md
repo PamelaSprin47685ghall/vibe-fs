@@ -38,7 +38,7 @@
 
 ### 静态门禁
 
-`scripts/checks/js-surface-gate.mjs`：`FORBIDDEN_TOKENS`（js-student/js-teacher 等 G3 debt）+ `HANDWRITTEN_ROLE_TOOL_TOKENS`（js-coder 等字面量）→ 扫描 `src/Wanxiangshu/**`；唯一合法静态枚举 = `src/Wanxiangshu/Tools/StaticTools.fs`（权限矩阵 schema 层）。`tests/unit/verify/js-surface-gate.test.mjs` 原为门禁的单元 oracle，已随本包 MOVE 为 `js-surface-gate.test.mjs`。
+`scripts/checks/js-surface-gate.mjs`：`FORBIDDEN_TOKENS`（js-student/js-teacher 等 G3 debt）+ `HANDWRITTEN_ROLE_TOOL_TOKENS`（js-coder 等字面量）→ 扫描 `src/Wanxiangshu/**`；唯一合法静态枚举 = `src/Wanxiangshu/Tools/StaticTools.fs`（权限矩阵 schema 层）。`requirements/repository-programming/tests/js-surface-gate.test.mjs` 原为门禁的单元 oracle，已随本包 MOVE 为 `js-surface-gate.test.mjs`。
 
 ## 主流程（唯一实现序）
 
