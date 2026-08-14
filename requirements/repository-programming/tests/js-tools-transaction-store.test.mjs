@@ -28,7 +28,7 @@ import {
 } from '../../../dist/Domain/JsTransaction.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { eventId, listItems, resultOf, toList } from '../../../tests/unit/support/domain.mjs'
+import { eventId, listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-txstore-'))

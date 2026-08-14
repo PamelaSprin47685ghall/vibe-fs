@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readGlobalPreference } from '../../../dist/Infrastructure/OpenCode/Host/ProviderLanguageBinding.js'
-import { caseOf, providerLanguage, providerResources, sessionId } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, providerLanguage, providerResources, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 test('HOST_026_readGlobalPreference_defaults_when_env_unset', () => {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE

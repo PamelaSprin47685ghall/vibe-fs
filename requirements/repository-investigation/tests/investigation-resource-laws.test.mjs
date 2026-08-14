@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { BUILD_ROOT } from '../../../tests/unit/support/domain.mjs'
+import { BUILD_ROOT } from '../../verification-system/tests/support/domain.mjs'
 
 const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
 const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semanticPath, `${locale}.md`), 'utf8')

@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync, existsSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { listItems } from '../../../tests/unit/support/domain.mjs'
+import { listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,

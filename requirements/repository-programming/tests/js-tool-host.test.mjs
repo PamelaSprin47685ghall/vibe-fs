@@ -17,8 +17,8 @@ import {
 import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
 import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
-import { FsSet } from '../../../tests/unit/support/domain.mjs'
-import { resultOf, stringSet } from '../../../tests/unit/support/domain.mjs'
+import { FsSet } from '../../verification-system/tests/support/domain.mjs'
+import { resultOf, stringSet } from '../../verification-system/tests/support/domain.mjs'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))

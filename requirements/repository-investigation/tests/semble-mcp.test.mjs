@@ -5,11 +5,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { caseOf, listItems, managedAgentConfig, payloadOf, runtimeResources } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, managedAgentConfig, payloadOf, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const dist = join(here, '../../../dist')
-const fixturePath = join(here, '../../../tests/unit/support/semble-mcp-fixture.js')
+const fixturePath = join(here, '../../verification-system/tests/support/semble-mcp-fixture.js')
 const kernel = await import(join(dist, 'Kernel/SembleMcp.js'))
 const { serverName, defaultRef, repo, toolName, maxSnippetLines, uvxCommand, fixtureCommand } = kernel
 const { parseText, parseToolResult } = await import(join(dist, 'Infrastructure/SembleSearchCodec.js'))

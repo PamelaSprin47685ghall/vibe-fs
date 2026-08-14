@@ -19,7 +19,7 @@ import {
   providerLanguage,
   providerResources,
   sessionId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const withPreference = async (raw, fn) => {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE

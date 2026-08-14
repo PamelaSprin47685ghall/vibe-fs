@@ -17,8 +17,8 @@ import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSur
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
 import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
-import { FsSet } from '../../../tests/unit/support/domain.mjs'
-import { listItems, resultOf } from '../../../tests/unit/support/domain.mjs'
+import { FsSet } from '../../verification-system/tests/support/domain.mjs'
+import { listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))

@@ -27,7 +27,7 @@ import {
 } from '../../../dist/Infrastructure/JsMutationFs.js'
 import { AnchorSpec } from '../../../dist/Domain/JsAnchor.js'
 import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
-import { listItems, resultOf, toList } from '../../../tests/unit/support/domain.mjs'
+import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const anchorCaseIndex = (name) => Object.create(AnchorSpec.prototype).cases().indexOf(name)
 const exact = (text) => new AnchorSpec(anchorCaseIndex('Exact'), [text])

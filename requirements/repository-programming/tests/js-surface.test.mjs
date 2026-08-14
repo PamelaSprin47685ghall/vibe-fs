@@ -16,8 +16,8 @@ import {
 } from '../../../dist/Domain/JsSurface.js'
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
 import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
-import { FsSet } from '../../../tests/unit/support/domain.mjs'
-import { isNone, isSome, listItems, roles } from '../../../tests/unit/support/domain.mjs'
+import { FsSet } from '../../verification-system/tests/support/domain.mjs'
+import { isNone, isSome, listItems, roles } from '../../verification-system/tests/support/domain.mjs'
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
 const caps = (...permissions) => FsSet.ofArray(permissions, permissionComparer)

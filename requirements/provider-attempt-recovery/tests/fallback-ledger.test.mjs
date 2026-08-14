@@ -22,7 +22,7 @@ import {
   promptDispatcher,
   providerRun,
   sessionId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { FallbackLedger_admitConfirmedFailure } = await import(
   '../../../dist/Application/Recovery/FallbackLedger.js'

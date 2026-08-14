@@ -30,7 +30,7 @@ import {
   providerRun,
   sessionId,
   stream,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = sessionId('ses_a')
 const RUN = logicalRunId('run_L')

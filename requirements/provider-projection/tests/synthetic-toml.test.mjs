@@ -20,7 +20,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { syntheticToml as toml } from '../../../tests/unit/support/domain.mjs'
+import { syntheticToml as toml } from '../../verification-system/tests/support/domain.mjs'
 
 /** Parse a rendered value back with a real parser. The oracle, not a reimplementation. */
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x

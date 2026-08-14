@@ -18,7 +18,7 @@ import {
   JsFailureModule_code as failureCode,
   JsFailureModule_reason as failureReason,
 } from '../../../dist/Domain/JsFailure.js'
-import { resultOf } from '../../../tests/unit/support/domain.mjs'
+import { resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const declaration = (spec, occurrence) => ({ Spec: spec, Occurrence: occurrence })
 const ok = (result) => resultOf(result).ok
