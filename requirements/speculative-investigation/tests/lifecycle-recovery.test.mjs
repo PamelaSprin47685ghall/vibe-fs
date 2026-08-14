@@ -11,8 +11,7 @@ import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import { MessagePart } from '../../../dist/Infrastructure/OpenCode/Codec/HostMessageCodec.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { FSharpResult$2_Ok as ok } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
-import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { okResult, toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const resultOf = (value) => value.tag === 0
   ? { ok: true, value: value.fields[0] }
@@ -89,7 +88,7 @@ test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_ex
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   const messages = toList([{ id: 'user-1' }, { id: 'run-1' }, { id: 'user-2' }])
   const messageIdOf = (message) => message.id
-  const load = async () => ok(frame)
+  const load = async () => okResult(frame)
 
   const beforePromotion = resultOf(await Lifecycle.StrengthLifecycle_replayPlans(session('owner'), messageIdOf, messages, load, projection))
   assert.equal(beforePromotion.ok, true)
@@ -135,7 +134,7 @@ test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', asy
     session('owner'),
     (message) => message.id,
     toList([{ id: 'user-1' }, { id: 'run-1' }]),
-    async () => ok(frame),
+    async () => okResult(frame),
     projection,
   ))
   assert.equal(replay.ok, true)
@@ -152,7 +151,7 @@ test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage
     session('owner'),
     (message) => message.id,
     toList([{ id: 'user-1' }, { id: 'run-1' }]),
-    async () => ok(frame),
+    async () => okResult(frame),
     projection,
   )).value)
 

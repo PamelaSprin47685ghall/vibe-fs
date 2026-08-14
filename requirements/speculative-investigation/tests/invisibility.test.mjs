@@ -6,7 +6,7 @@ import * as Renderer from '../../../dist/Domain/ProjectionRenderer.js'
 import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { ofArray as toList } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const P = { ...Intent, ...Renderer }
 const H = (text) => `H(${text})`

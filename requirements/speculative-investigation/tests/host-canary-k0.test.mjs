@@ -1,29 +1,28 @@
-// tests/unit/strength/host-canary-k0.test.mjs
+// Split from tests/unit/strength/host-canary-k0.test.mjs (cutover Wave 2a); owner: speculative-investigation
 //
-// Policy/transform fail-closed proofs for STRENGTH-002/004/010/011/014.
+// Policy/transform fail-closed proofs for STRENGTH-002/010/011/014.
 // Live Host request-budget dry-run is `tests/e2e/entry.test.mjs` long-stroke
 // strength-canary. This file does not enable K1/K2 treatment.
+//
+// The replica tool-map/execution-gate narrowing (STRENGTH_004_005,
+// STRENGTH_004_006) went to capability-enforcement (ENF-005).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as Policy from '../../../dist/Domain/StrengthPolicy.js'
 import { StrengthBudget, StrengthBudgetModule_requestLimit as requestLimit } from '../../../dist/Domain/StrengthBudget.js'
-import { toolCapabilitiesFor, systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
-import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
+import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
 import * as Association from '../../../dist/Journal/SessionAssociation.js'
 import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
 import { AttachmentKind, SessionExecutionClass } from '../../../dist/Kernel/SessionOwnership.js'
-import { AgentTier, Role, ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { toArray as mapEntries } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
-import { promptResources } from '../support/domain/prompt.mjs'
+import { promptResources } from '../../verification-system/tests/support/domain/prompt.mjs'
 
 const caseOf = (value) => value.cases()[value.tag]
-const permissionNames = (set) => [...set].map(caseOf).sort()
 
 const eligibleOpportunity = {
   IsRootWork: true,
@@ -141,43 +140,6 @@ test('STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
   )
   assert.equal(caseOf(equalMargin), 'Speculate')
   assert.equal(caseOf(equalMargin.fields[0]), 'K1')
-})
-
-test('STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
-  // Not the live Host execution-gate canary. Same capability set the schema is
-  // built from: forged mutating/network/session tools stay outside the replica.
-  const capabilities = toolCapabilitiesFor(Role.Coder, ProviderRequestKind.StrengthReplica)
-  const allowed = new Set(permissionNames(capabilities))
-  const denied = [
-    ToolPermission.Write,
-    ToolPermission.Edit,
-    ToolPermission.Exec,
-    ToolPermission.Fork,
-    ToolPermission.Join,
-    ToolPermission.Horizon,
-    ToolPermission.Network,
-    ToolPermission.Pty,
-  ]
-  for (const permission of denied) {
-    assert.equal(allowed.has(caseOf(permission)), false, caseOf(permission))
-  }
-
-  for (const tool of ['write', 'edit', 'run', 'fork', 'join', 'network', 'bash', 'horizon']) {
-    assert.equal(Frame.StrengthFrame_isAllowedTool(tool), false, tool)
-  }
-  assert.equal(Frame.StrengthFrame_isAllowedTool('read'), true)
-  assert.equal(Frame.StrengthFrame_isAllowedTool('glob'), true)
-  assert.equal(Frame.StrengthFrame_isAllowedTool('grep'), true)
-})
-
-test('STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking', () => {
-  // Not the live Host permission-popup canary. `* = false` is the unit stand-in:
-  // unknown tools are denied, so there is no permission-ask surface to raise.
-  const entries = Object.fromEntries(mapEntries(Runtime.StrengthReplicaTools_exactReadonlyHostToolMap))
-  assert.equal(entries['*'], false)
-  assert.equal(entries.read, true)
-  assert.equal(entries.glob, true)
-  assert.equal(entries.grep, true)
 })
 
 test('STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {

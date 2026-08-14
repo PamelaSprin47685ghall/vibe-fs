@@ -6,7 +6,7 @@ import * as Rollout from '../../../dist/Domain/StrengthRollout.js'
 import * as Policy from '../../../dist/Domain/StrengthPolicy.js'
 import * as HostDigest from '../../../dist/Host/HostDigest.js'
 import { Role } from '../../../dist/Kernel/Roles.js'
-import { ofArray as toList } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const S = Predictor.StrengthPrimarySymbol
 

@@ -1,16 +1,21 @@
+// Split from tests/unit/strength/runtime.test.mjs (cutover Wave 2a); owner: speculative-investigation
+//
+// SPEC-INV-004 Replica authority: runtime is owner-single-flight and decision-local;
+// K0 and ineligible replica authorities are rejected at registration.
+// The replica tool-map narrowing (STRENGTH_004_replica_host_tool_map_*) went to
+// capability-enforcement (ENF-005).
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
 import * as Authority from '../../../dist/Domain/PromptAuthority.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { Role, ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { Role } from '../../../dist/Kernel/Roles.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import { toArray as mapEntries } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
 
 const caseOf = (value) => value.cases()[value.tag]
-const setNames = (set) => [...set].map(caseOf).sort()
 
 const binding = (owner, replica, decision, role = Role.Coder, budget = StrengthBudget.K1) =>
   new Runtime.StrengthReplicaBinding(
@@ -25,14 +30,6 @@ const binding = (owner, replica, decision, role = Role.Coder, budget = StrengthB
     undefined,
     Authority.toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica),
   )
-
-test('STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly', () => {
-  const entries = Object.fromEntries(mapEntries(Runtime.StrengthReplicaTools_exactReadonlyHostToolMap))
-  assert.deepEqual(entries, { '*': false, glob: true, grep: true, read: true })
-  assert.deepEqual(setNames(Runtime.StrengthReplicaTools_capabilities(Role.Coder)), ['Glob', 'Grep', 'Read'])
-  assert.deepEqual(setNames(Runtime.StrengthReplicaTools_capabilities(Role.DevOps)), ['Glob', 'Grep', 'Read'])
-  assert.equal(Runtime.StrengthReplicaTools_capabilities(Role.Manager).size, 0)
-})
 
 test('STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
   const runtime = Runtime.StrengthRuntime_$ctor()

@@ -9,7 +9,7 @@ import * as PersistStore from '../../../dist/Infrastructure/Persist/EventStore.j
 import * as Fold from '../../../dist/Infrastructure/Persist/EventStoreFold.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
-import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const H = (text) => `H(${text})`
 const resultOf = (value) => value.tag === 0

@@ -10,7 +10,7 @@ import * as Projection from '../../../dist/Domain/StrengthProjection.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import * as HostDigest from '../../../dist/Host/HostDigest.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { ofArray as toList } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const resultOf = (value) => value.tag === 0
   ? { ok: true, value: value.fields[0] }

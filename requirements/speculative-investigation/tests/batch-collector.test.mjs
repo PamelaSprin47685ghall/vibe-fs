@@ -4,7 +4,7 @@ import test from 'node:test'
 import * as Collector from '../../../dist/Domain/StrengthBatchCollector.js'
 import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const call = (id, name, args) => new Provider.WirePart(2, [Id.ToolCallIdModule_create(id), name, args])
 const result = (id, body) => new Provider.WirePart(3, [Id.ToolCallIdModule_create(id), body])

@@ -9,7 +9,7 @@ import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import * as HostDigest from '../../../dist/Host/HostDigest.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
-import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const caseOf = (value) => value.cases()[value.tag]
 const resultOf = (value) => value.tag === 0
