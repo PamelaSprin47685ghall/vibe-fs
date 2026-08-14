@@ -1,4 +1,4 @@
-// tests/integration/persist/dumb-server.test.mjs
+// requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs
 // Phase 3.4 / §12 / §38 — GitGateway + ProcessGitRawStore against a dumb bare remote.
 //
 // Client may use Domain + Persist. The bare "server" (dumb-remote.mjs) must not
@@ -17,7 +17,7 @@ import {
   mapEntries,
   payloadOf,
   toList,
-} from '../../unit/support/domain.mjs'
+} from '../../../../verification-system/tests/support/domain.mjs'
 import {
   STORE_REF,
   createBareWorkspace,
@@ -26,14 +26,14 @@ import {
   remoteHasObject,
   remoteObjectType,
   runGitIn,
-} from './dumb-remote.mjs'
+} from '../../../../verification-system/tests/support/dumb-remote.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const Process = await import('../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
-const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')
-const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
-const Gateway = await import('../../../dist/Infrastructure/Git/GitGateway.js')
+const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const Persist = await import('../../../../../dist/Infrastructure/Persist/StoreTypes.js')
+const Process = await import('../../../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
+const GitRaw = await import('../../../../../dist/Infrastructure/Persist/GitRawStore.js')
+const Store = await import('../../../../../dist/Infrastructure/Persist/EventStore.js')
+const Gateway = await import('../../../../../dist/Infrastructure/Git/GitGateway.js')
 
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const oidValue = (rootOid) => Persist.GitObjectIdModule_value(Persist.RootOidModule_value(rootOid))
@@ -96,7 +96,7 @@ const withWorkspace = async (clientNames, body) => {
 }
 
 test('dumb_remote_helper_does_not_import_Domain_codecs', () => {
-  const helperPath = join(dirname(fileURLToPath(import.meta.url)), 'dumb-remote.mjs')
+  const helperPath = join(dirname(fileURLToPath(import.meta.url)), '../../../../verification-system/tests/support/dumb-remote.mjs')
   const source = readFileSync(helperPath, 'utf8')
   assert.equal(STORE_REF, 'refs/wanxiang/store')
   assert.equal(STORE_REF, Persist.StoreRef_canonical)

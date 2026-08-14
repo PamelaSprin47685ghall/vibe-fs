@@ -1,4 +1,4 @@
-// tests/integration/package/contents.test.mjs — pack membership from package.json files.
+// requirements/distribution/tests/integration/package/contents.test.mjs — pack membership from package.json files.
 //
 // No `npm pack` / `npm install` in tests. Membership is the files whitelist + required paths
 // that must exist on disk for a pack to be meaningful.
@@ -9,7 +9,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
 const PROVIDER_ROLES = [
   'blogger',

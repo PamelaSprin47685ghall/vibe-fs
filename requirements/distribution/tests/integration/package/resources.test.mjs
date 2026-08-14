@@ -1,4 +1,4 @@
-// tests/integration/package/resources.test.mjs — packaged resources at workspace root.
+// requirements/distribution/tests/integration/package/resources.test.mjs — packaged resources at workspace root.
 //
 // Assumes package already built. No npm pack/install in tests.
 
@@ -8,7 +8,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
 const PROVIDER_ROLES = [
   'blogger',

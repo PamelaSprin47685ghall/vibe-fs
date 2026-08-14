@@ -45,14 +45,14 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
-import { walk } from '../../../scripts/lib/walk.mjs';
+import { walk } from '../../../../../scripts/lib/walk.mjs';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
 /** The harness and its scripts: where a scenario registry and its consumers live. */
 const SCOPE = [
-  { root: 'tests/e2e', extensions: ['.js', '.mjs'] },
+  { root: 'requirements/verification-system/tests/e2e', extensions: ['.js', '.mjs'] },
   { root: 'scripts', extensions: ['.js', '.mjs'] },
 ];
 

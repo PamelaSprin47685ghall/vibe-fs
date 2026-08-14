@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../unit/plugin/plugin-fixture.mjs'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('AGENT_023_coder_receives_hard_denial_and_no_shell', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {

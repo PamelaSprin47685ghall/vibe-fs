@@ -6,11 +6,11 @@
  * EventStore events whose canonical JSON contains the fact name string.
  */
 
-import { eventId, toList } from '../../unit/support/domain.mjs'
+import { eventId, toList } from '../../support/domain.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const ProcessGit = await import('../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
-const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
+const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const ProcessGit = await import('../../../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
+const Store = await import('../../../../../dist/Infrastructure/Persist/EventStore.js')
 
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 

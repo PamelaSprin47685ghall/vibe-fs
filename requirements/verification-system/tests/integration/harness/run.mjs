@@ -7,7 +7,7 @@
  * Hang criterion: HARNESS_CASE_SILENCE_MS without a finished case (VERIFY-004).
  * Case completion is the only blocking advance — not case start, not console output.
  *
- * Run: node tests/integration/harness/run.mjs
+ * Run: node requirements/verification-system/tests/integration/harness/run.mjs
  */
 
 import { cases } from './cases.mjs';
@@ -68,7 +68,7 @@ const allCases = [
 ];
 
 console.log(
-  `Running tests/integration harness tests (${allCases.length} cases, ${GATE_CASE_CONCURRENCY} at a time, ` +
+  `Running requirements/verification-system/tests/integration harness tests (${allCases.length} cases, ${GATE_CASE_CONCURRENCY} at a time, ` +
     `${HARNESS_CASE_SILENCE_MS}ms case-silence window)...\n`,
 );
 
@@ -77,7 +77,7 @@ let finished = 0;
 
 const watchdog = new Watchdog({
   timeoutMs: HARNESS_CASE_SILENCE_MS,
-  label: 'tests/integration/harness',
+  label: 'requirements/verification-system/tests/integration/harness',
   onTimeout: () => {
     console.error(
       `harness: ${outstanding.size} case(s) still open: ${[...outstanding].slice(0, 20).join(', ')}` +

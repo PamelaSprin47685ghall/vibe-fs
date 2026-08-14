@@ -52,14 +52,14 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
-import { walk } from '../../../scripts/lib/walk.mjs';
+import { walk } from '../../../../../scripts/lib/walk.mjs';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
 /** The harness's own gate and static-check sources: the files VERIFY-004 is speaking about. */
 const SCOPE = [
-  { root: 'tests/e2e', extensions: ['.js', '.mjs'] },
+  { root: 'requirements/verification-system/tests/e2e', extensions: ['.js', '.mjs'] },
   { root: 'scripts', extensions: ['.js', '.mjs'] },
 ];
 

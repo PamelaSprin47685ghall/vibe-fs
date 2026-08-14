@@ -10,10 +10,11 @@ import { assertEq, assertTrue } from './lib.mjs';
 import { RETIRED_FIELDS, retiredFieldProblems } from '../../e2e/support/legacy-fields.js';
 import { compileScenario } from '../../e2e/support/scenario-schema.js';
 import { readFileSync } from 'node:fs';
-import { walk } from '../../../scripts/lib/walk.mjs';
+import { fileURLToPath } from 'node:url';
+import { walk } from '../../../../../scripts/lib/walk.mjs';
 
 /** The forest itself, so a scenario added later is covered without being registered. */
-const SCENARIO_ROOT = 'tests/e2e/scenarios';
+const SCENARIO_ROOT = fileURLToPath(new URL('../../e2e/scenarios', import.meta.url));
 
 const compile = (source) => compileScenario(source, { name: 'p.toml' });
 

@@ -26,7 +26,7 @@ import { pathToFileURL } from 'node:url'
 import { run } from 'node:test'
 import { spec } from 'node:test/reporters'
 
-import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS } from '../../e2e/support/time-budget.js'
+import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS } from '../e2e/support/time-budget.js'
 
 const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
 

@@ -1,4 +1,4 @@
-// tests/integration/plugin/file-mutation-tools.test.mjs — AGENT-016/017/018.
+// requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs — AGENT-016/017/018.
 //
 // Layer 3 (executable): the mv / rm tools registered by the plugin, driven through
 // the real `hooks.tool.*.execute` path with a durable Authority Root naming the
@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'nod
 import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../unit/plugin/plugin-fixture.mjs'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 

@@ -28,7 +28,7 @@ import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { EventProbe } from '../../e2e/support/event-probe.js';
 import { WAIT_FACT_WINDOW_MS, WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
 import { journalEventLines } from '../../e2e/support/journal-observer.js';
-import { walk } from '../../../scripts/lib/walk.mjs';
+import { walk } from '../../../../../scripts/lib/walk.mjs';
 
 const execFileAsync = promisify(execFile);
 

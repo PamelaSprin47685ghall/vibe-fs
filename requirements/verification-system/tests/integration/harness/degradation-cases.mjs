@@ -40,9 +40,9 @@ import { unitRunnerCases } from './unit-runner-cases.mjs';
 import { singleSourceCases } from './single-source-cases.mjs';
 import { pathCriterionCases } from './path-criterion-cases.mjs';
 
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const SOLE_ENTRY = 'tests/e2e/entry.test.mjs';
-const VERDICT_FEED_TEST = 'tests/unit/verdict-feed.test.mjs';
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
+const SOLE_ENTRY = 'requirements/verification-system/tests/e2e/entry.test.mjs';
+const VERDICT_FEED_TEST = 'requirements/verification-system/tests/verdict-feed.test.mjs';
 
 const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
 
@@ -148,7 +148,7 @@ export const degradationCases = [
         'package.json format-build-test must point at tests/e2e/entry.test.mjs',
       );
       assertTrue(
-        typeof pipeline === 'string' && !pipeline.includes('tests/e2e/run.mjs'),
+        typeof pipeline === 'string' && !pipeline.includes('requirements/verification-system/tests/e2e/run.mjs'),
         'package.json format-build-test must not target the retired multi-canary launcher',
       );
       assertTrue(
@@ -166,11 +166,11 @@ export const degradationCases = [
       // Pin absence when G4R-4 has already deleted the pool artifacts. Soft during cutover:
       // sole-entry scripts above already refuse to wire them.
       assertTrue(
-        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) || !pipeline.includes('tests/e2e/run.mjs'),
+        !existsSync(`${REPO_ROOT}requirements/verification-system/tests/e2e/run.mjs`) || !pipeline.includes('requirements/verification-system/tests/e2e/run.mjs'),
         'multi-canary run.mjs must be gone, or at least unused by format-build-test',
       );
       assertTrue(
-        !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`) || !/from\s*['"][^'"]*manifest/.test(entry),
+        !existsSync(`${REPO_ROOT}requirements/verification-system/tests/e2e/support/manifest.mjs`) || !/from\s*['"][^'"]*manifest/.test(entry),
         'canary manifest must be gone, or at least unused by the sole entry',
       );
 
@@ -185,7 +185,7 @@ export const degradationCases = [
   {
     name: 'VERIFY-004 internal expectations are background progress',
     fn: () => {
-      const source = readSource('tests/e2e/support/strict-mock-provider.js');
+      const source = readSource('requirements/verification-system/tests/e2e/support/strict-mock-provider.js');
 
       assertTrue(
         source.includes('blocking: entry.internal !== true'),
@@ -201,7 +201,7 @@ export const degradationCases = [
   {
     name: 'VERIFY-004 flow waits do not start a competing total timeout',
     fn: () => {
-      const source = readSource('tests/e2e/support/scenario-driver.mjs');
+      const source = readSource('requirements/verification-system/tests/e2e/support/scenario-driver.mjs');
 
       assertTrue(
         !source.includes('waitForExpectation(step.wait, step.timeoutMs || WATCHDOG_TIMEOUT_MS)'),
@@ -220,13 +220,13 @@ export const degradationCases = [
         'event waits must not race the fixed watchdog with a total deadline',
       );
 
-      const turnSource = readSource('tests/e2e/support/scenario-turn.js');
+      const turnSource = readSource('requirements/verification-system/tests/e2e/support/scenario-turn.js');
       assertTrue(
         !turnSource.includes('timeoutMs: opts.timeoutMs || WATCHDOG_TIMEOUT_MS'),
         'Turn must leave its local timeout absent unless the scenario explicitly declares one',
       );
 
-      const providerSource = readSource('tests/e2e/support/strict-mock-provider.js');
+      const providerSource = readSource('requirements/verification-system/tests/e2e/support/strict-mock-provider.js');
       assertTrue(
         !providerSource.includes('timeoutMs = WATCHDOG_TIMEOUT_MS'),
         'provider wait helpers must not default every flow wait to the silence window as a total deadline',

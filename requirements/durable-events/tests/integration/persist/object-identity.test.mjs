@@ -1,4 +1,4 @@
-// tests/integration/persist/object-identity.test.mjs
+// requirements/durable-events/tests/integration/persist/object-identity.test.mjs
 // The ODB write path must produce byte-identical Git objects.
 //
 // `GitObjectDatabase` writes loose objects itself (sha1 + zlib + objects/xx/yyyy) instead of
@@ -14,10 +14,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { isSome, listItems, toList } from '../../unit/support/domain.mjs'
+import { isSome, listItems, toList } from '../../../../verification-system/tests/support/domain.mjs'
 
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const Odb = await import('../../../dist/Infrastructure/Persist/GitObjectDatabase.js')
+const Persist = await import('../../../../../dist/Infrastructure/Persist/StoreTypes.js')
+const Odb = await import('../../../../../dist/Infrastructure/Persist/GitObjectDatabase.js')
 
 const oidText = (oid) => Persist.GitObjectIdModule_value(oid)
 const gitObjectId = (text) => Persist.GitObjectIdModule_create(text)

@@ -1,4 +1,4 @@
-// tests/integration/plugin/auto-injected-tool.test.mjs — HOST-013 entity through hooks.tool.
+// requirements/capability-enforcement/tests/integration/plugin/auto-injected-tool.test.mjs — HOST-013 entity through hooks.tool.
 //
 // Layer 3: auto-injected is a real Tool.Def. A Work role live call returns OK;
 // unresolved roles are rejected at AGENT-007 layer two.
@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../unit/plugin/plugin-fixture.mjs'
+import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('HOST_013_auto_injected_is_registered_and_coder_receives_OK', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {

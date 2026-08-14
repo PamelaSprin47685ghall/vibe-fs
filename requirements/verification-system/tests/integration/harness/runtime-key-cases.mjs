@@ -18,13 +18,13 @@ import { assertEq, assertTrue } from './lib.mjs';
 import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../../e2e/support/runtime-key.js';
 import { messageText, semanticOf } from '../../e2e/support/provider-wire.js';
 import { forkAnchor, forkRelay } from '../../e2e/support/production.js';
-import { toArray as listToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
+import { listItems } from '../../support/domain.mjs';
 // HOST-013: production constants read from the build artifact, so the step
 // cases exercise the real marker text and source, not a copy.
 import {
   source as pairProgrammingThoughtSource,
   text as pairProgrammingThoughtText,
-} from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
+} from '../../../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
@@ -385,7 +385,7 @@ export const runtimeKeyCases = [
       // taken from the same `messageText` path applied to the tool-call message
       // itself — not from a later user utterance that never contains the call.
       const prose = turnOf(request([user('fork')]));
-      const projected = listToArray(semanticOf(request([toolCall('fork')])).Messages);
+      const projected = listItems(semanticOf(request([toolCall('fork')])).Messages);
       const call = projected.length === 0 ? null : messageText(projected[0]);
 
       assertEq(prose, 'fork');

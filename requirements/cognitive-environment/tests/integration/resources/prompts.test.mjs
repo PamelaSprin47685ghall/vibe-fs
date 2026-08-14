@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { promptResources, providerLanguage, providerResources, runtimeResources } from '../../unit/support/domain.mjs'
+import { promptResources, providerLanguage, providerResources, runtimeResources } from '../../../../verification-system/tests/support/domain.mjs'
 
 const PROMPT_FIELDS = [
   'ManagerSystemPrompt',

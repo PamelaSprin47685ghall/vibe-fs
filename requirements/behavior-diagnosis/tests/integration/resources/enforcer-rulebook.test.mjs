@@ -1,4 +1,4 @@
-// tests/integration/resources/enforcer-rulebook.test.mjs — folder rulebook load contract.
+// requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs — folder rulebook load contract.
 //
 // EnforcerCatalogResource.load scans resources/enforcer/* directories
 // (enforcer.md + main.md) via PackageResources. catalog.json is not read.
@@ -19,9 +19,9 @@ import {
   promptResources,
   providerLanguage,
   runtimeResources,
-} from '../../unit/support/domain.mjs'
+} from '../../../../verification-system/tests/support/domain.mjs'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
 
 test('ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {

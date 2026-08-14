@@ -28,7 +28,7 @@
  */
 
 import { assistanceBindingPrefixHolds, isAppendOnlyPrefix, wireOf } from './provider-wire.js';
-import { equals } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
+import { equals } from '../../../../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
 
 export const BOUNDARY_KINDS = [
   'epoch-switch',

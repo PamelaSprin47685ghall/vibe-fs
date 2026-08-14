@@ -33,8 +33,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const BUILD_ROOT = fileURLToPath(new URL('../../../dist/', import.meta.url));
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const BUILD_ROOT = fileURLToPath(new URL('../../../../../dist/', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../..', import.meta.url));
 const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
 
 const asInstructionDocument = (body) => {

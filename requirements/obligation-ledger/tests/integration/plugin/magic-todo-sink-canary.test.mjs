@@ -1,4 +1,4 @@
-// tests/integration/plugin/magic-todo-sink-canary.test.mjs
+// requirements/obligation-ledger/tests/integration/plugin/magic-todo-sink-canary.test.mjs
 //
 // Phase 0 Host canaries D + I (magic-todo.md §37 / docs/proof/host.md HOST-023).
 //
@@ -26,7 +26,7 @@ import test from 'node:test'
 import { createRequire } from 'node:module'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const root = resolve(here, '../../..')
+const root = resolve(here, '../../../../..')
 const require = createRequire(import.meta.url)
 
 /** Resolve the pinned OpenCode source tree (sibling checkout preferred). */
@@ -170,7 +170,7 @@ test('HOST_023_canary_D_reviewing_sink_table_event_api_model', () => {
   // Prefer package file path — package "exports" no longer expose dist/gen/*.d.ts.
   const sdkTypes = join(
     dirname(fileURLToPath(import.meta.url)),
-    '../../../node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts',
+    '../../../../../node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts',
   )
   assert.equal(existsSync(sdkTypes), true, 'SDK types.gen.d.ts must exist on disk')
   const sdkSrc = readFileSync(sdkTypes, 'utf8')

@@ -1,4 +1,4 @@
-// tests/integration/persist/leave-unread.test.mjs
+// requirements/durable-events/tests/integration/persist/leave-unread.test.mjs
 // P4U3 LEAVE-UNREAD-CONTRACT — Amendment G3.5-A / Phase 4 Active notes.
 //
 // Abandoned on-disk legacy Journal NDJSON + RuntimePath blobs must remain
@@ -26,19 +26,19 @@ import {
   mapEntries,
   payloadOf,
   toList,
-} from '../../unit/support/domain.mjs'
+} from '../../../../verification-system/tests/support/domain.mjs'
 import {
   createBareWorkspace,
   readRemoteStoreOid,
   runGitIn,
-} from './dumb-remote.mjs'
+} from '../../../../verification-system/tests/support/dumb-remote.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const Process = await import('../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
-const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')
-const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
-const Gateway = await import('../../../dist/Infrastructure/Git/GitGateway.js')
+const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const Persist = await import('../../../../../dist/Infrastructure/Persist/StoreTypes.js')
+const Process = await import('../../../../../dist/Infrastructure/Persist/ProcessGitRawStore.js')
+const GitRaw = await import('../../../../../dist/Infrastructure/Persist/GitRawStore.js')
+const Store = await import('../../../../../dist/Infrastructure/Persist/EventStore.js')
+const Gateway = await import('../../../../../dist/Infrastructure/Git/GitGateway.js')
 
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'
 const STALE_RUNTIME_ID = 'abandoned-runtime'

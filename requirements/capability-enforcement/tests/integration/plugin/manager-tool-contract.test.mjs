@@ -1,4 +1,4 @@
-// tests/unit/Plugin/manager-tool-contract.test.mjs — AGENT-004/006/009/010, CTX-002.
+// requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs — AGENT-004/006/009/010, CTX-002.
 //
 // Layer 2 (resource contract): what the Host sees after `initSpikePlugin` — the tool
 // registry, the argument schemas the provider is offered, and the `opencode.json`
@@ -22,8 +22,8 @@ import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { agentJournal, handleId, handleProjection, idValue, roles, sessionId } from '../../unit/support/domain.mjs'
-import { RuntimeResourcesModule_current as currentRuntimeResources } from '../../../dist/Infrastructure/Resources/RuntimeResources.js'
+import { agentJournal, handleId, handleProjection, idValue, roles, sessionId } from '../../../../verification-system/tests/support/domain.mjs'
+import { RuntimeResourcesModule_current as currentRuntimeResources } from '../../../../../dist/Infrastructure/Resources/RuntimeResources.js'
 import {
   withPlugin,
   withExecutablePlugin,
@@ -32,7 +32,7 @@ import {
   notifyCompleted,
   activateLife,
   acceptFirstTodoWrite,
-} from '../../unit/plugin/plugin-fixture.mjs'
+} from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 /** AGENT-002: Role-backed managed agents (Bookkeeper pair added in hostFinalConfig). */
 const ROLE_NAMES = [
@@ -510,7 +510,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
 import {
   source as PAIR_PROGRAMMING_THOUGHT_SOURCE,
   text as PAIR_PROGRAMMING_THOUGHT_TEXT,
-} from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
+} from '../../../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
 
 /** HOST-013: count synthetic pair messages by source identity, never by text. */
 const markerCount = (messages) =>
@@ -687,8 +687,8 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
 test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
   // HOST-013 scope: durable Companion (Blogger) transcripts must not receive
   // pair-programming auto-injected pairs — they pollute the blog tool contract.
-  const { agentFact, sessionId, caseOf, stream } = await import('../../unit/support/domain.mjs')
-  const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+  const { agentFact, sessionId, caseOf, stream } = await import('../../../../verification-system/tests/support/domain.mjs')
+  const { AgentJournalModule_appendAgent } = await import('../../../../../dist/Journal/AgentJournal.js')
 
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const main = sessionId('ses-main-no-auto-injected')

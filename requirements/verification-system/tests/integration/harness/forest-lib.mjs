@@ -114,9 +114,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { relative } from 'node:path';
 
-import { walk } from '../../../scripts/lib/walk.mjs';
-import { canonicalJson } from '../../../dist/Infrastructure/OpenCode/Codec/CanonicalJson.js';
-import { sha256Hex } from '../../../dist/Host/HostDigest.js';
+import { walk } from '../../../../../scripts/lib/walk.mjs';
+import { canonicalJson } from '../../../../../dist/Infrastructure/OpenCode/Codec/CanonicalJson.js';
+import { sha256Hex } from '../../../../../dist/Host/HostDigest.js';
 import { compileScenario } from '../../e2e/support/scenario-schema.js';
 import { faultBody } from '../../e2e/support/delivery-plan.js';
 import { kindOf, turnFragments } from '../../e2e/support/runtime-key.js';

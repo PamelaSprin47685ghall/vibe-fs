@@ -33,9 +33,9 @@ import {
 } from '../../e2e/support/time-budget.js';
 import { harnessProgress } from './progress.mjs';
 
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const RUNNER = 'tests/unit/run.mjs';
-const FIXTURE_DIR = 'tests/unit/support/fixtures';
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
+const RUNNER = 'requirements/verification-system/tests/run.mjs';
+const FIXTURE_DIR = 'requirements/verification-system/tests/support/fixtures';
 
 /**
  * Run the real runner over ONE fixture and report what happened.
