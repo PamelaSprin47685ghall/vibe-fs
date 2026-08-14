@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import {
   enforcer,
   enforcerCatalogResource,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const RULEBOOK = join(ROOT, 'resources/enforcer')

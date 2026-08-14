@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapOfEntries, toList } from '../../../tests/unit/support/domain.mjs'
+import { mapOfEntries, toList } from '../../verification-system/tests/support/domain.mjs'
 import { Model, run, uct } from '../../../dist/Sphinx/MonteCarlo.js'
 import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
 

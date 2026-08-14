@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { idValue, okResult, providerRun, sessionId } from '../../../tests/unit/support/domain.mjs'
+import { idValue, okResult, providerRun, sessionId } from '../../verification-system/tests/support/domain.mjs'
 import {
   isNeedHelpDelta,
   isNeedHelpRelevantEvent,

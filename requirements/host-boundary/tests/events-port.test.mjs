@@ -7,7 +7,7 @@ import test from 'node:test'
 const { Events_HostEventPort, TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { providerRun, sessionId } = await import('../../../tests/unit/support/domain.mjs')
+const { providerRun, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
 
 const completed = (sid, run) =>
   new TerminalOutcome(0, [

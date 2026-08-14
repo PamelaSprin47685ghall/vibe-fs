@@ -42,7 +42,7 @@ import {
   sessionId,
   stream,
   toolCallId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = sessionId('ses_finality_disposition')
 const SESSION_KEY = idValue.session(SESSION)

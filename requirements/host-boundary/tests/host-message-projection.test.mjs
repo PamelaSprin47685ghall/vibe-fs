@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { toList, listItems } from '../../../tests/unit/support/domain.mjs'
+import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   sanitizeMessage,

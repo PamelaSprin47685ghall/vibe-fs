@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { hostCompaction, sessionId } from '../../../tests/unit/support/domain.mjs'
+import { hostCompaction, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const { sha256Hex } = await import('../../../dist/Host/HostDigest.js')
 const { HostSignal, RetrySignal } = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignal.js')

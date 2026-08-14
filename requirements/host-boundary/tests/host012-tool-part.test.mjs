@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { providerProjection, toList } from '../../../tests/unit/support/domain.mjs';
+import { providerProjection, toList } from '../../verification-system/tests/support/domain.mjs';
 const { decodeMessageView, toolResultDigests } = providerProjection;
 
 // VERIFY-007 / HOST-012: Host 1.18.10 的组装形状（message-v2.ts）把 tool 结果

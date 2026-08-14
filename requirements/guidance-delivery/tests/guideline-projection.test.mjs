@@ -7,7 +7,7 @@
 // and duplicate placements (one placement identity → at most one pair).
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listItems } from '../../../tests/unit/support/domain.mjs'
+import { listItems } from '../../verification-system/tests/support/domain.mjs'
 import {
   GuidelineProjection_empty as empty,
   GuidelineProjection_apply as apply,

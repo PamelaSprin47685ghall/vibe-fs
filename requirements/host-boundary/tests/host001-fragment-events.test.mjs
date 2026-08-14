@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hostSignals, caseOf, idValue, payloadOf } from '../../../tests/unit/support/domain.mjs'
+import { hostSignals, caseOf, idValue, payloadOf } from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = 'ses_frag'
 

@@ -5,7 +5,7 @@ import {
   idValue,
   sessionSnapshot,
   toolCallId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', callID = 'call_todo', status = 'pending' } = {}) => ({
   info: { id: messageID, role: 'assistant' },
