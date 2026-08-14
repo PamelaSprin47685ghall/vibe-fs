@@ -1,4 +1,5 @@
-// tests/unit/Context/blogger-toml.test.mjs — CTX-013 Blogger delta schema.
+// requirements/provider-projection/tests/blogger-toml.test.mjs — CTX-013 Blogger delta schema.
+// Moved from tests/unit/context/blogger-toml.test.mjs (cutover Wave 2a); owner: provider-projection.
 //
 // Schema: every delta part is `[[new_work_to_record]]`; kind is the field name.
 // Historic frames: `[[do_not_exec]] historic_frame = …`.
@@ -7,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerToml as toml, syntheticToml as syn } from '../support/domain.mjs'
+import { bloggerToml as toml, syntheticToml as syn } from '../../verification-system/tests/support/domain.mjs'
 
 const item = (part, { role = 'user', truncated = false } = {}) => toml.item({ role, part, truncated })
 

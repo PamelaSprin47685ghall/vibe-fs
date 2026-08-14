@@ -1,4 +1,5 @@
-// tests/unit/Context/fold-context-recovery.test.mjs — PERSIST-010 at the fold.
+// requirements/durable-events/tests/fold-context-recovery.test.mjs — PERSIST-010 at the fold.
+// Moved from tests/unit/context/fold-context-recovery.test.mjs (cutover Wave 2a); owner: durable-events.
 //
 // The projections in blog-projection.test.mjs and prefix-epoch.test.mjs decide
 // whether a line is APPLICABLE. Fold decides what a refusal MEANS: absorbed as a
@@ -21,7 +22,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { blogProjection as blog, bloggerRequestId, envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, frameEpochId, prefixEpochId, idValue } from '../support/domain.mjs'
+import { blogProjection as blog, bloggerRequestId, envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, frameEpochId, prefixEpochId, idValue } from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = 'ses_ctx'
 const session = sessionId(SESSION)

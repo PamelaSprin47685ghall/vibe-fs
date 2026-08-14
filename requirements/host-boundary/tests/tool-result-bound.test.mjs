@@ -1,10 +1,13 @@
+// requirements/host-boundary/tests/tool-result-bound.test.mjs — ARCH-012 bounded tail-keeping.
+// Moved from tests/unit/context/tool-result-bound.test.mjs (cutover Wave 2a); owner: host-boundary.
+//
 // Custom tool results pre-bound under OpenCode Host Truncate defaults.
 // Host: MAX_LINES=2000, MAX_BYTES=51200, default direction=head.
 // We keep the tail and size so Host's head pass is a no-op.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { toolResultBound, syntheticToml } from '../support/domain.mjs'
+import { toolResultBound, syntheticToml } from '../../verification-system/tests/support/domain.mjs'
 
 const hostLines = (text) => text.split('\n').length
 const hostBytes = (text) => syntheticToml.byteCount(text)
