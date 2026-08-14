@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcer } from '../support/domain.mjs'
+import { enforcer } from '../../../tests/unit/support/domain.mjs'
 
 const fields = () => enforcer.fieldNames()
 const tipA = () => fields()[0]

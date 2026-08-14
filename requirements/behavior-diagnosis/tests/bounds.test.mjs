@@ -33,7 +33,7 @@ import {
   syntheticToml,
   authorityRoot,
   logicalRunId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 // EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
 // Production installs at SpikePlugin.init; this suite drives Host without init.

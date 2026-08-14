@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcer } from '../support/domain.mjs'
+import { enforcer } from '../../../tests/unit/support/domain.mjs'
 
 test('ENFORCER_170_catalog_has_exactly_120_rules', () => {
   assert.equal(enforcer.ruleCount, 120)

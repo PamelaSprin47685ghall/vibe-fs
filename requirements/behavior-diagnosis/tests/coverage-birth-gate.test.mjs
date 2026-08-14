@@ -18,7 +18,7 @@ import {
   xTraceCapture,
   listItems,
   caseOf,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const { mainContextFromChunk } = await import('../../../dist/Session/EnforcerHost.js')
 const { XTraceProjection_empty, XTraceProjection_semanticCursorFor, XTraceProjection_parts: xTraceParts } = await import(

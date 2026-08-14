@@ -7,13 +7,12 @@ import {
   RulebookObservation_ofTipsAndFrames as ofTipsAndFrames,
   RulebookObservation_workLogFromUnits as workLogFromUnits,
 } from '../../../dist/Domain/RulebookObservation.js'
-import { listItems } from '../support/domain.mjs'
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { listItems, toList } from '../../../tests/unit/support/domain.mjs'
 
-const pair = (tips, frames) => listItems(pairTipsAndFrames(ofArray(tips), ofArray(frames)))
+const pair = (tips, frames) => listItems(pairTipsAndFrames(toList(tips), toList(frames)))
 
-const tipCycles = (pairs) => ofArray(pairs.map(([name, cycle]) => [name, cycle]))
-const digests = (xs) => ofArray(xs)
+const tipCycles = (pairs) => toList(pairs.map(([name, cycle]) => [name, cycle]))
+const digests = (xs) => toList(xs)
 
 const workLog = (tips, frames) =>
   listItems(ofTipsAndFrames(tipCycles(tips), digests(frames)))
@@ -103,15 +102,15 @@ test('RULEBOOK_OBS_007_ofTipsAndFrames_drops_leftover_frames', () => {
 
 test('RULEBOOK_OBS_008_workLogFromUnits_uses_unit_digests', () => {
   const units = pairTipsAndFrames(
-    ofArray(['a', 'b']),
-    ofArray([
+    toList(['a', 'b']),
+    toList([
       ['d1', 'body'],
       ['d2', undefined],
     ]),
   )
   const obs = listItems(
     workLogFromUnits(
-      ofArray([
+      toList([
         ['a', 'c-a'],
         ['b', 'c-b'],
       ]),
