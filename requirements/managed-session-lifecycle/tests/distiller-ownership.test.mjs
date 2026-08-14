@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, handleProjection, sessionId } from '../../../tests/unit/support/domain.mjs'
+import { agentJournal, caseOf, handleProjection, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const toolRuntimeScopeModule = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { ToolRuntimeScope } = toolRuntimeScopeModule

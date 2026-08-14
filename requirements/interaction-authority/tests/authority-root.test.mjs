@@ -25,7 +25,7 @@ import {
   runtimeId,
   sessionId,
   transportReceipt,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 // Visible stand-in for sha256：被测属性是哪些字段进 digest，不是 digest 函数本身。
 const H = (input) => `H(${input})`

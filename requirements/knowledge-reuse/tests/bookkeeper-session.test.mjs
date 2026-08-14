@@ -25,7 +25,7 @@ import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEve
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { idValue, resultOf, sessionId, toList } from '../../../tests/unit/support/domain.mjs'
+import { idValue, resultOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 import {
   BookkeeperRuntime_setSessionPort as setSessionPort,
   BookkeeperRuntime_resetSessionPort as resetSessionPort,

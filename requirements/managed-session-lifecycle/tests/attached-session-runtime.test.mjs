@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, sessionId, syncDelegate } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, sessionId, syncDelegate } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   AttachedSessionRuntime,

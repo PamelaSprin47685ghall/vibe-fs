@@ -12,7 +12,7 @@ import { shelfmarkFor } from '../../../dist/Infrastructure/CasebookIndex.js'
 import { Observation } from '../../../dist/Domain/Casebook.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { listItems, toList, resultOf } from '../../../tests/unit/support/domain.mjs'
+import { listItems, toList, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
 import {
   BookkeeperRuntime_setSessionPort as setSessionPort,

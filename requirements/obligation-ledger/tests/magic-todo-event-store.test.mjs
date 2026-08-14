@@ -15,7 +15,7 @@ import {
   stream,
   toolCallId,
   utcOffset,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const Store = await import('../../../dist/Infrastructure/Persist/EventStore.js')
 const GitRaw = await import('../../../dist/Infrastructure/Persist/GitRawStore.js')

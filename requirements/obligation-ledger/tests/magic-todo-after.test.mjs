@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { caseOf } from '../../../tests/unit/support/domain.mjs'
+import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 import {
   assignmentDelivery,
   AssignmentDelivery,

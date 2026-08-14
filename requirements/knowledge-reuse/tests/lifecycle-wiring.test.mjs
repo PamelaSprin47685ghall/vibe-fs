@@ -28,7 +28,7 @@ import {
 import { loadEvents, project } from '../../../dist/Infrastructure/CasebookStore.js'
 import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
-import { caseOf, listItems, mapEntries, resultOf } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, mapEntries, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import {
   CANONICAL_A,
   CANONICAL_Q,

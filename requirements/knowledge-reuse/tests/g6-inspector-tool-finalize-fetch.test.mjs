@@ -51,7 +51,7 @@ import {
   roles,
   sessionId,
   xTraceCapture,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import {
   BookkeeperRuntime_setSessionPort as setSessionPort,
   BookkeeperRuntime_resetSessionPort as resetSessionPort,

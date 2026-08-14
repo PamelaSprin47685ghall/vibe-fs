@@ -26,7 +26,7 @@ import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEve
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { caseOf, listItems, resultOf, sessionId, toList } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, resultOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 import {
   CANONICAL_A,
   CANONICAL_Q,

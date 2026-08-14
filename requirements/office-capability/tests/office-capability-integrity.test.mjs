@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { caseOf, managedAgentCatalog, roles } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, managedAgentCatalog, roles } from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const PROVIDER = join(ROOT, 'resources/provider')

@@ -25,7 +25,7 @@ import {
   rootKind,
   runtimeId,
   sessionId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const H = (input) => `H(${input})`
 

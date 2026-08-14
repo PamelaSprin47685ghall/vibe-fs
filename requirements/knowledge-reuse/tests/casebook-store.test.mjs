@@ -21,7 +21,7 @@ import {
 import { Observation } from '../../../dist/Domain/Casebook.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { caseOf, listItems, mapEntries, resultOf, toList } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems, mapEntries, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, hash) => new Observation(obsIndex('FileRead'), [path, hash])

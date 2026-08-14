@@ -13,7 +13,7 @@ import {
   requiresLag1Rebase,
   todoCheckpointEvidence,
 } from '../../../dist/Domain/MagicTodoPrefixEpoch.js'
-import { magicTodo, managerLifeId, toList, toolCallId } from '../../../tests/unit/support/domain.mjs'
+import { magicTodo, managerLifeId, toList, toolCallId } from '../../verification-system/tests/support/domain.mjs'
 
 const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('manager-life')

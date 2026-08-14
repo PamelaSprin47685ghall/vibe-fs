@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf } from '../../../tests/unit/support/domain.mjs'
+import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   ChildRunModule_bindSession,

@@ -13,7 +13,7 @@ import {
   ofExecCommand,
   contentHash,
 } from '../../../dist/Infrastructure/CasebookCapture.js'
-import { caseOf, listItems } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 test('CASE003_read_capture_is_typed_and_hashed', () => {
   const obs = capture('read', { path: 'src/a.fs' }, 'module A')

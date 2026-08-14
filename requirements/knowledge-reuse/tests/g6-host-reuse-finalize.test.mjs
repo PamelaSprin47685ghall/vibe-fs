@@ -51,7 +51,7 @@ import {
   roles,
   sessionId,
   xTraceCapture,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import {
   CANONICAL_A,
   CANONICAL_Q,
