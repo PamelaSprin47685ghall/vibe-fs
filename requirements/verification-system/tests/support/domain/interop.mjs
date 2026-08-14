@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 
-export const BUILD_ROOT = new URL('../../../../dist/', import.meta.url).pathname
+export const BUILD_ROOT = new URL('../../../../../dist/', import.meta.url).pathname
 
 // ── locating the emitted library ─────────────────────────────────────────────
 // The fable-library directory carries its version (fable-library-js.5.13.0).

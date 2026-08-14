@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Test/Fable-boundary ratchet (Wave 1, Proposal ch. 19).
 //
-// The anti-corruption boundary is tests/unit/support/domain/ — the ONLY place
-// tests may touch Fable internals (dist/fable_modules/**). Ordinary unit and
+// The anti-corruption boundary is requirements/verification-system/tests/support/domain/
+// (moved from tests/unit/support/domain/ during the requirements cutover) — the ONLY
+// place tests may touch Fable internals (dist/fable_modules/**). Ordinary unit and
 // integration tests must reach Fable shapes through the domain adapters.
 //
 // Existing violations (imports of dist/fable_modules/** in *.test.mjs that

@@ -9,28 +9,28 @@
 //   2. Supervise a child that runs node:test, with a silence window fed by test VERDICTS.
 //   3. Own the authoritative counts, because the reporter's are wrong (see supervise helper).
 //
-// Discovery is *.test.mjs under tests/unit/ plus structural eval oracles under tests/eval/.
-// registration.
+// Discovery is *.test.mjs under requirements/<package>/tests/ (package-owned
+// proof), excluding tests/e2e/ and tests/integration/ which own their own
+// entrypoints and silence criteria.
 //
-//   node tests/unit/run.mjs
-//   node tests/unit/run.mjs --skip-staleness-check   (build-tooling work only)
+//   node requirements/verification-system/tests/run.mjs
+//   node requirements/verification-system/tests/run.mjs --skip-staleness-check   (build-tooling work only)
 //
-// Supervision lives in tests/e2e/support/supervise-node-test.mjs so integration/package share
-// the same verdict-silence criterion (VERIFY-004). UNIT_VERDICT_SILENCE_MS remains the unit budget.
+// Supervision lives in requirements/verification-system/tests/e2e/support/supervise-node-test.mjs
+// so integration/package share the same verdict-silence criterion (VERIFY-004).
+// UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
 import { statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { UNIT_VERDICT_SILENCE_MS } from '../e2e/support/time-budget.js'
-import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
-import { walk } from '../../scripts/lib/walk.mjs'
+import { UNIT_VERDICT_SILENCE_MS } from './e2e/support/time-budget.js'
+import { superviseNodeTest } from './e2e/support/supervise-node-test.mjs'
+import { walk } from '../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
-const TESTS_ROOT = 'tests/unit'
 const REQUIREMENTS_ROOT = 'requirements'
-const EVAL_ROOT = 'tests/eval'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const BUILD_ROOT = 'dist'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -115,23 +115,24 @@ if (skipStaleness) {
 // be forbidden; this is the runner's own harness surface, and the override is announced on stderr so
 // it cannot be used to quietly narrow a CI run.
 const override = process.env.TESTS_MJS_FILES
+// Package-owned proof: every oracle lives under requirements/<package>/tests/.
+// Long-stroke (tests/e2e/) and integration suites (tests/integration/) own
+// their silence criterion and are excluded here — they run via their own
+// entrypoints (verification-system e2e entry, integration orchestrator).
 const files = override
   ? override
       .split(',')
       .map((file) => file.trim())
       .filter(Boolean)
-  : [
-      ...walk(TESTS_ROOT, ['.test.mjs']),
-      ...walk(EVAL_ROOT, ['.test.mjs']),
-      // Package-owned proof: every migrated/package-local oracle lives under
-      // requirements/<package>/tests/*.test.mjs and joins the same suite.
-      ...walk(REQUIREMENTS_ROOT, ['.test.mjs']),
-    ]
+  : walk(REQUIREMENTS_ROOT, ['.test.mjs']).filter((file) => {
+      const rel = file.replace(/\\/g, '/')
+      return !rel.includes('/tests/e2e/') && !rel.includes('/tests/integration/')
+    })
 
 if (override) console.error(`runner: discovery OVERRIDDEN by TESTS_MJS_FILES (${files.length} file(s))`)
 
 if (files.length === 0) {
-  console.error(`runner: no *.test.mjs found under ${TESTS_ROOT}/`)
+  console.error(`runner: no *.test.mjs found under ${REQUIREMENTS_ROOT}/`)
   process.exit(1)
 }
 

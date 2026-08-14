@@ -21,14 +21,14 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { walk } from '../../scripts/lib/walk.mjs'
+import { walk } from '../../../scripts/lib/walk.mjs'
 import { introspect } from './support/domain.mjs'
 
 // Repo-relative, because `walk` takes a path and `introspect.buildRoot` is the
 // absolute URL form the facade resolves modules through.
 const BUILD_ROOT = 'dist'
 
-const load = (modulePath) => import(new URL(`../../dist/${modulePath}.js`, import.meta.url).pathname)
+const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
 
 /** Every emitted name, minus the reflection metadata Fable adds per type. */
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
@@ -231,7 +231,7 @@ test('VERIFY_008_every_emitted_module_actually_loads', async () => {
   const failures = []
   for (const file of modules) {
     try {
-      await import(new URL(`../../${file}`, import.meta.url).pathname)
+      await import(new URL(`../../../${file}`, import.meta.url).pathname)
     } catch (error) {
       failures.push(`${file}: ${error.message.split('\n')[0]}`)
     }

@@ -10,9 +10,9 @@ import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { Watchdog } from './watchdog.js'
-import { classifyVerdict } from '../../unit/support/verdict-feed.mjs'
+import { classifyVerdict } from '../../support/verdict-feed.mjs'
 
-export const NODE_TEST_INNER = fileURLToPath(new URL('../../unit/support/run-inner.mjs', import.meta.url))
+export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
 
 /**
  * @param {{

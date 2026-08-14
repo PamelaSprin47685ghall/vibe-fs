@@ -7,9 +7,11 @@
 // Modes:
 //   node scripts/checks/e2e-watchdog-feed.mjs     exit 0 clean, exit 1 on violation
 //
-// Scope EXACTLY: top-level tests/e2e/*.test.mjs (One World sole entry).
-// Do not require tests/e2e/cases/; missing or empty cases/ is fine.
-// tests/e2e/support/* are the allowed feeders and are never flagged.
+// Scope EXACTLY: top-level e2e/*.test.mjs in the verification-system package
+// (requirements/verification-system/tests/e2e/ — the One World sole entry,
+// relocated from tests/e2e during the requirements cutover).
+// Do not require e2e/cases/; missing or empty cases/ is fine.
+// e2e/support/* are the allowed feeders and are never flagged.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -50,7 +52,7 @@ export const scanE2EWatchdogFeed = (files) => {
  * Paths are resolved against ROOT.
  */
 export const e2eTestCaseFiles = () => {
-  const dir = join(ROOT, 'tests/e2e')
+  const dir = join(ROOT, 'requirements/verification-system/tests/e2e')
   let names
   try {
     names = readdirSync(dir)

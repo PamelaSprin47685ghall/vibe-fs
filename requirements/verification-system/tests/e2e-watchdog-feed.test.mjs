@@ -21,7 +21,7 @@ test('E2E_WATCHDOG_FEED_case_files_do_not_feed_watchdog_directly', () => {
   // Sole entry path is the required-exactly-one-when-present cutover target.
   assert.ok(
     files.some((file) => file.endsWith('/tests/e2e/entry.test.mjs') || file.endsWith('tests/e2e/entry.test.mjs')),
-    'expected top-level sole entry tests/e2e/entry.test.mjs in scope',
+    'expected top-level sole entry e2e/entry.test.mjs (verification-system package) in scope',
   )
 
   // Missing/empty cases/ must be tolerated: do not walk or require that directory.
