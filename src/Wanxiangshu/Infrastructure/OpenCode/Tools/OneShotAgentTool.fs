@@ -128,6 +128,7 @@ module OneShotAgentTool =
                         // Ok carries (formal text, optional WorkRecord); Error is the
                         // Result.Error channel (timeout sibling) — not SetException.
                         let completion = TaskCompletionSource<Result<string * string option, string>>()
+                        emitJsExpr completion.Task "$0.catch(() => {})" |> ignore
                         // DSL-MUTABLE: subscription — one-shot terminal subscription
                         let mutable subscription: IDisposable option = None
                         // DSL-MUTABLE: resource — one-shot completion latch

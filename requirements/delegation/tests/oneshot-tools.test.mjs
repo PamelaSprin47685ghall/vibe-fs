@@ -363,7 +363,7 @@ test('ONESHOT_aborted_terminal_surfaces_an_error', async () => {
     await waitForPrompt(sessions)
     sessions.fireTerminal(new TerminalOutcome(1, ['operator killed it']))
 
-    await assert.rejects(pending, /Coder aborted: operator killed it/)
+    await assert.rejects(pending, (err) => /Coder aborted: operator killed it/.test(err?.message ?? String(err)))
   } finally {
     live.cleanup()
   }
@@ -378,7 +378,7 @@ test('ONESHOT_failed_terminal_surfaces_an_error', async () => {
     await waitForPrompt(sessions)
     sessions.fireTerminal(new TerminalOutcome(2, ['provider exploded']))
 
-    await assert.rejects(pending, /Coder failed: provider exploded/)
+    await assert.rejects(pending, (err) => /Coder failed: provider exploded/.test(err?.message ?? String(err)))
   } finally {
     live.cleanup()
   }
