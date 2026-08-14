@@ -16,11 +16,11 @@ import {
 } from '../../../dist/Domain/JsSurface.js'
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
 import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
-import { isNone, isSome, listItems, roles } from '../support/domain.mjs'
+import { FsSet } from '../../../tests/unit/support/domain.mjs'
+import { isNone, isSome, listItems, roles } from '../../../tests/unit/support/domain.mjs'
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
-const caps = (...permissions) => ofArray(permissions, permissionComparer)
+const caps = (...permissions) => FsSet.ofArray(permissions, permissionComparer)
 const jsProse = () => loadJsProse(ProviderLanguage.English)
 // surface(role, permissionNameArray) — names only; conversion happens here so
 // call sites can never drift from the ToolPermission vocabulary.

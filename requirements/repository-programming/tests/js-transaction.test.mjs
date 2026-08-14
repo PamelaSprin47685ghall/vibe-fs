@@ -19,7 +19,7 @@ import {
   JsTransaction_rollbackPlan as rollbackPlan,
 } from '../../../dist/Domain/JsTransaction.js'
 import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
-import { listItems, resultOf, toList } from '../support/domain.mjs'
+import { listItems, resultOf, toList } from '../../../tests/unit/support/domain.mjs'
 
 const ok = (result) => resultOf(result).ok
 const codeOf = (result) => failureCode(resultOf(result).error)

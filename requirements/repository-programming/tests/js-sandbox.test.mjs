@@ -9,7 +9,7 @@ import test from 'node:test'
 
 import { run, wrapProgram } from '../../../dist/Process/JsSandbox.js'
 import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
-import { resultOf } from '../support/domain.mjs'
+import { resultOf } from '../../../tests/unit/support/domain.mjs'
 
 const runWrapped = async (wrapped, api, { deadlineMs = 2000, outputBound = 1 << 20 } = {}) => resultOf(await run(wrapped, api, deadlineMs, outputBound))
 

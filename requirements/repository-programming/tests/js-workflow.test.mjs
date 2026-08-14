@@ -15,9 +15,9 @@ import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSur
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
 import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
-import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
+import { FsSet } from '../../../tests/unit/support/domain.mjs'
 import { parse as parseToml } from 'smol-toml'
-import { caseOf, listItems, resultOf } from '../support/domain.mjs'
+import { caseOf, listItems, resultOf } from '../../../tests/unit/support/domain.mjs'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
@@ -26,7 +26,7 @@ const sandbox = () => {
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
 const jsProse = () => loadJsProse(ProviderLanguage.English)
-const coderCaps = ofArray(
+const coderCaps = FsSet.ofArray(
   [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
   permissionComparer,
 )
