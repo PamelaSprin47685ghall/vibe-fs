@@ -10,15 +10,15 @@ Manager 是长期 mission 的执行者。系统随时要回答同一个问题：
 
 - **phase/status 伪装进度**：`pending → in_progress → reviewing → completed` 描述的是「我现在在哪个工作阶段」，
   不是「用户请求仍缺哪些真」。计划、等待、评审被冒充成债务，系统把过程动作当成用户仍欠的结果。
-- **meta-work 冒充债务**：`make a plan` / `analyze first` / `write todos` 被写进账本——
-  把 Planning Table 本身伪装成 mission debt，还会过早触发 T1 揭幕。
+- **planning debt 与 mission debt 被强迫伪装成同一种东西**：模型在计划尚未完备时仍需要记录调查、分析、分解等工作；若协议禁止这些工作进入账本，模型只会把它们改名成假的 mission debt，反而让账本失真并过早触发 T1。
 - **reviewer 拥有账本写权**：PERFECT/REVISE 决定哪个 account 才「真正生效」，
   制造 accepted-but-not-current 半态、回滚语义和第二 writer；崩溃恢复要重演 merge 策略。
 - **崩溃后只能猜**：用内存 Stage、布尔组合、时间猜测恢复，而不是重放 durable Accepted 链。
 
-**obligation-ledger 保证：当前 mission debt 有一个唯一真相源（last `TodoWriteAccepted` 对应的完整
-`{name,work}` account），由 Journal fold 纯推导，任何阶段机、meta-work、reviewer settlement 或 Host
-UI 表都无权改写它。**
+**obligation-ledger 保证：当前 owed work 有一个唯一真相源（last `TodoWriteAccepted` 对应的完整
+account）。`planComplete=false` 时它可以诚实记录把计划做完仍欠的 planning work；第一次 accepted
+`planComplete=true` 是不可逆 commitment，此后同一账本只记录 mission debt。该单调关系由 Journal fold
+从 Accepted facts 纯推导，任何阶段机、reviewer settlement 或 Host UI 表都无权改写它。**
 
 ## 2. 独立存在测试（Independent Change Test）
 
@@ -34,7 +34,7 @@ work-record、prefix-stability）的 WHAT 一律不需要改。
 RED = 满足下列任一：
 
 1. 当前 mission debt 无唯一真相源（Host TodoTable、reviewer、内存 Stage 都可以当 current）；
-2. workflow / meta-work 被当成用户仍欠的结果（`make a plan` 之类占 obligation）；
+2. `planComplete=false` 时 planning work 被迫伪装成 mission debt，或 commitment 后仍把 planning placeholder 当成 mission debt；
 3. REVISE 能静默回滚已经 accepted 的 account（reviewer settlement / semanticMerge 复活）；
 4. 崩溃恢复不重放 Accepted 链而靠 Stage / 布尔 / 时间猜；
 5. 同一 message 多个 todowrite 有 winner 仲裁，或 infra 失败被降格成 tool 红字。
@@ -49,7 +49,7 @@ RED = 满足下列任一：
 |---|---|
 | 同 message 多 todowrite 按 hook 到达顺序仲裁 winner | 全部作为语法/协议错误拒绝；无 ordinal winner |
 | V2 runner 裸奔（无 hook parity） | Attempt construction fail closed；错入则 fatal |
-| Host 用自然语言关键词分类器识别 meta-work | 分类器会把脆弱启发式重新变成隐藏状态机；语义只在 provider decision surface 表达 |
+| Host 用自然语言关键词分类器识别 meta-work | 分类器无法区分合法 planning work 与 commitment 后的伪 mission debt；改用 provider 显式 `planComplete` + durable 单调 latch |
 | reviewer 以 PERFECT/REVISE 决定哪个 account 生效 | reviewer 只判断并报告；REVISE 不涂改 Tk |
 | 每 Life 从 Host TodoTable adopt 旧项 | 新 Life canonical 空；仅升级瞬间一次 seed |
 | 用 `TodoStage`/`AwaitingReview` 程序计数器 | 恢复只从 durable facts 推导 |

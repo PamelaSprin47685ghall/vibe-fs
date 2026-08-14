@@ -240,7 +240,7 @@ export const magicTodoAdmission = (() => {
 /** Magic Todo's raw Host argument and compatibility-output boundary. */
 export const magicTodoHost = (() => {
   const m = bind(MagicTodoHostCodecModule, 'MagicTodoHostCodec', [
-    'tryDecodeObligations',
+    'tryDecodeInput',
     'canonicalInput',
     'canonicalInputDigest',
     'replaceCompatibilityArgs',
@@ -249,7 +249,7 @@ export const magicTodoHost = (() => {
   ])
 
   return {
-    decodeObligations: (args) => resultOf(m.tryDecodeObligations(args)),
+    decodeInput: (args) => resultOf(m.tryDecodeInput(args)),
     canonicalInput: (args) => m.canonicalInput(args),
     canonicalInputDigest: (sha256, args) => m.canonicalInputDigest(sha256, args),
     replaceCompatibilityArgs: (output, rows) => m.replaceCompatibilityArgs(output, toList(rows)),

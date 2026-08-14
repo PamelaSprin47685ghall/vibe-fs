@@ -6,19 +6,22 @@ work-record、prefix-stability、participant-horizon、effect-accounting）只�
 历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `PROOF.md`。
 
 词汇：`Tk` = 第 k 个 `TodoWriteAccepted`；`Pk` = Tk 提交的完整 obligation account；
-`C(k-1)` = Tk 之前的 `CurrentObligations`；`Rk` = Tk 派生的过程评审义务；`T1` = 本 Life 第一次
-`TodoWriteAccepted`（BlindPlan commitment）。
+`Dk` = Tk 对应 provider submission 的原始 `planComplete`；`Ek = D1 ∨ ... ∨ Dk` = Tk 后的有效 commitment latch；
+`C(k-1)` = Tk 之前的 `CurrentObligations`；`Rk` = Tk 派生的过程评审义务；`T1` = 最小满足 `Dk=true`
+的 Accepted checkpoint（BlindPlan commitment）。若从未出现 `true`，该 Life 仍是 Pre-T1。
 
 ---
 
-## OBLIGATION-LEDGER-001：当前义务 = mission debt，不是 workflow stage
+## OBLIGATION-LEDGER-001：当前义务 = 当前仍欠的工作，不是 workflow status
 
-**规范**：`CurrentObligations` 只描述「为了让用户请求真正满足，仍需成为真的工作 / 证据 / 条件」。
-它不描述「我现在处于哪个工作阶段」，不携带 `kind` / `id` / `status` / `priority` / `reviewing`
-之类的 provider-visible 冷状态，也没有 alias。
+**规范**：`CurrentObligations` 始终描述「在当前 relation 下仍欠什么」。Pre-T1（`Ek=false`）时，
+它可以诚实记录把计划做完仍欠的调查、分析、分解、验证与决策；Post-T1（`Ek=true`）时，它只描述
+为了真正满足用户请求仍需成为真的 mission work / evidence / condition。它不携带 `kind` / `id` /
+`status` / `priority` / `reviewing` 之类 provider-visible 冷状态，也没有 alias。
 
-**含义 / 动机**：Manager 生命周期唯一诚实的进度表示是「还欠什么」，不是「走到哪一步」。
-阶段机把计划、等待、评审冒充成用户债务（TODO-002/003；GrandRewrite 删除 provider 冷状态）。
+**含义 / 动机**：Manager 生命周期唯一诚实的进度表示是「现在还欠什么」，不是伪造 status。
+强迫 Pre-T1 账本假装只有 mission debt 会诱使模型把 planning work 改名成假的实现义务；显式 commitment
+边界允许同一账本在托付前后保持真实，而不引入机械 stage 枚举。
 
 **边界**：阶段语义（无持久程序计数器）由 `structured-workflow` 拥有；本包只拥有「账本不伪装进度」。
 Provider surface 的 schema 形态是当前实现（HOW），不是永久合同。
@@ -30,16 +33,17 @@ Provider surface 的 schema 形态是当前实现（HOW），不是永久合同�
 **规范**：
 
 ```text
-todowrite(obligations: [{ name: string, work: string }])
+todowrite(planComplete: bool, obligations: [{ name: string, work: string }])
 CurrentObligations = last accepted obligations list
+effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 ```
 
 `name` 在同一 obligation 存续期间稳定；`work` 是自然语言描述该义务仍欠什么。
 Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；
 不得在真正 discharge 后仅为「曾出现在计划中」而保留。
 
-**含义 / 动机**：wire 唯一语言是 `{name, work}` account；`CurrentObligations` 由 Journal fold 从
-Accepted 链纯推导，任何其它 writer 不得改动（TODO-002/005）。
+**含义 / 动机**：wire 唯一语言是显式 `planComplete` + `{name, work}` account；`CurrentObligations`
+与 commitment latch 都由 Journal fold 从 Accepted/Prepared identity 纯推导，任何其它 writer 不得改动。
 
 **边界**：`name`/`work` 字段名与 schema 具体形态是当前 surface（HOW）；「accepted account 即当前」的
 supersession 语义见 OBLIGATION-LEDGER-010。
@@ -60,30 +64,29 @@ supersession 语义见 OBLIGATION-LEDGER-010。
 
 **证据** → PROOF.md 行 O-3。
 
-## OBLIGATION-LEDGER-004：meta-work 不是 mission obligation
+## OBLIGATION-LEDGER-004：planning work 只在 commitment 前合法
 
-**规范**：`make a plan`、`analyze the request`、`write todos`、`decide next steps`、`先规划`、
-`先分析` 等 meta-work 不是 mission obligation。需要这些认知动作时直接完成它们，不占成 todo。
-对候选项同时做 **completion counterfactual**：若该项被完美完成而用户要求的世界状态/交付物仍未改变，
-只是 Manager 更理解、有清单、有计划或知道下一步，则它只是规划认知（TODO-002）。
+**规范**：当 effective `planComplete=false` 时，`make a plan`、调查仓库、分析请求、列出工作、决定
+下一步等 planning work 可以成为当前 obligation，只要它真实描述「为了把计划做完还欠什么」。当 effective
+`planComplete=true` 后，同类条目若只是增加 Manager 自己的理解、清单或下一步决定，就不再是 mission
+obligation；此时对候选项使用 completion counterfactual，必须改写为用户世界/交付物仍欠的结果与证据。
 
-**含义 / 动机**：若把 Planning Table 本身写进账本，模型会把「规划」冒充成用户债务，
-并过早触发 T1 揭幕（TODO-015）。
+**含义 / 动机**：语言模型确实会把规划工作写进 todo。与其要求它用自然语言伪装，不如让它在显式
+Pre-T1 账本中诚实记录；真正不可逆的边界由 `planComplete` commitment 决定，而不是由关键词猜测。
 
-**边界**：该判定是**语义形状**，Host 不得按关键词分类或拒绝（见 OBLIGATION-LEDGER-005）。
-T1 特例的 commitment framing 见 OBLIGATION-LEDGER-016。
+**边界**：Host 不得按 `plan` / `survey` 等自然语言关键词分类；唯一机器判据是 durable commitment latch。
+T1 commitment 见 OBLIGATION-LEDGER-016。
 
 **证据** → PROOF.md 行 O-4。
 
-## OBLIGATION-LEDGER-005：可托付完整性（handoff-completeness）
+## OBLIGATION-LEDGER-005：obligation 必须可闭环，不得只是空槽位
 
-**规范**：每项 obligation 必须单独写清楚「欠的结果是什么」以及「什么证据足以闭环」，达到另一位
-称职 Manager 无需替提交者发明缺失内容即可执行和验收的程度。`placeholder: planning`、`TBD`、
-裸阶段名、仅占槽位的 label、把内容推迟到未来的 name/work 都不是较小的 obligation，
-而是尚未完成的 Planning Table 认知。
+**规范**：无论 Pre-T1 还是 Post-T1，每项 obligation 都必须说明足以判断其完成的具体 owed work。
+Pre-T1 可闭环的是 planning result（例如建立某事实、完成某分解、解决某不确定性）；Post-T1 可闭环的是
+mission result / closure evidence。`placeholder: planning`、`TBD`、裸阶段名或只占槽位而没有实际 work
+的条目仍然不构成 obligation；但具体的 planning task 不再因它属于规划而被禁止。
 
-**含义 / 动机**：可托付完整性是 meta-work 边界（OBLIGATION-LEDGER-004）的独立 gate：
-无法由另一 Manager 直接判断 outcome + closure evidence 的条目不是 debt（TODO-002）。
+**含义 / 动机**：新协议放宽的是「planning work 可以记账」，不是允许无内容 token 冒充工作。
 
 **边界**：该判定是语义形状，Host 不得用自然语言关键词分类器拒绝这些字符串——
 分类器会把脆弱启发式重新变成隐藏状态机。`MagicTodoHostCodec` 不得出现
@@ -293,26 +296,28 @@ reviewing 降级 in_progress 等）是**兼容性实现**，属 HOW「历史与�
 
 ## OBLIGATION-LEDGER-016：T1 commitment 与 Opening 关闭
 
-**规范**：本 Life 第一次 accepted `todowrite` = T1 commitment（CommitmentContract）。
+**规范**：每次 `todowrite` 必须显式提交 `planComplete: bool`。本 Life 第一次 accepted
+`planComplete=true` = T1 commitment（CommitmentContract）；在此之前任意数量的 accepted
+`planComplete=false` 都是合法 Planning Table checkpoint。
 
 ```text
-todowrite(T1)
-  → validate
-  → durably TodoWriteAccepted(T1)
-  → derive: first accepted todo in this Life
-  → render canonical T1 result containing entrustment revelation
-  → persist exact provider-visible result
-  → return
-  → Opening closes；WorkRecordStart = OpeningBoundary
+Dk = submitted planComplete of Accepted(Tk)
+Ek = D1 OR ... OR Dk
+T1 = first Tk where Dk = true
+
+before T1: accepted false checkpoints are planning accounts; Opening stays open
+at T1:     reveal entrustment; Opening closes; WorkRecordStart = OpeningBoundary
+after T1:  effective planComplete is forever true, even if provider later submits false
 ```
 
 T1 call + canonical accepted result 属 constitutive OpeningMaterial。交托只经 conversation tool
 result；**禁止** system prompt / Persona / Role Law 切换。每个新 Life（含 Reawakening）重新进入
 BlindPlan Opening（TODO-015/GLORY-074）。
 
-**含义 / 动机**：T1 是对初始判断的一次不可逆承诺——「没有第二次第一次提交」。后续 living account
-仍可因现实变化、新证据或纠偏而更新，但不得用这种可更新性为 T1 的遗漏、placeholder 或延后决定
-开后门（TODO-002 的 T1 特例；规范性 commitment pressure，不是 Host 禁止后续更新）。
+**含义 / 动机**：T1 是对「计划已经完备」的一次不可逆承诺——「没有第二次第一次 true」。
+LLM 可以在 Planning Table 用 false checkpoint 诚实维护 planning work；一旦提交 true，后续 living account
+仍可因现实变化、新证据或纠偏更新，但 commitment latch 不可回退。provider 后续传 false 时，Host 仍按
+true 解释，并继续要求 mission-debt account。这个不可逆性是真实 Host 语义，不再只是 prompt pressure。
 
 **边界**：OpeningMaterial / WorkRecordStart 的 LWR 表示与压缩 floor 属 `work-record`；system
 prompt 字节稳定属 `participant-identity` + `prefix-stability`；T1 文案具体 wording 是 HOW。
@@ -322,7 +327,8 @@ prompt 字节稳定属 `participant-identity` + `prefix-stability`；T1 文案�
 ## OBLIGATION-LEDGER-017：Manager BlindPlan Opening（无生产 Activation）
 
 **规范**：Manager OpeningPolicy = BlindPlan。Pre-T1 = Planning Table：替将要扛路的另一 Manager 写
-诚实义务账，可调查，**不得**开始执行所规划之路。T1 accepted 后才进入 Living Mission。
+诚实计划，可调查，**不得**开始执行所规划之路；可以反复用 `todowrite(planComplete=false, ...)`
+记录当前仍欠的 planning work。只有第一次 accepted `planComplete=true` 才进入 Living Mission。
 删除生产路径上的 planning-only → Activation 两阶段：`PlanningTail`、`ManagerWorkActivation`、
 `WorkActivated` 业务资格、Birth/Labor compression floor、Activation-only suicide gate、
 Planning→Working system prompt 切换均非生产合同（TODO-001/GLORY-074）。
@@ -338,9 +344,10 @@ Opening 永久 raw 的保护语义属 `work-record`。
 
 ## OBLIGATION-LEDGER-018：恢复只从 durable facts；禁止程序计数器与平行证据
 
-**规范**：恢复只从 durable facts 重建（`TodoWritePrepared` / `TodoWriteAccepted` live-or-recovery /
-physical ToolPart / `VerdictKnown` / `TodoReviewConcluded` 等），不靠内存 Stage、布尔组合、
-时间猜测或「下次还应发生」。不得新增或恢复为控制状态：
+**规范**：恢复只从 durable facts 重建（`TodoWritePrepared.planComplete` / `TodoWriteAccepted` live-or-recovery /
+physical ToolPart / `VerdictKnown` / `TodoReviewConcluded` 等），不靠内存 Stage、独立 phase bool、
+时间猜测或「下次还应发生」。`effectivePlanComplete` 是 Accepted Prepared 声明的单调 OR 投影，属于
+业务事实，不是程序计数器。不得新增或恢复为控制状态：
 
 ```text
 TodoPlanningStage / ReviewStage / AwaitingReview bool
@@ -407,20 +414,23 @@ Manager 不可见 dedicated session/barrier/witness 的 admission 归 `participa
 
 **证据** → PROOF.md 行 O-20。
 
-## OBLIGATION-LEDGER-021：desired lag-1 cutoff 仅由 Accepted 链推导
+## OBLIGATION-LEDGER-021：desired lag-1 cutoff 仅由 committed Accepted 子链推导
 
-**规范**：Accepted checkpoints 只使 **desired** lag-1 cutoff 可推导；**不**在 todowrite after 提交
-PrefixEpoch。
+**规范**：Pre-T1 `planComplete=false` checkpoints 仍属于未关闭的 Opening，**不得**派生 TodoCheckpoint
+Prefix rebase。令 `CommittedAccepted = [Tk | Ek=true]`（从 T1 起，含 T1 后 provider 误传 false 的
+checkpoints）；只有这个子链使 desired lag-1 cutoff 可推导，且**不**在 todowrite after 提交 PrefixEpoch。
 
 ```text
-desiredCutoff(Tk) = Before(T(k-1) tool-call)   // T1 无 prior
+desiredCutoff(first CommittedAccepted = T1) = None
+desiredCutoff(committed checkpoint j≥2) = Before(previous committed checkpoint tool-call)
 ```
 
 下一 provider attempt seal/绑定前原子 `PrefixRebaseCommitted`（`EvidenceKind=TodoCheckpoint`），
-进入既有 `ActivePrefixEpoch` SSOT；provider 成败不回滚已 seal epoch（TODO-009）。
+进入既有 `ActivePrefixEpoch` SSOT；provider 成败不回滚已 seal epoch。
 
-**含义 / 动机**：desired ≠ committed。Accepted 链是 cutoff 推导的唯一事实源；seal 时点属于
-下一 provider attempt 的 transform 边界，不是 todowrite 的 after。
+**含义 / 动机**：desired ≠ committed。过滤 Pre-T1 planning checkpoints 是 Opening 永 raw 的必要条件；
+commitment 后的 Accepted 子链才是 TodoCheckpoint cutoff 的事实源。seal 时点属于下一 provider attempt
+的 transform 边界，不是 todowrite 的 after。
 
 **边界**：PrefixEpoch / `ActivePrefixEpoch` SSOT、`PrefixCoverage` 与 rebase 机制属
 `prefix-stability`；本包只拥有「desired cutoff 的事实源 = Accepted 链」。
@@ -445,8 +455,9 @@ desiredCutoff(Tk) = Before(T(k-1) tool-call)   // T1 无 prior
 
 **规范**：`MagicTodoManagerGuideline` 是 **Manager-only** fragment，与全局 pair-programming
 guideline（HOST-013）分离；不得并入全局文案。其冻结语义覆盖：obligations 增删（keep while owed /
-remove when earned）、checkpoint 连续性（lag-1）、T1 首收（第一次 todowrite = 完整道路账）、
-不伪造 Activation（Pre-T1/T1/Post-T1 是 conversation relation，不是 persisted phase）
+remove when earned）、checkpoint 连续性（lag-1）、Pre-T1 可用 `planComplete=false` 维护 planning account、
+第一次 accepted true = 不可逆 T1、true 后 false 仍按 true、不伪造 Activation（Pre-T1/T1/Post-T1 是
+conversation relation，不是 persisted phase）
 （TODO-013/PROMPT-013）。
 
 **含义 / 动机**：Manager 需要持续诚实的账本纪律指引；把它写进全局 pair 文案会污染非 Manager /
@@ -461,7 +472,8 @@ Blogger 合同（why「Manager 表面」裁决）。
 
 **规范**：`tool.definition` 是 provider-visible V2 schema 的**唯一** Host 侧广告点，必须同时更新
 `parameters` / `jsonSchema` / `description`；只改一处导致组装不一致 → fail closed（HOST-018）。
-description 覆盖 Manager 可见纪律（与 002/003/004/006/013 一致），**禁止**泄露隐藏编排
+description 覆盖 Manager 可见纪律（与 002/003/004/006/013/016 一致），包括 `planComplete` 的
+Pre-T1 用法与单调不可回退语义；**禁止**泄露隐藏编排
 （dedicated reviewer、hidden agent/session、Finality cohort、barrier、witness、2N，TODO-013）。
 definition 改广告 schema 不自动替换原 executor decode schema；before 额外挂载 V1 compatibility view，
 该 view 不得改写 provider-visible enumerable input（HOST-018/020）。
@@ -488,8 +500,9 @@ before live args → decode obligations → compatibility projection → executo
                      carrier/provider run/part 变化 → fail closed
 ```
 
-`TodoWritePrepared` 冻结 canonical `{obligations:[{name,work}]}` `ProviderInputDigest` 与
-BaseObligations / Submitted digests、`ReviewFrontier`（本 tool-call 前 exclusive cursor，绑
+`TodoWritePrepared` 冻结 provider 原始 `planComplete` + canonical
+`{planComplete,obligations:[{name,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
+`ReviewFrontier`（本 tool-call 前 exclusive cursor，绑
 ManagerLifeId；pending before-hook 计入 next-assigned + 同 message 本 call 之前的可捕获 part 数）。
 `TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 Prepared 返回的真实 Journal `EventId`，
 不得重猜、伪造或用逻辑 id 代替（TODO-004）。
@@ -513,7 +526,7 @@ ManagerLifeId；pending before-hook 计入 next-assigned + 同 message 本 call 
 3. ensure DedicatedTodoReviewer / ensureReview（Rk 义务；after 不必「已跑 reviewer」才算成功）
 4. desired lag-1 cutoff 可从 Accepted 链推导（提交 PrefixEpoch 不在 after，OBLIGATION-LEDGER-021）
 5. 富化模型可见 tool result：上一 ConsumableReview 的 ProcessReviewLWR（REVISE 是反馈不是 rollback；
-   T1 时含 entrustment revelation）
+   仅第一次 accepted `planComplete=true` 时含 entrustment revelation；commitment 已 true 后即使 provider 传 false 也仍按 Post-T1）
 6. cleanup bridge
 7. return
 ```
