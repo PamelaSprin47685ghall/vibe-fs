@@ -17,9 +17,9 @@ mock 按已观察次数改变响应（退化成队列，失去确定性）
 覆盖率分母缩水（没加载的模块从账本上消失）
 ```
 
-其中每一件都真实发生过。`archive/changes/completed/fix.md` 的审计发现 DSL 门禁只扫 136/245 个
+其中每一件都真实发生过。历史 change（fix）的审计发现 DSL 门禁只扫 136/245 个
 生产文件却宣称「threshold=0 全量清零」——**门禁绿了，门根本没装在关键房间门口**；
-`archive/changes/completed/test.md`（G4R）记录了 31 个 E2E 里单 case 90 秒超时、flake 当作测试
+历史 change（test）（G4R）记录了 31 个 E2E 里单 case 90 秒超时、flake 当作测试
 分类而不是架构错误的漫长历史。
 
 `verification-system` 存在的理由：**把「什么算证明」本身变成被证明的规则。** 证据要
@@ -66,10 +66,10 @@ gate；gate 失败码被吞掉照样 exit 0；watchdog 靠总超时而不是因�
 | 历史 G4R change（test.md） | One World / Pure Time：恰一个 Long Stroke、race 是代数不是调度彩票、watchdog 因果续期 |
 | 历史 change（canary-unbend） | canary 不可弯曲迎合生产；断言不得为绿削弱 |
 | 历史 change（orchestrator-e2e-timeout） | 先可解释再修根因；超时放大不是修复 |
-| `archive/changes/completed/waitfact-causal-renewal.md` | waitFact 续期因果归因；背景进展只记录不续期 |
-| `archive/changes/completed/fix.md` | 验收口径不缩水；静态门禁必须命中真实路径（伪门禁教训） |
-| `archive/requirements-design/PROOF-MAP.md` Phase D | gate/test family 的 MECHANISM 归属；missing oracle 3（proof ladder 可红） |
-| `archive/requirements-design/EVIDENCE.md` §1 | 两 META 包正确无 runtime 源码 |
+| 历史 change（waitfact-causal-renewal） | waitFact 续期因果归因；背景进展只记录不续期 |
+| 历史 change（fix） | 验收口径不缩水；静态门禁必须命中真实路径（伪门禁教训） |
+| 历史 PROOF-MAP Phase D | gate/test family 的 MECHANISM 归属；missing oracle 3（proof ladder 可红） |
+| 历史 EVIDENCE §1 | 两 META 包正确无 runtime 源码 |
 
 ## 被拒方向
 

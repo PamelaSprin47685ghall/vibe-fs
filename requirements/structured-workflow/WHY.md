@@ -31,7 +31,7 @@ COVERAGE.md 的 TODO-012 / EXEC-020 / PERSIST-006 / CTX-007 / HOST-007 交叉行
 
 ### 2.1 源码表面 Direct-CE，实际仍是状态机
 
-`archive/changes/completed/ce-temporal-ownership.md` §0 记录了一次关键裁决：
+历史 change（ce-temporal-ownership）§0 记录了一次关键裁决：
 
 > 项目把「Direct CE」做成了源码表面要求，却没有真正把业务时序所有权交给 CE 调用结构。
 
@@ -88,9 +88,9 @@ single-flight registry（`IParkedTransformHost.HasFlight` / `bloggerFlights`）�
 
 | 备选 | 被拒理由 | 来源 |
 |---|---|---|
-| 封闭 AST + 唯一 Interpreter 表达流程 | 与 ARCH-001 冲突；Reply DU + Trace 解释器把复杂度乘在每一业务步上 | `archive/docs/why/flow.md` |
-| 恢复协程指针 | 调用栈不可序列化；假装透明续跑实为不可恢复 | `archive/docs/why/flow.md` |
-| 规则 DSL 兼管程序下一步 | 规则面长第二运行时；职责收窄到「是否允许」，控制流归语言 CE | `archive/docs/why/flow.md` |
+| 封闭 AST + 唯一 Interpreter 表达流程 | 与 ARCH-001 冲突；Reply DU + Trace 解释器把复杂度乘在每一业务步上 | 历史 why/flow 条款 |
+| 恢复协程指针 | 调用栈不可序列化；假装透明续跑实为不可恢复 | 历史 why/flow 条款 |
+| 规则 DSL 兼管程序下一步 | 规则面长第二运行时；职责收窄到「是否允许」，控制流归语言 CE | 历史 why/flow 条款 |
 | 继续只靠名称黑名单 | 可被等价改名绕过 | `fsharp-dsl-governance.md` Alternatives 1 |
 | 对任何含多个 DU/option 的 record 一律判红 | 误伤合法领域模型，不可接受 | `fsharp-dsl-governance.md` Alternatives 2 |
 | 只做报告不做门禁 | 不能长期替代可执行门禁 | `fsharp-dsl-governance.md` Alternatives 3 |

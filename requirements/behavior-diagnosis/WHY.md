@@ -16,11 +16,11 @@ evidence 支撑，且每次成立的 diagnosis 是一次有独立 semantic ident
 不是评分、不是重复计数、不是历史改写**。规则是数据（目录 Markdown），Host 只证明
 cycle 身份与原子提交，不重新解释严重度、不对工程判断做数值积分。
 
-## 2. 历史上为什么 RED（archive/changes/ 考古）
+## 2. 历史上为什么 RED（归档 changes 考古）
 
 ### 2.1 旧 `15`：120 维 score-vector 才是原罪
 
-`archive/changes/completed/enforcer.md`（旧 `SSOT/15` rebase）记录：旧设计是「120 个
+历史 change（enforcer）（旧 `SSOT/15` rebase）记录：旧设计是「120 个
 optional 0..9 字段 → score vector → leaky-evidence throttle → NudgeAnchored /
 NudgeConsumed → Main fake-user overlay」。它把「给出一个工程意见」升级成了第二个
 解释器：聚合、衰减、时间、阈值、reset、overlay 锚定、消费确认和恢复窗口全都要。
@@ -41,7 +41,7 @@ rebase 裁决（已落地）：删除全部 score/throttle/Main-overlay 机制�
 新壳。每个 tip 目录只保留单一 `tip` 字段；Host 只证明 tip 来自 catalog、cycle 身份
 成立、text 非空、commit 与 coverage 原子、replay/recovery 不重复产生业务事实。
 
-### 2.3 规则载体三连拒（`archive/docs/why/enforcer.md`）
+### 2.3 规则载体三连拒（历史 why/enforcer 条款）
 
 - **拒生成代码**：规范生成 F# 让变更绑编译、多份清单漂移；规则是数据、按 tip
   目录打包、运行期扫描校验。
@@ -49,7 +49,7 @@ rebase 裁决（已落地）：删除全部 score/throttle/Main-overlay 机制�
   第二个会漂的 ordinal/field 表。
 - **拒代码内 fallback catalog / dist 双副本**：掩盖打包错误，让坏包静默成功。
 
-### 2.4 观察配对（`archive/changes/completed/rulebook.md`）
+### 2.4 观察配对（历史 change（rulebook））
 
 旧实现把 tip 历史与 work-log frame 建模成两套独立列表；squash 后 frame 变一个而
 tips 仍独立存活，模型必须自己猜「tip 2 属于 frame 1/2/3 哪个」。Rulebook v2 把二者

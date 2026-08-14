@@ -2,7 +2,7 @@
 
 本文件只规定 Agent 如何查找规范、修改仓库和验证交付。产品语义只由
 `requirements/<package>/` 的 WHY/WHAT/HOW/PROOF 定义（45 包 normative 树，
-2026-08-14 cutover 自 `docs/` 迁移）；迁移前 Clause 原文归档于 `archive/docs/`。
+2026-08-14 cutover 自 `docs/` 迁移）；迁移前 Clause 原文已归档（git 历史可回溯）。
 本文件引用条款，不复述条款。
 
 # Kolmogorov 标准工作流程
@@ -89,8 +89,8 @@
 
 正式语义在 `requirements/<package>/`（每包 WHY/WHAT/HOW/PROOF + 包自有测试）。
 旧 Proposal 生命周期合同（`changes/proposed|active|completed` 与
-`docs/how/document-governance.md`）已随 2026-08-14 cutover 归档于 `archive/changes/`、
-`archive/docs/`；历史决策与失败模式复盘见 `archive/changes/completed/`。
+`docs/how/document-governance.md`）已随 2026-08-14 cutover 归档删除；历史决策与
+失败模式复盘见 git 历史。deferred 未来材料归 `proposals/`。
 
 - 若用户重新启用变更管理流程，`changes/proposed/` 由用户管理。进入其中的 Proposal
   已完成人工裁决并获批准；Agent 不重新执行 Admission、寻找批准证据或判断 Accepted/Rejected。

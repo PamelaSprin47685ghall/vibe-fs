@@ -36,7 +36,7 @@ dotnet tool run fable precompile src/Wanxiangshu/Wanxiangshu.fsproj -o dist
 ```
 
 - 先清空再编译：`dist/` 不留上次构建的旧字节（DISTRIBUTION-005）。
-- 不把 `resources/` 复制进 `dist/`：单份发布，杜绝双副本漂移（`archive/docs/why/enforcer.md` 分发裁决）。
+- 不把 `resources/` 复制进 `dist/`：单份发布，杜绝双副本漂移（历史 why/enforcer 分发裁决）。
 - build 内嵌的 resources 校验是**编译期 closure 前置**：坏资源在 build 就红，不等到 pack/install。
 
 ## 3. 资源加载（Infrastructure/Resources/）

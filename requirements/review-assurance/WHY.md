@@ -55,9 +55,9 @@ HANDOFF §6.4 / §7.6：
 
 ## 历史教训（考古）
 
-- `archive/docs/why/review.md`：单 PERFECT 可被模型随口同意 → 双 PERFECT + seal 把确认从口头变成因果消费证据；Witness 自包含（拒外围 Map）；tree 变化作废（审的是代码状态不是 Session 情绪）；seal 绑定 fail closed（拒 same-root 猜测）。
-- `archive/docs/why/review.md`「VerdictKnown 与 ConsumableReview 分型」：把「只有判断、尚无 report」挤进同一个 `TodoReviewConcluded`，恢复路径无法区分「已可 settle」与「已可展示报告」。
-- `archive/docs/why/review.md`「为何基础设施失败不是 REVISE」：伪装成 REVISE 会触发错误 semantic merge、推进虚假 ConsumableReview，让 Manager 去修系统故障。
-- `archive/docs/why/review.md`「为何禁止 wall-clock polling」：sleep/timer 把 Journal 因果等待退化成运气；本地 waiter 崩溃后无法从 durable facts 重建同一等待。
-- `archive/changes/completed/fix-revise.md`（GARBAGE transcript 但考古高价值）：Gap A 曾暴露 record-ready 的 fail-closed 回归——Blogger 放弃时 `recordReadiness` 必须判 `RecordUnavailable` 并 fail-close 至 `FinalityUndecided`，绝不产生缺 `# Work log` 的 `FinalityRejected`；waiter 崩溃必须以相同 ToolCallId 从 durable evidence 续等（`awaitChangeFrom`，无 timerTask/sleep re-probe）。
-- `archive/changes/completed/magic-todo.md`：两段式事实分型 `VerdictKnown(k)` vs `TodoReviewConcluded(k) ≡ ConsumableReview(k)`；`ensureReview` 可重入；Rk obligation pending 看的是缺失 Concluded 而非缺失 VerdictKnown。
+- 历史 why/review 条款：单 PERFECT 可被模型随口同意 → 双 PERFECT + seal 把确认从口头变成因果消费证据；Witness 自包含（拒外围 Map）；tree 变化作废（审的是代码状态不是 Session 情绪）；seal 绑定 fail closed（拒 same-root 猜测）。
+- 历史 why/review「VerdictKnown 与 ConsumableReview 分型」：把「只有判断、尚无 report」挤进同一个 `TodoReviewConcluded`，恢复路径无法区分「已可 settle」与「已可展示报告」。
+- 历史 why/review「为何基础设施失败不是 REVISE」：伪装成 REVISE 会触发错误 semantic merge、推进虚假 ConsumableReview，让 Manager 去修系统故障。
+- 历史 why/review「为何禁止 wall-clock polling」：sleep/timer 把 Journal 因果等待退化成运气；本地 waiter 崩溃后无法从 durable facts 重建同一等待。
+- 历史 change（fix-revise）（GARBAGE transcript 但考古高价值）：Gap A 曾暴露 record-ready 的 fail-closed 回归——Blogger 放弃时 `recordReadiness` 必须判 `RecordUnavailable` 并 fail-close 至 `FinalityUndecided`，绝不产生缺 `# Work log` 的 `FinalityRejected`；waiter 崩溃必须以相同 ToolCallId 从 durable evidence 续等（`awaitChangeFrom`，无 timerTask/sleep re-probe）。
+- 历史 change（magic-todo）：两段式事实分型 `VerdictKnown(k)` vs `TodoReviewConcluded(k) ≡ ConsumableReview(k)`；`ensureReview` 可重入；Rk obligation pending 看的是缺失 Concluded 而非缺失 VerdictKnown。

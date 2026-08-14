@@ -23,7 +23,7 @@
 | `KNOWLEDGE-REUSE-006` | Bookkeeper 契约：CaseRefresh/CaseFinalize；`js-bookkeeper` 单程序原子变换；setQuestion/setAnswer 各至多一次；zero mutation 合法；无 filesystem capability；`edit-qa` 非法。 |
 | `KNOWLEDGE-REUSE-007` | Case 的 durable authority = 统一 EventStore（InspectorCase* events + fold + PayloadRef）；禁 feature ref/LWW/pin/hook。 |
 | `KNOWLEDGE-REUSE-008` | LRU 有界：淘汰 = `InspectorCaseEvicted` tombstone 事件；last_access 派生不独立 merge。 |
-| `KNOWLEDGE-REUSE-009` | feature opt-in 双门：marker absent → schema 无 fetch + execution 拒绝 + 无 index/archive/Bookkeeper；未启用 repository 行为不变。 |
+| `KNOWLEDGE-REUSE-009` | feature opt-in 双门：marker absent → schema 无 fetch + execution 拒绝 + 无 index / archive / Bookkeeper；未启用 repository 行为不变。 |
 | `KNOWLEDGE-REUSE-010` | lifecycle：非复用 terminal → archive；复用 ReuseScope close → exactly one finalize；禁 per-return/idle/timer finalize；unexpected SessionDeleted 仅 cleanup。 |
 | `KNOWLEDGE-REUSE-011` | 并发：同 Case 合法 fork 显式 DomainConflict；禁 (revision, wall_clock) LWW / timestamp 裁决；same-worktree fetch single-flight。 |
 | `KNOWLEDGE-REUSE-012` | 低信任 index：只暴露 `{ shelfmark, canonical question }`；shelfmark 是稳定公开 locator 非 session identity；epoch 字节稳定。 |

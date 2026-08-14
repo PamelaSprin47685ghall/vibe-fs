@@ -13,7 +13,7 @@ Strength 要替代的是昂贵 primary 在局部窗口里重复做出的**机械
 忽略结果恢复。
 
 「看起来只读」不是充分条件。扩大安全集合必须逐个证明：副作用 = 0、权限交互 = 0、
-结果可稳定重放、错误方向的损失有界（archive/changes/completed/strength.md §三.1）。
+结果可稳定重放、错误方向的损失有界（历史 change（strength）§三.1）。
 
 ### 1.2 投机结果不是历史；被消费以后才是历史
 
@@ -23,7 +23,7 @@ primary 已发生的因果历史。提前写入 XTrace/Companion 会让未发生
 durable Candidate → consumption proof → Promotion 分开「准备好了」与「已经影响了 primary」。
 
 关键：**没有 rollback。** 不是「先写进去，失败再回滚」，而是 Candidate 只对目标 run 可见、
-观察消费证据、再 promotion（archive/changes/completed/strength.md §三.2）。
+观察消费证据、再 promotion（历史 change（strength）§三.2）。
 
 ### 1.3 低成本路径必须具有更低 authority，而不是更弱的文字提醒
 
@@ -60,7 +60,7 @@ owner。Strength 只在这些代数中增加合法 case：`AttachmentKind.Streng
 × Attached`，不是 `SatelliteKind` case）、`ProviderRequestKind.StrengthReplica`、
 ProjectionIntent 的 Strength intent、EventStore 事件族。重新建立 Replica role、Satellite
 kind、私有 journal/blob、fallback 或 projection DSL 会制造同一事实的第二表示，并让恢复与
-权限产生分叉（archive/docs/shape/strength.md STRENGTH-013..019 逐条分配 owner）。
+权限产生分叉（历史 shape/strength 条款 STRENGTH-013..019 逐条分配 owner）。
 
 ### 1.8 为什么 same-role fast leaf
 
@@ -86,12 +86,12 @@ request-specific 工具集合。现有 `fast-ROLE/deep-ROLE` 与 `AttemptExecuti
 | canary/cost/evidence 不足仍启用 treatment | 优化成为正确性依赖 | SPEC-INV-002/011 |
 | durable 歧义时 fail-open | 状态与世界事实脱节 | SPEC-INV-006/007/011 |
 
-历史失败模式第一手考古：`archive/changes/completed/strength.md` §二十二（存储收口）、§二十三
+历史失败模式第一手考古：历史 change（strength）§二十二（存储收口）、§二十三
 （崩溃矩阵）、§三十（明确拒绝的方向）、§三十一（最终不变量）。
 
 ## 3. 明确拒绝的方向（考古，不构成 WHAT）
 
-以下方向在 archive/changes/completed/strength.md §三十逐条拒绝，理由已吸收进对应命题：
+以下方向在历史 change（strength）§三十逐条拒绝，理由已吸收进对应命题：
 
 - **同一 Work Session 临时切 fast model**：污染 authority/fallback identity、stable prefix、
   provider run attribution、model-visible continuity；独立 leaf 才是正确隔离边界。
@@ -118,4 +118,4 @@ request-specific 工具集合。现有 `fast-ROLE/deep-ROLE` 与 `AttemptExecuti
 - 当前 Strength 名字、same-role-fast 模型选择、具体 budget/predictor algorithm → HOW，不进 WHAT。
 - 大 material 存储 substrate（EventStore envelope / payload_refs 语义）→ `durable-events`。
 
-边界卡片：`archive/archive/archive/requirements-design/18-optimization-epistemics.md`。
+边界卡片：历史 requirements-design card（18-optimization-epistemics）。

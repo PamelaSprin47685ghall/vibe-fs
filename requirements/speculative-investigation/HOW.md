@@ -2,8 +2,8 @@
 
 > 非 normative。描述当前实现模型与约束，以及「历史与弃权」裁决。
 > 当前实现名（Strength、same-role-fast、K1/K2 数值、predictor 特征）全部是 HOW，不是 WHAT。
-> 若未来换实现，WHAT.md 不变。源：`archive/docs/how/strength.md`、`archive/docs/shape/strength.md`、
-> `archive/changes/completed/strength.md`、`src/Wanxiangshu/**`。
+> 若未来换实现，WHAT.md 不变。源：历史 how/shape strength 条款、历史 change（strength）、
+> `src/Wanxiangshu/**`。
 
 ## 1. 模块地图（当前实现）
 
@@ -48,7 +48,7 @@ src/Wanxiangshu/Infrastructure/OpenCode/Host/
   StrengthSettings.fs / PluginStrengthScope.fs      env 设置、Host canary fingerprint、process fuse
 ```
 
-主 transform 顺序固定（archive/docs/how/strength.md）：
+主 transform 顺序固定（历史 how/strength 条款）：
 
 ```text
 StrengthReplay → XTraceCapture → Companion → XWire → EnforcerHost → StrengthSpeculate
@@ -161,22 +161,22 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 - **算法/常量降为 HOW**：`same-role-fast` 模型选择、K1/K2 数值、margin/evidence floor、
   predictor 特征分桶、canary 指纹格式——全部是当前实现，不进 WHAT（边界卡片
   DOES NOT OWN 与 HANDOFF §6.7 同类裁决）。
-- **STRENGTH-013..019（archive/docs/shape/strength.md）**：这些是「所有权分配」条款，不是本包新增
+- **STRENGTH-013..019（历史 shape/strength 条款）**：这些是「所有权分配」条款，不是本包新增
   行为——Session 归属 → `session-ontology`、profile 构造 → `participant-identity`、
   projection intent → `provider-projection`、durable substrate → `durable-events`、
   XTrace/Companion coverage → `semantic-trace`/`context-compression`、fallback/review 隔离 →
   `provider-attempt-recovery`/`review-*`。信息已分别落入本 WHAT 各命题的「边界」节。
-- **被拒方向**：见 WHY.md §3（archive/changes/completed/strength.md §三十逐条）。
+- **被拒方向**：见 WHY.md §3（历史 change（strength）§三十逐条）。
 - **Semble 弃权**：Strength 不消费 Semble（AGENT-027）；历史伪造 read 的失败模式见
   WHY.md §1.9。
 - **Student/Teacher**：已删除领域；`Student & Teacher.md` 为 GARBAGE（CHANGES-AUDIT）；
   absence ratchet 归 `session-ontology` 的 `student-teacher-absence` gate，本包不背墓碑。
-- **`archive/docs/why/loop.md` / `archive/docs/{what,how,proof}/loop.md`**：loop 主题是退化循环检测
+- **历史 loop 条款（why/what/how/proof）**：loop 主题是退化循环检测
   （`degeneration-guard`），全篇 grep `speculat/投机/strength` 零命中——无本包可吸收的
   speculation 内容，弃权。
 - **dry-run / e2e**：DryRun 定义现为“real + OpenCode-visible + owner-nonblocking + zero-promotion”。
   `requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 继续证明 K2 物理 request budget；
   本包新增 frozen unit contract 证明 owner continuation 不等待 unresolved Replica deadline，且 DryRun 不 Prepared/Promoted。
 - **GARBAGE 结论**：旧稿 `FrameBundleRef` / `PredictorSnapshotRef` / Journal NDJSON /
-  RuntimePath blob 类型名已被存储收口删除（archive/changes/completed/strength.md §二十二）——只留
+  RuntimePath blob 类型名已被存储收口删除（历史 change（strength）§二十二）——只留
   EventStore `payload_refs`；不进入 WHAT。
