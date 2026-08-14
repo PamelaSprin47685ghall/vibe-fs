@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { providerProjection, toList } from '../../../tests/unit/support/domain.mjs'
+import { providerProjection, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const { isAppendOnlyPrefix } = providerProjection
 

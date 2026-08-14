@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { prefixEpochProjection as prefix } from '../../../tests/unit/support/domain.mjs'
+import { prefixEpochProjection as prefix } from '../../verification-system/tests/support/domain.mjs'
 
 const candidate = ({ cutoff, prefixDigest = `prefix-${cutoff}`, digest = `frozen-${cutoff}`, seal = `seal-${cutoff}` }) =>
   prefix.snapshot({

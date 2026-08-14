@@ -18,7 +18,7 @@ import {
   sessionId,
   structuralComparer,
   toList,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, payloadOf, resultOf } from '../../../tests/unit/support/domain.mjs'
+import { caseOf, payloadOf, resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const { createPort } = await import('../../../dist/Process/PtyBackend.js')
 

@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { authority, caseOf, managedAgentCatalog, roles } from '../../../tests/unit/support/domain.mjs'
+import { authority, caseOf, managedAgentCatalog, roles } from '../../verification-system/tests/support/domain.mjs'
 
 const TIER_NAMES = ['Fast', 'Deep']
 

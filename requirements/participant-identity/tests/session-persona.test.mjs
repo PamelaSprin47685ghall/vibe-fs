@@ -10,8 +10,8 @@ import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
 import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
 import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
-import { resultOf, unwrapOption } from '../../../tests/unit/support/domain/interop.mjs'
-import { sessionId } from '../../../tests/unit/support/domain.mjs'
+import { resultOf, unwrapOption } from '../../verification-system/tests/support/domain/interop.mjs'
+import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const persona = PersonaCatalog.PersonaCatalog_persona
 const bindOnce = (id, value) => resultOf(PersonaCatalog.SessionPersona_bindOnce(id, value))

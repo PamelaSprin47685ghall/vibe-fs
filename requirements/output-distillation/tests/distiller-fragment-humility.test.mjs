@@ -19,7 +19,7 @@ import {
   distillationRuntime,
   okResult,
   providerLanguage,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 /** Spool.ChunkSizeBytes — a spool of this size + 64 bytes splits into 2 chunks. */
 const SPOOL_CHUNK_BYTES = 204_800

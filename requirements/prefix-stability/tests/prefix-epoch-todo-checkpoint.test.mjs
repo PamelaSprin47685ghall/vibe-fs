@@ -18,7 +18,7 @@ import {
   blobRef,
   blobDigest,
   idValue,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const { coveredBefore, requiresLag1Rebase, buildTodoCheckpointCommit } = await import(
   '../../../dist/Domain/MagicTodoPrefixEpoch.js'
