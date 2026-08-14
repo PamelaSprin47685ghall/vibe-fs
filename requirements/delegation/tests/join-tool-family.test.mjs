@@ -7,14 +7,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapOfEntries, sessionId, structuralComparer } from '../../verification-system/tests/support/domain.mjs'
+import { agentJournal, attemptPlanner, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
 const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { forJournal, Runtime__RegisterAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'
 )
@@ -25,12 +24,27 @@ const context = (session = 'ses_join') =>
 
 const lock = () => ({ Enter: () => ({ Exit: () => {} }) })
 
-const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
+const scopeFor = async ({ engineTask, mailbox }) => {
+  const opened = await agentJournal.create({ directory: `join-family-${Math.random()}` })
+  assert.equal(opened.ok, true, opened.ok ? '' : opened.error)
+  const dispatcher = forJournal(opened.journal)
+  const accepted = await Runtime__RegisterAuthority(
+    dispatcher,
+    attemptPlanner.authority({
+      session: 'ses_join',
+      run: 'run_join',
+      root: 'msg_join_root',
+      selected: 'orchestrator',
+      peer: 'orchestrator',
+      role: 'Orchestrator',
+      tier: 'Fast',
+    }),
+  )
+  assert.equal(accepted.tag, 0, accepted.fields?.[0])
 
-const scopeFor = ({ engineTask, mailbox }) => {
   const scope = new ToolRuntimeScope(
     {},
-    undefined,
+    opened.journal,
     undefined,
     undefined,
     new Map(),
@@ -52,34 +66,7 @@ const scopeFor = ({ engineTask, mailbox }) => {
     engineTask: engineTask ?? undefined,
   }
   scope.orchestratorHosts.set('ses_join', host)
-  // RoleFor = Orchestrator via a fake authority profile on a fake journal.
-  scope.journal = {
-    gate: lock(),
-    projection: {
-      AgentProjections: {
-        Sessions: sessionMap([
-          [
-            sessionId('ses_join'),
-            new SessionAgentProjection(
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              { ActiveLogicalRun: { CanonicalRole: Role.Orchestrator, SelectedAgent: 'fast-manager' }, LastAuthorityProfile: undefined },
-              undefined,
-              undefined,
-              undefined,
-            ),
-          ],
-        ]),
-      },
-    },
-  }
-  return scope
+  return { scope, cleanup: opened.dispose }
 }
 
 const run = async (scope, session = 'ses_join') => spec(scope).Execute({}, context(session))
@@ -87,20 +74,23 @@ const run = async (scope, session = 'ses_join') => spec(scope).Execute({}, conte
 test('JOINFAM_orchestrator_drains_published_verdicts', async () => {
   const mailbox = verdictMailbox()
   publish(mailbox, OrchestratorVerdict.Empty)
-  const scope = scopeFor({ mailbox })
-  const wire = await run(scope)
+  const live = await scopeFor({ mailbox })
+  const wire = await run(live.scope)
   assert.match(wire, /There is nothing away to receive/i)
+  live.cleanup()
 })
 
 test('JOINFAM_orchestrator_empty_mailbox_still_reports_completed', async () => {
-  const scope = scopeFor({ mailbox: verdictMailbox() })
-  const wire = await run(scope)
+  const live = await scopeFor({ mailbox: verdictMailbox() })
+  const wire = await run(live.scope)
   assert.match(wire, /There is nothing away to receive/i)
+  live.cleanup()
 })
 
 test('JOINFAM_orchestrator_engine_failure_is_a_natural_consequence', async () => {
-  const scope = scopeFor({ engineTask: Promise.resolve({ tag: 1, fields: ['engine exploded'] }) })
-  const wire = await run(scope)
+  const live = await scopeFor({ engineTask: Promise.resolve({ tag: 1, fields: ['engine exploded'] }) })
+  const wire = await run(live.scope)
   assert.match(wire, /orchestrator is not ready to join yet/i)
   assert.doesNotMatch(wire, /engine exploded|\berror\s*=/i)
+  live.cleanup()
 })

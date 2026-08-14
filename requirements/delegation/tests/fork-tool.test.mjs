@@ -19,6 +19,7 @@ import {
   promptDispatcher,
   sessionId,
   toList,
+  transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
 const {
@@ -37,7 +38,7 @@ const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
   '../../../dist/Journal/DelegatedToolEstimateProjection.js'
 )
-const { OrchestratorHost } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
+const { OrchestratorHost, OrchestratorHost__JoinPublished: hostJoinPublished } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
 const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
   '../../../dist/Application/Orchestration/Runtime.js'
@@ -83,8 +84,10 @@ const fakeSessions = (behaviour = {}) => {
     },
     SendPrompt: async (...args) => {
       calls.push(['SendPrompt', ...args])
-      if (!behaviour.physicalAccept) return { tag: 0, fields: [] }
       physicalSeq += 1
+      if (!behaviour.physicalAccept) {
+        return promptDispatcher.admittedWithReceipt(transportReceipt(`receipt-${physicalSeq}`))
+      }
       return promptDispatcher.admittedWithPhysicalMessage(`physical-${physicalSeq}`)
     },
     SendPromptAsync: async (...args) => {
@@ -493,6 +496,7 @@ test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byna
   const starts = live.managerCalls.filter(([name]) => name === 'StartManager')
   assert.equal(starts.length, 1)
   assert.equal(starts[0][1].ManagerAgent, 'fast-manager')
+  await hostJoinPublished(live.host)
   live.cleanup()
 })
 
@@ -508,6 +512,7 @@ test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
 
   const continued = await spec.Execute(makeArgs({ name: 'North Road', charge: 'keep going' }), context())
   assert.doesNotMatch(continued, /No continuing road|manager job|fast-manager|job_id/i)
+  await hostJoinPublished(live.host)
   live.cleanup()
 })
 
