@@ -11,7 +11,7 @@ import {
   causalWaitHub,
   CausalWaitRegistry,
   listItems,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import { CausalWaitRegistry__get_HistoryCapacity } from '../../../dist/Session/CausalWaitRegistry.js'
 
 const owner = (id) => causalWait.owner('flow', [['id', id]])

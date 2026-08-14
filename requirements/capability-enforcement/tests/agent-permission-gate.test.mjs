@@ -14,7 +14,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { managedAgentConfig, roles, runtimeResources } from '../../../tests/unit/support/domain.mjs'
+import { managedAgentConfig, roles, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 const ROLES = [
   'Manager',

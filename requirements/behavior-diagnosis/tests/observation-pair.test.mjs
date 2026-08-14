@@ -7,7 +7,7 @@ import {
   RulebookObservation_ofTipsAndFrames as ofTipsAndFrames,
   RulebookObservation_workLogFromUnits as workLogFromUnits,
 } from '../../../dist/Domain/RulebookObservation.js'
-import { listItems, toList } from '../../../tests/unit/support/domain.mjs'
+import { listItems, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const pair = (tips, frames) => listItems(pairTipsAndFrames(toList(tips), toList(frames)))
 

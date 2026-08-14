@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { listItems, managerJobId, resultOf, worktreeIdentity, worktreePath } from '../../../tests/unit/support/domain.mjs'
+import { listItems, managerJobId, resultOf, worktreeIdentity, worktreePath } from '../../verification-system/tests/support/domain.mjs'
 
 const {
   WorktreeCommands_create,

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { resultOf, runtimeResources, mapEntries, caseOf, isSome, isNone } = await import('../../../tests/unit/support/domain.mjs')
+const { resultOf, runtimeResources, mapEntries, caseOf, isSome, isNone } = await import('../../verification-system/tests/support/domain.mjs')
 
 const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindings))
 

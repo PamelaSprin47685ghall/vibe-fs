@@ -12,7 +12,7 @@ import {
   enforcer,
   enforcerCatalogResource,
   providerLanguage,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const BASE = 'base blogger system prompt'
 

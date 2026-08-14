@@ -36,7 +36,7 @@ import {
   fold,
   authorityRoot,
   logicalRunId,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 // EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
 runtimeResources.installFromPackage()

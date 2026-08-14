@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcerCatalog, enforcer } from '../../../tests/unit/support/domain.mjs'
+import { enforcerCatalog, enforcer } from '../../verification-system/tests/support/domain.mjs'
 
 const rule = (overrides) => enforcerCatalog.rule(overrides)
 

@@ -15,7 +15,7 @@ import {
   causalWait,
   CausalWaitRegistry,
   utcOffset,
-} from '../../../tests/unit/support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const owner = (id) => causalWait.owner('flow', [['id', id]])
 
