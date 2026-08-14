@@ -131,7 +131,7 @@ barrier 再入 roster（GLORY-003/045；TODO-010）。
 破坏既有毕业语义，也不应永远缺席终局（why「Dedicated 普通 graduate 却保留 process duty」裁决）。
 
 **边界**：process PERFECT ≠ terminal first PERFECT（FINALITY-010）；roster 推导的纯函数在
-`Journal/FinalityReviewCohort.fs`。
+`Composition/Bridges/FinalityReview/FinalityReviewCohort.fs`。
 
 **证据** → PROOF.md 行 F-9。
 

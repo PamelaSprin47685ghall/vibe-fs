@@ -25,7 +25,7 @@
 ## HOW 概览
 
 实现模型见 `HOW.md`：`Domain/SessionRecovery.fs`（纯代数）、
-`Application/Reconciliation/SessionRecoveryWorkflow.fs` / `ChildRecoveryWorkflow.fs`（编排）、
+`Execution/Session/SessionRecoveryWorkflow.fs` / `ChildRecoveryWorkflow.fs`（编排）、
 `Session/HandleController.fs`（completion 单一 owner）、`ReconcilePass.fs` / `Reconciler.fs`
 （观测稳定器）、`HostForkRestart.fs`（restart 证明结构）。
 

@@ -42,7 +42,7 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
     'utf8',
   )
   const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
     'utf8',
   )
   assert.match(spike, /AttachFamilyRecoveryPorts/)
@@ -66,7 +66,7 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
 test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
   const workflow = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
     'utf8',
   )
   const coordinator = readFileSync(

@@ -17,14 +17,14 @@
 
 ### 2. 投影与 fold（Journal）
 
-- `src/Wanxiangshu/Journal/ReviewProjection.fs`：
+- `src/Wanxiangshu/Mission/Review/Barrier/Projection.fs`：
   - `PerfectChallenge`（第一次 PERFECT 的 durable 证据）、`ProviderInputSeal`（`IncludedToolResultDigests` = 因果证据集）、`ReviewGuardProjection`（barrier/tree/witness/TerminalFrontier/PendingChallenge/Seals/ObservedAttemptKeys）。
   - `startBarrier`：新 barrier 清 pending challenge 与 attempt 窗口，保留 confirmed witness 可审计（REVIEW-008）；同 barrier 重入幂等。
   - `applyChallengeIssued`：pending witness 由 challenge 构建，参数只有一个——防两者不一致（REVIEW-005）。
   - `applyVerdict`：REVISE 清 pending（REVIEW-002 条件 7 的机制）；**不**判因果、不构建 Confirmed——writer 证明、fold 应用（seal 窗口有界，重放不重证）。
   - `applyConfirmedWitness`：以两个 digest + 两个 witness 判 `NotDistinctAttempt`/构建 Confirmed。
   - 窗口：`AttemptWindow = 8`、`SealWindow = 8`（PERSIST-008 有界）。
-- `src/Wanxiangshu/Journal/ReviewBarrier.fs`（`openBarrier`）、`ReviewFactFold.fs`（fold 分派）、`FinalityReviewCohort.fs`（roster/graduate 代数——finality 消费侧）。
+- `src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs`（`openBarrier`）、`ReviewFactFold.fs`（fold 分派）、`FinalityReviewCohort.fs`（roster/graduate 代数——finality 消费侧）。
 
 ### 3. 确认写入与 continuation（Application/Review）
 
@@ -35,7 +35,7 @@
 - `src/Wanxiangshu/Application/Review/ReviewBarrierWorkflow.fs`（`reverify`：openBarrier → awaitWitness 事件驱动 → readStatus 读 durable 证据，`ConfirmationUnproven`/`ReviewerProducedNoVerdict` 续等）、`ReviewerContinuation.fs`（ensureVerdictSubmitted / ensurePerfectConfirmed）、`ReviewerWorkflow.fs`（observe 唯一业务 writer）。
 - `src/Wanxiangshu/Application/Review/ReviewerEvidence.fs`：`continuationOpen`（sibling REVISE 后撤销 capability）、`classifyNeed`（process → `CompleteRevision` 无 confirmation nudge）、`confirmed` 从 witness 派生。
 
-### 4. Seal 绑定（Application/Reconciliation/ReviewSeal.fs）
+### 4. Seal 绑定（Mission/Review/Assurance/Seal.fs）
 
 - `bindableRun`（HOST-010）：候选 = assistant ∧ ¬Completed ∧ ¬compaction ∧ ParentId = physical user；恰好一个且为最新 id → Ok，否则 `NoBindableRun | AmbiguousRun | NotLatestRun`——四条件合取，缺一 admit 错误答案。
 - `sealTransform`：只在 Reviewer session 的 `messages.transform` 时刻 park seal 候选（`IncludedToolResultDigests` 含 challenge digest）；challenge request 一律 deferred binding。

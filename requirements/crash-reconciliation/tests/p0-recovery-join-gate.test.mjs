@@ -393,11 +393,11 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     'src/Wanxiangshu/Session/CompletionMailbox.fs',
     'src/Wanxiangshu/Session/JoinDrain.fs',
     'src/Wanxiangshu/Domain/ChildRecovery.fs',
-    'src/Wanxiangshu/Application/Reconciliation/Join.fs',
+    'src/Wanxiangshu/Execution/Delegation/Join.fs',
     'src/Wanxiangshu/Domain/SessionRecovery.fs',
     'src/Wanxiangshu/Kernel/Fact.fs',
-    'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryWorkflow.fs',
-    'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs',
+    'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
+    'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
@@ -422,10 +422,10 @@ test('P0_RECOVERY_JOIN_GATE_positive_recovery_shapes_present', () => {
   const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/ChildRecovery.fs'), 'utf8')
   const mailbox = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/CompletionMailbox.fs'), 'utf8')
   const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
     'utf8',
   )
-  const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/Join.fs'), 'utf8')
+  const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Join.fs'), 'utf8')
 
   for (const [file, text, ids] of [
     ['ChildRecovery.fs', child, ['joinable-from-decoded', 'child-recovery-result-five-cases']],

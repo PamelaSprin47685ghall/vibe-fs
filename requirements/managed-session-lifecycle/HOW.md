@@ -2,7 +2,7 @@
 
 ## 实现模型
 
-### Handle 状态机（`src/Wanxiangshu/Journal/LinkageProjection.fs`）
+### Handle 状态机（`src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs`）
 
 ```fsharp
 type HandleLifecycle =

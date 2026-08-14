@@ -22,7 +22,7 @@ SessionOwnership（Root | Attached of ownerSessionId × AttachmentKind）
 ## HOW 概览
 
 ```text
-durable fact     Journal/SessionAssociation.fs   ManagedSessionKind（WorkSession | SatelliteSession(_, Companion)）
+durable fact     Execution/Session/Association.fs   ManagedSessionKind（WorkSession | SatelliteSession(_, Companion)）
 derived view     SessionOwnershipClassification  ExecutionClass × Ownership（additive，不改 codec）
 hints            SyncDelegateAssociationHints     dedicated Sync* = Work + Attached(SyncInspector|SyncCoder)
                  StrengthReplicaAssociationHints  StrengthReplica = InternalLeaf + Attached(StrengthReplica)

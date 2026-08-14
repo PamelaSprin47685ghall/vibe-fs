@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel.Identity
 
 /// Reconcile pure Domain: Evidence → Decision + publish seals.
 /// Zero task, zero mutable, zero I/O (FLOW-001 / FLOW-004).
-/// Workflow CE lives in Application/Reconciliation/Reconciler.fs.
+/// Workflow CE lives in Composition/Turn/Scheduler.fs.
 module ReconcileProgram =
 
     // ── outcomes (Domain-owned; Application maps wire into these) ─────────────

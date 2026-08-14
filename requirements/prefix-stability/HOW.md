@@ -35,7 +35,7 @@ type XProjectionChoice = UseCommittedEpoch | UsePrefixProbe of PrefixProbe
 - `requiredBlob`：probe 候选必须读**候选**的 blob，读 committed 的 blob 会把旧 prefix
   配到新 synthetic id 下——fold 检测不到，因为是两个各自合法的半套。
 
-### 1.3 epoch 投影（`Journal/PrefixEpochProjection.fs`）
+### 1.3 epoch 投影（`Context/Prefix/Epoch.fs`）
 
 ```fsharp
 type ActivePrefixEpoch =
@@ -54,7 +54,7 @@ type ActivePrefixEpoch =
 - `sameCandidate` 排除 SealRoot/SyntheticMessageId（COMPANION-013 由前三字段派生，包含会
   循环比较）。
 
-### 1.4 fold 接线（`Journal/ContextFactFold.fs`）
+### 1.4 fold 接线（`Context/Companion/Blogger/ContextFactFold.fs`）
 
 - `PrefixRebaseCommitted` → `tryUpdatePrefix` + `PrefixEpochProjection.applyRebase`。
 - `ContextReanchored` → **一个** session 级更新原子做两件事：prefix 退休 +
@@ -67,7 +67,7 @@ type ActivePrefixEpoch =
 
 - 比较 `Tools`（相等非前缀）、`System`、`ProviderId`、`ModelId`、`Variant` 与完整 message
   前缀（`next.Messages |> List.truncate (length previous) = previous.Messages`）。
-- 生产前置 proof（`Application/Reconciliation/XWire.fs`）与回归测试共用同一函数
+- 生产前置 proof（`Context/Prefix/XWire.fs`）与回归测试共用同一函数
   （cache.md §11：`assertPrefix` fail fast）。
 
 ### 1.6 TodoCheckpoint（`Domain/MagicTodoPrefixEpoch.fs`）

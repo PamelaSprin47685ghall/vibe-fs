@@ -236,7 +236,7 @@ squash 分支。
 
 **含义/动机**：混父材料会把另一段 work 的历史压进本段。
 
-**证据**：COMPANION-006；`Journal/BlogProjection.fs`；`tests/blog-projection.test.mjs`
+**证据**：COMPANION-006；`Context/Companion/Blogger/Projection.fs`；`tests/blog-projection.test.mjs`
 （`COMPANION_006_squash_rewrites_first_half_of_frames_permanently`）。
 
 ---
@@ -251,7 +251,7 @@ frame 与 coverage 永不半套。
 
 **边界**：coverage 是 XTrace 游标的事实归 semantic-trace；本命题拥有推进条件。
 
-**证据**：COMPANION-008；`Journal/BlogProjection.fs`；
+**证据**：COMPANION-008；`Context/Companion/Blogger/Projection.fs`；
 `tests/blog-projection.test.mjs`（`COMPANION_008_entry_appends_frame_and_advances_coverage_together`、
 `CTX_011_entry_that_consumed_nothing_is_refused`）。
 
@@ -268,7 +268,7 @@ frame 与 coverage 永不半套。
 
 **边界**：cutoff digest 的字节计算归 prefix-stability / provider-projection。
 
-**证据**：CTX-015；`Journal/BlogProjection.fs`（`BlogCoverage` 双字段）；
+**证据**：CTX-015；`Context/Companion/Blogger/Projection.fs`（`BlogCoverage` 双字段）；
 `tests/probe-selection.test.mjs`（`CTX_011_*`、`COMPANION_011_*`）；
 `tests/blogger-delta.test.mjs`（`CTX_011_*` cutoff 只前进）。
 
@@ -286,5 +286,5 @@ Opening cursor 纯推导，不是 Stage；不绑回 `WorkActivated`（TODO-001�
 **边界**：floor 的推导类型（`ManagerOpeningFloor`）语义归 work-record（WORK-RECORD-015）；
 本命题拥有「Y 不得吞 Opening」这一半。
 
-**证据**：CTX-016；TODO-001；`Journal/ManagerOpeningFloor.fs`；`Domain/MagicTodo.fs`
+**证据**：CTX-016；TODO-001；`Mission/Manager/Life/OpeningFloor.fs`；`Domain/MagicTodo.fs`
 （`bloggerEffectiveStart`）；`tests/ctx-opening-floor.test.mjs`（NEW）全部。

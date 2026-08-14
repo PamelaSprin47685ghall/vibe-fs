@@ -9,10 +9,10 @@
 | 001/002 | `Application/Prompting/PromptDispatcher.fs`（`Runtime`：`RegisterAuthority`、`AcceptHumanRoot`、`Abandon`、`AcceptContinuation`、`AcceptAgentOwnerRoot`）+ `Application/Prompting/PromptDispatcherSend.fs`（`RecordSendOutcome`） | 唯一写入口；四态事实由 `Runtime.Persist` 落 `PluginPromptClaimed/Submitted/PhysicalAccepted/Abandoned` |
 | 003/004 | `Domain/PromptAuthority.fs` → `PromptClaim`（`Receipt: TransportReceipt option`）；`PromptAuthorityRun.submitClaim`；`Kernel/Identity.fs` → `TransportReceipt.isAdmissionShaped` | receipt 只记不解决；admission 形态可判别 |
 | 005/006 | `Domain/PromptAuthority.fs` → `claimScopeDigest`、`nextClaimSequence`、`derivePromptKey`；`PromptDispatcherSend.deriveKey` | 确定性幂等身份；序列在注册时消费 |
-| 007/008 | `Application/Reconciliation/PromptRecovery.fs` → `reconcile`、`reconcileClaim`、`findPhysical`（tail window 内 `role=user` + PromptKey metadata 匹配）；`RecoveryGate`（post-init 单飞） | Proven / StillPending(hasReceipt) / GaveUp / Unreadable |
+| 007/008 | `Interaction/Dispatch/Recovery.fs` → `reconcile`、`reconcileClaim`、`findPhysical`（tail window 内 `role=user` + PromptKey metadata 匹配）；`RecoveryGate`（post-init 单飞） | Proven / StillPending(hasReceipt) / GaveUp / Unreadable |
 | 009 | `PromptDispatcher.AwaitMode`（Await/Detached）；`RecordSendOutcome` 的 `acceptanceCallback` 分支 | Detached 不回调；claim/submit 照常 |
 | 010 | `Domain/PromptAuthority.fs` → `AuthorityExecutionProfile` 无 model 字段；`PromptDispatcherSend.fs` 发送 options 恒 `Model = None` | 「Root 不得选 model」结构性不可表达 |
-| 011 | `Journal/PromptFactFold.fs`（`foldPromptClaimed` 用 `projection.RuntimeStartCount` 盖章）+ `Domain/PromptAuthority.fs` → `recoveryAttempts`/`recoveryBudgetSpent` + `PromptAuthorityRun.abandonClaim` | budget 由 workspace 水印派生，不写恢复事实 |
+| 011 | `Interaction/Authority/PromptFactFold.fs`（`foldPromptClaimed` 用 `projection.RuntimeStartCount` 盖章）+ `Domain/PromptAuthority.fs` → `recoveryAttempts`/`recoveryBudgetSpent` + `PromptAuthorityRun.abandonClaim` | budget 由 workspace 水印派生，不写恢复事实 |
 
 事实折叠：`PromptAuthorityLedger.foldPromptClaimed/Submitted/PhysicalAccepted/Abandoned` 是
 `PromptAuthorityProjection` 的纯 fold。`PromptDispatcher.Runtime` 无可变 authority 状态——每次读

@@ -26,7 +26,7 @@ rebaseReviewPublishLoop:
 冲突递归只能发生在 `rebaseReviewPublishLoop` 内；Integration Gate 只覆盖 ref mutation 窗口，
 不在 LLM Review / 冲突修复期间持有（ORCH-005）。
 
-### 持久事实（`Journal/OrchestratorFactFold.fs` / `OrchestratorProjection.fs`，ORCH-006）
+### 持久事实（`Change/Orchestration/OrchestratorFactFold.fs` / `OrchestratorProjection.fs`，ORCH-006）
 
 ```fsharp
 ManagerJobCreated = { ManagerJobId; ManagerSessionId; ManagerAgent

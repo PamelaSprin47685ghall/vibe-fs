@@ -24,7 +24,7 @@
 - 选择（CTX-011）：候选 cutoff 严格新于 committed；identical candidate 拒绝；digest 失配
   fail closed；`requiredBlob` 按 choice 取 blob（probe 候选的 blob ≠ committed blob）。
 
-### 1.3 Blog 投影（`Journal/BlogProjection.fs` + `Domain/BloggerDelta.fs`）
+### 1.3 Blog 投影（`Context/Companion/Blogger/Projection.fs` + `Domain/BloggerDelta.fs`）
 
 - `BlogFrameKind = Entry | Squash`；`BlogFrame { Kind; Digest; TextRef; CoveredFrom; CoveredThrough }`。
 - `BlogCoverage` 双字段：`IngestedThroughSequence`（RecordCoverage，可 mid-turn）与

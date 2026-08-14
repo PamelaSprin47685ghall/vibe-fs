@@ -31,7 +31,7 @@ at-most-one）。两个包按 HANDOFF §7.4 硬拆：**authority ≠ dispatch**�
 |---|---|
 | WHY | 物理 `role=user` 廉价可伪造；typed provenance 是唯一 authority 证据 |
 | WHAT | `INTERACTION-AUTHORITY-001..015`：Root 独占权、Continuation 禁区、来源解析、fail-closed、assistance/join 延续 |
-| HOW | `Domain/PromptAuthority.fs`、`PromptAuthorityRun.fs`、`Application/Prompting/PromptIngress.fs`、`Journal/PromptFactFold.fs` |
+| HOW | `Domain/PromptAuthority.fs`、`PromptAuthorityRun.fs`、`Application/Prompting/PromptIngress.fs`、`Interaction/Authority/PromptFactFold.fs` |
 | PROOF | 17 个测试落点（REUSE 为主 + 2 个包内 NEW 文件）；`authority.test.mjs` SPLIT@cutover |
 | 依赖 | `participant-identity`（Persona/ExecutionBinding 不是本包）、`session-ontology`（Companion 关联不是本包） |
 

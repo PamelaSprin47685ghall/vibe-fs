@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Identity
 /// The prefix epoch used to live here too — `ActivePrefixEpoch` plus a
 /// `ReplacementActive` flag, written by `switchEpoch` from a token-budget comparison.
 /// That was a second writer of prefix-epoch state, and it decided WHEN to compress by
-/// estimating context (CTX-001, CTX-002 both forbid it). `Journal/PrefixEpochProjection`
+/// estimating context (CTX-001, CTX-002 both forbid it). `Context/Prefix/Epoch`
 /// is the single owner now, and the only things that move it are a promoted probe
 /// (CTX-012) and a reanchor (HOST-006).
 ///

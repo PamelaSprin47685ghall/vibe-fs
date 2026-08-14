@@ -12,7 +12,7 @@ import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerCrashRecovery.fs'),
+  join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs'),
   'utf8',
 )
 const spikeSrc = readFileSync(
@@ -24,12 +24,12 @@ const scopeSrc = readFileSync(
   'utf8',
 )
 const interpreterSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
+  join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
   'utf8',
 )
 
 const probeModuleSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+  join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
   'utf8',
 )
 

@@ -7,8 +7,8 @@
 | 模块 | 职责 | 命题 |
 |---|---|---|
 | `src/Wanxiangshu/Domain/ManagerLifecycle.fs` | `ManagerLifecycleFact` 类型（`LifeOpened` / `FinalityRequested` / `FinalityReviewerEnlisted` / `FinalityRejected` / `FinalitySiblingSteered` / `FinalityBlessed` / `FinalityUndecided` / `LifeCompleted`；`WorkActivated` 仅 legacy decode） | 008/021/025 |
-| `src/Wanxiangshu/Journal/ManagerLifecycleProjection.fs` | `LifeProjection` / `FinalityRequestProjection` fold：ActiveFinality、EnlistedReviewers、LastBlessing、Completed、Resolution（Open/Rejected/Blessed/Undecided） | 008-017/021/022 |
-| `src/Wanxiangshu/Journal/FinalityReviewCohort.fs` | `rosterOf` / `graduatedReviewer`（纯函数） | 009/010 |
+| `src/Wanxiangshu/Mission/Manager/Life/Projection.fs` | `LifeProjection` / `FinalityRequestProjection` fold：ActiveFinality、EnlistedReviewers、LastBlessing、Completed、Resolution（Open/Rejected/Blessed/Undecided） | 008-017/021/022 |
+| `src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs` | `rosterOf` / `graduatedReviewer`（纯函数） | 009/010 |
 | `src/Wanxiangshu/Application/Finality/FinalityWorkflow.fs` | 终结 CE：start / resume / undecided 收束 | 008/012/026 |
 | `src/Wanxiangshu/Application/Finality/CohortWorkflow.fs` | cohort 并发驱动（`concurrentAllOrShortCircuit`） | 008/011 |
 | `src/Wanxiangshu/Application/Finality/BlessingWorkflow.fs` | `blessIfTreeUnchanged`（tree 重读 + stable-ordinal bundle + `FinalityBlessed`） | 016 |

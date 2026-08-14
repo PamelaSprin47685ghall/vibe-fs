@@ -12,7 +12,7 @@ import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerCrashRecovery.fs'),
+  join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs'),
   'utf8',
 )
 const enforcerSrc = readFileSync(
@@ -25,7 +25,7 @@ const repairSrc = readFileSync(
 )
 
 const probeModuleSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+  join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
   'utf8',
 )
 
@@ -140,7 +140,7 @@ test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   // (rejudgeFromEvidence / rejudgeToolRecovery in BloggerRecoveryProbe) must
   // restore InteractionNudgeIssued at most, never AabbRepairConsumed.
   const probeSrc = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+    join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
     'utf8',
   )
   const coldRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)

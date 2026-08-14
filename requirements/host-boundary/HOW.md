@@ -24,7 +24,7 @@ idle-derived continuation 能力（QuiescenceGate 属 causal-wait，本包只拥
 ToolPart/assistant/run/ordinal（0/≥2 → `Ambiguous` fail-closed）。`HostSessionContext.read`
 从 raw event 提取 `(sessionId, agent)`；`roleOf` 经 `AgentRoleIdentity`。
 
-### Reconciler（`Application/Reconciliation/Reconciler.fs`）
+### Reconciler（`Composition/Turn/Scheduler.fs`）
 
 `Scheduler` 持有 queued/active/generation/wake：同 session 信号合并、最多一个 drain、
 generation 隔离（HOST-004）。`maxCausalRereads = 3`；`maxConsecutiveErrors = 5`。

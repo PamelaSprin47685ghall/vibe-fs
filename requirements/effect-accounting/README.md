@@ -50,10 +50,10 @@ tests/      本包拥有的可执行 proof（1 个 NEW 文件，4 断言）
 ```text
 Kernel/Fact.fs           OrchestratorFactCases：WorktreeCreateRequested / WorktreeCreated /
                          PublishClaimed / Published（typed 事实）
-Journal/OrchestratorFactFold.fs   fold 拒绝「Accepted → Requested」回归
-Journal/OrchestratorProjection.fs recoveryAction：PublishClaimed 三分支（固定顺序）
-Journal/EventStoreJournalWriter.fs 写失败 → CommitUnknown（结局未知，poison）
-Journal/AgentJournal.fs    JournalAppendFailure.WriteUnknown | FactRejected
+Change/Orchestration/OrchestratorFactFold.fs   fold 拒绝「Accepted → Requested」回归
+Change/Orchestration/OrchestratorProjection.fs recoveryAction：PublishClaimed 三分支（固定顺序）
+Persistence/Journal/EventStoreJournalWriter.fs 写失败 → CommitUnknown（结局未知，poison）
+Persistence/Journal/AgentJournal.fs    JournalAppendFailure.WriteUnknown | FactRejected
 Application/Reconciliation/   PromptRecovery（先 snapshot 核对再决定）、MagicTodoMembrane
                               （Prepared 先于 provider 调用，Accepted 需物理成功证据）
 ```
@@ -63,10 +63,10 @@ Application/Reconciliation/   PromptRecovery（先 snapshot 核对再决定）�
 | 概念 | 文件 |
 |---|---|
 | typed effect 事实 | `src/Wanxiangshu/Kernel/Fact.fs`（`OrchestratorFactCases.WorktreeCreateRequested/WorktreeCreated/PublishClaimed/Published`）、`Domain/MagicTodoFacts.fs`（`TodoWritePrepared/TodoWriteAccepted`） |
-| effect 状态投影 | `Journal/OrchestratorProjection.fs`（`WorktreeEffectStatus = Requested\|Created`、`JobProgress.PublishClaimed`、`recoveryAction`） |
-| 拒绝回归 | `Journal/OrchestratorFactFold.fs`（PublishClaimed 需 RebasedCandidateReady；`acceptWorktree` 后 request 不回归） |
-| outcome-unknown 机械面 | `Journal/EventStoreJournalWriter.fs`（`CommitUnknown`）、`Journal/AgentJournal.fs`（`JournalAppendFailure`） |
-| 先证后重试 | `Application/Reconciliation/PromptRecovery.fs`（`reconcileClaim`：snapshot 核对先于 budget）、`Application/Reconciliation/MagicTodoMembrane.fs`（`prepare` 先 append 再 provider 调用；`accept` 需物理成功 + digest） |
+| effect 状态投影 | `Change/Orchestration/OrchestratorProjection.fs`（`WorktreeEffectStatus = Requested\|Created`、`JobProgress.PublishClaimed`、`recoveryAction`） |
+| 拒绝回归 | `Change/Orchestration/OrchestratorFactFold.fs`（PublishClaimed 需 RebasedCandidateReady；`acceptWorktree` 后 request 不回归） |
+| outcome-unknown 机械面 | `Persistence/Journal/EventStoreJournalWriter.fs`（`CommitUnknown`）、`Persistence/Journal/AgentJournal.fs`（`JournalAppendFailure`） |
+| 先证后重试 | `Interaction/Dispatch/Recovery.fs`（`reconcileClaim`：snapshot 核对先于 budget）、`Mission/Obligation/Todo/MagicTodoMembrane.fs`（`prepare` 先 append 再 provider 调用；`accept` 需物理成功 + digest） |
 
 ## proof 概览
 
