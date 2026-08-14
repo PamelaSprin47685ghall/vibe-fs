@@ -5,7 +5,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { xTraceCapture } from '../support/domain.mjs'
+import { xTraceCapture } from '../../../tests/unit/support/domain.mjs'
 
 test('COMPANION_012_text_maps_to_semantic_text', () => {
   const mapped = xTraceCapture.map(xTraceCapture.text('hello world'))

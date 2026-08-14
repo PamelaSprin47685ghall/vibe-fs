@@ -5,7 +5,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { xTrace } from '../support/domain.mjs'
+import { xTrace } from '../../../tests/unit/support/domain.mjs'
 
 test('XTRACE_cursor_is_strictly_monotonic', () => {
   const origin = xTrace.originCursor
