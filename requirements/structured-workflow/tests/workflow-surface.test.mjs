@@ -17,7 +17,7 @@ const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$r
 test('SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
   const manager = await load('Application/Manager/ManagerWorkflow')
   const reviewer = await load('Application/Review/ReviewerWorkflow')
-  const turn = await load('Application/Reconciliation/TurnWorkflow')
+  const turn = await load('Composition/Turn/Workflow')
 
   assert.deepEqual(surfaceOf(manager).sort(), ['observe', 'observeIdle'])
   assert.deepEqual(surfaceOf(reviewer).sort(), ['observe'])
@@ -36,7 +36,7 @@ test('SW_002_workflow_modules_export_no_program_counter_shaped_names', async () 
   for (const modulePath of [
     'Application/Manager/ManagerWorkflow',
     'Application/Review/ReviewerWorkflow',
-    'Application/Reconciliation/TurnWorkflow',
+    'Composition/Turn/Workflow',
   ]) {
     const names = surfaceOf(await load(modulePath))
     const hits = names.filter((n) => programCounterShape.test(n))

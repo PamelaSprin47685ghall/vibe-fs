@@ -19,8 +19,8 @@
 | 015 | `Session/JoinInterruptRegistry.fs`（`UserMessageArrived`）；`PromptIngressCodec`（ExternalUserIngressPulse 候选） | wake 低权限；ingress 不给 authority |
 | 016 | `Domain/PromptAuthorityRun.fs` → `acceptClaim`（root 不入 continuation map） | root ≠ continuation |
 
-事实折叠：`Journal/PromptFactFold.fs` 把 `PluginPromptClaimed/Submitted/PhysicalAccepted/Abandoned` 与
-`AuthorityRootAccepted` fold 进 `AgentProjectionSet`；`Journal/PromptAuthorityLedger.fs` 是
+事实折叠：`Interaction/Authority/PromptFactFold.fs` 把 `PluginPromptClaimed/Submitted/PhysicalAccepted/Abandoned` 与
+`AuthorityRootAccepted` fold 进 `AgentProjectionSet`；`Interaction/Authority/Ledger.fs` 是
 `PromptAuthorityProjection` 的纯 fold（`foldAuthorityRootAccepted`、`foldPromptClaimed`…）。authority
 状态没有第二份内存拷贝——`PromptDispatcher.Runtime` 无可变 authority 字段，每次读都走 fold
 （`ProjectionFor`）。

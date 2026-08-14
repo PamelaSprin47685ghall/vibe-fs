@@ -12,7 +12,7 @@
 | `src/Wanxiangshu/Application/Recovery/FallbackLedger.fs` | **唯一写入口**：confirmed failure → dedupe → advance/exhaust → append 事实；`admitConfirmedFailure` 投影 host-facing admission | PAR-003/005/007 |
 | `src/Wanxiangshu/Application/Recovery/FallbackEvidence.fs` | 只读查询（currentCursor/currentSide/effectiveAgent/mayContinue） | PAR-004/013 |
 | `src/Wanxiangshu/Application/Recovery/ProviderRecoveryWorkflow.fs` | 失败后的恢复编排：记录失败 → 等 coverage material → 决定 continuation；`continueAfterLoopKill` 桥接 degeneration-guard | PAR-003/010/014 |
-| `src/Wanxiangshu/Journal/FallbackProjection.fs` / `FallbackFactFold.fs` | 持久事实的 fold 与拒绝条件 | PAR-002/007 |
+| `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs` / `FallbackFactFold.fs` | 持久事实的 fold 与拒绝条件 | PAR-002/007 |
 | `src/Wanxiangshu/Session/EnforcerRepair.fs` | `interrupted=true` 残留的判定 | PAR-012 |
 
 ## 一次已确认失败的主路径（代码时序）

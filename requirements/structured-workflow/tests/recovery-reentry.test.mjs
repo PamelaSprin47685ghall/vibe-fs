@@ -46,7 +46,7 @@ test('SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () =>
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the
   // thin per-context TurnWorkflow router. None of them is a stored position.
-  const sessionRecovery = await load('Application/Reconciliation/SessionRecoveryWorkflow')
+  const sessionRecovery = await load('Execution/Session/SessionRecoveryWorkflow')
   assert.equal(typeof sessionRecovery.recoverFamilyDirect, 'function')
 
   const providerRecovery = await load('Application/Recovery/ProviderRecoveryWorkflow')
@@ -54,7 +54,7 @@ test('SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () =>
     assert.equal(typeof providerRecovery[n], 'function', `ProviderRecoveryWorkflow must export ${n}`)
   }
 
-  const turn = await load('Application/Reconciliation/TurnWorkflow')
+  const turn = await load('Composition/Turn/Workflow')
   assert.equal(typeof turn.observe, 'function')
 
   const manager = await load('Application/Manager/ManagerWorkflow')

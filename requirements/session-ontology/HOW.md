@@ -24,7 +24,7 @@ type SessionOwnership =
 辅助谓词：`SessionExecutionClass.isWork/isInternalLeaf`、
 `SessionOwnership.tryOwner/attachmentKind`（Root → None）。
 
-### durable 事实（`src/Wanxiangshu/Journal/SessionAssociation.fs`）
+### durable 事实（`src/Wanxiangshu/Execution/Session/Association.fs`）
 
 ```fsharp
 type SatelliteKind = | Companion          // 唯一案例；Teacher 已 G3 删除

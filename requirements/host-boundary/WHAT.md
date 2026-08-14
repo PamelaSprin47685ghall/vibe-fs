@@ -64,7 +64,7 @@ retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
 
 **含义/动机**：轮询把时间推进当业务状态探测（A 类病态）；事件驱动只对真实信号反应。
 
-**证据**：`Application/Reconciliation/Reconciler.fs`（Scheduler：queued/active/generation/
+**证据**：`Composition/Turn/Scheduler.fs`（Scheduler：queued/active/generation/
 wake）；→ PROOF.md `HOST-BOUNDARY-005`（REUSE `execution/reconcile-idle-early.test.mjs`、
 `domain/reconcile-program.test.mjs`）。
 

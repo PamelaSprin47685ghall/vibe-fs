@@ -31,7 +31,7 @@ PromptKey 幂等身份、unknown outcome 不自动重发、fire-and-forget 只�
 |---|---|
 | WHY | 收据/unknown 不得变成重发许可；一次 logical send 一次 logical effect |
 | WHAT | `DISPATCH-PROTOCOL-001..011`：唯一写入口、四态、receipt≠身份、PromptKey、at-most-one、Detached |
-| HOW | `Application/Prompting/{PromptDispatcher,PromptDispatcherSend}.fs`、`Journal/PromptFactFold.fs`、`Application/Reconciliation/PromptRecovery.fs` |
+| HOW | `Application/Prompting/{PromptDispatcher,PromptDispatcherSend}.fs`、`Interaction/Authority/PromptFactFold.fs`、`Interaction/Dispatch/Recovery.fs` |
 | PROOF | 10 个测试落点（NEW 2 文件 14 断言 + MOVE 1 文件 + REUSE 锚点）；`authority.test.mjs` SPLIT@cutover |
 | 依赖 | `interaction-authority`、`effect-accounting`、`host-boundary`、`durable-events` |
 

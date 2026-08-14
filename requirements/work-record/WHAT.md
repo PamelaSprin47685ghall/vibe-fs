@@ -143,7 +143,7 @@ tool 滤入 Recent work。
 在 record 里属于 Opening 区间」。
 
 **证据**：COMPANION-014 ⑨；TODO-015；`Domain/LifecycleWorkRecord.fs` `withConstitutive`；
-`Journal/ManagerOpeningFloor.fs`（WorkRecordStart 含 T1 call）。
+`Mission/Manager/Life/OpeningFloor.fs`（WorkRecordStart 含 T1 call）。
 
 ---
 
@@ -246,7 +246,7 @@ RecordCoverage 推导可替换前缀，禁止用 PrefixCoverage 填 LWR gap。
 **边界**：epoch/rebase 语义归 `prefix-stability`；Y 从 floor 起算的压缩行为归
 `context-compression`；本命题拥有「floor 的结构性 + Opening 不复制」这一半。
 
-**证据**：TODO-001；COMPANION-014；GLORY-006；`Journal/ManagerOpeningFloor.fs`
+**证据**：TODO-001；COMPANION-014；GLORY-006；`Mission/Manager/Life/OpeningFloor.fs`
 （`workRecordStart`/`effectiveOpeningFloor`，从不读 `WorkActivated`）。
 
 ---

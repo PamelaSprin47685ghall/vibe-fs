@@ -151,14 +151,14 @@ test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async 
 
 test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
   const [journal, esWriter, envelope, codec, state] = await Promise.all([
-    load('Journal/AgentJournal'),
-    load('Journal/EventStoreJournalWriter'),
-    load('Journal/Envelope'),
-    load('Journal/FactCodec'),
-    load('Journal/ProjectionState'),
+    load('Persistence/Journal/AgentJournal'),
+    load('Persistence/Journal/EventStoreJournalWriter'),
+    load('Persistence/Journal/Envelope'),
+    load('Persistence/Journal/FactCodec'),
+    load('Composition/Durable/ProjectionState'),
   ])
 
-  assertCallable(journal, 'Journal/AgentJournal', [
+  assertCallable(journal, 'Persistence/Journal/AgentJournal', [
     'AgentJournalModule_createFromEventStore',
     'AgentJournalModule_createFromProjection',
     'AgentJournalModule_appendAgent',
@@ -178,12 +178,12 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
   assert.equal(hasResume, true, 'EventStoreJournalWriter.resumeOrCreate must be published')
   assert.equal(typeof esWriter.EventStoreJournalWriter_loadJournalEnvelopes, 'function')
 
-  assertCallable(envelope, 'Journal/Envelope', [
+  assertCallable(envelope, 'Persistence/Journal/Envelope', [
     'EnvelopeModule_serialize',
     'EnvelopeModule_deserialize',
     'EnvelopeModule_compareSortKey',
   ])
-  assertCallable(codec, 'Journal/FactCodec', ['serializeFact', 'deserializeFact'])
+  assertCallable(codec, 'Persistence/Journal/FactCodec', ['serializeFact', 'deserializeFact'])
 
   // PERSIST-008's integrated state, and the runtime snapshot a boot produces.
   for (const name of ['ProjectionSet', 'RuntimeSnapshot']) {

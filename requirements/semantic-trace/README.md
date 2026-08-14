@@ -20,9 +20,9 @@ X 的「当时到底发生了什么」必须可长期定位、可重建。若只
 ## HOW 概览（→ HOW.md）
 
 - 类型：`src/Wanxiangshu/Domain/XTrace.fs`（cursor/item/flatten/render/slice）
-- durable 投影：`src/Wanxiangshu/Journal/XTraceProjection.fs`（Opening/Part/Terminal 三事实，PERSIST-010 拒绝规则）
-- 捕获链路：`src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs`（唯一 `MessagePart → SemanticPart` mapper）
-- fold：`src/Wanxiangshu/Journal/Fold.fs` + `XTraceProjection`
+- durable 投影：`src/Wanxiangshu/Context/Trace/Projection.fs`（Opening/Part/Terminal 三事实，PERSIST-010 拒绝规则）
+- 捕获链路：`src/Wanxiangshu/Context/Trace/Capture.fs`（唯一 `MessagePart → SemanticPart` mapper）
+- fold：`src/Wanxiangshu/Composition/Durable/Fold.fs` + `XTraceProjection`
 
 ## proof 概览（→ PROOF.md）
 

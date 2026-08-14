@@ -32,7 +32,7 @@ type TipGuidance =
 > Full 历史），没有独立的字节级 horizon 探测。两轴在投影层分离（GD-001），
 > 机器可证明的部分见 §2 与 PROOF.md。
 
-## 2. 投影：`src/Wanxiangshu/Journal/TipDeliveryProjection.fs`
+## 2. 投影：`src/Wanxiangshu/Feedback/Enforcer/Guidance/DeliveryProjection.fs`
 
 ```fsharp
 type TipDeliveryProjectionState = { FullDeliveredTips: Set<string> }
@@ -46,7 +46,7 @@ type TipDeliveryProjectionState = { FullDeliveredTips: Set<string> }
   （GD-005；`TDP_004/005` 锁定）。
 - `hasFullDelivered`：判定函数，null/空 tipName → false。
 
-## 3. 历史字节：`src/Wanxiangshu/Journal/GuidelineProjection.fs`（GD-011）
+## 3. 历史字节：`src/Wanxiangshu/OpenCode/Contract/GuidelineProjection.fs`（GD-011）
 
 ```fsharp
 type PairProgrammingGuideline =

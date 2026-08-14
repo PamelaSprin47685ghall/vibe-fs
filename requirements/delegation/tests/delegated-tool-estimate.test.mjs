@@ -46,7 +46,7 @@ test('DELEG_022_each_distinct_real_tool_call_decrements_once_and_saturates_at_ze
 
 test('DELEG_022_projection_is_incremental_not_a_transcript_or_xtrace_scan', () => {
   const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Journal/DelegatedToolEstimateProjection.fs', import.meta.url),
+    new URL('../../../src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs', import.meta.url),
     'utf8',
   )
 

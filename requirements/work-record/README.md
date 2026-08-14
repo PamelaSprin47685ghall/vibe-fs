@@ -26,7 +26,7 @@
   `MagicTodoLwr.fs`（`BoundedRange`）、`SyncDelegatePrompt.fs`
 - 物化：`src/Wanxiangshu/Application/Finality/LifecycleWorkRecordProjection.fs`
   （`lifecycleWorkRecordFromSnapshot` / `lifecycleWorkRecordBoundedFromSnapshot`）
-- floor：`src/Wanxiangshu/Journal/ManagerOpeningFloor.fs`（WorkRecordStart 纯推导）
+- floor：`src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs`（WorkRecordStart 纯推导）
 
 ## proof 概览（→ PROOF.md）
 

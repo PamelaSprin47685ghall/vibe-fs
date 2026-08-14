@@ -18,7 +18,7 @@ Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界
 **边界**：本命题只定分类轴本身；具体有哪些 `AttachmentKind`、kind 之间的生命周期机制不归本命题。
 
 **证据**：类型 `src/Wanxiangshu/Kernel/SessionOwnership.fs`；派生视图
-`Journal/SessionAssociation.fs` `SessionOwnershipClassification`；→ PROOF.md `SESSION-ONTOLOGY-001/002`。
+`Execution/Session/Association.fs` `SessionOwnershipClassification`；→ PROOF.md `SESSION-ONTOLOGY-001/002`。
 
 ## SESSION-ONTOLOGY-002：ExecutionClass 与 Ownership 是正交且穷尽的组合
 
@@ -91,7 +91,7 @@ Host 树深度恒为 2。归属关系不由物理 parentID 承载，只由 durab
 **规范**：durable `SessionAssociation`（FactCodec）仍以 `ManagedSessionKind`
 （`WorkSession | SatelliteSession(_, Companion)`）记录；`ExecutionClass × Ownership` 是
 `SessionOwnershipClassification` 派生视图，**additive only**——不改 `SessionAssociation` 字段与
-FactCodec（`Journal/SessionAssociation.fs` 头注释）。
+FactCodec（`Execution/Session/Association.fs` 头注释）。
 
 **含义/动机**：既有 journal 不必迁移；新视图不破坏 codec 稳定性。`SatelliteKind` 仅 `Companion`。
 

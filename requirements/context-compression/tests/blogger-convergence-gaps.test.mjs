@@ -171,7 +171,7 @@ test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   )
   assert.equal(
     /PreviousCoverableTurnCutoffExclusive = 0\s*\n\s*NextCoverableTurnCutoffExclusive = 0/.test(
-      prodText('src/Wanxiangshu/Application/Reconciliation/BloggerCrashRecovery.fs'),
+      prodText('src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs'),
     ),
     false,
     'crash recovery must not zero cutoff/digest when reloading Main context',
