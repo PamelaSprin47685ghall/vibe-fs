@@ -24,7 +24,8 @@ const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { SessionAgentProjection, AgentProjectionSet, AgentProjection_empty: emptyAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { ProjectionSet } = await import('../../../dist/Composition/Durable/ProjectionState.js')
 const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Session/ChildRun.js')
 
 const FORBIDDEN = /\b(agent_id|session_id|pty_id|child_session_id|status|kind|ordinal|has_pending_completion|current_run_id|fallback_peer|tier|role)\s*=|completed-awaiting-join|running|busy/
@@ -77,25 +78,39 @@ const yState = (entries) => {
   return state
 }
 
-const fakeJournal = (handles, childBlogs = [], blobs = new Map()) => ({
-  gate: { Enter: () => ({ Exit: () => {} }) },
-  writer: {
-    BlobWriter: {
-      Read: async (ref) => {
-        const key = idValue.blobRef(ref)
-        return blobs.has(key) ? { tag: 0, fields: [blobs.get(key)] } : { tag: 1, fields: ['missing'] }
+const fakeJournal = (handles, childBlogs = [], blobs = new Map()) => {
+  const sessions = sessionMap([
+    [sessionId('ses_horizon'), sessionProjection({ handles })],
+    ...childBlogs.map(([child, blog]) => [sessionId(child), sessionProjection({ blog })]),
+  ])
+  const agentProjections = new AgentProjectionSet(
+    sessions,
+    emptyAgentProjection.Associations,
+    emptyAgentProjection.Orchestrator,
+    emptyAgentProjection.HandleByChildSession,
+    emptyAgentProjection.Fission,
+    emptyAgentProjection.MagicTodo,
+    0,
+  )
+  const projection = new ProjectionSet(agentProjections, undefined)
+  return {
+    gate: { Enter: () => ({ Exit: () => {} }) },
+    derivedFallbackSuccesses: new Set(),
+    writer: {
+      TryCurrent: () => undefined,
+      LastCommittedLocalSeq: 0n,
+      BlobWriter: {
+        Read: async (ref) => {
+          const key = idValue.blobRef(ref)
+          return blobs.has(key) ? { tag: 0, fields: [blobs.get(key)] } : { tag: 1, fields: ['missing'] }
+        },
       },
+      Release: () => {},
+      ReleaseAsync: () => Promise.resolve(),
     },
-  },
-  projection: {
-    AgentProjections: {
-      Sessions: sessionMap([
-        [sessionId('ses_horizon'), sessionProjection({ handles })],
-        ...childBlogs.map(([child, blog]) => [sessionId(child), sessionProjection({ blog })]),
-      ]),
-    },
-  },
-})
+    initialProjection: projection,
+  }
+}
 
 const scopeFor = (journal, runtime) => {
   const scope = new ToolRuntimeScope(

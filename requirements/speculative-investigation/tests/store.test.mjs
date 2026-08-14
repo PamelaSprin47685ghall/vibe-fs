@@ -39,7 +39,7 @@ test('STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary',
     'StrengthFramesTraced',
     'StrengthCandidateAbandoned',
   ]) {
-    assert.equal(Vocabulary.AuthoritativeEventTypes_isKnown(name), true, name)
+    assert.equal(Vocabulary.isKnown(name), true, name)
   }
 })
 

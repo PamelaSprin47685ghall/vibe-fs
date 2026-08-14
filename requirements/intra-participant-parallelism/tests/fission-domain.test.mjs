@@ -2,9 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { caseOf, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Fission = await import('../../../dist/Domain/Fission.js')
+import {
+  FissionPrompt_parse as parsePrompt,
+  FissionCompletionAffinity,
+  FissionCompletionAffinityModule_lane as affinityLane,
+  FissionCompletionRouting_targets as completionTargets,
+  FissionDeliveryModule_empty as deliveryEmpty,
+  FissionDeliveryModule_mark as deliveryMark,
+  FissionDeliveryModule_pendingTargets as deliveryPendingTargets,
+  FissionWorkBundleModule_empty as workBundleEmpty,
+  FissionWorkBundleModule_add as workBundleAdd,
+  FissionWorkBundleModule_merge as workBundleMerge,
+  FissionWorkBundleModule_keys as workBundleKeys,
+  FissionWorkBundleModule_entries as workBundleEntries,
+  FissionConvergence_ready as convergenceReady,
+} from '../../../dist/Domain/Fission.js'
 
-const parse = (text) => Fission.FissionPrompt_parse(text)
+const parse = (text) => parsePrompt(text)
 const lanePrompts = (parsed) => listItems(parsed.Lanes).map((lane) => [lane.Index, lane.Prompt])
 
 const mustOk = (result) => {
@@ -28,40 +42,41 @@ test('canonical parser normalizes only newline shape and preserves lane text', (
 })
 
 test('pre-fission completion broadcasts to every lane; post-fission completion has one affinity target', () => {
-  assert.deepEqual(listItems(Fission.FissionCompletionRouting_targets(4, Fission.FissionCompletionAffinity_preFission)), [0, 1, 2, 3])
-  assert.deepEqual(listItems(Fission.FissionCompletionRouting_targets(4, Fission.FissionCompletionAffinity_lane(2))), [2])
+  const preFissionAffinity = new FissionCompletionAffinity(0, [])
+  assert.deepEqual(listItems(completionTargets(4, preFissionAffinity)), [0, 1, 2, 3])
+  assert.deepEqual(listItems(completionTargets(4, affinityLane(2))), [2])
 
-  let delivery = Fission.FissionDelivery_empty(3)
-  delivery = mustOk(Fission.FissionDelivery_mark('child-A', 0, delivery))
-  delivery = mustOk(Fission.FissionDelivery_mark('child-A', 0, delivery)) // idempotent
-  delivery = mustOk(Fission.FissionDelivery_mark('child-A', 2, delivery))
-  assert.deepEqual(listItems(Fission.FissionDelivery_pendingTargets('child-A', delivery)), [1])
+  let delivery = deliveryEmpty(3)
+  delivery = mustOk(deliveryMark('child-A', 0, delivery))
+  delivery = mustOk(deliveryMark('child-A', 0, delivery)) // idempotent
+  delivery = mustOk(deliveryMark('child-A', 2, delivery))
+  assert.deepEqual(listItems(deliveryPendingTargets('child-A', delivery)), [1])
 })
 
 test('keyed work bundle is idempotent and rejects conflicting records for one lane', () => {
-  const empty = Fission.FissionWorkBundle_empty
-  const a = mustOk(Fission.FissionWorkBundle_add(2, 'ref-c', empty))
-  const b = mustOk(Fission.FissionWorkBundle_add(0, 'ref-a', a))
-  const same = mustOk(Fission.FissionWorkBundle_add(0, 'ref-a', b))
-  assert.deepEqual(listItems(Fission.FissionWorkBundle_keys(same)), [0, 2])
+  const empty = workBundleEmpty
+  const a = mustOk(workBundleAdd(2, 'ref-c', empty))
+  const b = mustOk(workBundleAdd(0, 'ref-a', a))
+  const same = mustOk(workBundleAdd(0, 'ref-a', b))
+  assert.deepEqual(listItems(workBundleKeys(same)), [0, 2])
 
-  const conflict = Fission.FissionWorkBundle_add(0, 'ref-other', same)
+  const conflict = workBundleAdd(0, 'ref-other', same)
   assert.equal(caseOf(conflict), 'Error')
   assert.equal(caseOf(payloadOf(conflict)), 'ConflictingLaneRecord')
 
-  const left = mustOk(Fission.FissionWorkBundle_add(1, 'ref-b', b))
-  const right = mustOk(Fission.FissionWorkBundle_add(1, 'ref-b', mustOk(Fission.FissionWorkBundle_add(0, 'ref-a', empty))))
-  const merged1 = mustOk(Fission.FissionWorkBundle_merge(left, right))
-  const merged2 = mustOk(Fission.FissionWorkBundle_merge(right, left))
-  assert.deepEqual(listItems(Fission.FissionWorkBundle_entries(merged1)), listItems(Fission.FissionWorkBundle_entries(merged2)))
+  const left = mustOk(workBundleAdd(1, 'ref-b', b))
+  const right = mustOk(workBundleAdd(1, 'ref-b', mustOk(workBundleAdd(0, 'ref-a', empty))))
+  const merged1 = mustOk(workBundleMerge(left, right))
+  const merged2 = mustOk(workBundleMerge(right, left))
+  assert.deepEqual(listItems(workBundleEntries(merged1)), listItems(workBundleEntries(merged2)))
 })
 
 test('convergence requires all lane records and all completion deliveries', () => {
-  const bundle = [0, 1, 2].reduce((state, lane) => mustOk(Fission.FissionWorkBundle_add(lane, `ref-${lane}`, state)), Fission.FissionWorkBundle_empty)
-  let delivery = Fission.FissionDelivery_empty(3)
-  for (const lane of [0, 1, 2]) delivery = mustOk(Fission.FissionDelivery_mark('pre-child', lane, delivery))
+  const bundle = [0, 1, 2].reduce((state, lane) => mustOk(workBundleAdd(lane, `ref-${lane}`, state)), workBundleEmpty)
+  let delivery = deliveryEmpty(3)
+  for (const lane of [0, 1, 2]) delivery = mustOk(deliveryMark('pre-child', lane, delivery))
 
-  assert.equal(Fission.FissionConvergence_ready(3, toList(['pre-child']), bundle, delivery), true)
-  const incomplete = mustOk(Fission.FissionWorkBundle_add(0, 'ref-0', Fission.FissionWorkBundle_empty))
-  assert.equal(Fission.FissionConvergence_ready(3, toList(['pre-child']), incomplete, delivery), false)
+  assert.equal(convergenceReady(3, toList(['pre-child']), bundle, delivery), true)
+  const incomplete = mustOk(workBundleAdd(0, 'ref-0', workBundleEmpty))
+  assert.equal(convergenceReady(3, toList(['pre-child']), incomplete, delivery), false)
 })

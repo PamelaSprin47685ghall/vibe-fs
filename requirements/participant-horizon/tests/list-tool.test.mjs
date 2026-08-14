@@ -9,7 +9,8 @@ const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { SessionAgentProjection, AgentProjectionSet, AgentProjection_empty: emptyAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { ProjectionSet } = await import('../../../dist/Composition/Durable/ProjectionState.js')
 const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Session/ChildRun.js')
 const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
 
@@ -19,14 +20,30 @@ const PARENT = sessionId('ses_list')
 
 const FORBIDDEN = /\b(agent_id|session_id|pty_id|child_session_id|status|kind|ordinal|has_pending_completion|current_run_id|fallback_peer|tier|role)\s*=/
 
-const fakeJournal = (handles) => ({
-  gate: { Enter: () => ({ Exit: () => {} }) },
-  projection: {
-    AgentProjections: {
-      Sessions: sessionMap([[PARENT, new SessionAgentProjection(undefined, undefined, undefined, undefined, handles, undefined, undefined, undefined, undefined, undefined, undefined, undefined)]]),
+const fakeJournal = (handles) => {
+  const sessions = sessionMap([[PARENT, new SessionAgentProjection(undefined, undefined, undefined, undefined, handles, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined)]])
+  const agentProjections = new AgentProjectionSet(
+    sessions,
+    emptyAgentProjection.Associations,
+    emptyAgentProjection.Orchestrator,
+    emptyAgentProjection.HandleByChildSession,
+    emptyAgentProjection.Fission,
+    emptyAgentProjection.MagicTodo,
+    0,
+  )
+  const projection = new ProjectionSet(agentProjections, undefined)
+  return {
+    gate: { Enter: () => ({ Exit: () => {} }) },
+    derivedFallbackSuccesses: new Set(),
+    writer: {
+      TryCurrent: () => undefined,
+      LastCommittedLocalSeq: 0n,
+      Release: () => {},
+      ReleaseAsync: () => Promise.resolve(),
     },
-  },
-})
+    initialProjection: projection,
+  }
+}
 
 const linked = (handle, child, target, role, byname = target) => {
   const applied = handleProjection.linkNamed(handle, child, target, byname, roles.of(role), handleProjection.empty)

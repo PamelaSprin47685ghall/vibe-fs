@@ -32,11 +32,13 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 import { applyTransform, reconcileAttempt } from '../../../dist/Context/Prefix/XWire.js'
 import {
-  PluginRuntimeScope_$ctor_Z47771AD0 as makeScope,
+  PluginRuntimeScope,
   PluginRuntimeScope__ArmRecovery_Z31B28506 as armRecovery,
   PluginRuntimeScope__TryAttemptPlan,
   PluginRuntimeScope__TryRecoveryArming_Z31B28506 as tryRecoveryArming,
 } from '../../../dist/Infrastructure/OpenCode/Host/PluginRuntimeScope.js'
+
+const makeScope = (journal) => new PluginRuntimeScope(journal)
 import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { sha256Hex } from '../../../dist/Host/HostDigest.js'
 import { buildTurn } from '../../../dist/Interaction/Repair/CompletedTurn.js'

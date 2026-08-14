@@ -62,8 +62,8 @@ test('TIME_007_durable_session_start_fact_keeps_the_first_prompt_sample', async 
 
 test('TIME_007_session_start_uses_bounded_projection_not_history_scan_or_mutable_counter', () => {
   for (const relative of [
-    '../../../src/Wanxiangshu/Journal/SessionStartedAtProjection.fs',
-    '../../../src/Wanxiangshu/Journal/SessionStartedAtLedger.fs',
+    '../../../src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs',
+    '../../../src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs',
   ]) {
     const source = readFileSync(new URL(relative, import.meta.url), 'utf8')
     for (const forbidden of ['XTrace', 'transcript', 'messages', 'Dictionary<', 'mutable ']) {

@@ -73,8 +73,8 @@ test('DURABLE_CONVERGENCE_003_runtime_append_and_external_hook_share_one_physica
   const hook = await read('src/Wanxiangshu/Infrastructure/Git/HookSync.fs')
 
   assert.match(log, /proper-lockfile/)
-  assert.match(store, /ProcessEventLog\.acquireStoreLock/)
-  assert.match(hook, /ProcessEventLog\.acquireStoreLock/)
+  assert.match(store, /ProcessEventLog\.withStoreLock/)
+  assert.match(hook, /ProcessEventLog\.withStoreLock/)
   assert.match(log, /"forever"\s*==>|forever.*true/s, 'physical lock wait must not inherit a business timeout window')
 })
 

@@ -201,6 +201,7 @@ test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', asyn
   adoptChild(liveCtx.runtime, 'ag7', sessionId('ses_c7'))
   failRun(liveCtx.runtime, run, 'already done')
   assert.equal(pendingRunCount(liveCtx.runtime), 0)
+  await run.Source.get_Task()
 
   // No pending run anymore: CancelAgent must not throw, and the child session
   // is still aborted (the map retains the child until join retires it).

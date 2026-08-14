@@ -410,6 +410,7 @@ test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedA
         ParentSessionId: managerSession,
         Handle: handleId.agent('h_rev'),
         TargetAgent: 'fast-reviewer',
+        Byname: 'fast-reviewer',
         ChildSessionId: reviewerSession,
         CanonicalRole: roles.of('Reviewer'),
         Ownership: HandleOwnership.HostOwnedHidden,
@@ -422,8 +423,7 @@ test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedA
       agentFact('HandleCompleted', {
         ParentSessionId: managerSession,
         Handle: handleId.agent('h_rev'),
-        ChildSessionId: reviewerSession,
-        CompletionKind: HandleCompletionKind.Terminal,
+        Kind: HandleCompletionKind.Terminal,
         CompletionRef: undefined,
         CompletionDigest: undefined,
       }),
@@ -500,6 +500,7 @@ test('REVIEW_017 durable verdict keeps record-ready producer present after the r
       ParentSessionId: managerSession,
       Handle: handleId.agent('h_retired_verdict'),
       TargetAgent: 'fast-reviewer',
+      Byname: 'fast-reviewer',
       ChildSessionId: retiredReviewerSession,
       CanonicalRole: roles.of('Reviewer'),
       Ownership: HandleOwnership.HostOwnedHidden,
@@ -522,8 +523,7 @@ test('REVIEW_017 durable verdict keeps record-ready producer present after the r
     await appendAgent(managerSession, agentFact('HandleCompleted', {
       ParentSessionId: managerSession,
       Handle: handleId.agent('h_retired_verdict'),
-      ChildSessionId: retiredReviewerSession,
-      CompletionKind: HandleCompletionKind.Terminal,
+      Kind: HandleCompletionKind.Terminal,
       CompletionRef: undefined,
       CompletionDigest: undefined,
     }))

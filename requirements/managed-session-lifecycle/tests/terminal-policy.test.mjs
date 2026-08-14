@@ -33,6 +33,7 @@ const linkFact = (parent = MAIN, child = CHILD, target = 'fast-coder') =>
     ChildSessionId: child,
     Handle: handleId.agent('h1'),
     TargetAgent: target,
+    Byname: 'tpol-child',
     CanonicalRole: roles.of('Coder'),
     Ownership: handleOwnership.durableParentHandle(),
   })
@@ -67,7 +68,7 @@ test('TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', async () =
     const record = tryLinkedChild(journal, 'ses_child')
     assert.ok(record, 'linked child must be findable')
     assert.equal(record.TargetAgent, 'fast-coder')
-    assert.equal(record.ChildSessionId, CHILD)
+    assert.deepEqual(record.ChildSessionId, CHILD)
     assert.equal(isLinkedChild(journal, 'ses_child'), true)
     assert.equal(tryLinkedChild(journal, 'ses_unknown'), undefined)
     assert.equal(isLinkedChild(journal, 'ses_unknown'), false)
@@ -129,6 +130,7 @@ test('TPOL_outstandingBackground_orchestrator_active_jobs', async () => {
     ManagerJobId: managerJobId('job_1'),
     ManagerSessionId: CHILD,
     ManagerAgent: 'fast-manager',
+    Byname: 'tpol-manager',
     WorktreeIdentity: worktreeIdentity('wt_1'),
     WorktreePath: worktreePath('/tmp/wt1'),
     TargetRef: targetRef('refs/heads/main'),

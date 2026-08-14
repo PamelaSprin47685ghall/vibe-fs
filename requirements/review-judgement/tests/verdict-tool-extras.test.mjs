@@ -13,7 +13,8 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { SessionAgentProjection, AgentProjectionSet, AgentProjection_empty: emptyAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
+const { ProjectionSet } = await import('../../../dist/Composition/Durable/ProjectionState.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 
 const fakeSchema = {
@@ -44,14 +45,30 @@ const reviewerSession = (guard) =>
     undefined,
   )
 
-const fakeJournal = (guard, extraSessions = []) => ({
-  gate: { Enter: () => ({ Exit: () => {} }) },
-  projection: {
-    AgentProjections: {
-      Sessions: sessionMap([[REVIEWER, reviewerSession(guard)], ...extraSessions]),
+const fakeJournal = (guard, extraSessions = []) => {
+  const sessions = sessionMap([[REVIEWER, reviewerSession(guard)], ...extraSessions])
+  const agentProjections = new AgentProjectionSet(
+    sessions,
+    emptyAgentProjection.Associations,
+    emptyAgentProjection.Orchestrator,
+    emptyAgentProjection.HandleByChildSession,
+    emptyAgentProjection.Fission,
+    emptyAgentProjection.MagicTodo,
+    0,
+  )
+  const projection = new ProjectionSet(agentProjections, undefined)
+  return {
+    gate: { Enter: () => ({ Exit: () => {} }) },
+    derivedFallbackSuccesses: new Set(),
+    writer: {
+      TryCurrent: () => undefined,
+      LastCommittedLocalSeq: 0n,
+      Release: () => {},
+      ReleaseAsync: () => Promise.resolve(),
     },
-  },
-})
+    initialProjection: projection,
+  }
+}
 
 const scopeFor = ({ journal, sessionParents = sessionMap([]), gitTreePort } = {}) =>
   new ToolRuntimeScope(

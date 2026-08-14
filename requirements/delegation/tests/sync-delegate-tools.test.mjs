@@ -329,7 +329,10 @@ test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_char
       async () => providerPrompt,
     )
 
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'prepared Inspector Invoke did not send')
+    await waitFor(
+      () => prompts.length === 1 && createCalls.length === 1 && inspectorPrompts.length === 1,
+      'prepared Inspector Invoke did not finish its post-send semantic hook',
+    )
     assert.equal(prompts[0].text, providerPrompt, 'provider must receive prepared bytes')
     assert.deepEqual(inspectorPrompts, [charge], 'Casebook Q hook must receive raw semantic Charge')
 

@@ -29,6 +29,7 @@ const linkFact = (parent = MAIN, child = CHILD, target = 'fast-coder') =>
     ChildSessionId: child,
     Handle: handleId.agent('h1'),
     TargetAgent: target,
+    Byname: 'tpol-child',
     CanonicalRole: roles.of('Coder'),
     Ownership: handleOwnership.durableParentHandle(),
   })

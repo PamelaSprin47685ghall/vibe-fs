@@ -83,7 +83,7 @@ test('SEMANTIC_TRACE_appendable_xtrace_facts_are_exactly_three', () => {
   // branches ARE the capture boundary: if a speculative/candidate fact family
   // could reach the trace, it would appear here as a fourth apply site.
   const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Journal/CompanionFactFold.fs', import.meta.url),
+    new URL('../../../src/Wanxiangshu/Context/Companion/CompanionFactFold.fs', import.meta.url),
     'utf8',
   )
 

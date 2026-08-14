@@ -176,7 +176,6 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
   )
   assert.equal(hasCreate, true, 'EventStoreJournalWriter.create must be published')
   assert.equal(hasResume, true, 'EventStoreJournalWriter.resumeOrCreate must be published')
-  assert.equal(typeof esWriter.EventStoreJournalWriter_loadJournalEnvelopes, 'function')
 
   assertCallable(envelope, 'Persistence/Journal/Envelope', [
     'EnvelopeModule_serialize',

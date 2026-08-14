@@ -15,6 +15,7 @@ import test from 'node:test'
 
 import {
   agentJournal,
+  promptDispatcher,
   resultOf,
   sessionId,
   uncurry2,
@@ -71,7 +72,7 @@ const fakeSessions = ({ createError } = {}) => {
     },
     SendPrompt: async (...args) => {
       calls.prompt.push(args)
-      return { tag: 0, fields: [] }
+      return promptDispatcher.admittedWithPhysicalMessage('msg_phys_oneshot')
     },
     SubscribeTerminal: (_childId, callback) => {
       terminals.add(callback)

@@ -20,6 +20,7 @@ import { parse as parseToml } from 'smol-toml'
 import { caseOf, listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { JsTransactionProjectionModule_pending as pendingTransactions } from '../../../dist/Domain/JsTransaction.js'
+import { JsToolsTransactionStore_createPersistence as createPersistence } from '../../../dist/Infrastructure/JsToolsTransactionStore.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
@@ -158,7 +159,7 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     return { done: true };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, store)
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, createPersistence(store))
     assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
 

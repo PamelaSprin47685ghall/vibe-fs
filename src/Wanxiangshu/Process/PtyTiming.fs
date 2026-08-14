@@ -40,19 +40,30 @@ module PtyTiming =
         completion.Task
 
     let raceExit (exitTask: Task) (milliseconds: int) : Task<bool> =
-        let exited =
-            task {
-                do! exitTask
-                return true
-            }
-
-        let elapsed =
-            task {
-                do! timerTask milliseconds
-                return false
-            }
-
-        emitJsExpr (exited, elapsed) "Promise.race([$0, $1])"
+        emitJsExpr
+            (exitTask, milliseconds)
+            """
+            new Promise((resolve, reject) => {
+                let timer = null;
+                $0.then(
+                    () => {
+                        if (timer !== null) { clearTimeout(timer); timer = null; }
+                        resolve(true);
+                    },
+                    (err) => {
+                        if (timer !== null) { clearTimeout(timer); timer = null; }
+                        reject(err);
+                    }
+                );
+                timer = setTimeout(() => {
+                    timer = null;
+                    resolve(false);
+                }, $1);
+                if (timer !== null && typeof timer.unref === 'function') {
+                    timer.unref();
+                }
+            })
+            """
 
     /// Production Node timer port: setTimeout + clearTimeout; ms ≥ 1000 → unref.
     let nodeTimerPort () : ITimerPort =
