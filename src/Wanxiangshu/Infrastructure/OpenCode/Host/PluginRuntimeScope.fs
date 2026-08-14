@@ -76,8 +76,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable assistanceTurnHandler: (ReconciledTurnContext -> Task<AssistanceTurnDisposition>) option =
         None
 
-    // DSL-MUTABLE: resource — assistance session-drop handler attachment slot
-    let mutable assistanceDropSession: (SessionId -> unit) option = None
+    // DSL-MUTABLE: resource — assistance synchronous signal-drop attachment slot
+    let mutable assistanceDropSignals: (SessionId -> unit) option = None
+    // DSL-MUTABLE: resource — assistance durable session-drop handler attachment slot
+    let mutable assistanceDropSession: (SessionId -> Task) option = None
 
     member _.Journal = journal
 
@@ -106,9 +108,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
     member _.AttachAssistance
-        (handleTurn: ReconciledTurnContext -> Task<AssistanceTurnDisposition>, dropSession: SessionId -> unit)
+        (
+            handleTurn: ReconciledTurnContext -> Task<AssistanceTurnDisposition>,
+            dropSignals: SessionId -> unit,
+            dropSession: SessionId -> Task
+        )
         =
         assistanceTurnHandler <- Some handleTurn
+        assistanceDropSignals <- Some dropSignals
         assistanceDropSession <- Some dropSession
 
     member _.HandleAssistanceTurn(context: ReconciledTurnContext) =
@@ -116,8 +123,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | Some handle -> handle context
         | None -> Task.FromResult AssistanceTurnDisposition.NotAssistance
 
-    member _.DropAssistanceSession(sessionId: SessionId) =
-        assistanceDropSession |> Option.iter (fun drop -> drop sessionId)
+    member _.DropAssistanceSignals(sessionId: SessionId) =
+        assistanceDropSignals |> Option.iter (fun drop -> drop sessionId)
+
+    member _.DropAssistanceSession(sessionId: SessionId) : Task =
+        match assistanceDropSession with
+        | Some drop -> drop sessionId
+        | None -> Task.FromResult()
 
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
 

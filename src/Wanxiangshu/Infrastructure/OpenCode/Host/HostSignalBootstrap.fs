@@ -209,7 +209,7 @@ module HostSignalBootstrap =
                     (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
                 )
 
-            do scope.AttachAssistance(assistance.HandleTurn, assistance.DropSession)
+            do scope.AttachAssistance(assistance.HandleTurn, assistance.DropSignals, assistance.DropSession)
 
             let signalRouter =
                 HostSignalRouter(
@@ -357,7 +357,7 @@ module HostSignalBootstrap =
                 |> Seq.iter (fun id ->
                     scope.LoopSensor.DropSession id
                     scope.NeedHelpSensor.DropSession id
-                    scope.DropAssistanceSession id
+                    scope.DropAssistanceSignals id
                     signalRouter.UnregisterOwned id)
 
             return

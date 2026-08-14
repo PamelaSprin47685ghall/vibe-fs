@@ -706,38 +706,45 @@ type AssistanceHost
         }
         :> Task
 
-    /// Owner cancellation closes its active consultation resource. Child deletion
-    /// alone only removes stream state; the durable handle remains the recovery truth.
-    member _.DropSession(sessionId: SessionId) =
+    /// Synchronous signal-plane teardown. Parent cancellation uses this before its
+    /// own durable handle cancellation CE; no durable work is started here.
+    member _.DropSignals(sessionId: SessionId) =
         sensor.DropSession sessionId
         dropOwnerClaims sessionId
 
-        // The Host deletion/cancel callback is synchronous. Keep the physical abort
-        // synchronous, then continue the durable hidden-handle cleanup in one explicit
-        // detached Task rather than implicitly discarding each journal Task.
-        task {
+    /// Owner deletion closes its active consultation resource. Child deletion
+    /// alone only removes stream state; the durable handle remains the recovery truth.
+    /// Physical abort is issued immediately; the returned Task owns durable abandon
+    /// completion and must be awaited before Journal/store teardown.
+    member this.DropSession(sessionId: SessionId) : Task =
+        this.DropSignals sessionId
+
+        let active =
             match currentProjection () with
-            | None -> ()
+            | None -> []
             | Some snapshot ->
-                for KeyValue(childId, record) in snapshot.AgentProjections.HandleByChildSession do
-                    match tryDecodeRecord record with
-                    | Some(agentId, owner, _, _) when owner = sessionId ->
-                        match record.Lifecycle with
-                        | HandleLifecycle.Active
-                        | HandleLifecycle.CompletedAwaitingJoin _ ->
-                            sessions.AbortSession childId |> ignore
+                [ for KeyValue(childId, record) in snapshot.AgentProjections.HandleByChildSession do
+                      match tryDecodeRecord record with
+                      | Some(agentId, owner, _, _) when owner = sessionId ->
+                          match record.Lifecycle with
+                          | HandleLifecycle.Active
+                          | HandleLifecycle.CompletedAwaitingJoin _ ->
+                              sessions.AbortSession childId |> ignore
+                              yield agentId, owner
+                          | HandleLifecycle.Abandoned _
+                          | HandleLifecycle.Retired -> ()
+                      | _ -> () ]
 
-                            let! _ =
-                                HandleController.recordAbandon
-                                    journal
-                                    owner
-                                    agentId
-                                    HandleAbandonReason.ParentCancelled
-                                    (clockPort.UtcNow())
+        task {
+            for agentId, owner in active do
+                let! _ =
+                    HandleController.recordAbandon
+                        journal
+                        owner
+                        agentId
+                        HandleAbandonReason.ParentCancelled
+                        (clockPort.UtcNow())
 
-                            ()
-                        | HandleLifecycle.Abandoned _
-                        | HandleLifecycle.Retired -> ()
-                    | _ -> ()
+                ()
         }
-        |> ignore
+        :> Task
