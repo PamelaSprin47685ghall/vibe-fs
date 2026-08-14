@@ -31,7 +31,7 @@ RED = 换 model/execution context 能偷偷改变 responsibility/self-model，�
 Persona 从 `Role × initial tier` 改为显式创建时选择，同时 office capability 与 provider renderer 完全不动。
 
 **CURRENT EVIDENCE**  
-`docs/why/agent.md`；AGENT-028/029；`PersonaCatalog.fs`；`session-persona.test.mjs`；prompt-stability proofs。
+`docs/why/agent.md`；AGENT-028/029；type `Domain/PersonaCatalog.fs`、`Kernel/Roles.fs`、`Session/AgentRoleIdentity.fs`、`Domain/ManagedAgentCatalog.fs`；`session-persona.test.mjs`；prompt-stability proofs。
 
 ---
 
@@ -63,7 +63,7 @@ RED = office authority 不清、互相重叠，或能产生自己无资格产生
 重画 Inspector 与 DevOps 的 existing-evidence/new-behavior 边界，不改 Persona、projection、dispatch。
 
 **CURRENT EVIDENCE**  
-ARCH-017；`OFFICE_CAPABILITY_ANCHORS`；Manager/fork capability projections；`Kernel/Roles.fs` 仅作 enforcement 证据。
+ARCH-017；type `Kernel/Roles.fs`；resource `resources/provider/role/*/`；`OFFICE_CAPABILITY_ANCHORS`；Manager/fork capability projections。
 
 ---
 
@@ -98,4 +98,4 @@ RED = participant 看见无行动价值的机器状态/虚假 affordance，或�
 允许一种新的 runtime measurement 进入 horizon，而 renderer 与 office capability 不动。
 
 **CURRENT EVIDENCE**  
-ARCH-014；`provider-leak-gate.mjs`；`provider-leak-gate.test.mjs`；`horizon-surface.test.mjs`；projection Horizon filter。
+ARCH-014；type `Domain/{ProjectionIntent,ProviderProjection,ToolResultBound}.fs`；`scripts/checks/provider-leak-gate.mjs`；`provider-leak-gate.test.mjs`、`horizon-surface.test.mjs`。

@@ -28,7 +28,7 @@ FAILURE MEANING: RED = 当前 mission debt 无唯一真相源，或 workflow/met
 
 INDEPENDENT CHANGE: 从当前 `todowrite` UI/schema 改成另一 obligation authoring surface，而 canonical account/checkpoint semantics 不变。
 
-CURRENT EVIDENCE: `docs/why/todo.md`；TODO-001..015；`MagicTodoProjection`；Manager guideline；todo tests。
+CURRENT EVIDENCE: `docs/why/todo.md`；TODO-001..015；type `Domain/{MagicTodo,MagicTodoFacts,MagicTodoAdmission,MagicTodoAfter,MagicTodoObligationCodec}.fs`；wiring `Application/Reconciliation/{MagicTodoMembrane,MagicTodoLocality}.fs`；fact `Journal/{MagicTodoProjection,MagicTodoFactCodec}.fs`；magic-todo、`tests/unit/reconciliation/magic-todo-membrane.test.mjs`。
 
 ---
 
@@ -59,7 +59,7 @@ FAILURE MEANING: RED = reviewer 可以凭表演式谨慎、固定 checklist 或�
 
 INDEPENDENT CHANGE: 全面重写 Reviewer Ledger/判断哲学，而 review witness/seal/finality protocol 不变。
 
-CURRENT EVIDENCE: `docs/why/review.md` judgement sections；Reviewer Role Law；Examiner's Ledger/Rulebook；judge tool semantics。
+CURRENT EVIDENCE: `docs/why/review.md` judgement sections；type `Application/Review/{VerdictWorkflow,ReviewerEvidence}.fs`；resource `resources/provider/role/reviewer/`、`resources/provider/library/reviewer/`、`resources/provider/review/challenge/`；reviewer verdict tests。
 
 ---
 
@@ -93,7 +93,7 @@ FAILURE MEANING: RED = 系统可以消费针对旧 tree/错误 frontier/未看 c
 
 INDEPENDENT CHANGE: 将 dual-PERFECT+seal 换成另一 causally verifiable confirmation protocol，而 judgement meaning/finality contract 不变。
 
-CURRENT EVIDENCE: REVIEW-003/006/013..020；`docs/why/review.md`；seal/witness tests；request-range LWR；Todo process-review materialization。
+CURRENT EVIDENCE: REVIEW-003/006/013..020；`docs/why/review.md`；type `Domain/{ReviewWitness,ReviewChallenge}.fs`；wiring `Application/Review/{ReviewBarrierWorkflow,ReviewerContinuation}.fs`、`Application/Reconciliation/ReviewSeal.fs`；fact `Journal/{ReviewBarrier,ReviewProjection,ReviewFactFold}.fs`、`Journal/FinalityReviewCohort.fs`；tests `tests/unit/review/**`、seal/witness。
 
 ---
 
@@ -125,4 +125,4 @@ FAILURE MEANING: RED = participant 可绕过 outstanding obligations/review 直�
 
 INDEPENDENT CHANGE: 改 terminal UX/tool 名/hidden reviewer cohort shape，而“只有合格证据才允许 life completion”的 WHAT 不变。
 
-CURRENT EVIDENCE: `docs/why/glory.md`；GLORY/TODO/REVIEW finality clauses；Manager terminal tests；last_words/finality surface proofs。
+CURRENT EVIDENCE: `docs/why/glory.md`；GLORY/TODO/REVIEW finality clauses；wiring `Application/Finality/{FinalityWorkflow,CohortWorkflow,BlessingWorkflow,RevisionWorkflow,RecordWorkflow}.fs`、`Application/Manager/ManagerFinality.fs`；type `Domain/{FinalityPrompt,MagicTodoFinalityCohort}.fs`；tests `tests/unit/glory/**`。

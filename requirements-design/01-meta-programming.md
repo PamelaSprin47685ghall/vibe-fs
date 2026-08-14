@@ -32,7 +32,7 @@ RED = 仓库中存在无 owner、双 owner、互相矛盾或无法独立验收�
 把 manifest 从 TOML 改为其它机器格式，或改变 package 物理 layout，而不改变任何产品 package WHAT。
 
 **CURRENT EVIDENCE**  
-`AGENTS.md`、`docs/what/document-governance.md`、`changes/README.md`、现有 GOV 条款，以及本次重构目标。旧 changes lifecycle 只作反例与迁移证据。
+`AGENTS.md`、`docs/what/document-governance.md`、`changes/README.md`、`scripts/checks/{spec,spec-rules}.mjs`、现有 GOV 条款。旧 changes lifecycle 只作反例与迁移证据。
 
 ---
 
@@ -105,7 +105,7 @@ RED = 领域模型开始保存程序位置、解释 AST 或依赖可变 stage �
 从 F# CE 改成另一种宿主语言结构化 effect 表达，只要仍无第二业务 runtime。
 
 **CURRENT EVIDENCE**  
-`docs/{why,what}/dsl-structured-program.md`、`docs/what/flow.md`、`scripts/checks/dsl-ownership*`、相关 completed DSL changes。
+`docs/{why,what}/dsl-structured-program.md`、`docs/what/flow.md`；type `Kernel/DomainFlow.fs`、wiring `Application/Manager/ManagerWorkflow.fs`、`Application/Review/ReviewerWorkflow.fs`；`scripts/checks/dsl-ownership*`；相关 completed DSL changes。
 
 ---
 
@@ -140,7 +140,7 @@ RED = 业务结果可能仅因 wall-clock 环境、测试运行速度或隐藏 t
 从当前 port 形态改为显式 `Instant/Deadline` token + scheduler capability，不改变 causal-wait 或 process semantics。
 
 **CURRENT EVIDENCE**  
-`IClockPort` / `ITimerPort`、ambient-time static gates、temporal ownership changes。
+type `Kernel/Temporal.fs`、`Process/{Deadline,PtyTiming}.fs`；`tests/unit/temporal`；ambient-time static gates；temporal ownership changes。
 
 ---
 
@@ -176,4 +176,4 @@ RED = 系统要么只能靠盲轮询/睡眠理解等待，要么把诊断状态�
 把 process-local waiter 从当前实现换成 subscription/future/actor mailbox，而所有业务 package WHAT 不变。
 
 **CURRENT EVIDENCE**  
-`causal-ce-observability.md`、`waitfact-causal-renewal.md`、`ce-temporal-ownership.md`、Reviewer/Host 中 event-driven wait 纪律。
+type `Kernel/CausalWait.fs`、`Session/{CausalWaitRegistry,CausalAwait,CausalWaitBridge}.fs`；`scripts/checks/causal-wait-boundary.mjs`；`causal-ce-observability.md`、`waitfact-causal-renewal.md`；Reviewer/Host event-driven wait 纪律。

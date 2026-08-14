@@ -25,7 +25,7 @@ FAILURE MEANING: RED = 模糊关键词、评分或单一表象就能制造 diagn
 
 INDEPENDENT CHANGE: 规则载体从 Markdown directory 改成 typed catalog，而 diagnosis semantics 不动。
 
-CURRENT EVIDENCE: `docs/why/enforcer.md`；tip directory SSOT；chronicle occurrence；Observation pairing；score-vector clean break。
+CURRENT EVIDENCE: `docs/why/enforcer.md`；type `Domain/{EnforcerCatalog,EnforcerCodec,EnforcerCycle,RulebookObservation}.fs`；resource `resources/enforcer/**`（124 tip 目录 = 检测边界）；wiring `Session/{EnforcerHost,EnforcerCycleCommit,EnforcerFrameRecovery}.fs`；tests `tests/unit/enforcer/**`。
 
 ---
 
@@ -56,4 +56,4 @@ FAILURE MEANING: RED = guidance 可无限重复、reanchor 后永久丢失，或
 
 INDEPENDENT CHANGE: 从 Full/Identity 改成摘要+按需展开，而 diagnosis ontology 不变。
 
-CURRENT EVIDENCE: ENFORCER TipDeliveryFrontier / TipSemanticCoverage；Full/Identity；Main overlay 与 Blogger Detection Wing。
+CURRENT EVIDENCE: type `Journal/{TipDeliveryProjection,GuidelineProjection,ObservationProjection}.fs`；wiring `Session/{EnforcerTipGuidance,EnforcerRepair,EnforcerContinuation}.fs`、`Domain/EnforcerCycle.fs`（Full/Identity）；failure `scripts/checks/{enforcer-cross-family-collision,enforcer-rulebook-gate}.mjs`；tests `tests/unit/enforcer/**`。

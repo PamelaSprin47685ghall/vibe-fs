@@ -28,7 +28,7 @@ FAILURE MEANING: RED = 未被 primary 使用的 speculative intervention 能污�
 
 INDEPENDENT CHANGE: 把 predictor 从当前模型/统计策略换成 deterministic heuristic 或 learned policy，而 Candidate/Promotion/no-impact semantics 不变。
 
-CURRENT EVIDENCE: `docs/why/strength.md`；STRENGTH-001..012；StrengthReplica/Projection；candidate/promoted frame tests。
+CURRENT EVIDENCE: `docs/why/strength.md`；STRENGTH-001..012；type `Domain/{StrengthBudget,StrengthCostModel,StrengthEvents,StrengthFrame,StrengthPolicy,StrengthPredictor,StrengthPromotion,StrengthProjection,StrengthRollout,StrengthCommit,StrengthBatchCollector}.fs`；wiring `Application/Strength/**`、`Session/StrengthRuntime.fs`；fact `Infrastructure/Persist/{StrengthDurability,StrengthStore}.fs`；tests `tests/unit/strength/**`。
 
 ---
 
@@ -62,4 +62,4 @@ FAILURE MEANING: RED = 模型可以通过重复思考提高“证据”，把同
 
 INDEPENDENT CHANGE: 用完全不同的 planning/search/inference algorithm 重写 Sphinx core，而 Proposal≠Evidence、dependency、qualified posterior、controller-owned closure 等 WHAT 不变。
 
-CURRENT EVIDENCE: `docs/{why,what}/sphinx.md`；`Wanxiangshu.Sphinx`；SPHINX-001..010；A*/Bayes/MCTS degeneration tests；No Free Information tests。
+CURRENT EVIDENCE: `docs/{why,what}/sphinx.md`；SPHINX-001..010；type `Sphinx/{Types,State,Search,Bayes,MonteCarlo,Value,Policy,Closure,Methodology,Representation,Absorb}.fs`；host `Sphinx/{McpServer,Codec,WireEncode,DecodePrimitives}.fs`；tests `tests/unit/sphinx/**`。

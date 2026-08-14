@@ -29,7 +29,7 @@ FAILURE MEANING: RED = 后续系统无法证明一段工作记录对应哪个真
 
 INDEPENDENT CHANGE: 把 XTrace 存储/part 编码整体重写，只要 semantic capture、frontier 与 provenance contract 不变。
 
-CURRENT EVIDENCE: XTrace capture/materialization；COMPANION/LWR；TODO/REVIEW request-range bounded records；Strength unpromoted≠history。
+CURRENT EVIDENCE: type `Domain/XTrace.fs`；wiring `Application/Reconciliation/XTraceCapture.fs`、`Session/CompanionProgram.fs`；fact `Journal/{XTraceProjection,CompanionProjection}.fs`；XTrace append/capture/frontier tests；TODO/REVIEW request-range bounded records；Strength unpromoted≠history。
 
 ---
 
@@ -62,7 +62,7 @@ FAILURE MEANING: RED = 未提交候选污染真实历史、压缩覆盖不完整
 
 INDEPENDENT CHANGE: 从当前 failure-driven X/Y pipeline 换成另一 semantic compressor，而 trace/prefix laws 不变。
 
-CURRENT EVIDENCE: `docs/why/context.md`；CTX failure-driven recovery、PrefixProbe、ActivePrefixEpoch；Companion/Y projection。
+CURRENT EVIDENCE: `docs/why/context.md`；CTX failure-driven recovery；type `Domain/{PrefixCandidate,PrefixProbeSelection,BloggerDelta,BloggerRequestContext}.fs`；wiring `Session/{Companion,CompanionHost,BloggerCoordinator,CompanionHostBlogger}.fs`；fact `Journal/{CompanionProjection,BlogProjection}.fs`；tests `tests/unit/context/**`。
 
 ---
 
@@ -96,4 +96,4 @@ FAILURE MEANING: RED = 无业务语义变化时历史被重排/改字节，或�
 
 INDEPENDENT CHANGE: 完全替换当前 HOST-013 gap anchoring/wire representation，只要 append-only prefix law 与合法 cold-boundary semantics 不变。
 
-CURRENT EVIDENCE: HOST-013 prefix law、`ProviderProjection.isAppendOnlyPrefix`、CTX ActivePrefixEpoch、PROMPT-014、ProviderLanguage bind-once、prompt-stability tests。
+CURRENT EVIDENCE: HOST-013 prefix law、PROMPT-014；type `Domain/{XPrefixProjection,ProviderProjection}.fs`、`Domain/MagicTodoPrefixEpoch.fs`；fact `Journal/{PrefixEpochProjection,ContextFactFold}.fs`；failure `Application/Reconciliation/XWire.fs`（isAppendOnlyPrefix）；prompt-stability、`tests/unit/host/pair-thought-anchored.test.mjs`。

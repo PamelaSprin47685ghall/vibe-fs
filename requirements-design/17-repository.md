@@ -24,7 +24,7 @@ FAILURE MEANING: RED = 推理、旧缓存、搜索 hint 或修改后观察可以
 
 INDEPENDENT CHANGE: 替换具体文件查询工具/semantic search orientation，而 evidence contract 不变。
 
-CURRENT EVIDENCE: Inspector Role Law；AGENT-012/024/032；inspect/query-shell descriptions；Repository Warm Start；Casebook observation capture。
+CURRENT EVIDENCE: AGENT-012/024/032；resource `resources/provider/tool/{inspect,query-shell}/`、`resources/provider/role/inspector/`；wiring `Agent/AgentProgram.fs`、`Infrastructure/RepositoryWarmStart.fs`；failure Semble 低信任 hint 不冒充 fact（`Kernel/SembleMcp.fs`、`Infrastructure/SembleMcpStdio.fs`）；inspect/query-shell、warm-start tests。
 
 ---
 
@@ -53,7 +53,7 @@ FAILURE MEANING: RED = 旧 Q/A 被当作当前事实、freshness 被当 correctn
 
 INDEPENDENT CHANGE: Case maintenance 从 Bookkeeper agent 改成 deterministic merge + optional LLM，而 Case reuse semantics 不变。
 
-CURRENT EVIDENCE: `docs/why/casebook.md`；CASE-001..012；InspectorCase events；Bookkeeper staged Case；fetch replay。
+CURRENT EVIDENCE: `docs/why/casebook.md`；CASE-001..012；type `Domain/Casebook.fs`；wiring `Infrastructure/{CasebookCapture,CasebookIndex,CasebookLifecycle,CasebookReplay,CasebookSessionDraft,CasebookWorkflow,CasebookBookkeeper,BookkeeperStaging,BookkeeperRuntime}.fs`；fact `Infrastructure/CasebookStore.fs` + EventStore（InspectorCase*）；tests `tests/unit/casebook/**`。
 
 ---
 
@@ -86,4 +86,4 @@ FAILURE MEANING: RED = 模型看到无权方法、program 获得 ambient authori
 
 INDEPENDENT CHANGE: 从 JavaScript sandbox 改成另一 embedded language/IR，而 capability projection 与 transaction semantics 不变。
 
-CURRENT EVIDENCE: `docs/why/js-tools.md`；JS-001..020；generated SDK/runtime gate；transaction staging/rollback tests。
+CURRENT EVIDENCE: `docs/why/js-tools.md`；JS-001..020；type `Domain/{JsCapability,JsSurface,JsDescription,JsFailure,JsAnchor,JsTransaction}.fs`；wiring `Infrastructure/{JsToolsBindings,JsAnchorFs,JsToolsTransactionStore,JsGlobFs,JsMutationFs,JsUtf8Fs}.fs`、`Process/JsSandbox.fs`；failure `scripts/checks/js-surface-gate.mjs`；tests `tests/unit/js-tools/**`。

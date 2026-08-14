@@ -32,7 +32,7 @@ RED = execution class、logical ownership 与 participant identity 只能靠彼�
 新增一种 Attached Work 类型而不改变 Persona 或 lifecycle protocol。
 
 **CURRENT EVIDENCE**  
-`docs/shape/host.md` HOST-008；`SessionExecutionClass`、`SessionOwnership`、`AttachmentKind`；Dedicated Sync* 与 Companion/Bookkeeper/StrengthReplica。
+`docs/shape/host.md` HOST-008；type `Kernel/SessionOwnership.fs`（`SessionExecutionClass`/`SessionOwnership`）、`Session/AgentRoleIdentity.fs`、`Domain/CompanionIdentity.fs`；fact `Journal/{SessionAssociation,LinkageProjection}.fs`；Dedicated Sync* 与 Companion/Bookkeeper/StrengthReplica。
 
 ---
 
@@ -70,7 +70,7 @@ RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cance
 把当前 runtime registry 换成 durable locator + Host lookup，而不改变 session ontology/delegation WHAT。
 
 **CURRENT EVIDENCE**  
-HOST-008/015；`AttachedSessionRuntime`、`LinkageProjection`、handle tombstone、managed-session restore tests。
+HOST-008/015；wiring `Session/{AttachedSessionRuntime,HandleController,ForkRuntime,SatelliteRuntime,ReuseScope}.fs`；fact `Journal/LinkageProjection.fs`；handle tombstone、managed-session restore tests。
 
 ---
 
@@ -108,4 +108,4 @@ RED = 产品语义需要猜 Host private/streaming state 或依赖未经验证�
 迁到另一 Host，只要 adapter 提供同等 capability，participant/mission/durability WHAT 不变。
 
 **CURRENT EVIDENCE**  
-`docs/{why,what,shape,how,proof}/host.md`；ARCH-002/003；snapshot、transform、ToolContext、session API 与 canaries。ProviderLanguage、HOST-013、MagicTodo overlay 等混入 Host 文档的产品事实应迁出。
+`docs/{why,what,shape,how,proof}/host.md`；ARCH-002/003；host `Host/HostDigest.fs`、`Infrastructure/OpenCode/**`、`Tools/ToolContext.fs`；wiring `Application/Reconciliation/{Reconciler,XWire}.fs`；snapshot、transform、session API 与 canaries。ProviderLanguage、HOST-013、MagicTodo overlay 等混入 Host 文档的产品事实应迁出。

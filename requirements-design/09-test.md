@@ -23,4 +23,4 @@ FAILURE MEANING: RED = 系统无法区分“请求过”“可能已经发生”
 
 INDEPENDENT CHANGE: 某类 effect 改用 Host 原生 idempotency-token 确认，而 event substrate 不变。
 
-CURRENT EVIDENCE: PERSIST-009；`docs/how/persist.md` Durable Effect；Prompt、worktree、publish 的 claim→accept patterns。
+CURRENT EVIDENCE: PERSIST-009；fact `Journal/PromptFactFold.fs`（Requested/Accepted）、`Journal/OrchestratorFactFold.fs`、`Domain/MagicTodoFacts.fs`（TodoWritePrepared→Accepted）；failure `Infrastructure/Git/IntegrationGate.fs`（PublishClaimed 三分支）、`Domain/EventStore.fs`（Requested/Accepted）；tests `tests/unit/persist/**`、MagicTodo membrane。

@@ -24,7 +24,7 @@ FAILURE MEANING: RED = synthetic/unknown/continuation 可冒充新 root 或重�
 
 INDEPENDENT CHANGE: 新增一种合法 continuation provenance，而物理 dispatch protocol 完全不变。
 
-CURRENT EVIDENCE: PROMPT-001..004/018；`PromptAuthority.fs`、`PromptIngress.fs`；`authority.test.mjs` 的 root/continuation/origin proof。
+CURRENT EVIDENCE: PROMPT-001..004/018；type `Domain/PromptAuthority.fs`、`Domain/PromptAuthorityRun.fs`、wiring `Application/Prompting/PromptIngress.fs`；fact `Journal/{PromptFactFold,PromptAuthorityLedger}.fs`；tests `tests/unit/prompt/authority.test.mjs`。
 
 ---
 
@@ -56,4 +56,4 @@ FAILURE MEANING: RED = 一次 logical send 可因 receipt 混淆、restart 或 r
 
 INDEPENDENT CHANGE: Host 原生提供可靠 idempotency key 时，可整体替换当前 send HOW，而 authority WHAT 不动。
 
-CURRENT EVIDENCE: PROMPT-005/007/011；`PromptDispatcherSend.fs`、`PromptAuthorityLedger.fs`；fire-and-forget 与 dispatch tests。
+CURRENT EVIDENCE: PROMPT-005/007/011；wiring `Application/Prompting/{PromptDispatcher,PromptDispatcherSend}.fs`；fact `Journal/PromptAuthorityLedger.fs`；failure `Application/Reconciliation/PromptRecovery.fs`（Pending→PhysicalAccepted，at-most-one）；dispatch/fire-and-forget tests。

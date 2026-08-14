@@ -32,4 +32,4 @@ RED = 同样 semantic intent 集因装配顺序得到不同 provider 世界，�
 替换 TOML/wire renderer 或 planner，只要 semantic intent、horizon 与 equality contract 不变。
 
 **CURRENT EVIDENCE**  
-`docs/{why,what,shape,how,proof}/projection.md`；`ProjectionIntent.fs`、`ProjectionPlanner.fs`、`ProjectionRenderer.fs`、`ProviderProjection.fs`；projection algebra tests；Synthetic TOML 作为表示机制证据。
+`docs/{why,what,shape,how,proof}/projection.md`；type `Domain/{ProjectionIntent,ProjectionPlanner,ProjectionRenderer,ProviderProjection,SyntheticToml,XPrefixProjection}.fs`；projection algebra tests；Synthetic TOML 作为表示机制证据。

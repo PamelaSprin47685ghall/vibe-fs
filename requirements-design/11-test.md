@@ -29,7 +29,7 @@ FAILURE MEANING: RED = durable facts 可被覆盖/部分提交/跳过损坏，�
 
 INDEPENDENT CHANGE: Git ODB/CAS 换成另一 append+atomic-publish store，而各 domain event semantics 不变。
 
-CURRENT EVIDENCE: PERSIST-001..008；EventStore/GitGateway/FactCodec/Fold；`docs/{why,what,shape,how,proof}/persist.md`。
+CURRENT EVIDENCE: PERSIST-001..008；`docs/{why,what,shape,how,proof}/persist.md`；type/fact `Infrastructure/Persist/{CanonicalEventCodec,EventStore,EventStoreFold,GitRawStore,ProcessGitRawStore,StoreTypes}.fs`、`Journal/{Envelope,FactCodec,Fold}.fs`、`Domain/EventStore.fs`；tests `tests/unit/persist/{event-store-append,fold,identity-collision}.test.mjs`。
 
 ---
 
@@ -58,4 +58,4 @@ FAILURE MEANING: RED = 同步静默丢掉合法分支，或相同 object set 在
 
 INDEPENDENT CHANGE: 替换 remote transport/packing 或优化 object exchange，而 event/store semantics 不动。
 
-CURRENT EVIDENCE: Persist convergence/CAS；Casebook 并发 fork → DomainConflict；dumb remote/storage changes。
+CURRENT EVIDENCE: type `Infrastructure/Persist/EventStoreMerge.fs`（set-union/DomainConflict）；tests `tests/unit/persist/{event-store-merge,event-store-converge}.test.mjs`；Casebook 并发 fork → DomainConflict；dumb remote/storage changes。

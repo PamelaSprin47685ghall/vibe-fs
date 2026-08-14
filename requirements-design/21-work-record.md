@@ -29,4 +29,4 @@ FAILURE MEANING: RED = consumer 收到的工作记录混入其它 invocation/ses
 
 INDEPENDENT CHANGE: 完全重写 renderer/section representation，只要 work-boundedness、preserved Opening、coverage 分型、prose-claim 与 projection semantics 不变；review/finality/delegation WHAT 无需改变。
 
-CURRENT EVIDENCE: COMPANION-003/014/015；ARCH-015；TODO-008；REVIEW-014/016；`docs/why/companion.md`；`docs/why/todo.md`；`docs/why/review.md`；canonical LWR materializer/proofs。
+CURRENT EVIDENCE: COMPANION-003/014/015；ARCH-015；TODO-008；REVIEW-014/016；`docs/why/{companion,todo,review}.md`；type `Domain/LifecycleWorkRecord.fs`、`Domain/MagicTodoLwr.fs`、`Domain/SyncDelegatePrompt.fs`；wiring `Application/Finality/LifecycleWorkRecordProjection.fs`；fact `Journal/ManagerOpeningFloor.fs`；tests `tests/unit/glory/lifecycle.test.mjs`、canonical LWR materializer。

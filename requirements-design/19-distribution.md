@@ -27,4 +27,4 @@ FAILURE MEANING: RED = consumer 安装的 artifact 缺少运行所需 code/resou
 
 INDEPENDENT CHANGE: 从 npm package 改为另一 bundle/install format，而 runtime closure/entry/resource guarantees 不变。
 
-CURRENT EVIDENCE: `package.json` `files=[dist/,resources/]`；package integration `contents/install/import/resources`；`npm pack --dry-run`；VERIFY release proof；`PackageResources` fixed-relative-path test。
+CURRENT EVIDENCE: type `Infrastructure/Resources/{PackageResources,RuntimeResources}.fs`（fixed-relative-path lookup）；wiring `package.json` `files=[dist/,resources/]`；tests `tests/unit/resources/**`、package integration `contents/install/import/resources`、`npm pack --dry-run`。

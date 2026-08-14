@@ -31,4 +31,4 @@ RED = 长期 self/world model 被瞬时阶段、能力、任务或外来知识�
 全面重写 Office Library inheritance / Common Law 结构，而 authority、Persona、action contracts 不动。
 
 **CURRENT EVIDENCE**  
-PROMPT-015/016；`PromptResources.systemForRole`；`resources/provider/world|role|library/**`；Prompt Restoration；Role semantic-depth proof。
+PROMPT-015/016；wiring `Infrastructure/Resources/PromptResources.fs`；resource `resources/provider/{world,role,library}/**`；Prompt Restoration；Role semantic-depth proof。

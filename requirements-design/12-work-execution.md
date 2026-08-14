@@ -26,7 +26,7 @@ FAILURE MEANING: RED = caller 无法从业务语义区分“创建独立工作�
 
 INDEPENDENT CHANGE: 把 sync delegation 从 dedicated reusable session 改成 one-shot invocation，而 returned consequence contract 不变。
 
-CURRENT EVIDENCE: ARCH-017；AGENT-009/024；EXEC SyncDelegate；Orchestrator commission/fork/join；delegation resources/tests。
+CURRENT EVIDENCE: ARCH-017；AGENT-009/024；type `Kernel/SyncDelegate.fs`、`Domain/{SyncDelegatePrompt,ForkChildPayload}.fs`；wiring `Session/{SyncDelegateRuntime,SyncDelegateWorkflow,SyncDelegateWait,SyncDelegateCallStore,ForkRuntime}.fs`；resource `resources/provider/tool/{fork,commission,inspect,sync-delegate}/`、`resources/provider/delegation/**`；sync-delegate、fork tests。
 
 ---
 
@@ -57,7 +57,7 @@ FAILURE MEANING: RED = stdout/transport 状态可冒充 process completion，或
 
 INDEPENDENT CHANGE: 更换 terminal backend，而 command/exit/cancel semantics 不变。
 
-CURRENT EVIDENCE: `docs/why/execution.md`；EXEC-015/017/020；PTY tools/runtime；execution tests。
+CURRENT EVIDENCE: `docs/why/execution.md`；EXEC-015/017/020；type `Process/{Pty,PtySession,PtyTypes,PtyBackend,PtySupervisor,ProcessRunner,NodeProcessHost,NodeProcessWait}.fs`；failure onExit-only completion、`Process/Deadline.fs`；tests `tests/unit/process/**`。
 
 ---
 
@@ -86,7 +86,7 @@ FAILURE MEANING: RED = 截断/压缩会把局部片段伪装成整体事实，�
 
 INDEPENDENT CHANGE: 把当前 Distiller agent 替换为 deterministic+LLM hybrid summarizer，而 process execution contract 不动。
 
-CURRENT EVIDENCE: `docs/why/agent.md` Distiller；`resources/provider/role/distiller/*`；execution proof 中 Distiller surface。
+CURRENT EVIDENCE: `docs/why/agent.md` Distiller；resource `resources/provider/role/distiller/`（fragment humility）；wiring `Agent/AgentProgram.fs`、distill tool；failure `Process/LargeGate.fs`、`Domain/ToolResultBound.fs`；Distiller surface tests。
 
 ---
 
@@ -117,4 +117,4 @@ FAILURE MEANING: RED = 并发 publish 可互相覆盖，或系统为了安全把
 
 INDEPENDENT CHANGE: 从 worktree+rebase 改为另一 candidate integration strategy，而 publish/CAS semantics 不变。
 
-CURRENT EVIDENCE: Orchestrator projection/job recovery；publish claimed/CAS；`docs/what|why/orchestrator.md`；completed orchestrator changes。
+CURRENT EVIDENCE: `docs/{what,why}/orchestrator.md`；type/wiring `Infrastructure/Git/{IntegrationGate,GitGateway,WorktreeResource,HookDispatcher,GitOperations,GitSubject}.fs`；fact `Journal/{OrchestratorProjection,OrchestratorFactFold}.fs`；failure PublishClaimed 三分支 CAS、`Application/Reconciliation` restart reconcile；tests `tests/unit/orchestrator/**`。

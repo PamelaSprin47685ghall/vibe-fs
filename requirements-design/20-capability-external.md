@@ -26,7 +26,7 @@ FAILURE MEANING: RED = schema/gate 漂移、某 execution tier 获得额外 auth
 
 INDEPENDENT CHANGE: ToolPermission Set 改成 capability tokens/traits，并重写 Host/plugin gate，只要 office authority 与 participant-visible action contract 不变。
 
-CURRENT EVIDENCE: AGENT-006/007/010；`AttemptExecutionProfile.ToolCapabilitySet`；`Roles.permissions`；ToolRegistry/Host permissions；agent-permission-gate；Strength read-only request projection；MCP role locks。
+CURRENT EVIDENCE: AGENT-006/007/010；type `Domain/ManagedAgentCatalog.fs`、`Domain/JsCapability.fs`、`AttemptPlanner.fs`（`AttemptExecutionProfile.ToolCapabilitySet` 唯一构建点）、`Kernel/Roles.fs`（`permissions`）；failure `scripts/checks/{capability-isomorphism-gate,js-surface-gate,agent-permission-gate}.mjs`；tests capability-isomorphism、agent-permission、`tests/unit/js-tools/js-surface.test.mjs`。
 
 ---
 
@@ -56,4 +56,4 @@ FAILURE MEANING: RED = 网络可达内容可被无 provenance 当作事实，来
 
 INDEPENDENT CHANGE: 从当前 browser backend 换成另一 browser/search backend，而 provenance/evidence boundary 不变。
 
-CURRENT EVIDENCE: Browser Role Law semantic anchors；ARCH-017 Browser consequence；AGENT-026 MCP integration；fork Browser boundary。
+CURRENT EVIDENCE: ARCH-017 Browser consequence；AGENT-026 MCP integration；resource `resources/provider/role/browser/`（Role Law + provenance contract）；wiring `Kernel/StealthBrowserMcp.fs`、`Agent/AgentProgram.fs`（browser office）；failure `scripts/checks/semantic-anchors.mjs` Browser consequence、MCP role-lock；tests 默认 disabled（不打真实 git）。

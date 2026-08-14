@@ -30,4 +30,4 @@ RED = 同一 session 出现多个自然语言世界、child 与 owner 语言漂�
 新增 locale 或改变 locale resource layout，而 identity/horizon/projection 语义不动。
 
 **CURRENT EVIDENCE**  
-PROMPT-017/019；HOST-026；`SessionProviderLanguage`；`ProviderResources`；language parity gate；PromptRestoration。
+PROMPT-017/019；HOST-026；type `Domain/ProviderLanguage.fs`、wiring `Infrastructure/Resources/{ProviderResources,ProviderProse}.fs`；`scripts/checks/language-parity-gate.mjs`；PromptRestoration。

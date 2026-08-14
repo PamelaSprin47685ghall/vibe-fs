@@ -26,7 +26,7 @@ FAILURE MEANING: RED = provider failure 可以重选 authority/换人格，或�
 
 INDEPENDENT CHANGE: 把当前 cursor policy 换成别的 bounded peer-selection policy，而 interaction/identity contracts 不变。
 
-CURRENT EVIDENCE: `docs/why/fallback.md`；FallbackController/Projection；PROMPT-006/014；fallback tests。
+CURRENT EVIDENCE: `docs/why/fallback.md`；PROMPT-006/014；type `Domain/{AgentPairCursor,RecoverySlot}.fs`；wiring `Application/Recovery/{FallbackEvidence,FallbackLedger,ProviderRecoveryWorkflow}.fs`；fact `Journal/{FallbackProjection,FallbackFactFold}.fs`；tests `tests/unit/fallback/cursor.test.mjs`。
 
 ---
 
@@ -56,7 +56,7 @@ FAILURE MEANING: RED = restart 后必须相信临时内存/日志/时间猜测�
 
 INDEPENDENT CHANGE: 把 startup sweep 改成 lazy on-demand reconciliation，而 durable/domain contracts 不变。
 
-CURRENT EVIDENCE: PERSIST recovery；Prompt pending recovery；AttachedSession restore；Orchestrator recoveryAction；Context/Reviewer event-driven recovery；DSL-004/FLOW-005。
+CURRENT EVIDENCE: PERSIST recovery；DSL-004/FLOW-005；wiring `Application/Reconciliation/{SessionRecoveryWorkflow,ChildRecoveryWorkflow,PromptRecovery,BloggerCrashRecovery,BloggerRecoveryProbe}.fs`；fact `Journal/RecoveryClosureProjection.fs`、`Domain/{SessionRecovery,ChildRecovery}.fs`；tests `tests/unit/reconciliation/**`。
 
 ---
 
@@ -85,4 +85,4 @@ FAILURE MEANING: RED = 明显退化 attempt 可以无限污染历史，或 detec
 
 INDEPENDENT CHANGE: 换掉当前 detector，只要它仍 attempt-local、bounded、非权威并复用标准 recovery。
 
-CURRENT EVIDENCE: `docs/{why,what}/loop.md`；LoopDetector；LoopKillArmed→FallbackController bridge；loop tests。
+CURRENT EVIDENCE: `docs/{why,what}/loop.md`；type `Session/LoopDetector.fs`（4-gram + 指数核、固定内存）；wiring `Session/CompletionMailbox.fs`、LoopKill→`Application/Recovery/ProviderRecoveryWorkflow.fs` 桥接；loop detector tests。

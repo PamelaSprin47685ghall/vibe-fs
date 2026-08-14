@@ -31,4 +31,4 @@ RED = participant 必须靠名字或猜测才能知道一个动作真正会做�
 重写所有动作说明与参数语义，而长期 cognition 与 office capability model 不动。
 
 **CURRENT EVIDENCE**  
-PROMPT-020/021；`TOOL_DESCRIPTION_ANCHORS`；`prompt-semantic-depth.test.mjs`；Inspector/Coder/DevOps caller-boundary incidents。
+PROMPT-020/021；resource `resources/provider/tool/**`；`TOOL_DESCRIPTION_ANCHORS`、`scripts/checks/tool-referential-integrity.mjs`；`prompt-semantic-depth.test.mjs`；Inspector/Coder/DevOps caller-boundary incidents。
