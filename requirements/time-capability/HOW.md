@@ -78,11 +78,11 @@ RAW_TIME_TOKENS = ['DateTimeOffset.UtcNow', 'DateTime.Now', 'DateTime.UtcNow', '
 
 | 源 | 裁决 | 理由 / 落点 |
 |---|---|---|
-| `changes/completed/ce-temporal-ownership.md`（时间部分） | 吸收为 WHY 考古 | 五个时序 owner 分工 + `TurnCompletionProgram` 第二运行时教训 → `WHY.md` §失败模式 1；deadline 有界机制 → WHAT TIME-002 |
-| `changes/completed/reconciler-event-driven-de-polling.md`（ITimerPort 部分） | 吸收为 HOW + WHY | 等待四分类（A/B/C/D）→ `WHY.md` §失败模式 2；C 类 deadline 注入 → TIME-001/003；分类表本身 → `causal-wait` HOW |
-| `docs/what/loop.md` | GARBAGE（对本包） | 全部 LOOP 条款归 `degeneration-guard`（循环检测/强杀）；无时间能力内容 |
-| `docs/what/orchestrator.md` / `docs/how/orchestrator.md` | GARBAGE（对本包） | ORCH-001/002/007/008 归 `change-integration` / `delegation`；无时间条款 |
-| `docs/what/execution.md` EXEC-001..032 中非时间条款 | 不消费 | 归 delegation / process-execution / work-record 等；本包只取 EXEC-004/011/025 的时间机制面 |
+| `archive/changes/completed/ce-temporal-ownership.md`（时间部分） | 吸收为 WHY 考古 | 五个时序 owner 分工 + `TurnCompletionProgram` 第二运行时教训 → `WHY.md` §失败模式 1；deadline 有界机制 → WHAT TIME-002 |
+| `archive/changes/completed/reconciler-event-driven-de-polling.md`（ITimerPort 部分） | 吸收为 HOW + WHY | 等待四分类（A/B/C/D）→ `WHY.md` §失败模式 2；C 类 deadline 注入 → TIME-001/003；分类表本身 → `causal-wait` HOW |
+| `archive/docs/what/loop.md` | GARBAGE（对本包） | 全部 LOOP 条款归 `degeneration-guard`（循环检测/强杀）；无时间能力内容 |
+| `archive/docs/what/orchestrator.md` / `archive/docs/how/orchestrator.md` | GARBAGE（对本包） | ORCH-001/002/007/008 归 `change-integration` / `delegation`；无时间条款 |
+| `archive/docs/what/execution.md` EXEC-001..032 中非时间条款 | 不消费 | 归 delegation / process-execution / work-record 等；本包只取 EXEC-004/011/025 的时间机制面 |
 | `ProcessEstimate.effectiveDeadline`（min(3×estimate, HardLimit)） | HOW（归 process-execution） | deadline 的应用，非时间能力本身 |
 | `ITimerPort` / `IClockPort` 名字、`DevOpsJoinTimeoutMs = 10_000` | HOW | 名字/数值可替换，不进入 WHAT |
 | `g4r-ce-vocabulary` RAW_TIME 静态扫描 | 机制归他人，本包消费 | 见上文 §5 |

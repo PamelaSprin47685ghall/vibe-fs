@@ -43,9 +43,9 @@ RED = 推理、旧缓存、搜索 hint 或修改后观察被当成原 repository
 
 ## 历史背景（为什么这些命题不是纸上谈兵）
 
-- **`changes/completed/repository-warm-start.md`**：warm-start 是显式 keywords 驱动的低可信仓库定向能力。核心裁决：hints 不是 instructions、不是 proof、不是合成的工具历史；`charge` 是 assignment/authority，`keywords` 是 optional discovery hints——两者 authority 不同（§8）。fail-open 是正确性依赖的反面：Semble disabled/timeout/launch failure/单 query failure 都不能让工作 invocation 失败（§16）。「Absence of hints is not evidence of absence」：provider 措辞永远不能说「Semble confirmed X does not exist」，只能说「no warm-start hints were obtained for this query」（§17）。
-- **`changes/completed/perm-inspector.md`**：Casebook 的 replay 机制建立在这个合同上——observation 是 typed 的、可重放的；fetch 的重放结果只是 freshness hint，不是正确性证明。
-- **AGENT-027**：Semble 是进程内 stdio MCP 语义搜索，不是 Host MCP、不是 provider tool、不是 permission、不是 Strength 能力——它的输出永远不能伪装成 `read` 或工具历史（`docs/why/agent.md` 拒 Host mcp：语义搜索会漏进所有角色 schema；拒 Strength 注入：假 read 污染 primary 可见历史）。
+- **`archive/changes/completed/repository-warm-start.md`**：warm-start 是显式 keywords 驱动的低可信仓库定向能力。核心裁决：hints 不是 instructions、不是 proof、不是合成的工具历史；`charge` 是 assignment/authority，`keywords` 是 optional discovery hints——两者 authority 不同（§8）。fail-open 是正确性依赖的反面：Semble disabled/timeout/launch failure/单 query failure 都不能让工作 invocation 失败（§16）。「Absence of hints is not evidence of absence」：provider 措辞永远不能说「Semble confirmed X does not exist」，只能说「no warm-start hints were obtained for this query」（§17）。
+- **`archive/changes/completed/perm-inspector.md`**：Casebook 的 replay 机制建立在这个合同上——observation 是 typed 的、可重放的；fetch 的重放结果只是 freshness hint，不是正确性证明。
+- **AGENT-027**：Semble 是进程内 stdio MCP 语义搜索，不是 Host MCP、不是 provider tool、不是 permission、不是 Strength 能力——它的输出永远不能伪装成 `read` 或工具历史（`archive/docs/why/agent.md` 拒 Host mcp：语义搜索会漏进所有角色 schema；拒 Strength 注入：假 read 污染 primary 可见历史）。
 
 ## 历史拒绝方案（被拒 ≠ 永久命题，记录 WHY）
 

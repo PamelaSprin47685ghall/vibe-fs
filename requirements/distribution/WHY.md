@@ -34,7 +34,7 @@ RED = consumer 安装的 artifact 缺少运行所需 code/resource
 | 安装 tarball 后 `import "wanxiangshu"` 失败（`dist/.../Plugin.js` 不在包里） | DISTRIBUTION-001/003 |
 | 从非仓库目录启动，插件找不到 `resources/`（查找依赖 `process.cwd()`） | DISTRIBUTION-002 |
 | `main` 与 `exports["."]` 指向不同文件，或指向未打包路径 | DISTRIBUTION-003 |
-| tarball 意外含 `src/`、`tests/`、`scripts/`、`docs/` 或 `.fs` 源文件 | DISTRIBUTION-004 |
+| tarball 意外含 `src/`、`tests/`、`scripts/`、`archive/docs/` 或 `.fs` 源文件 | DISTRIBUTION-004 |
 | `dist/` 里混入源文件副本（双副本），或测试跑一份、发布另一份 | DISTRIBUTION-005 |
 | 资源缺失但启动静默继续（代码内 fallback catalog 掩盖坏包） | DISTRIBUTION-006 |
 | release 发布前没有跑过 build/package/packing/install/import/resource 检查 | DISTRIBUTION-007 |
@@ -42,11 +42,11 @@ RED = consumer 安装的 artifact 缺少运行所需 code/resource
 
 ## 历史考古（为什么长这样）
 
-`changes/completed/` 中无 distribution 专属 completed change（CHANGES-AUDIT 结论：36 份 completed 均无 distribution 行）。本包语义的 WHY 考古来自 `docs/why/enforcer.md` 的分发裁决：
+`archive/changes/completed/` 中无 distribution 专属 completed change（CHANGES-AUDIT 结论：36 份 completed 均无 distribution 行）。本包语义的 WHY 考古来自 `archive/docs/why/enforcer.md` 的分发裁决：
 
 > **分发：单一打包 vs dist 双副本/代码 fallback。** 拒双副本：掩盖打包错误；拒代码内 fallback catalog：让坏的打包静默成功。resource 随 npm pack 单份发布。
 
-即：历史上确实考虑过「把资源复制进 dist/ 双份」与「代码内嵌 fallback 清单」两种方案，均被拒——前者掩盖打包错误（测试可能读 src 副本而消费者拿到坏 dist），后者让缺资源的包静默运行。当前实现=单份发布 + 目录即清单 + fail fast，正是这两次拒绝的正面形态。`catalog.json` 作为 rulebook 元数据第二真相也被废止（`docs/why/enforcer.md`、ENFORCER-002/072/073 → GARBAGE）。
+即：历史上确实考虑过「把资源复制进 dist/ 双份」与「代码内嵌 fallback 清单」两种方案，均被拒——前者掩盖打包错误（测试可能读 src 副本而消费者拿到坏 dist），后者让缺资源的包静默运行。当前实现=单份发布 + 目录即清单 + fail fast，正是这两次拒绝的正面形态。`catalog.json` 作为 rulebook 元数据第二真相也被废止（`archive/docs/why/enforcer.md`、ENFORCER-002/072/073 → GARBAGE）。
 
 ## 世界什么时候变绿（guarantee 成立）
 

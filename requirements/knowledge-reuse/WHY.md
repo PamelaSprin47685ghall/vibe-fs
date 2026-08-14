@@ -2,7 +2,7 @@
 
 ## 不可替代的存在理由
 
-> Inspector 的一次调用天然形成知识单元（Question → 调查 → Answer），调用结束后只存在于 transcript；后续 Inspector 面对相同或高度相关的问题必须重新调查，已消耗的 read/glob/grep 证据无法复用。Casebook 让旧答案可 fetch、按当前 worktree 重放 observations、无变化时直接复用——**best-effort semantic cache，不是知识数据库**（`docs/why/casebook.md`）。
+> Inspector 的一次调用天然形成知识单元（Question → 调查 → Answer），调用结束后只存在于 transcript；后续 Inspector 面对相同或高度相关的问题必须重新调查，已消耗的 read/glob/grep 证据无法复用。Casebook 让旧答案可 fetch、按当前 worktree 重放 observations、无变化时直接复用——**best-effort semantic cache，不是知识数据库**（`archive/docs/why/casebook.md`）。
 
 本包保证的是一条**复用规则**，而不是「复用内容」：
 
@@ -34,7 +34,7 @@ RED = 旧 Q/A 被当作当前事实（无 replay / replay 被跳过）
     ∨ 未启用 feature 的 repository 行为被改变
 ```
 
-具体可观察形态（来自 `changes/completed/perm-inspector.md` 的失败面）：
+具体可观察形态（来自 `archive/changes/completed/perm-inspector.md` 的失败面）：
 
 | 形态 | 违反 |
 |---|---|
@@ -49,7 +49,7 @@ RED = 旧 Q/A 被当作当前事实（无 replay / replay 被跳过）
 
 ## 历史背景（为什么这些命题不是纸上谈兵）
 
-`changes/completed/perm-inspector.md`（Inspector Casebook）确立的**设计姿态**：
+`archive/changes/completed/perm-inspector.md`（Inspector Casebook）确立的**设计姿态**：
 
 > Casebook 是 hopefully useful 的 best-effort semantic cache，不是证明系统。旧答案可能因 observation capture 不完整、shell 阅读未识别、未观察到的新文件、并发变化、Bookkeeper 失败而过时——这些是**允许的产品行为**。
 

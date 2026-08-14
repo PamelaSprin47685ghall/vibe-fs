@@ -75,12 +75,12 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 
 | 源 | 信息落点 |
 |---|---|
-| `docs/what/host.md` HOST-005/006 | WHAT-001/002/003/004/009；WHY §1/§3 |
-| `docs/what/companion.md` COMPANION-003/007/008/012/014 | WHAT-001/005/006/007/009/010 |
-| `docs/why/context.md`（probe 失败不写事实） | WHAT-008；WHY §4.3 |
-| `docs/why/strength.md` + `changes/completed/strength.md` | WHAT-008；WHY §4.1 |
-| `changes/completed/cursor-pair-hint.md` §12（prefix/idempotence scope） | 与 HOST-013 互斥 → 本包只记「XTrace 无 synthetic 正文」；主体归 prefix-stability（见该包 HOW §5） |
-| `changes/completed/cache.md`（HOST-013 anchored prefix） | 同上；anchor 语义归 prefix-stability |
+| `archive/docs/what/host.md` HOST-005/006 | WHAT-001/002/003/004/009；WHY §1/§3 |
+| `archive/docs/what/companion.md` COMPANION-003/007/008/012/014 | WHAT-001/005/006/007/009/010 |
+| `archive/docs/why/context.md`（probe 失败不写事实） | WHAT-008；WHY §4.3 |
+| `archive/docs/why/strength.md` + `archive/changes/completed/strength.md` | WHAT-008；WHY §4.1 |
+| `archive/changes/completed/cursor-pair-hint.md` §12（prefix/idempotence scope） | 与 HOST-013 互斥 → 本包只记「XTrace 无 synthetic 正文」；主体归 prefix-stability（见该包 HOW §5） |
+| `archive/changes/completed/cache.md`（HOST-013 anchored prefix） | 同上；anchor 语义归 prefix-stability |
 | `requirements-design/COVERAGE.md` HOST-005 / COMPANION-003/007/008 行 | WHAT-001..010 的 owner 裁决 |
 | `requirements-design/EVIDENCE.md` semantic-trace 行 | HOW §1 的实现路径 |
 

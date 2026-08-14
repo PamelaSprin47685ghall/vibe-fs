@@ -8,7 +8,7 @@
 ## 不可替代的存在理由
 
 1. **所有权事实多个 owner = 恢复与级联必然分叉**。为 SyncDelegate 或 Strength 复制独立
-   parent/child map、恢复、取消、retire 框架（`docs/why/host.md` §15 被拒方案），崩溃恢复与
+   parent/child map、恢复、取消、retire 框架（`archive/docs/why/host.md` §15 被拒方案），崩溃恢复与
    级联取消会各自按自己的半套规则走，同一 child 在不同路径下得到不同结局。
 2. **已回收状态必须不可重新激活**。`Retired` / `Abandoned` 是 durable terminal；没有 tombstone
    语义，restart 会把已消费的 completion 再次投递（EXEC-009），或把「已完成的 child」重新 fork

@@ -17,9 +17,9 @@ mock 按已观察次数改变响应（退化成队列，失去确定性）
 覆盖率分母缩水（没加载的模块从账本上消失）
 ```
 
-其中每一件都真实发生过。`changes/completed/fix.md` 的审计发现 DSL 门禁只扫 136/245 个
+其中每一件都真实发生过。`archive/changes/completed/fix.md` 的审计发现 DSL 门禁只扫 136/245 个
 生产文件却宣称「threshold=0 全量清零」——**门禁绿了，门根本没装在关键房间门口**；
-`changes/completed/test.md`（G4R）记录了 31 个 E2E 里单 case 90 秒超时、flake 当作测试
+`archive/changes/completed/test.md`（G4R）记录了 31 个 E2E 里单 case 90 秒超时、flake 当作测试
 分类而不是架构错误的漫长历史。
 
 `verification-system` 存在的理由：**把「什么算证明」本身变成被证明的规则。** 证据要
@@ -62,12 +62,12 @@ gate；gate 失败码被吞掉照样 exit 0；watchdog 靠总超时而不是因�
 | 来源 | 吸收为什么 |
 |---|---|
 | `requirements-design/01-meta-programming.md`（boundary card） | proof ladder、禁止语义分支直跳 E2E、verifier 必须可红、dependency closure 验证、One World 共享、确定性证明原则 |
-| `docs/proof/verify.md`（VERIFY-001..009 全部） | 五层金字塔、晋级阶梯、canary mock 剧本、因果推进门禁、Architecture Gates、No-Go、三种 projection、语言边界、覆盖门禁 |
-| `changes/completed/test.md`（G4R） | One World / Pure Time：恰一个 Long Stroke、race 是代数不是调度彩票、watchdog 因果续期 |
-| `changes/completed/canary-unbend.md` | canary 不可弯曲迎合生产；断言不得为绿削弱 |
-| `changes/completed/orchestrator-e2e-timeout.md` | 先可解释再修根因；超时放大不是修复 |
-| `changes/completed/waitfact-causal-renewal.md` | waitFact 续期因果归因；背景进展只记录不续期 |
-| `changes/completed/fix.md` | 验收口径不缩水；静态门禁必须命中真实路径（伪门禁教训） |
+| `archive/docs/proof/verify.md`（VERIFY-001..009 全部） | 五层金字塔、晋级阶梯、canary mock 剧本、因果推进门禁、Architecture Gates、No-Go、三种 projection、语言边界、覆盖门禁 |
+| `archive/changes/completed/test.md`（G4R） | One World / Pure Time：恰一个 Long Stroke、race 是代数不是调度彩票、watchdog 因果续期 |
+| `archive/changes/completed/canary-unbend.md` | canary 不可弯曲迎合生产；断言不得为绿削弱 |
+| `archive/changes/completed/orchestrator-e2e-timeout.md` | 先可解释再修根因；超时放大不是修复 |
+| `archive/changes/completed/waitfact-causal-renewal.md` | waitFact 续期因果归因；背景进展只记录不续期 |
+| `archive/changes/completed/fix.md` | 验收口径不缩水；静态门禁必须命中真实路径（伪门禁教训） |
 | `requirements-design/PROOF-MAP.md` Phase D | gate/test family 的 MECHANISM 归属；missing oracle 3（proof ladder 可红） |
 | `requirements-design/EVIDENCE.md` §1 | 两 META 包正确无 runtime 源码 |
 

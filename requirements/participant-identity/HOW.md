@@ -41,8 +41,8 @@
 
 ## 历史（考古摘要）
 
-- `changes/completed/universal.md`：Student/Teacher 删除后目录重排、Bookkeeper pair 条件化——
+- `archive/changes/completed/universal.md`：Student/Teacher 删除后目录重排、Bookkeeper pair 条件化——
   session 部分归 `session-ontology`，身份轴（Role/Persona/Binding 分离）由此沉淀。
-- `docs/why/agent.md`「备选与被拒」：Role=Persona=Binding 合一被拒（Bookkeeper 病理实例）；
+- `archive/docs/why/agent.md`「备选与被拒」：Role=Persona=Binding 合一被拒（Bookkeeper 病理实例）；
   双层权限、内部 Agent 隐去、Persona 一次绑定各有独立失败模式记录。
-- `docs/what/prompt.md` PROMPT-006/014：binding 解析律与 Persona 冻结立法。
+- `archive/docs/what/prompt.md` PROMPT-006/014：binding 解析律与 Persona 冻结立法。

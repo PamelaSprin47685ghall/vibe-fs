@@ -37,10 +37,10 @@ tests/      本包拥有的可执行 proof
 
 1. `requirements/requirement-system/tests/meta-verifier.test.mjs`：扫描 requirements/ 全树，
    断言 5 文档齐备、WHAT→PROOF 交叉、落点文件存在、无 INDEX 外目录、DEPENDS ON ⊆ 骨架。
-2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：当前 docs/changes 世界的
+2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：当前 archive/docs/changes 世界的
    条款唯一性、引用解析、生命周期目录与废止路径静态门（spec-rules 的纯规则回归在
    `tests/spec-rules.test.mjs`）。
-3. `requirements/README.md`：45 包树入口导航（当前由 docs/README.md 同构承接导航职责）。
+3. `requirements/README.md`：45 包树入口导航（当前由 archive/docs/README.md 同构承接导航职责）。
 
 ## proof 概览
 
@@ -57,7 +57,7 @@ node --test requirements/requirement-system/tests/spec-rules.test.mjs
 - 什么证据技术足够证明某个产品事实 → `verification-system`。
 - 任一产品领域事实（prompt/journal/review/host/…）→ 各对应包。
 - Git/PR 历史沉积、Proposal 生命周期本身；未来 requirements/ 树只表达当前接受真理。
-- 当前 Clause ID 前缀表、`docs/why|what|shape|how|proof` 文件层级 → 当前 HOW（历史载体）。
+- 当前 Clause ID 前缀表、`archive/docs/why|what|shape|how|proof` 文件层级 → 当前 HOW（历史载体）。
 
 ## DEPENDS ON
 

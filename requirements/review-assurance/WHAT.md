@@ -29,7 +29,7 @@
 
 **规范**：第一次 PERFECT 只产生 `PerfectChallengeIssued`（pending witness），**不构成确认**。确认要求 seal 的 `IncludedToolResultDigests` 含 challenge digest——即第二次输入的 canonical 视图真实携带了第一次 challenge 的工具结果。ReviewConfirmation prompt 只让 Host 启动下一次 provider request，**不是**确认事实本身。
 
-**含义/动机**：单 PERFECT 可被模型随口同意；只有「第二次输入里真的含有 skeptical challenge 的字节」才把确认从口头变成因果消费证据（docs/why/review.md）。challenge 是工具结果，seal 必然携带其 digest——第二条哈希路径只会漂移并伪装成 fail-closed。
+**含义/动机**：单 PERFECT 可被模型随口同意；只有「第二次输入里真的含有 skeptical challenge 的字节」才把确认从口头变成因果消费证据（archive/docs/why/review.md）。challenge 是工具结果，seal 必然携带其 digest——第二条哈希路径只会漂移并伪装成 fail-closed。
 
 **边界**：challenge 的文案世代（TextVersion）与装载 → HOW；「ToolResultDigest 怎么算」→ `provider-projection`。
 
@@ -168,5 +168,5 @@
 | REVIEW-001/011（judge 形态、判断语义） | 显式驳斥：→ `review-judgement`（不复制） |
 | REVIEW-002/007（cohort 关闭、Manager 面） | 显式驳斥：→ `finality` |
 | REVIEW-013/015（节拍、dedicated 生命周期） | 显式驳斥：→ `obligation-ledger`/`managed-session-lifecycle` |
-| `changes/completed/magic-todo.md` 两段式与 ensureReview | REVIEW-ASSURANCE-008/009（考古见 WHY） |
-| `changes/completed/fix-revise.md`（GARBAGE transcript） | REVIEW-ASSURANCE-009/010 考古（弃权记录见 HOW） |
+| `archive/changes/completed/magic-todo.md` 两段式与 ensureReview | REVIEW-ASSURANCE-008/009（考古见 WHY） |
+| `archive/changes/completed/fix-revise.md`（GARBAGE transcript） | REVIEW-ASSURANCE-009/010 考古（弃权记录见 HOW） |

@@ -7,7 +7,7 @@
 
 ## CAUSAL-001：等待观测是非权威的 process-local 诊断信息
 
-**规范陈述**：业务等待的诊断观测（`DiagnosticWait`，`src/Wanxiangshu/Kernel/CausalWait.fs`）可以描述当前 wait、owner、producer、causal identity、cancellation/deadline；**不得**决定业务 branch、mint permit、写 Journal 作为世界事实、用于 recovery、用于 dedupe、推进 workflow、影响 PromptAuthority / Finality / Reviewer / Manager 决策。一句话：**观察可以看程序，程序绝不可以看观察**（DSL-012，`docs/what/dsl-structured-program.md`）。
+**规范陈述**：业务等待的诊断观测（`DiagnosticWait`，`src/Wanxiangshu/Kernel/CausalWait.fs`）可以描述当前 wait、owner、producer、causal identity、cancellation/deadline；**不得**决定业务 branch、mint permit、写 Journal 作为世界事实、用于 recovery、用于 dedupe、推进 workflow、影响 PromptAuthority / Finality / Reviewer / Manager 决策。一句话：**观察可以看程序，程序绝不可以看观察**（DSL-012，`archive/docs/what/dsl-structured-program.md`）。
 
 **含义/动机**：观测是给诊断面（人 / E2E watchdog / 排障）看的，不是给程序决策看的。一旦观测能改变业务结果，它就变成第二套真相源，与 durable facts 竞争 authority。
 
@@ -19,7 +19,7 @@
 
 ## CAUSAL-002：跨 owner / turn / attempt / capability 的等待必须生成诊断观测
 
-**规范陈述**：任何跨业务 owner、跨 Host turn、跨 provider attempt 或跨 physical capability 的业务等待（`docs/what/dsl-structured-program.md` DSL-012），都必须能生成一个 process-local diagnostic wait observation，回答 CCE 五问：Owner（谁在等）、Wait（等什么真实条件）、Producer（谁有资格满足）、Last causal progress（最后相关事实）、Termination（谁负责结束）。
+**规范陈述**：任何跨业务 owner、跨 Host turn、跨 provider attempt 或跨 physical capability 的业务等待（`archive/docs/what/dsl-structured-program.md` DSL-012），都必须能生成一个 process-local diagnostic wait observation，回答 CCE 五问：Owner（谁在等）、Wait（等什么真实条件）、Producer（谁有资格满足）、Last causal progress（最后相关事实）、Termination（谁负责结束）。
 
 **含义/动机**：可诊断性是 suspended-flow 的硬要求（causal-ce-observability.md：三个 orchestrator canary 曾只能看到「测试脚本在等什么」）。观测与等待同生共死：`CausalAwait.awaitTask` 等括弧函数保证 enter → await → resolve/cancel/fail → leave 的完整生命周期。
 
@@ -105,7 +105,7 @@
 
 | 源 Clause / change（COVERAGE.md / CHANGES-AUDIT.md 归属） | 落点 |
 |---|---|
-| DSL-012 业务异步等待因果观测（`docs/what/dsl-structured-program.md`） | CAUSAL-001/002/003/004 |
+| DSL-012 业务异步等待因果观测（`archive/docs/what/dsl-structured-program.md`） | CAUSAL-001/002/003/004 |
 | `causal-ce-observability.md` CCE-001..005 + 类型隔离 + frontier | CAUSAL-001/002/005/007 |
 | `waitfact-causal-renewal.md`（显式 renewOn，不反推因果） | CAUSAL-001（E2E 消费面） |
 | `reconciler-event-driven-de-polling.md`（causal-wait 部分：B 类事件等待零轮询） | CAUSAL-005 |

@@ -73,7 +73,7 @@ TodoProcessReview：一次 judge → ProcessTerminal → VerdictKnown
 
 ### 被拒方案（保留考古，不进入 WHAT）
 
-来自 `docs/why/review.md`「备选与被拒」与 `docs/shape/review.md`：
+来自 `archive/docs/why/review.md`「备选与被拒」与 `archive/docs/shape/review.md`：
 
 - **单 PERFECT 即确认**：拒（可被随口同意）→ 双 PERFECT + seal（REVIEW-003）。
 - **外围 Map 补 witness 身份**：拒（恢复/并发读到别人或空的确认）→ 自包含 witness（REVIEW-006）。
@@ -89,8 +89,8 @@ TodoProcessReview：一次 judge → ProcessTerminal → VerdictKnown
 
 | 内容 | 判定 | 理由 | 记录位置 |
 |---|---|---|---|
-| `changes/completed/fix-revise.md` | GARBAGE（review transcript） | REVISE follow-up 登记；其 Gap A 的 record-ready fail-closed 回归与 waiter 恢复已由 GLORY-072/073 命题 + 本包 `consumable-review.test.mjs` 与 `tests/unit/execution|temporal` 回归承接；transcript 本身不是规范 | WHAT 反向覆盖；本 HOW §5；WHY 考古 |
-| `changes/completed/ce-revise-review.md` | GARBAGE（review transcript） | CE 复审记录；Student–Teacher 争议归 session-ontology/delegation（`universal.md`/`ce-student-teacher-collapse.md`），与本包无 normative 关系 | 见 `review-judgement` HOW；CHANGES-AUDIT |
+| `archive/changes/completed/fix-revise.md` | GARBAGE（review transcript） | REVISE follow-up 登记；其 Gap A 的 record-ready fail-closed 回归与 waiter 恢复已由 GLORY-072/073 命题 + 本包 `consumable-review.test.mjs` 与 `tests/unit/execution|temporal` 回归承接；transcript 本身不是规范 | WHAT 反向覆盖；本 HOW §5；WHY 考古 |
+| `archive/changes/completed/ce-revise-review.md` | GARBAGE（review transcript） | CE 复审记录；Student–Teacher 争议归 session-ontology/delegation（`universal.md`/`ce-student-teacher-collapse.md`），与本包无 normative 关系 | 见 `review-judgement` HOW；CHANGES-AUDIT |
 | `ChallengeTextVersion=1`、英文 canonical 字节不变版本保持 | HOW | 文案世代机制（COVERAGE review.md GARBAGE 行）；版本是解码语义不是产品合同 | 本 HOW §1；WHAT 不冻结版本号 |
 | `fast-reviewer` / `deep-reviewer` 机器名 | GARBAGE | HANDOFF §12：machine names 不进入永久 WHAT | 不提及 |
 | REVIEW-007 的 Manager 面无 Review Guard | 边界 → `finality` | ManagerWorkflow 分支判据是 finality 的（GLORY-070）；本包移动的 witness 文件含 barrier-mirror 传输断言（`REVIEW_007_*`），cutover 时按断言拆给 finality | PROOF.md SPLIT@cutover 行 |

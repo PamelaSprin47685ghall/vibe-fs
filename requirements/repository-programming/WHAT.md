@@ -129,7 +129,7 @@
 
 **含义/动机**：multi-file 编辑的半途落盘留下不一致世界。all-or-nothing 不是「所有路径在同一 CPU instant 变化」（普通文件系统没有跨路径瞬时原子点），而是「正常成功 → 全部新状态；正常失败 → 全部旧状态；崩溃 → recovery 收敛到可证明完整终态」。
 
-**边界**：外部不服从 transaction ownership 的进程在底层多次文件替换之间观察到短暂 mixed view，不属于本合同隐藏的事实（`changes/completed/js-capability-projected-tools.md` §63）。
+**边界**：外部不服从 transaction ownership 的进程在底层多次文件替换之间观察到短暂 mixed view，不属于本合同隐藏的事实（`archive/changes/completed/js-capability-projected-tools.md` §63）。
 
 **证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-013 行。
 

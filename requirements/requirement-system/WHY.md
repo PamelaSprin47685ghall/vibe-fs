@@ -10,7 +10,7 @@ completed change（历史裁决）。只要没有一条规则说清「某个产�
 docs 说 A，gate 说 B，test 证明 C，change 记录 D —— 四者同时为真，互相覆盖
 ```
 
-历史已经发生过这种失败。`changes/completed/fix.md` 审计发现的「验收口径事后缩水」之所以
+历史已经发生过这种失败。`archive/changes/completed/fix.md` 审计发现的「验收口径事后缩水」之所以
 可能，正是因为**没有单一权威能裁决「谁有权宣布 close 判据」**；旧 `ce.md` 的 DSL 门禁
 「threshold=0」只扫 136/245 个生产文件却宣称全量清零，正是因为**门的边界没有 owner**——
 一个没人拥有的门禁，扫不扫、扫多少、谁负责，全凭实现者当天的心情。
@@ -59,9 +59,9 @@ WHAT 命题在 PROOF.md 里找不到行——「绿」无法被检查，只能�
 | 来源 | 吸收为什么 |
 |---|---|
 | `requirements-design/01-meta-programming.md`（boundary card） | 唯一 owner、同时为真、proof 唯一 owner、无裸权威、包 verifier |
-| `docs/what/document-governance.md` GOV-002/005/006/007/008/009/011/012 | 分域权威、条款 ID、单文件生命周期、用户所有权、Active/Completed、blocker、层归属、直接闭环 |
-| `docs/shape|how/proof/document-governance.md` | 所有权与边界、执行程序、机器检查/人工评审义务 |
-| `changes/README.md` + `AGENTS.md` 文档生命周期节 | 变更工作协议的执行文本 |
+| `archive/docs/what/document-governance.md` GOV-002/005/006/007/008/009/011/012 | 分域权威、条款 ID、单文件生命周期、用户所有权、Active/Completed、blocker、层归属、直接闭环 |
+| `archive/docs/shape|how/proof/document-governance.md` | 所有权与边界、执行程序、机器检查/人工评审义务 |
+| `archive/changes/README.md` + `AGENTS.md` 文档生命周期节 | 变更工作协议的执行文本 |
 | `requirements-design/COVERAGE.md` GOV 行 | GOV-001/003/004/010 判 HOW/GARBAGE（当前 5 层载体 + clean break 历史），不迁入永久 WHAT |
 | `requirements-design/PROOF-MAP.md` Meta 行 | spec.mjs + spec-rules.mjs 机制归本包；未来新增 meta-verifier |
 

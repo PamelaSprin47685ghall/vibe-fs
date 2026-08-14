@@ -9,7 +9,7 @@ effect** 或**虚假成功**。
 
 ## 为什么必须独立存在
 
-`docs/why/persist.md` 与 `docs/what/persist.md`（PERSIST-009）反复确认同一个失败模式：
+`archive/docs/why/persist.md` 与 `archive/docs/what/persist.md`（PERSIST-009）反复确认同一个失败模式：
 **内存记账「好像做了」会在崩溃后无法按效果身份核对。**
 
 外部世界的 effect 与内部 event 有本质区别：event 一旦 append 就是事实；effect 是

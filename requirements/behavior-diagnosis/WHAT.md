@@ -24,7 +24,7 @@ TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。�
 启动装载失败（目录缺失、叶子缺失、文本为空、Domain 校验失败）→ 进程 fail fast，
 不 skip、不 warn-and-continue、无代码内 fallback catalog、无 dist 双副本。
 
-- 含义：坏包必须当场暴露，不能静默成功（`docs/why/enforcer.md` 三连拒之一）。
+- 含义：坏包必须当场暴露，不能静默成功（`archive/docs/why/enforcer.md` 三连拒之一）。
 - 证据：`catalog.test.mjs`、`catalog-validation.test.mjs`；打包路径由
   `tests/integration/resources/enforcer-rulebook.test.mjs`（REUSE）覆盖；`PROOF.md` 行 11。
 
@@ -76,7 +76,7 @@ TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fal
 RuleId = FieldName = TipName；未知 tip / 拼写近似 / 词形变体一律失败，不做
 fuzzy / Damerau–Levenshtein / 默认 tip 修复。查找前 trim。
 
-- 含义：诊断不能在「最接近的规则」上成立（`docs/why/enforcer.md` 1.4）；
+- 含义：诊断不能在「最接近的规则」上成立（`archive/docs/why/enforcer.md` 1.4）；
   未知输入不得被强行解释成某条工程规则。
 - 证据：`codec.test.mjs` `ENFORCER_021_*`、`ENFORCER_024_fuzzy_or_misspelled_*`；
   `PROOF.md` 行 15–17。

@@ -54,5 +54,5 @@ node --test requirements/semantic-trace/tests/x-trace-provider-run-provenance.te
 ## 5. semantic anchor id
 
 本包未在 `scripts/checks/semantic-anchors.mjs` 声明独立 anchor（XTrace 语义由 F# 类型 + fold
-测试承担；锚点散文属 `docs/` 迁移范围）。若 cutover 后需要散文 canary，建议在
+测试承担；锚点散文属 `archive/docs/` 迁移范围）。若 cutover 后需要散文 canary，建议在
 `semantic-anchors.mjs` 增加 `SEMANTIC_TRACE_*` 锚点并声明 owner 为本包（见 §6 协调备注）。

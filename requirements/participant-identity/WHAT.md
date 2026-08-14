@@ -23,7 +23,7 @@ Role = 职责 office（session 内不变）；Persona = 自我模型（session �
 ExecutionBinding = 物理模型 / tier / config（可随 Peer Fallback / Strength 变化）（AGENT-029）。
 
 含义/动机：三轴合一的历史病理（Bookkeeper 用 inspector binding 却收 inspector prompt）在
-`docs/why/agent.md` 有完整事故记录；分离使「换执行者」与「换人」在类型层面就是不同操作。
+`archive/docs/why/agent.md` 有完整事故记录；分离使「换执行者」与「换人」在类型层面就是不同操作。
 
 边界：personhood 的 durable 归类（谁算 participant）由 `session-ontology` 的 attachment/ownership
 定义；本包只保证三条轴不会互相冒充。
@@ -49,7 +49,7 @@ contract）；「冻结」机制本身是 WHAT。child 继承见 PID-010。
 Peer Fallback、Strength replica、assistance escalation（fast→deep）都只改变物理执行绑定；
 Persona 不变，system prompt 身份字节不变（AGENT-029、FALLBACK-014、PROMPT-014 禁止清单）。
 
-含义/动机：`docs/why/agent.md`「Peer Fallback 换模型时半途换人」是真实失败模式；换 binding 必须是
+含义/动机：`archive/docs/why/agent.md`「Peer Fallback 换模型时半途换人」是真实失败模式；换 binding 必须是
 「同一 participant 换执行者」，不是新 participant。
 
 边界：system prompt **字节**稳定本身由 `prefix-stability` 拥有（byte invariant）；本包拥有「身份不随
@@ -78,7 +78,7 @@ tier/binding 输入」这个事实。
 不得把 Binding 名冒充 Persona（AGENT-029）。prompt identity 不含 binding 名（PID-005）是该律的直接
 投影。
 
-含义/动机：`docs/why/agent.md`「`fast-*`/`deep-*` 是机器路由身份，不是模型可见自称」；让模型自称
+含义/动机：`archive/docs/why/agent.md`「`fast-*`/`deep-*` 是机器路由身份，不是模型可见自称」；让模型自称
 「我是 fast-coder」等于把内部拓扑暴露成身份。
 
 边界：**什么信息有资格进入 horizon**（admission filter，含 `fast-`/`deep-` token 的泄漏拦截）由
@@ -112,7 +112,7 @@ GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
   override 不改变 frozen base，下一次普通发送恢复 base；未知/缺失 base → fail-closed（PROMPT-006）。
 
 含义/动机：execution binding 是身份轴的一部分（PID-002）；允许内部路径静默改 binding = 机器拓扑
-冒充用户选择，或冒充换人。`docs/why/agent.md` 的 PROMPT-006 即为此立法。
+冒充用户选择，或冒充换人。`archive/docs/why/agent.md` 的 PROMPT-006 即为此立法。
 
 边界：发送海关机制（Preserve/override 的 wire 语义、fail-closed 的物理实现）与 `dispatch-protocol` /
 `provider-attempt-recovery` 共用，但解析律的语义 owner 在本包（COVERAGE PROMPT-006）。

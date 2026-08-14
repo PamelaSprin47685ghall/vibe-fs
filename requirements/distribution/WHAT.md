@@ -35,7 +35,7 @@
 
 ## DISTRIBUTION-004 — package contents 由明确 whitelist 决定
 
-**规范陈述**：打包内容由 `package.json` `files` 白名单显式决定（当前 `["dist/", "resources/"]`）；不属于 consumer runtime 的开发/测试/legacy authority（`src/`、`tests/`、`scripts/`、`docs/`、`artifacts/`、`spec/`、`.fs`/`.fsproj` 源文件、已废止的 `resources/prompts/`、`catalog.json`）不得因偶然目录打包进入 artifact。
+**规范陈述**：打包内容由 `package.json` `files` 白名单显式决定（当前 `["dist/", "resources/"]`）；不属于 consumer runtime 的开发/测试/legacy authority（`src/`、`tests/`、`scripts/`、`archive/docs/`、`artifacts/`、`spec/`、`.fs`/`.fsproj` 源文件、已废止的 `resources/prompts/`、`catalog.json`）不得因偶然目录打包进入 artifact。
 
 **含义/动机**：无 whitelist 时，npm 默认规则会把不该进 tarball 的源码/测试/文档带进去（体积、泄源码、维护负担）。白名单是"显式只装 runtime"的机制；任何新进入 artifact 的内容必须先在 `files` 里声明。
 
@@ -47,7 +47,7 @@
 
 **规范陈述**：`dist/**` 是唯一编译产物：构建先清空再编译（不留旧产物混入），测试只消费这份 `dist/`，发布也只打包这份 `dist/`；资源单份发布（不复制进 `dist/` 形成双副本）；测试运行时存在 fresh-dist 门（`dist/` 比任何 `.fs` 源新，否则拒绝跑）。
 
-**含义/动机**：测试另一份实现（读 `src/` 副本、或 dist 里混入旧字节）会让"绿"失去对发布物的证明力。双副本是历史明确拒绝的方案（`docs/why/enforcer.md`）：掩盖打包错误。
+**含义/动机**：测试另一份实现（读 `src/` 副本、或 dist 里混入旧字节）会让"绿"失去对发布物的证明力。双副本是历史明确拒绝的方案（`archive/docs/why/enforcer.md`）：掩盖打包错误。
 
 **边界**：Fable/fantomas 等构建工具的具体实现是 HOW；本命题只要求"唯一产物 + 测试与发布同源"。
 
@@ -57,7 +57,7 @@
 
 **规范陈述**：package resource 的 I/O 只发生在 `src/Wanxiangshu/Infrastructure/Resources/`（`PackageResources`/`ProviderResources`/`PromptResources`/`EnforcerCatalogResource`/`RuntimeResources`）；资源缺失必须抛错终止（`package resource missing: <full>`），不得代码内 fallback catalog、不得静默降级；rulebook 元数据不以 `catalog.json` 为第二真源（目录即清单）。
 
-**含义/动机**：散布的资源读取无法审计 closure；fallback 让坏包"看起来能跑"从而掩盖打包错误（历史被拒方案）；`catalog.json` 与目录双写必漂（`docs/why/enforcer.md`）。
+**含义/动机**：散布的资源读取无法审计 closure；fallback 让坏包"看起来能跑"从而掩盖打包错误（历史被拒方案）；`catalog.json` 与目录双写必漂（`archive/docs/why/enforcer.md`）。
 
 **边界**：资源缺失时上层具体如何反应（启动失败 vs 其它）由消费方语义决定；本命题只要求"读不到就失败，不伪装"。
 
@@ -65,7 +65,7 @@
 
 ## DISTRIBUTION-007 — release proof 覆盖 artifact closure
 
-**规范陈述**：release 级 proof（`package.json` `format-build-test` 末级）必须包含 build/package/packing，并验证 install/import/resource availability；当前形态 = `npm run format-build-test` 全链 + 末级 `npm pack --dry-run`（证明阶梯 L5，`docs/proof/verify.md` VERIFY-001/002 第 5 层）。
+**规范陈述**：release 级 proof（`package.json` `format-build-test` 末级）必须包含 build/package/packing，并验证 install/import/resource availability；当前形态 = `npm run format-build-test` 全链 + 末级 `npm pack --dry-run`（证明阶梯 L5，`archive/docs/proof/verify.md` VERIFY-001/002 第 5 层）。
 
 **含义/动机**：closure 命题若只在 unit/integration 层验，发布前没有任何一步真正面对"打包后的样子"。L5 是唯一站在 artifact 面的一次性确定性 full proof；发布由它把关（No-Go 红线：`repeat-until-pass` 永久禁止）。
 

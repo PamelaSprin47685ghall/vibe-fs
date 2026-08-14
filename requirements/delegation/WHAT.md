@@ -8,7 +8,7 @@
 一项委托必须同时明确四件事：交给谁的 charge（语义任务）、允许该 callee 产生的后果（office）、
 这条工作的逻辑 owner（caller 或一条 named road）、以及返回给 caller 的 bounded 后果。
 任何一项缺失或含糊即为 RED。委托的识别依据是**后果**（entrust by consequence），不是 persona 名、
-不是「看起来能做」（`resources/provider/tool/fork/description`、`docs/what/agent.md` AGENT-009）。
+不是「看起来能做」（`resources/provider/tool/fork/description`、`archive/docs/what/agent.md` AGENT-009）。
 
 含义/动机：caller 需要的是「改变 repository source」「建立 repository 事实」「对运行中的世界行动」这类
 consequence，而不是一个名字或工具白名单。
@@ -33,7 +33,7 @@ consequence，而不是一个名字或工具白名单。
 ## DELEG-003：独立 road 与 same-road continuation 硬区分
 
 - `commission(calling?, name, charge)`：`calling` 在场 → 新独立 road；缺省 → 按 `name`（Byname）续做
-  既有 road（`docs/what/orchestrator.md` ORCH-001、`docs/what/agent.md` AGENT-015、EXEC-029）。
+  既有 road（`archive/docs/what/orchestrator.md` ORCH-001、`archive/docs/what/agent.md` AGENT-015、EXEC-029）。
 - 同一目的地的后续阶段、纠正、重试、恢复、证据变化但目标不变——都仍是同一条 road，
   不因劳动量大或进入下一阶段而另开（`resources/provider/role/orchestrator/`「道路」）。
 - 检验标准是目的地是否独立：若邻近 road 从未存在，这项工作仍能为自己诚实完成？不能 → 同一条 road。
@@ -52,7 +52,7 @@ semantic act / schema / argument meaning / lifecycle / return / failure semantic
 
 边界：`join` 可在 Manager 与 Orchestrator 共享，当且仅当语义合同完全同一（消费当前 owner 可用 completion）。
 
-证据：anchor `office-not-witness`（fork 组）；`docs/what/architecture.md` ARCH-006/007。
+证据：anchor `office-not-witness`（fork 组）；`archive/docs/what/architecture.md` ARCH-006/007。
 
 ## DELEG-005：机器拓扑永不进入委托面
 
@@ -180,7 +180,7 @@ authority、不产生 `TurnAborted`；operator abort 先打断当前 attempt，�
 可用 completion，再发 interrupt 结果。无 active attempt 的消息不 latched 给 future join。
 
 含义/动机：中断是控制面事件不是业务失败；两类 ingress（用户消息 vs Esc）不得混同
-（`changes/completed/corrective.md`）。
+（`archive/changes/completed/corrective.md`）。
 
 边界：Esc 的 authority 语义与 TurnAborted 级联 → `interaction-authority` / `managed-session-lifecycle`。
 
@@ -206,7 +206,7 @@ watcher 或自动刷新（EXEC-005）。返回当前在场名册（Byname/Termin
 返回的 WorkRecord / advice 是 evidence：它告诉 caller 一条工作声称建立了什么，不自动决定「整个请求
 接下来应变成什么」（`resources/provider/role/orchestrator/`「返回的 WorkRecord 是证据」）。NEEDHELP
 advice continuation 明确「这是独立视角；继续你的原 charge；不要把 consultation 当 replacement assignment」
-（AGENT-031、`changes/completed/increase-strength.md` §9）。返回不授予 caller 新权限，也不免除 caller
+（AGENT-031、`archive/changes/completed/increase-strength.md` §9）。返回不授予 caller 新权限，也不免除 caller
 的既有义务。
 
 含义/动机：委托的返回是认识更新，不是 authority 转移；否则 caller 可借委托自授权限。

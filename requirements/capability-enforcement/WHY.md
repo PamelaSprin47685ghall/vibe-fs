@@ -10,9 +10,9 @@ schema 有、gate 无   → provider 看得见工具、schema 撒谎（调用即
 gate 有、schema 无   → provider 看不见却可能执行（更危险：无资格面被伪造调用命中）
 ```
 
-真实历史：`changes/completed/js-capability-projected-tools.md` 明确「手写 role→JS 矩阵 vs 从唯一
-权威投影」被拒——任何第二份矩阵必然与权威漂移；`docs/why/agent.md`「双层权限 vs 单层可信」被拒——
-Host 配置可漂，只信一层会在配置异常时漏工具或越权执行。`docs/why/js-tools.md` 的四层同构
+真实历史：`archive/changes/completed/js-capability-projected-tools.md` 明确「手写 role→JS 矩阵 vs 从唯一
+权威投影」被拒——任何第二份矩阵必然与权威漂移；`archive/docs/why/agent.md`「双层权限 vs 单层可信」被拒——
+Host 配置可漂，只信一层会在配置异常时漏工具或越权执行。`archive/docs/why/js-tools.md` 的四层同构
 （capability → base-class member → description → example → runtime gate）是同一律在编程面的应用：
 模型看到的与可执行的必须完全一致，不需要读权限矩阵。
 

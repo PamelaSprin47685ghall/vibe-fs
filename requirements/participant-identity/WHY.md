@@ -10,8 +10,8 @@ Persona           = 自我模型：你自称什么、怎样理解自己（Engine
 ExecutionBinding  = 物理执行者：当前用哪个模型、哪个 tier、哪份 config（fast-coder / deep-coder）
 ```
 
-如果三者合一或两两混淆，换执行机制会偷偷改变人格与责任。真实事故（`docs/why/agent.md`、
-`changes/completed/universal.md`）：
+如果三者合一或两两混淆，换执行机制会偷偷改变人格与责任。真实事故（`archive/docs/why/agent.md`、
+`archive/changes/completed/universal.md`）：
 
 - **Bookkeeper 用 `fast-inspector` 创建却收 Inspector prompt**：机器身份（binding）与自我模型
   （persona）合一，身份轴错位。

@@ -4,7 +4,7 @@
 
 > 可编程 repository mutation 若拆成多套独立 RPC（`read` 一套、`edit` 一套、`write` 一套、`glob` 一套、`grep` 一套），path boundary、filesystem、result rendering、permissions、snapshot、string computation、transaction 会被**重复实现七遍并各自漂移**。一次 `js-*` 调用 = 一个受 capability 约束的 program：批量读、批量变换、批量写入在**一个事务**内完成。模型看到的编程 surface 必须与 runtime 真能执行的能力**同构**——这是本包不可替代的 WHY。
 
-能力不是写进工具说明里的散文；**工具本身就是能力的投影**（`docs/why/js-tools.md`）：
+能力不是写进工具说明里的散文；**工具本身就是能力的投影**（`archive/docs/why/js-tools.md`）：
 
 ```text
 If a method is present, the capability exists.
@@ -48,10 +48,10 @@ RED = 模型看到无权方法（surface 与 capability 脱钩）
 
 ## 历史失败（为什么这些命题不是纸上谈兵）
 
-- **五套漂移 RPC 风险**（`changes/completed/js-capability-projected-tools.md`）：手写 `read/edit/write/glob/grep` 各一套实现会把基础设施重复七遍；generator 若接收 `role` 自行重算权限，会形成第二张漂移矩阵。
-- **结果面曾经固化缺陷**（`changes/completed/js-tools-toml-result.md`）：JS-016 声称走 Synthetic TOML，实际把 `run()` 的 JSON `stringify` 进一个字符串字段——`status = "ok"` / `result = "{...}"` / 逗号拼接 `written`，两套语法叠信封，路径含逗号不可消歧。`requirements/repository-programming/tests/js-workflow.test.mjs` 的旧 golden 曾把缺陷锁成正确形状。本 Change 重做结果面（REPOSITORY-PROGRAMMING-016），`status`/`result`/`written`/`created` 是已拒绝方向。
-- **Grep 曾被误判为「可表达即不需要 primitive」**（`docs/why/js-tools.md`）：`glob()+file()+RegExp` 可表达 grep，但 glob 假阴性让组合零命中；修正为 `ToolPermission.Grep` 投影为 Host `grep()` member（REPOSITORY-PROGRAMMING-009）。
-- **Student/Teacher 已删**：`js-student`/`js-teacher` 是 G3 rebase debt，`FORBIDDEN_TOKENS` 保证它们永不复活（REPOSITORY-PROGRAMMING-021；DELETE 类 ratchet，`changes/completed/js-capability-projected-tools.md` §6）。
+- **五套漂移 RPC 风险**（`archive/changes/completed/js-capability-projected-tools.md`）：手写 `read/edit/write/glob/grep` 各一套实现会把基础设施重复七遍；generator 若接收 `role` 自行重算权限，会形成第二张漂移矩阵。
+- **结果面曾经固化缺陷**（`archive/changes/completed/js-tools-toml-result.md`）：JS-016 声称走 Synthetic TOML，实际把 `run()` 的 JSON `stringify` 进一个字符串字段——`status = "ok"` / `result = "{...}"` / 逗号拼接 `written`，两套语法叠信封，路径含逗号不可消歧。`requirements/repository-programming/tests/js-workflow.test.mjs` 的旧 golden 曾把缺陷锁成正确形状。本 Change 重做结果面（REPOSITORY-PROGRAMMING-016），`status`/`result`/`written`/`created` 是已拒绝方向。
+- **Grep 曾被误判为「可表达即不需要 primitive」**（`archive/docs/why/js-tools.md`）：`glob()+file()+RegExp` 可表达 grep，但 glob 假阴性让组合零命中；修正为 `ToolPermission.Grep` 投影为 Host `grep()` member（REPOSITORY-PROGRAMMING-009）。
+- **Student/Teacher 已删**：`js-student`/`js-teacher` 是 G3 rebase debt，`FORBIDDEN_TOKENS` 保证它们永不复活（REPOSITORY-PROGRAMMING-021；DELETE 类 ratchet，`archive/changes/completed/js-capability-projected-tools.md` §6）。
 
 ## 历史拒绝方案（被拒 ≠ 永久命题，记录 WHY）
 

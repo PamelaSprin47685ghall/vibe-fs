@@ -76,17 +76,17 @@ gate 由 `node scripts/check.mjs` 接线；本轮不移动 `scripts/checks/` 文
 
 | 源 | 裁决 | 理由 / 落点 |
 |---|---|---|
-| `changes/completed/causal-ce-observability.md` | EVIDENCE（全部吸收） | CCE 五问、类型隔离、frontier、RED-1..10、canary 教训 → WHAT CAUSAL-001/002/005/007、WHY §失败模式 1 |
-| `changes/completed/waitfact-causal-renewal.md` | EVIDENCE（吸收非权威面） | `renewOn` 显式归因、背景写入不续期 → WHAT CAUSAL-001 边界、WHY §失败模式 2（E2E watchdog 本体归 verification-system） |
-| `changes/completed/reconciler-event-driven-de-polling.md`（causal-wait 部分） | EVIDENCE（吸收） | 等待四分类表、B 类事件等待零轮询 → WHAT CAUSAL-005、HOW 事件驱动表 |
-| `changes/completed/ce-temporal-ownership.md` | 本包不消费（时间/Join 部分归 structured-workflow/delegation/time-capability） | 其「五个时序 owner」教训 → `time-capability` WHY；canary causal integrity（poll≠progress）→ verification-system |
-| `docs/what/dsl-structured-program.md` DSL-012/013/014 | EVIDENCE | DSL-012 → CAUSAL-001..004；DSL-013/014（Semantic Vocabulary）归 `structured-workflow` |
-| `docs/what/host.md` HOST-004 | NEEDS-SPLIT（本包取非权威面） | `QuiescencePermit` 观测稳定≠静止资格、不写 Journal、不参与 crash recovery → CAUSAL-008；reconcile machinery → `host-boundary` |
-| `docs/what/context.md` CTX-014 | EVIDENCE（诊断边界） | 可观测诊断不得成控制输入 → CAUSAL-001 实例 |
-| `docs/what/review.md` REVIEW-017 | 消费（不拥有） | record-ready 等待事件驱动 → CAUSAL-005 消费；fresh witness 判据归 `review-assurance` |
-| `docs/what/glory.md` GLORY-072/073 | 消费（不拥有） | record-ready 等待与 recovery → `review-assurance` + `work-record` + 本包（事件驱动/非权威）交叉 |
-| `docs/what/loop.md` | GARBAGE（对本包） | 循环检测/强杀归 `degeneration-guard`；`LoopKillArmed` 进程内事实是 degeneration 的，不是等待诊断 |
-| `docs/what/orchestrator.md` | GARBAGE（对本包） | ORCH 条款归 `change-integration` / `delegation`；无等待诊断内容 |
+| `archive/changes/completed/causal-ce-observability.md` | EVIDENCE（全部吸收） | CCE 五问、类型隔离、frontier、RED-1..10、canary 教训 → WHAT CAUSAL-001/002/005/007、WHY §失败模式 1 |
+| `archive/changes/completed/waitfact-causal-renewal.md` | EVIDENCE（吸收非权威面） | `renewOn` 显式归因、背景写入不续期 → WHAT CAUSAL-001 边界、WHY §失败模式 2（E2E watchdog 本体归 verification-system） |
+| `archive/changes/completed/reconciler-event-driven-de-polling.md`（causal-wait 部分） | EVIDENCE（吸收） | 等待四分类表、B 类事件等待零轮询 → WHAT CAUSAL-005、HOW 事件驱动表 |
+| `archive/changes/completed/ce-temporal-ownership.md` | 本包不消费（时间/Join 部分归 structured-workflow/delegation/time-capability） | 其「五个时序 owner」教训 → `time-capability` WHY；canary causal integrity（poll≠progress）→ verification-system |
+| `archive/docs/what/dsl-structured-program.md` DSL-012/013/014 | EVIDENCE | DSL-012 → CAUSAL-001..004；DSL-013/014（Semantic Vocabulary）归 `structured-workflow` |
+| `archive/docs/what/host.md` HOST-004 | NEEDS-SPLIT（本包取非权威面） | `QuiescencePermit` 观测稳定≠静止资格、不写 Journal、不参与 crash recovery → CAUSAL-008；reconcile machinery → `host-boundary` |
+| `archive/docs/what/context.md` CTX-014 | EVIDENCE（诊断边界） | 可观测诊断不得成控制输入 → CAUSAL-001 实例 |
+| `archive/docs/what/review.md` REVIEW-017 | 消费（不拥有） | record-ready 等待事件驱动 → CAUSAL-005 消费；fresh witness 判据归 `review-assurance` |
+| `archive/docs/what/glory.md` GLORY-072/073 | 消费（不拥有） | record-ready 等待与 recovery → `review-assurance` + `work-record` + 本包（事件驱动/非权威）交叉 |
+| `archive/docs/what/loop.md` | GARBAGE（对本包） | 循环检测/强杀归 `degeneration-guard`；`LoopKillArmed` 进程内事实是 degeneration 的，不是等待诊断 |
+| `archive/docs/what/orchestrator.md` | GARBAGE（对本包） | ORCH 条款归 `change-integration` / `delegation`；无等待诊断内容 |
 | `tests/unit/session/causal-wait-bridge.test.mjs` | REUSE（含多 owner） | bridge 文件断言 + E2E diagnostics 格式化（`formatDiagnostics`/`formatCausalSection`/watchdog onTimeout）与 verification-system MECHANISM 混合 → SPLIT@cutover |
 | `scripts/checks/causal-wait-boundary.mjs` | 机制保留（本包拥有语义） | 不可移动（scripts/checks 禁止改）；REUSE 经 check.mjs |
 

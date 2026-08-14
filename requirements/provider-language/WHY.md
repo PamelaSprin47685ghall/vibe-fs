@@ -11,7 +11,7 @@ identifiers 则必须保持同一 identity，永远不翻译。
 
 - **不是 `participant-identity`**：换 execution binding（fast→deep fallback、Strength
   replica）不换人，也不换语言。把语言绑在 Role/EffectiveAgent 上，换 Peer 就会误换世界语言
-  （`docs/why/host.md` §21 被拒方案）。
+  （`archive/docs/why/host.md` §21 被拒方案）。
 - **不是 `participant-horizon`**：horizon 回答「什么信息有资格进入 experience」；
   language 回答「这些信息用哪种语言呈现」。
 - **不是 `provider-projection`**：projection 回答「已决定可见后如何确定性表示」；
@@ -26,11 +26,11 @@ identifiers 则必须保持同一 identity，永远不翻译。
    contract（PROMPT-019 明文禁止）。
 2. **child 与 owner 语言漂移**：fallback / Strength / restart / reanchor / BlindPlan T1
    之后子会话或下一轮突然换语——Opening、Office Library、tool 后果与历史 marker 不再
-   属于同一世界，前缀缓存与身份连续性同时碎（`docs/why/host.md` §21）。
+   属于同一世界，前缀缓存与身份连续性同时碎（`archive/docs/why/host.md` §21）。
 3. **翻译改变 tool/wire identity**：把 `exit_code` 译成「退出码」、把 wire field 名本地化。
    机器标识不翻译——翻译改变的是世界的语言，不是机器的标识（PROMPT-017）。
 
-历史上为什么发生过：PromptRestoration（`changes/completed/PromptRestoration.md`）记录
+历史上为什么发生过：PromptRestoration（`archive/changes/completed/PromptRestoration.md`）记录
 Gate 0 之前的半 i18n 状态——system prompt = zh-CN、role law / library = zh-CN、tool
 description / consequence / runtime / finality = English。同一个 participant 同时面对
 两个语言世界；散落 prose 由业务代码直接拥有，`match lang` 遍布代码。这是本包存在的

@@ -17,7 +17,7 @@ zh-CN.md`。
 **含义**：语言是类型，不是字符串；编译器拦截「第五种语言」的非法状态。
 **边界**：当前只支持 EN/zh-CN **不是**永久承诺（`06-language.md` DOES NOT OWN）；
 新增 locale 属于本包独立变化范围。语言值 ≠ prose 内容。
-**证据**：`docs/what/prompt.md` PROMPT-017。
+**证据**：`archive/docs/what/prompt.md` PROMPT-017。
 
 ## PROVIDER-LANGUAGE-002：语言在 session 创建时绑定一次，不可变
 
@@ -29,7 +29,7 @@ review / Finality / compaction / recovery）都**不得**改写已绑语言。
 **含义**：世界语言是 session 的创建事实，不是可随请求漂移的配置。
 **边界**：绑定「谁执行」不在本包——execution binding 变化（换 Peer）由
 `participant-identity` 管辖；本包只保证 binding 变了语言不变。
-**证据**：`docs/what/host.md` HOST-026、`docs/what/prompt.md` PROMPT-017/014。
+**证据**：`archive/docs/what/host.md` HOST-026、`archive/docs/what/prompt.md` PROMPT-017/014。
 
 ## PROVIDER-LANGUAGE-003：child / attached / internal 继承 owner 语言，不各自重读全局
 
@@ -39,7 +39,7 @@ review / Finality / compaction / recovery）都**不得**改写已绑语言。
 
 **含义**：父会话说 zh-CN，子会话不能说 English——否则同一段工作出现两个认知环境。
 **边界**：继承的是语言值，不是 authority 或 persona。
-**证据**：`docs/what/host.md` HOST-026、`docs/proof/host.md`「SessionProviderLanguage
+**证据**：`archive/docs/what/host.md` HOST-026、`archive/docs/proof/host.md`「SessionProviderLanguage
 证明」child 继承行。
 
 ## PROVIDER-LANGUAGE-004：全局偏好变化只影响未来 session
@@ -50,7 +50,7 @@ review / Finality / compaction / recovery）都**不得**改写已绑语言。
 **含义**：已开 Life 的世界语言与 Opening / Library / tool 后果必须字节连续；中途换语
 等于重写前缀。
 **边界**：全局偏好源（`WANXIANGSHU_PROVIDER_LANGUAGE` env）是 HOW，不是命题。
-**证据**：`docs/what/host.md` HOST-026、`docs/why/host.md` §21。
+**证据**：`archive/docs/what/host.md` HOST-026、`archive/docs/why/host.md` §21。
 
 ## PROVIDER-LANGUAGE-005：localizable / invariant 分类（Class A/B/C）
 
@@ -65,7 +65,7 @@ review / Finality / compaction / recovery）都**不得**改写已绑语言。
 **含义**：`A translation changes the language of the world, not the identifiers of its
 machinery.`
 **边界**：Class A 的**语义内容**归各 semantic owner；本包只拥有「语言」这一轴。
-**证据**：`docs/what/prompt.md` PROMPT-017（Localizable/Invariant 表）、PROMPT-019。
+**证据**：`archive/docs/what/prompt.md` PROMPT-017（Localizable/Invariant 表）、PROMPT-019。
 
 ## PROVIDER-LANGUAGE-006：每个 provider semantic resource 必须 en.md + zh-CN.md 成对存在；bound 缺语言 fail-closed
 
@@ -75,7 +75,7 @@ fallback**（`ProviderResources.requireLanguagePair` 抛错）。
 
 **含义**：缺 localization ≠ 许可换语言。
 **边界**：资源文件的**内容语义**归 semantic owner；「成对存在」的结构保证归本包。
-**证据**：`docs/what/prompt.md` PROMPT-019、`docs/what/architecture.md` ARCH-016 Gate C。
+**证据**：`archive/docs/what/prompt.md` PROMPT-019、`archive/docs/what/architecture.md` ARCH-016 Gate C。
 
 ## PROVIDER-LANGUAGE-007：`{{name}}` placeholder 结构 parity；填值不译；未替换 fail-closed
 
@@ -85,7 +85,7 @@ fallback**（`ProviderResources.requireLanguagePair` 抛错）。
 
 **含义**：placeholder 是语言无关的操作数，两边模板必须同构；缺参是程序错误不是排版。
 **边界**：placeholder 的**值**语义归各 surface owner。
-**证据**：`docs/what/prompt.md` PROMPT-019、PromptRestoration Gate C。
+**证据**：`archive/docs/what/prompt.md` PROMPT-019、PromptRestoration Gate C。
 
 ## PROVIDER-LANGUAGE-008：同一 participant 的工具 prose 与其 session 语言一致
 
@@ -96,7 +96,7 @@ fallback**（`ProviderResources.requireLanguagePair` 抛错）。
 **含义**：语言是一整个世界的属性，不是每块 prose 各自挑的。
 **边界**：tool description 的**调用合同语义**（act/时机/负边界/后果/参数）归
 `action-affordance`。
-**证据**：`docs/what/prompt.md` PROMPT-019、`docs/how/prompt.md`「Tool description 按
+**证据**：`archive/docs/what/prompt.md` PROMPT-019、`archive/docs/how/prompt.md`「Tool description 按
 已绑语言装载」。
 
 ## PROVIDER-LANGUAGE-009：prose 三向所有权分离；禁 TranslationRegistry、禁业务 `match lang`
@@ -116,7 +116,7 @@ Rendering belongs to machinery.
 **含义**：Language 集中为律；Meaning 仍按 owner 分布。渲染机制不拥有 prose 意义。
 **边界**：`SyntheticToml` 的布局/转义机制本身归 `provider-projection`；本包只拥有
 「谁的语言、何时装载」这条轴。
-**证据**：`docs/what/prompt.md` PROMPT-019、`docs/how/prompt.md`「Provider-visible
+**证据**：`archive/docs/what/prompt.md` PROMPT-019、`archive/docs/how/prompt.md`「Provider-visible
 prose 装载」、PromptRestoration Gate E。
 
 ## PROVIDER-LANGUAGE-010：Role Law semantic-anchor 同 id 双语命中（结构 parity 机制）
@@ -128,7 +128,7 @@ prose 装载」、PromptRestoration Gate E。
 **边界**：anchor id 的**内容语义**归各 owner（office → `office-capability`、tool →
 `action-affordance`、cognition → `cognitive-environment`、browser provenance →
 `external-investigation`）；本包只拥有「同 id 双语都命中」的结构保证。
-**证据**：`docs/proof/prompt.md`「EN / zh-CN 语言面」Role Law semantic-anchor 行。
+**证据**：`archive/docs/proof/prompt.md`「EN / zh-CN 语言面」Role Law semantic-anchor 行。
 
 ## PROVIDER-LANGUAGE-011：protocol identifiers 永不翻译
 
@@ -138,7 +138,7 @@ prose 装载」、PromptRestoration Gate E。
 
 **含义**：机器标识是 identity，不是 prose；翻译它等于换 contract。
 **边界**：wire layout 本身（消息怎么排）归 `host-boundary`；本包只保证标识符的语言不变性。
-**证据**：`docs/what/prompt.md` PROMPT-017 invariant 列、PROMPT-019 Class B。
+**证据**：`archive/docs/what/prompt.md` PROMPT-017 invariant 列、PROMPT-019 Class B。
 
 ---
 

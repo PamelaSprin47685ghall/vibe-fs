@@ -4,7 +4,7 @@
 > 全部命题。历史断言、迁移沉积、被拒方案不在此列（见 HOW.md「历史与弃权」）。
 > 每条命题的测试落点见 PROOF.md §1 表对应行。
 
-条款来源映射：`docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md`
+条款来源映射：`archive/docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md`
 的 OWNED Clause（COVERAGE.md 归属）与本包 boundary card 的 OWNS。反向下述全部
 structured-workflow OWNED Clause 均已落到下列命题或显式驳斥/移交（见各命题「边界」）。
 
@@ -109,7 +109,7 @@ managed-session-lifecycle 的**真实物理归属**词汇时合法——物理�
 变成构建期失败，同时不误伤合法领域/物理组合（fixtures `state-axes-{illegal,domain,physical}.fs`）。
 
 **边界**：门禁只守卫「未分类即红」，不替代 DSL-002/005 的人工语义判断（正交组合
-人工证明见 `docs/proof/dsl-structured-program.md`「正交组合证明」节）。
+人工证明见 `archive/docs/proof/dsl-structured-program.md`「正交组合证明」节）。
 
 **证据**：PROOF.md §1 第 5 行。
 
@@ -257,7 +257,7 @@ rebase/review…），但被压缩的 Vocabulary **必须拥有自己的 tempora
 名字（rabbit.md DSL-014 目标条款）。
 
 **边界**：每个高阶 Vocabulary 的 proof 义务表见 HOW.md §3.4（源自
-`docs/proof/dsl-structured-program.md` 高阶 Vocabulary 证明义务表）；新增高阶
+`archive/docs/proof/dsl-structured-program.md` 高阶 Vocabulary 证明义务表）；新增高阶
 Vocabulary 必须追加该表一行并挂可观察效果测试。
 
 **证据**：PROOF.md §1 第 12 行。

@@ -82,13 +82,13 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 
 | 源 | 信息落点 |
 |---|---|
-| `docs/what/companion.md` COMPANION-003/014/015 | WHAT-001..013；HOW §1.1 |
-| `docs/what/todo.md` TODO-001/008/009/015 | WHAT-014/015/016；HOW §1.4 |
-| `docs/what/review.md` REVIEW-016 | WHAT-014/016 |
-| `docs/what/execution.md` EXEC-004/028/031 | WHAT-004/010/011/016 |
-| `docs/what/glory.md` GLORY-004/006/072/074 | WHAT-008/009/015/016 |
-| `docs/why/companion.md` | WHY §4.2/4.4；WHAT-012 证据 |
-| `docs/how/companion.md` / `docs/shape/companion.md` | HOW §1.1/1.3/1.4 |
+| `archive/docs/what/companion.md` COMPANION-003/014/015 | WHAT-001..013；HOW §1.1 |
+| `archive/docs/what/todo.md` TODO-001/008/009/015 | WHAT-014/015/016；HOW §1.4 |
+| `archive/docs/what/review.md` REVIEW-016 | WHAT-014/016 |
+| `archive/docs/what/execution.md` EXEC-004/028/031 | WHAT-004/010/011/016 |
+| `archive/docs/what/glory.md` GLORY-004/006/072/074 | WHAT-008/009/015/016 |
+| `archive/docs/why/companion.md` | WHY §4.2/4.4；WHAT-012 证据 |
+| `archive/docs/how/companion.md` / `archive/docs/shape/companion.md` | HOW §1.1/1.3/1.4 |
 | `requirements-design/21-work-record.md` | 全部 WHAT 的 owner 裁决（OWNS 表） |
 | `requirements-design/13-context-continuity.md` | 边界裁决（DOES NOT OWN） |
 | `requirements-design/COVERAGE.md` COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行 | WHAT 命题归属 |

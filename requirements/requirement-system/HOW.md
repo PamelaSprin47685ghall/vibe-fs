@@ -35,15 +35,15 @@
 
 ### 2. spec gate（`scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`）
 
-`node scripts/check.mjs` 中第 1 个 wired gate。检查当前 docs/changes 世界的条款治理：
+`node scripts/check.mjs` 中第 1 个 wired gate。检查当前 archive/docs/changes 世界的条款治理：
 
 ```text
 条款唯一（同 ID 双定义红）、引用可解析（悬空/未知前缀红）
 Change 文件不得定义正式 Clause（formalClauseDefinitionHeadings）
-changes/ 三目录存在；同一工作项不并存于多目录
-废止路径 docs/proposal|status 不得被引用（legacyWorkflowPathReferences）
-当前规范/实现不得依赖 changes/proposed|completed 历史（changeDependencyReferences）
-docs/README.md 导航精确覆盖正式文件（navigationProblems）
+archive/changes/ 三目录存在；同一工作项不并存于多目录
+废止路径 archive/docs/proposal|status 不得被引用（legacyWorkflowPathReferences）
+当前规范/实现不得依赖 archive/changes/proposed|completed 历史（changeDependencyReferences）
+archive/docs/README.md 导航精确覆盖正式文件（navigationProblems）
 ```
 
 纯规则抽在 `spec-rules.mjs`（lib，不直接 spawn），回归测试已移入本包
@@ -51,7 +51,7 @@ docs/README.md 导航精确覆盖正式文件（navigationProblems）
 
 ### 3. 树入口导航
 
-`requirements/README.md` 是 45 包树入口（迁移期与 `docs/README.md` 同构承担导航）；导航文件
+`requirements/README.md` 是 45 包树入口（迁移期与 `archive/docs/README.md` 同构承担导航）；导航文件
 只路由不定义条款（REQUIREMENT-SYSTEM-005/007）。
 
 ## 依赖与理由
@@ -75,12 +75,12 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时两条
 
 | 来源 | 裁决 | 记录在哪 |
 |---|---|---|
-| GOV-001（当前规范只位于 docs/ 5 层） | HOW/GARBAGE：当前文件层级是迁移载体；cutover 后由 requirements/ 树取代 | 本 HOW 实现模型 §3；WHAT 不收录 |
+| GOV-001（当前规范只位于 archive/docs/ 5 层） | HOW/GARBAGE：当前文件层级是迁移载体；cutover 后由 requirements/ 树取代 | 本 HOW 实现模型 §3；WHAT 不收录 |
 | GOV-003（执行链 what→shape→how→code） | HOW：流程描述并入 WHAT-009 层归属的动机，不另立条款 | WHAT-009 |
 | GOV-004（滚动基线：当前 docs+实现=当前系统） | HOW/GARBAGE：迁移期过渡概念；「不得从 Completed 解释当前语义」的 live 面已并入 WHAT-010 | WHAT-010 |
-| GOV-010（clean break：docs/proposal|status 废止） | HOW/GARBAGE：一次性迁移历史；live 面（废止路径不引用）并入 WHAT-010 | WHAT-010；本 HOW |
+| GOV-010（clean break：archive/docs/proposal|status 废止） | HOW/GARBAGE：一次性迁移历史；live 面（废止路径不引用）并入 WHAT-010 | WHAT-010；本 HOW |
 | 当前 Clause ID 前缀表（ARCH/GOV/…/VERIFY） | HOW：迁移载体；ID 稳定性原则本身是 WHAT-008 | WHAT-008 |
-| `docs/README.md` 导航职责 | HOW：当前由 docs/README.md 承担，cutover 后由 requirements/README.md 承接 | 本 HOW §3 |
+| `archive/docs/README.md` 导航职责 | HOW：当前由 archive/docs/README.md 承担，cutover 后由 requirements/README.md 承接 | 本 HOW §3 |
 | change 正文内容合同（Active 字段白名单、Completed 原文冻结） | 人工评审承接（GOV-008 人工评审表）；机器落点待 cutover 的 change-lifecycle verifier | WHAT-013；PROOF L13 |
 | blocker 协议（GOV-009） | 过程合同，人工评审承接 | WHAT-014；PROOF L14 |
 | 直接闭环小变更（GOV-012） | 过程合同，人工评审承接（AGENTS.md 文档生命周期节为执行文本） | WHAT-015；PROOF L15 |
@@ -89,8 +89,8 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时两条
 ## 遗留风险 / cutover 待办
 
 - **SPLIT@cutover**：meta-verifier 的依赖骨架解析源从 `requirements-design/INDEX.md` 迁入
-  requirements/ 树；`docs/README.md` 导航职责移交 `requirements/README.md`；docs/changes
-  归档后 spec gate 的 docs/changes 检查面整体重写为 requirements/ 树治理。
+  requirements/ 树；`archive/docs/README.md` 导航职责移交 `requirements/README.md`；archive/docs/changes
+  归档后 spec gate 的 archive/docs/changes 检查面整体重写为 requirements/ 树治理。
 - **GAP@cutover**：WHAT-013/014/015 的机器落点（change-lifecycle verifier）cutover 后补；
   当前由人工评审承接。
 - 命题 ID 前缀规则（`<PACKAGE>-NNN` = 大写包名）由 meta-verifier 强制；若后续裁决改用其它

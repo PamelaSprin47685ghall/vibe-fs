@@ -1,10 +1,10 @@
 # WHAT — host-boundary（唯一 normative 合同）
 
 命题前缀：`HOST-BOUNDARY-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：`docs/{what,shape,how,why,proof}/host.md`（HOST-001/002/003/004/006/010/011/012/016/
-019/020/025/027）、`docs/what/architecture.md`（ARCH-002/003/012）、
-`docs/why/host.md` §1–9、`changes/completed/cache.md`（HOST-006/013）、
-`changes/completed/reconciler-event-driven-de-polling.md`。
+来源：`archive/docs/{what,shape,how,why,proof}/host.md`（HOST-001/002/003/004/006/010/011/012/016/
+019/020/025/027）、`archive/docs/what/architecture.md`（ARCH-002/003/012）、
+`archive/docs/why/host.md` §1–9、`archive/changes/completed/cache.md`（HOST-006/013）、
+`archive/changes/completed/reconciler-event-driven-de-polling.md`。
 落点与运行命令见 `PROOF.md`。
 
 ---
@@ -105,13 +105,13 @@ judgeFirstTurn / nextReanchor）；`HostCompactionGate/Observer`；→ PROOF.md 
 **规范**：transform 绑定用因果读：`role=assistant`、`time.completed` 未设、`parentID` 匹配最后一条
 user、`id` 为 session 内 assistant 最大者 → 命中**恰好一个**才绑定；命中 0 或 ≥2 → 不写 seal。
 compaction / summary 路径 → 不写 seal。唯一性前提是单 actor 写 assistant（HOST-010；
-`docs/how/host.md` 引理 1–4）。
+`archive/docs/how/host.md` 引理 1–4）。
 
 **含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可放弃 seal（REVIEW-010 只见
 PendingIdentity/Rejected），不赌同一身。
 
 **证据**：`ReviewSeal` / `TurnBinding`（消费因果读）；→ PROOF.md `HOST-BOUNDARY-008`
-（REUSE `review/*` + `host/` 相关 seal 测试；canary 见 `docs/proof/host.md`）。
+（REUSE `review/*` + `host/` 相关 seal 测试；canary 见 `archive/docs/proof/host.md`）。
 
 ## HOST-BOUNDARY-009：Tool 身份两个半边；缺一 fail closed
 
@@ -120,7 +120,7 @@ call id。`ProviderRunIdentity` + `ToolCallId` 只能同时从 `ToolContext` 取
 closed。禁止用 after 的 callID 与别处 messageID 猜测配对；禁止使用 SDK/Host 不存在的字段
 （如 `userMessageID`）冒充物理用户消息身份（HOST-011）。
 
-**含义/动机**：身份半边是 hook 面的物理现实；猜配对 = 假绿（`docs/shape/host.md` HOST-011）。
+**含义/动机**：身份半边是 hook 面的物理现实；猜配对 = 假绿（`archive/docs/shape/host.md` HOST-011）。
 
 **证据**：`Tools/ToolContext.fs`、`ToolHostCodec`；→ PROOF.md `HOST-BOUNDARY-009`
 （REUSE `plugin/tool-host-codec.test.mjs` `HOST-011`）。
@@ -244,12 +244,12 @@ card DOES NOT OWN 之外的产品决策）。
 
 **规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、
 因果读唯一性）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或
-假设上游默认值（HOST-019/024/025 blocking canaries；`docs/proof/host.md` Magic Todo membrane
+假设上游默认值（HOST-019/024/025 blocking canaries；`archive/docs/proof/host.md` Magic Todo membrane
 清单）。
 
 **含义/动机**：未验证能力 = 上线首炸；`HostContractUnsupported` 是显式失败而非悄悄降级。
 
-**证据**：本包 proof 表全部 canary + `docs/proof/host.md` canary 清单；→ PROOF.md
+**证据**：本包 proof 表全部 canary + `archive/docs/proof/host.md` canary 清单；→ PROOF.md
 `HOST-BOUNDARY-019`。
 
 ## HOST-BOUNDARY-020：观察不足或多解时 fail closed（家族原则）

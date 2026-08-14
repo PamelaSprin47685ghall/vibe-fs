@@ -51,7 +51,7 @@ HANDOFF §6.4 / §7.6 的裁决：`review-protocol` 拆成 `review-judgement` �
 
 ## 历史教训（考古）
 
-- `docs/why/review.md`「判断哲学是 discrimination，不是 rejection 表演」：曾拒绝过「谨慎 = 多 REVISE」与「可描述偏好即缺陷」两个方向（备选与被拒节）。
-- `docs/what/review.md` REVIEW-011：Examiner's Ledger 是判断方向非 checklist；PERFECT+minor 共存；material defect 才 REVISE；无 prose 的过程 PERFECT 无效。
-- `docs/why/glory.md`「为什么 Manager 不能知道隐藏 review 机制」：旧 prompt 把 review 显式化为 checklist 的最后一步，Manager 会在工作未收敛时机械执行最后一项——checklist 化的代价是真实失败模式。
+- `archive/docs/why/review.md`「判断哲学是 discrimination，不是 rejection 表演」：曾拒绝过「谨慎 = 多 REVISE」与「可描述偏好即缺陷」两个方向（备选与被拒节）。
+- `archive/docs/what/review.md` REVIEW-011：Examiner's Ledger 是判断方向非 checklist；PERFECT+minor 共存；material defect 才 REVISE；无 prose 的过程 PERFECT 无效。
+- `archive/docs/why/glory.md`「为什么 Manager 不能知道隐藏 review 机制」：旧 prompt 把 review 显式化为 checklist 的最后一步，Manager 会在工作未收敛时机械执行最后一项——checklist 化的代价是真实失败模式。
 - 语义锚 `semantic-anchors.mjs` reviewer family 五条（discrimination / rejection-must-purchase / non-blocking / perfect-not-flawless / acceptance-not-omniscience）逐条对应本包命题——证明这些不是装饰性散文，而是被 gate 校验的合同。

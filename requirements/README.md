@@ -4,7 +4,7 @@
 > 唯一拥有的 WHAT 命题、显式 hard dependencies，以及 package-local 的可执行 proof。
 > 全部 packages 同时为真；dependency 只表示 guarantee consumption，不表示优先级。
 
-本树由 `docs/`、`changes/`、`src/`、`tests/` 综合迁移而来（非机械改名）。每个包目录：
+本树由 `archive/docs/`、`archive/changes/`、`src/`、`tests/` 综合迁移而来（非机械改名）。每个包目录：
 
 ```text
 README.md   包入口（阅读顺序 + 概览）
@@ -127,4 +127,4 @@ node scripts/check.mjs           # 全 static gates
 ```
 
 - 每条 WHAT 命题的测试落点见该包 PROOF.md。
-- 迁移期：旧 `tests/`、`docs/`、`changes/` 仍保留；cutover 后删除并存档（见 `requirements-design/MIGRATION-CONTRACT.md`）。
+- 迁移状态：旧 `docs/`、`changes/` 已归档至 `archive/`；`tests/` 仍在逐包迁移中（SPLIT@cutover 收尾后删除，见各包 PROOF.md 与 `requirements-design/MIGRATION-CONTRACT.md`）。

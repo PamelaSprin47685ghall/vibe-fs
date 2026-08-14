@@ -1,9 +1,9 @@
 # WHAT — managed-session-lifecycle（唯一 normative 合同）
 
 命题前缀：`MANAGED-SESSION-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：`docs/{shape,what,how,proof}/host.md`（HOST-008/009/015）、`docs/shape/execution.md`
-（EXEC-006/009/014/017/026/028）、`docs/what/execution.md`（EXEC-017/022/028/031）、
-`docs/shape/companion.md`、`changes/completed/universal.md` §11/13/17、`cache.md` §17。
+来源：`archive/docs/{shape,what,how,proof}/host.md`（HOST-008/009/015）、`archive/docs/shape/execution.md`
+（EXEC-006/009/014/017/026/028）、`archive/docs/what/execution.md`（EXEC-017/022/028/031）、
+`archive/docs/shape/companion.md`、`archive/changes/completed/universal.md` §11/13/17、`cache.md` §17。
 落点与运行命令见 `PROOF.md`。
 
 ---
@@ -12,7 +12,7 @@
 
 **规范**：`AttachedSessionRuntime` 是 Attached 会话的唯一创建、恢复、注册、级联取消与 retire
 owner；各 AttachmentKind 只提供 payload/terminal 策略，不得复制所有权框架（HOST-008 shape；
-`docs/how/host.md` HOST-009）。
+`archive/docs/how/host.md` HOST-009）。
 
 **含义/动机**：所有权事实单一 owner；否则崩溃恢复与级联取消分叉（WHY §1）。
 
@@ -36,7 +36,7 @@ Work 处理。
 **规范**：restart 恢复 Attached：query family root children（owner ≠ root 时并查 owner children）→
 journal 关联（`RestoredSessionId`）且 id+agent+title 恰好 1 个匹配 → 复用；journal id 不存在 →
 Replacement（新建，物理挂 root）；无 journal 关联 → 不复用任何候选、直接新建；id 匹配但
-agent/title 冲突、多个 id 匹配或查询失败 → fail closed（HOST-009/015；`docs/how/host.md`）。
+agent/title 冲突、多个 id 匹配或查询失败 → fail closed（HOST-009/015；`archive/docs/how/host.md`）。
 
 **含义/动机**：恢复必须可证明绑对；猜测 = 收养别人的 child（HOST-015）。REVIEW-019：仅 proven
 loss 后替换，不确定 fail closed。
@@ -192,5 +192,5 @@ id 派生虚构 session（`HandleController.linkNamed` 注释）。
 - `EXEC-014` 的 Distiller office 语义（map/reduce、机器 Assignment 不进工具面）→
   `output-distillation` / `participant-horizon`；本包只拥有 hidden handle 的可见性。
 - 历史 `Student/Teacher` 生命周期（`StudentRun`/`teacherCalls` 等）→ GARBAGE（G3 删除；
-  `docs/shape/execution.md` EXEC-027 空缺）。
+  `archive/docs/shape/execution.md` EXEC-027 空缺）。
 

@@ -13,12 +13,12 @@
 文件/进程类既有合法计数（EXEC-011）。
 
 **含义/动机**：估计容量把错误阈值固化成产品行为，并与 KV-cache / 前缀稳定性冲突。
-`docs/why/context.md` 明确拒绝预测式压缩。
+`archive/docs/why/context.md` 明确拒绝预测式压缩。
 
 **边界**：「文件/进程既有合法计数」的字节计量归 `process-execution`；本命题拥有
 「压缩路径不得观察窗口」。
 
-**证据**：CTX-001；`docs/why/context.md`；`Domain/BloggerDelta.fs`（只含 200 KiB 常数）。
+**证据**：CTX-001；`archive/docs/why/context.md`；`Domain/BloggerDelta.fs`（只含 200 KiB 常数）。
 
 ---
 

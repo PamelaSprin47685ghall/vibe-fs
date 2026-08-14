@@ -102,7 +102,7 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
 ### 3.4 高阶 Vocabulary 证明义务（DSL-014）
 
 每个改变 trace 的压缩 Vocabulary 必须有 temporal/behavioral proof。当前义务表
-（源自 `docs/proof/dsl-structured-program.md`）：
+（源自 `archive/docs/proof/dsl-structured-program.md`）：
 
 | Vocabulary | 必须证明 |
 |---|---|
@@ -154,11 +154,11 @@ deadline escape 都是消费关系，非定义前提。
 
 | 源 | 吸收位置 |
 |---|---|
-| `changes/completed/rabbit.md`（G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.3 |
-| `changes/completed/ce-temporal-ownership.md`（时序所有权清算） | WHY.md §2.1/§2.2/§3；WHAT 009；HOW §2.2/§2.3 |
-| `changes/completed/fsharp-dsl-governance.md`（mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
-| `changes/completed/dsl-structured-program-gap.md`（DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
-| `docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md` | WHAT.md 反向覆盖清单 + 各命题 |
+| `archive/changes/completed/rabbit.md`（G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.3 |
+| `archive/changes/completed/ce-temporal-ownership.md`（时序所有权清算） | WHY.md §2.1/§2.2/§3；WHAT 009；HOW §2.2/§2.3 |
+| `archive/changes/completed/fsharp-dsl-governance.md`（mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
+| `archive/changes/completed/dsl-structured-program-gap.md`（DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
+| `archive/docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md` | WHAT.md 反向覆盖清单 + 各命题 |
 | `requirements-design/COVERAGE.md`（flow/dsl/arch/execution/loop 小节） | WHAT.md 反向覆盖清单 |
 | `requirements-design/EVIDENCE.md` §2 行 | README.md HOW 概览 |
 | `requirements-design/PROOF-MAP.md`（dsl-ownership SPLIT、g4r-ce-vocabulary KEEP、g4r-freeze DELETE、domain/kernel/temporal/verify family） | PROOF.md §4/§6 |
@@ -167,11 +167,11 @@ deadline escape 都是消费关系，非定义前提。
 
 | 源 | 弃权理由 | 记录位置 |
 |---|---|---|
-| `changes/completed/ChatGPT-时序控制流修复提案.md`（4310 行 raw chat export） | **GARBAGE（transcript）**：ChatGPT 对话原始导出，非规范源。其中 2N Finality cohort、REVISE 立即短路、Blessed 后 rest-in-peace、Reviewer HostOwnedHidden、Join 中断仅 OperatorAbort\|DeadlineExpired 等决策的**规范结果**已落 `docs/`（GLORY/EXEC-017/EXEC-020 等）并由对应 owner 拥有；transcript 本身不携带任何独立 normative 内容，不迁移为命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 56 |
-| `changes/completed/refactor.md`（1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（kolmogorov-size.mjs ratchet、god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属 verification-system MECHANISM / 各 semantic owner；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
-| `docs/what/loop.md` LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
-| `docs/what/execution.md` EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
-| `docs/what/architecture.md` ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |
+| `archive/changes/completed/ChatGPT-时序控制流修复提案.md`（4310 行 raw chat export） | **GARBAGE（transcript）**：ChatGPT 对话原始导出，非规范源。其中 2N Finality cohort、REVISE 立即短路、Blessed 后 rest-in-peace、Reviewer HostOwnedHidden、Join 中断仅 OperatorAbort\|DeadlineExpired 等决策的**规范结果**已落 `archive/docs/`（GLORY/EXEC-017/EXEC-020 等）并由对应 owner 拥有；transcript 本身不携带任何独立 normative 内容，不迁移为命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 56 |
+| `archive/changes/completed/refactor.md`（1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（kolmogorov-size.mjs ratchet、god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属 verification-system MECHANISM / 各 semantic owner；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
+| `archive/docs/what/loop.md` LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
+| `archive/docs/what/execution.md` EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
+| `archive/docs/what/architecture.md` ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |
 | `scripts/checks/dsl-ownership.mjs` 的 `program-counter` 词表 + `behaviour-bool` 名称正则、`dsl-ownership-ratchet` 基线、`g4r-ce-vocabulary` obsolete-controller absence、`g4r-freeze` | **migration ratchet（DELETE@cutover）**：旧 symbol absence 黑名单只能防已经想起来的坏名字；新世界以 positive 结构门（state-product / mutable-record-field / second-runtime-protocol / registry-joint-branch）+ 本包 NEW 测试为正式证明面 | PROOF.md §4/§6；PROOF-MAP DELETE 清单 |
 
 ### 5.3 已实施的 clean break（不再回退）

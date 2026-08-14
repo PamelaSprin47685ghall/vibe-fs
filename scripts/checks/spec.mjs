@@ -14,8 +14,8 @@ import {
   unknownClauseReferences,
 } from './spec-rules.mjs'
 
-const DOCS = 'docs'
-const CHANGES = 'changes'
+const DOCS = 'archive/docs'
+const CHANGES = 'archive/changes'
 const FORMAL_DIRS = ['why', 'what', 'shape', 'how', 'proof']
 const CHANGE_DIRS = ['proposed', 'active', 'completed']
 const NAV_FILE = join(DOCS, 'README.md')

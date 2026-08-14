@@ -23,7 +23,7 @@ signal-terminal(name, signal)   发信号
 ## PROC-002：command/signal 是 real-world acts；stdout/stderr 是 observation
 
 command 与 signal 是作用在物理进程上的 act；stdout/stderr 是这些 act 产生的 observation，不是
-completion，也不是下一动作的 authority（`docs/why/execution.md`、devops Role Law `act-vs-observation` /
+completion，也不是下一动作的 authority（`archive/docs/why/execution.md`、devops Role Law `act-vs-observation` /
 `mechanical-meaning`）。signal 是 act 不是 exit（`signal-not-exit`）。
 
 含义/动机：把输出当完成、把 signal 当退出，都是把 observation 升级成物理事实——两类错误都让

@@ -3,7 +3,7 @@
 ## 不可替代的存在理由
 
 系统让一个 participant 把工作托付给另一个 office。托付的依据必须是「对方有资格产生什么后果」，
-否则选择面退化成名单/工具白名单，出现两类失败（`docs/why/architecture.md`「Office 认知」备选与被拒）：
+否则选择面退化成名单/工具白名单，出现两类失败（`archive/docs/why/architecture.md`「Office 认知」备选与被拒）：
 
 - **名单即权威的幻觉**：fork 枚举 calling 名（fast-coder、deep-inspector…）看起来够用，但调用方
   看不到被调用方 Role Law 时，会把 Inspector 当成「另一个能处理 repository 的 agent」，把 Browser

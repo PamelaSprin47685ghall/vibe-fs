@@ -29,8 +29,8 @@ digest 从 Semantic 算（011）、确定性 renderer（012）。
 类型 `Domain/{ProjectionIntent,ProjectionPlanner,ProjectionRenderer,ProviderProjection,
 SyntheticToml}.fs`；Y 帧形状源 `Domain/CompanionProjectionBuilder.fs`；host wire 适配
 `Infrastructure/OpenCode/Codec/*`、`Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs`；
-值树结果面证据 `changes/completed/js-tools-toml-result.md`；plane 判据
-`changes/completed/corrective.md` §1。
+值树结果面证据 `archive/changes/completed/js-tools-toml-result.md`；plane 判据
+`archive/changes/completed/corrective.md` §1。
 
 ## Proof 概览
 

@@ -58,4 +58,4 @@ RED = 满足下列任一：
 历史上还有：`verdict`/`judge` 工具名之争（`judge` 属 Reviewer、`suicide` 属 Manager，因果身份不同）；
 单一结束文案把未接受当安息（why「Finality：单一结束文案 vs rejection/blessed/rest」裁决）；
 结构化 `FinalityFinding` schema 被拒（第二事实源、摘要漂移，GLORY-004/049/050）。
-完整推导见 `docs/why/glory.md` 与 `docs/why/review.md`；被拒方案记录在 HOW.md「历史与弃权」。
+完整推导见 `archive/docs/why/glory.md` 与 `archive/docs/why/review.md`；被拒方案记录在 HOW.md「历史与弃权」。

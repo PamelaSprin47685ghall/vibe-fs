@@ -31,7 +31,7 @@ COVERAGE.md 的 TODO-012 / EXEC-020 / PERSIST-006 / CTX-007 / HOST-007 交叉行
 
 ### 2.1 源码表面 Direct-CE，实际仍是状态机
 
-`changes/completed/ce-temporal-ownership.md` §0 记录了一次关键裁决：
+`archive/changes/completed/ce-temporal-ownership.md` §0 记录了一次关键裁决：
 
 > 项目把「Direct CE」做成了源码表面要求，却没有真正把业务时序所有权交给 CE 调用结构。
 
@@ -88,13 +88,13 @@ single-flight registry（`IParkedTransformHost.HasFlight` / `bloggerFlights`）�
 
 | 备选 | 被拒理由 | 来源 |
 |---|---|---|
-| 封闭 AST + 唯一 Interpreter 表达流程 | 与 ARCH-001 冲突；Reply DU + Trace 解释器把复杂度乘在每一业务步上 | `docs/why/flow.md` |
-| 恢复协程指针 | 调用栈不可序列化；假装透明续跑实为不可恢复 | `docs/why/flow.md` |
-| 规则 DSL 兼管程序下一步 | 规则面长第二运行时；职责收窄到「是否允许」，控制流归语言 CE | `docs/why/flow.md` |
+| 封闭 AST + 唯一 Interpreter 表达流程 | 与 ARCH-001 冲突；Reply DU + Trace 解释器把复杂度乘在每一业务步上 | `archive/docs/why/flow.md` |
+| 恢复协程指针 | 调用栈不可序列化；假装透明续跑实为不可恢复 | `archive/docs/why/flow.md` |
+| 规则 DSL 兼管程序下一步 | 规则面长第二运行时；职责收窄到「是否允许」，控制流归语言 CE | `archive/docs/why/flow.md` |
 | 继续只靠名称黑名单 | 可被等价改名绕过 | `fsharp-dsl-governance.md` Alternatives 1 |
 | 对任何含多个 DU/option 的 record 一律判红 | 误伤合法领域模型，不可接受 | `fsharp-dsl-governance.md` Alternatives 2 |
 | 只做报告不做门禁 | 不能长期替代可执行门禁 | `fsharp-dsl-governance.md` Alternatives 3 |
-| 独立 Loop 恢复机制 | 第二状态机；破坏 FALLBACK-003 唯一写入口；桥接 FallbackController 复用统一预算 | `docs/why/loop.md`（degeneration-guard 交叉） |
+| 独立 Loop 恢复机制 | 第二状态机；破坏 FALLBACK-003 唯一写入口；桥接 FallbackController 复用统一预算 | `archive/docs/why/loop.md`（degeneration-guard 交叉） |
 | 大 `Decision` DU 压扁整个 workflow | 仍是程序计数器；只允许小型真实领域判断（ReviewWitness / ReviewerOutcome / PromptAcceptance / FamilyRecovery） | `ce-temporal-ownership.md` §2 |
 | `TurnCompletionProgram` 什么都管 | 第二运行时；拆成五个独立时序 owner + 薄 router | `ce-temporal-ownership.md` §3/§15 |
 

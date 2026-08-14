@@ -1,9 +1,9 @@
 # WHAT — session-ontology（唯一 normative 合同）
 
 命题前缀：`SESSION-ONTOLOGY-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：`docs/{shape,what,why,proof}/host.md`（HOST-008/015）、`docs/shape/companion.md`
-（COMPANION-001/002）、`docs/shape/execution.md`（EXEC-026）、`docs/what/execution.md`
-（EXEC-028）、`docs/what/agent.md`（AGENT-001/024）、`docs/why/host.md` §15。
+来源：`archive/docs/{shape,what,why,proof}/host.md`（HOST-008/015）、`archive/docs/shape/companion.md`
+（COMPANION-001/002）、`archive/docs/shape/execution.md`（EXEC-026）、`archive/docs/what/execution.md`
+（EXEC-028）、`archive/docs/what/agent.md`（AGENT-001/024）、`archive/docs/why/host.md` §15。
 落点与运行命令见 `PROOF.md`。
 
 ---
@@ -12,7 +12,7 @@
 
 **规范**：长期 session 所有权由 `SessionExecutionClass`（`Work | InternalLeaf`）与
 `SessionOwnership`（`Root | Attached of ownerSessionId × AttachmentKind`）两个正交维度联合决定，
-不再以单一 `SatelliteKind` 轴为唯一模型（`docs/shape/host.md` HOST-008）。
+不再以单一 `SatelliteKind` 轴为唯一模型（`archive/docs/shape/host.md` HOST-008）。
 
 **含义/动机**：Dedicated Sync* 是长期 hot-knowledge Work Session（需要 Companion/context），
 Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界；单轴分类必然把两种不同事实揉成一个。
@@ -28,7 +28,7 @@ Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界
 `Attached` 恒携带恰一个 `ownerSessionId` 与一个 `AttachmentKind`。
 
 **含义/动机**：四格穷尽使「这个 session 是什么」可 O(1) 分辨，不需要从 agent 名、工具面、
-Logical Run、Authority、Fallback 临时推导（`docs/proof/host.md`「正交投影」行）。
+Logical Run、Authority、Fallback 临时推导（`archive/docs/proof/host.md`「正交投影」行）。
 
 **边界**：分类不暗示任何 lifecycle 行为（复用/取消/retire 归 `managed-session-lifecycle`）。
 
@@ -39,7 +39,7 @@ Logical Run、Authority、Fallback 临时推导（`docs/proof/host.md`「正交�
 
 **规范**：Dedicated SyncInspector / SyncCoder 是 `Work + Attached(SyncInspector|SyncCoder)`，
 可拥有自己的 Companion（Work 能力路径）；**不得**实现成历史 Teacher-style InternalLeaf /
-no-Companion Satellite（`docs/shape/host.md` HOST-008；`docs/shape/execution.md` EXEC-026）。
+no-Companion Satellite（`archive/docs/shape/host.md` HOST-008；`archive/docs/shape/execution.md` EXEC-026）。
 
 **含义/动机**：Dedicated Sync* 吃 prefix/context 复用，长上下文需要 Companion；做成叶子会撞
 context 问题。「复用 Teacher 的调用代数，不复用 Teacher 的 Session 分类」（universal.md §13.6）。
@@ -133,7 +133,7 @@ map O(1) 回答，无第二索引可分歧（PERSIST-008）。
 Authority / Fallback 临时决定（HOST-008 不变量）；「有没有 Companion」不由角色资格白名单决定
 （COMPANION-001）。
 
-**含义/动机**：把拓扑绑到身份会让换执行者 = 换人、换 Peer = 换世界（`docs/why/host.md` §21）。
+**含义/动机**：把拓扑绑到身份会让换执行者 = 换人、换 Peer = 换世界（`archive/docs/why/host.md` §21）。
 
 **证据**：`SessionAssociationProjection.isCompanion` 只读 durable kind，无任何 role 参数；
 → PROOF.md `SESSION-ONTOLOGY-010`。
@@ -179,7 +179,7 @@ label 稳定性」这一可观察面。
 **规范**：`Role.Student` / `Role.Teacher`、Student↔Teacher 绑定、HOST-014 canary 与
 `TeacherSessionId` 投影 **absent**（G3 clean-break）；不得写成 pending / 仍存在的过渡路径，
 不得以 alias / deprecated type / 隐藏 storage / SyncDelegate fallthrough 复活
-（`docs/shape/host.md` HOST-008 G3；`docs/what/host.md` HOST-014 空号）。
+（`archive/docs/shape/host.md` HOST-008 G3；`archive/docs/what/host.md` HOST-014 空号）。
 
 **含义/动机**：absence ratchet 防止旧领域借兼容层复活；`SatelliteKind` 只允许 `Companion`。
 
@@ -194,6 +194,6 @@ label 稳定性」这一可观察面。
 - `AGENT-002` exact catalog（22 agent 名等）→ GARBAGE（machine vocabulary）。
 - `AGENT-020/021/022` Student absence 细节 → GARBAGE（与 SESSION-ONTOLOGY-014 同源，收敛到 absence）。
 - 历史 `SatelliteKind = { Companion, Teacher }` 中的 Teacher 案例 → GARBAGE（G3 删除）。
-- `changes/completed/ce-student-teacher-collapse.md` 的 CE/registry 细节 → HOW/GARBAGE
+- `archive/changes/completed/ce-student-teacher-collapse.md` 的 CE/registry 细节 → HOW/GARBAGE
   （实施记录 + 已删领域；其 durable WHY 已由 session-ontology / delegation 拥有）。
 

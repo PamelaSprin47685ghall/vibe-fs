@@ -19,7 +19,7 @@
 本命题拥有「唯一 + append-only + 三事实捕获」的语义。XTrace 是 `work-record` 物化的 source
 material，不是第二事实源。
 
-**证据**：`docs/what/host.md` HOST-005；`docs/what/companion.md` COMPANION-003；
+**证据**：`archive/docs/what/host.md` HOST-005；`archive/docs/what/companion.md` COMPANION-003；
 `src/Wanxiangshu/Domain/XTrace.fs`；`src/Wanxiangshu/Journal/XTraceProjection.fs`。
 
 ---
@@ -145,13 +145,13 @@ Semantic projection，禁止反向解析 TOML（COMPANION-007）。同一 segmen
   `TerminalOutputCaptured`——没有「candidate frame」事实族。
 
 **含义/动机**：提前写入 = 用未发生的干预污染未来请求；事后回滚 = 删除真实因果。两者都破坏
-「历史 = 已发生」。（与 `docs/why/strength.md` 的 Candidate ≠ 历史同构。）
+「历史 = 已发生」。（与 `archive/docs/why/strength.md` 的 Candidate ≠ 历史同构。）
 
 **边界**：promotion 的因果链（何时 Candidate 算被消费）归 `speculative-investigation`；
 本命题拥有 capture 侧负律。
 
-**证据**：`docs/why/context.md`（probe 失败不写事实）；`docs/why/strength.md`；
-`changes/completed/strength.md`；`src/Wanxiangshu/Journal/XTraceProjection.fs`（无 candidate 事实）。
+**证据**：`archive/docs/why/context.md`（probe 失败不写事实）；`archive/docs/why/strength.md`；
+`archive/changes/completed/strength.md`；`src/Wanxiangshu/Journal/XTraceProjection.fs`（无 candidate 事实）。
 
 ---
 

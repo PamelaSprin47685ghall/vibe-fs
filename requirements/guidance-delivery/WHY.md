@@ -20,22 +20,22 @@ horizon 内可恢复、不无限膨胀、不伪造新事件的交付**。
 「重发全文 ≠ 新 occurrence」的边界**。它们不能被一个 durable bool、一个内存
 HashSet 或一个文件 ledger 替代。
 
-## 2. 历史上为什么 RED（changes/ 考古）
+## 2. 历史上为什么 RED（archive/changes/ 考古）
 
-### 2.1 从「不投 Main」到「双消费者」的反复（`changes/completed/rulebook.md` §13/§27）
+### 2.1 从「不投 Main」到「双消费者」的反复（`archive/changes/completed/rulebook.md` §13/§27）
 
 Enforcer rebase 文档一度声称「tip 只作为 Blogger history，不投 Main」；而 HOST
 实现又规定 prior tip 会进入新的 Main auto-injected pair。两种叙述并存 = 双解释。
 Rulebook v2 裁决：**tip 有两个消费者**——Blogger（配对历史观察）与 Main（Host
 adopted guidance），两者来源相同、权限语义不同（§27），且不得共用 renderer（§28）。
 
-### 2.2 为什么拒绝「Main fake-user overlay」（`docs/why/enforcer.md`）
+### 2.2 为什么拒绝「Main fake-user overlay」（`archive/docs/why/enforcer.md`）
 
 向 Main 注入工程 fake-user message = 给 Main 建立第二个 Authority 解释器，污染
 投影、seal 与恢复。Main tip 半边必须是正式交付事实（`TipGuidanceDelivered`）+ 
 auto-injected tool pair，经投影进 horizon，**不 mint authority**。
 
-### 2.3 为什么拒绝单一 durable bool（`docs/why/enforcer.md` 交付前沿 vs 语义覆盖）
+### 2.3 为什么拒绝单一 durable bool（`archive/docs/why/enforcer.md` 交付前沿 vs 语义覆盖）
 
 「已交付」≠「全文此刻仍可从 horizon 恢复」。单一 bool 在 reanchor 后要么误删已
 交付事实、要么假装全文仍在 horizon。所以：
@@ -48,13 +48,13 @@ TipSemanticCoverage    TipName / horizon-relative；ContextReanchored 可清空
 覆盖丢失后再次给出 full main.md 是语义恢复，不是新 occurrence——拒把二者压成
 一个 durable bool（ENFORCER-071）。
 
-### 2.4 为什么拒绝「每次 Full」和「仅 Identity」（`docs/why/enforcer.md`）
+### 2.4 为什么拒绝「每次 Full」和「仅 Identity」（`archive/docs/why/enforcer.md`）
 
 - 每次 Full：重复烧上下文且无法区分「已交付」。
 - 仅 Identity：首次无正文可执行。
 - 选 Full 一次 + Identity 重复，且 Identity 仅当 Coverage 仍可恢复全文时合法。
 
-### 2.5 历史字节必须冻结（`changes/completed/rulebook.md` §17）
+### 2.5 历史字节必须冻结（`archive/changes/completed/rulebook.md` §17）
 
 第一次投递 `main.md` = version A 并 commit 后，repository 更新为 version B：
 restart 后历史 pair 必须从 EventStore **byte-identical replay** 当时实际送出的 A，

@@ -2,8 +2,8 @@
 
 > 非 normative。描述当前实现模型与约束，以及「历史与弃权」裁决。
 > 当前实现名（Sphinx、A*/Bayes/MCTS、MCP start/resume、handle、F# 文件布局）全部是 HOW，
-> 不是 WHAT。若未来换实现，WHAT.md 不变。源：`docs/how/sphinx.md`、`docs/shape/sphinx.md`、
-> `changes/completed/Sphinx.md`、`src/Wanxiangshu/Sphinx/*.fs`。
+> 不是 WHAT。若未来换实现，WHAT.md 不变。源：`archive/docs/how/sphinx.md`、`archive/docs/shape/sphinx.md`、
+> `archive/changes/completed/Sphinx.md`、`src/Wanxiangshu/Sphinx/*.fs`。
 
 ## 1. 模块地图（当前实现）
 
@@ -149,10 +149,10 @@ Answer 不复制 transcript，也不把 candidate/value estimate/method score �
   handle/SessionStore、F# 文件布局、value 系数（0.65、synthesis factor 0.72 等）、闭包 16 轮
   guard、方法库权重（0.58/0.42）——全部当前实现，不进 WHAT（边界卡片 DOES NOT OWN 与
   HANDOFF §6.7 同类裁决：`sphinx` 组件名与算法降为 HOW/proof）。
-- **`Sphinx-wiki.html`（changes/proposed/）**：算法资料，HOW 参考，非 ontology（CHANGES-AUDIT）。
+- **`Sphinx-wiki.html`（archive/changes/proposed/）**：算法资料，HOW 参考，非 ontology（CHANGES-AUDIT）。
 - **旧完成声明的语义漂移**：`evidenceMass` 伪置信度、primary argmax、bind-once、wire
   equivalenceKey、LLM 自报 confidence、开局一次性生成候选，已在 corrective round
-  （changes/completed/Sphinx.md「Corrective outcome — 2026-08-12」）逐条修正；被拒方向归档于
+  （archive/changes/completed/Sphinx.md「Corrective outcome — 2026-08-12」）逐条修正；被拒方向归档于
   WHY.md §3。
 - **MCP/wire 身份 → `host-boundary`**：MCP server identity、launch config、`sphinx_*` 权限键、
   wire 编码归属 Host 边界；本包只拥有认识语义（EPI-004 的「同型契约」是语义侧）。

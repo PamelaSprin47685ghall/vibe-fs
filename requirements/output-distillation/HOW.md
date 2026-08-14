@@ -64,7 +64,7 @@ Distiller 映射子会话：`distillerAgent = ManagedAgent.nameOf AgentTier.Fast
 - **GARBAGE——chunk 统计 wire**：蒸馏不得返回 chunk 统计仪表盘、不得叙述 map-reduce 机械过程、
   不得报告 success ratio（Role Law「切割是你的私务」）；不进入未来 WHAT 的任何字段合同。
 - **GARBAGE——Meditator/Executor 角色路径**：与 Distiller 无关的已删算法面，见
-  `docs/how/execution.md` 已删除清单。
+  `archive/docs/how/execution.md` 已删除清单。
 - **HOW——机制常数**：`ReduceFanIn=8`、`AwaitAgentTimeoutMs=600_000`、`MemoryBufferBudget=204800`、
   `Spool.ChunkSizeBytes=204800`、`HostMaxLines=2000`/`HostMaxBytes=51200`、
   `ContentMaxLines=1998`/`ContentMaxBytes=51166`、`MarkerBytes=34`：有界性/诚实性才是 WHAT。

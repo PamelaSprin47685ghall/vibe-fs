@@ -124,7 +124,7 @@ SyncDelegate caller `false`（REVIEW-016、EXEC-031）。
 trace 区间事实归 `semantic-trace`（SEMANTIC-TRACE-010）；本命题拥有「record 里的 Opening
 来自 preserved 区间」这一半。
 
-**证据**：COMPANION-014；`docs/what/glory.md` GLORY-074。
+**证据**：COMPANION-014；`archive/docs/what/glory.md` GLORY-074。
 
 ---
 
@@ -188,7 +188,7 @@ fixed report schema（`### Summary` / files/tests/risks/blockers 等强制字段
 **边界**：角色可自然提及事实；「提及义务」不得写成格式。协议真需处的结构（如
 `SyncDelegatePromptRequest { Charge; ProviderPrompt }`）不属于 report DTO。
 
-**证据**：ARCH-015；COMPANION-015 ⑫；`docs/why/companion.md`（陈述：散文 vs 固定字段 schema）。
+**证据**：ARCH-015；COMPANION-015 ⑫；`archive/docs/why/companion.md`（陈述：散文 vs 固定字段 schema）。
 
 ---
 

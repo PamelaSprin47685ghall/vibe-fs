@@ -10,7 +10,7 @@
 （`src/Wanxiangshu/Domain/PromptAuthority.fs`）；唯一调用点是 `Domain/AttemptPlanner.fs` 的 `plan`。
 禁止在 profile 之外另造能力字段（PROMPT-008 enforcement 侧）。
 
-含义/动机：`docs/why/js-tools.md`「唯一权威投影 vs 手写矩阵」——任何第二份矩阵必然与权威漂移；
+含义/动机：`archive/docs/why/js-tools.md`「唯一权威投影 vs 手写矩阵」——任何第二份矩阵必然与权威漂移；
 `AttemptExecutionProfile` 注释记录了历史事故：四源拼装（mutable session cache、最后用户消息、Role
 map、fallback projection）互相矛盾。
 
@@ -22,7 +22,7 @@ map、fallback projection）互相矛盾。
 
 ## ENF-002：provider-visible schema 与 runtime execution gate 读同一 capability truth
 
-两层都必须存在且都从同一 Role→permission 集推导（AGENT-007；`docs/shape/agent.md`）：
+两层都必须存在且都从同一 Role→permission 集推导（AGENT-007；`archive/docs/shape/agent.md`）：
 
 ```text
 Host-final Agent permission（StaticTools.permissionObj）   → 无权工具不进 provider-visible schema
@@ -32,7 +32,7 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 两层各自的机械推导都读 `Roles.permissions`（或 profile 的 ToolCapabilitySet），无第二份矩阵
 （AGENT-006）。
 
-含义/动机：Host 配置可漂（`docs/why/agent.md`「双层 vs 单层可信」）；只信一层会在配置异常时漏工具
+含义/动机：Host 配置可漂（`archive/docs/why/agent.md`「双层 vs 单层可信」）；只信一层会在配置异常时漏工具
 或越权执行。
 
 边界：Host 配置的物理写入机制 → `host-boundary`；本包拥有「schema 与 gate 同源」的语义。
@@ -46,7 +46,7 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 `Roles.permissions role` 更大的集合（`toolCapabilitiesFor`：普通 WorkMain = role 全集；StrengthReplica
 = 更窄子集；非 eligible 角色 = 空集）。
 
-含义/动机：`changes/completed/js-capability-projected-tools.md` 的按 RequestKind 分叉案例——能力
+含义/动机：`archive/changes/completed/js-capability-projected-tools.md` 的按 RequestKind 分叉案例——能力
 「可以完全不同」但方向只能是收窄。
 
 边界：RequestKind 语义归属见 ENF-001 边界；本包拥有「收窄律」（projection ⊆ entitlement）。
@@ -58,10 +58,10 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 
 `permissions(fast-ROLE) = permissions(deep-ROLE)`（AGENT-010）；不得出现 fast 只读、deep 才可写。
 结构性保证：`systemPromptIdFor` 与 `toolCapabilitiesFor` 都只依赖 CanonicalRole，不依赖 tier
-（`docs/what/agent.md` AGENT-001/010）。
+（`archive/docs/what/agent.md` AGENT-001/010）。
 
 含义/动机：tier 是 ExecutionBinding（`participant-identity`），不是 authority；换深度不得换权限
-（`docs/why/agent.md`「fast/deep 随换模型演化成两套产品」是反面案例）。
+（`archive/docs/why/agent.md`「fast/deep 随换模型演化成两套产品」是反面案例）。
 
 边界：tier 的身份轴语义 → `participant-identity`；本包拥有「权限相等」的执行证明。
 
@@ -76,7 +76,7 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 Host-native 只读之外的一切工具在 replica 内 fail-closed。
 
 含义/动机：replica 是「零影响 speculation」的执行面（`speculative-investigation`），capability 收窄
-是 enforce 不扩权；`docs/why/agent.md` Semble 选型：假 read 污染 primary 可见历史。
+是 enforce 不扩权；`archive/docs/why/agent.md` Semble 选型：假 read 污染 primary 可见历史。
 
 边界：replica 的预算/推进/提升 → `speculative-investigation`；本包拥有「replica 能力面精确收窄」
 这一 enforcement 律。
@@ -90,7 +90,7 @@ strength family KEEP speculative-investigation，本断言 enforcement 侧归本
 Blogger 工具面恰为 `{chronicle}`、Distiller 为空、Bookkeeper 仅 `js-bookkeeper`；其它角色不得获得
 这些面（ENFORCER-010/011、AGENT-006 表）。`auto-injected` 只进 Work 角色，Blogger/Distiller 不含。
 
-含义/动机：内部路径（运行时合成）不得被模型当作可选工具（`docs/why/agent.md`「内部 Agent 从 public
+含义/动机：内部路径（运行时合成）不得被模型当作可选工具（`archive/docs/why/agent.md`「内部 Agent 从 public
 enum 消失」）；admission（不进 choice surface）归 `participant-horizon`，本包拥有 schema/gate 拒绝。
 
 边界：可见性过滤的认知面 → `participant-horizon`（AGENT-008）；本包拥有工具面拒绝的执行面。
@@ -105,7 +105,7 @@ enum 消失」）；admission（不进 choice surface）归 `participant-horizon
 schema wildcard、registry），semantic source 只能一个（`Roles.permissions` 中的域能力 token）。
 
 含义/动机：MCP 是 Host 集成机制（`host-boundary`），但它的 permission 语义必须与插件工具同一政策；
-`docs/shape/agent.md` 三张所有权表（stealth-browser / Sphinx / Semble）都写「禁止第二套 role→MCP 表」。
+`archive/docs/shape/agent.md` 三张所有权表（stealth-browser / Sphinx / Semble）都写「禁止第二套 role→MCP 表」。
 
 边界：MCP 启动/注入机制 → `host-boundary`；域能力 token（Network/Sphinx）属于 `Roles.permissions`
 （Kernel）；本包拥有「schema wildcard 与 gate 服从同一 policy」的 enforcement。
@@ -121,7 +121,7 @@ canonical examples 不出现该方法、伪造底层调用 runtime gate 仍 fail
 经 `JsToolGenerator.generate`（读 `Roles.permissions` / profile capability set），无手写 `js-*`
 ToolSpec 路径；`JsFragmentRegistry` 是成员唯一出生点。
 
-含义/动机：`docs/why/js-tools.md`「If a method is present, the capability exists. If a method is
+含义/动机：`archive/docs/why/js-tools.md`「If a method is present, the capability exists. If a method is
 absent, it does not.」——模型不需要读权限矩阵；运行时拒绝 = 把错误留给调用之后。
 
 边界：JS SDK 的语义（transaction/sandbox/anchors/failure algebra）→ `repository-programming`
@@ -136,7 +136,7 @@ absent, it does not.」——模型不需要读权限矩阵；运行时拒绝 = 
 return semantics / important failure semantics`（ARCH-007 / Gate A）。role visibility 与永不同时出现
 不削弱该不变量；`join` 可在 Manager 与 Orchestrator 共享当且仅当语义合同完全同一。
 
-含义/动机：同名不同义让模型在一个名字下学到两套合同；`docs/why/agent.md`「工具名：fork-manager/list/
+含义/动机：同名不同义让模型在一个名字下学到两套合同；`archive/docs/why/agent.md`「工具名：fork-manager/list/
 inspector(tool) 保留 vs commission/horizon/inspect」被拒（DTO 名冒充动词）。
 
 边界：工具描述的语义合同内容 → `action-affordance`；本包拥有「名称唯一 + schema 结构唯一」的
@@ -149,7 +149,7 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 
 - Role 或 profile 无法确定 → 模型可见插件工具集为空；ToolRegistry `gateExecute` 对 unresolved role
   返回 deny（`Path.DeniedUnestablished`），禁止「role 未定时暂时允许 Inspector」类放行
-  （`docs/shape/agent.md` AGENT-007）。
+  （`archive/docs/shape/agent.md` AGENT-007）。
 - Host `config` hook 校验失败（如重复 fast/deep model）仍必须写入 owned `mode`/`permission`/`prompt`，
   使 managed agent 不回落 Host 默认（`"*": "allow"` 会把 bash 开放给每个角色）。
 
@@ -171,7 +171,7 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 `ManagedAgentConfig.applyOwnedFields`（AGENT-019）。禁止：省略覆盖、编入 `Roles.permissions` /
 `ToolPermission` / AGENT-006、用全局 permission 顶替 agent 级写入、借本条放宽角色工具。
 
-含义/动机：`docs/why/agent.md`「external_directory 固定 allow vs 塞进角色工具矩阵」——塞矩阵会污染
+含义/动机：`archive/docs/why/agent.md`「external_directory 固定 allow vs 塞进角色工具矩阵」——塞矩阵会污染
 AGENT-006 语义边界并诱导「工具白名单 = 一切权限」的错心智。
 
 边界：external_directory 的路径边界机制本身 → `host-boundary`；本包拥有「唯一 enforcement 写点 +
@@ -182,12 +182,12 @@ AGENT-006 语义边界并诱导「工具白名单 = 一切权限」的错心智�
 
 ## ENF-012：工具名投影唯一写入口 = CanonicalRole → permission；禁止第二套旧名表/手写矩阵
 
-矩阵唯一写入口仍是 `CanonicalRole → permission` 投影（`docs/shape/agent.md` AGENT-007）；旧工具名
+矩阵唯一写入口仍是 `CanonicalRole → permission` 投影（`archive/docs/shape/agent.md` AGENT-007）；旧工具名
 （fork-manager/list/inspector(工具)/verdict/blog/executor(工具)/fork-pty/edit-qa/return）非法、无
 alias；`js-*` 工具名只能由 generator 运行时产生，生产源码中任何字面量 per-role `js-*` 名 = 手写
 变体，fail-closed（`scripts/checks/js-surface-gate.mjs`）。
 
-含义/动机：第二套旧名表/手写矩阵必然与权威漂移（`docs/why/agent.md`「矩阵唯一写入口」）；工具名
+含义/动机：第二套旧名表/手写矩阵必然与权威漂移（`archive/docs/why/agent.md`「矩阵唯一写入口」）；工具名
 是动词，DTO 名冒充动词强迫模型解码机器拓扑。
 
 边界：`js-surface-gate.mjs` 文件 owner = `repository-programming`（应用）；本包拥有「唯一写入口」律

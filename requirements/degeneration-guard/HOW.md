@@ -46,7 +46,7 @@ Step 4  verdict.MayContinue → 发 ProviderRetryAttempt continuation（loop-con
 
 ## 历史与弃权
 
-以下事实来自 `docs/why/loop.md` 考古，均为决策记录，不是现行命题：
+以下事实来自 `archive/docs/why/loop.md` 考古，均为决策记录，不是现行命题：
 
 - **可变状态封装**：拒公开 `mutable Step` / `Value[][]` 等可变数组字段（易被传出 attempt 边界或
   被诊断并发读取）；选私有封装 + 只读快照 + feed 接口。

@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
 /** The heading the list lives under. Exported so a failure message and the test agree. */
 export const ANCHOR = '### 禁止退化清单';
 
-export const SSOT_ORIGIN = 'docs/proof/verify.md';
+export const SSOT_ORIGIN = 'archive/docs/proof/verify.md';
 
 /** Resolved from this module, not from `cwd`: two trees import it. */
 const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', SSOT_ORIGIN);

@@ -2,8 +2,8 @@
 
 > 非 normative。描述当前实现模型与约束，以及「历史与弃权」裁决。
 > 当前实现名（Strength、same-role-fast、K1/K2 数值、predictor 特征）全部是 HOW，不是 WHAT。
-> 若未来换实现，WHAT.md 不变。源：`docs/how/strength.md`、`docs/shape/strength.md`、
-> `changes/completed/strength.md`、`src/Wanxiangshu/**`。
+> 若未来换实现，WHAT.md 不变。源：`archive/docs/how/strength.md`、`archive/docs/shape/strength.md`、
+> `archive/changes/completed/strength.md`、`src/Wanxiangshu/**`。
 
 ## 1. 模块地图（当前实现）
 
@@ -48,7 +48,7 @@ src/Wanxiangshu/Infrastructure/OpenCode/Host/
   StrengthSettings.fs / PluginStrengthScope.fs      env 设置、Host canary fingerprint、process fuse
 ```
 
-主 transform 顺序固定（docs/how/strength.md）：
+主 transform 顺序固定（archive/docs/how/strength.md）：
 
 ```text
 StrengthReplay → XTraceCapture → Companion → XWire → EnforcerHost → StrengthSpeculate
@@ -153,22 +153,22 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 - **算法/常量降为 HOW**：`same-role-fast` 模型选择、K1/K2 数值、margin/evidence floor、
   predictor 特征分桶、canary 指纹格式——全部是当前实现，不进 WHAT（边界卡片
   DOES NOT OWN 与 HANDOFF §6.7 同类裁决）。
-- **STRENGTH-013..019（docs/shape/strength.md）**：这些是「所有权分配」条款，不是本包新增
+- **STRENGTH-013..019（archive/docs/shape/strength.md）**：这些是「所有权分配」条款，不是本包新增
   行为——Session 归属 → `session-ontology`、profile 构造 → `participant-identity`、
   projection intent → `provider-projection`、durable substrate → `durable-events`、
   XTrace/Companion coverage → `semantic-trace`/`context-compression`、fallback/review 隔离 →
   `provider-attempt-recovery`/`review-*`。信息已分别落入本 WHAT 各命题的「边界」节。
-- **被拒方向**：见 WHY.md §3（changes/completed/strength.md §三十逐条）。
+- **被拒方向**：见 WHY.md §3（archive/changes/completed/strength.md §三十逐条）。
 - **Semble 弃权**：Strength 不消费 Semble（AGENT-027）；历史伪造 read 的失败模式见
   WHY.md §1.9。
 - **Student/Teacher**：已删除领域；`Student & Teacher.md` 为 GARBAGE（CHANGES-AUDIT）；
   absence ratchet 归 `session-ontology` 的 `student-teacher-absence` gate，本包不背墓碑。
-- **`docs/why/loop.md` / `docs/{what,how,proof}/loop.md`**：loop 主题是退化循环检测
+- **`archive/docs/why/loop.md` / `archive/docs/{what,how,proof}/loop.md`**：loop 主题是退化循环检测
   （`degeneration-guard`），全篇 grep `speculat/投机/strength` 零命中——无本包可吸收的
   speculation 内容，弃权。
 - **dry-run / e2e**：`tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 是 Host
   request-budget 的物理证明（K2 恰好两轮、第 3 轮不外发、`StrengthCandidatePrepared=0`），
   归 `verification-system` MECHANISM，本包 PROOF 交叉引用。
 - **GARBAGE 结论**：旧稿 `FrameBundleRef` / `PredictorSnapshotRef` / Journal NDJSON /
-  RuntimePath blob 类型名已被存储收口删除（changes/completed/strength.md §二十二）——只留
+  RuntimePath blob 类型名已被存储收口删除（archive/changes/completed/strength.md §二十二）——只留
   EventStore `payload_refs`；不进入 WHAT。

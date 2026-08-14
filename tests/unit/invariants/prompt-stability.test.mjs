@@ -52,7 +52,7 @@ const assertGateDFrozen = ({ owner, persona, catalog, managerPromptId, reviewerP
 }
 
 test('PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
-  const verify = readFileSync(new URL('../../../docs/proof/verify.md', import.meta.url), 'utf8')
+  const verify = readFileSync(new URL('../../../archive/docs/proof/verify.md', import.meta.url), 'utf8')
   assert.match(verify, /prompt-stability\.test\.mjs/)
   assert.match(verify, /Gate D/)
   assert.match(verify, /system prompt 字节相同/)

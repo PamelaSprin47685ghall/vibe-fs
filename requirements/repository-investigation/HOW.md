@@ -49,7 +49,7 @@ provider envelope：charge = instruction/assignment；repository_search/reposito
 
 ## 历史与弃权
 
-### 被拒方案（详见 `changes/completed/repository-warm-start.md`、`docs/why/agent.md`、`docs/why/casebook.md`）
+### 被拒方案（详见 `archive/changes/completed/repository-warm-start.md`、`archive/docs/why/agent.md`、`archive/docs/why/casebook.md`）
 
 把 Semble 注册成 Host MCP / provider tool / ToolPermission；Strength Replica 工具面加入 Semble；自动从 charge 抽词 / tokenizer / noun picker / LLM generator；cross-call warm-start cache；warm-start 注入 provider-visible `read`（假工具历史）；把 hints 直接写入 Casebook；搜索零命中 → 告知「确认不存在」；猜 `repoPath = "."`；非直接消费者接收 snippets。均记录于 `WHY.md` §历史拒绝方案。
 

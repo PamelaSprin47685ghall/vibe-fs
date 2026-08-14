@@ -27,7 +27,7 @@
 
 **规范陈述**：Observation 从工具执行的 typed 结果捕获（read full/range → `FileRead`，glob → `GlobResult`，grep → `GrepResult`），**从不从 transcript 文本推断**。捕获不完整（如命令无法识别）不阻止归档：original Inspector 成功、Case 照常 Captured、缺失的 observation 只是未来少一次变化检测机会。阅读类命令（`cat`/`head`/`tail`/`sed` 单文件形式）识别为 observation；命令替换、`sh -c`、`bash -c`、无法确定读取目标的复杂 pipeline 安全跳过且不报错。同路径同内容观察经 `ObservationIdentity` 去重并规范化排序，保证同一证据折叠到同一 Case 字节。
 
-**含义/动机**：文本推断在重放时不可靠、不可重放；typed capture 是「同一 observation 可再次验证」的唯一方式（`docs/why/casebook.md` 被拒方案：从 transcript 推断）。
+**含义/动机**：文本推断在重放时不可靠、不可重放；typed capture 是「同一 observation 可再次验证」的唯一方式（`archive/docs/why/casebook.md` 被拒方案：从 transcript 推断）。
 
 **边界**：观察本身如何被工具产生（read/glob/grep 的语义）→ `repository-programming`/`repository-investigation` 交叉；本命题只管「Case 里的 observation 从哪来、如何规范化」。
 
@@ -57,7 +57,7 @@
 
 **规范陈述**：私有 Bookkeeper Agent 提供两个 request contract：`CaseRefresh`（changed evidence → `js-bookkeeper`*（一个 provider transaction 内 0..N 次）→ stability verify → `InspectorCaseRefreshed`）与 `CaseFinalize`（ReuseScope close → freeze draft → exactly one finalize → `InspectorCaseCaptured` → retire/release）。工具唯一：`js-bookkeeper(program)`——一次程序 = 一次原子 staged 变换；`setQuestion`/`setAnswer` 各至多一次；zero mutation 合法；**无 filesystem capability**（不得回 repository 再取证）。旧名 `edit-qa` 非法、无 alias。不新建 LearningCompiler / CaseSynthesizer / StudentReplacement。
 
-**含义/动机**：Bookkeeper 是 maintenance participant，不是第二 Inspector。它只能重塑**已供给证据上**的 staged Case；「回 repository 取证」会把维护变成新的调查，破坏 evidence-supplied 边界（`docs/why/casebook.md`：拒借用 Scout/Investigator 自我模型）。
+**含义/动机**：Bookkeeper 是 maintenance participant，不是第二 Inspector。它只能重塑**已供给证据上**的 staged Case；「回 repository 取证」会把维护变成新的调查，破坏 evidence-supplied 边界（`archive/docs/why/casebook.md`：拒借用 Scout/Investigator 自我模型）。
 
 **边界**：Bookkeeper 的 Persona（Clerk/Curator）、机器身份（`fast-bookkeeper`/`deep-bookkeeper`）、session 形态（InternalLeaf + Attached）→ HOW + `participant-identity`/`session-ontology` 交叉；「无取证权 + 原子 staged 变换」才是本命题。
 
@@ -87,7 +87,7 @@
 
 **规范陈述**：marker absent → Inspector 无 fetch schema（provider 门）+ ToolRegistry execute fetch 也拒绝（execution 门）+ 无 Casebook index + 无 Bookkeeper config requirement + 无 archive / 无 InspectorCase* append——Casebook surface 全关。未启用 Casebook 的 repository 行为保持不变。
 
-**含义/动机**：只隐藏 schema 不够——模型可伪造调用名；只拒绝 execution 不够——provider 会看到不存在的工具。双门独立测试（`docs/how/casebook.md` Feature gating）。opt-in（而非 opt-out）保证未启用仓库与现状逐字节一致。
+**含义/动机**：只隐藏 schema 不够——模型可伪造调用名；只拒绝 execution 不够——provider 会看到不存在的工具。双门独立测试（`archive/docs/how/casebook.md` Feature gating）。opt-in（而非 opt-out）保证未启用仓库与现状逐字节一致。
 
 **边界**：marker 目录名（`.wanxiang/casebook`）与检测机制 → HOW。
 

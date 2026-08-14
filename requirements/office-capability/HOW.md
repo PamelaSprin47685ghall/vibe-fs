@@ -4,7 +4,7 @@
 
 | 面 | 实现 | 说明 |
 |----|------|------|
-| canonical 模型（normative 定义处） | `docs/what/architecture.md` ARCH-017 | 五分法 + 每 office entitled consequence / non-consequence 表；权威在语义层，不在代码单点 |
+| canonical 模型（normative 定义处） | `archive/docs/what/architecture.md` ARCH-017 | 五分法 + 每 office entitled consequence / non-consequence 表；权威在语义层，不在代码单点 |
 | 语义锚点目录 | `scripts/checks/semantic-anchors.mjs` `OFFICE_CAPABILITY_ANCHORS`（5 id）+ `OFFICE_CAPABILITY_NEGATIVES` | Gate F 的 oracle；id 归本包（见 PROOF.md 清单） |
 | Gate F 机制 | `scripts/checks/language-parity-gate.mjs` `scanOfficeCapabilityIntegrity` | 读 `role/manager/{en,zh-CN}.md` + `tool/fork/description/{en,zh-CN}.md`，五个 consequence 同 ID 双语命中；negatives 检查 |
 | 五分法域事实 | `src/Wanxiangshu/Domain/ManagedAgentCatalog.fs` `managerForkableRoles` | `[Coder; Inspector; DevOps; Browser; Inquiry]`——与 ARCH-017 表一致 |
@@ -36,10 +36,10 @@
 
 ## 历史（考古摘要）
 
-- `docs/what/architecture.md` ARCH-017：office capability model 立法，含「单一语义所有权，多处投影」表。
-- `docs/why/architecture.md`「Office 认知」备选与被拒：拒「fork 枚举 calling 名即足够」；真实事故
+- `archive/docs/what/architecture.md` ARCH-017：office capability model 立法，含「单一语义所有权，多处投影」表。
+- `archive/docs/why/architecture.md`「Office 认知」备选与被拒：拒「fork 枚举 calling 名即足够」；真实事故
   （Coder 按 inspect tooltip 把修复交给 Inspector）催生边界镜投影。
-- `docs/what/agent.md` AGENT-009/011…016/023：各 office 的 consequence / non-consequence 明细条款。
-- `docs/what/prompt.md` PROMPT-021：critical semantic redundancy——关键区别出现在每个会改变行动的决策面。
+- `archive/docs/what/agent.md` AGENT-009/011…016/023：各 office 的 consequence / non-consequence 明细条款。
+- `archive/docs/what/prompt.md` PROMPT-021：critical semantic redundancy——关键区别出现在每个会改变行动的决策面。
 - 语义锚点 Gate F 现状：`OFFICE_CAPABILITY_ANCHORS` 5 id 双语文档命中由 `language-parity-gate.test.mjs`
   `gate_f_*` fixture 测试与 `scripts/check.mjs` 的 `language-parity-gate.mjs` 双重守护。

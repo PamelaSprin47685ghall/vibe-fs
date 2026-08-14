@@ -115,7 +115,7 @@ Journal/Fold.fs apply：PERSIST-004 —— 第一个不可能的行即停，不�
 
 ## 恢复 fold 不变量（PERSIST-010）的实现落点
 
-不变量权威定义在 `docs/what/persist.md` PERSIST-010（迁移后由本包 WHAT 015 承接）；
+不变量权威定义在 `archive/docs/what/persist.md` PERSIST-010（迁移后由本包 WHAT 015 承接）；
 逐 fact 校验在 `Journal/Fold.fs` 恢复事实分支 + 各 domain fold（`CompanionFactFold`/
 `ContextFactFold`/`BlogProjection`/`PrefixEpochProjection`/`XTraceProjection` 等）。
 物理 event 形状见 WHAT 002/004；Journal 行经 codec 进入 EventStore。
