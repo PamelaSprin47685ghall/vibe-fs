@@ -79,6 +79,7 @@ HOW                   = 机制/实施记录，无 normative 内容
 
 - **36 份 completed 全部命中**：27 EVIDENCE + 5 GARBAGE-mixed（transcript / 已删领域）+ 3 GARBAGE-pure + 1 HOW。
 - **0 份 changes 升级为 authority**：每份都正确自标「不是当前产品规范」；其确立的 durable WHY 已由 45 包之一拥有，无 ORPHAN。
+- **高参考价值**：completed change 比 `docs/why` 更详细（被拒方案、迁移细节、proof plan、失败模式复盘），是 WHY 考古第一手参考；参考价值是考古价值，不改变「历史证据 ≠ 权威」边界（见 HANDOFF §1.3）。
 - **GARBAGE 沉积确认**：Student/Teacher 删除（3 份）、ChatGPT/review transcript（5 份）、absence ratchet——与 Phase A 的 GARBAGE 清单一致，不进入永久 WHAT。
 - **Active/blocked 不冒充历史**：GrandRewrite 语义已进 docs、fork-attach 增量未实现、fission/Steward 维持 DEFERRED/不立包——与 HANDOFF §10 的三个 WATCH/DEFERRED 项一一对应。
 

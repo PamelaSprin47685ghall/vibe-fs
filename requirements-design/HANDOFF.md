@@ -74,6 +74,8 @@ docs/{why,what,shape,how,proof}
 
 它们**不能因为存在就自动升级为未来永久 requirement**。
 
+`changes/completed/` 往往比 `docs/why` 更详细：保留被拒方案、迁移细节、proof plan、失败模式复盘与完整推导链。当 `docs/why` 只留下结论而缺推理过程时，completed change 是 WHY 考古的第一手参考，参考价值高——但这不改变「历史证据 ≠ 规范权威」的边界：参考价值是考古价值，不是 authority。
+
 尤其注意：
 
 ```text
