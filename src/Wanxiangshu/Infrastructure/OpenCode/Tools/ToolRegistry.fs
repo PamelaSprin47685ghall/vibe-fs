@@ -7,11 +7,11 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
 open Wanxiangshu.Review
 open Wanxiangshu.Session
 

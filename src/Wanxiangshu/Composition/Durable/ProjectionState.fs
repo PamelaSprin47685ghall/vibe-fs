@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Kernel
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Persistence.Journal
 
 /// Rebuilt journal state: durable domain projections plus runtime frontier.
 type ProjectionSet =

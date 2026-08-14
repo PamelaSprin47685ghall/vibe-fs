@@ -1,12 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 
 /// Reviewer-side reads of the durable review guard.
 ///

@@ -1,18 +1,18 @@
 namespace Wanxiangshu.Composition.Turn
 
 open System.Collections.Generic
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Host
 open System.Threading.Tasks
-open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Domain
+open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
 open Wanxiangshu.Session
+open Wanxiangshu.Host
 
 /// Ordinary (non-role-specialized) turn outcome routing: observation / outcome
 /// match that drives repair, recovery, abort, and completed join-guard paths.

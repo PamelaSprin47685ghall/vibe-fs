@@ -1,5 +1,77 @@
 {
-  "Domain/LoopDetector.fs": {
-    "mutable-record-field": 1
+  "Composition/Durable/Fold.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Durable/Projection.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/Observation.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/OrdinaryTurnWorkflow.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/ReconcilePass.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/Scheduler.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/Supervisor.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/TurnReconcile.fs": {
+    "infrastructure-leak": 1
+  },
+  "Composition/Turn/Workflow.fs": {
+    "infrastructure-leak": 1
+  },
+  "Context/Companion/Blogger/BloggerCrashRecovery.fs": {
+    "infrastructure-leak": 1
+  },
+  "Context/Companion/CompanionTransform.fs": {
+    "infrastructure-leak": 1
+  },
+  "Context/Prefix/XWire.fs": {
+    "infrastructure-leak": 1
+  },
+  "Context/Trace/Capture.fs": {
+    "infrastructure-leak": 1
+  },
+  "Context/Trace/TerminalReporter.fs": {
+    "infrastructure-leak": 1
+  },
+  "Execution/Delegation/ChildRecoveryWorkflow.fs": {
+    "infrastructure-leak": 1
+  },
+  "Execution/Session/SessionRecoveryWorkflow.fs": {
+    "infrastructure-leak": 1
+  },
+  "Feedback/Enforcer/BloggerRecoveryProbe.fs": {
+    "infrastructure-leak": 1
+  },
+  "Interaction/Dispatch/Recovery.fs": {
+    "infrastructure-leak": 1
+  },
+  "Interaction/Repair/CompletedTurn.fs": {
+    "infrastructure-leak": 1
+  },
+  "Interaction/Repair/InteractionRepair.fs": {
+    "infrastructure-leak": 1
+  },
+  "Mission/Obligation/Todo/MagicTodoLocality.fs": {
+    "infrastructure-leak": 1
+  },
+  "Mission/Obligation/Todo/MagicTodoMembrane.fs": {
+    "infrastructure-leak": 1
+  },
+  "Mission/Review/Assurance/Seal.fs": {
+    "infrastructure-leak": 1
+  },
+  "OpenCode/Contract/GuidelineProjection.fs": {
+    "infrastructure-leak": 1
+  },
+  "OpenCode/Contract/HostFactFold.fs": {
+    "infrastructure-leak": 1
   }
 }

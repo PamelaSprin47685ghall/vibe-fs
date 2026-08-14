@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Orchestrator
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
 ///

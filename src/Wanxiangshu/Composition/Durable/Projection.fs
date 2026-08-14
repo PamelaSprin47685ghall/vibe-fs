@@ -1,20 +1,19 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Change.Orchestration
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Domain
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Feedback.Enforcer
 open Wanxiangshu.Feedback.Enforcer.Guidance
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review.Barrier

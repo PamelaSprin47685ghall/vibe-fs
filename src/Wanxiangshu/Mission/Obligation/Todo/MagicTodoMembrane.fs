@@ -1,24 +1,24 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Domain
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoAdmission
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Domain.MagicTodoSurface
 open Wanxiangshu.Host
+open Wanxiangshu.Resources
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Manager
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
 open Wanxiangshu.Review
-open Wanxiangshu.Session
 
 /// Durable half of the GrandRewrite Magic Todo membrane.
 ///

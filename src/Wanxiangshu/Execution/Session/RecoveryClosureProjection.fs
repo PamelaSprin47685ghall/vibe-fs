@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Execution.Session
 
 open System
-open Wanxiangshu.Change.Orchestration
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain.SessionRecovery
-open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Change.Orchestration
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
 
 /// Pure RecoveryClosure discovery from durable projections (RECOVERY-FAMILY-001).
 /// Child-first order: dependents before ancestors; siblings by SessionId.

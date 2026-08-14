@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Interaction.Repair
 
 open System
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.OpenCode
 
 /// Pure classification of a fully-loaded assistant message.
 /// Empty formal text or formal text that contains XML markup (including broken

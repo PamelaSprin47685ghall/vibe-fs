@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Session
 
 open System
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Host
@@ -10,6 +8,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 
 /// EXEC-009 + EXEC-018 + clean-break: pure durable join drain.
 ///

@@ -1,25 +1,25 @@
 namespace Wanxiangshu.Context.Prefix
 
 open System
+open System.Threading.Tasks
+open Wanxiangshu.Domain
+open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Host
+open Wanxiangshu.Resources
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Domain
-open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Host
-open System.Threading.Tasks
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery
-open Wanxiangshu.Resources
 open Wanxiangshu.Session
 
 module XWire =

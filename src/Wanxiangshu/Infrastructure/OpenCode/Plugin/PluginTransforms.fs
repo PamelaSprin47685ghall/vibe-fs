@@ -5,26 +5,26 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Domain
+open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Host
+open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Domain
-open Wanxiangshu.Domain.ProviderProjection
-open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Feedback.Enforcer
-open Wanxiangshu.Host
-open Wanxiangshu.Infrastructure
-open PluginHostInterop
-open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery
 open Wanxiangshu.Resources
 open Wanxiangshu.Session
+open PluginHostInterop
 
 module PluginTransforms =
 

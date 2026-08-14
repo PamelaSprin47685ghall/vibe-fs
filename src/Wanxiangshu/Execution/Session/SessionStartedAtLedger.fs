@@ -1,11 +1,11 @@
 namespace Wanxiangshu.Execution.Session
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module SessionStartedAtLedger =

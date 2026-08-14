@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Context.Companion.Blogger
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).
 /// Kind reuses BlogFrameKind — the frame-vs-cycle distinction is the same

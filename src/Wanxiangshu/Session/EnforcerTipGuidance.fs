@@ -1,15 +1,15 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Feedback.Enforcer
-open Wanxiangshu.Feedback.Enforcer.Guidance
-open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Session
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Feedback.Enforcer.Guidance
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

@@ -1,10 +1,14 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Change.Orchestration
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Domain
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
@@ -14,10 +18,6 @@ open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode.Contract
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 
 /// Pure envelope dispatch. Each bounded projection owns its own fold algorithm;
 /// this module only routes facts and decides which refusals are fatal.

@@ -1,13 +1,13 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
 
 open System
+open System.Threading.Tasks
+open Wanxiangshu.Kernel
+open Wanxiangshu.Domain
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
-open System.Threading.Tasks
-open Wanxiangshu.Domain
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Kernel.Identity
 
 /// Durable localization for one V1 Host tool callback.
 ///

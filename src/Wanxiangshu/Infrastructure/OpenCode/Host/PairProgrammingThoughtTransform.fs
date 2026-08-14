@@ -1,9 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.OpenCode.Contract
-open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
@@ -11,6 +8,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Session
 open Wanxiangshu.Host
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.OpenCode.Contract
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

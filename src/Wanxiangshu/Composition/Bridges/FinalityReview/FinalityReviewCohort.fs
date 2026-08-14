@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Composition.Bridges.FinalityReview
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.Manager.Life
 
 /// GLORY-043/044/045: the pure cohort algebra of one FinalityRequest.

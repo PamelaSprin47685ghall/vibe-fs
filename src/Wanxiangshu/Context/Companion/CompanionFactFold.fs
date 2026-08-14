@@ -1,13 +1,14 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal.ProjectionUpdate
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
 
 module CompanionFactFold =
 

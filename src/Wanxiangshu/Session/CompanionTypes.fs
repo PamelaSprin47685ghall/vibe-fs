@@ -1,13 +1,13 @@
 namespace Wanxiangshu.Session
 
 open System
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Trace
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
 
 type BlogText = string
 

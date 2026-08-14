@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Composition.Durable
 
 module FissionFactFold =
 

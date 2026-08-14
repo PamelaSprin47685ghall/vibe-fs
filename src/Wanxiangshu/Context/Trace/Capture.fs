@@ -1,20 +1,20 @@
 namespace Wanxiangshu.Context.Trace
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
-open System.Threading.Tasks
 open Wanxiangshu.Host
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Kernel
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// COMPANION-003 / HOST-005 / COMPANION-012: the single semantic capture path.

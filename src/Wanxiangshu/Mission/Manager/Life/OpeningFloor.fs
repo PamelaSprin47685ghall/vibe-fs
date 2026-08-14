@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Mission.Manager.Life
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Mission.Obligation.Todo
 
 /// TODO-001 / GLORY-074 / COMPANION-014: production Opening floor owner.

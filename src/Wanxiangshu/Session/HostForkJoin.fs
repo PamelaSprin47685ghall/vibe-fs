@@ -1,10 +1,6 @@
 namespace Wanxiangshu.Session
 
 open System
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -17,6 +13,10 @@ open Wanxiangshu.Process
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session.AgentRoleIdentity
 
 /// Wave 3 (Proposal ch. 12): HostForkRuntime keeps the state/resource spine;

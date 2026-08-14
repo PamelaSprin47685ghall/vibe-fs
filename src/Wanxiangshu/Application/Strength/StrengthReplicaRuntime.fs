@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System
-open Wanxiangshu.Composition.Turn
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -13,6 +12,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
+open Wanxiangshu.Composition.Turn
 
 
 [<RequireQualifiedAccess>]

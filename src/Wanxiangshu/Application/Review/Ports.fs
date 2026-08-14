@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Review
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain.MagicTodo
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel.Identity
 
 /// Review-facing tree capability. Infrastructure owns the physical Git adapter;

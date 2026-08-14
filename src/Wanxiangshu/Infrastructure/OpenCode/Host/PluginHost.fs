@@ -5,10 +5,10 @@ open System.Threading.Tasks
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Review
 open Wanxiangshu.Session

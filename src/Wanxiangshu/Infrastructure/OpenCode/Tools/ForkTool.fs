@@ -1,17 +1,17 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Change.Orchestration
 open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
+open Wanxiangshu.Change.Orchestration
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Session
 
 /// Manager fork / Orchestrator commission. Each public tool has its own typed

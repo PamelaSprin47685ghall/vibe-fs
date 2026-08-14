@@ -1,22 +1,22 @@
 namespace Wanxiangshu.Context.Companion
 
 open System
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Kernel
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
-open HostMessageProjection
 open Wanxiangshu.Tools
+open Wanxiangshu.Domain
+open HostMessageProjection
 
 module CompanionTransform =
 

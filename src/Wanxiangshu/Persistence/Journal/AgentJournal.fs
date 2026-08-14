@@ -1,18 +1,18 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Domain.MagicTodoFacts
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Kernel
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
+open Wanxiangshu.Domain.MagicTodoFacts
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Feedback.Enforcer
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger
 
 /// Observation view over Journal Blog + Enforcement substrate.
 ///

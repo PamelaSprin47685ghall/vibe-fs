@@ -1,8 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
@@ -13,6 +11,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Review
 open Wanxiangshu.Session
 

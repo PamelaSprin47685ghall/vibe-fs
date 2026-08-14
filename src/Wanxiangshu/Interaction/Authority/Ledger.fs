@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Interaction.Authority
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Fission
 
 /// Prompt Authority folds (docs/what/prompt.md).
 ///

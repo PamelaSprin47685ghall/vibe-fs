@@ -1,12 +1,13 @@
 namespace Wanxiangshu.Mission.Review
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal.ProjectionUpdate
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Mission.Review.Barrier
 
 module ReviewFactFold =
 

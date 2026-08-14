@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Composition.Turn
 
 open System
-open Wanxiangshu.Composition.Durable
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
@@ -10,8 +9,9 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.OpenCode
 
 /// Direct-CE reconcile scheduler (FLOW-001 / PR4).
 /// Owns queue / generation / single-flight / clear-session runtime state.

@@ -1,16 +1,16 @@
 namespace Wanxiangshu.Mission.Review.Assurance
 
 open System.Collections.Generic
-open Wanxiangshu.Composition.Durable
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open System.Threading.Tasks
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 

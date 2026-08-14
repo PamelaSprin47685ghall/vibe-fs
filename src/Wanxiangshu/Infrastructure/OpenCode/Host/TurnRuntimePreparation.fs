@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Turn
 
 /// Physical runtime cleanup before Application turn observation (rabbit §19).
 /// Prompt authority belongs to Application/Prompting/ChildPromptAuthority.

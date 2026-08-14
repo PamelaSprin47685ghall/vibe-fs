@@ -1,9 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Turn
 
 /// STRENGTH-007/008: pure lifecycle decisions around durable Strength facts.
 /// Persistence and Host message codecs are ports supplied by the composition root.

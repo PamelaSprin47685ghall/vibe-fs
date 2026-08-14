@@ -1,18 +1,18 @@
 namespace Wanxiangshu.Review
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Finality
 open Wanxiangshu.Host
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

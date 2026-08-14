@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Composition.Turn
 
 open System.Collections.Generic
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Session
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel

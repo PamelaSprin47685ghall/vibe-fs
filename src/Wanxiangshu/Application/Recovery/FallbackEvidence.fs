@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Recovery
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Kernel.Identity
 

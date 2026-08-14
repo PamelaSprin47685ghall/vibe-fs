@@ -5,8 +5,8 @@ open Fable.Core
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
+open Wanxiangshu.OpenCode
 
 /// Single reconcile pass: snapshot → evidence → reread/publish until causal decision.
 /// Owns no queue / generation / single-flight state — Scheduler supplies those ports.

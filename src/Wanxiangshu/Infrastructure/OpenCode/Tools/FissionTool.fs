@@ -2,18 +2,18 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open ToolHostCodec
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
 open Wanxiangshu.Session
+open ToolHostCodec
 
 /// Same-participant physical replacement. Fission never calls the Host session
 /// fork endpoint: it creates fresh sibling sessions, starts them from the

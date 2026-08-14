@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System
-open Wanxiangshu.Composition.Durable
 open System.Text
 open System.Threading.Tasks
 open Wanxiangshu.Domain
@@ -11,6 +10,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Outcome
+open Wanxiangshu.Composition.Durable
 
 /// Local payload writer for EventStore journals.
 /// `BlobRef` keeps the long-standing `blobs/<handle>` application shape, while

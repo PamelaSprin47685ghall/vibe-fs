@@ -1,15 +1,15 @@
 namespace Wanxiangshu.Interaction.Repair
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Resources
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
 /// Idle-derived interaction repair (missing-final-report / incomplete interaction).

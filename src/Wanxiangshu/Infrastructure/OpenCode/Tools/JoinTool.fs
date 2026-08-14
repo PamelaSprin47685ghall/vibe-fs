@@ -3,9 +3,16 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
+open Wanxiangshu.Session
 
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure.Resources

@@ -1,17 +1,17 @@
 namespace Wanxiangshu.Context.Companion.Blogger
 
 open System.Threading.Tasks
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Domain
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel
+open Wanxiangshu.Domain
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Session
 
 /// C5 item 20: crash windows for the Blogger vertical slice only.

@@ -1,11 +1,11 @@
 namespace Wanxiangshu.Finality
 
 open System.Threading.Tasks
+open Wanxiangshu.Domain
+open Wanxiangshu.Resources
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Domain
-open Wanxiangshu.Resources
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 

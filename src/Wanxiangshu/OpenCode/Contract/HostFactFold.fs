@@ -1,13 +1,14 @@
 namespace Wanxiangshu.OpenCode.Contract
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Domain
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Feedback.Enforcer.Guidance
-open Wanxiangshu.Journal.ProjectionUpdate
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.ProjectionUpdate
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Feedback.Enforcer.Guidance
 
 module HostFactFold =
 

@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System
-open Wanxiangshu.Composition.Durable
 open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Composition.Durable
 
 /// Host-facing EventStore journal boot port.
 ///

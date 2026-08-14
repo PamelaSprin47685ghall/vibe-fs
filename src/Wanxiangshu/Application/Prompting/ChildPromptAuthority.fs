@@ -1,10 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
+open Wanxiangshu.Host
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Host
 open Wanxiangshu.Kernel.Identity
 
 /// Application ownership of linked-child prompt authority (rabbit §19).
