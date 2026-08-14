@@ -49,7 +49,10 @@ export const ANCHOR = '### 禁止退化清单';
 export const SSOT_ORIGIN = 'archive/docs/proof/verify.md';
 
 /** Resolved from this module, not from `cwd`: two trees import it. */
-const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', SSOT_ORIGIN);
+// e2e/support is now requirements/verification-system/tests/e2e/support, five
+// levels below the repo root where archive/ lives (support -> e2e -> tests ->
+// verification-system -> requirements -> root).
+const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', SSOT_ORIGIN);
 
 /**
  * Clause text → stable id.

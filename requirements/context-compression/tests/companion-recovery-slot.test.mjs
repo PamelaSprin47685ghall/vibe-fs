@@ -8,7 +8,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sessionId } from '../support/domain.mjs'
+import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const Companion = await import('../../../dist/Session/Companion.js')
 

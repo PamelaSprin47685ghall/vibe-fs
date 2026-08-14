@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { toolHostCodec } from '../support/domain.mjs'
+import { toolHostCodec } from '../../verification-system/tests/support/domain.mjs'
 
 test('HOST_011_call_id_and_message_id_present_decode_to_some', () => {
   const ctx = toolHostCodec.decodeContext({

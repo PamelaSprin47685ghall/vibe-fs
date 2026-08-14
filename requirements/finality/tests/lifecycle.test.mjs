@@ -1,7 +1,10 @@
-// tests/unit/glory/lifecycle.test.mjs — GLORY-010/011/012/014/021/052/064.
+// Split from tests/unit/glory/lifecycle.test.mjs (cutover Wave 2a); owner: finality.
 //
-// Layer-1 pure tests: the ManagerLifecycle fact algebra, its fold, the frozen
-// narrative texts, and the golden byte fixtures (proof/glory.md).
+// GLORY-010/011/012/014/045/052/055/057/060/062/064/066/076 + SURFACE golden
+// byte fixtures (proof/glory.md). Layer-1 pure tests: the ManagerLifecycle
+// fact algebra, its fold, the frozen narrative texts, and the golden bytes.
+// GLORY_074 (T1 revelation) and GLORY_021 (WorkActivated inert decode) moved to
+// requirements/obligation-ledger/tests/lifecycle-opening.test.mjs.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -15,7 +18,6 @@ import {
   fold,
   gitTreeHash,
   idValue,
-  journal,
   listItems,
   managerLifecycleFact,
   managerLifeId,
@@ -28,7 +30,7 @@ import {
   sessionId,
   stream,
   toolCallId,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const SESSION = sessionId('ses_a')
 const LIFE = managerLifeId('life-1')
@@ -131,18 +133,6 @@ test('GLORY_010_LifeOpened_opens_the_first_life', () => {
   assert.ok(current.ProtectedPrefixEnd == null)
   assert.equal(current.Completed, false)
   assert.ok(current.ActiveFinality == null)
-})
-
-test('GLORY_021_WorkActivated_fixes_the_protected_prefix_end_once', () => {
-  const once = fold.apply(fold.empty, [lifecycleEnv(lifeOpened()), lifecycleEnv(workActivated())])
-  assert.equal(once.ok, true, JSON.stringify(once.error))
-  const end = life(once.value).CurrentLife.ProtectedPrefixEnd
-  assert.equal(Number(end.Sequence), 42)
-
-  // Replay of the same activation is idempotent (PERSIST-010).
-  const replay = fold.apply(once.value, [lifecycleEnv(workActivated())])
-  assert.equal(replay.ok, true, JSON.stringify(replay.error))
-  assert.equal(Number(life(replay.value).CurrentLife.ProtectedPrefixEnd.Sequence), 42)
 })
 
 test('GLORY_012_a_second_life_cannot_open_while_one_is_active', () => {
@@ -364,7 +354,7 @@ test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
 // ── golden byte fixtures (proof/glory.md) ────────────────────────────────────
 
 test('GLORY_014_first_birth_golden_bytes', async () => {
-  const { managerNarrative } = await import('../support/glory.mjs')
+  const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
   const birth = managerNarrative.firstBirth('Fix the retry race.')
   assert.equal(birth.parts.length, 2)
   assert.equal(birth.parts[0].text, 'Fix the retry race.')
@@ -378,7 +368,7 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
 })
 
 test('GLORY_064_reawakening_golden_bytes', async () => {
-  const { managerNarrative } = await import('../support/glory.mjs')
+  const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
   const reawakening = managerNarrative.reawakening('Add Windows support.')
   assert.equal(reawakening.parts.length, 3)
   assert.equal(reawakening.parts[0].synthetic, true)
@@ -390,16 +380,8 @@ test('GLORY_064_reawakening_golden_bytes', async () => {
   assert.ok(reawakening.parts[2].text.includes('# The Planning Table'))
 })
 
-test('GLORY_074_t1_revelation_hook', async () => {
-  const { managerNarrative } = await import('../support/glory.mjs')
-  const wrapped = managerNarrative.wrapT1AcceptedResult('checkpoint body')
-  assert.ok(wrapped.startsWith('# The account has been accepted.'))
-  assert.ok(wrapped.includes('The Manager who will carry it is you.'))
-  assert.ok(wrapped.includes('checkpoint body'))
-})
-
 test('GLORY_019_activation_golden_bytes', async () => {
-  const { managerLifecyclePrompt } = await import('../support/glory.mjs')
+  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.workActivation(),
     '# Now complete it yourself.\n# Carry out the work you described until the final goal is fully achieved.\n#\n# Planning is not completion.\n# Delegation is not completion.\n# A child finishing is not completion.\n# A successful command is not completion while meaningful uncertainty remains.\n# An explanation of the work is not the work itself.\n# A partial implementation is not completion merely because the remaining work is difficult.\n# As long as any useful action remains, continue.\n',
@@ -407,13 +389,13 @@ test('GLORY_019_activation_golden_bytes', async () => {
 })
 
 test('GLORY_029_idle_encouragement_golden_bytes', async () => {
-  const { managerLifecyclePrompt } = await import('../support/glory.mjs')
+  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
   assert.ok(managerLifecyclePrompt.idleEncouragementPostT1().includes('# You have done useful work'))
 })
 
 test('GLORY_057_host_undecidable_golden_bytes', async () => {
-  const { managerLifecyclePrompt } = await import('../support/glory.mjs')
+  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.finalityUndecidable(),
     '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n',
@@ -421,7 +403,7 @@ test('GLORY_057_host_undecidable_golden_bytes', async () => {
 })
 
 test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', async () => {
-  const { finalityPrompt } = await import('../support/glory.mjs')
+  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const record = 'Chronicle\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
@@ -431,7 +413,7 @@ test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', as
 })
 
 test('GLORY_076_finality_three_experiences', async () => {
-  const { finalityPrompt } = await import('../support/glory.mjs')
+  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const rejected = finalityPrompt.rejected('')
   assert.ok(rejected.includes('# Your ending has not accepted you.'))
   const blessed = finalityPrompt.blessed('')
@@ -442,7 +424,7 @@ test('GLORY_076_finality_three_experiences', async () => {
 })
 
 test('GLORY_075_manager_system_prompt_stable_role_law', async () => {
-  const { managerSystemPrompt } = await import('../support/glory.mjs')
+  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   assert.equal(prompt.includes('carrying one task'), false)
   assert.equal(prompt.includes('Born with a Task'), false)
@@ -451,7 +433,7 @@ test('GLORY_075_manager_system_prompt_stable_role_law', async () => {
 })
 
 test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
-  const { managerSystemPrompt } = await import('../support/glory.mjs')
+  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const forbidden = [/\breview\b/i, /\breviewer\b/i, /\bverdict\b/i, /\bPERFECT\b/, /\bREVISE\b/, /\bbarrier\b/i, /\bwitness\b/i, /\bconfirmation\b/i]
   for (const re of forbidden) {
     assert.equal(re.test(managerSystemPrompt()), false, `manager prompt must not contain ${re}`)
@@ -459,7 +441,7 @@ test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
 })
 
 test('SURFACE_006_manager_role_law_does_not_name_foreign_tools', async () => {
-  const { managerSystemPrompt } = await import('../support/glory.mjs')
+  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   for (const tool of [
     'read', 'write', 'edit', 'glob', 'grep', 'bash', 'bash-honeypot',
@@ -477,7 +459,7 @@ test('SURFACE_006_manager_role_law_does_not_name_foreign_tools', async () => {
 // ── SURFACE-002: LF-only line endings ────────────────────────────────────────
 
 test('SURFACE_002_frozen_texts_use_lf_only', async () => {
-  const { managerNarrative, managerLifecyclePrompt, finalityPrompt } = await import('../support/glory.mjs')
+  const { managerNarrative, managerLifecyclePrompt, finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   for (const text of [
     managerNarrative.firstBirthText('X'),
     managerNarrative.reawakeningText('X'),
@@ -490,7 +472,3 @@ test('SURFACE_002_frozen_texts_use_lf_only', async () => {
     assert.equal(text.includes('\r'), false, 'frozen text must not contain CR')
   }
 })
-
-// helper re-export for shape assertions above
-const _unused = () => [caseOf, payloadOf, journal].length
-void _unused

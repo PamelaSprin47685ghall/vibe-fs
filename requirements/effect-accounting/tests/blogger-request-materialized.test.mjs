@@ -17,7 +17,7 @@ import {
   sessionId,
   stream,
   toList,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const session = sessionId('ses-main')
 const blogger = sessionId('ses-blogger')

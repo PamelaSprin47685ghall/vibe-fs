@@ -34,7 +34,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { withPlugin, withPluginClient } from './plugin-fixture.mjs'
+import { withPlugin, withPluginClient } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
 const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)

@@ -25,7 +25,7 @@ import {
   payloadOf,
   sessionId,
   stream,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
 const RuntimePath = await import('../../../dist/Journal/RuntimePath.js')

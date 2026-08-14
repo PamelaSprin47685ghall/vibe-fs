@@ -8,8 +8,8 @@ import {
   eventCeilingSetupProblems,
   isCountedSseEvent,
   normalizeEventCeilings,
-} from '../../../tests/e2e/support/event-ceiling.js';
-import { compileScenario } from '../../../tests/e2e/support/scenario-schema.js';
+} from './e2e/support/event-ceiling.js';
+import { compileScenario } from './e2e/support/scenario-schema.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -82,8 +82,8 @@ test('attachEventCeilings breaches maxSseEvents without counting heartbeats', ()
 });
 
 test('long-stroke.toml declares theoretical exact event ceilings', () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-  const source = readFileSync(path.join(root, 'tests/e2e/scenarios/long-stroke.toml'), 'utf8');
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
   assert.equal(result.scenario.setup.maxJournalEvents, 636);

@@ -1,14 +1,14 @@
-// tests/unit/glory/rewrite-consistency.test.mjs — GLORY-015/013 seal contract.
+// Moved from tests/unit/glory/rewrite-consistency.test.mjs (cutover Wave 2a); owner: finality.
 //
-// The Birth rewrite is a request-level view transform: the Host persists the
-// raw conversation, so EVERY provider request must re-apply the narrative to
-// the Life's Opening message with byte-identical results — otherwise the next
-// request breaks the ARCH-004 seal (measured in e2e as
-// `SEAL-DIFF msg[1] user != user` on the Activation request).
+// GLORY-015/013 seal contract. The Birth rewrite is a request-level view
+// transform: the Host persists the raw conversation, so EVERY provider request
+// must re-apply the narrative to the Life's Opening message with byte-identical
+// results — otherwise the next request breaks the ARCH-004 seal (measured in
+// e2e as `SEAL-DIFF msg[1] user != user` on the Activation request).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { acceptAuthorityRoot, withExecutablePlugin } from '../plugin/plugin-fixture.mjs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'ses_glory_rewrite'
 

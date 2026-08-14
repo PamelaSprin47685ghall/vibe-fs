@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { joinResultRenderer, nonEmptyBatch, agentCompletion } from '../support/domain.mjs'
+import { joinResultRenderer, nonEmptyBatch, agentCompletion } from '../../verification-system/tests/support/domain.mjs'
 
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]|work_record\s*=/
 

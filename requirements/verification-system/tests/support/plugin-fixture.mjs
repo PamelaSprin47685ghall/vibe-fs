@@ -14,7 +14,7 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 }
 
-const { initSpikePlugin } = await import('../../../dist/Infrastructure/OpenCode/Plugin/SpikePlugin.js')
+const { initSpikePlugin } = await import('../../../../dist/Infrastructure/OpenCode/Plugin/SpikePlugin.js')
 
 // ── the layer-3 executable fixture (EXEC-002, AGENT-007 layer two) ───────────
 //
@@ -33,37 +33,37 @@ const { initSpikePlugin } = await import('../../../dist/Infrastructure/OpenCode/
 // HostEventPort `initSpikePlugin` wired. No production export or visibility was
 // widened for this (VERIFY-008); the same-import precedent is this file's own
 // `initSpikePlugin` line.
-const { forWorkspace, gitCommonDir } = await import('../../../dist/Journal/RuntimePath.js')
-const { acquire: acquireJournal, release: releaseJournal } = await import('../../../dist/Journal/SharedAgentJournal.js')
-const { acquire: acquireTerminalBus } = await import('../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
-const { bootPort } = await import('../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
+const { forWorkspace, gitCommonDir } = await import('../../../../dist/Journal/RuntimePath.js')
+const { acquire: acquireJournal, release: releaseJournal } = await import('../../../../dist/Journal/SharedAgentJournal.js')
+const { acquire: acquireTerminalBus } = await import('../../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
+const { bootPort } = await import('../../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
 const { AgentJournalModule_runtimeId, AgentJournalModule_createFromProjection } = await import(
-  '../../../dist/Journal/AgentJournal.js'
+  '../../../../dist/Journal/AgentJournal.js'
 )
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
-  '../../../dist/Application/Prompting/PromptDispatcher.js'
+  '../../../../dist/Application/Prompting/PromptDispatcher.js'
 )
 const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create, ManagerLifeIdModule_create, BlobDigestModule_create, BlobRefModule_create, ToolCallIdModule_create } = await import(
-  '../../../dist/Kernel/Identity.js'
+  '../../../../dist/Kernel/Identity.js'
 )
-const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
-const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
+const { TerminalOutcome } = await import('../../../../dist/Infrastructure/OpenCode/Host/Events.js')
+const { AgentRunResult } = await import('../../../../dist/Kernel/Outcome.js')
 const {
   HandleController_recordCompletion: recordCompletion,
   HandleController_agentHandle: agentHandle,
-} = await import('../../../dist/Session/HandleController.js')
-const ChildRecovery = await import('../../../dist/Domain/ChildRecovery.js')
-const { ManagerLifecycleFact } = await import('../../../dist/Kernel/Fact.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
+} = await import('../../../../dist/Session/HandleController.js')
+const ChildRecovery = await import('../../../../dist/Domain/ChildRecovery.js')
+const { ManagerLifecycleFact } = await import('../../../../dist/Kernel/Fact.js')
+const { StreamId } = await import('../../../../dist/Journal/Envelope.js')
 const {
   MagicTodoFact,
   PhysicalSuccessEvidence,
   TodoWriteAccepted,
   TodoWritePrepared,
-} = await import('../../../dist/Domain/MagicTodoFacts.js')
-const { TodoWriteIdModule_create } = await import('../../../dist/Domain/MagicTodo.js')
-const { XTraceCursor } = await import('../../../dist/Domain/XTrace.js')
-const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../dist/Journal/AgentJournal.js')
+} = await import('../../../../dist/Domain/MagicTodoFacts.js')
+const { TodoWriteIdModule_create } = await import('../../../../dist/Domain/MagicTodo.js')
+const { XTraceCursor } = await import('../../../../dist/Domain/XTrace.js')
+const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../../dist/Journal/AgentJournal.js')
 const terminalEvidenceCompleted =
   ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed
 const terminalEvidenceFailed =

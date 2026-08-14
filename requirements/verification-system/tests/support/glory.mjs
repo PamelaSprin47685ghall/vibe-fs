@@ -8,7 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const root = path.join(here, '..', '..', '..')
+// requirements/verification-system/tests/support → repo root (4 levels up).
+const root = path.join(here, '..', '..', '..', '..')
 const dist = (rel) => pathToFileURL(path.join(root, 'dist', rel)).href
 
 const load = async (rel, names) => {
