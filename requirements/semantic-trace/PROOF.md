@@ -49,7 +49,7 @@ node --test requirements/semantic-trace/tests/x-trace-provider-run-provenance.te
 | `tests/unit/strength/invisibility.test.mjs` | Candidate 不可见性（未入历史） | SPLIT@cutover：同上 |
 | `tests/unit/context/fold-context-recovery.test.mjs` | `PERSIST_010_entry_and_squash_fold_into_the_blog_projection`、`HOST_006_reanchor_*`（fold 语义 = durable-events） | SPLIT@cutover：fold 部分归 durable-events；reanchor 的 XTrace 存活半边由本包 NEW 测试承担 |
 | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`、`tests/unit/enforcer/blogger-crash-recovery.test.mjs` | Blogger delta 从 XTrace 消费的收敛（capture 侧同源） | SPLIT@cutover：enforcer/behavior-diagnosis 保留协议面；本包引用同源事实 |
-| `tests/unit/context/x-trace-locality.test.mjs` 的 `TODO-008 ManagerCheckpointLWR range` 锚点 | work-record 交叉 | 已在包内文件保留（该文件本包 MOVE） |
+| `tests/x-trace-locality.test.mjs`（本包）的 `TODO-008 ManagerCheckpointLWR range` 锚点 | work-record 交叉 | 已在包内文件保留（该文件本包 MOVE） |
 
 ## 5. semantic anchor id
 
