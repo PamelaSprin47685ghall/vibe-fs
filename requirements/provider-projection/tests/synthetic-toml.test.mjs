@@ -20,7 +20,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { syntheticToml as toml } from '../support/domain.mjs'
+import { syntheticToml as toml } from '../../../tests/unit/support/domain.mjs'
 
 /** Parse a rendered value back with a real parser. The oracle, not a reimplementation. */
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x
@@ -404,4 +404,13 @@ test('ARCH_010_value_tree_scalars_and_keys', () => {
   assert.equal(toml.renderKey('/egg/i'), '"/egg/i"')
   assert.equal(toml.tableEntry('data', ['truncated = false']).startsWith('[data]'), true)
   assert.equal(toml.tableEntry('data', ['truncated = false']).includes('[['), false)
+})
+test('ARCH_011_renderer_exposes_no_parser', () => {
+  // ARCH-010 明文「There is deliberately no parser」：业务不得反解析 synthetic TOML 回
+  // 控制流（corrective.md §8「从结果 TOML 反向解析控制流」被拒）。support 包装面是
+  // renderer 的完整 public 面——若出现 parse/decode/read，本命题立刻红。
+  const surface = new Set(Object.keys(toml))
+  for (const forbidden of ['parse', 'decode', 'read']) {
+    assert.equal(surface.has(forbidden), false, `SyntheticToml must not expose ${forbidden}`)
+  }
 })
