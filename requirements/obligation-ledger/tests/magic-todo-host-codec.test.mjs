@@ -3,7 +3,7 @@ import test from 'node:test'
 import {
   listItems,
   magicTodoHost,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 test('TODO-002 decodes the clean-break obligations wire', () => {
   const decoded = magicTodoHost.decodeObligations({

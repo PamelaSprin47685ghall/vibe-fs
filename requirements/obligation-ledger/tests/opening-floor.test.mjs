@@ -9,7 +9,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { lifecycleWorkRecord, magicTodo, xTrace } from '../support/domain.mjs'
+import { lifecycleWorkRecord, magicTodo, xTrace } from '../../../tests/unit/support/domain.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 

@@ -9,7 +9,7 @@ import {
   okResult,
   toList,
   toolCallId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const sha256 = (value) => `digest:${value}`
 const ok = (result) => {

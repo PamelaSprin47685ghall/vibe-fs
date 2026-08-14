@@ -17,7 +17,7 @@ import {
   stream,
   toList,
   toolCallId,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const FactCodec = await import('../../../dist/Journal/FactCodec.js')
 
