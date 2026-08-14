@@ -142,7 +142,7 @@ test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message'
 test('DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
-    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2026-01-01T00:00:00Z' })
+    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2020-01-01T00:00:00Z' })
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
       const runtime = promptDispatcher.forJournal(first.journal)
