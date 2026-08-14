@@ -246,8 +246,8 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     assert.equal(bookkeeper.programCalls.length >= 1, true, 'js-bookkeeper invoked')
 
     const common = gitCommonDir(dir)
-    const [raw, store] = acquire(common)
-    const published = resultOf(await fetchCase(store, raw, 10, delegateId))
+    const store = acquire(common)
+    const published = resultOf(await fetchCase(store, 10, delegateId))
     assert.equal(published.ok, true)
     assert.equal(published.value !== undefined && published.value !== null, true, 'Case exists after ReuseScope close')
     assert.equal(published.value.SessionId, delegateId)
@@ -258,8 +258,8 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
 
     cleanupInspector(delegateId)
 
-    const [rawCold, storeCold] = acquire(gitCommonDir(dir))
-    const cold = resultOf(await fetchCase(storeCold, rawCold, 10, delegateId))
+    const storeCold = acquire(gitCommonDir(dir))
+    const cold = resultOf(await fetchCase(storeCold, 10, delegateId))
     assert.equal(cold.ok, true)
     assert.equal(cold.value !== undefined && cold.value !== null, true, 'cleanup must not delete published Case (cold reuse)')
     assert.equal(cold.value.SessionId, delegateId)
@@ -270,7 +270,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     assert.equal(second.ok, false, 'finalize twice is refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
-    const still = resultOf(await fetchCase(store, raw, 10, delegateId))
+    const still = resultOf(await fetchCase(store, 10, delegateId))
     assert.equal(still.value.SessionId, delegateId, 'original Case retained after refused second finalize')
     assert.equal(createCalls.length, 1, 'createChild stays once after scope close')
   })

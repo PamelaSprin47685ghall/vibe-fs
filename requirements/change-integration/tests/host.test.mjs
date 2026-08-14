@@ -8,7 +8,7 @@
 // to requirements/review-assurance/tests/host-reverify.test.mjs.
 
 import assert from 'node:assert/strict'
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -102,6 +102,15 @@ test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
   assert.equal(result.ok, false)
   assert.match(result.error, /Unknown manager job|no longer active/i)
   live.cleanup()
+})
+
+test('HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs', import.meta.url), 'utf8')
+  assert.doesNotMatch(
+    source,
+    /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/,
+    'continuation must not leak a detached timeout/polling task after the Host callback path is already live',
+  )
 })
 
 test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {

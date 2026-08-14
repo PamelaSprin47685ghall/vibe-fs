@@ -44,9 +44,10 @@ key 顺序、数字格式、Unicode escaping 不冻结，重放身份就会漂�
 ## DURABLE-EVENTS-004 —— local append 的提交原语 = 完整 NDJSON 行
 
 **规范陈述**：`Append`/`Publish` 的本地 durable witness 是当前 process writer 文件末尾出现
-完整 canonical `JSON+LF` 行；成功返回前必须完成该行写入。运行时 append **不得**创建 Git blob、
-Git tree、Git ref 或执行 Git CAS，也不得因为历史长度重写既有 bytes。半行、截断行、原地改写既有
-canonical 行均非法。
+完整 canonical `JSON+LF` 行；成功返回前必须完成该行写入，且必须已经**同步释放**与独立 Git hook
+共享的 physical store gate：`Append`/`WritePayload` 的 Task 不得在 lock release 尚未完成、heartbeat/
+retry handle 仍存活时提前完成。运行时 append **不得**创建 Git blob、Git tree、Git ref 或执行 Git CAS，
+也不得因为历史长度重写既有 bytes。半行、截断行、原地改写既有 canonical 行均非法。
 
 **含义/动机**：本地事件真相就是裸 append-only 文件；Git 是同步编码，不是在线数据库。
 一次事实提交的物理成本只与新事实 bytes 有关，不再与 Git object/tree/index 数量有关。

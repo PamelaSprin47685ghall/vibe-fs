@@ -181,39 +181,37 @@ module EventStore =
 
         { new IEventStore with
             member _.Append(events) =
-                task {
-                    use! _physical = ProcessEventLog.acquireStoreLock commonDir
-
-                    return
-                        lock gate (fun () ->
-                            try
-                                match validateForAppend commonDir integrator events with
-                                | Error error -> Error(asAppendStorage error)
-                                | Ok [] -> Ok()
-                                | Ok fresh ->
-                                    match integrator.PrepareLive fresh with
-                                    | Error reason ->
-                                        Error(AppendError.AppendFailed("integration rejected: " + reason))
-                                    | Ok commit ->
-                                        // Cross-process store lock + process-local gate make the
-                                        // append linear with standalone Git-hook snapshots while
-                                        // keeping all business meaning in the Integrator.
-                                        ProcessEventLog.append log fresh
-                                        commit ()
-                                        Ok()
-                            with ex ->
-                                Error(AppendError.AppendFailed ex.Message))
-                }
+                ProcessEventLog.withStoreLock commonDir (fun () ->
+                    task {
+                        return
+                            lock gate (fun () ->
+                                try
+                                    match validateForAppend commonDir integrator events with
+                                    | Error error -> Error(asAppendStorage error)
+                                    | Ok [] -> Ok()
+                                    | Ok fresh ->
+                                        match integrator.PrepareLive fresh with
+                                        | Error reason ->
+                                            Error(AppendError.AppendFailed("integration rejected: " + reason))
+                                        | Ok commit ->
+                                            // Cross-process store lock + process-local gate make the
+                                            // append linear with standalone Git-hook snapshots while
+                                            // keeping all business meaning in the Integrator.
+                                            ProcessEventLog.append log fresh
+                                            commit ()
+                                            Ok()
+                                with ex ->
+                                    Error(AppendError.AppendFailed ex.Message))
+                    })
 
             member _.WritePayload(content) =
-                task {
-                    use! _physical = ProcessEventLog.acquireStoreLock commonDir
-
-                    try
-                        return Ok(ProcessEventLog.writePayload commonDir content)
-                    with ex ->
-                        return Error ex.Message
-                }
+                ProcessEventLog.withStoreLock commonDir (fun () ->
+                    task {
+                        try
+                            return Ok(ProcessEventLog.writePayload commonDir content)
+                        with ex ->
+                            return Error ex.Message
+                    })
 
             member _.ReadPayload(payloadRef) =
                 task {

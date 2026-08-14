@@ -32,6 +32,7 @@ participant 自己认为 mission 完成 ≠ 世界允许不可逆结束。
 - MOVE：无（glory 测试族是多 owner 家族，按 PROOF-MAP 保留原位，SPLIT@cutover）
 - REUSE：`requirements/finality/tests/lifecycle.test.mjs`（lifecycle 事实代数）、`requirements/finality/tests/finality-cohort-law.test.mjs`（roster/graduate）、`requirements/finality/tests/rewrite-consistency.test.mjs`（Opening 改写幂等）、~~`tests/unit/glory/manager-lifecycle-gate.test.mjs`~~（Activation 缺席，GARBAGE 侧，已 DELETE@cutover）
 - NEW：`manager-finality-disposition.test.mjs`（`ManagerFinality.classifyEnding` / `admitLabor` 纯代数：drain 门禁、in-motion、rejection 续命、blessed-rest、Life 隔离）
+- NEW：`manager-job-no-resurrection.test.mjs`（FINALITY-028：terminal Job 不复活；active 续做同 session/worktree）
 
 ## 阅读顺序
 

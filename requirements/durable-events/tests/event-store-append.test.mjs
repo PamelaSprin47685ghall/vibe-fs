@@ -2,6 +2,7 @@
 // Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
@@ -61,6 +62,20 @@ test('append_rejects_unknown_event_type_fail_closed', async () => {
   const local = createLocalEventStore()
   try {
     assert.equal(resultOf(await local.store.Append(toList([event(1, [], 'UnknownFutureEvent')]))).ok, false)
+  } finally {
+    local.close()
+  }
+})
+
+test('append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
+  const local = createLocalEventStore({ writerId: 'lock-release-proof' })
+  try {
+    assert.equal(resultOf(await local.store.Append(toList([event(1)]))).ok, true)
+    assert.equal(
+      existsSync(path.join(local.commonDir, 'wanxiang.lock')),
+      false,
+      'Append completion must mean proper-lockfile has already released its physical gate',
+    )
   } finally {
     local.close()
   }

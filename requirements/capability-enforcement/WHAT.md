@@ -44,7 +44,10 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 
 同一 CanonicalRole 在不同 RequestKind 下可以有不同（更窄的）能力面；任何收窄都不得产生比
 `Roles.permissions role` 更大的集合（`toolCapabilitiesFor`：普通 WorkMain = role 全集；StrengthReplica
-= 更窄子集；非 eligible 角色 = 空集）。
+= 更窄子集；非 eligible 角色 = 空集）。`Fission` 的 office entitlement 由
+`intra-participant-parallelism` 的 INTRA-PARTICIPANT-PARALLELISM-012 拥有：V1 恰为
+Manager、Coder、Inspector、Browser、Inquiry；本包只证明该 entitlement 从同一 `Roles.permissions`
+投影到 Attempt profile、Host schema 与 runtime gate，不维护第二份 Fission role 表。
 
 含义/动机：`archive/changes/completed/js-capability-projected-tools.md` 的按 RequestKind 分叉案例——能力
 「可以完全不同」但方向只能是收窄。

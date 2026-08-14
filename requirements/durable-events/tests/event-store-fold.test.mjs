@@ -1,205 +1,119 @@
-// tests/unit/persist/event-store-fold.test.mjs
-// Phase 2 Wave C — §5.1/§5.3 DAG topo fold: StorageInvalid fail-closed + DomainConflict.
+// Shock-cut structural fold contract: history ordering is EventKWayMerge and
+// Current ownership is CanonicalIntegrator. There is no standalone EventStoreFold.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, eventId, idValue, listItems, mapEntries, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { caseOf, eventId, idValue, listItems, payloadOf, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
-const Fold = await import('../../../dist/Infrastructure/Persist/EventStoreFold.js')
+const Merge = await import('../../../dist/Infrastructure/Persist/EventKWayMerge.js')
 
-const streamId = (v) => Domain.EventStreamIdModule_create(v)
-const payloadRef = (v) => Domain.PayloadRefModule_create(v)
-
-const envelope = ({
-  id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+const streamId = (value) => Domain.EventStreamIdModule_create(value)
+const make = ({
+  id,
   stream = 'job/main',
   eventType = 'JobRequested',
   parents = [],
   payload = { status: 'open' },
-  payloadRefs = [],
-} = {}) =>
-  new Domain.EventEnvelope(
-    eventId(id),
-    streamId(stream),
-    eventType,
-    toList(parents.map(eventId)),
-    payload,
-    toList(payloadRefs.map(payloadRef)),
-  )
+} = {}) => new Domain.EventEnvelope(
+  eventId(id),
+  streamId(stream),
+  eventType,
+  toList(parents.map(eventId)),
+  payload,
+  toList([]),
+)
 
-const mustOk = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Ok', `${label} should be Ok, got ${caseOf(result)}`)
-  return payloadOf(result)
-}
+const ids = (result) => listItems(resultOf(result).value).map((event) => idValue.event(event.EventId))
+const A = 'a'.repeat(40)
+const B = 'b'.repeat(40)
+const C = 'c'.repeat(40)
+const D = 'd'.repeat(40)
 
-const mustErr = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Error', `${label} should be Error`)
-  return payloadOf(result)
-}
-
-const foldOrderIds = (projection) => listItems(projection.FoldOrder).map((id) => idValue.event(id))
-
-const streamState = (projection, stream) => {
-  const entry = mapEntries(projection.Streams).find(([key]) => key === stream)
-  assert.ok(entry, `missing stream ${stream}`)
-  return entry[1]
-}
-
-test('AuthoritativeEventTypes_isKnown_includes_JournalEnvelope_and_Job_types', () => {
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JournalEnvelope'), true)
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobRequested'), true)
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobAccepted'), true)
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobRejected'), true)
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobConflictResolved'), true)
-  assert.equal(Fold.AuthoritativeEventTypes_isKnown('TotallyUnknownEventType'), false)
+test('DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => {
+  const child = make({ id: B, parents: [A] })
+  const result = resultOf(Merge.merge(toList([['writer', toList([child])]])))
+  assert.equal(result.ok, false)
+  assert.equal(caseOf(result.error), 'MissingParent')
+  assert.equal(idValue.event(payloadOf(result.error)), A)
 })
 
-test('fold_JournalEnvelope_validates', () => {
-  const journal = envelope({
-    id: 'dddddddddddddddddddddddddddddddddddddddd',
-    stream: 'journal/main',
-    eventType: 'JournalEnvelope',
-    payload: { kind: 'entry' },
-  })
-  const projection = mustOk(Fold.EventStoreFold_fold(toList([journal])))
-  assert.deepEqual(foldOrderIds(projection), ['dddddddddddddddddddddddddddddddddddddddd'])
-  assert.equal(listItems(projection.Conflicts).length, 0)
-  const state = streamState(projection, 'journal/main')
-  assert.equal(caseOf(state), 'Unique')
+test('DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier', () => {
+  const a = make({ id: A, parents: [B] })
+  const b = make({ id: B, parents: [A] })
+  const result = resultOf(Merge.merge(toList([['writer', toList([a, b])]])))
+  assert.equal(result.ok, false)
+  assert.equal(caseOf(result.error), 'NonCanonical')
 })
 
-test('fold_unknown_authoritative_event_type_fail_closed', () => {
-  const unknown = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    eventType: 'TotallyUnknownEventType',
-  })
-  const err = mustErr(Fold.EventStoreFold_fold(toList([unknown])))
-  assert.equal(caseOf(err), 'StorageInvalid')
-  assert.equal(caseOf(payloadOf(err)), 'UnknownEventType')
-  assert.equal(payloadOf(payloadOf(err)), 'TotallyUnknownEventType')
+test('DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
+  const root = make({ id: A })
+  const high = make({ id: C, parents: [A], eventType: 'JobAccepted' })
+  const low = make({ id: B, parents: [A], eventType: 'JobRejected' })
+
+  const first = ids(Merge.merge(toList([
+    ['writer-a', toList([root, high])],
+    ['writer-b', toList([low])],
+  ])))
+  const second = ids(Merge.merge(toList([
+    ['writer-b', toList([low])],
+    ['writer-a', toList([root, high])],
+  ])))
+
+  assert.deepEqual(first, [A, B, C])
+  assert.deepEqual(second, first)
 })
 
-test('fold_missing_parent_fail_closed', () => {
-  const child = envelope({
-    id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    parents: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
-  })
-  const err = mustErr(Fold.EventStoreFold_fold(toList([child])))
-  assert.equal(caseOf(err), 'StorageInvalid')
-  assert.equal(caseOf(payloadOf(err)), 'MissingParent')
-  assert.equal(idValue.event(payloadOf(payloadOf(err))), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
-})
+test('DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
+  const local = createLocalEventStore()
+  try {
+    const sid = streamId('job/conflict')
+    assert.equal(resultOf(await local.store.Append(toList([
+      make({ id: A, stream: 'job/conflict' }),
+    ]))).ok, true)
+    assert.equal(resultOf(await local.store.Append(toList([
+      make({ id: B, stream: 'job/conflict' }),
+    ]))).ok, true)
 
-test('fold_cyclic_parents_fail_closed', () => {
-  const a = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    parents: ['bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
-  })
-  const b = envelope({
-    id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    parents: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
-  })
-  const err = mustErr(Fold.EventStoreFold_fold(toList([a, b])))
-  assert.equal(caseOf(err), 'StorageInvalid')
-  assert.equal(caseOf(payloadOf(err)), 'CyclicParents')
-})
-
-test('fold_deterministic_topological_order_with_EventId_tiebreak', () => {
-  const root = envelope({ id: '0000000000000000000000000000000000000000' })
-  const late = envelope({
-    id: 'cccccccccccccccccccccccccccccccccccccccc',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobAccepted',
-  })
-  const early = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobRejected',
-  })
-
-  const orders = [
-    [root, late, early],
-    [early, root, late],
-    [late, early, root],
-  ].map((batch) => foldOrderIds(mustOk(Fold.EventStoreFold_fold(toList(batch)))))
-
-  for (const order of orders) {
-    assert.deepEqual(order, [
-      '0000000000000000000000000000000000000000',
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'cccccccccccccccccccccccccccccccccccccccc',
-    ])
+    assert.deepEqual(listItems(local.store.TryHeads(sid)).map(idValue.event).sort(), [A, B])
+    assert.equal(local.store.TryHead(sid), undefined, 'a fork must not masquerade as a unique head')
+  } finally {
+    local.close()
   }
 })
 
-test('fold_concurrent_heads_are_DomainConflict_not_StorageInvalid', () => {
-  const parent = envelope({ id: '0000000000000000000000000000000000000000' })
-  const a1 = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobAccepted',
-  })
-  const b1 = envelope({
-    id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobRejected',
-  })
+test('DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
+  const local = createLocalEventStore()
+  try {
+    const sid = streamId('job/resolution')
+    assert.equal(resultOf(await local.store.Append(toList([
+      make({ id: A, stream: 'job/resolution' }),
+    ]))).ok, true)
+    assert.equal(resultOf(await local.store.Append(toList([
+      make({ id: B, stream: 'job/resolution' }),
+    ]))).ok, true)
+    assert.equal(resultOf(await local.store.Append(toList([
+      make({ id: D, stream: 'job/resolution', eventType: 'JobConflictResolved', parents: [A, B] }),
+    ]))).ok, true)
 
-  const projection = mustOk(Fold.EventStoreFold_fold(toList([parent, a1, b1])))
-  assert.equal(listItems(projection.Conflicts).length, 1)
-  const conflict = listItems(projection.Conflicts)[0]
-  assert.equal(caseOf(conflict), 'ConcurrentHeads')
-  const [, heads] = payloadOf(conflict)
-  const headIds = listItems(heads).map((id) => idValue.event(id)).sort()
-  assert.deepEqual(headIds, [
-    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-  ])
-
-  const state = streamState(projection, 'job/main')
-  assert.equal(caseOf(state), 'Conflict')
+    assert.deepEqual(listItems(local.store.TryHeads(sid)).map(idValue.event), [D])
+    assert.equal(idValue.event(local.store.TryHead(sid)), D)
+  } finally {
+    local.close()
+  }
 })
 
-test('fold_resolution_with_all_competing_heads_as_parents_leaves_conflict', () => {
-  const parent = envelope({ id: '0000000000000000000000000000000000000000' })
-  const a1 = envelope({
-    id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobAccepted',
-  })
-  const b1 = envelope({
-    id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    parents: ['0000000000000000000000000000000000000000'],
-    eventType: 'JobRejected',
-  })
-  const resolved = envelope({
-    id: 'cccccccccccccccccccccccccccccccccccccccc',
-    parents: [
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    ],
-    eventType: 'JobConflictResolved',
-  })
-
-  const projection = mustOk(Fold.EventStoreFold_fold(toList([parent, a1, b1, resolved])))
-  assert.equal(listItems(projection.Conflicts).length, 0)
-  assert.equal(foldOrderIds(projection).at(-1), 'cccccccccccccccccccccccccccccccccccccccc')
-
-  const state = streamState(projection, 'job/main')
-  assert.equal(caseOf(state), 'Unique')
-  assert.equal(idValue.event(payloadOf(state)), 'cccccccccccccccccccccccccccccccccccccccc')
-})
-
-test('fold_empty_history_ok', () => {
-  const projection = mustOk(Fold.EventStoreFold_fold(toList([])))
-  assert.deepEqual(foldOrderIds(projection), [])
-  assert.equal(listItems(projection.Conflicts).length, 0)
-})
-
-test('validate_matches_fold_StorageInvalid', () => {
-  const unknown = envelope({ eventType: 'NoSuchType' })
-  const foldErr = mustErr(Fold.EventStoreFold_fold(toList([unknown])))
-  const validateErr = mustErr(Fold.EventStoreFold_validate(toList([unknown])))
-  assert.equal(caseOf(payloadOf(foldErr)), caseOf(payloadOf(validateErr)))
+test('DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
+  const local = createLocalEventStore()
+  try {
+    const result = resultOf(await local.store.Append(toList([
+      make({ id: A, eventType: 'TotallyUnknownEventType' }),
+    ])))
+    assert.equal(result.ok, false)
+    assert.equal(caseOf(result.error), 'StorageInvalid')
+    assert.equal(caseOf(payloadOf(result.error)), 'UnknownEventType')
+  } finally {
+    local.close()
+  }
 })
