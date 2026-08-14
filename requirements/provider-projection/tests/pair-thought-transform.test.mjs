@@ -15,6 +15,7 @@ const {
   tryInject,
   isPairProgrammingThought,
   skipAutoInjectedRequested,
+  source,
   text,
   stableCallId,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
@@ -31,6 +32,20 @@ const userMsg = (id, body = 'hello') => ({
 })
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
+
+const assertPairShape = (msg, callId, markerText) => {
+  assert.equal(msg.info.role, 'assistant')
+  assert.equal(msg.info.source, source)
+  assert.equal(msg.info.synthetic, true)
+  assert.equal(msg.parts.length, 1)
+  assert.equal(msg.parts[0].type, 'tool')
+  assert.equal(msg.parts[0].tool, 'auto-injected')
+  assert.equal(msg.parts[0].callID, callId)
+  assert.equal(msg.parts[0].state.status, 'completed')
+  assert.notEqual(msg.parts[0].state.status, 'pending')
+  assert.notEqual(msg.parts[0].state.status, 'running')
+  assert.equal(msg.parts[0].state.output, markerText)
+}
 
 test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -51,6 +66,7 @@ test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () 
 
     const ordinary = await inject(session, [userMsg('u1', 'steer')])
     assert.equal(pairMessages(ordinary).length, 1, 'Cursor still durably records the provider-independent occurrence')
+    assertPairShape(ordinary[0], stableCallId(session, 1n), text)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
