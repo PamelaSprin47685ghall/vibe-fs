@@ -981,3 +981,95 @@ current accepted truth = conjunction of 45 packages，无一新增/删除/合并
 ## Phase A 完成标志
 
 HANDOFF §23 Definition of Done 第 1 条（全部 `docs/what` propositions 已 reverse-classify，无未解释 ORPHAN）现已满足。后续 Phase B（WHY 反审计）、C（source/runtime evidence）、D（test/gate 覆盖）、E（dependency audit）、F（cutover 设计）仍待进行。
+
+---
+
+# Phase B — WHY 反审计（45 包 × docs/why + completed changes）
+
+## 方法
+
+对每个 future package 回到 `docs/why/*.md`（25 文件）+ `changes/completed/`（41 份）逐包问四问：
+
+1. 是否真的只有一个不可替代 WHY？
+2. 有没有另一个完全不同 failure meaning 被塞进来（double-WHY）？
+3. 当前 DOES NOT OWN 是否足够硬？
+4. 是否只是当前 mechanism 被误认为需求（假边界）？
+
+## 45 包 verdict 表
+
+| Package | WHY verdict | why-doc 证据 | flag |
+|---|---|---|---|
+| `requirement-system` | 单 WHY（meta：唯一 owner + 同时为真 + 无裸权威） | document-governance.md | — |
+| `verification-system` | 单 WHY（meta：可失败可重放证据体系） | document-governance.md + verify proof | — |
+| `structured-workflow` | 单 WHY（无第二程序计数器） | dsl-structured-program.md + flow.md + ce-temporal-ownership.md | — |
+| `time-capability` | 单 WHY（时间显式 capability，非 ambient） | execution.md/loop.md deadline + IClockPort | — |
+| `causal-wait` | 单 WHY（observation 可诊断但非权威） | causal-ce-observability.md + waitfact-causal-renewal.md | weak dep |
+| `session-ontology` | 单 WHY（execution class × ownership × personhood 正交） | host.md why §15 HOST-008 | — |
+| `managed-session-lifecycle` | 单 WHY（单一 create/reuse/retire/replacement 合同） | host.md why §15 | — |
+| `host-boundary` | 单 WHY（业务只依赖可验证 Host 物理能力） | host.md why §1–9 + ARCH-002/003 | — |
+| `participant-identity` | 单 WHY（Role≠Persona≠Binding） | agent.md why §1 + fallback.md why | — |
+| `office-capability` | 单 WHY（office 由 entitled consequence 定义） | agent.md why + ARCH-017 | — |
+| `capability-enforcement` | 单 WHY（可见 capability 与可执行 capability 同源不扩权） | agent.md why AGENT-006/007 + js-tools.md why 四层同构 | OVERLAP 已修 |
+| `participant-horizon` | 单 WHY（只让行动相关最小事实穿过） | architecture.md why Provider Horizon + execution.md leak 禁令 | — |
+| `cognitive-environment` | 单 WHY（长期 cognition 与 runtime/mission 分离；knowledge≠authority） | prompt.md why Library | — |
+| `action-affordance` | 单 WHY（调用瞬间 act contract 五问） | prompt.md why PROMPT-020/021 + architecture.md why 关键区别 | — |
+| `provider-language` | 单 WHY（life 单一稳定语言世界；protocol id 不译） | prompt.md why + host.md why §21 | — |
+| `provider-projection` | 单 WHY（typed intent → 确定性表示；表示不反解 authority） | projection.md why + synthetic-toml.md why | — |
+| `external-investigation` | 单 WHY（public-web facts 以 provenance 建立） | agent.md why Browser | — |
+| `interaction-authority` | 单 WHY（PhysicalUserMessage≠AuthorityTurn） | prompt.md why §1 | — |
+| `dispatch-protocol` | 单 WHY（已授权 interaction 过不可靠 Host 不复制逻辑效果） | prompt.md why Dispatcher 四阶段 | — |
+| `effect-accounting` | 单 WHY（Requested/unknown/Accepted 分型） | persist.md why PERSIST-009 + storage.md §45 | — |
+| `durable-events` | 单 WHY（单一可重放 durable substrate） | persist.md why + storage.md | — |
+| `durable-convergence` | 单 WHY（replica 按对象语义收敛，无 LWW） | storage.md §10.9 + casebook.md why | — |
+| `delegation` | 单 WHY（语义工作转交时 authority/charge/owner/return 明确） | execution.md why + orchestrator.md why | — |
+| `process-execution` | 单 WHY（真实进程/PTY 有界可终止物理完成） | execution.md why PTY onExit | — |
+| `output-distillation` | 单 WHY（大输出诚实有损压缩，fragment≠成功） | agent.md why Distiller | — |
+| `change-integration` | 单 WHY（独立道路进共享 ref 短原子门，长 review 不串行） | orchestrator.md why | — |
+| `semantic-trace` | 单 WHY（append-only 可定位原始语义历史） | companion.md why XTrace + host.md why | — |
+| `work-record` | 单 WHY（bounded canonical 跨边界 work statement） | companion.md why + todo.md why + review.md why | — |
+| `context-compression` | 单 WHY（仅失败驱动、证据边界明确地替换可压缩区） | context.md why | — |
+| `prefix-stability` | 单 WHY（同 epoch 已呈现前缀 byte-stable） | host.md why §9–13 + context.md why | — |
+| `provider-attempt-recovery` | 单 WHY（失败后有界换 binding 不换身份/权威） | fallback.md why | — |
+| `crash-reconciliation` | 单 WHY（restart 从 durable facts 重入普通程序） | persist.md why + storage.md §39 | — |
+| `degeneration-guard` | 单 WHY（病态重复提前止损，桥接标准 recovery） | loop.md why | — |
+| `obligation-ledger` | 单 WHY（持续维护仍欠世界什么，非 phase 伪装） | todo.md why | — |
+| `review-judgement` | 单 WHY（PERFECT/REVISE 是 discrimination 非表演） | review.md why | — |
+| `review-assurance` | 单 WHY（judgement 何时可消费） | review.md why + glory.md why | — |
+| `finality` | 单 WHY（不可逆结束资格非自宣） | glory.md why | fake dep 已删 |
+| `behavior-diagnosis` | 单 WHY（诊断需 trigger/negative/distinction） | enforcer.md why | — |
+| `guidance-delivery` | 单 WHY（诊断成立≠必重复告知） | enforcer.md why | weak dep |
+| `repository-investigation` | 单 WHY（repository claim 由真实观察建立） | casebook.md why + agent.md why inspect | — |
+| `knowledge-reuse` | 单 WHY（旧知识 best-effort cache 非当前证明） | casebook.md why | — |
+| `repository-programming` | 单 WHY（单一 bounded transactional 能力同构编程面） | js-tools.md why | OVERLAP 已修 |
+| `speculative-investigation` | 单 WHY（零影响 speculation 才可换成本收益） | strength.md why | — |
+| `epistemic-reasoning` | 单 WHY（生成不增知识；proposal≠evidence） | sphinx.md why | — |
+| `distribution` | 单 WHY（artifact 携带 runtime closure） | enforcer.md why dist 双副本 + package.json | — |
+
+## 结论
+
+- **0 double-WHY、0 假边界 → 0 拆包、0 并包、0 新包、0 删包。** 45 包逐一通过单 WHY + DOES NOT OWN hardness + independent-change 测试。
+- **假边界「反例确认」**：`sphinx→epistemic-reasoning` 改名正确地把 F#/MCP/A*/Bayes/MCTS 降为 HOW（sphinx.md why「为什么 A*/Bayes/MCTS 必须是真退化」+「为什么改成 Wanxiangshu.Sphinx F#」都只是 implementation/proof 证据）；`companion` / `synthetic-toml` / `agent-catalog` / `mcp` / `sync-delegate` 继续确认不立包（why-doc 无一条需要独立 owner）。
+- **1 OVERLAP 修复**：`repository-programming` 与 `capability-enforcement` 曾同时 claim「capability → surface → runtime gate 四层同构」。修复：同构/同源律唯一归 `capability-enforcement`；`repository-programming` 只应用它到编程面，新增 `capability-enforcement` hard edge（17-repository.md / 20-capability-external.md）。
+- **1 假依赖删除**：`finality → managed-session-lifecycle`。life completion 触发的 dedicated reviewer session 退休是下游 effect（由 `managed-session-lifecycle` owner-closure 消费），不是 finality 定义前提（15-mission-review.md）。
+
+## 转入 Phase E 的弱依赖候选（本轮只标记，不删）
+
+1. `structured-workflow → causal-wait`：causal-wait 的「observation 非权威」不依赖「无程序计数器」，是 CE builder 的 implementation coupling。
+2. `time-capability → causal-wait`：卡内自注「当等待需要 deadline 时」，是条件依赖，非 hard prerequisite。
+3. `guidance-delivery → provider-projection`：delivery 的 occurrence/coverage 语义不依赖 renderer；渲染是下游机制。
+4. `finality → participant-horizon`：finality「隐藏机制只暴露 consequence」是 horizon-respecting 约束（与 delegation 同型），薄依赖，Phase E 再定。
+
+## Boundary / coverage / proof delta
+
+```text
+Boundary:   UNCHANGED 45（无拆/并/增/删）
+Coverage:   本轮不新增 OWNED/ORPHAN/OVERLAP 条款（clause 级已在 Phase A 闭环）
+Proof:      无新 proof 归属变化
+Dependency: +1 edge repository-programming → capability-enforcement
+            -1 edge finality → managed-session-lifecycle
+            （净 0；仍 90 edges、0 cycle、0 unknown ref）
+```
+
+## 确认的跨域边界纪律（不立新包）
+
+「failure-domain separation」（tool red / semantic REVISE / infra fatal）在 todo/review/glory why 中反复出现，但三态分别由 `capability-enforcement`（tool 语法红）、`review-judgement`（语义 REVISE）、`host-boundary`/`crash-reconciliation`（infra fatal fail-fast）各司其职；`review-assurance` 的「infra failure 不伪装 REVISE」是其 review-side 本地负边界。三者是硬边界纪律，不是第四个独立 WHY，故不立包。

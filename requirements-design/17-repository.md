@@ -68,16 +68,17 @@ OWNS:
 - staged mutation、pre-commit validation、multi-file all-or-nothing commit。
 - conflict detection 与 failure algebra。
 - program return 在 commit 前必须可诚实编码。
-- capability → generated surface → description/example → runtime gate 同构。
+- generated surface/description/example 与 runtime gate 消费同一 capability truth（四层同构由 `capability-enforcement` 拥有，本包只把它应用到编程面）。
 
 DOES NOT OWN:
 - office capability canonical authority。
 - builtin tool 是否长期 coexist。
 - 当前 JS language、base class、`js-*` tool names。
 - Synthetic TOML 的一般 representation law。
+- capability 同构/同源律本身（`capability-enforcement` 拥有）；本包只应用它到编程 SDK。
 - Git shared-ref integration。
 
-DEPENDS ON: `office-capability`, `effect-accounting`, `durable-events`, `participant-horizon`。
+DEPENDS ON: `office-capability`, `capability-enforcement`, `effect-accounting`, `durable-events`, `participant-horizon`。
 
 PROVIDES: bounded, transactional, authority-isomorphic repository programming surface。
 

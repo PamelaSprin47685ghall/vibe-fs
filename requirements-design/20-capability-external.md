@@ -20,7 +20,7 @@ DOES NOT OWN:
 
 DEPENDS ON: `office-capability`, `participant-identity`。
 
-PROVIDES: participant 能看见的 capability 与实际能执行的 capability 同构且不越权的 guarantee。
+PROVIDES: participant 能看见的 capability 与实际能执行的 capability 同构且不越权的 guarantee（编程面 SDK 的四层同构是本律的应用；`repository-programming` 等应用方不重复拥有本律）。
 
 FAILURE MEANING: RED = schema/gate 漂移、某 execution tier 获得额外 authority、或 internal action 能被无资格 participant 合成/执行。
 

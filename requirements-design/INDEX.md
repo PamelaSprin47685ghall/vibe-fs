@@ -129,7 +129,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee：
+这不是权威优先级，只表示定义所需 guarantee（本骨架为示意；精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准，Phase E 统一重画）：
 
 ```text
 requirement-system ──→ verification-system

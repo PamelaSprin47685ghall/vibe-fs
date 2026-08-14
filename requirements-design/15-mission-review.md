@@ -114,9 +114,9 @@ DOES NOT OWN:
 - assurance primitive 的内部实现。
 - obligation account semantics。
 - 当前 `suicide` 字面工具名或叙事风格必须永久保持。
-- generic session lifecycle。
+- generic session lifecycle（life completion 触发的 dedicated reviewer session 退休由 `managed-session-lifecycle` owner-closure 消费，是下游 effect，非 finality 定义前提）。
 
-DEPENDS ON: `obligation-ledger`, `review-assurance`, `participant-horizon`, `managed-session-lifecycle`。
+DEPENDS ON: `obligation-ledger`, `review-assurance`, `participant-horizon`。
 
 PROVIDES: mission 何时真正可以结束的 product guarantee。
 

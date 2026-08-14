@@ -215,3 +215,29 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 
 - `semantic-trace` **不**依赖 `participant-horizon`：canonical trace 位于 horizon 之前，horizon 只治理后续 provider-visible projection/record delivery。
 - bounded canonical LWR 已抽成独立 `work-record` package；`semantic-trace` 拥有原始历史，`context-compression` 拥有可替代 coverage，`work-record` 拥有 bounded cross-boundary statement。
+
+## Phase B — WHY reverse audit（已完）
+
+对 45 包逐包回 `docs/why/*.md`（25 文件）+ `changes/completed/`（41 份）做单-WHY / double-WHY / 假边界 / DOES-NOT-OWN-hardness 四问。完整 verdict 表见 `COVERAGE.md` Phase B 节。
+
+### 结果
+
+- **0 double-WHY、0 假边界、0 拆/并/增/删。** 45 包全部通过单 WHY + independent-change 测试。
+- 假边界反例确认：`sphinx→epistemic-reasoning`、`companion`、`synthetic-toml`、`agent-catalog`、`mcp`、`sync-delegate` 均维持不立包（why-doc 无独立 WHY）。
+
+### 本轮修复（2 处边界缺陷）
+
+1. **OVERLAP（已修）**：`repository-programming` × `capability-enforcement` 曾同时 claim「capability → surface → runtime gate 四层同构」。裁决：同构/同源律唯一归 `capability-enforcement`（其 OWNS 已有「schema 与 runtime gate 读同一 capability truth」）；`repository-programming` 只应用它到 js-* 编程面，新增 `capability-enforcement` hard edge（17-repository.md / 20-capability-external.md）。依据：js-tools.md why「四层同构（capability → base-class method → description → example → runtime gate）保证模型看到的与可执行的完全一致」是通用同源律，不是编程面专有事实。
+2. **假依赖（已删）**：`finality → managed-session-lifecycle`。life completion 触发的 dedicated reviewer session 退休由 `managed-session-lifecycle` 的 owner-closure 消费，是下游 effect，不是 finality 定义前提（15-mission-review.md）。
+
+### 转入 Phase E 的弱依赖候选
+
+- `structured-workflow → causal-wait`（CE builder implementation coupling）。
+- `time-capability → causal-wait`（条件依赖「当等待需要 deadline 时」，非 hard）。
+- `guidance-delivery → provider-projection`（渲染是下游机制）。
+- `finality → participant-horizon`（horizon-respecting 薄依赖）。
+
+### 非问题确认
+
+- 「failure-domain separation」（tool red / semantic REVISE / infra fatal）是三态各归 `capability-enforcement` / `review-judgement` / `host-boundary`+`crash-reconciliation` 的硬边界纪律，不构成第四个独立 WHY；`review-assurance` 的「infra failure 不伪装 REVISE」是其 review-side 本地负边界。
+- `INDEX.md` 依赖骨架是示意；精确 hard edge 以各 boundary card `DEPENDS ON` 为准（已加注），Phase E 统一重画。
