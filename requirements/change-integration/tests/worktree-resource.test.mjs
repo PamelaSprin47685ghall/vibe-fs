@@ -16,13 +16,15 @@ const {
   WorktreeCommands_list,
   WorktreeCommands_listBranches,
   WorktreeCommands_remove,
-  WorktreeResource_Adopt_Z1F839BE4,
-  WorktreeResource_Create_697541F4,
   WorktreeResource__get_Identity,
   WorktreeResource__get_Path,
   WorktreeResource__MarkDurable,
   WorktreeResource__Release,
-} = await import('../../../dist/Infrastructure/Git/WorktreeResource.js')
+  WorktreeResource,
+} = await import('../../../dist/Git/WorktreeResource.js')
+const worktreeModule = await import('../../../dist/Git/WorktreeResource.js')
+const adopt = Object.entries(worktreeModule).find(([k]) => k.startsWith('WorktreeResource_Adopt_'))?.[1]
+const createWorktree = Object.entries(worktreeModule).find(([k]) => k.startsWith('WorktreeResource_Create_'))?.[1]
 
 const resourcePath = (resource) => WorktreeResource__get_Path(resource)
 const resourceIdentity = (resource) => WorktreeResource__get_Identity(resource)
@@ -68,7 +70,7 @@ const PATH = '/repo/.worktrees/job-9'
 
 test('WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
   const { port, calls } = fakeGit()
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
   assert.equal(created.ok, true)
   const resource = created.value
@@ -79,7 +81,7 @@ test('WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () 
 
 test('WORKTREE_create_propagates_port_error', async () => {
   const { port } = fakeGit({ CreateWorktree: { tag: 1, fields: ['worktree add exploded'] } })
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
   assert.equal(created.ok, false)
   assert.equal(created.error, 'worktree add exploded')
@@ -87,7 +89,7 @@ test('WORKTREE_create_propagates_port_error', async () => {
 
 test('WORKTREE_release_removes_worktree_and_branch_once', async () => {
   const { port, calls } = fakeGit()
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const resource = created.value
 
   const first = resultOf(await release(resource))
@@ -105,7 +107,7 @@ test('WORKTREE_release_aggregates_both_failures', async () => {
     RemoveWorktree: { tag: 1, fields: ['rm failed'] },
     DeleteBranch: { tag: 1, fields: ['branch failed'] },
   })
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const result = resultOf(await release(created.value))
 
   assert.equal(result.ok, false)
@@ -114,19 +116,19 @@ test('WORKTREE_release_aggregates_both_failures', async () => {
 
 test('WORKTREE_release_reports_single_failure_side', async () => {
   const { port } = fakeGit({ RemoveWorktree: { tag: 1, fields: ['rm failed'] } })
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const result = resultOf(await release(created.value))
   assert.equal(result.error, 'worktree=rm failed')
 
   const { port: port2 } = fakeGit({ DeleteBranch: { tag: 1, fields: ['branch failed'] } })
-  const created2 = resultOf(await WorktreeResource_Create_697541F4(port2, managerJobId('job-9'), worktreePath(PATH)))
+  const created2 = resultOf(await createWorktree(port2, managerJobId('job-9'), worktreePath(PATH)))
   const result2 = resultOf(await release(created2.value))
   assert.equal(result2.error, 'branch=branch failed')
 })
 
 test('WORKTREE_adopt_never_releases_on_dispose', async () => {
   const { port, calls } = fakeGit()
-  const resource = WorktreeResource_Adopt_Z1F839BE4(port, worktreeIdentity('manager/job-9'), worktreePath(PATH))
+  const resource = adopt(port, worktreeIdentity('manager/job-9'), worktreePath(PATH))
 
   assert.equal(resourceIdentity(resource).fields[0], 'manager/job-9')
   await resource["System.IAsyncDisposable.DisposeAsync"]()
@@ -140,7 +142,7 @@ test('WORKTREE_adopt_never_releases_on_dispose', async () => {
 
 test('WORKTREE_mark_durable_disposes_without_release', async () => {
   const { port, calls } = fakeGit()
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const resource = created.value
 
   markDurable(resource)
@@ -155,7 +157,7 @@ test('WORKTREE_mark_durable_disposes_without_release', async () => {
 
 test('WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
   const { port, calls } = fakeGit()
-  const created = resultOf(await WorktreeResource_Create_697541F4(port, managerJobId('job-9'), worktreePath(PATH)))
+  const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
   await created.value["System.IAsyncDisposable.DisposeAsync"]()
 

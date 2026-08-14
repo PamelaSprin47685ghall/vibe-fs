@@ -46,7 +46,8 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

@@ -13,24 +13,26 @@ import test from 'node:test'
 
 import { agentJournal, caseOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { PtyPort } = await import('../../../dist/Process/Pty.js')
-const {
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_TrackPtyRun_Z33F80F6F: trackPtyRun,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_RegisterPtySnapshot: registerPtySnapshot,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_UntrackPtyRun_Z721C83C5: untrackPtyRun,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_OwnsPty_Z33F80F6F: ownsPty,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_IsPtyCompletion_Z721C83C5: isPtyCompletion,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_ForkPty_Z27B191B4: forkPty,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_TryPty_Z721C83C5: tryPty,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_SendPty_BCBC66B: sendPty,
-} = await import('../../../dist/Session/HostForkPty.js')
+const ptyModule = await import('../../../dist/Execution/Delegation/Fork/Host/Pty.js')
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const memberOf = (name) => Object.entries(ptyModule).find(([k]) => k.includes(`HostForkRuntime_${name}_`) || k.endsWith(`_${name}`))?.[1]
+const trackPtyRun = memberOf('TrackPtyRun')
+const registerPtySnapshot = Object.entries(ptyModule).find(([k]) => k.includes('RegisterPtySnapshot'))?.[1]
+const untrackPtyRun = memberOf('UntrackPtyRun')
+const ownsPty = memberOf('OwnsPty')
+const isPtyCompletion = memberOf('IsPtyCompletion')
+const forkPty = memberOf('ForkPty')
+const tryPty = memberOf('TryPty')
+const sendPty = memberOf('SendPty')
 const { PtyId_Create_Z721C83C5: ptyIdOf, PtyId__get_Value: ptyIdValue } = await import(
   '../../../dist/Process/PtyTypes.js'
 )
 const { PtySignal } = await import('../../../dist/Process/PtyTypes.js')
 const { PtyPort__ReadResult_3DD67D20 } = await import('../../../dist/Process/Pty.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 const PARENT = sessionId('ses_pty')
 const AGENT = { Value: 'pty-agent' }

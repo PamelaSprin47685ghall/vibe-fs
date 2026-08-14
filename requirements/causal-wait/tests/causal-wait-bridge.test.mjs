@@ -17,14 +17,14 @@ import {
   CausalProducerRef,
   DiagnosticWaitModule_create,
   WaitEscape,
-} from '../../../dist/Kernel/CausalWait.js'
+} from '../../../dist/Execution/Session/Wait/CausalWait.js'
 import {
   CausalWaitRegistry,
   CausalWaitHub_setWorkspace,
   CausalWaitHub_observer,
   CausalWaitHub_writeToWorkspace,
-} from '../../../dist/Session/CausalWaitRegistry.js'
-import { writeSnapshot as CausalWaitBridge_writeSnapshot } from '../../../dist/Session/CausalWaitBridge.js'
+} from '../../../dist/Execution/Session/Wait/Registry.js'
+import { writeSnapshot as CausalWaitBridge_writeSnapshot } from '../../../dist/Execution/Session/Wait/Bridge.js'
 
 const mkWait = (waitKind, ownerKind, subjectPairs, producer) =>
   DiagnosticWaitModule_create(

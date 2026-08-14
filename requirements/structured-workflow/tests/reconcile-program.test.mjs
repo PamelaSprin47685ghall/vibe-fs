@@ -23,7 +23,7 @@ test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisiona
   // HOST-004 Clean Break: TurnUnknown is not a TurnOutcome member, so it cannot
   // be classified as a non-terminal TurnOutcome. Structural demotion is the gate;
   // isTerminalOutcome('TurnUnknown') is type-unreachable after the cut.
-  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
   assert.equal(
     turnOutcomeCases.includes('TurnUnknown'),
@@ -179,7 +179,7 @@ test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn 
   // HOST-004 Clean Break: TurnUnknown must leave TurnOutcome entirely and live
   // only as reconciliation-private SnapshotObservation (type-unreachable for
   // publishDecision). Behavior above stays; this locks the structural demotion.
-  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
   assert.equal(
     turnOutcomeCases.includes('TurnUnknown'),
@@ -201,7 +201,7 @@ test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn 
 
 
 test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
-  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
   assert.equal(
     names.some((n) => /Command|Reply|materializePass|interpretWith|TraceInterpreter|ProtocolMismatch/.test(n)),
@@ -213,7 +213,7 @@ test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST expor
 })
 
 test('RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', async () => {
-  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
 
   assert.deepEqual(

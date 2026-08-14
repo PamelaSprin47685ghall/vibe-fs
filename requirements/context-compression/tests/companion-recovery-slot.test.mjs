@@ -10,9 +10,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const Companion = await import('../../../dist/Session/Companion.js')
+const Companion = await import('../../../dist/Context/Companion/Runtime.js')
 
-const make = () => Companion.Companion_$ctor_Z79B603FF(undefined, undefined, sessionId('ses-main'))
+const make = () => Object.entries(Companion).find(([k]) => k.startsWith('Companion_$ctor'))?.[1](undefined, undefined, sessionId('ses-main'))
 
 const startOpportunity = (c) => Companion.Companion__StartRecoveryOpportunity(c)
 const offerMaterial = (c) => Companion.Companion__OfferRecoveryMaterial(c)

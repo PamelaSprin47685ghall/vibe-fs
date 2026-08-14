@@ -54,7 +54,8 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
-open Wanxiangshu.Orchestrator
+open Wanxiangshu.Change
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

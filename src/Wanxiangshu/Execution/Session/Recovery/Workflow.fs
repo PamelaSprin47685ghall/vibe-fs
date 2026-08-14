@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Session.Recovery
 
+#nowarn "0035"
+
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Change
@@ -102,9 +104,9 @@ module SessionRecoveryWorkflow =
                         | BloggerCrashRecovery.WindowOutcome.Recommitted _ -> false)
 
                 match NonEmpty.ofList blocked with
-                | Some blocks -> return SessionRecovery.Blocked blocks
-                | None when touched -> return SessionRecovery.Recovered(emptyReceipt sessionId sequence)
-                | None -> return SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
+                | Some blocks -> return SessionRecovery.SessionRecovery.Blocked blocks
+                | None when touched -> return SessionRecovery.SessionRecovery.Recovered(emptyReceipt sessionId sequence)
+                | None -> return SessionRecovery.SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
             }
 
     /// Default RecoverPromptClaims using PromptRecovery.reconcile.
@@ -131,7 +133,7 @@ module SessionRecoveryWorkflow =
                 let forSession = reconciled |> List.filter (fun item -> item.SessionId = sessionId)
 
                 if List.isEmpty forSession then
-                    return SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
+                    return SessionRecovery.SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
                 else
                     let unreadable =
                         forSession
@@ -145,7 +147,7 @@ module SessionRecoveryWorkflow =
                             | PromptRecovery.ClaimOutcome.GaveUp -> None)
 
                     match NonEmpty.ofList unreadable with
-                    | Some blocks -> return SessionRecovery.Blocked blocks
+                    | Some blocks -> return SessionRecovery.SessionRecovery.Blocked blocks
                     | None ->
                         let keys =
                             forSession
@@ -154,7 +156,7 @@ module SessionRecoveryWorkflow =
                                 | PromptRecovery.ClaimOutcome.Proven _ -> Some item.PromptKey
                                 | _ -> None)
 
-                        return SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None keys [])
+                        return SessionRecovery.SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None keys [])
             }
 
     let private recoverManagerJobOutcome (ports: SessionRecoveryPorts) (jobId: ManagerJobId) : Task<SessionRecovery> =

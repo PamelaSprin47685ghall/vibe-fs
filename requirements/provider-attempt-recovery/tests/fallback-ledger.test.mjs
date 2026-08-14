@@ -25,7 +25,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { FallbackLedger_admitConfirmedFailure } = await import(
-  '../../../dist/Application/Recovery/FallbackLedger.js'
+  '../../../dist/Participant/Provider/Attempt/Fallback/Ledger.js'
 )
 
 const SESSION = 'ses_ledger'
@@ -165,7 +165,7 @@ test('PAR_FALLBACK_005_admission_continues_while_budget_remains', async () => {
 })
 
 async function acceptHumanRoot(journal, userMessageId) {
-  const { Runtime__AcceptHumanRoot } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
+  const { Runtime__AcceptHumanRoot } = await import('../../../dist/Interaction/Dispatch/Dispatcher.js')
   const runtime = promptDispatcher.forJournal(journal)
   const accepted = await Runtime__AcceptHumanRoot(runtime, sessionId(SESSION), physicalUser(userMessageId), 'fast-coder')
   assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0]}`)

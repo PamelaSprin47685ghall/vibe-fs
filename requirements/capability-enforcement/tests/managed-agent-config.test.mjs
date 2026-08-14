@@ -16,10 +16,10 @@ const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindin
 runtimeResources.installFromPackage()
 
 const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel, tryBoundModel } = await import(
-  join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js')
+  join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js')
 )
 const { OpencodeModel } = await import(
-  join(here, '../../../dist/Infrastructure/OpenCode/Codec/OpencodeTypes.js')
+  join(here, '../../../dist/OpenCode/Codec/OpencodeTypes.js')
 )
 
 const okOf = (r) => resultOf(r)

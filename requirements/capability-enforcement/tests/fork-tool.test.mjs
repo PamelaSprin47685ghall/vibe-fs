@@ -15,11 +15,11 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { managerSpec, orchestratorSpec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/Tool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents } = await import(
-  '../../../dist/Session/HostForkRuntime.js'
+  '../../../dist/Execution/Delegation/Fork/Host/Runtime.js'
 )
 
 const chain = (kind, extra = {}) => ({

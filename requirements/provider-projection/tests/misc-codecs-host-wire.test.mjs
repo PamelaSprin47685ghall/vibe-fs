@@ -18,16 +18,16 @@ const {
   OpencodeHookInput,
   OpencodeToolExecuteInput,
   OpencodeToolExecuteOutput,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/OpencodeTypes.js')
+} = await import('../../../dist/OpenCode/Codec/OpencodeTypes.js')
 
 const {
   HostMessageCodec_decodePart: decodePart,
   HostMessageCodec_decodeParts: decodeParts,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/HostMessageCodec.js')
+} = await import('../../../dist/OpenCode/Codec/HostMessageCodec.js')
 
 const {
   decode: ingressDecode,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/PromptIngressCodec.js')
+} = await import('../../../dist/Interaction/Dispatch/OpenCode/IngressCodec.js')
 
 // ── OpencodeTypes records ────────────────────────────────────────────────────
 

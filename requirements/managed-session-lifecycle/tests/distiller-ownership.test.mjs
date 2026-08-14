@@ -13,21 +13,21 @@ import test from 'node:test'
 
 import { agentJournal, caseOf, handleProjection, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const toolRuntimeScopeModule = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const toolRuntimeScopeModule = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const { ToolRuntimeScope } = toolRuntimeScopeModule
 const executorRuntimeFor = Object.entries(toolRuntimeScopeModule).find(
   ([name, value]) => name.includes('ExecutorRuntimeFor') && typeof value === 'function',
 )?.[1]
 assert.equal(typeof executorRuntimeFor, 'function', 'ExecutorRuntimeFor export must be discoverable')
 
-const hostForkAgentModule = await import('../../../dist/Session/HostForkAgent.js')
+const hostForkAgentModule = await import('../../../dist/Execution/Delegation/Fork/Host/Agent.js')
 const fork = Object.entries(hostForkAgentModule).find(
   ([name, value]) => name.includes('_HostForkRuntime_Fork_') && typeof value === 'function',
 )?.[1]
 assert.equal(typeof fork, 'function', 'HostForkRuntime Fork export must be discoverable')
 
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const { HostToolContext } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 
 const PARENT = sessionId('ses_distiller')
 

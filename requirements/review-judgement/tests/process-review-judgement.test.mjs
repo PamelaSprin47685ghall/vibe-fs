@@ -27,9 +27,9 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { needsEnsureReview, renderAssignmentUserMessage, ReviewRequestKind } = await import(
-  '../../../dist/Domain/MagicTodoProcessReview.js'
+  '../../../dist/Mission/Obligation/Todo/ProcessReview.js'
 )
-const { renderObligationListWire } = await import('../../../dist/Domain/MagicTodoSurface.js')
+const { renderObligationListWire } = await import('../../../dist/Mission/Obligation/Todo/Surface.js')
 
 const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('life-process-judgement')

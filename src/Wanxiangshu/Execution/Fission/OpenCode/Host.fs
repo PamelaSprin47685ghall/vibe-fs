@@ -53,7 +53,8 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation

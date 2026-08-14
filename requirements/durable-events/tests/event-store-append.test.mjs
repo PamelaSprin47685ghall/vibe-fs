@@ -9,7 +9,7 @@ import test from 'node:test'
 import { eventId, idValue, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const id = (n) => n.toString(16).padStart(40, '0')
 const event = (n, parents = [], type = 'JobRequested', payload = { n }) => new Domain.EventEnvelope(
@@ -82,8 +82,8 @@ test('append_task_does_not_return_until_the_cross_process_store_lock_is_released
 })
 
 test('append_cost_contract_is_independent_of_history_and_EventId_distribution', async () => {
-  const source = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/EventStore.fs', import.meta.url), 'utf8')
-  const log = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/ProcessEventLog.fs', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
+  const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source + log, /SegmentMaxBytes|EventIdShard|index\/|WriteTree|CompareAndSwapRef|materializeSnapshot/)
   assert.match(log, /appendFileSync|AppendAllText/)
 })

@@ -7,7 +7,7 @@ import { toList, listItems } from '../../verification-system/tests/support/domai
 const {
   sanitizeMessage,
   sanitizeMessages,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/HostMessageProjection.js')
+} = await import('../../../dist/OpenCode/Host/HostMessageProjection.js')
 
 test('HOST_016_assistant_message_with_only_reasoning_gets_text_part_from_reasoning', () => {
   const raw = {

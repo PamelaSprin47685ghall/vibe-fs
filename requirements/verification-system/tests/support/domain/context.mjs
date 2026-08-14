@@ -960,8 +960,8 @@ export const managedAgentCatalog = (() => {
 // ── SyncDelegate vocabulary (EXEC-026 / HOST-008) ────────────────────────────
 // Types + pure helpers only. SyncDelegateRuntime is deliberately not surfaced.
 
-const SyncDelegateModule = await prod('Kernel/SyncDelegate')
-const SessionOwnershipModule = await prod('Kernel/SessionOwnership')
+const SyncDelegateModule = await prod('Execution/Delegation/SyncDelegate/Model')
+const SessionOwnershipModule = await prod('Execution/Session/Ownership')
 
 const buildSyncDelegateRole = unionCase(SyncDelegateModule.SyncDelegateRole, 'SyncDelegateRole')
 const buildAttachmentKind = unionCase(SessionOwnershipModule.AttachmentKind, 'AttachmentKind')

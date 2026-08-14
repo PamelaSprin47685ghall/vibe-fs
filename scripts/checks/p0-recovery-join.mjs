@@ -51,7 +51,7 @@ export const RULES = [
   },
   {
     id: 'codec-encode-finality-aborted',
-    fileHint: 'HandleCompletionCodec.fs',
+    fileHint: 'HandleCompletionCodec.fs|CompletionCodec.fs',
     // Encode path must never write finality/status aborted as a Current blob.
     pattern: /finality["']\s*,\s*str\s+"aborted"|str\s+"aborted"[\s\S]{0,80}schemaVersion|"finality",\s*str\s+"aborted"/,
     label: 'HandleCompletionCodec must not encode finality=aborted as joinable blob (EXEC-021)',
@@ -76,32 +76,32 @@ export const RULES = [
   },
   {
     id: 'lifecycle-aborted-completion',
-    fileHint: 'HostForkRunLifecycle.fs',
+    fileHint: 'HostForkRunLifecycle.fs|RunLifecycle.fs',
     pattern: /AgentCompletion\.aborted\b/,
     label: 'HostForkRunLifecycle must not mint AgentCompletion.aborted',
   },
   {
     id: 'lifecycle-aborted-record',
-    fileHint: 'HostForkRunLifecycle.fs',
+    fileHint: 'HostForkRunLifecycle.fs|RunLifecycle.fs',
     // Aborted branch that still calls recordCompletion (comment-stripped line)
     pattern: /\brecordCompletion\b[\s\S]{0,80}\bAborted\b|\bAborted\b[\s\S]{0,120}\brecordCompletion\b/,
     label: 'TerminalOutcome.Aborted must not call recordCompletion',
   },
   {
     id: 'lifecycle-aborted-setresult',
-    fileHint: 'HostForkRunLifecycle.fs',
+    fileHint: 'HostForkRunLifecycle.fs|RunLifecycle.fs',
     pattern: /\bAborted\b[\s\S]{0,200}\.SetResult\b|\.SetResult\b[\s\S]{0,80}\bAborted\b/,
     label: 'Aborted path must not SetResult on completion cell',
   },
   {
     id: 'fork-recovery-synthetic-restored',
-    fileHint: 'ForkRecovery.fs',
+    fileHint: 'ForkRecovery.fs|Recovery.fs',
     pattern: /ofSimpleText[\s\S]{0,160}?restored|Completion\.TrySet|\.TrySetResult\b/,
     label: 'ForkRecovery must not synthesize restored completions',
   },
   {
     id: 'fork-recovery-interrupted-finality',
-    fileHint: 'ForkRecovery.fs',
+    fileHint: 'ForkRecovery.fs|Recovery.fs',
     pattern: /RunCompletion|makeAborted|AgentCompletion\.(?:aborted|failed|completed)|INTERRUPTED/,
     label: 'ForkRecovery.markInterrupted must not construct RunCompletion / INTERRUPTED finality',
   },
@@ -123,14 +123,14 @@ export const RULES = [
   {
     // GREEN-4: option RestoreHandles / RecoverJob must not collapse to NoRecoveryRequired.
     id: 'restore-handles-none-no-recovery',
-    fileHint: 'SessionRecoveryWorkflow.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs|Workflow.fs',
     pattern:
       /RestoreHandles[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|None\s*->\s*[\s\S]{0,60}NoRecoveryRequired[\s\S]{0,80}RestoreHandles|match ports\.RestoreHandles/,
     label: 'RestoreHandles must be mandatory; missing port must not map to NoRecoveryRequired',
   },
   {
     id: 'recover-job-none-no-recovery',
-    fileHint: 'SessionRecoveryWorkflow.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs|Workflow.fs',
     pattern:
       /RecoverJob[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|match ports\.RecoverJob|RecoverJob:\s*\([^)]*\)\s*option/,
     label: 'RecoverJobs must be mandatory; RecoverJob option → NoRecoveryRequired is forbidden',
@@ -143,7 +143,7 @@ export const RULES = [
   },
   {
     id: 'host-fork-runtime-recovery-task',
-    fileHint: 'HostForkRuntime.fs',
+    fileHint: 'HostForkRuntime.fs|Runtime.fs',
     pattern: /\brecoveryTask\b|EnsureChildRestoreStarted|member [^\n]*AwaitRecovery|member [^\n]*RestoreLinkedHandles\s*\(\s*\)/,
     label: 'HostForkRuntime must not own recoveryTask / AwaitRecovery / EnsureChildRestoreStarted',
   },
@@ -225,21 +225,21 @@ export const RULES = [
   },
   {
     id: 'join-with-permit-closure-digest',
-    fileHint: 'HostForkJoin.fs',
+    fileHint: 'Host/Join.fs|HostForkJoin.fs',
     pattern: /closureDigest|permitDigest|RecoveryClosureProjection\.discover/,
     label: 'JoinWithPermit must re-check closureDigest via RecoveryClosureProjection.discover',
     positive: true,
   },
   {
     id: 'host-fork-restart-false-finality',
-    fileHint: 'HostForkRestart.fs',
+    fileHint: 'HostForkRestart.fs|Restart.fs',
     // Synthetic aborted / restored finality must not be published on restart.
     pattern: /AgentCompletion\.aborted|makeAborted|ofSimpleText[\s\S]{0,100}?restored/,
     label: 'HostForkRestart must not mint aborted or synthetic restored finality',
   },
   {
     id: 'host-fork-restart-proof-structure',
-    fileHint: 'HostForkRestart.fs',
+    fileHint: 'HostForkRestart.fs|Restart.fs',
     // Restart recovery must walk interpreter / JoinableCompletion path.
     pattern:
       /ChildRecoveryWorkflow|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.(tryRead|tryReadBody|decodeBody)|fromDecoded|LegacyFalseAbort/,
@@ -248,13 +248,13 @@ export const RULES = [
   },
   {
     id: 'host-fork-restart-bare-publish',
-    fileHint: 'HostForkRestart.fs',
+    fileHint: 'HostForkRestart.fs|Restart.fs',
     pattern: /AgentCompletion\.completed[\s\S]{0,400}PublishCompletion/,
     label: 'HostForkRestart must not PublishCompletion from bare AgentCompletion.completed',
   },
   {
     id: 'fork-runtime-parent-cancelled-aborted',
-    fileHint: 'ForkRuntime.fs',
+    fileHint: 'ForkRuntime.fs|Runtime.fs',
     pattern: /ParentCancelled[\s\S]{0,120}makeAborted|makeAborted[\s\S]{0,80}parent cancelled/,
     label: 'ParentCancelled must not mint makeAborted completion cell',
   },
@@ -394,6 +394,7 @@ const stripComments = (line) => line.replace(/\/\/.*/g, '')
 /** Basename allowlist for record-completion-single-owner (definition + sole commit owner). */
 const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
   'HandleController.fs',
+  'Controller.fs',
   'ChildRecoveryWorkflow.fs',
 ])
 
@@ -405,6 +406,7 @@ const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
 const BARE_RUNTIME_JOIN_ALLOWLIST = new Set([
   'HostForkRuntime.fs',
   'ForkRuntime.fs',
+  'Runtime.fs',
   'CompletionMailbox.fs',
   'Join.fs', // direct CE ops call JoinWithPermit / JoinAvailableWithPermit only
 ])
@@ -422,10 +424,9 @@ export const scanText = (text, file = '<synthetic>') => {
   const hits = []
 
   for (const rule of RULES) {
-    if (rule.fileHint && base !== rule.fileHint && file !== '<synthetic>') {
-      // Production scan: only apply file-scoped rules to matching basename.
-      // Synthetic tests pass file = the basename under test.
-      if (!file.endsWith(rule.fileHint) && base !== rule.fileHint) continue
+    if (rule.fileHint && file !== '<synthetic>') {
+      const hints = rule.fileHint.split('|')
+      if (!hints.some((h) => base === h || file.endsWith(h))) continue
     }
 
     if (rule.positive) {

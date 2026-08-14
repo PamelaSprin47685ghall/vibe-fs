@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Durability from '../../../dist/Infrastructure/Persist/StrengthDurability.js'
+import * as Durability from '../../../dist/Strength/Persistence/Durability.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-import * as Events from '../../../dist/Domain/StrengthEvents.js'
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
-import * as Projection from '../../../dist/Domain/StrengthProjection.js'
-import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
-import * as HostDigest from '../../../dist/Host/HostDigest.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as Events from '../../../dist/Strength/Events.js'
+import * as Frame from '../../../dist/Strength/Frame.js'
+import * as Projection from '../../../dist/Strength/Projection/Model.js'
+import { StrengthBudget } from '../../../dist/Strength/Budget.js'
+import * as HostDigest from '../../../dist/Host/Digest.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const resultOf = (value) => value.tag === 0

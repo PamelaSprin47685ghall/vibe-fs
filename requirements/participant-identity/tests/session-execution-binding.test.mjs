@@ -7,10 +7,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { InjectedSessionPort_$ctor_Z60D0357E as createPort } from '../../../dist/Infrastructure/OpenCode/Host/Sessions.js'
-import { create as createChatParams } from '../../../dist/Infrastructure/OpenCode/Host/ChatParamsHook.js'
-import { validate, configureFromHostConfig } from '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js'
-import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
+const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
+import { create as createChatParams } from '../../../dist/OpenCode/Host/ChatParamsHook.js'
+import { validate, configureFromHostConfig } from '../../../dist/OpenCode/Host/ManagedAgentConfig.js'
+import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
 import { runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 runtimeResources.installFromPackage()

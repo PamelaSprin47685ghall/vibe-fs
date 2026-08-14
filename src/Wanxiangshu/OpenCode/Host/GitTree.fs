@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Git
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

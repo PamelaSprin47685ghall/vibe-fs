@@ -10,7 +10,7 @@ import test from 'node:test'
 const {
   PendingSeal,
   PendingReviewSeals,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/SharedState.js')
+} = await import('../../../dist/OpenCode/Host/SharedState.js')
 const { sessionId, physicalUser, sealDigest, toList, listItems } = await import(
   '../../verification-system/tests/support/domain.mjs'
 )

@@ -51,7 +51,8 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources

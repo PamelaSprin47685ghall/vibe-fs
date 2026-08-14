@@ -53,7 +53,10 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Review
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Mission.Review.Judgement
 
 /// One review barrier, driven by the Orchestrator (REVIEW-008, REVIEW-009).
 ///

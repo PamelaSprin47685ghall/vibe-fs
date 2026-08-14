@@ -44,8 +44,8 @@ const {
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,
-} = await import('../../../dist/Session/EnforcerHost.js')
-const { resolveCycleContext } = await import('../../../dist/Session/EnforcerFrameRecovery.js')
+} = await import('../../../dist/Enforcer/Host.js')
+const { resolveCycleContext } = await import('../../../dist/Enforcer/Cycle/Recovery.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'

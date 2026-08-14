@@ -37,7 +37,7 @@ import { walk } from '../lib/walk.mjs'
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
 
 /** Paths (posix, relative to PRODUCTION_ROOT) allowed to own the canonical store ref / Git primitives. */
-export const STORE_OWNER_PREFIXES = ['Infrastructure/Persist/', 'Infrastructure/Git/']
+export const STORE_OWNER_PREFIXES = ['Persistence/', 'Git/', 'Infrastructure/Persist/', 'Infrastructure/Git/']
 
 /**
  * Extra production sites allowed to mention git process tokens outside Persist/Git.
@@ -52,10 +52,10 @@ export const GIT_BYPASS_ALLOWLIST = Object.freeze([])
  * Listed for documentation; the store-context heuristic already excludes them.
  */
 export const NON_STORE_SCHEMA_VERSION_SITES = Object.freeze([
-  'Domain/EnforcerCatalog.fs',
-  'Infrastructure/Resources/EnforcerCatalogResource.fs',
-  'Session/HandleCompletionCodec.fs',
-  'Domain/ChildRecovery.fs',
+  'Enforcer/Catalog.fs',
+  'Resources/EnforcerCatalogResource.fs',
+  'Execution/Delegation/Handle/CompletionCodec.fs',
+  'Execution/Delegation/Fork/ChildRecovery.fs',
 ])
 
 /**

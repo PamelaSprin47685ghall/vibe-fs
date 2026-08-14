@@ -38,7 +38,7 @@ const {
   PtyPort__Fork_515E235E,
   PtyPort__Read_Z33F80F6F,
   PtyPort__ReadResult_3DD67D20,
-  PtyPort__AddMailboxSender_15902874,
+  PtyPort__AddMailboxSender_6A484C48,
 } = await import('../../../dist/Process/Pty.js')
 
 const id = (v) => PtyId_Create_Z721C83C5(v)
@@ -421,7 +421,7 @@ test('SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session
   const exit = tcs()
   const completions = []
   const p = portWith('pty-ex')
-  PtyPort__AddMailboxSender_15902874(p, (item) => completions.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => completions.push(item))
   PtySupervisorModule_attach(s, p, id('pty-ex'), term, exit)
 
   term.exitCb({ exitCode: 0 })
@@ -443,7 +443,7 @@ test('SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
   const exit = tcs()
   const completions = []
   const p = portWith('pty-ro')
-  PtyPort__AddMailboxSender_15902874(p, (item) => completions.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => completions.push(item))
   PtySupervisorModule_attach(s, p, id('pty-ro'), term, exit)
   term.dataCb('final words')
   term.exitCb({ exitCode: 1 })
@@ -518,7 +518,7 @@ test('SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session', async
   const exit = tcs()
   const completions = []
   const p = portWith('pty-idem')
-  PtyPort__AddMailboxSender_15902874(p, (item) => completions.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => completions.push(item))
   PtySupervisorModule_attach(s, p, id('pty-idem'), term, exit)
   term.exitCb({ exitCode: 0 })
   await exit.get_Task()
@@ -531,7 +531,7 @@ test('SUPERVISOR_attach_onExit_noop_when_session_already_closed', async () => {
   const term = fakeTerm(9999)
   const completions = []
   const p = portWith('pty-ec')
-  PtyPort__AddMailboxSender_15902874(p, (item) => completions.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => completions.push(item))
   PtySupervisorModule_attach(s, p, id('pty-ec'), term, tcs())
   PtySupervisorModule_get(s, id('pty-ec')).Closed = true
   term.exitCb({ exitCode: 0 })

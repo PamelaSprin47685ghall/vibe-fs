@@ -4,9 +4,9 @@ import test from 'node:test'
 import { listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const { ToolHostCodec_factory } = await import(
-  '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
+  '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 )
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsBookkeeperTool.js')
+const { spec } = await import('../../../dist/Repository/Programming/Js/OpenCode/BookkeeperTool.js')
 
 const schemaNode = (kind, extra = {}) => ({
   kind,

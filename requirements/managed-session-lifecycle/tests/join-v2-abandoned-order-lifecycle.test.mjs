@@ -22,8 +22,8 @@ import {
   utcOffset,
 } from '../../verification-system/tests/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
-import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
-import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import * as HandleControllerModule from '../../../dist/Execution/Delegation/Handle/Controller.js'
+import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 const PARENT = sessionId('ses_parent')
 

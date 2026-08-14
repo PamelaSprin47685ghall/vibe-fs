@@ -243,8 +243,8 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
   }
 
   for (const rel of [
-    ['Infrastructure', 'OpenCode', 'Host', 'LoopSensor.fs'],
-    ['Application', 'Recovery', 'ProviderRecoveryWorkflow.fs'],
+    ['OpenCode', 'Host', 'LoopSensor.fs'],
+    ['Participant', 'Provider', 'Attempt', 'Fallback', 'Workflow.fs'],
   ]) {
     const sitePath = path.join(NEXT_DIR, ...rel)
     const siteBody = fs.readFileSync(sitePath, 'utf8')
@@ -263,7 +263,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
     }
   }
 
-  const sensorPath = path.join(NEXT_DIR, 'Infrastructure', 'OpenCode', 'Host', 'LoopSensor.fs')
+  const sensorPath = path.join(NEXT_DIR, 'OpenCode', 'Host', 'LoopSensor.fs')
   const sensorBody = fs.readFileSync(sensorPath, 'utf8')
   for (const key of ['session_id', 'result', 'detector_step', 'effective_character_count', 'provider_error']) {
     assert.ok(
@@ -272,7 +272,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
     )
   }
 
-  const diagnosticPath = path.join(NEXT_DIR, 'Infrastructure', 'OpenCode', 'Host', 'Diagnostic.fs')
+  const diagnosticPath = path.join(NEXT_DIR, 'OpenCode', 'Host', 'Diagnostic.fs')
   const diagnosticBody = fs.readFileSync(diagnosticPath, 'utf8')
   assert.match(diagnosticBody, /"effective_character_count"/)
   assert.match(diagnosticBody, /"detector_step"/)

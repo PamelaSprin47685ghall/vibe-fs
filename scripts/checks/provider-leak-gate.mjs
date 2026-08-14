@@ -17,21 +17,21 @@ const norm = (p) => p.replace(/\\/g, '/')
 
 /** Provider renderer surfaces (Join / horizon / tool catalog prose). */
 export const PROVIDER_SCAN_ROOTS = Object.freeze([
-  'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/HorizonTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ChronicleTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ForkTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/PtyTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JudgeTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/CoderTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/InspectorTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FetchTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/BashHoneypotTool.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FileMutationTools.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
+  'src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/PtyTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs',
+  'src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/CoderTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs',
+  'src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/FetchTool.fs',
+  'src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs',
+  'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
 ])
 
 /** Lines that assemble provider-visible prose or wire fields. */

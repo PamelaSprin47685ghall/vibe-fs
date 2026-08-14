@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const LWR_SOURCE = new URL('../../../src/Wanxiangshu/Domain/LifecycleWorkRecord.fs', import.meta.url)
+const LWR_SOURCE = new URL('../../../src/Wanxiangshu/Mission/WorkRecord/Model.fs', import.meta.url)
 
 const CANONICAL = ['Opening', 'Chronicle', 'Recent work']
 const LEGACY = ['Opening task', 'Work log', 'Uncompressed tail', 'Final output']

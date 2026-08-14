@@ -12,7 +12,7 @@ import {
   capture,
   ofExecCommand,
   contentHash,
-} from '../../../dist/Infrastructure/CasebookCapture.js'
+} from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
 import { caseOf, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 test('CASE003_read_capture_is_typed_and_hashed', () => {

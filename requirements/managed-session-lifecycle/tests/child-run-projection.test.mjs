@@ -18,18 +18,18 @@ const {
   ChildRunModule_makeCompleted,
   ChildRunModule_makeFailed,
   ChildRunModule_tryComplete,
-} = await import('../../../dist/Session/ChildRun.js')
+} = await import('../../../dist/Execution/Delegation/Fork/ChildRun.js')
 
-const { status, toRecord } = await import('../../../dist/Session/ChildRunProjection.js')
+const { status, toRecord } = await import('../../../dist/Execution/Delegation/Fork/ChildRunProjection.js')
 
 const {
   AgentCompletion_abandoned,
   AgentCompletion_failed,
   AgentCompletion_ofSimpleText,
-} = await import('../../../dist/Session/AgentCompletion.js')
+} = await import('../../../dist/Execution/Session/AgentCompletion.js')
 
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { SessionId } = await import('../../../dist/Kernel/Identity.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const { SessionId } = await import('../../../dist/Foundation/Identity.js')
 
 const makeRun = () => ChildRunModule_create('agent-1', 'run-1', 'fast-coder', Role.Manager, 'do the thing')
 const complete = (run, outcome) => {

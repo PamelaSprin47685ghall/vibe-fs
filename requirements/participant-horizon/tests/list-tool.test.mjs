@@ -5,13 +5,13 @@ import test from 'node:test'
 
 import { completionKind, handleId, handleProjection, mapOfEntries, roles, sessionId, structuralComparer, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { HostToolContext } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec } = await import('../../../dist/Execution/Session/OpenCode/HorizonTool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { SessionAgentProjection, AgentProjectionSet, AgentProjection_empty: emptyAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
 const { ProjectionSet } = await import('../../../dist/Composition/Durable/ProjectionState.js')
-const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Session/ChildRun.js')
+const { CompletionCell$1_$ctor: completionCell } = await import('../../../dist/Execution/Delegation/Fork/ChildRun.js')
 const sessionMap = (entries) => mapOfEntries(entries, structuralComparer)
 
 const context = (session = 'ses_list') => new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})

@@ -8,8 +8,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { WaitEscape } from '../../../dist/Kernel/CausalWait.js'
-import { writeSnapshot } from '../../../dist/Session/CausalWaitBridge.js'
+import { WaitEscape } from '../../../dist/Execution/Session/Wait/CausalWait.js'
+import { writeSnapshot } from '../../../dist/Execution/Session/Wait/Bridge.js'
 import {
   caseNames,
   causalWait,

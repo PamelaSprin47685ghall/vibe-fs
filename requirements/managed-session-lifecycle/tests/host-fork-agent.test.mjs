@@ -11,8 +11,8 @@ import test from 'node:test'
 
 import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const hostForkAgentModule = await import('../../../dist/Session/HostForkAgent.js')
+const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
+const hostForkAgentModule = await import('../../../dist/Execution/Delegation/Fork/Host/Agent.js')
 const fork = Object.entries(hostForkAgentModule).find(
   ([name, value]) => name.includes('_HostForkRuntime_Fork_') && typeof value === 'function',
 )?.[1]
@@ -21,16 +21,13 @@ const reuse = Object.entries(hostForkAgentModule).find(
   ([name, value]) => name.includes('_HostForkRuntime_Reuse_') && typeof value === 'function',
 )?.[1]
 assert.equal(typeof reuse, 'function', 'HostForkRuntime Reuse export must be discoverable without pinning Fable hash')
-const {
-  HostForkRuntime__get_PendingRunCount: pendingRunCount,
-  HostForkRuntime__get_PendingRuns: pendingRunsOf,
-  HostForkRuntime__FailRun_1B5DABF9: failRun,
-  HostForkRuntime__Cancel: cancelRuntime,
-} = await import('../../../dist/Session/HostForkRuntime.js')
-const { HandleController_link } = await import('../../../dist/Session/HandleController.js')
-const { HandleOwnership } = await import('../../../dist/Kernel/Fact.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { drainFromJournal: JoinDrain_drainFromJournal } = await import('../../../dist/Session/JoinDrain.js')
+const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
+const { HostForkRuntime__get_PendingRunCount: pendingRunCount, HostForkRuntime__get_PendingRuns: pendingRunsOf, HostForkRuntime__Cancel: cancelRuntime } = hostRuntimeModule
+const failRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__FailRun_'))?.[1]
+const { HandleController_link } = await import('../../../dist/Execution/Delegation/Handle/Controller.js')
+const { HandleOwnership } = await import('../../../dist/Composition/Durable/Fact.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const { drainFromJournal: JoinDrain_drainFromJournal } = await import('../../../dist/Execution/Delegation/Handle/JoinDrain.js')
 
 const PARENT = sessionId('ses_hfa')
 

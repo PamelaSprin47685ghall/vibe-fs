@@ -9,16 +9,16 @@ import { providerLanguage, toList } from '../../verification-system/tests/suppor
 
 const {
   renderJoinItemBatch,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/JoinResultRenderer.js')
+} = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.js')
 
 const {
   JoinItem,
   AgentJoinItem,
   AgentCompletionPayload,
-} = await import('../../../dist/Session/AgentCompletion.js')
+} = await import('../../../dist/Execution/Session/AgentCompletion.js')
 
-const { NonEmptyBatch_ofHeadTail: batchOf } = await import('../../../dist/Session/CompletionMailbox.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { NonEmptyBatch_ofHeadTail: batchOf } = await import('../../../dist/Execution/Session/Wait/CompletionMailbox.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 const lang = providerLanguage.english
 

@@ -16,7 +16,7 @@ import {
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
-import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 const CHILD = sessionId('ses_race_c')
 const HANDLE = handleId.agent('h-race')

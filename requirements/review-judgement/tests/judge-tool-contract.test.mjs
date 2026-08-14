@@ -10,11 +10,11 @@ import test from 'node:test'
 import { caseOf, listItems, payloadOf, providerLanguage, providerResources, resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const { StaticTools_reviewerVerdictOfString, StaticTools_reviewerVerdictSchemaJson } = await import(
-  '../../../dist/Tools/StaticTools.js'
+  '../../../dist/OpenCode/Tools/StaticTools.js'
 )
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
-const { ToolHostCodec_factory } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const { spec } = await import('../../../dist/Mission/Review/OpenCode/JudgeTool.js')
+const { ToolHostCodec_factory } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 
 const parse = (value) => resultOf(StaticTools_reviewerVerdictOfString(value))
 

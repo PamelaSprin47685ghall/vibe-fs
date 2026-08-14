@@ -42,8 +42,8 @@ test('gate_a_extracts_tool_spec_record_names', () => {
 
 test('gate_a_duplicate_tool_name_is_red', () => {
   const entries = [
-    { file: 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/AlphaTool.fs', text: DUPLICATE_OWNERS.split('\n\n')[0] + '\n' },
-    { file: 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/BetaTool.fs', text: DUPLICATE_OWNERS.split('\n\n')[1] + '\n' },
+    { file: 'src/Wanxiangshu/OpenCode/Tools/AlphaTool.fs', text: DUPLICATE_OWNERS.split('\n\n')[0] + '\n' },
+    { file: 'src/Wanxiangshu/OpenCode/Tools/BetaTool.fs', text: DUPLICATE_OWNERS.split('\n\n')[1] + '\n' },
   ]
   const violations = scanEntries(entries)
   assert.ok(violations.some((v) => v.code === 'duplicate-tool-owner' && v.detail?.includes("'join'")))

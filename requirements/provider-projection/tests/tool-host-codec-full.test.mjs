@@ -52,7 +52,7 @@ const {
   ToolHostCodec_tomlTable: tomlTable,
   ToolHostCodec_TomlValue,
   ToolSpec,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 
 // ── HostToolArguments ────────────────────────────────────────────────────────
 

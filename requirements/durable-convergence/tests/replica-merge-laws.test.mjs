@@ -6,8 +6,8 @@ import test from 'node:test'
 import { eventId, idValue, listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Merge = await import('../../../dist/Infrastructure/Persist/EventKWayMerge.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
+const Merge = await import('../../../dist/Persistence/EventStore/EventKWayMerge.js')
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const make = (id, parents = [], stream = 'replica/law', type = 'JobRequested', payload = {}) => new Domain.EventEnvelope(
   eventId(id), streamId(stream), type, toList(parents.map(eventId)), payload, toList([]),

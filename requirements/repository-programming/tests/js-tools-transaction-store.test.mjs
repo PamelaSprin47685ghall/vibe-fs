@@ -12,11 +12,11 @@ import {
   JsToolsTransactionStore_appendPrepared as appendPrepared,
   JsToolsTransactionStore_appendCommitted as appendCommitted,
   JsToolsTransactionStore_recoverCurrent as recoverCurrent,
-} from '../../../dist/Infrastructure/JsToolsTransactionStore.js'
+} from '../../../dist/Repository/Programming/Js/TransactionStore.js'
 import {
   JsTransactionIdModule_create as txId,
   JsTransactionProjectionModule_pending as pending,
-} from '../../../dist/Domain/JsTransaction.js'
+} from '../../../dist/Repository/Programming/Js/Transaction.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
@@ -101,7 +101,7 @@ test('JS015_recoverCurrent_undoes_only_what_the_integrator_says_is_pending', asy
 })
 
 test('JS015_store_source_has_no_manual_history_reader', async () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Infrastructure/JsToolsTransactionStore.fs', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|scanUncommitted|OpenSnapshot|readStreams/)
   assert.match(source, /TryCurrent "JsTransaction"/)
 })

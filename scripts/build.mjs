@@ -52,7 +52,7 @@ try {
 removeGitignores(dist)
 removeSources(dist)
 
-const entry = path.join(root, 'dist/Infrastructure/OpenCode/Plugin/Plugin.js')
+const entry = path.join(root, 'dist/OpenCode/Plugin/Plugin.js')
 if (!fs.existsSync(entry)) fail(`missing entry: ${entry}`)
 
 const enforcerRoot = path.join(root, 'resources/enforcer')

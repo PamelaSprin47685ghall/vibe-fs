@@ -10,7 +10,7 @@ import test from 'node:test'
 
 import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
-const Hook = await import('../../../dist/Infrastructure/Git/HookDispatcher.js')
+const Hook = await import('../../../dist/Git/Hook/Dispatcher.js')
 const MARKER = 'wanxiang-hook-dispatcher'
 const read = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
@@ -20,7 +20,7 @@ const sandboxHooks = () => {
 }
 
 test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
-  const source = read('src/Wanxiangshu/Infrastructure/Git/HookDispatcher.fs')
+  const source = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   assert.match(source, /HookKind\.ReferenceTransaction/)
   assert.match(source, /HookKind\.PrePush/)
   assert.match(source, /remote\.%s\.fetch/)
@@ -31,8 +31,8 @@ test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_r
 })
 
 test('HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
-  const dispatcher = read('src/Wanxiangshu/Infrastructure/Git/HookDispatcher.fs')
-  const sync = read('src/Wanxiangshu/Infrastructure/Git/HookSync.fs')
+  const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
+  const sync = read('src/Wanxiangshu/Git/Hook/Sync.fs')
   const runner = read('resources/git/wanxiang-hook.mjs')
 
   assert.match(dispatcher, /resources\/git/)

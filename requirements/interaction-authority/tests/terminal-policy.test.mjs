@@ -17,7 +17,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { isTopLevelManager } = await import('../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js')
+const { isTopLevelManager } = await import('../../../dist/OpenCode/Host/TerminalPolicy.js')
 
 const MAIN = sessionId('ses_main')
 const CHILD = sessionId('ses_child')

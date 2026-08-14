@@ -27,12 +27,12 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { restoreLinkedChildren, restoreLinkedChildrenWithoutRuntime } = await import(
-  '../../../dist/Session/HostForkRestart.js'
+  '../../../dist/Execution/Delegation/Fork/Host/Restart.js'
 )
-const { ForkRuntime, ForkRuntime__List } = await import('../../../dist/Session/ForkRuntime.js')
-const { HandleOwnership } = await import('../../../dist/Kernel/Fact.js')
-const { HandleController_link } = await import('../../../dist/Session/HandleController.js')
-const { NonEmpty_toList } = await import('../../../dist/Domain/SessionRecovery.js')
+const { ForkRuntime, ForkRuntime__List } = await import('../../../dist/Execution/Delegation/Fork/Runtime.js')
+const { HandleOwnership } = await import('../../../dist/Composition/Durable/Fact.js')
+const { HandleController_link } = await import('../../../dist/Execution/Delegation/Handle/Controller.js')
+const { NonEmpty_toList } = await import('../../../dist/Execution/Session/Recovery/Model.js')
 
 const PARENT = sessionId('ses_restart')
 const CHILD = sessionId('ses_child_1')

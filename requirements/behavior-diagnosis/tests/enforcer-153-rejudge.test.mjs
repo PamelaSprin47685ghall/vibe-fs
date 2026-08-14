@@ -16,16 +16,16 @@ const recoverySrc = readFileSync(
   'utf8',
 )
 const enforcerSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Session/EnforcerContinuation.fs'),
+  join(ROOT, 'src/Wanxiangshu/Enforcer/Continuation.fs'),
   'utf8',
 )
 const repairSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Session/EnforcerRepair.fs'),
+  join(ROOT, 'src/Wanxiangshu/Enforcer/Repair.fs'),
   'utf8',
 )
 
 const probeModuleSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
+  join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'),
   'utf8',
 )
 
@@ -36,7 +36,7 @@ const loadRecovery = async () => {
     new URL('../../../dist/Context/Companion/Blogger/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const probe = await import(
-    new URL('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js', import.meta.url).pathname
+    new URL('../../../dist/Enforcer/Cycle/BloggerProbe.js', import.meta.url).pathname
   )
   return { crash, probe }
 }
@@ -123,7 +123,7 @@ test('ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
   // BloggerRuntimeState.fs must not define a cell/State DU or mark* writers;
   // restoreRuntime does not store rejudged recovery.
   const runtimeSrc = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Session/BloggerRuntimeState.fs'),
+    join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs'),
     'utf8',
   )
   assert.doesNotMatch(runtimeSrc, /BloggerRuntimeState\b/, 'no BloggerRuntimeState DU')
@@ -140,7 +140,7 @@ test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   // (rejudgeFromEvidence / rejudgeToolRecovery in BloggerRecoveryProbe) must
   // restore InteractionNudgeIssued at most, never AabbRepairConsumed.
   const probeSrc = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
+    join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'),
     'utf8',
   )
   const coldRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
@@ -162,7 +162,7 @@ test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run'
   // AABB branch (issued run != current terminal), never a second nudge.
   const { agentFact, agentJournal, authorityRoot, idValue, logicalRunId, payloadOf, promptKey, providerRun, sessionId, stream } = await import('../../verification-system/tests/support/domain.mjs')
   const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-  const probe = await import('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js')
+  const probe = await import('../../../dist/Enforcer/Cycle/BloggerProbe.js')
   const repairState =
     probe.BloggerRecoveryProbe_repairState ||
     probe.repairState

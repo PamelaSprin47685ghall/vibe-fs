@@ -14,7 +14,7 @@ import {
   isTool,
   localCommand,
   fixtureCommand,
-} from '../../../dist/Kernel/SphinxMcp.js'
+} from '../../../dist/Sphinx/Mcp.js'
 
 test('AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')

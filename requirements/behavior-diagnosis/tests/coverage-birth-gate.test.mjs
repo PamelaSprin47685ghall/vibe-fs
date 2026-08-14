@@ -20,11 +20,11 @@ import {
   caseOf,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { mainContextFromChunk } = await import('../../../dist/Session/EnforcerHost.js')
+const { mainContextFromChunk } = await import('../../../dist/Enforcer/Host.js')
 const { XTraceProjection_empty, XTraceProjection_semanticCursorFor, XTraceProjection_parts: xTraceParts } = await import(
   '../../../dist/Context/Trace/Projection.js'
 )
-const { PrefixEpochIdModule_initial } = await import('../../../dist/Kernel/Identity.js')
+const { PrefixEpochIdModule_initial } = await import('../../../dist/Foundation/Identity.js')
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'coverage-birth-'))

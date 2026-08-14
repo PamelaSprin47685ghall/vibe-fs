@@ -23,7 +23,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { agentJournal, handleId, handleProjection, idValue, roles, sessionId } from '../../../../verification-system/tests/support/domain.mjs'
-import { RuntimeResourcesModule_current as currentRuntimeResources } from '../../../../../dist/Infrastructure/Resources/RuntimeResources.js'
+import { RuntimeResourcesModule_current as currentRuntimeResources } from '../../../../../dist/Resources/RuntimeResources.js'
 import {
   withPlugin,
   withExecutablePlugin,
@@ -505,7 +505,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
 import {
   source as PAIR_PROGRAMMING_THOUGHT_SOURCE,
   text as PAIR_PROGRAMMING_THOUGHT_TEXT,
-} from '../../../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
+} from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js'
 
 /** HOST-013: count synthetic pair messages by source identity, never by text. */
 const markerCount = (messages) =>
@@ -731,7 +731,7 @@ test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
 //
 //   1. No session transport under `client: {}` — production had briefly
 //      FABRICATED a completed AgentRunResult carrying "test output"
-//      (src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs:149-153 records its removal), so the old
+//      (src/Wanxiangshu/OpenCode/Host/Sessions.fs:149-153 records its removal), so the old
 //      expectations were written against a fake. The fixture now supplies a
 //      real minimal SDK client and completions arrive as real
 //      `TerminalOutcome.Completed` payloads with distinct SessionWide/TurnFormal

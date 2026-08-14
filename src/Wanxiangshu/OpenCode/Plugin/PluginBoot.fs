@@ -51,7 +51,7 @@ module PluginBoot =
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
-          GitTreePort: Wanxiangshu.Review.GitTreePort option
+          GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
           FamilyParent: SessionId -> SessionId option }
 
     let create (input: obj) : Task<Boot> =

@@ -101,7 +101,7 @@ test('EXEC_017_interrupted_wire_is_natural_language_not_error', () => {
 })
 
 test('EXEC_017_user_message_interrupt_wire', async () => {
-  const { JoinInterruptReason } = await import('../../../dist/Session/CompletionMailbox.js')
+  const { JoinInterruptReason } = await import('../../../dist/Execution/Session/Wait/CompletionMailbox.js')
   const wire = joinResultRenderer.renderInterrupted(JoinInterruptReason.UserMessageArrived)
   assert.match(wire, /# Something nearer has arrived\./)
   assert.ok(!LEGACY_DTO.test(wire))

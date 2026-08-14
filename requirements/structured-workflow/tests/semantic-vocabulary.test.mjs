@@ -18,13 +18,13 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
  * is waiting for from the name + arguments + return type alone.
  */
 const VOCABULARY_SURFACES = {
-  'Application/Manager/ManagerBackground': ['ensureSettled'],
-  'Application/Manager/ManagerActivation': ['ensureAccepted'],
-  'Application/Manager/ManagerIdle': ['encourageLabor'],
-  'Application/Manager/ManagerJobHandoff': ['completeIfTransferred'],
-  'Application/Review/ReviewerContinuation': ['ensurePerfectConfirmed', 'ensureVerdictSubmitted'],
-  'Application/Review/ReviewerEvidence': ['classifyNeed'],
-  'Application/Recovery/ProviderRecoveryWorkflow': ['continueAfterConfirmedFailure'],
+  'Mission/Manager/Background': ['ensureSettled'],
+  'Mission/Manager/Activation': ['ensureAccepted'],
+  'Mission/Manager/Idle': ['encourageLabor'],
+  'Mission/Manager/JobHandoff': ['completeIfTransferred'],
+  'Mission/Review/Judgement/Continuation': ['ensurePerfectConfirmed', 'ensureVerdictSubmitted'],
+  'Mission/Review/Judgement/Evidence': ['classifyNeed'],
+  'Participant/Provider/Attempt/Fallback/Workflow': ['continueAfterConfirmedFailure'],
 }
 
 /** DSL-013 rejected shapes: implementation-action names, not business promises. */

@@ -81,7 +81,6 @@ open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Recovery
 open Wanxiangshu.Resources
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -313,13 +312,7 @@ module PluginTransforms =
                                                     providerRun
                                                     reason
 
-                                            return
-                                                outcome
-                                                |> Result.map (function
-                                                    | Wanxiangshu.Recovery.RecoveryAdmission.ContinueRecovery ->
-                                                        Wanxiangshu.Participant.Provider.Attempt.Fallback.RecoveryAdmission.ContinueRecovery
-                                                    | Wanxiangshu.Recovery.RecoveryAdmission.RecoveryExhausted ->
-                                                        Wanxiangshu.Participant.Provider.Attempt.Fallback.RecoveryAdmission.RecoveryExhausted)
+                                            return outcome
                                         }
 
                                 // ENFORCER-153: the recovery stage probe derives

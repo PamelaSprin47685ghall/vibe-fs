@@ -12,7 +12,7 @@
  * 6. CausalWaitRegistry mutable fields must carry DSL-MUTABLE annotations
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
@@ -25,8 +25,11 @@ const problems = []
 
 const read = (abs) => readFileSync(abs, 'utf8')
 
-const filesUnder = (relDir) =>
-  [...walk(join(src, relDir))].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
+const filesUnder = (relDir) => {
+  const dir = join(src, relDir)
+  if (!existsSync(dir)) return []
+  return [...walk(dir)].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
+}
 
 const allFs = () =>
   [...walk(src)].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
@@ -60,7 +63,7 @@ for (const { abs, rel } of allFs()) {
 }
 
 // 4. diagnostics snapshot not in PromptDispatcher / decision
-for (const name of ['Session/PromptDispatcher.fs', 'Application/Reconciliation/TurnCompletionProgram.fs']) {
+for (const name of ['Interaction/Dispatch/Dispatcher.fs', 'Session/PromptDispatcher.fs', 'Application/Reconciliation/TurnCompletionProgram.fs']) {
   const abs = join(src, name)
   try {
     const text = read(abs)
@@ -74,17 +77,18 @@ for (const name of ['Session/PromptDispatcher.fs', 'Application/Reconciliation/T
 
 // 5. Critical migrated sites — no bare `return! xxx.Task` / `do! xxx.Task` outside CausalAwait lines
 const critical = [
-  'Session/SyncDelegateRuntime.fs',
-  'Application/Finality/CohortWorkflow.fs',
-  'Infrastructure/OpenCode/Tools/FinalityTool.fs',
-  'Infrastructure/OpenCode/Tools/JoinTool.fs',
-  'Infrastructure/OpenCode/Orchestration/Host.fs',
-  'Application/Review/ReviewBarrierWorkflow.fs',
-  'Application/Orchestration/ManagerJob.fs',
+  'Execution/Delegation/SyncDelegate/Workflow.fs',
+  'Mission/Finality/Cohort.fs',
+  'Mission/Finality/OpenCode/Tool.fs',
+  'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
+  'Change/Host/Host.fs',
+  'Mission/Review/Barrier/Workflow.fs',
+  'Change/Job.fs',
 ]
 
 for (const rel of critical) {
   const abs = join(src, rel)
+  if (!existsSync(abs)) continue
   const text = read(abs)
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i += 1) {
@@ -106,14 +110,16 @@ for (const rel of critical) {
 
 // 6. CausalWaitRegistry mutable must be DSL-MUTABLE annotated
 {
-  const abs = join(src, 'Session/CausalWaitRegistry.fs')
-  const text = read(abs)
-  const lines = text.split('\n')
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!/\blet mutable\b/.test(lines[i])) continue
-    const prev = lines.slice(Math.max(0, i - 2), i).join('\n')
-    if (!/\/\/\s*DSL-MUTABLE:/.test(prev)) {
-      problems.push(`Session/CausalWaitRegistry.fs:${i + 1}: mutable lacks DSL-MUTABLE annotation`)
+  const abs = join(src, 'Execution/Session/Wait/Registry.fs')
+  if (existsSync(abs)) {
+    const text = read(abs)
+    const lines = text.split('\n')
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!/\blet mutable\b/.test(lines[i])) continue
+      const prev = lines.slice(Math.max(0, i - 2), i).join('\n')
+      if (!/\/\/\s*DSL-MUTABLE:/.test(prev)) {
+        problems.push(`Execution/Session/Wait/Registry.fs:${i + 1}: mutable lacks DSL-MUTABLE annotation`)
+      }
     }
   }
 }

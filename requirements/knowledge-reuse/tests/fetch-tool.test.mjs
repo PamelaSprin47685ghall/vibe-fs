@@ -7,15 +7,15 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { contentHash as hash } from '../../../dist/Infrastructure/CasebookCapture.js'
-import { shelfmarkFor } from '../../../dist/Infrastructure/CasebookIndex.js'
-import { Observation } from '../../../dist/Domain/Casebook.js'
+import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { contentHash as hash } from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
+import { shelfmarkFor } from '../../../dist/Repository/Knowledge/Casebook/Index.js'
+import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, toList, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
-import { HostToolArguments_$ctor_4E60E31B as hostArgs } from '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
+import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
+import { HostToolArguments_$ctor_4E60E31B as hostArgs } from '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])
@@ -24,11 +24,11 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 const factoryFor = async () => {
-  const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+  const codec = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
   return codec.ToolHostCodec_factory({ tool: { schema: { string: () => ({ type: 'string' }) } } })
 }
 const buildTool = async (dir, store) => {
-  const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/FetchTool.js')
+  const { spec } = await import('../../../dist/OpenCode/Tools/FetchTool.js')
   return spec(await factoryFor(), dir, store)
 }
 const record = (session, q, a, obs) => ({ SessionId: session, Q: q, A: a, Observations: toList(obs), LastAccessOrder: 0 })

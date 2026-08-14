@@ -115,7 +115,7 @@ test('Journal-only or EventStore-only modules are not dual-write', () => {
     'let create store = EventStore.create store',
   ].join('\n')
   assert.equal(
-    scanDualWrite(eventStoreOnly, 'src/Wanxiangshu/Infrastructure/Persist/EventStore.fs').length,
+    scanDualWrite(eventStoreOnly, 'src/Wanxiangshu/Persistence/EventStore/Store.fs').length,
     0,
   )
 })
@@ -181,7 +181,7 @@ test('owner remote-tracking store ref is allowed; other feature refs stay RED', 
 test('git-bypass allowlist is empty; only Persist/Git ownership may invoke git', () => {
   assert.deepEqual([...GIT_BYPASS_ALLOWLIST], [])
   const source = 'let c = { FileName = "git"; Arguments = [] }'
-  assert.equal(scanGitBypass(source, 'src/Wanxiangshu/Infrastructure/Git/GitSubject.fs').length, 0)
+  assert.equal(scanGitBypass(source, 'src/Wanxiangshu/Git/Subject.fs').length, 0)
   assert.equal(scanGitBypass(source, 'src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs').length, 0)
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Domain/Sneaky.fs').length >= 1)
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Journal/RuntimePath.fs').length >= 1)

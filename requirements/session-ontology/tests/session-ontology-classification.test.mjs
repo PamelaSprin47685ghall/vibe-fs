@@ -32,9 +32,9 @@ const {
   StrengthReplicaAssociationHints_isStrengthReplicaAttachment: isStrengthReplicaAttachment,
 } = await import('../../../dist/Execution/Session/Association.js')
 
-const { roleName } = await import('../../../dist/Session/AgentRoleIdentity.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { AttachmentKind } = await import('../../../dist/Kernel/SessionOwnership.js')
+const { roleName } = await import('../../../dist/Participant/Persona/RoleIdentity.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const { AttachmentKind } = await import('../../../dist/Execution/Session/Ownership.js')
 
 const linkedPair = () => {
   // sessionAssociation.link takes plain session-id strings (the facade wraps

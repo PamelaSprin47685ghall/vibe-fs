@@ -39,7 +39,7 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
-import { observationsOfSession } from '../../../dist/Feedback/Enforcer/Observation.js'
+import { observationsOfSession } from '../../../dist/Enforcer/Observation.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const RULEBOOK = join(ROOT, 'resources/enforcer')
@@ -233,7 +233,7 @@ test('A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembl
 })
 
 test('A42_PAIRED_HISTORY_004_proved_vs_still_human', async () => {
-  const host = await import('../../../dist/Session/EnforcerHost.js')
+  const host = await import('../../../dist/Enforcer/Host.js')
   assert.equal(host.trueRepeat, undefined)
   assert.equal(host.isTrueRepeat, undefined)
   assert.equal(host.judgeTrueRepeat, undefined)

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
 const wrapper = path.join(here, 'cursor-hint-channel-canary-plugin.mjs');
-const production = path.join(repo, 'dist/Infrastructure/OpenCode/Plugin/Plugin.js');
+const production = path.join(repo, 'dist/OpenCode/Plugin/Plugin.js');
 const opencode = process.env.OPENCODE_BIN ?? 'opencode';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

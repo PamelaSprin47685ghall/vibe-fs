@@ -15,17 +15,16 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { runSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ExecutorTool.js')
-const {
-  ToolRuntimeScope,
-  ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery,
-} = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { runSpec } = await import('../../../dist/OpenCode/Tools/ExecutorTool.js')
+const toolRuntimeModule = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { ToolRuntimeScope } = toolRuntimeModule
+const attachFamilyRecovery = Object.entries(toolRuntimeModule).find(([k]) => k.startsWith('ToolRuntimeScope__AttachFamilyRecovery_'))?.[1]
 const {
   FamilyRecovery,
   NonEmpty_one: nonEmptyOne,
   RecoveryBlock,
-} = await import('../../../dist/Domain/SessionRecovery.js')
+} = await import('../../../dist/Execution/Session/Recovery/Model.js')
 
 const chain = (kind, extra = {}) => ({
   kind,

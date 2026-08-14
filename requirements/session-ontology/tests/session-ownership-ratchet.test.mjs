@@ -254,6 +254,6 @@ test('session_ownership_repo_scan_is_green', () => {
   }
   assert.equal(
     loaded.matrix.kinds.Bookkeeper.evidencePath,
-    'src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs',
+    'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
   )
 })

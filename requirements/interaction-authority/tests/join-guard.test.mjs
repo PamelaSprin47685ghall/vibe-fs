@@ -16,7 +16,7 @@ import {
   stream, caseOf, promptDispatcher, transportReceipt, runtimeNudge,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { nudge } = await import('../../../dist/Infrastructure/OpenCode/Host/HostJoinGuard.js')
+const { nudge } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinGuard.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const capturingPort = (captured) => ({

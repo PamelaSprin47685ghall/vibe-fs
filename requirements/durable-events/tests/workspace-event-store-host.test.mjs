@@ -12,7 +12,7 @@ import { agentFact, caseOf, fold, payloadOf, sessionId, stream } from '../../ver
 
 const RuntimePath = await import('../../../dist/Persistence/Journal/RuntimePath.js')
 const Shared = await import('../../../dist/Persistence/Journal/SharedAgentJournal.js')
-const Workspace = await import('../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
+const Workspace = await import('../../../dist/OpenCode/Host/WorkspaceEventStore.js')
 const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'

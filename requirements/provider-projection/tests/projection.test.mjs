@@ -12,21 +12,21 @@ const {
   messagesFromTransformOutput,
   hostMessageId,
   projectionSessionIdFromMessages,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js')
+} = await import('../../../dist/OpenCode/Codec/ProviderWireDecode.js')
 const {
   decodeMessage,
   decodeMessageView,
   decodeRequest,
   lastUserMessageId,
   formalText,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js')
+} = await import('../../../dist/OpenCode/Codec/ProviderWireCapture.js')
 const {
   prependCompanionMemory,
   applyRenderedPrefix,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js')
+} = await import('../../../dist/OpenCode/Codec/ProjectionMessageEdit.js')
 
-const { RenderedPrefix } = await import('../../../dist/Domain/ProjectionRenderer.js')
-const { PrefixActivation } = await import('../../../dist/Domain/ProjectionIntent.js')
+const { RenderedPrefix } = await import('../../../dist/Participant/Provider/Projection/Renderer.js')
+const { PrefixActivation } = await import('../../../dist/Participant/Provider/Projection/Intent.js')
 
 test('MISC_projection_decode_part_text_reasoning', () => {
   assert.equal(decodePart(null), undefined)

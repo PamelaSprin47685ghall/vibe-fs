@@ -7,8 +7,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { joinResultRenderer } from '../../verification-system/tests/support/domain.mjs'
-import { ForkError } from '../../../dist/Session/ForkTypes.js'
-import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
+import { ForkError } from '../../../dist/Execution/Delegation/Fork/Model.js'
+import { JoinInterruptReason } from '../../../dist/Execution/Session/Wait/CompletionMailbox.js'
 
 test('devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
   const wire = joinResultRenderer.renderInterrupted(JoinInterruptReason.DeadlineExpired)

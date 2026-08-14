@@ -7,15 +7,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  SatelliteRuntime_$ctor_Z39272A43 as createRuntime,
-  SatelliteRuntime__Ensure_73F925B0 as ensure,
-  SatelliteOrigin,
-  SatelliteSpec,
-} from '../../../dist/Session/SatelliteRuntime.js'
-import { OpenCodeChildInfo } from '../../../dist/Infrastructure/OpenCode/Host/OpenCodePort.js'
+const satelliteModule = await import('../../../dist/Execution/Session/Attachment/SatelliteRuntime.js')
+const { SatelliteRuntime, SatelliteOrigin, SatelliteSpec } = satelliteModule
+const createRuntime = Object.entries(satelliteModule).find(([k]) => k.startsWith('SatelliteRuntime_$ctor'))?.[1]
+const ensure = Object.entries(satelliteModule).find(([k]) => k.startsWith('SatelliteRuntime__Ensure_'))?.[1]
+import { OpenCodeChildInfo } from '../../../dist/OpenCode/Host/OpenCodePort.js'
 import { SatelliteKind } from '../../../dist/Execution/Session/Association.js'
-import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
+import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
 import { errorResult, okResult, toList } from '../../verification-system/tests/support/domain.mjs'
 
 // HOST-015: satellites are physically parented to the family root ('root'),

@@ -70,7 +70,7 @@ open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Recovery
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

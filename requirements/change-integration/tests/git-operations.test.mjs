@@ -9,7 +9,7 @@ import test from 'node:test'
 
 import { commitHash, listItems, managerJobId, resultOf, targetRef, worktreeIdentity, worktreePath } from '../../verification-system/tests/support/domain.mjs'
 
-const { createWithRepo, createWithRunner } = await import('../../../dist/Infrastructure/Git/GitOperations.js')
+const { createWithRepo, createWithRunner } = await import('../../../dist/Git/Operations.js')
 
 /** Fake process host: script answers by (file, args) and records every command.
  *  A response entry of `[tripleA, tripleB, ...]` (array of triples) is consumed in

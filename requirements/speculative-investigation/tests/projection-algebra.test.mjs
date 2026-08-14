@@ -11,15 +11,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Intent from '../../../dist/Domain/ProjectionIntent.js'
-import * as Planner from '../../../dist/Domain/ProjectionPlanner.js'
-import * as Renderer from '../../../dist/Domain/ProjectionRenderer.js'
+import * as Intent from '../../../dist/Participant/Provider/Projection/Intent.js'
+import * as Planner from '../../../dist/Participant/Provider/Projection/Planner.js'
+import * as Renderer from '../../../dist/Participant/Provider/Projection/Renderer.js'
 // Fable emits a bare `plan` for the single-module Planner file; keep the
 // historical prefixed name so call sites stay stable.
 const P = { ...Intent, ...Planner, ...Renderer, ProjectionPlanner_plan: Planner.plan }
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import * as Frame from '../../../dist/Strength/Frame.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const H = (text) => `H(${text})`

@@ -28,9 +28,9 @@ runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { EnforcerTipGuidance_latestTipNudge: latestTipNudge } = await import(
-  '../../../dist/Session/EnforcerTipGuidance.js',
+  '../../../dist/Enforcer/Guidance/Tip.js',
 )
-const { tryInject } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
+const { tryInject } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const main = sessionId('ses-nudge-main')
 const blogger = sessionId('ses-nudge-blogger')

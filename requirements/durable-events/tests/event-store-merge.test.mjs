@@ -6,8 +6,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { eventId, listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Merge = await import('../../../dist/Infrastructure/Persist/EventKWayMerge.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
+const Merge = await import('../../../dist/Persistence/EventStore/EventKWayMerge.js')
 const streamId = (value) => Domain.EventStreamIdModule_create(value)
 const envelope = (id, parents = [], stream = 'proof/merge', payload = {}) => new Domain.EventEnvelope(
   eventId(id), streamId(stream), 'JobRequested', toList(parents.map(eventId)), payload, toList([]),

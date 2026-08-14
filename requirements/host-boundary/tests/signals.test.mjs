@@ -6,23 +6,23 @@ import test from 'node:test'
 
 import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
-const { SessionIdModule_create: sid } = await import('../../../dist/Kernel/Identity.js')
+const { SessionIdModule_create: sid } = await import('../../../dist/Foundation/Identity.js')
 const {
   HostSignal,
   RetrySignal,
-} = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignal.js')
-const {
-  HostSignalAdapter_sessionIdOf: sessionIdOf,
-  HostSignalAdapter_tryAdapt: tryAdapt,
-  HostSignalRouter,
-  HostSignalRouter__RegisterOwned_Z31B28506: RegisterOwned,
-  HostSignalRouter__UnregisterOwned_Z31B28506: UnregisterOwned,
-  HostSignalRouter__Observe_4E60E31B: Observe,
-  HostSignalRouter__ObserveLocal_4E60E31B: ObserveLocal,
-  HostSignalRouter__isOwned_Z31B28506: isOwned,
-} = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignalAdapter.js')
+} = await import('../../../dist/OpenCode/Signals/HostSignal.js')
+const adapter = await import('../../../dist/OpenCode/Signals/HostSignalAdapter.js')
+const { HostSignalAdapter_sessionIdOf: sessionIdOf, HostSignalAdapter_tryAdapt: tryAdapt, HostSignalRouter } = adapter
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const memberOf = (name) => Object.entries(adapter).find(([k]) => k.startsWith(`HostSignalRouter__${name}_`))?.[1]
+const RegisterOwned = memberOf('RegisterOwned')
+const UnregisterOwned = memberOf('UnregisterOwned')
+const Observe = memberOf('Observe')
+const ObserveLocal = memberOf('ObserveLocal')
+const isOwned = memberOf('isOwned')
 const makeRouter = (...args) => new HostSignalRouter(...args)
-const { trySubscribe } = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
+const { trySubscribe } = await import('../../../dist/OpenCode/Signals/HostSignalSubscribe.js')
 
 
 const idleRaw = (sessionID, extra = {}) => ({ type: 'session.status', sessionID, properties: { status: { type: 'idle' }, ...extra } })

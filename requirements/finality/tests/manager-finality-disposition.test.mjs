@@ -23,8 +23,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { admitLabor, classifyEnding, EndingDisposition, LaborAdmission } from '../../../dist/Application/Manager/ManagerFinality.js'
-import { Role, Roles_isAllowed, ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { admitLabor, classifyEnding, EndingDisposition, LaborAdmission } from '../../../dist/Mission/Manager/Finality.js'
+import { Role, Roles_isAllowed, ToolPermission } from '../../../dist/Foundation/Roles.js'
 import {
   blobDigest,
   blobRef,

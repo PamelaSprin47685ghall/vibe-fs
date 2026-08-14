@@ -15,8 +15,8 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { mvSpec, rmSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/FileMutationTools.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { mvSpec, rmSpec } = await import('../../../dist/OpenCode/Tools/FileMutationTools.js')
 
 // The spec builder only calls schema.string(); the real Host owns the rest of the DSL.
 const fakeSchema = { string: () => ({ kind: 'string-schema' }) }

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as EventStore from '../../../dist/Domain/EventStore.js'
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
-import * as Events from '../../../dist/Domain/StrengthEvents.js'
-import * as Projection from '../../../dist/Domain/StrengthProjection.js'
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import * as HostDigest from '../../../dist/Host/HostDigest.js'
-import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as EventStore from '../../../dist/Persistence/EventStore/Model.js'
+import * as Frame from '../../../dist/Strength/Frame.js'
+import * as Events from '../../../dist/Strength/Events.js'
+import * as Projection from '../../../dist/Strength/Projection/Model.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import * as HostDigest from '../../../dist/Host/Digest.js'
+import { StrengthBudget } from '../../../dist/Strength/Budget.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const caseOf = (value) => value.cases()[value.tag]

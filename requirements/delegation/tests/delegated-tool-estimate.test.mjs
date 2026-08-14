@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
+import { ToolCallIdModule_create as toolCallId } from '../../../dist/Foundation/Identity.js'
 
 const {
   DelegatedToolEstimateProjection_replace: replace,

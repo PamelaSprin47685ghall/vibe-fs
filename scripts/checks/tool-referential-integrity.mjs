@@ -11,9 +11,9 @@ import { basename, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
-export const TOOLS_ROOT = 'src/Wanxiangshu/Infrastructure/OpenCode/Tools'
-export const STATIC_TOOLS_REL = 'src/Wanxiangshu/Tools/StaticTools.fs'
-export const TOOL_REGISTRY_REL = 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs'
+export const TOOLS_ROOT = 'src/Wanxiangshu'
+export const STATIC_TOOLS_REL = 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs'
+export const TOOL_REGISTRY_REL = 'src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'
 
 /** Legacy provider tool names that must not reappear as ToolSpec.Name owners. */
 export const LEGACY_FORBIDDEN_NAMES = Object.freeze([
@@ -180,18 +180,28 @@ export const scanEntries = (entries, extra = {}) => {
  * @param {string} [repoRoot]
  * @returns {{ ok: boolean, violations: Violation[] }}
  */
+export const isToolFile = (file) => {
+  const rel = norm(file)
+  return (
+    rel.includes('/OpenCode/Tools/') ||
+    (rel.includes('/OpenCode/') && /Tool(?:s)?\.fs$/.test(rel)) ||
+    rel.endsWith('StaticTools.fs') ||
+    rel.endsWith('ToolRegistry.fs')
+  )
+}
+
 export const scanRepo = (repoRoot = process.cwd()) => {
   /** @type {Violation[]} */
   const violations = []
-  const toolsAbs = resolve(repoRoot, TOOLS_ROOT)
-  if (!existsSync(toolsAbs)) {
+  const prodAbs = resolve(repoRoot, 'src/Wanxiangshu')
+  if (!existsSync(prodAbs)) {
     return {
       ok: false,
       violations: [{ code: 'missing-tools-root', path: TOOLS_ROOT, detail: 'Tools directory missing' }],
     }
   }
 
-  const files = walk(toolsAbs, ['.fs'])
+  const files = walk(prodAbs, ['.fs']).filter(isToolFile)
   const entries = files.map((file) => ({
     file: norm(file.slice(repoRoot.length + 1)),
     text: readFileSync(file, 'utf8'),

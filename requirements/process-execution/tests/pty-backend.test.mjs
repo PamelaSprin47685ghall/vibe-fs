@@ -10,7 +10,7 @@ import { caseOf, payloadOf, resultOf } from '../../verification-system/tests/sup
 const { createPort } = await import('../../../dist/Process/PtyBackend.js')
 
 const {
-  PtyPort__AddMailboxSender_15902874,
+  PtyPort__AddMailboxSender_6A484C48,
   PtyPort__Fork_515E235E,
   PtyPort__Exists_Z33F80F6F,
   PtyPort__Known_Z33F80F6F,
@@ -39,7 +39,7 @@ test('BACKEND_createPort_returns_a_working_port', () => {
 test('BACKEND_fork_without_bun_pty_fails_spawn_and_publishes_failed', async () => {
   const port = createPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(port, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
   const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-sf'))
   await settle()
 
@@ -65,7 +65,7 @@ test('BACKEND_failed_fork_leaves_unknown_active_but_known_closed', async () => {
 test('BACKEND_generated_id_also_fails_cleanly', async () => {
   const port = createPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(port, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
   const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent)
   await settle()
   assert.match(PtyId__get_Value(pid), /^pty-[0-9a-f]{8}$/)
@@ -122,7 +122,7 @@ test('BACKEND_ports_are_isolated_from_each_other', async () => {
 test('BACKEND_concurrent_failed_forks_each_publish_one_completion', async () => {
   const port = createPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(port, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
   PtyPort__Fork_515E235E(port, 'cmd one', agent, id('pty-f1'))
   PtyPort__Fork_515E235E(port, 'cmd two', agent, id('pty-f2'))
   await settle()

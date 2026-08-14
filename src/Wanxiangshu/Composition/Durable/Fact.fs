@@ -1,9 +1,8 @@
 namespace Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable
+
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Sphinx
 

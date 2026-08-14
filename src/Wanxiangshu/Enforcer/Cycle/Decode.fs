@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork.Host

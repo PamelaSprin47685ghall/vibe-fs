@@ -11,12 +11,12 @@ import { join } from 'node:path'
 import {
   serverName,
   localCommand,
-} from '../../../dist/Kernel/SphinxMcp.js'
+} from '../../../dist/Sphinx/Mcp.js'
 import {
   apply as applyMcp,
   launchFromVars,
   defaultServerEntry,
-} from '../../../dist/Infrastructure/OpenCode/Host/SphinxMcpConfig.js'
+} from '../../../dist/OpenCode/Host/SphinxMcpConfig.js'
 import { managedAgentConfig, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 const ROLES = [

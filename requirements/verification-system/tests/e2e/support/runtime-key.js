@@ -40,7 +40,7 @@ import { toArray as listToArray } from '../../../../../dist/fable_modules/fable-
 // making every marker-shaped assistant count as a real step.
 import {
   source as pairProgrammingThoughtSource,
-} from '../../../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
+} from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js';
 
 // ── lane ────────────────────────────────────────────────────────────────────
 

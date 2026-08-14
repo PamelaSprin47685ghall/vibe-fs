@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const Store = await import('../../../../dist/Infrastructure/Persist/EventStore.js')
-const Integrator = await import('../../../../dist/Infrastructure/Persist/CanonicalIntegrator.js')
+const Store = await import('../../../../dist/Persistence/EventStore/Store.js')
+const Integrator = await import('../../../../dist/Persistence/EventStore/CanonicalIntegrator.js')
 
 /** Test-only production-shape EventStore: temp git common-dir + one WriterId NDJSON. */
 export const createLocalEventStore = ({ commonDir, writerId } = {}) => {

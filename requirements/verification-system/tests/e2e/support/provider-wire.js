@@ -28,9 +28,9 @@
  * questions (there really is one meaning).
  */
 
-import { canonicalJson } from '../../../../../dist/Infrastructure/OpenCode/Codec/CanonicalJson.js';
-import { sha256Hex } from '../../../../../dist/Host/HostDigest.js';
-import { ToolCallIdModule_create as toolCallId } from '../../../../../dist/Kernel/Identity.js';
+import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJson.js';
+import { sha256Hex } from '../../../../../dist/Host/Digest.js';
+import { ToolCallIdModule_create as toolCallId } from '../../../../../dist/Foundation/Identity.js';
 import {
   ProviderWireProjection,
   WireMessage,
@@ -43,7 +43,7 @@ import {
   semanticallyEqual,
   toSemantic,
   toolResultDigests,
-} from '../../../../../dist/Domain/ProviderProjection.js';
+} from '../../../../../dist/Participant/Provider/Projection/Model.js';
 import { ofArray, toArray as listToArray } from '../../../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
 
 // ── union construction by case NAME ─────────────────────────────────────────

@@ -25,7 +25,7 @@ import {
   transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
-import { send } from '../../../dist/Session/HostForkBusyNudge.js'
+import { send } from '../../../dist/Execution/Delegation/Fork/Host/BusyNudge.js'
 
 const capturingPort = (sends) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),

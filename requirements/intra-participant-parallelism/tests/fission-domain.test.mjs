@@ -16,7 +16,7 @@ import {
   FissionWorkBundleModule_keys as workBundleKeys,
   FissionWorkBundleModule_entries as workBundleEntries,
   FissionConvergence_ready as convergenceReady,
-} from '../../../dist/Domain/Fission.js'
+} from '../../../dist/Execution/Fission/Model.js'
 
 const parse = (text) => parsePrompt(text)
 const lanePrompts = (parsed) => listItems(parsed.Lanes).map((lane) => [lane.Index, lane.Prompt])

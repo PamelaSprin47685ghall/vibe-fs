@@ -6,7 +6,7 @@ import test from 'node:test'
 const root = new URL('../../../', import.meta.url).pathname
 const read = (path) => readFileSync(join(root, path), 'utf8')
 
-const workflowPath = 'src/Wanxiangshu/Application/Manager/ObligationLedgerWorkflow.fs'
+const workflowPath = 'src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs'
 
 test('OBLIGATION_LEDGER_018 business sequencing is a direct F# CE, not a second runtime', () => {
   assert.equal(existsSync(join(root, workflowPath)), true, `${workflowPath} must own the business workflow`)
@@ -37,17 +37,17 @@ test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, n
 
   for (const path of [
     'src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs',
-    'src/Wanxiangshu/Application/Manager/ManagerIdle.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs',
+    'src/Wanxiangshu/Mission/Manager/Idle.fs',
+    'src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs',
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-    'src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs',
+    'src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
   ]) {
     assert.doesNotMatch(read(path), /\.AcceptedOrder\b|acceptedOrder\s+/, `${path} must consume O(1) projection queries`)
   }
 })
 
 test('OBLIGATION_LEDGER_018 recovery contract is fact reentry, not a resumable workflow position', () => {
-  const facts = read('src/Wanxiangshu/Domain/MagicTodoFacts.fs')
+  const facts = read('src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs')
   const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
 
   assert.doesNotMatch(facts, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter|AwaitingReview\s*:/)

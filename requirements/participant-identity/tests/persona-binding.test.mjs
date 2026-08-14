@@ -8,9 +8,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
-import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
-import * as SessionPersona from '../../../dist/Session/SessionPersona.js'
+import { AgentTier, Role } from '../../../dist/Foundation/Roles.js'
+import * as PersonaCatalog from '../../../dist/Participant/Persona/Catalog.js'
+import * as SessionPersona from '../../../dist/Participant/Persona/SessionPersona.js'
 import { resultOf, sessionId, unwrapOption } from '../../verification-system/tests/support/domain.mjs'
 
 test('PROMPT_STABILITY_persona_binds_once_and_never_rewrites', () => {

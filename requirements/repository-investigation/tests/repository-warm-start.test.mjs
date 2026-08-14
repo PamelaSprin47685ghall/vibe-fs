@@ -16,12 +16,12 @@ import {
   RepositoryWarmStartPrompt_appendToProviderPrompt as appendToProviderPrompt,
   RepositoryWarmStartPrompt_normalizeKeywords as normalizeKeywords,
   RepositoryWarmStartPrompt_render as render,
-} from '../../../dist/Domain/RepositoryWarmStartPrompt.js'
-import { Hit } from '../../../dist/Kernel/SembleMcp.js'
+} from '../../../dist/Repository/Investigation/WarmStart/Prompt.js'
+import { Hit } from '../../../dist/Repository/Investigation/Semble/Mcp.js'
 import {
   appendToBaseWithSearch,
   prepareWithSearch,
-} from '../../../dist/Infrastructure/RepositoryWarmStart.js'
+} from '../../../dist/Repository/Investigation/WarmStart/Runtime.js'
 
 const hint = (ordinal, rank, file, content, score = 0.9) =>
   new RepositoryWarmStartHint(ordinal, rank, file, rank, rank + 2, content, score, 100)

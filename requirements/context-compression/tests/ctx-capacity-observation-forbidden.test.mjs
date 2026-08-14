@@ -58,12 +58,12 @@ test('CTX_001_the_only_allowed_byte_metric_is_the_delta_input_contract', () => {
   // The one legal byte quantity: BloggerDeltaLimitBytes = 200 KiB measured on
   // rendered TOML (CTX-003). It must exist and be a constant, not a query of
   // the provider window.
-  const bloggerDelta = fs.readFileSync(path.join(NEXT_DIR, 'Domain', 'BloggerDelta.fs'), 'utf8')
+  const bloggerDelta = fs.readFileSync(path.join(NEXT_DIR, 'Context', 'Companion', 'Blogger', 'Delta.fs'), 'utf8')
   assert.match(bloggerDelta, /200\s*\*\s*1024|200 \* 1024|200L/, 'the 200 KiB input contract is a constant')
   // And the Domain must not compare it to any window: no "window" identifier
   // anywhere in the compression domain files.
-  const probe = fs.readFileSync(path.join(NEXT_DIR, 'Domain', 'PrefixProbeSelection.fs'), 'utf8')
+  const probe = fs.readFileSync(path.join(NEXT_DIR, 'Context', 'Prefix', 'ProbeSelection.fs'), 'utf8')
   assert.ok(!probe.includes('Window'), 'probe selection must not reference a model window')
-  const slot = fs.readFileSync(path.join(NEXT_DIR, 'Domain', 'RecoverySlot.fs'), 'utf8')
+  const slot = fs.readFileSync(path.join(NEXT_DIR, 'Participant', 'Provider', 'Attempt', 'RecoverySlot.fs'), 'utf8')
   assert.ok(!slot.includes('Window'), 'recovery slot must not reference a model window')
 })

@@ -28,11 +28,9 @@ import {
   worktreePath,
 } from './domain.mjs'
 
-const hostModule = await import(new URL('../../../../dist/Infrastructure/OpenCode/Orchestration/Host.js', import.meta.url).pathname)
-const {
-  OrchestratorHost,
-  OrchestratorHost__JoinPublishedAvailable_Z2FFF68F8: rawJoinPublishedAvailable,
-} = hostModule
+const hostModule = await import(new URL('../../../../dist/Change/Host/Host.js', import.meta.url).pathname)
+const { OrchestratorHost } = hostModule
+const rawJoinPublishedAvailable = Object.entries(hostModule).find(([k]) => k.startsWith('OrchestratorHost__JoinPublishedAvailable_'))?.[1]
 const member = (name) =>
   Object.entries(hostModule).find(
     ([exportName, value]) => exportName.includes(`OrchestratorHost__${name}_`) && typeof value === 'function',
@@ -45,10 +43,9 @@ for (const [name, value] of [
 ]) {
   if (typeof value !== 'function') throw new Error(`${name} export must be discoverable without pinning Fable hash`)
 }
-const { OrchestratorHostDeps } = await import('../../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
-const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
-  '../../../../dist/Application/Orchestration/Runtime.js'
-)
+const { OrchestratorHostDeps } = await import('../../../../dist/Change/Host/Types.js')
+const RuntimeModule = await import('../../../../dist/Change/Runtime.js')
+const createOrchestrator = Object.entries(RuntimeModule).find(([k]) => k.startsWith('Orchestrator_$ctor'))?.[1] ?? ((...args) => new RuntimeModule.Orchestrator(...args))
 
 // Fable Results are {tag, fields}; resultOf restores the {ok, value, error} surface.
 export const forkManagerJob = async (host, ...args) => resultOf(await rawForkManagerJob(host, ...args))

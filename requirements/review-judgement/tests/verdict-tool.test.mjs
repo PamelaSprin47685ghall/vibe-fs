@@ -9,9 +9,9 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec } = await import('../../../dist/Mission/Review/OpenCode/JudgeTool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 
 const fakeSchema = {
   enum: (values) => ({ values }),

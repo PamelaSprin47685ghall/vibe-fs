@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Evidence from '../../../dist/Application/Strength/StrengthTurnEvidence.js'
-import { MessagePart } from '../../../dist/Infrastructure/OpenCode/Codec/HostMessageCodec.js'
+import * as Evidence from '../../../dist/Strength/TurnEvidence.js'
+import { MessagePart } from '../../../dist/OpenCode/Codec/HostMessageCodec.js'
 
 const caseOf = (value) => value.cases()[value.tag]
 const text = (value) => new MessagePart(0, [value])

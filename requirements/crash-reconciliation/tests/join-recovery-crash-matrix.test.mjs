@@ -17,7 +17,7 @@ import {
   sessionId,
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
-import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 const PARENT = sessionId('ses_crash_p')
 const CHILD = sessionId('ses_crash_c')

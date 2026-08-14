@@ -9,7 +9,7 @@ const {
   canonicalJson,
   equal,
   withoutKeys,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/CanonicalJson.js')
+} = await import('../../../dist/OpenCode/Codec/CanonicalJson.js')
 
 // ── CanonicalJson ────────────────────────────────────────────────────────────
 

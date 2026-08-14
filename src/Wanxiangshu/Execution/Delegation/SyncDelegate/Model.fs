@@ -2,9 +2,6 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Sphinx
 
 open Wanxiangshu.Foundation.Identity
 

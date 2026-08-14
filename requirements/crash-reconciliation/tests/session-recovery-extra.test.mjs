@@ -33,9 +33,9 @@ const {
   RecoveredHandle,
   HandleRecoveryWait,
   HandleRecoveryBlock,
-} = await import('../../../dist/Domain/SessionRecovery.js')
+} = await import('../../../dist/Execution/Session/Recovery/Model.js')
 
-const { SessionIdModule_create: sid, AgentHandleIdModule_create: handleId, ManagerJobIdModule_create: jobId } = await import('../../../dist/Kernel/Identity.js')
+const { SessionIdModule_create: sid, AgentHandleIdModule_create: handleId, ManagerJobIdModule_create: jobId } = await import('../../../dist/Foundation/Identity.js')
 
 test('MISC_recovery_of_handle_family_all_branches', () => {
   const s = sid('s1')

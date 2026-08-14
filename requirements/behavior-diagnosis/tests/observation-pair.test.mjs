@@ -6,7 +6,7 @@ import {
   RulebookObservation_pairTipsAndFrames as pairTipsAndFrames,
   RulebookObservation_ofTipsAndFrames as ofTipsAndFrames,
   RulebookObservation_workLogFromUnits as workLogFromUnits,
-} from '../../../dist/Domain/RulebookObservation.js'
+} from '../../../dist/Enforcer/Rulebook.js'
 import { listItems, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const pair = (tips, frames) => listItems(pairTipsAndFrames(toList(tips), toList(frames)))

@@ -5,11 +5,11 @@ import {
   ProviderRequestKind,
   ProviderRequestKindModule_clearsFailureCountOnSuccess as clearsFailureCountOnSuccess,
   ProviderRequestKindModule_mayCarryProbe as mayCarryProbe,
-} from '../../../dist/Domain/PrefixCandidate.js'
-import * as Cost from '../../../dist/Domain/StrengthCostModel.js'
-import * as Policy from '../../../dist/Domain/StrengthPolicy.js'
-import { toolCapabilitiesFor } from '../../../dist/Domain/PromptAuthority.js'
-import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
+} from '../../../dist/Context/Prefix/Candidate.js'
+import * as Cost from '../../../dist/Strength/Prediction/CostModel.js'
+import * as Policy from '../../../dist/Strength/Policy.js'
+import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
+import { AgentTier, Role } from '../../../dist/Foundation/Roles.js'
 
 const caseName = (value) => value.cases()[value.tag]
 const permissionNames = (set) => [...set].map(caseName).sort()

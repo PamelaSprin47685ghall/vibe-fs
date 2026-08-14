@@ -44,7 +44,10 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Wanxiangshu.Orchestrator
+open Wanxiangshu.Change
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
 
 /// Host wiring for the Orchestrator: forks Managers and reviewers under one
 /// runtime, and supplies `ManagerPort` to the pure publish program.

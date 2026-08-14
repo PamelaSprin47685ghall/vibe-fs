@@ -27,7 +27,7 @@ test('JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => 
 })
 
 test('JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', async () => {
-  const { ForkError } = await import('../../../dist/Session/ForkTypes.js')
+  const { ForkError } = await import('../../../dist/Execution/Delegation/Fork/Model.js')
   assertClean(joinResultRenderer.renderInterrupted(), 'operator abort')
   assertClean(joinResultRenderer.renderForkError(ForkError.NothingToJoin), 'nothing to join')
   assertClean(joinResultRenderer.renderForkError(ForkError.TimedOut), 'timed out')

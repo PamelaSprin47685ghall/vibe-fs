@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { roleName } = await import('../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const { roleName } = await import('../../../dist/OpenCode/Host/TerminalPolicy.js')
 
 test('TPOL_roleName_lowercases_roles_and_handles_none', () => {
   assert.equal(roleName(Role.Manager), 'manager')

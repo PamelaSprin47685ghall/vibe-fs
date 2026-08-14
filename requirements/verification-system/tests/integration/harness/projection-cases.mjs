@@ -233,7 +233,7 @@ export const projectionCases = [
   {
     name: 'VERIFY-007 harness asks production, it does not re-implement',
     fn: async () => {
-      const production = await import('../../../../../dist/Domain/ProviderProjection.js');
+      const production = await import('../../../../../dist/Participant/Provider/Projection/Model.js');
       const adapter = await import('../../e2e/support/provider-wire.js');
 
       // Identity comparison, not shape comparison: a local copy with the same

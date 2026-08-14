@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as WireDecode from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js'
-import * as WireCapture from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
-import * as MessageEdit from '../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as WireDecode from '../../../dist/OpenCode/Codec/ProviderWireDecode.js'
+import * as WireCapture from '../../../dist/OpenCode/Codec/ProviderWireCapture.js'
+import * as MessageEdit from '../../../dist/OpenCode/Codec/ProjectionMessageEdit.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const H = (text) => `H(${text})`

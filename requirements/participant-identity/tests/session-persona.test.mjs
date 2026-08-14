@@ -6,11 +6,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
-import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
-import * as SessionPersona from '../../../dist/Session/SessionPersona.js'
-import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
-import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
+import { AgentTier, Role } from '../../../dist/Foundation/Roles.js'
+import * as PersonaCatalog from '../../../dist/Participant/Persona/Catalog.js'
+import * as SessionPersona from '../../../dist/Participant/Persona/SessionPersona.js'
+import { systemPromptIdFor } from '../../../dist/Interaction/Authority/Model.js'
+import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Foundation/Identity.js'
 import { resultOf, unwrapOption } from '../../verification-system/tests/support/domain/interop.mjs'
 import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 

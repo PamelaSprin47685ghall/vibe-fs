@@ -13,8 +13,8 @@ import test from 'node:test'
 
 import { eventId, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const LocalLog = await import('../../../dist/Infrastructure/Persist/ProcessEventLog.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
+const LocalLog = await import('../../../dist/Persistence/EventStore/ProcessEventLog.js')
 
 const streamId = (value) => Domain.EventStreamIdModule_create(value)
 const envelope = (id, n) =>
@@ -53,7 +53,7 @@ test('DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segmen
 
 test('DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies', async () => {
   const source = await readFile(
-    new URL('../../../src/Wanxiangshu/Infrastructure/Persist/ProcessEventLog.fs', import.meta.url),
+    new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url),
     'utf8',
   )
 

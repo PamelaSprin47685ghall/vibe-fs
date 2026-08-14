@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { caseOf, listItems, payloadOf } from '../../verification-system/tests/support/domain.mjs'
-import { SessionIdModule_create as sessionId, SessionIdModule_value as sessionValue } from '../../../dist/Kernel/Identity.js'
+import { SessionIdModule_create as sessionId, SessionIdModule_value as sessionValue } from '../../../dist/Foundation/Identity.js'
 
-const Fission = await import('../../../dist/Domain/Fission.js')
+const Fission = await import('../../../dist/Execution/Fission/Model.js')
 import {
   FissionAdmissionModule_create as createAdmission,
   FissionAdmissionModule_admit as admit,
   FissionAdmissionModule_isActive as isActive,
   FissionAdmissionModule_release as release,
-} from '../../../dist/Session/FissionAdmission.js'
+} from '../../../dist/Execution/Fission/Admission.js'
 
 const parsed = () => payloadOf(Fission.FissionPrompt_parse(' lane A  \nlane B'))
 

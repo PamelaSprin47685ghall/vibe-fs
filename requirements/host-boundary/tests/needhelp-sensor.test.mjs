@@ -8,9 +8,9 @@ import {
   tryDecodeDelta,
   tryDecodePartUpdated,
   tryDecodeReasoningDelta,
-} from '../../../dist/Infrastructure/OpenCode/Codec/NeedHelpEventCodec.js'
-import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
-import { AssistancePrompt_stripSentinel as stripSentinel } from '../../../dist/Domain/AssistancePrompt.js'
+} from '../../../dist/Interaction/Dispatch/OpenCode/NeedHelpEventCodec.js'
+import * as NeedHelpSensorModule from '../../../dist/Interaction/Dispatch/OpenCode/NeedHelpSensor.js'
+import { AssistancePrompt_stripSentinel as stripSentinel } from '../../../dist/Interaction/Dispatch/AssistancePrompt.js'
 
 const { NeedHelpSensor } = NeedHelpSensorModule
 

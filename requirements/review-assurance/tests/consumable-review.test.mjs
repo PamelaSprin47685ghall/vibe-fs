@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { HandleCompletionKind, HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import { HandleCompletionKind, HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 import {
   agentFact,
   agentJournal,
@@ -48,7 +48,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { tryConclude, producerPresence, awaitConsumableReview } = await import(
-  '../../../dist/Application/Review/TodoProcessReviewProgram.js'
+  '../../../dist/Mission/Review/TodoProcess.js'
 )
 
 const sha256 = (value) => `digest:${value}`

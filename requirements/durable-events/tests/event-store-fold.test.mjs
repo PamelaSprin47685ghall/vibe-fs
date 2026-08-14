@@ -6,8 +6,8 @@ import test from 'node:test'
 import { caseOf, eventId, idValue, listItems, payloadOf, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Merge = await import('../../../dist/Infrastructure/Persist/EventKWayMerge.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
+const Merge = await import('../../../dist/Persistence/EventStore/EventKWayMerge.js')
 
 const streamId = (value) => Domain.EventStreamIdModule_create(value)
 const make = ({

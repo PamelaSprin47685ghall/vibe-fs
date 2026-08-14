@@ -9,7 +9,7 @@
       "handle": "No. Companion is not a public Handle and does not enter Handle/list/join.",
       "companion": "No. InternalLeaf must not hold a Companion (COMPANION-002 CompanionWouldRecurse).",
       "crashReconcile": "SessionRecoveryWorkflow.defaultRecoverBlogger via BloggerCrashRecovery.reconcile. SatelliteRuntime.Ensure reuses the journal-linked child, Replacement if Host proves it gone, fail closed on query/conflict.",
-      "evidencePath": "src/Wanxiangshu/Session/SatelliteRuntime.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs"
     },
     "SyncInspector": {
       "owner": "Owning Work session (ownerSessionId). DedicatedDelegateKey = (OwnerReuseScopeId, Inspector). Work + Attached(SyncInspector).",
@@ -19,7 +19,7 @@
       "handle": "No. Dedicated SyncInspector does not enter public Handle/list/join.",
       "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
       "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
-      "evidencePath": "src/Wanxiangshu/Kernel/SyncDelegate.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs"
     },
     "SyncCoder": {
       "owner": "Owning Work session (ownerSessionId). DedicatedDelegateKey = (OwnerReuseScopeId, Coder). Work + Attached(SyncCoder).",
@@ -29,7 +29,7 @@
       "handle": "No. Dedicated SyncCoder does not enter public Handle/list/join.",
       "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
       "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
-      "evidencePath": "src/Wanxiangshu/Kernel/SyncDelegate.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs"
     },
     "Bookkeeper": {
       "owner": "Owning Work session (ownerSessionId). InternalLeaf + Attached(Bookkeeper of transactionId). BookkeeperRuntime.bindSession records sessionId→txId with AttachmentKind.Bookkeeper txId.",
@@ -39,7 +39,7 @@
       "handle": "No. Bookkeeper must not enter public Handle/list/join.",
       "companion": "No. InternalLeaf does not hold a Companion.",
       "crashReconcile": "Process-local live map is not durable lifecycle authority. After crash do not reuse the child; next CaseRefresh/CaseFinalize creates a new InternalLeaf via CreateChildSession with a new txId. Not in-process digest. This questionnaire is still not full G9 release-close.",
-      "evidencePath": "src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs",
+      "evidencePath": "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
       "notes": "G6 landed BookkeeperRuntime.fs: one CreateChildSession per transaction, js-bookkeeper against process-local staging, then AbortSession. OpenCodeChildOptions stays {Title, Agent, Directory}. CasebookBookkeeper synthesizer/digest is gone; refreshStale calls runTransaction CaseRefresh. AttachmentKind.Bookkeeper remains declared on SessionOwnership.fs."
     },
     "hidden Reviewer": {
@@ -50,7 +50,7 @@
       "handle": "Yes, HostOwnedHidden. The handle exists for EXEC-009 identity but never enters Manager list/join/guard or parent RestoreHandles.",
       "companion": "MAY. Role.Reviewer is Work, so CompanionTransform may attach a Blogger leaf when the session is not a satellite. The Reviewer handle itself stays HostOwnedHidden.",
       "crashReconcile": "FinalityReviewCohort crash re-entry reuses the enlisted ReviewerSessionId (AdoptChild). HostForkRestart RestoreHandles skips HostOwnedHidden so the Reviewer is not resurrected inside the parent Manager runtime.",
-      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityHostPort.fs"
+      "evidencePath": "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs"
     },
     "StrengthReplica": {
       "owner": "Owning Work session (StrengthReplicaBinding.OwnerSessionId). InternalLeaf + Attached(StrengthReplica). At most one active replica per owner.",
@@ -60,7 +60,7 @@
       "handle": "No. Not a public Handle and not a SatelliteKind case.",
       "companion": "No. No Companion, SyncDelegate, or nested Attached (STRENGTH-004/014).",
       "crashReconcile": "Process-local StrengthRuntime is not durable lifecycle authority. After crash do not reuse a replica transcript; a new decision creates a new child. Durable causality lives in Strength EventStore facts.",
-      "evidencePath": "src/Wanxiangshu/Session/StrengthRuntime.fs"
+      "evidencePath": "src/Wanxiangshu/Strength/Runtime.fs"
     },
     "fork agent": {
       "owner": "Parent Work session (HandleLinked.ParentSessionId / HostForkRuntime parentId).",
@@ -70,7 +70,7 @@
       "handle": "Yes. DurableParentHandle; the agent handle id is the runtime agent id (HandleController.agentHandle).",
       "companion": "MAY. A Work fork child is not a satellite, so CompanionTransform may attach a Blogger leaf.",
       "crashReconcile": "HostForkRestart RestoreHandles → ChildRecoveryWorkflow; SessionRecoveryWorkflow.RestoreHandles. HostOwnedHidden handles are excluded from parent restore. Fail closed on missing proof.",
-      "evidencePath": "src/Wanxiangshu/Session/HostForkRuntime.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs"
     },
     "Distiller child": {
       "owner": "Calling session via HostForkRuntime (run tool parent). Map/reduce workers are forked with Role.Distiller through DistillationRuntime.asDistillationRuntime.",
@@ -80,7 +80,7 @@
       "handle": "Yes, HostOwnedHidden. The handle exists for EXEC-009 identity and permit-gated AwaitAgentWithPermit, but never enters the parent list/join/guard or parent RestoreHandles.",
       "companion": "No. Distiller is an internal Role (AGENT-008); not a Work+Companion path.",
       "crashReconcile": "FamilyRecoveryPermit required before join. FamilyBlocked fail closed; FamilyWaiting retries inside awaitAgent timeout. HostForkRestart RestoreHandles skips HostOwnedHidden so a distiller is never resurrected into the parent runtime.",
-      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/DistillationRuntime.fs"
+      "evidencePath": "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs"
     }
   }
 }

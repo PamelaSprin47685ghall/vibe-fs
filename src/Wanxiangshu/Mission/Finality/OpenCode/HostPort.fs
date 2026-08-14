@@ -55,7 +55,8 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Finality
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation

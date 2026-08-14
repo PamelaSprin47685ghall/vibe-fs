@@ -10,12 +10,12 @@ import {
   materializeInput,
 } from '../../../dist/Mission/Obligation/Todo/MagicTodoLocality.js'
 import { MagicTodoHostHooks_create } from '../../../dist/Mission/Obligation/Todo/MagicTodoMembrane.js'
-import { Obligation } from '../../../dist/Domain/MagicTodo.js'
+import { Obligation } from '../../../dist/Mission/Obligation/Todo/Model.js'
 import {
   SessionMessage,
   SessionToolPart,
   SnapshotToolPartState,
-} from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
+} from '../../../dist/OpenCode/Host/SessionSnapshotPort.js'
 import {
   agentJournal,
   blobDigest,

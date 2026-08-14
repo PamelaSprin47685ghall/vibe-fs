@@ -10,7 +10,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { sessionId, toList, okResult } from '../../verification-system/tests/support/domain.mjs'
-import { InjectedSessionPort_$ctor_Z60D0357E as createPort } from '../../../dist/Infrastructure/OpenCode/Host/Sessions.js'
+const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
 
 // HOST-015: every managed child session is physically parented to the family
 // root — a son's son is a son. The Host tree is exactly two levels deep so the

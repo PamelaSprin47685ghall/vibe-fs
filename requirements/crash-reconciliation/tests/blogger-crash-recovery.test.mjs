@@ -16,20 +16,20 @@ const recoverySrc = readFileSync(
   'utf8',
 )
 const spikeSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginRecoveryWiring.fs'),
+  join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'),
   'utf8',
 )
 const scopeSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs'),
+  join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs'),
   'utf8',
 )
 const interpreterSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
+  join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
   'utf8',
 )
 
 const probeModuleSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Feedback/Enforcer/BloggerRecoveryProbe.fs'),
+  join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'),
   'utf8',
 )
 
@@ -40,7 +40,7 @@ const loadRecovery = async () => {
     new URL('../../../dist/Context/Companion/Blogger/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const probe = await import(
-    new URL('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js', import.meta.url).pathname
+    new URL('../../../dist/Enforcer/Cycle/BloggerProbe.js', import.meta.url).pathname
   )
   return { crash, probe }
 }

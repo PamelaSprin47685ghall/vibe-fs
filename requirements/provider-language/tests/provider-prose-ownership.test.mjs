@@ -32,14 +32,14 @@ module LeakyPrompt =
 `
 
 test('gate_e_scan_roots_cover_gate0_owners', () => {
-  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('RuntimeNudge.fs')))
-  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ReviewChallenge.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Nudge.fs') || p.endsWith('RuntimeNudge.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Challenge.fs') || p.endsWith('ReviewChallenge.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('HorizonTool.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JoinResultRenderer.fs')))
-  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('MagicTodoSurface.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Surface.fs') || p.endsWith('MagicTodoSurface.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ToolRegistry.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('FileMutationTools.fs')))
-  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JsToolHost.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ToolHost.fs') || p.endsWith('JsToolHost.fs')))
 })
 
 test('gate_e_green_fixture_is_zero_hits', () => {

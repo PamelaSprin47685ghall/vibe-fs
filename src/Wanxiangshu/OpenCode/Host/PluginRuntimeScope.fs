@@ -64,6 +64,9 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+open Wanxiangshu.Strength.OpenCode
+open Wanxiangshu.Context.Companion.Blogger.OpenCode
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Host
 
 /// Session-scoped resource owner implemented by the tool runtime without

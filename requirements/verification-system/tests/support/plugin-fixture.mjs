@@ -14,7 +14,7 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 }
 
-const { initSpikePlugin } = await import('../../../../dist/Infrastructure/OpenCode/Plugin/SpikePlugin.js')
+const { initSpikePlugin } = await import('../../../../dist/OpenCode/Plugin/SpikePlugin.js')
 
 // ── the layer-3 executable fixture (EXEC-002, AGENT-007 layer two) ───────────
 //
@@ -35,34 +35,34 @@ const { initSpikePlugin } = await import('../../../../dist/Infrastructure/OpenCo
 // `initSpikePlugin` line.
 const { forWorkspace, gitCommonDir } = await import('../../../../dist/Persistence/Journal/RuntimePath.js')
 const { acquire: acquireJournal, release: releaseJournal } = await import('../../../../dist/Persistence/Journal/SharedAgentJournal.js')
-const { acquire: acquireTerminalBus } = await import('../../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
-const { bootPort } = await import('../../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
+const { acquire: acquireTerminalBus } = await import('../../../../dist/OpenCode/Host/SharedTerminalBus.js')
+const { bootPort } = await import('../../../../dist/OpenCode/Host/WorkspaceEventStore.js')
 const { AgentJournalModule_runtimeId, AgentJournalModule_createFromProjection } = await import(
   '../../../../dist/Persistence/Journal/AgentJournal.js'
 )
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
-  '../../../../dist/Application/Prompting/PromptDispatcher.js'
+  '../../../../dist/Interaction/Dispatch/Dispatcher.js'
 )
 const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create, ManagerLifeIdModule_create, BlobDigestModule_create, BlobRefModule_create, ToolCallIdModule_create } = await import(
-  '../../../../dist/Kernel/Identity.js'
+  '../../../../dist/Foundation/Identity.js'
 )
-const { TerminalOutcome } = await import('../../../../dist/Infrastructure/OpenCode/Host/Events.js')
-const { AgentRunResult } = await import('../../../../dist/Kernel/Outcome.js')
+const { TerminalOutcome } = await import('../../../../dist/OpenCode/Host/Events.js')
+const { AgentRunResult } = await import('../../../../dist/Foundation/Outcome.js')
 const {
   HandleController_recordCompletion: recordCompletion,
   HandleController_agentHandle: agentHandle,
-} = await import('../../../../dist/Session/HandleController.js')
-const ChildRecovery = await import('../../../../dist/Domain/ChildRecovery.js')
-const { ManagerLifecycleFact } = await import('../../../../dist/Kernel/Fact.js')
+} = await import('../../../../dist/Execution/Delegation/Handle/Controller.js')
+const ChildRecovery = await import('../../../../dist/Execution/Delegation/Fork/ChildRecovery.js')
+const { ManagerLifecycleFact } = await import('../../../../dist/Composition/Durable/Fact.js')
 const { StreamId } = await import('../../../../dist/Persistence/Journal/Envelope.js')
 const {
   MagicTodoFact,
   PhysicalSuccessEvidence,
   TodoWriteAccepted,
   TodoWritePrepared,
-} = await import('../../../../dist/Domain/MagicTodoFacts.js')
-const { TodoWriteIdModule_create } = await import('../../../../dist/Domain/MagicTodo.js')
-const { XTraceCursor } = await import('../../../../dist/Domain/XTrace.js')
+} = await import('../../../../dist/Mission/Obligation/Todo/Facts.js')
+const { TodoWriteIdModule_create } = await import('../../../../dist/Mission/Obligation/Todo/Model.js')
+const { XTraceCursor } = await import('../../../../dist/Context/Trace/Model.js')
 const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../../dist/Persistence/Journal/AgentJournal.js')
 const terminalEvidenceCompleted =
   ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed

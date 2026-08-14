@@ -9,7 +9,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { sessionId, toList, okResult } from '../../verification-system/tests/support/domain.mjs'
-import { InjectedSessionPort_$ctor_Z60D0357E as createPort } from '../../../dist/Infrastructure/OpenCode/Host/Sessions.js'
+const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
 
 // HOST-015: abort of the family root cascades to every flattened descendant;
 // the logical middle layer owns no physical children.

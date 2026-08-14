@@ -17,7 +17,7 @@ import {
   CasebookProjection_emptyState as emptyState,
   CasebookProjection_apply as apply,
   CasebookProjection_evict as evict,
-} from '../../../dist/Domain/Casebook.js'
+} from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { caseOf, listItems, mapEntries, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const caseIndex = (cls, name) => Object.create(cls.prototype).cases().indexOf(name)

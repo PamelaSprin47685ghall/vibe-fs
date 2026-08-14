@@ -41,7 +41,10 @@ export const HANDWRITTEN_ROLE_TOOL_TOKENS = [
 ]
 
 /** Files where the static enumeration is legitimate (permission matrix only). */
-const PERMISSION_MATRIX_FILES = ['src/Wanxiangshu/Tools/StaticTools.fs']
+const PERMISSION_MATRIX_FILES = [
+  'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs',
+  'src/Wanxiangshu/Tools/StaticTools.fs',
+]
 
 const norm = (path) => path.replace(/\\/g, '/')
 

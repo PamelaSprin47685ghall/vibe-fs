@@ -13,7 +13,7 @@ const {
   ToolHostCodec_factory: makeFactory,
   ToolHostCodec_register: register,
   ToolSpec,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 
 test('CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result', async () => {
   const registrations = []

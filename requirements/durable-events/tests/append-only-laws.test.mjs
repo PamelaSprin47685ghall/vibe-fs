@@ -8,7 +8,7 @@ import path from 'node:path'
 import { eventId, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const event = (id, parents = []) => new Domain.EventEnvelope(eventId(id), streamId('append/law'), 'JobRequested', toList(parents.map(eventId)), { id }, toList([]))
 
@@ -46,8 +46,8 @@ test('one_writer_is_one_file_regardless_of_history_size', async () => {
 })
 
 test('append_path_has_no_Git_object_or_ref_capability', async () => {
-  const source = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/EventStore.fs', import.meta.url), 'utf8')
-  const log = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/ProcessEventLog.fs', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
+  const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
   for (const token of ['WriteBlob', 'WriteTree', 'ReadRef', 'CompareAndSwapRef', 'RootOid', 'ProcessGitRawStore']) {
     assert.equal(source.includes(token), false)
     assert.equal(log.includes(token), false)

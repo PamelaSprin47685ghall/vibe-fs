@@ -8,7 +8,7 @@ import { eventId } from '../../support/domain/identity.mjs'
 import { toList } from '../../support/domain/interop.mjs'
 import { createLocalEventStore } from '../../support/local-event-store.mjs'
 
-const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../../../dist/Persistence/EventStore/Model.js')
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 
 export const hexId = (n) => n.toString(16).padStart(40, '0')

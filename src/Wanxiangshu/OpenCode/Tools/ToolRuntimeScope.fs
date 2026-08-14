@@ -13,7 +13,11 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Change
+open Wanxiangshu.Change.Host
+open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Transform from '../../../dist/Application/Strength/StrengthReplicaTransform.js'
-import * as Authority from '../../../dist/Domain/PromptAuthority.js'
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
-import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import * as WireCapture from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
-import * as MessageEdit from '../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
-import { Role } from '../../../dist/Kernel/Roles.js'
-import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
+import * as Transform from '../../../dist/Strength/Replica/Transform.js'
+import * as Authority from '../../../dist/Interaction/Authority/Model.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import { StrengthBudget } from '../../../dist/Strength/Budget.js'
+import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
+import * as WireCapture from '../../../dist/OpenCode/Codec/ProviderWireCapture.js'
+import * as MessageEdit from '../../../dist/OpenCode/Codec/ProjectionMessageEdit.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
+import { Role } from '../../../dist/Foundation/Roles.js'
+import * as Runtime from '../../../dist/Strength/Runtime.js'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const H = (text) => `H(${text})`
@@ -18,6 +18,10 @@ const resultOf = (value) => value.tag === 0
   ? { ok: true, value: value.fields[0] }
   : { ok: false, error: value.fields[0] }
 const caseOf = (value) => value.cases()[value.tag]
+const tryFindByReplica = (r, id) => {
+  const fn = Object.entries(Runtime).find(([k]) => k.startsWith('StrengthRuntime__TryFindByReplica_'))?.[1]
+  return fn(r, id)
+}
 const session = (value) => Id.SessionIdModule_create(value)
 const decision = (value) => Id.StrengthDecisionIdModule_create(value)
 const run = (value) => Id.ProviderRunIdentityModule_create(value)
@@ -55,7 +59,8 @@ const binding = (replica, budget) => new Runtime.StrengthReplicaBinding(
 
 const registered = (replica, budget) => {
   const runtime = Runtime.StrengthRuntime_$ctor()
-  assert.equal(Runtime.StrengthRuntime__Register_Z18AE9AF0(runtime, binding(replica, budget)).tag, 0)
+  const registerFn = Object.entries(Runtime).find(([k]) => k.startsWith('StrengthRuntime__Register_'))?.[1]
+  assert.equal(registerFn(runtime, binding(replica, budget)).tag, 0)
   return runtime
 }
 
@@ -104,7 +109,7 @@ test('STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch'
   assert.equal(outcome.fields[0], 'provider-request-budget-reached')
   assert.equal(listItems(outcome.fields[1]).length, 1)
   assert.deepEqual(host.aborted, ['replica-k1'])
-  assert.equal(Runtime.StrengthRuntime__TryFindByReplica_Z31B28506(runtime, session('replica-k1')), undefined)
+  assert.equal(tryFindByReplica(runtime, session('replica-k1')), undefined)
 
   // Transform-level K+1 stop, not the live Host nested-session canary: a later
   // transform on the same child cannot re-admit a provider request.
@@ -273,5 +278,5 @@ test('STRENGTH_003_005_transform_discards_incomplete_and_invalid_batches_then_st
   assert.match(retired.fields[0], /invalid-replica-frame/)
   assert.equal(listItems(retired.fields[1]).length, 1)
   assert.deepEqual(host.aborted, ['replica-discard'])
-  assert.equal(Runtime.StrengthRuntime__TryFindByReplica_Z31B28506(runtime, session('replica-discard')), undefined)
+  assert.equal(tryFindByReplica(runtime, session('replica-discard')), undefined)
 })

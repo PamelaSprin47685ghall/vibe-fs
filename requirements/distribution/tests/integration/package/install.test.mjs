@@ -21,7 +21,7 @@ test('PACKAGE_install_layout_matches_manifest_and_main', () => {
     'files must include resources/',
   )
 
-  const main = path.join(repoRoot, pkg.main || 'dist/Infrastructure/OpenCode/Plugin/Plugin.js')
+  const main = path.join(repoRoot, pkg.main || 'dist/OpenCode/Plugin/Plugin.js')
   assert.ok(fs.existsSync(main), `main entry must exist: ${main}`)
   assert.ok(fs.existsSync(path.join(repoRoot, 'package.json')))
   assert.ok(fs.existsSync(path.join(repoRoot, 'dist', 'Infrastructure', 'OpenCode', 'Plugin', 'Plugin.js')))
