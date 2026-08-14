@@ -102,6 +102,10 @@ TOML comment/field、literal/basic escaping、value tree 是 representation HOW�
 
 未来不得整体迁成一个 package。
 
+Clause 级结果见 `COVERAGE.md`：PROMPT-001..007/009/010/011/015..021 单 owner；
+PROMPT-008/013/014 标 NEEDS-SPLIT 但已被现有包分解吸收（interaction-authority / capability-enforcement / prefix-stability / host-boundary / obligation-ledger / participant-horizon / finality / participant-identity / provider-language）；
+PROMPT-012 全条判 GARBAGE（Student/Teacher migration absence）。本轮无新包、无 ORPHAN。
+
 ### `docs/what/agent.md`
 
 至少混合：
@@ -176,6 +180,7 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 1. `managed-session-lifecycle → crash-reconciliation` 的依赖方向是否需要改成两个更窄 guarantees，避免 lifecycle-specific restore 与 generic crash epistemology互相引用。
 2. `distribution` 与 `provider-language` 的 resource closure 是否只需 dependency edge，还是应有更一般的 `runtime-resource-integrity` package。当前先不拆。
 3. Fission 实现真正出现后重新做 independent-change test，不允许因为已经有 `fission` tool name 就倒推 package 必然存在。
+4. PROMPT-006 execution-binding 解析律（managed 冻结 / user-facing 追真实用户 / ExplicitExecutionOverride 单次 / fail-closed）当前归 `participant-identity`，但其 send 海关机制与 `dispatch-protocol`、`provider-attempt-recovery` 共用。语义 owner 唯一故暂不立包；若未来 dispatch 层需独立重写 binding 海关而不动 identity，重做 independent-change test。
 
 ## Recently resolved questions
 
