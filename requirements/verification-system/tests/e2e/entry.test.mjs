@@ -203,11 +203,6 @@ const awaitManagerJoinRunning = async (scenario, ctx) => {
     && event?.toolStatus === 'running';
 
   await scenario.events.awaitEvent(isRunningJoin, null);
-  scenario.watchdog?.advance({
-    reason: 'manager-join-tool-running',
-    lane: `session:${managerSessionId}`,
-    blocking: true,
-  });
 };
 
 const assertG6ColdFetch = async (scenario) => {
