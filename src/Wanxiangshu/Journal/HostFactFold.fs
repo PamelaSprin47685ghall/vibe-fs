@@ -55,3 +55,14 @@ module HostFactFold =
                             TipDelivery = Some(TipDeliveryProjection.apply payload.TipName payload.Presentation prior) })
                     projection
             )
+
+        | HostFactCases.SessionStartedAtBound payload ->
+            Ok(
+                AgentProjection.update
+                    payload.SessionId
+                    (fun session ->
+                        { session with
+                            SessionStartedAt =
+                                Some(SessionStartedAtProjection.bind payload.StartedAt session.SessionStartedAt) })
+                    projection
+            )

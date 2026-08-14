@@ -130,6 +130,13 @@ type SyncDelegateRuntime
           NoteInspectorPrompt = noteInspectorPrompt
           CleanupInspectorDraft = cleanupInspectorDraft
           Directory = directory
+          ReplaceToolEstimate =
+            fun sessionId expectedToolCalls ->
+                task {
+                    match expectedToolCalls with
+                    | Some expected -> do! DelegatedToolEstimateLedger.replace journal sessionId expected
+                    | None -> ()
+                }
           SendPrompt =
             fun call request ->
                 task {
@@ -192,21 +199,39 @@ type SyncDelegateRuntime
             true
         | _ -> false
 
-    member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, charge: string) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge None (fun () -> Task.FromResult charge)
+    member _.Invoke
+        (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
+        : Task<Result<string, string>> =
+        SyncDelegateWorkflow.invoke
+            store
+            deps
+            ownerSessionKey
+            role
+            charge
+            expectedToolCalls
+            None
+            (fun () -> Task.FromResult charge)
         |> singletonResult
 
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
     /// producer; workflow invokes it only after semantic batch admission.
     member _.InvokePrepared
-        (ownerSessionKey: string, role: SyncDelegateRole, charge: string, prepareProviderPrompt: unit -> Task<string>) : Task<
-                                                                                                                             Result<
-                                                                                                                                 string,
-                                                                                                                                 string
-                                                                                                                              >
-                                                                                                                          >
-        =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge None prepareProviderPrompt
+        (
+            ownerSessionKey: string,
+            role: SyncDelegateRole,
+            charge: string,
+            prepareProviderPrompt: unit -> Task<string>,
+            ?expectedToolCalls: int
+        ) : Task<Result<string, string>> =
+        SyncDelegateWorkflow.invoke
+            store
+            deps
+            ownerSessionKey
+            role
+            charge
+            expectedToolCalls
+            None
+            prepareProviderPrompt
         |> singletonResult
 
     member _.InvokeBatchPrepared
@@ -215,9 +240,18 @@ type SyncDelegateRuntime
             role: SyncDelegateRole,
             charge: string,
             batch: SyncDelegateBatch,
-            prepareProviderPrompt: unit -> Task<string>
+            prepareProviderPrompt: unit -> Task<string>,
+            ?expectedToolCalls: int
         ) : Task<Result<SyncDelegateInvocationResult, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge (Some batch) prepareProviderPrompt
+        SyncDelegateWorkflow.invoke
+            store
+            deps
+            ownerSessionKey
+            role
+            charge
+            expectedToolCalls
+            (Some batch)
+            prepareProviderPrompt
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {

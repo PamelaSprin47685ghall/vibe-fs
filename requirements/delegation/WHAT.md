@@ -255,3 +255,51 @@ fork child 首 prompt 由 `ForkChildAssignment { Assignment; CommissionerRecord;
 含义/动机：防止把「当前 tool 名」当 ontology（HANDOFF §25.11 反例）。
 
 证据：本命题的落点 = 命题结构本身（HOW.md「历史与弃权」）；无独立断言。
+
+## DELEG-021：fork attachment 只附背景，不转移 charge / authority
+
+`fork(..., attach?)` 可把同一 mission 内另一已知 person 的 canonical
+`LifecycleWorkRecord(includeOpening=true)` 作为 `attached_work_record` 放进被委托者的新 work-unit 首 prompt。
+`attach` 只接受 parent handle projection 中可按 Byname 解析的 person；不接受任意 Host SessionId。
+attachment 是 data，不是 assignment：不改变本次 `charge`，不把附件中的未竟工作变成被委托者义务，
+不复制附件 person 的 Persona / authority / runtime topology。
+
+边界：`attach` 缺省 = 原行为；unknown Byname → 自然语言拒绝且不得回显机器身份；`attach = target name`
+自附 → 拒绝；retired person 只要 durable LWR 可物化即可附；LWR 不存在则静默省略；busy reuse 只追加
+当前 charge 的 busy nudge，不物化 attachment、不失败，并明确本次 attachment 未附。`keywords` 的
+warm-start role gate 不适用于 attachment。V1 只有单个 `attach: string`。`commission` 无 attachment。
+
+含义/动机：附件解决“把另一人的已知工作当背景交给新 witness”而不制造 charge 合并、任务转移或
+Session clone。canonical LWR 是唯一可跨 participant 携带的 bounded work statement。
+
+证据：GAP-011；`requirements/delegation/tests/fork-attachment.test.mjs`。
+
+## DELEG-022：delegator 可给 callee 一个 advisory `expected_tool_calls` 估算
+
+caller-visible delegation act 可带可选非负整数 `expected_tool_calls`：当前 HOW surface 为
+`fork`、`commission`、`inspect`、`establish-behavior`、`repair-behavior`。显式值 X **替换** callee
+当前 estimate 为 X；参数省略则保留 callee 当前 `remaining`，不清零、不重置。SyncDelegate 同一
+ProviderRun 合并多个调用时，显式 estimate 求和后作一次 replace；全部省略则保留原值。
+
+callee 每个真实 Host tool invocation 消耗 1：并行一次发 N 个工具即消耗 N；自身调用委派工具也只按
+这一条真实 invocation 消耗 1，descendant 后续工具不反扣 parent。`remaining = max(0, remaining - 1)`；
+到 0 后保持 0。synthetic HOST-013 pair、provider request、tool result、reasoning/text 都不计数。
+
+这是 measurement / calibration，不是执行预算：`remaining=0` **不得**禁用工具、强制 text-only、结束
+turn/session、改变 authority/permission、触发 retry/fallback/abort、拒绝后续 delegation 或改变任何
+workflow 路径。user-facing/root session 没有 delegator estimate 时自然无该提示；禁止用 role 名硬编码
+“root 跳过”。
+
+持久语义只能是 typed immutable fact → pure incremental fold → O(1) keyed projection。禁止扫描
+transcript/XTrace/log 重新计数；禁止 `Dictionary<SessionId,int>` / `mutable remaining` 等业务计数器；
+禁止 Stage/Phase/Armed/InFlight 状态机。tool-call 去重证据只服务同一 estimate 的事实幂等，且必须随
+replace 重置、在 remaining=0 后停止增长。
+
+含义/动机：委任者给的是“按当前理解大约需要多少工具动作”的局部估算，目的是让被委托者更早调整
+任务范围、并行度或可用的委派/分裂策略；估算错误不能改变世界中的合法动作。
+
+边界：动态提示文案 craft → `cognitive-environment`；HOST-013 occurrence 组装/冻结 →
+`guidance-delivery` + `prefix-stability`；时间采样不是本命题。
+
+证据：GAP-012；`requirements/delegation/tests/delegated-tool-estimate.test.mjs`、
+`requirements/delegation/tests/delegation-tool-contract.test.mjs`。

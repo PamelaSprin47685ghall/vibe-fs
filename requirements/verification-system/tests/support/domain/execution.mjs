@@ -51,6 +51,7 @@ export const forkChildPayload = (() => {
   const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
     'BasePath',
     'CommissionerRecordPath',
+    'AttachmentPath',
     'RequirementsPath',
     'render',
     'relay',
@@ -67,29 +68,32 @@ export const forkChildPayload = (() => {
     new ForkChildPayloadModule.ForkChildInstructions(
       toList(readLines(m.BasePath)),
       readOne(m.CommissionerRecordPath),
+      readOne(m.AttachmentPath),
       readOne(m.RequirementsPath),
     )
 
   return {
     baseInstructions: readLines(m.BasePath),
     commissionerRecordInstruction: readOne(m.CommissionerRecordPath),
+    attachmentInstruction: readOne(m.AttachmentPath),
     /** @deprecated use commissionerRecordInstruction */
     parentWorkRecordInstruction: readOne(m.CommissionerRecordPath),
     requirementsInstruction: readOne(m.RequirementsPath),
 
-    render: ({ assignment, commissionerRecord, parentWorkRecord, originalUserRequirements = [], rootRequirements, payload }) =>
+    render: ({ assignment, commissionerRecord, parentWorkRecord, attachment, originalUserRequirements = [], rootRequirements, payload }) =>
       m.render(
         defaultProse(),
         new ForkChildPayloadModule.ForkChildAssignment(
           assignment,
           commissionerRecord ?? parentWorkRecord ?? undefined,
+          attachment,
           toList(rootRequirements ?? originalUserRequirements),
           payload,
         ),
       ),
 
-    relay: (assignment, commissionerRecord, requirements = [], payload) =>
-      m.relay(defaultProse(), assignment, commissionerRecord, toList(requirements), payload),
+    relay: (assignment, commissionerRecord, attachment, requirements = [], payload) =>
+      m.relay(defaultProse(), assignment, commissionerRecord, attachment, toList(requirements), payload),
   }
 })()
 

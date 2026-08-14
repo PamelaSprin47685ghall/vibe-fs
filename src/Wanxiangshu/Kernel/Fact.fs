@@ -636,6 +636,18 @@ module Fact =
                TipName: string
                Presentation: TipPresentation |}
 
+        | SessionStartedAtBound of
+            {| SessionId: SessionId
+               StartedAt: DateTimeOffset |}
+
+    type DelegationFactCases =
+        | DelegatedToolEstimateReplaced of
+            {| SessionId: SessionId
+               ExpectedToolCalls: int |}
+        | DelegatedToolCallObserved of
+            {| SessionId: SessionId
+               ToolCallId: ToolCallId |}
+
     // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
     // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
     // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
@@ -645,6 +657,7 @@ module Fact =
 
     /// One journal line for the agent domain: exactly one family. The family
     /// case is dispatch data for replay, not a program counter (PERSIST-010).
+    /// DSL-class: DurableFact — bounded-context dispatch over immutable facts.
     [<RequireQualifiedAccess>]
     type AgentFact =
         | Prompt of PromptFactCases
@@ -655,6 +668,14 @@ module Fact =
         | Companion of CompanionFactCases
         | Context of ContextFactCases
         | Host of HostFactCases
+        | Delegation of DelegationFactCases
+
+    module DelegationFact =
+        let inline DelegatedToolEstimateReplaced payload =
+            AgentFact.Delegation(DelegationFactCases.DelegatedToolEstimateReplaced payload)
+
+        let inline DelegatedToolCallObserved payload =
+            AgentFact.Delegation(DelegationFactCases.DelegatedToolCallObserved payload)
 
     /// HOST-013 constructor surface.
     module HostFact =
@@ -663,6 +684,9 @@ module Fact =
 
         let inline TipGuidanceDelivered payload =
             AgentFact.Host(HostFactCases.TipGuidanceDelivered payload)
+
+        let inline SessionStartedAtBound payload =
+            AgentFact.Host(HostFactCases.SessionStartedAtBound payload)
 
     /// Constructor surface for the PromptFact family: each function wraps its
     /// family case in the single-case Prompt dispatch.

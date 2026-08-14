@@ -24,6 +24,7 @@ and internal SyncDelegateInvocation =
         OwnerScope: ReuseScopeId
         Role: SyncDelegateRole
         Charge: string
+        ExpectedToolCalls: int option
         PrepareProviderPrompt: unit -> Task<string>
         Batch: SyncDelegateBatch option
         Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>

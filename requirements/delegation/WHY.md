@@ -14,6 +14,8 @@
    consultation 的 advice 被当成 replacement assignment，改变 owner 的 charge。
 3. **返回后果没有边界**：一次委托返回一整份 session 历史或字段式 DTO，caller 无法判断它改变了什么认识。
 4. **runtime 拓扑泄漏**：SessionId/AgentId/worktree path 出现在 provider 面，业务语义被物理事实污染。
+5. **背景材料被误当任务转移**：把另一 person 的历史附给 child 时若没有 typed attachment 边界，读取别人的 work 会悄悄变成“替他完成”的新 charge。
+6. **估算被误做执行预算**：delegator 的工具调用估算若复用 `maxSteps`、扫描 transcript/XTrace 或藏进 mutable counter，会同时制造 enforcement、第二真相源与第二运行时；估算应只校准认知，不改变合法动作。
 
 RED 判定：caller 无法从业务语义区分「创建独立工作」「续做同一路」「同步取证」，或委托暗中改变
 authority/personhood。此时世界 RED。
@@ -43,6 +45,8 @@ contract（bounded WorkRecord、canonical/sibling 分型）不变——本包 WH
   fallback / 羞辱会走错恢复分支。consultation 是正常协作，是真实 child 委托（AGENT-031 / HOST-027）。
 - **用户消息唤醒 join 被误当 authority**（`archive/changes/completed/corrective.md`）：唤醒只结束当前 wait，
   不创建 HumanRoot / LogicalRun，不 cancel child。低权限 pulse 与 authority transition 是两类事件。
+- **attachment = clone / charge merge**（`archive/changes/active/fork-attach.md`）：复制第三方 Session/Journal 或把其未竟义务并入 child charge 会制造第二 owner。选择 canonical LWR 只读背景；看得见不等于接手。
+- **expected tool calls = hard cap / history scan**：OpenCode `maxSteps` 会强制 text-only，和 advisory 语义相反；从 transcript/XTrace 反算 remaining 又把历史当控制面日志。选择 typed observation facts + pure incremental fold，0 只改变下一次 calibration 文案。
 
 ## 与相邻包的边界
 

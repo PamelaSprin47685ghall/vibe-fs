@@ -25,6 +25,15 @@ cutover 时按 `SPLIT@cutover` 拆分；`NEW` = 新写。运行命令：`node --
 | DELEG-018 NEEDHELP consultation = 真实 child 委托 | `requirements/host-boundary/tests/needhelp-sensor.test.mjs`（sentinel 识别，SPLIT：识别归 `interaction-authority`）；`requirements/delegation/tests/assistance-host.test.mjs`（consultation 委托/advice 路由，本包部分）；`archive/changes/completed/increase-strength.md` §8–10 为考古 | REUSE | `node --test requirements/host-boundary/tests/needhelp-sensor.test.mjs requirements/delegation/tests/assistance-host.test.mjs` |
 | DELEG-019 fork child 首 prompt typed 载荷 | `tests/fork-child-payload.test.mjs`（`FORK_CHILD_PAYLOAD_*` 全组：assignment/commissioner/requirements/payload 渲染、无 answer 字段） | MOVE | `node --test requirements/delegation/tests/fork-child-payload.test.mjs` |
 | DELEG-020 语义不依赖工具名 | 命题结构本身（HOW.md「历史与弃权」）；无独立断言（改名不破坏任何断言 = 命题的证明） | — | — |
+| DELEG-021 fork attachment | `tests/fork-attachment.test.mjs`（typed background/order/blank/anti-assignment）；`tests/fork-tool.test.mjs` `DELEG_021_*`（unknown/self 在 child 创建前拒绝、fresh LWR attachment、busy reuse 不物化） | NEW + REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
+| DELEG-022 delegated expected tool calls | `tests/delegated-tool-estimate.test.mjs`（pure replace/decrement/idempotence/saturation + no scan/mutable）；`tests/delegated-tool-estimate-facts.test.mjs`（durable fold）；`tests/delegation-tool-contract.test.mjs`（五个 surface + no maxSteps）；`tests/fork-tool.test.mjs` `DELEG_022_*`（invalid / replace / omitted retain）；`tests/sync-delegate-tools.test.mjs` `DELEG_022_*`（batch sum / reusable omission retain）；交叉 `requirements/guidance-delivery/tests/pair-calibration.test.mjs` | NEW + REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
+
+## GAP
+
+| GAP | 待建命题 | 缺口 | 状态 | 关闭条件 |
+|---|---|---|---|---|
+| GAP-011 | DELEG-021 fork attachment | 正式 WHAT + 独立 frozen oracle + production wiring 均已落地 | CLOSED | `tests/fork-attachment.test.mjs` + `tests/fork-tool.test.mjs`；按用户要求 frozen 后未执行；full build 被 unrelated Fission parse error 阻塞 |
+| GAP-012 | DELEG-022 delegated expected tool calls | 正式 WHAT + 独立 frozen oracle + typed facts/fold/surfaces/HOST-013 wiring 均已落地；无 transcript/XTrace scan、业务 mutable counter、enforcement | CLOSED | `tests/delegated-tool-estimate*.test.mjs` + `tests/delegation-tool-contract.test.mjs` + fork/SyncDelegate reuse/batch oracle；按用户要求 frozen 后未执行；相关静态 gates 绿，full build 被 unrelated Fission parse error 阻塞 |
 
 ## 移动文件清单
 

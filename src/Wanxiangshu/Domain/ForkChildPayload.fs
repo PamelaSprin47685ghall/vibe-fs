@@ -11,6 +11,8 @@ type ForkChildAssignment =
         Assignment: string
         /// Commissioner background for the child. Absent for a commissioner that has produced none yet.
         CommissionerRecord: string option
+        /// Another person's bounded work statement, visible only as background context.
+        Attachment: string option
         /// REVIEW-002 authoritative scope: the HumanRoot prompts received since the previous review
         /// reached its double-PERFECT barrier. Empty for every non-Reviewer fork.
         RootRequirements: string list
@@ -22,6 +24,7 @@ type ForkChildAssignment =
 type ForkChildInstructions =
     { Base: string list
       CommissionerRecord: string
+      Attachment: string
       Requirements: string }
 
 /// The first prompt of a forked child, as one ARCH-010 payload.
@@ -30,6 +33,7 @@ module ForkChildPayload =
 
     let BasePath = "delegation/fork-child-base"
     let CommissionerRecordPath = "delegation/fork-child-commissioner-record"
+    let AttachmentPath = "delegation/fork-child-attachment"
     let RequirementsPath = "delegation/fork-child-requirements"
 
     let render (prose: ForkChildInstructions) (input: ForkChildAssignment) : string =
@@ -39,6 +43,11 @@ module ForkChildPayload =
 
         let commissionerRecord =
             input.CommissionerRecord
+            |> Option.map (fun record -> record.Trim())
+            |> Option.filter (fun record -> record <> "")
+
+        let attachment =
+            input.Attachment
             |> Option.map (fun record -> record.Trim())
             |> Option.filter (fun record -> record <> "")
 
@@ -52,6 +61,9 @@ module ForkChildPayload =
             @ prose.Base
             @ (match commissionerRecord with
                | Some record -> [ prose.CommissionerRecord ] @ (record.Split('\n') |> Array.toList)
+               | None -> [])
+            @ (match attachment with
+               | Some record -> [ prose.Attachment ] @ (record.Split('\n') |> Array.toList)
                | None -> [])
             @ (if List.isEmpty requirements then
                    []
@@ -77,6 +89,7 @@ module ForkChildPayload =
         (prose: ForkChildInstructions)
         (assignment: string)
         (commissionerRecord: string option)
+        (attachment: string option)
         (requirements: string list)
         (payload: string option)
         : string =
@@ -84,5 +97,6 @@ module ForkChildPayload =
             prose
             { Assignment = assignment
               CommissionerRecord = commissionerRecord
+              Attachment = attachment
               RootRequirements = requirements
               Payload = payload }

@@ -117,9 +117,11 @@ module CoderTool =
                     let charge = args.Text "charge"
                     let keywords = args.Text "keywords"
 
-                    if String.IsNullOrWhiteSpace charge then
+                    match DelegatedToolEstimate.decode args with
+                    | Error _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
+                    | Ok expectedToolCalls when String.IsNullOrWhiteSpace charge ->
                         return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
-                    else
+                    | Ok expectedToolCalls ->
                         let prepareProviderPrompt () =
                             task {
                                 match!
@@ -144,7 +146,8 @@ module CoderTool =
                                     SyncDelegateRole.Coder,
                                     charge,
                                     semanticBatch,
-                                    prepareProviderPrompt
+                                    prepareProviderPrompt,
+                                    ?expectedToolCalls = expectedToolCalls
                                 )
                             | None ->
                                 task {
@@ -153,7 +156,8 @@ module CoderTool =
                                             context.SessionId,
                                             SyncDelegateRole.Coder,
                                             charge,
-                                            prepareProviderPrompt
+                                            prepareProviderPrompt,
+                                            ?expectedToolCalls = expectedToolCalls
                                         )
                                     with
                                     | Ok workRecord -> return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
@@ -194,7 +198,8 @@ module CoderTool =
               "keywords",
               ToolHostCodec.optionalStringSchemaDescribed
                   (ProviderProse.render language surface.ArgKeywords Map.empty)
-                  factory ]
+                  factory
+              "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
           Execute = execute name surface scope syncDelegate }
 
     let establishSpec

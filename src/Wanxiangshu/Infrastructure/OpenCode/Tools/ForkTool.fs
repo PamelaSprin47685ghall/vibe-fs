@@ -35,6 +35,18 @@ module ForkTool =
             let ArgKeywords = "tool/fork/arg-keywords"
 
             [<Literal>]
+            let ArgAttach = "delegation/fork-attach-argument"
+
+            [<Literal>]
+            let AttachUnknown = "delegation/fork-attach-unknown"
+
+            [<Literal>]
+            let AttachSelf = "delegation/fork-attach-self"
+
+            [<Literal>]
+            let AttachBusy = "delegation/fork-attach-busy"
+
+            [<Literal>]
             let NameRequired = "tool/fork/name-required"
 
             [<Literal>]
@@ -128,19 +140,28 @@ module ForkTool =
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     type Request =
         { Calling: string
           Name: string
           Charge: string
-          Keywords: string }
+          Keywords: string
+          Attach: string option
+          ExpectedToolCalls: int option }
 
-    let private decode (args: HostToolArguments) =
-        { Calling = args.Text "calling"
-          Name = args.Text "name"
-          Charge = args.Text "charge"
-          Keywords = args.Text "keywords" }
+    let private decode language (args: HostToolArguments) =
+        match DelegatedToolEstimate.decode args with
+        | Error _ -> Error(DelegatedToolEstimate.invalid language)
+        | Ok expectedToolCalls ->
+            Ok
+                { Calling = args.Text "calling"
+                  Name = args.Text "name"
+                  Charge = args.Text "charge"
+                  Keywords = args.Text "keywords"
+                  Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
+                  ExpectedToolCalls = expectedToolCalls }
 
     let private consequence (message: string) =
         ToolHostCodec.tomlObjectWithInstructions [ message ] []
@@ -202,23 +223,59 @@ module ForkTool =
     let private warmStartAllowed role =
         RepositoryWarmStartPrompt.isDirectConsumer role
 
-    let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
+    let private prepareForkPrompt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (role: Role)
+        (request: Request)
+        (attachment: string option)
+        =
         task {
             let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
 
             let basePrompt =
-                ForkChildPayload.relay (forkInstructions runtime.ParentId) request.Charge parentWorkRecord [] None
+                ForkChildPayload.relay
+                    (forkInstructions runtime.ParentId)
+                    request.Charge
+                    parentWorkRecord
+                    attachment
+                    []
+                    None
 
-            match!
-                RepositoryWarmStart.appendToBase
-                    runtime.ParentId
-                    role
-                    scope.WorkspaceDirectory
-                    request.Keywords
-                    basePrompt
-            with
-            | Ok prompt -> return prompt
-            | Error _ -> return basePrompt
+            if hasKeywords request then
+                match!
+                    RepositoryWarmStart.appendToBase
+                        runtime.ParentId
+                        role
+                        scope.WorkspaceDirectory
+                        request.Keywords
+                        basePrompt
+                with
+                | Ok prompt -> return prompt
+                | Error _ -> return basePrompt
+            else
+                return basePrompt
+        }
+
+    let private isSelfAttachment (request: Request) =
+        request.Attach
+        |> Option.exists (fun attach ->
+            System.String.Equals(attach, request.Name.Trim(), System.StringComparison.OrdinalIgnoreCase))
+
+    let private resolveAttachment
+        (scope: ToolRuntimeScope)
+        (handles: AgentLinkageProjection option)
+        (request: Request)
+        =
+        task {
+            match request.Attach with
+            | None -> return Ok None
+            | Some attach ->
+                match handles |> Option.bind (HandleProjection.tryFindByByname attach) with
+                | None -> return Error Path.Fork.AttachUnknown
+                | Some record ->
+                    let! workRecord = scope.ParentWorkRecordFor(SessionId.value record.ChildSessionId)
+                    return Ok workRecord
         }
 
     let private bynameOf (request: Request) (fallback: string) =
@@ -235,6 +292,8 @@ module ForkTool =
                 return consequence (prose language Path.Fork.NameRequired)
             elif String.IsNullOrWhiteSpace request.Charge then
                 return consequence (prose language Path.Fork.ChargeRequired)
+            elif isSelfAttachment request then
+                return consequence (prose language Path.Fork.AttachSelf)
             else
                 match scope.RuntimeFor context with
                 | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
@@ -260,41 +319,47 @@ module ForkTool =
                                 if hasKeywords request && not (warmStartAllowed role) then
                                     return consequence (prose language Path.Fork.WarmStartUnavailable)
                                 else
-                                    let handleId = ToolHostCodec.newHandleId ()
+                                    match! resolveAttachment scope handles request with
+                                    | Error path -> return consequence (prose language path)
+                                    | Ok attachment ->
+                                        let handleId = ToolHostCodec.newHandleId ()
 
-                                    let! forkResult =
-                                        if hasKeywords request then
-                                            task {
-                                                let! rendered = prepareForkPrompt scope runtime role request
+                                        let! forkResult =
+                                            if hasKeywords request || request.Attach.IsSome then
+                                                task {
+                                                    let! rendered =
+                                                        prepareForkPrompt scope runtime role request attachment
 
-                                                return!
-                                                    runtime.Fork(
-                                                        handleId,
-                                                        role,
-                                                        managed.Name,
-                                                        request.Charge,
-                                                        None,
-                                                        renderedPrompt = rendered,
-                                                        byname = request.Name
-                                                    )
-                                            }
-                                        else
-                                            runtime.Fork(
-                                                handleId,
-                                                role,
-                                                managed.Name,
-                                                request.Charge,
-                                                None,
-                                                byname = request.Name
-                                            )
+                                                    return!
+                                                        runtime.Fork(
+                                                            handleId,
+                                                            role,
+                                                            managed.Name,
+                                                            request.Charge,
+                                                            None,
+                                                            renderedPrompt = rendered,
+                                                            byname = request.Name,
+                                                            ?expectedToolCalls = request.ExpectedToolCalls
+                                                        )
+                                                }
+                                            else
+                                                runtime.Fork(
+                                                    handleId,
+                                                    role,
+                                                    managed.Name,
+                                                    request.Charge,
+                                                    None,
+                                                    byname = request.Name,
+                                                    ?expectedToolCalls = request.ExpectedToolCalls
+                                                )
 
-                                    match forkResult with
-                                    | Ok _ ->
-                                        return
-                                            successInstruction (
-                                                namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
-                                            )
-                                    | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
+                                        match forkResult with
+                                        | Ok _ ->
+                                            return
+                                                successInstruction (
+                                                    namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                )
+                                        | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
                     else
                         match existingByname with
                         | None -> return consequence (prose language Path.Fork.PersonUnknown)
@@ -312,24 +377,64 @@ module ForkTool =
                                     let activeRun =
                                         lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
-                                    let! reuseResult =
-                                        if hasKeywords request && not activeRun then
-                                            task {
-                                                let! rendered = prepareForkPrompt scope runtime record.Role request
-
-                                                return!
-                                                    runtime.Reuse(agentId, request.Charge, renderedPrompt = rendered)
-                                            }
-                                        else
-                                            runtime.Reuse(agentId, request.Charge)
-
-                                    match reuseResult with
-                                    | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                                    | Ok _ ->
-                                        return
-                                            successInstruction (
-                                                namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                    if activeRun then
+                                        match!
+                                            runtime.Reuse(
+                                                agentId,
+                                                request.Charge,
+                                                ?expectedToolCalls = request.ExpectedToolCalls
                                             )
+                                        with
+                                        | Error _ ->
+                                            return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+                                        | Ok _ when request.Attach.IsSome ->
+                                            return
+                                                successInstruction (
+                                                    namedProse language Path.Fork.AttachBusy (request.Name.Trim())
+                                                )
+                                        | Ok _ ->
+                                            return
+                                                successInstruction (
+                                                    namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                )
+                                    else
+                                        match! resolveAttachment scope handles request with
+                                        | Error path -> return consequence (prose language path)
+                                        | Ok attachment ->
+                                            let! reuseResult =
+                                                if hasKeywords request || request.Attach.IsSome then
+                                                    task {
+                                                        let! rendered =
+                                                            prepareForkPrompt
+                                                                scope
+                                                                runtime
+                                                                record.Role
+                                                                request
+                                                                attachment
+
+                                                        return!
+                                                            runtime.Reuse(
+                                                                agentId,
+                                                                request.Charge,
+                                                                renderedPrompt = rendered,
+                                                                ?expectedToolCalls = request.ExpectedToolCalls
+                                                            )
+                                                    }
+                                                else
+                                                    runtime.Reuse(
+                                                        agentId,
+                                                        request.Charge,
+                                                        ?expectedToolCalls = request.ExpectedToolCalls
+                                                    )
+
+                                            match reuseResult with
+                                            | Error _ ->
+                                                return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+                                            | Ok _ ->
+                                                return
+                                                    successInstruction (
+                                                        namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                    )
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
@@ -360,7 +465,13 @@ module ForkTool =
                             let host = scope.OrchestratorHostFor context.SessionId
 
                             match!
-                                host.ForkManagerJob(managerId, managed.Name, request.Charge, byname = request.Name)
+                                host.ForkManagerJob(
+                                    managerId,
+                                    managed.Name,
+                                    request.Charge,
+                                    byname = request.Name,
+                                    ?expectedToolCalls = request.ExpectedToolCalls
+                                )
                             with
                             | Ok _ ->
                                 return
@@ -374,7 +485,13 @@ module ForkTool =
                     | Some job ->
                         let host = scope.OrchestratorHostFor context.SessionId
 
-                        match! host.ContinueManagerJob(job.ManagerJobId, request.Charge) with
+                        match!
+                            host.ContinueManagerJob(
+                                job.ManagerJobId,
+                                request.Charge,
+                                ?expectedToolCalls = request.ExpectedToolCalls
+                            )
+                        with
                         | Ok _ ->
                             return
                                 successInstruction (
@@ -396,8 +513,18 @@ module ForkTool =
                   factory
               "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgName) factory
               "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgCharge) factory
-              "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory ]
-          Execute = fun args context -> executeManager scope (decode args) context }
+              "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory
+              "attach", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgAttach) factory
+              "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Execute =
+            fun args context ->
+                task {
+                    let language = lang context
+
+                    match decode language args with
+                    | Error message -> return consequence message
+                    | Ok request -> return! executeManager scope request context
+                } }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
@@ -411,5 +538,14 @@ module ForkTool =
                   (prose language Path.Commission.ArgCalling)
                   factory
               "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgName) factory
-              "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgCharge) factory ]
-          Execute = fun args context -> executeOrchestrator scope (decode args) context }
+              "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgCharge) factory
+              "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Execute =
+            fun args context ->
+                task {
+                    let language = lang context
+
+                    match decode language args with
+                    | Error message -> return consequence message
+                    | Ok request -> return! executeOrchestrator scope request context
+                } }

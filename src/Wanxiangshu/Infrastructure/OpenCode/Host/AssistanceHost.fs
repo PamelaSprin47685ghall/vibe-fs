@@ -314,10 +314,11 @@ type AssistanceHost
                 let forkProse: ForkChildInstructions =
                     { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
                       CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+                      Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
                       Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
                 let providerPrompt =
-                    ForkChildPayload.relay forkProse assignment (Some commissionerRecord) [] None
+                    ForkChildPayload.relay forkProse assignment (Some commissionerRecord) None [] None
 
                 do! XTraceCapture.captureOpening journal childId assignment []
 

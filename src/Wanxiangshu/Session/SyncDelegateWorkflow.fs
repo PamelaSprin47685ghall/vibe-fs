@@ -18,6 +18,7 @@ type Dependencies =
       NoteInspectorPrompt: string -> string -> unit
       CleanupInspectorDraft: string -> unit
       Directory: string option
+      ReplaceToolEstimate: SessionId -> int option -> Task<unit>
       SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
       ResolveBoundAgent: SessionId -> string option
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
@@ -57,6 +58,7 @@ let invoke
     (ownerSessionKey: string)
     (role: SyncDelegateRole)
     (charge: string)
+    (expectedToolCalls: int option)
     (batch: SyncDelegateBatch option)
     (prepareProviderPrompt: unit -> Task<string>)
     : Task<Result<SyncDelegateInvocationResult, string>> =
@@ -74,6 +76,7 @@ let invoke
               OwnerScope = ownerScope
               Role = role
               Charge = charge
+              ExpectedToolCalls = expectedToolCalls
               PrepareProviderPrompt = prepareProviderPrompt
               Batch = batch
               Completion = completion
@@ -113,6 +116,15 @@ let invoke
                         store.ReleaseAdmission(ownerScope, role)
                         completeError invocations error
                     | Ok(delegateSession, attachedAgent) ->
+                        let combinedExpectedToolCalls =
+                            invocations
+                            |> List.choose (fun item -> item.ExpectedToolCalls)
+                            |> function
+                                | [] -> None
+                                | values -> Some(List.sum values)
+
+                        do! deps.ReplaceToolEstimate delegateSession combinedExpectedToolCalls
+
                         let! preparedPrompts =
                             task {
                                 let results = ResizeArray<string>()

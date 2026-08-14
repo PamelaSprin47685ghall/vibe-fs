@@ -152,3 +152,18 @@ MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provi
   收到的那一版（Rulebook §17）。
 - 证据：`guideline-projection.test.mjs` `GP_001..006`；`latest-tip-nudge.test.mjs`
   `CTX_002_GUIDELINE_001/002`（marker 正文透传）；`PROOF.md` 行 20。
+
+### GD-012 新 occurrence 只消费当前 calibration projection，随后冻结最终 MarkerText
+
+HOST-013 每个**新** pair occurrence 在物化时可组合：latest tip guidance、TIME-007 的 session elapsed、
+delegation 的 `remaining expected tool calls` 动态 calibration、canonical pair-programming guideline。动态值
+只从各 owner 提供的 O(1) projection 读取一次；不得扫描 transcript/XTrace/log。无 estimate 时完全省略
+tool-estimate fragment；elapsed 在 `SessionStartedAt` 已绑定后始终存在。组装后的最终 `MarkerText` 立即进入
+GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/remaining 重写历史 occurrence。
+
+- 含义：dynamic calibration 是“这一刻提供了什么指导”的 occurrence 数据；projection 决定新文案，
+  durable MarkerText 决定历史文案。两个时间面不混合。
+- 边界：elapsed 的起点/采样 → `time-capability` TIME-007；remaining 的 replace/decrement/0 语义 →
+  `delegation` DELEG-022；tool-estimate 提示 craft → `cognitive-environment` COGNITIVE-ENVIRONMENT-014；
+  prefix placement/stability → `prefix-stability`。
+- 证据：GAP-012；`tests/pair-calibration.test.mjs`。

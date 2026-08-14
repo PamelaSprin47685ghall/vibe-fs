@@ -1,0 +1,1 @@
+{{name}} 正在忙于既有工作。本次 charge 已作为 nudge 送达，但这次请求中的 attachment 没有附加。

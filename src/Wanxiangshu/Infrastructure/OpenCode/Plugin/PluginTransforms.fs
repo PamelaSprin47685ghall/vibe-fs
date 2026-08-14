@@ -27,6 +27,7 @@ module PluginTransforms =
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : obj -> obj -> Task<unit> =
         let scope = boot.Scope
         let journal = boot.Journal
+        let clock = boot.Clock
         let sessionPort = host.SessionPort
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
@@ -47,6 +48,28 @@ module PluginTransforms =
                 projectionSessionIdOpt
                 |> Option.iter (fun sessionId ->
                     scope.Sessions.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
+
+                // TIME-007: the first provider-facing prompt is the session's
+                // creation boundary. Sample synchronously before any await, then
+                // bind once durably; later prompts reuse the projection value.
+                let sessionStartCandidate =
+                    projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
+
+                let! sessionStartedAt =
+                    match journal, projectionSessionIdOpt, sessionStartCandidate with
+                    | Some durable, Some sessionId, Some candidate ->
+                        task {
+                            match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
+                            | Ok startedAt -> return Some startedAt
+                            | Error reason ->
+                                Diagnostic.emit
+                                    "host-013-session-start-bind-failed"
+                                    [ "session_id", sessionId; "result", reason ]
+
+                                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                                return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
+                        }
+                    | _ -> Task.FromResult None
 
                 let! strengthReplayPlans =
                     match projectionSessionIdOpt with
@@ -295,24 +318,45 @@ module PluginTransforms =
                 if not skipGuideline then
                     let messages = unbox<obj array> outObj?messages |> Array.toList
 
-                    let guideline =
-                        let lang =
-                            match projectionSessionIdOpt with
-                            | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-                            | None -> ProviderLanguage.English
+                    let language =
+                        match projectionSessionIdOpt with
+                        | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
+                        | None -> ProviderLanguage.English
 
-                        ProviderProse.render lang ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+                    let guideline =
+                        ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+
+                    let elapsed =
+                        sessionStartedAt
+                        |> Option.map (fun startedAt ->
+                            let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
+                            PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
+
+                    let toolEstimate =
+                        match journal, projectionSessionIdOpt with
+                        | Some durable, Some sessionId ->
+                            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
+                            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
+                        | _ -> None
 
                     let! markerText =
                         match journal, projectionSessionIdOpt with
                         | Some durable, Some sessionId ->
                             task {
-                                // Main session id: resolveTipGuidance maps owner via association.
-                                match! EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId) with
-                                | Some guidance -> return guidance + "\n\n" + guideline
-                                | None -> return guideline
+                                let! guidance =
+                                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+
+                                return
+                                    PairProgrammingCalibration.composeWithElapsed
+                                        guidance
+                                        elapsed
+                                        toolEstimate
+                                        guideline
                             }
-                        | _ -> Task.FromResult guideline
+                        | _ ->
+                            Task.FromResult(
+                                PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline
+                            )
 
                     match!
                         PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages

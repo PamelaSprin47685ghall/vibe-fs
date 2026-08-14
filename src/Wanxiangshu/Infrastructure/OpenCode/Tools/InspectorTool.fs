@@ -62,9 +62,11 @@ module InspectorTool =
                     let charge = args.Text "charge"
                     let keywords = args.Text "keywords"
 
-                    if String.IsNullOrWhiteSpace charge then
+                    match DelegatedToolEstimate.decode args with
+                    | Error _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
+                    | Ok expectedToolCalls when String.IsNullOrWhiteSpace charge ->
                         return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
-                    else
+                    | Ok expectedToolCalls ->
                         let prepareProviderPrompt () =
                             task {
                                 match!
@@ -89,7 +91,8 @@ module InspectorTool =
                                     SyncDelegateRole.Inspector,
                                     charge,
                                     semanticBatch,
-                                    prepareProviderPrompt
+                                    prepareProviderPrompt,
+                                    ?expectedToolCalls = expectedToolCalls
                                 )
                             | None ->
                                 task {
@@ -98,7 +101,8 @@ module InspectorTool =
                                             context.SessionId,
                                             SyncDelegateRole.Inspector,
                                             charge,
-                                            prepareProviderPrompt
+                                            prepareProviderPrompt,
+                                            ?expectedToolCalls = expectedToolCalls
                                         )
                                     with
                                     | Ok workRecord -> return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
@@ -137,5 +141,6 @@ module InspectorTool =
               "keywords",
               ToolHostCodec.optionalStringSchemaDescribed
                   (ProviderProse.render language Path.ArgKeywords Map.empty)
-                  factory ]
+                  factory
+              "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
           Execute = execute scope syncDelegate }

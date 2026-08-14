@@ -63,6 +63,22 @@ module PluginHooks =
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput
 
+            let toolBefore (toolInput: obj) (toolOutput: obj) =
+                task {
+                    let context = ToolHostCodec.decodeContext toolInput
+
+                    match journal, context.ToolCallId with
+                    | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
+                        do!
+                            DelegatedToolEstimateLedger.observe
+                                durable
+                                (SessionId.create context.SessionId)
+                                toolCallId
+                    | _ -> ()
+
+                    do! magicTodo.Before toolInput toolOutput
+                }
+
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     do! magicTodo.After toolInput toolOutput
@@ -148,12 +164,7 @@ module PluginHooks =
                       // membrane. Definition must replace both schema surfaces;
                       // before mutates the original args object in place.
                       "tool.definition", box (pairedHook (box toolDefinition))
-                      "tool.execute.before",
-                      box (
-                          pairedHook (
-                              box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Before hookInput hookOutput)
-                          )
-                      )
+                      "tool.execute.before", box (pairedHook (box toolBefore))
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then
                       // sees the exact provider-visible result bytes.

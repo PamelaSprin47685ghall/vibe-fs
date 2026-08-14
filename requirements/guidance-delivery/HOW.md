@@ -63,10 +63,9 @@ type PairProgrammingGuideline =
 
 ## 4. marker 注入：`src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs`
 
-- `tryInject`：生成 auto-injected tool-call/tool-result pair，marker text =
-  tip guidance（Full/Identity）+ `"\n\n"` + pair-programming guideline 正文；
-  锚到 transcript 的 CallGap/ResultGap。Main 侧没有 fake-user message
-  （GD-009；`CTX_002_GUIDELINE_001/002` 锁定 marker 输出形状）。
+- `tryInject`：只负责把**已经完成组装的** `MarkerText` 生成 auto-injected tool-call/tool-result pair，并锚到 transcript 的 CallGap/ResultGap；Main 侧没有 fake-user message（GD-009）。
+- occurrence 组装在 `PluginTransforms` + `PairProgrammingCalibration`：`latest tip guidance` → TIME-007 `elapsed` → DELEG-022 `remaining expected tool calls` → canonical pair-programming guideline，各动态 owner 只做 O(1) projection read；无 estimate 时省略该 fragment。
+- `composeWithElapsed` 的结果立即交给 `tryInject`，成功后由 `PairProgrammingGuidelineAnchored.MarkerText` 原样 durable；replay 不再调用 elapsed/estimate renderer。
 
 ## 5. 检测冲突门：`scripts/checks/enforcer-cross-family-collision.mjs`（GD-010）
 

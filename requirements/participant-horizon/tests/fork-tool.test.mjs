@@ -20,11 +20,14 @@ const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode
 const chain = (kind, extra = {}) => ({
   kind,
   ...extra,
+  int: () => chain(`${kind}-int`, extra),
+  nonnegative: () => chain(`${kind}-nonnegative`, extra),
   describe: (description) => chain(`${kind}-described`, { ...extra, description }),
   optional: () => chain(`${kind}-optional`, extra),
 })
 const fakeSchema = {
   string: () => chain('string'),
+  number: () => chain('number'),
   enum: (values) => chain('enum', { values }),
   union: (parts) => chain('union', { parts }),
 }

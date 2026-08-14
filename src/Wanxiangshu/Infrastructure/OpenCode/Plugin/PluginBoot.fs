@@ -8,6 +8,7 @@ open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
 
 module PluginBoot =
 
@@ -19,6 +20,7 @@ module PluginBoot =
           PortOpt: IOpenCodePort option
           Journal: AgentJournal option
           Scope: PluginRuntimeScope
+          Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
           GitTreePort: Wanxiangshu.Review.GitTreePort option
@@ -39,6 +41,7 @@ module PluginBoot =
                 | Error err -> raise (InvalidOperationException err)
 
             let scope = new PluginRuntimeScope(journal)
+            let clock = PtyTiming.nodeClockPort ()
 
             let strengthFailClosed (reason: string) : unit =
                 scope.Strength.TripStrengthFuse reason
@@ -68,6 +71,7 @@ module PluginBoot =
                   PortOpt = portOpt
                   Journal = journal
                   Scope = scope
+                  Clock = clock
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory
                   GitTreePort = gitTreePort

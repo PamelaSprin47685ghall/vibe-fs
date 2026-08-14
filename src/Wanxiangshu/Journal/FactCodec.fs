@@ -136,6 +136,12 @@ module FactCodec =
                     {| payload with
                         ObservedAt = payload.ObservedAt.ToOffset TimeSpan.Zero |}
             )
+        | Agent(AgentFact.Host(HostFactCases.SessionStartedAtBound payload)) ->
+            Agent(
+                HostFact.SessionStartedAtBound
+                    {| payload with
+                        StartedAt = payload.StartedAt.ToOffset TimeSpan.Zero |}
+            )
         | other -> other
 
     let serializeFact (fact: Fact) : string =

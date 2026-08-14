@@ -44,8 +44,8 @@ import {
 
 const buildAgentFactDispatch = unionCase(FactModule.AgentFact, 'AgentFact')
 
-// DSL-003: AgentFact is a 7-case dispatch union over per-bounded-context
-// *FactCases families. The facade keeps the flat construction surface — a test
+// DSL-003: AgentFact is a dispatch union over per-bounded-context *FactCases
+// families. The facade keeps the flat construction surface — a test
 // names the business case, the family lookup wraps it — so no test learns the
 // nesting, and the wire shape (case name + payload) is unchanged.
 const AGENT_FACT_FAMILIES = [
@@ -57,6 +57,7 @@ const AGENT_FACT_FAMILIES = [
   ['Companion', FactModule.CompanionFactCases],
   ['Context', FactModule.ContextFactCases],
   ['Host', FactModule.HostFactCases],
+  ['Delegation', FactModule.DelegationFactCases],
 ]
 
 const buildAgentFact = (() => {

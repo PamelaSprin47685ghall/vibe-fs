@@ -77,13 +77,25 @@
 
 ---
 
+## TIME-007：HOST-013 的 SessionStartedAt 绑定首次 prompt，一次采样形成新 marker 的 elapsed
+
+**规范陈述**：每个 provider-facing session 的 `SessionStartedAt` 定义为该 session **首次 prompt 开始 materialize/发送**时由显式注入 `IClockPort.UtcNow()` 取得的时刻；只能 bind once。HOST-013 每个新 pair occurrence 再从同一注入时钟采样一次 `now`，计算 `max(0, now - SessionStartedAt)` 并渲染为 human-readable elapsed fragment；该 fragment 随当次最终 `MarkerText` 一起 durable 冻结，历史 occurrence 不重算。restart 后从 bounded session projection O(1) 读取 `SessionStartedAt`，不得扫描 transcript/XTrace/log，也不得用 runtime/plugin start time、Host physical session create time或“首次 marker 时间”替代。
+
+**含义/动机**：elapsed 描述“这次 session 从第一次实际 prompt 开始已经存在多久”，而不是进程活了多久。首次 prompt 就是 session 对 provider 的出生边界；bind-once 使 restart/replay 保持同一时间原点，新 marker 的 fresh sample 又保留真实经过时间。
+
+**边界**：elapsed 文案及与 tip/estimate/guideline 的 occurrence composition → `guidance-delivery` GD-012；历史 MarkerText byte freeze → `prefix-stability` PREFIX-STABILITY-011；本包只拥有时间原点与采样规则。elapsed 不是 authority，不触发 abort、deadline、fallback 或任何执行分支（TIME-005）。
+
+**证据指针**：→ `PROOF.md` TIME-007 行。
+
+---
+
 ## 反向覆盖（源 Clause → 本包命题）
 
 | 源 Clause（COVERAGE.md 归属） | 落点 |
 |---|---|
 | EXEC-011 deadline 有界（时间部分） | TIME-002 / TIME-003 |
 | EXEC-025 / EXEC-004 DevOps 10s → DeadlineExpired（机制部分；10s 数值=HOW） | TIME-002 |
-| HOST-013 `SessionStartedAt` 经 `IClockPort`、禁 ambient `UtcNow` | TIME-004 |
+| HOST-013 `SessionStartedAt` 经 `IClockPort`、禁 ambient `UtcNow` | TIME-004 / TIME-007 |
 | `reconciler-event-driven-de-polling.md` C 类 deadline 允许墙钟但须注入 | TIME-001 / TIME-003 |
 | G4R「Time is input, never authority」 | TIME-005 |
 | `causal-wait` 的 `DeadlineAt` escape | TIME-006 |

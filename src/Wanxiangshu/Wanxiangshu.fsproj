@@ -153,6 +153,8 @@
     <Compile Include="Journal/BloggerCycleProjection.fs"/>
     <Compile Include="Journal/GuidelineProjection.fs"/>
     <Compile Include="Journal/TipDeliveryProjection.fs"/>
+    <Compile Include="Journal/DelegatedToolEstimateProjection.fs"/>
+    <Compile Include="Journal/SessionStartedAtProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
     <Compile Include="Journal/ManagerOpeningFloor.fs"/>
     <Compile Include="Journal/ObservationProjection.fs"/>
@@ -171,10 +173,13 @@
     <Compile Include="Journal/CompanionFactFold.fs"/>
     <Compile Include="Journal/ContextFactFold.fs"/>
     <Compile Include="Journal/HostFactFold.fs"/>
+    <Compile Include="Journal/DelegationFactFold.fs"/>
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/JournalEventStoreBoot.fs"/>
     <Compile Include="Journal/EventStoreJournalWriter.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
+    <Compile Include="Journal/DelegatedToolEstimateLedger.fs"/>
+    <Compile Include="Journal/SessionStartedAtLedger.fs"/>
     <Compile Include="Journal/ReviewBarrier.fs"/>
     <Compile Include="Journal/SharedAgentJournal.fs"/>
     <Compile Include="Infrastructure/Git/GitSubject.fs"/>
@@ -247,6 +252,7 @@
     <Compile Include="Infrastructure/OpenCode/Codec/ProviderWireDecode.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ProviderWireCapture.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ProjectionMessageEdit.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/PairProgrammingCalibration.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Events.fs"/>
@@ -396,6 +402,7 @@
     <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewRunner.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Host.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ToolHostCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/DelegatedToolEstimate.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/JoinResultRenderer.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityHostPort.fs"/>

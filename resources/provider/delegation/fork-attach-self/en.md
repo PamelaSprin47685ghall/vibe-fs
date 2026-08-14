@@ -1,0 +1,1 @@
+A person cannot attach its own work record to its own charge.

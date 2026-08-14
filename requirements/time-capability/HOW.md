@@ -11,6 +11,9 @@ Process/Deadline.fs       typed deadline（ofBudget / remaining / isExpired / ne
 Process/ProcessRunner.fs  process 等待消费 deadline（物理层，允许直接采样 UtcNow）
 Session/CompletionMailbox.fs  join 等待用注入 IClockPort + ITimerPort + Deadline.nextWaitMs 分段等待
 Kernel/CausalWait.fs      WaitEscape.DeadlineAt（causal-wait 引用本包的 typed 时刻）
+Journal/SessionStartedAtProjection.fs  HOST-013 session 起点的 bounded projection
+Journal/SessionStartedAtLedger.fs      首次 prompt bind-once durable writer
+Infrastructure/OpenCode/Plugin/PluginBoot.fs / PluginTransforms.fs  注入 IClockPort；新 occurrence 采 elapsed
 ```
 
 ### 1. `Kernel/Temporal.fs` — 纯接口合同
@@ -61,7 +64,15 @@ type IClockPort =
 - `Session/CompletionMailbox.fs`：join 等待注入 `ITimerPort` + `IClockPort`；budget 是绝对 `Deadline`，每次等待 `ITimerPort.Delay(Deadline.nextWaitMs clock expires)`；到期 → `DeadlineExpired` 中断（EXEC-025 机制，delegation/process 拥有业务意义）。
 - `HostForkJoin.fs`：deadline handle 与信号 `Promise.race`，race 后 `Cancel()`。
 
-### 5. ambient 静态扫描（机制归 structured-workflow）
+### 5. HOST-013 SessionStartedAt / elapsed（TIME-007）
+
+- `PluginBoot` 在 composition root 创建一次 `IClockPort`，`PluginTransforms` 只消费 `boot.Clock`；没有 ambient 时间读取。
+- 每次 provider transform 入口在任何 `let!` 前同步采样 candidate。`SessionStartedAtLedger.bind` 对 session 的 bounded projection 做 O(1) lookup：已有值直接返回；缺失时 append `HostFact.SessionStartedAtBound(SessionId, StartedAt)`，fold 的 `SessionStartedAtProjection.bind` 永远保留第一值。
+- journal append 成功后返回 fold 后的 canonical first value；bind 失败时当前 provider attempt fail closed，不能拿 process-local candidate 继续，因为 restart 后会换原点。
+- 新 HOST-013 occurrence 再调用同一 `IClockPort.UtcNow()` 一次，`PairProgrammingCalibration.renderElapsed` 把 `max(0, now-startedAt)` 转成人类尺度；最终字节交给 guidance-delivery / prefix-stability 冻结。
+- 不从 OpeningPrompt/XTrace/transcript 反推时间，不把 first marker time 当创建时间；这里“首次 prompt”就是 session 的 provider-facing 创建边界。
+
+### 6. ambient 静态扫描（机制归 structured-workflow）
 
 `scripts/checks/g4r-ce-vocabulary.mjs`：
 

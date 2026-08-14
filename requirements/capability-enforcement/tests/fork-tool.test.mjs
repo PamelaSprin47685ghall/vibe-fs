@@ -25,11 +25,14 @@ const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents } = await impo
 const chain = (kind, extra = {}) => ({
   kind,
   ...extra,
+  int: () => chain(`${kind}-int`, extra),
+  nonnegative: () => chain(`${kind}-nonnegative`, extra),
   describe: (description) => chain(`${kind}-described`, { ...extra, description }),
   optional: () => chain(`${kind}-optional`, extra),
 })
 const fakeSchema = {
   string: () => chain('string'),
+  number: () => chain('number'),
   enum: (values) => chain('enum', { values }),
   union: (parts) => chain('union', { parts }),
 }
@@ -174,8 +177,20 @@ test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', 
   const commission = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   assert.equal(fork.Name, 'fork')
   assert.equal(commission.Name, 'commission')
-  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), ['calling', 'name', 'charge', 'keywords'])
-  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), ['calling', 'name', 'charge'])
+  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), [
+    'calling',
+    'name',
+    'charge',
+    'keywords',
+    'attach',
+    'expected_tool_calls',
+  ])
+  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), [
+    'calling',
+    'name',
+    'charge',
+    'expected_tool_calls',
+  ])
 })
 
 test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {

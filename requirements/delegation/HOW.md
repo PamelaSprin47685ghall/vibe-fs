@@ -8,9 +8,33 @@
 
 | 面 | owner 角色 | 语义 | 物理实现 |
 |----|-----------|------|---------|
-| `fork` | Manager | mission 内 witness；Byname 承接 charge | `Session/ForkRuntime.fs`（ChildRun map）、`Domain/ForkChildPayload.fs`（首 prompt） |
-| `commission` | Orchestrator | 独立集成之路；calling 在场=新路，缺省=续做 | `Application/Orchestration/*.fs`、`Infrastructure/Git/WorktreeResource.fs` |
-| `inspect` / `establish-behavior` / `repair-behavior` | SyncDelegate callers | 同步委托；普通 completion → bounded WorkRecord | `Session/{SyncDelegateRuntime,SyncDelegateWorkflow,SyncDelegateWait,SyncDelegateCallStore}.fs` |
+| `fork` | Manager | mission 内 witness；Byname 承接 charge；可选 attachment / tool-call estimate | `Session/ForkRuntime.fs`（ChildRun map）、`Domain/ForkChildPayload.fs`（首 prompt） |
+| `commission` | Orchestrator | 独立集成之路；calling 在场=新路，缺省=续做；可选 tool-call estimate | `Application/Orchestration/*.fs`、`Infrastructure/Git/WorktreeResource.fs` |
+| `inspect` / `establish-behavior` / `repair-behavior` | SyncDelegate callers | 同步委托；普通 completion → bounded WorkRecord；可选 tool-call estimate | `Session/{SyncDelegateRuntime,SyncDelegateWorkflow,SyncDelegateWait,SyncDelegateCallStore}.fs` |
+
+### fork attachment（DELEG-021）
+
+`attach` 在 parent `HandleProjection` 以 Byname 定位 sibling/retired child，再调用唯一
+`LifecycleWorkRecord(includeOpening=true)` projector。`ForkChildPayload` 只接收 `Attachment: string option`
+并在 `commissioner_record` 后、requirements 前渲染 `attached_work_record` data block；不解析 LWR、
+不复制 Journal projection。new fork 与 idle reuse 可物化；busy reuse 不物化，只返回自然语言 deferred
+说明。unknown/self 在任何 send 前拒绝。
+
+### delegated tool estimate（DELEG-022）
+
+持久事实只有 `DelegatedToolEstimateReplaced(SessionId, ExpectedToolCalls)` 与
+`DelegatedToolCallObserved(SessionId, ToolCallId)`。`DelegatedToolEstimateProjection` 纯 fold：replace →
+`Remaining=X, CountedCalls=∅`；observe → duplicate/zero no-op，否则 `Remaining-1` 并记录 call id。
+`CountedCalls` 最大长度 ≤ 本次 X；remaining=0 后 Host 不再 append observation，因此不会随 session 生命周期
+无限增长。projection 挂在 `SessionAgentProjection`，按 SessionId O(1) 读取；禁止从 XTrace/transcript 派生。
+
+estimate 在 delegated prompt/nudge 物理发送前 durable append：fork/reuse 在 child session 已解析后；
+commission 在 Manager session 已创建/解析后；SyncDelegate 在 `GetOrCreate` 后、`SendPrompt` 前。省略参数不
+append replace fact。SyncDelegate semantic batch 对全部显式值求和；无显式值 = None。
+
+全局 `tool.execute.before` 是真实 tool invocation 的唯一 observation seam：有 session + callID 且该 session
+存在 estimate/remaining>0 时 append `DelegatedToolCallObserved`。synthetic HOST-013 pair 不经过 execute hook，
+天然不计数。该 hook 只记事实，不决定工具是否继续执行。
 
 ### SyncDelegate 核心类型（`Kernel/SyncDelegate.fs`）
 

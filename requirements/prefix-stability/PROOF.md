@@ -22,7 +22,7 @@
 
 ## GAP
 
-- `GAP-009`：HOST-013 的 elapsed 动态 marker 在 cutover 后只保留了 `PREFIX-STABILITY-011` 的历史字节不重算约束；“每条新 marker 采样 `SessionStartedAt → now` 并把 human-readable elapsed 写入当次 immutable `MarkerText`”的正向义务没有进入当前 WHAT 的独立命题，也没有可执行 oracle。生产 `Infrastructure/OpenCode/Plugin/PluginTransforms.fs` 当前只组装 `tip guidance + pair-programming guideline`，未注入 elapsed；因此该行为实际缺失。恢复时必须保持一条原则：新 occurrence 只采样一次，已持久化 `MarkerText` 永不重算。
+- `GAP-009` — **CLOSED**：正向义务已恢复为 `time-capability` TIME-007，并由 `requirements/time-capability/tests/pair-session-elapsed.test.mjs` 独立 frozen oracle 承载（首次 prompt durable bind-once、no-scan/no-mutable、fresh elapsed、historical MarkerText immutable）。production 以 `SessionStartedAtBound` → bounded session projection → injected `IClockPort` → `PairProgrammingCalibration.composeWithElapsed` 接入 HOST-013；历史 replay 仍只读已存 `MarkerText`。按用户要求 oracle 冻结后未执行；相关静态 gates 绿，full build 被 unrelated Fission parse error 阻塞。
 
 ## 2. 本包拥有的测试文件（全部单跑绿）
 

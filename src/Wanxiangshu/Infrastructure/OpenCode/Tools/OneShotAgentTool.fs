@@ -19,6 +19,7 @@ module OneShotAgentTool =
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     type Request = { Agent: string; Prompt: string }
@@ -102,7 +103,7 @@ module OneShotAgentTool =
                     let! parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
                     let fullPrompt =
-                        ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord [] None
+                        ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord None [] None
 
                     match!
                         scope.Sessions.CreateChildSession(

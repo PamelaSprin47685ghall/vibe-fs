@@ -44,6 +44,8 @@ type SessionAgentProjection =
         Guidelines: GuidelineProjectionState option
         /// Rulebook Main tip Full/Identity delivery (TipGuidanceDelivered fold).
         TipDelivery: TipDeliveryProjectionState option
+        SessionStartedAt: SessionStartedAtProjectionState option
+        DelegatedToolEstimate: DelegatedToolEstimateProjectionState option
     }
 
 type AgentProjectionSet =
@@ -91,7 +93,9 @@ module AgentProjection =
           BloggerCycles = None
           ManagerLife = None
           Guidelines = None
-          TipDelivery = None }
+          TipDelivery = None
+          SessionStartedAt = None
+          DelegatedToolEstimate = None }
 
     let empty =
         { Sessions = Map.empty

@@ -75,7 +75,8 @@ type ManagerStart =
     { JobId: ManagerJobId
       ManagerAgent: string
       Worktree: WorktreePath
-      Prompt: string }
+      Prompt: string
+      ExpectedToolCalls: int option }
 
 /// Manager and reviewer execution, as the Host layer provides it.
 ///

@@ -58,15 +58,21 @@ const {
 const { spec: inspectSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/InspectorTool.js')
 const { establishSpec, repairSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/CoderTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
+  '../../../dist/Journal/DelegatedToolEstimateProjection.js'
+)
 
 const chain = (kind, extra = {}) => ({
   kind,
   ...extra,
+  int: () => chain(`${kind}-int`, extra),
+  nonnegative: () => chain(`${kind}-nonnegative`, extra),
   describe: (description) => chain(`${kind}-described`, { ...extra, description }),
   optional: () => chain(`${kind}-optional`, extra),
 })
 const fakeSchema = {
   string: () => chain('string'),
+  number: () => chain('number'),
   enum: (values) => chain('enum', { values }),
   array: (inner) => chain('array', { inner }),
 }
@@ -242,8 +248,13 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
     undefined,
   )
 
+  const delegatedRemaining = (childKey) => {
+    const state = agentJournal.snapshot(opened.journal).AgentProjections.Sessions.get(sessionId(childKey)).DelegatedToolEstimate
+    return estimateRemaining(state)
+  }
+
   try {
-    await fn({ runtime, createCalls, prompts, inspectorPrompts, scope })
+    await fn({ runtime, createCalls, prompts, inspectorPrompts, scope, delegatedRemaining })
   } finally {
     disposeRuntime(runtime)
     opened.dispose()
@@ -255,7 +266,7 @@ test('INSPECT_spec_exposes_charge_plus_optional_keywords_no_agent', () => {
   const tool = inspectSpec(factory, bareScope(), undefined)
   assert.equal(tool.Name, 'inspect')
   assert.match(tool.Description, /WorkRecord/)
-  assert.deepEqual(argNames(tool), ['charge', 'keywords'])
+  assert.deepEqual(argNames(tool), ['charge', 'keywords', 'expected_tool_calls'])
 })
 
 test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
@@ -263,8 +274,8 @@ test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
   const repair = repairSpec(factory, bareScope(), undefined)
   assert.equal(establish.Name, 'establish-behavior')
   assert.equal(repair.Name, 'repair-behavior')
-  assert.deepEqual(argNames(establish), ['charge', 'keywords'])
-  assert.deepEqual(argNames(repair), ['charge', 'keywords'])
+  assert.deepEqual(argNames(establish), ['charge', 'keywords', 'expected_tool_calls'])
+  assert.deepEqual(argNames(repair), ['charge', 'keywords', 'expected_tool_calls'])
 })
 
 test('INSPECT_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
@@ -325,6 +336,58 @@ test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_char
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'bounded answer', 'asst_prepared')
     const result = resultOf(await pending)
     assert.equal(result.ok, true, result.error)
+  })
+})
+
+test('DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
+  const runId = 'asst_inspect_estimate_batch'
+  const firstCall = toolCallId('inspect_estimate_1')
+  const secondCall = toolCallId('inspect_estimate_2')
+  const message = batchMessage(runId, [
+    { id: firstCall, tool: 'inspect' },
+    { id: secondCall, tool: 'inspect' },
+  ])
+
+  await withHarness(async ({ runtime, createCalls, prompts, scope, delegatedRemaining }) => {
+    const owner = 'ses_owner_inspect_estimate_batch'
+    const tool = inspectSpec(factory, scope, runtime)
+
+    const second = tool.Execute(
+      makeArgs({ charge: 'inspect second', expected_tool_calls: 5 }),
+      context(owner, providerRun(runId), secondCall),
+    )
+    const first = tool.Execute(
+      makeArgs({ charge: 'inspect first', expected_tool_calls: 2 }),
+      context(owner, providerRun(runId), firstCall),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'estimated inspect batch did not send once')
+    assert.equal(delegatedRemaining(createCalls[0].child), 7)
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'estimated batch answer')
+    await first
+    await second
+  }, { snapshotMessages: [message] })
+})
+
+test('DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts, scope, delegatedRemaining }) => {
+    const owner = 'ses_owner_inspect_estimate_reuse'
+    const tool = inspectSpec(factory, scope, runtime)
+
+    const first = tool.Execute(makeArgs({ charge: 'first inquiry', expected_tool_calls: 4 }), context(owner))
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'first estimated inspect did not send')
+    const child = createCalls[0].child
+    assert.equal(delegatedRemaining(child), 4)
+    await settlePendingInvoke(runtime, child, roles.of('Inspector'), 'first answer', 'asst_estimate_first')
+    await first
+
+    const second = tool.Execute(makeArgs({ charge: 'second inquiry' }), context(owner))
+    await waitFor(() => prompts.length === 2, 'reused inspect did not send')
+    assert.equal(createCalls.length, 1, 'Inspector session must be reused')
+    assert.equal(delegatedRemaining(child), 4, 'omitted expected_tool_calls must preserve remaining')
+    await settlePendingInvoke(runtime, child, roles.of('Inspector'), 'second answer', 'asst_estimate_second')
+    await second
   })
 })
 

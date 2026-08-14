@@ -11,7 +11,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
+import {
+  agentJournal,
+  forkChildPayload,
+  lifecycleWorkRecordProjection,
+  listItems,
+  sessionId,
+  toList,
+} from '../../verification-system/tests/support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -26,6 +33,9 @@ const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: for
   '../../../dist/Session/HostForkAgent.js'
 )
 const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
+  '../../../dist/Journal/DelegatedToolEstimateProjection.js'
+)
 const { OrchestratorHost } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
 const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
@@ -36,11 +46,14 @@ const { targetRef, commitHash, managerJobId, sessionId: makeSessionId, fact, str
 const chain = (kind, extra = {}) => ({
   kind,
   ...extra,
+  int: () => chain(`${kind}-int`, extra),
+  nonnegative: () => chain(`${kind}-nonnegative`, extra),
   describe: (description) => chain(`${kind}-described`, { ...extra, description }),
   optional: () => chain(`${kind}-optional`, extra),
 })
 const fakeSchema = {
   string: () => chain('string'),
+  number: () => chain('number'),
   enum: (values) => chain('enum', { values }),
   union: (parts) => chain('union', { parts }),
 }
@@ -89,6 +102,8 @@ const liveScope = async (behaviour = {}) => {
   assert.equal(opened.ok, true, 'journal must open')
 
   const sessions = fakeSessions(behaviour)
+  const openingRecord = (sid) => lifecycleWorkRecordProjection.lifecycleWorkRecord(opened.journal, sid, true)
+  const childRecord = (sid) => lifecycleWorkRecordProjection.lifecycleWorkRecord(opened.journal, sid, false)
   const runtime = new HostForkRuntime(
     PARENT,
     sessions,
@@ -98,8 +113,8 @@ const liveScope = async (behaviour = {}) => {
     undefined, // ptyPort
     undefined, // directoryFor
     undefined, // onRunStarted
-    undefined, // parentWorkRecordFor
-    undefined, // childWorkRecordFor
+    openingRecord,
+    childRecord,
     undefined, // sessionSnapshot
     undefined, // cancelSignals
   )
@@ -114,8 +129,8 @@ const liveScope = async (behaviour = {}) => {
     new Set(),
     new Map(),
     undefined,
-    undefined,
-    undefined,
+    (sid) => openingRecord(sessionId(sid)),
+    (sid) => childRecord(sessionId(sid)),
     undefined,
     undefined,
   )
@@ -175,6 +190,20 @@ test('FORK_name_without_calling_is_continuation_only', async () => {
   assert.doesNotMatch(result, /fast-|deep-|agent id/i)
 })
 
+test('DELEG_022_expected_tool_calls_rejects_negative_and_fractional_values_before_fork', async () => {
+  for (const invalid of [-1, 1.5]) {
+    const live = await liveScope()
+    const spec = managerSpec(factory, live.scope)
+    const result = await runManager(spec, 'Ada', 'do work', {
+      calling: 'coder',
+      expected_tool_calls: invalid,
+    })
+    assert.match(result, /non-negative integer|nonnegative integer|非负整数/i)
+    assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
+    live.cleanup()
+  }
+})
+
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
 
 test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
@@ -209,6 +238,68 @@ test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
   live.cleanup()
 })
 
+test('DELEG_021_unknown_attachment_is_refused_before_child_creation', async () => {
+  const live = await liveScope()
+  const spec = managerSpec(factory, live.scope)
+  const result = await runManager(spec, 'Bob', 'do work', { calling: 'coder', attach: 'Ghost' })
+
+  assert.match(result, /attachment.*name|known.*attachment/i)
+  assert.doesNotMatch(result, /agent id|fast-|deep-|session/i)
+  assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
+  live.cleanup()
+})
+
+test('DELEG_021_self_attachment_is_refused_before_child_creation', async () => {
+  const live = await liveScope()
+  const spec = managerSpec(factory, live.scope)
+  const result = await runManager(spec, 'Bob', 'do work', { calling: 'coder', attach: 'Bob' })
+
+  assert.match(result, /cannot.*attach.*itself|cannot.*attach.*own|不能.*附/i)
+  assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
+  live.cleanup()
+})
+
+test('DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async () => {
+  const live = await liveScope()
+  const spec = managerSpec(factory, live.scope)
+
+  assert.match(await runManager(spec, 'Ada', 'trace the retry path', { calling: 'coder' }), /Ada carries/)
+  assert.match(
+    await runManager(spec, 'Bob', 'use the existing evidence', { calling: 'coder', attach: 'Ada' }),
+    /Bob carries/,
+  )
+
+  const prompts = live.sessions.calls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
+  const bobPrompt = prompts.at(-1)[2]
+  assert.ok(bobPrompt.includes(forkChildPayload.attachmentInstruction))
+  assert.match(bobPrompt, /trace the retry path/)
+  assert.ok(
+    bobPrompt.indexOf(forkChildPayload.attachmentInstruction) < bobPrompt.indexOf('trace the retry path'),
+    'the canonical attachment framing precedes the attached LWR',
+  )
+  live.cleanup()
+})
+
+test('DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral', async () => {
+  const live = await liveScope()
+  const spec = managerSpec(factory, live.scope)
+
+  assert.match(await runManager(spec, 'Ada', 'trace the retry path', { calling: 'coder' }), /Ada carries/)
+  assert.match(await runManager(spec, 'Bob', 'primary work', { calling: 'coder' }), /Bob carries/)
+
+  const before = live.sessions.calls.length
+  const result = await runManager(spec, 'Bob', 'add this charge too', { attach: 'Ada' })
+  const afterCalls = live.sessions.calls.slice(before)
+
+  assert.match(result, /busy.*attachment|attachment.*not.*attach|attachment.*not.*added/i)
+  const promptTexts = afterCalls
+    .filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
+    .map((call) => call[2])
+  assert.ok(promptTexts.every((text) => !String(text).includes(forkChildPayload.attachmentInstruction)))
+  assert.ok(promptTexts.every((text) => !String(text).includes('trace the retry path')))
+  live.cleanup()
+})
+
 // ── reuse path: create by calling, continue by Byname ───────────────────────
 
 test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
@@ -223,6 +314,32 @@ test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'Byname continuation must not spawn a second session')
+  live.cleanup()
+})
+
+test('DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', async () => {
+  const live = await liveScope()
+  const spec = managerSpec(factory, live.scope)
+  const child = sessionId('child-1')
+  const remaining = () => {
+    const state = agentJournal.snapshot(live.journal).AgentProjections.Sessions.get(child).DelegatedToolEstimate
+    return estimateRemaining(state)
+  }
+
+  assert.match(
+    await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder', expected_tool_calls: 3 }),
+    /Ada carries/,
+  )
+  assert.equal(remaining(), 3)
+
+  assert.match(await runManager(spec, 'Ada', 'continue without recalibration'), /Ada carries/)
+  assert.equal(remaining(), 3, 'omitting expected_tool_calls must retain current remaining')
+
+  assert.match(
+    await runManager(spec, 'Ada', 'recalibrate current work', { expected_tool_calls: 7 }),
+    /Ada carries/,
+  )
+  assert.equal(remaining(), 7, 'an explicit estimate replaces the current remaining even on busy reuse')
   live.cleanup()
 })
 

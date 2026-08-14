@@ -121,8 +121,8 @@ type ActivePrefixEpoch =
 - **Pair Hint 正文（简体中文思考纪律、parallel wave craft）**：属 `cognitive-environment`
   （CHANGES-AUDIT：pair-parallel-tools → cognitive-environment）。本包只拥有「若属于 prefix
   identity 则稳定」。
-- **elapsed 采样（`SessionStartedAt → now`）**：HOST-013 的 wall-clock 计量归 host-boundary；
-  本包只拥有「历史 marker 永不重算 elapsed」（WHAT-011 边界）。
+- **elapsed 采样（`SessionStartedAt → now`）**：HOST-013 的 wall-clock 计量归 `time-capability` TIME-007；
+  本包只拥有「历史 marker 永不重算 elapsed」（PREFIX-STABILITY-011 边界）。
 - **`PairProgrammingGuidelineAppended` legacy 无 anchor 事实**：是 migration sediment
   （fail closed 不迁移）；本包以 WHAT-010 的 fail-closed 表述，不立「如何迁移」命题。
 - **`NeedRebase` / `RebaseRequested` Stage**：被拒方案（TODO-009/012 GARBAGE）；本包

@@ -39,6 +39,7 @@ const {
   ToolHostCodec_optionalEnumSchema: optionalEnumSchema,
   ToolHostCodec_optionalEnumSchemaDescribed: optionalEnumSchemaDescribed,
   ToolHostCodec_optionalNumberSchema: optionalNumberSchema,
+  ToolHostCodec_optionalNonNegativeIntegerSchemaDescribed: optionalNonNegativeIntegerSchemaDescribed,
   ToolHostCodec_optionalStringArraySchema: optionalStringArraySchema,
   ToolHostCodec_optionalStringSchema: optionalStringSchema,
   ToolHostCodec_optionalStringSchemaDescribed: optionalStringSchemaDescribed,
@@ -108,7 +109,17 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
           }),
           optional: () => ({ schema: 'string-optional' }),
         }),
-        number: () => ({ schema: 'number', optional: () => ({ schema: 'number-optional' }) }),
+        number: () => ({
+          schema: 'number',
+          optional: () => ({ schema: 'number-optional' }),
+          int: () => ({
+            nonnegative: () => ({
+              describe: (description) => ({
+                optional: () => ({ schema: 'nonnegative-int-described-optional', description }),
+              }),
+            }),
+          }),
+        }),
         enum: (values) => ({
           describe: (description) => ({
             optional: () => ({ schema: 'enum-described-optional', values, description }),
@@ -156,6 +167,12 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
 
   const optNumber = unwrap(optionalNumberSchema(factory))
   assert.deepEqual(optNumber, { schema: 'number-optional' })
+
+  const estimate = unwrap(optionalNonNegativeIntegerSchemaDescribed('delegator estimate', factory))
+  assert.deepEqual(estimate, {
+    schema: 'nonnegative-int-described-optional',
+    description: 'delegator estimate',
+  })
 
   const optArray = unwrap(optionalStringArraySchema(factory))
   assert.equal(optArray.schema, 'array-optional')

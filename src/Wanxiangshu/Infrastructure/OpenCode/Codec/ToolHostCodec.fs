@@ -64,6 +64,17 @@ type HostToolArguments internal (raw: obj) =
             with _ ->
                 None
 
+    member _.OptionalNonNegativeInteger(name: string) : Result<int option, unit> =
+        if isNull raw || isNull raw?(name) then
+            Ok None
+        else
+            let value = raw?(name)
+
+            if emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0" then
+                Ok(Some(int (unbox<float> value)))
+            else
+                Error()
+
     member _.OptionalBool(name: string) =
         if isNull raw || isNull raw?(name) then
             None
@@ -147,6 +158,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.number().optional()")>]
     let private rawOptionalNumberSchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.number().int().nonnegative().describe($1).optional()")>]
+    let private rawOptionalNonNegativeIntegerSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.array($0.schema.string()).optional()")>]
     let private rawOptionalStringArraySchema (tool: obj) : obj = jsNative
@@ -273,6 +287,9 @@ module ToolHostCodec =
 
     let optionalNumberSchema (HostToolFactory factory) =
         HostSchema(rawOptionalNumberSchema factory)
+
+    let optionalNonNegativeIntegerSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawOptionalNonNegativeIntegerSchemaDescribed factory description)
 
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)

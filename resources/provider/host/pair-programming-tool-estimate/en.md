@@ -1,0 +1,1 @@
+According to your delegator's estimate, you have about {{remaining}} tool calls left for this delegated work. This is not an execution limit. If your current approach is likely to exceed it, proactively narrow or reorder the scope, shorten the verification path, increase useful parallelism, or use delegation/splitting only where your available capabilities support it.

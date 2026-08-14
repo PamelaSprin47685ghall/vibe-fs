@@ -64,6 +64,7 @@ module HostForkAgent =
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     let private userPromptText (message: SessionMessage) =
@@ -180,7 +181,8 @@ module HostForkAgent =
                 ?renderedPrompt: string,
                 ?ownership: Fact.HandleOwnership,
                 ?deferSend: bool,
-                ?byname: string
+                ?byname: string,
+                ?expectedToolCalls: int
             ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
 
@@ -236,6 +238,7 @@ module HostForkAgent =
                                             (forkInstructions this.ParentId)
                                             prompt
                                             parentWorkRecord
+                                            None
                                             requirements
                                             payload)
                             }
@@ -248,6 +251,11 @@ module HostForkAgent =
                     match retired, existing with
                     | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                     | _, Some childId ->
+                        match this.Journal, expectedToolCalls with
+                        | Some journal, Some expected ->
+                            do! DelegatedToolEstimateLedger.replace journal childId expected
+                        | _ -> ()
+
                         let sendAgent =
                             this.BoundManagedAgent(agentId, childId) |> Option.defaultValue agentName
 
@@ -331,6 +339,11 @@ module HostForkAgent =
                                     if isFirstPrompt then
                                         do! XTraceCapture.captureOpening this.Journal childId prompt requirements
 
+                                    match this.Journal, expectedToolCalls with
+                                    | Some journal, Some expected ->
+                                        do! DelegatedToolEstimateLedger.replace journal childId expected
+                                    | _ -> ()
+
                                     if deferSend && isFirstPrompt then
                                         this.DeferredFirstPrompts.[agentId] <-
                                             {| ChildId = childId
@@ -355,7 +368,9 @@ module HostForkAgent =
                                             return Error err
             }
 
-        member this.Reuse(agentId: string, prompt: string, ?renderedPrompt: string) : Task<Result<ForkResult, string>> =
+        member this.Reuse
+            (agentId: string, prompt: string, ?renderedPrompt: string, ?expectedToolCalls: int)
+            : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 // After join retires the prior work unit, reuse of the same
@@ -378,6 +393,11 @@ module HostForkAgent =
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | _, Some childId ->
+                    match this.Journal, expectedToolCalls with
+                    | Some journal, Some expected ->
+                        do! DelegatedToolEstimateLedger.replace journal childId expected
+                    | _ -> ()
+
                     // The record carries the managed name this handle was forked
                     // with. Rebuilding it from the role would silently downgrade a
                     // deep-* agent to fast-* on reuse.
@@ -445,6 +465,7 @@ module HostForkAgent =
                                                             (forkInstructions this.ParentId)
                                                             prompt
                                                             parentWorkRecord
+                                                            None
                                                             []
                                                             None
                                                     )

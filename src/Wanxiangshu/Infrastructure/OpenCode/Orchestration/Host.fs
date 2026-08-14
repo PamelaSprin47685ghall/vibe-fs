@@ -77,11 +77,22 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (worktree: WorktreePath)
         (prompt: string)
         (deferSend: bool)
+        (expectedToolCalls: int option)
         =
         task {
             worktrees.[agentId] <- WorktreePath.value worktree
 
-            match! runtime.Fork(agentId, role, agent, prompt, None, deferSend = deferSend) with
+            match!
+                runtime.Fork(
+                    agentId,
+                    role,
+                    agent,
+                    prompt,
+                    None,
+                    deferSend = deferSend,
+                    ?expectedToolCalls = expectedToolCalls
+                )
+            with
             | Error error -> return Error error
             | Ok _ ->
                 match runtime.TryChildSession agentId with
@@ -171,7 +182,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // ── ManagerPort ─────────────────────────────────────────────────────────
 
     let startManager (start: ManagerStart) : Task<Result<SessionId, string>> =
-        forkChild (managerAgentId start.JobId) Role.Manager start.ManagerAgent start.Worktree start.Prompt false
+        forkChild
+            (managerAgentId start.JobId)
+            Role.Manager
+            start.ManagerAgent
+            start.Worktree
+            start.Prompt
+            false
+            start.ExpectedToolCalls
 
     /// Await the Manager, then stage its work into a candidate commit.
     ///
@@ -339,7 +357,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         OrchestratorHostReview.reverify
             deps.Journal
             (fun _ path prompt ->
-                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true)
+                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
             (fun _ ->
                 task {
                     match! runtime.SendDeferredFirstPrompt reviewerAgentId with
@@ -457,7 +475,13 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     task)
 
     member _.ForkManagerJob
-        (jobId: ManagerJobId, managerAgent: string, prompt: string, ?byname: string)
+        (
+            jobId: ManagerJobId,
+            managerAgent: string,
+            prompt: string,
+            ?byname: string,
+            ?expectedToolCalls: int
+        )
         : Task<Result<string, string>> =
         task {
             let providerByname =
@@ -479,7 +503,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     match! engine () with
                     | Error reason -> return Error reason
                     | Ok engine ->
-                        match! engine.ForkManager(jobId, managerAgent, prompt, byname = providerByname) with
+                        match!
+                            engine.ForkManager(
+                                jobId,
+                                managerAgent,
+                                prompt,
+                                byname = providerByname,
+                                ?expectedToolCalls = expectedToolCalls
+                            )
+                        with
                         | Error verdict -> return Error(sprintf "%A" verdict)
                         | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
                 }
@@ -489,8 +521,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
     /// Manager job (same worktree, same session) with an appended requirement.
-    member _.ContinueManagerJob(jobId: ManagerJobId, prompt: string) : Task<Result<string, string>> =
+    member _.ContinueManagerJob
+        (jobId: ManagerJobId, prompt: string, ?expectedToolCalls: int)
+        : Task<Result<string, string>> =
         task {
+            match expectedToolCalls, jobRecord jobId, deps.Journal with
+            | Some expected, Some record, Some journal ->
+                do! DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
+            | _ -> ()
+
             match! engine () with
             | Error reason -> return Error reason
             | Ok engine ->

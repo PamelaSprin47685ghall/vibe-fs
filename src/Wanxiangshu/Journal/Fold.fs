@@ -28,6 +28,7 @@ module Fold =
         | AgentFact.Companion companion -> CompanionFactFold.fold projection companion
         | AgentFact.Context context -> ContextFactFold.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
+        | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with

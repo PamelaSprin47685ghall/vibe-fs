@@ -114,6 +114,17 @@ Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical sema
 
 该语义**不**按 provider 复制；wire 形状由 renderer 决定（`prefix-stability` / `provider-projection`）。
 
+### COGNITIVE-ENVIRONMENT-014：delegated tool estimate 是校准提示，不是服从预算
+
+当当前 participant 持有 delegator 提供的 `expected_tool_calls` measurement 时，新的 Pair Hint occurrence
+可追加一段动态 calibration：明确“根据委任者估算，目前还剩约 X 次工具调用”；同时明确 X 不是执行上限。
+若当前方案预计超支，应主动收缩/重排范围、缩短验证路径、提高真实可并行工作，或仅在自身已有相应
+capability 时考虑委派/分裂。提示不得宣称 participant 拥有其实际没有的 delegation/fission capability。
+
+没有 delegator estimate 的 user-facing/root participant 不出现该段；`X=0` 仍只表示估算已耗尽，不要求
+停止工作或停止调用工具。X 的计量与 replace/retain 语义归 `delegation`（DELEG-022）；本包只拥有 provider
+该如何理解这个 measurement 的 craft。
+
 ## 反向覆盖
 
 本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-015、PROMPT-016、AGENT-031（NEEDHELP 正常协作

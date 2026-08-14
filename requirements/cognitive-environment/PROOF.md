@@ -19,10 +19,11 @@
 | 011 | REUSE：`requirements/participant-identity/tests/session-persona.test.mjs::FALLBACK_014_system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 面归 `participant-identity`；本包取「身份由 office 决定」认知面）；`requirements/provider-language/tests/provider-prose-ownership.test.mjs`（prose 不散落） | REUSE | `node --test requirements/participant-identity/tests/session-persona.test.mjs` |
 | 012 | REUSE：`requirements/cognitive-environment/tests/prompt-semantic-depth.test.mjs::PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model`（Kernel self-model 面归 `epistemic-reasoning`）；Reviewer prompt 组合面由 `resources/provider/role/reviewer/*` 承载，无独立 runtime oracle | REUSE | `node --test requirements/cognitive-environment/tests/prompt-semantic-depth.test.mjs` |
 | 013 | `tests/cognitive-environment.test.mjs::CE_agent_031_pair_hint_teaches_needhelp_as_normal_collaboration` + `CE_pair_hint_teaches_parallel_wave_without_global_concurrency_number`；REUSE：`requirements/prefix-stability/tests/pair-thought-transform.test.mjs::PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N`（SPLIT@cutover：正文 craft → 本包；anchor/replay 机制 → `prefix-stability`/`provider-projection`） | NEW + REUSE | `node --test requirements/prefix-stability/tests/pair-thought-transform.test.mjs` |
+| 014 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs` `CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages` | REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
 
 ## 统计
 
-- 命题数：13
+- 命题数：14
 - NEW：1 个文件（`cognitive-environment.test.mjs`），9 个断言
 - MOVE：0（本包无单-owner 现有测试文件；prompt-semantic-depth 是 SPLIT，留在原处）
 - REUSE：6 处（prompt-semantic-depth、language-parity-gate、session-persona、pair-thought-transform、session-flattening、provider-prose-ownership）
