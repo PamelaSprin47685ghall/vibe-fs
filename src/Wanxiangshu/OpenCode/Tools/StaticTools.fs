@@ -1,4 +1,6 @@
 namespace Wanxiangshu.OpenCode
+open Wanxiangshu.Sphinx
+open Wanxiangshu.Composition.Durable
 
 open System
 open Fable.Core

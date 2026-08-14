@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode

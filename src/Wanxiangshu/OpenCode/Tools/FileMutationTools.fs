@@ -7,8 +7,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Tools
-
 /// mv / rm — Coder-only file mutation tools (AGENT-016/017/018).
 ///
 /// Both map to the POSIX command of the same name, implemented over Node's

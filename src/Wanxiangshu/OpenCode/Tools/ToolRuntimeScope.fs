@@ -1,4 +1,5 @@
 namespace Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 
 open System
 open System.Collections.Generic

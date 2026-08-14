@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
+open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity

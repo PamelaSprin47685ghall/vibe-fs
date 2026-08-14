@@ -15,7 +15,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Tools
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Fable.Core.JsInterop

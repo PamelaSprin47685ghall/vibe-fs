@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion

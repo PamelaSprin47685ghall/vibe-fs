@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 
 open System
 open Wanxiangshu.Composition.Turn

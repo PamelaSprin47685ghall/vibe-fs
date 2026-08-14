@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation

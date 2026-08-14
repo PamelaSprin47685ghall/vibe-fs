@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Composition.Durable
 
 open System
 open System.Threading.Tasks

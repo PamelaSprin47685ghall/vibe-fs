@@ -40,8 +40,6 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
-open Wanxiangshu.Tools
-
 /// managed agent config gate: validate Host-final opencode.json agent inventory.
 /// Does not invent missing agents, fill models, or read model env vars.
 module ManagedAgentConfig =
