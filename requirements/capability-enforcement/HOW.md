@@ -35,12 +35,12 @@
 
 ## 历史（考古摘要）
 
-- `archive/changes/completed/js-capability-projected-tools.md`：四层同构立法（§2.1）；「不新增第二份
+- 历史 change（js-capability-projected-tools）：四层同构立法（§2.1）；「不新增第二份
   Authority」——generator 只读 `AttemptExecutionProfile.ToolCapabilitySet`（§3）；手写矩阵被拒（§1）。
-- `archive/docs/why/js-tools.md`：「If a method is present, the capability exists. If a method is absent,
+- 历史 why/js-tools 条款：「If a method is present, the capability exists. If a method is absent,
   it does not.」四层同构；万能基类 + prose warning 被拒。
-- `archive/docs/why/agent.md`：「双层权限 vs 单层可信」被拒（Host 配置可漂）；external_directory 固定 allow
+- 历史 why/agent 条款：「双层权限 vs 单层可信」被拒（Host 配置可漂）；external_directory 固定 allow
   元权限 vs 塞矩阵被拒；内部 Agent 从 public enum 消失。
-- `archive/docs/shape/agent.md` AGENT-007/019：双层边界与唯一写点。
+- 历史 shape/agent 条款 AGENT-007/019：双层边界与唯一写点。
 - COVERAGE OVERLAP 修复：同构/同源律唯一归 capability-enforcement；repository-programming 只应用
   （因此 `js-surface-gate.mjs` 的语义 oracle 属于本包律的应用）。

@@ -1,8 +1,8 @@
 # WHAT —— durable-convergence（唯一 normative 合同）
 
 条款前缀 `DURABLE-CONVERGENCE-`。每条的落点测试见 `PROOF.md`。
-来源：`archive/changes/completed/storage.md`（§5.3、§10、§11–§19、§38、§42、§48）、
-`archive/docs/what/casebook.md`（CASE-011）、`archive/requirements-design/COVERAGE.md` persist 小节
+来源：历史 change（storage）（§5.3、§10、§11–§19、§38、§42、§48）、
+历史 what/casebook（CASE-011）、历史 COVERAGE persist 小节
 （PERSIST-003 split）。
 
 ## DURABLE-CONVERGENCE-001 —— merge = set union，永不丢事实

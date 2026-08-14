@@ -67,7 +67,7 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
 
 ## 历史与弃权
 
-以下事实来自 `archive/docs/why/*`、`archive/docs/how/host.md` 与 gate 考古，均为决策记录，不是现行命题：
+以下事实来自历史五层 docs（why/*、how/host）与 gate 考古，均为决策记录，不是现行命题：
 
 - **恢复哲学（ARCH-005 / FLOW-005 / DSL-004）**：恢复重入普通程序，不恢复协程；「执行到第几步」
   不是可恢复对象。曾有一个 `EnsureRecoveryDone: Task<unit>`（collapsed FamilyRecovery → unit）

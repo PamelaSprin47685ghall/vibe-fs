@@ -69,7 +69,7 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
 test('PACKAGE_contents_tarball_excludes_source_tests_docs_scripts', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   const files = pkg.files.map((f) => String(f).replace(/\\/g, '/'))
-  const banned = ['src', 'src/', 'tests', 'tests/', 'scripts', 'scripts/', 'spec', 'spec/', 'docs', 'docs/', 'archive', 'archive/']
+  const banned = ['src', 'src/', 'tests', 'tests/', 'scripts', 'scripts/', 'spec', 'spec/', 'docs', 'docs/', 'requirements', 'requirements/']
   for (const entry of files) {
     for (const b of banned) {
       assert.ok(

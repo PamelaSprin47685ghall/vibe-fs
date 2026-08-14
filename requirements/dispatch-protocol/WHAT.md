@@ -14,7 +14,7 @@
 
 所有插件产生的 user-shaped message（Guard、repair、ReviewConfirmation、busy nudge、provider
 failure continuation、Orchestrator 冲突提示、SyncDelegate 首发与 idle nudge 等）必须经过同一个
-`PromptDispatcher`；禁止第二 writer 直接 `prompt_async`（PROMPT-005 / `archive/docs/shape/prompt.md`）。
+`PromptDispatcher`；禁止第二 writer 直接 `prompt_async`（PROMPT-005 / 历史 shape/prompt 条款）。
 
 - 含义：发出去的每一条内部消息都有 claim 记录，恢复才能凭 PromptKey 找到它。
 - 证据：→ PROOF.md R5、R6。

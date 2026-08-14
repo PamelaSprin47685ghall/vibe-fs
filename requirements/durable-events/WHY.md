@@ -8,7 +8,7 @@ Canonical Integrator CE、查询=Current。运行时真相是 `.git` 内 process
 
 ## 为什么必须独立存在
 
-`archive/docs/why/persist.md` 与 `archive/changes/completed/storage.md` 反复确认同一个失败模式：
+历史 why/persist 与历史 change（storage）反复确认同一个失败模式：
 **每个 feature 自造一份 durable 机制，崩溃恢复与多进程合并立刻分裂成多个世界。**
 
 一旦「谁先写盘、何时算提交、坏了怎么办、多进程怎么合并」由每个 feature 各答一遍，
@@ -45,7 +45,7 @@ Canonical Integrator CE、查询=Current。运行时真相是 `.git` 内 process
   `refs/wanxiang/inspector-casebook`、Student QA 私有文件——都被 storage.md §31/§26
   明确禁止；`scripts/checks/unified-store-gate.mjs` 的 `feature-ref` 规则现在钉死它。
 - 先改内存再补盘：内存会看见**无证据的未来**；崩溃后重放与内存分歧进不了恢复路径
-  （archive/docs/why/persist.md「先改内存再补盘 vs append 成功后才改权威态」）。
+  （历史 why/persist「先改内存再补盘 vs append 成功后才改权威态」）。
 - 同 EventId + 不同 bytes 被静默接受 → 重放身份漂移。
 - 坏 JSON / 缺 parent / 成环 / 未知 event_type 被跳过继续 fold → 后续事实建在错基上。
 - schemaVersion / store-v2：版本不是领域事实，逼出永久 migration mode。

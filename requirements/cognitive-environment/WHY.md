@@ -30,7 +30,7 @@ Office Library 的名称与结构）而不动 authority、Persona、action contr
 
 | 症状 | 历史出处 |
 |---|---|
-| 书扩大 Role 权（Library 教识别缺陷却暗示可修复） | archive/docs/why/prompt.md「Office Library：knowledge ≠ authority」：拒书授职权 |
+| 书扩大 Role 权（Library 教识别缺陷却暗示可修复） | 历史 why/prompt 条款「Office Library：knowledge ≠ authority」：拒书授职权 |
 | universal bible 灌每个 persona；同 role 的 fast/deep 异书 | PROMPT-016 禁令；fast/deep 共享同一 Role Law（AGENT-001） |
 | 把隐藏编排写进 Reviewer 书 | PROMPT-016 禁令；REVIEW-012：双 PERFECT 流程不入 Reviewer prompt |
 | 把工具清单/瞬时 capability 枚举进 system prompt | PROMPT-015：`Tools 不是 Role Prompt 章节`；PromptRestoration：Manager Role Law 去掉工具清单 |
@@ -49,7 +49,7 @@ Prompt/Role Law 只是这些事实的 presentation surface，不获得 semantic 
 
 - **「更靠近 system 者胜」全序覆盖。** 拒绝：Mission 不能授予 Role 没有的权；Library 不能扩大 Role；
   Handbook 遇 concrete requirement 时具体要求胜；Rulebook 不是 present-case evidence
-  （archive/docs/why/prompt.md）。
+  （历史 why/prompt 条款）。
 - **把 Pair Hint 拆成多个独立 synthetic 消息（一个中文、一个 NEEDHELP、一个并行工具）。** 拒绝：
   一个 canonical Pair Hint occurrence 承载全部 craft；provider renderer 只决定 wire 形状
   （pair-parallel-tools.md §18）。

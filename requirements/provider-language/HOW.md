@@ -39,7 +39,7 @@ semantic owner（Domain 文本 owner）
   - `substitute(template, subs)`：`{{name}}` 替换；缺参或残留 → 抛错（fail-closed）。
   - `render` / `instructionLines` / `document` / `documentFor`：装载 + 替换 + 交
     `SyntheticToml` 布局。
-- 装载装配顺序（`archive/docs/how/prompt.md`）：Common Law → Role Law → Office Library；Tools
+- 装载装配顺序（历史 how/prompt 条款）：Common Law → Role Law → Office Library；Tools
   面不并入 system 串。tool description 按已绑 `SessionProviderLanguage` 装载。
 
 ### 结构 parity 机制（Gate C）
@@ -70,9 +70,9 @@ semantic owner（Domain 文本 owner）
 
 | 源 | 判定 | 说明 / 落点 |
 |---|---|---|
-| `archive/changes/completed/PromptRestoration.md` | EVIDENCE | WHY 考古：Gate 0 前「system=zh-CN + tool=English」半 i18n 病灶；Class A/B/C；Gate E ratchet 580→0。落点：WHY.md 失败模式 + WHAT 005/009 |
-| `archive/docs/why/host.md` §21 | EVIDENCE | 被拒方案：每 attempt/child 重读全局；语言绑 Role/Agent。落点：WHY.md + WHAT 002/003/004 |
-| `archive/docs/why/prompt.md`「ProviderLanguage」节 | EVIDENCE | 被拒方案：运行中切语言、译 protocol id。落点：WHY.md + WHAT 004/011 |
+| 历史 change（PromptRestoration） | EVIDENCE | WHY 考古：Gate 0 前「system=zh-CN + tool=English」半 i18n 病灶；Class A/B/C；Gate E ratchet 580→0。落点：WHY.md 失败模式 + WHAT 005/009 |
+| 历史 why/host §21 | EVIDENCE | 被拒方案：每 attempt/child 重读全局；语言绑 Role/Agent。落点：WHY.md + WHAT 002/003/004 |
+| 历史 why/prompt「ProviderLanguage」节 | EVIDENCE | 被拒方案：运行中切语言、译 protocol id。落点：WHY.md + WHAT 004/011 |
 | Gate 0/Batch 1–5 迁文日程（PromptRestoration §Migration batches） | HOW | 迁移执行记录，非永久命题。记录于本 HOW 历史节 |
 | `ProviderLanguage.tryParse` 别名（`zh`/`chs`/`cn`/`eng`…） | HOW | 解析容错，非规范 |
 | `WANXIANGSHU_PROVIDER_LANGUAGE` env 名 | HOW | 当前偏好源机制 |

@@ -1,9 +1,9 @@
 # WHAT —— effect-accounting（唯一 normative 合同）
 
 条款前缀 `EFFECT-ACCOUNTING-`。每条的落点测试见 `PROOF.md`。
-来源：`archive/docs/{why,what,shape,how,proof}/persist.md`（PERSIST-009）、
-`archive/docs/why/execution.md`（EXEC-020/021/022）、`archive/docs/what/execution.md`（EXEC-020）、
-`archive/requirements-design/COVERAGE.md` persist 小节、`archive/requirements-design/PROOF-MAP.md`
+来源：历史五层 persist 条款（PERSIST-009）、
+历史 why/what execution（EXEC-020/021/022）、
+历史 COVERAGE persist 小节、历史 PROOF-MAP
 （p0-recovery-join SPLIT）。
 
 ## EFFECT-ACCOUNTING-001 —— Requested/Claimed 与 Accepted/Created/Published 分型
