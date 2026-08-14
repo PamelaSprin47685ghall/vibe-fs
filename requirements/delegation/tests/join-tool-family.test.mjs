@@ -11,10 +11,12 @@ import { agentJournal, attemptPlanner, sessionId } from '../../verification-syst
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
-const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
-  await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const {
+  ToolRuntimeScope,
+  ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery,
+  ToolRuntimeScope__RoleFor_Z939596C: roleFor,
+} = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { forJournal, Runtime__RegisterAuthority_Z6B6240E7: registerAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
-const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'
@@ -73,6 +75,7 @@ const scopeFor = async ({ engineTask, mailbox }) => {
     scope,
     async () => new FamilyRecovery(0, [new FamilyRecoveryPermit(sessionId('ses_join'), sequence, closure.Digest)]),
   )
+  assert.equal(roleFor(scope, context()).tag, Role.Orchestrator.tag, 'fixture must exercise the Orchestrator join branch')
   const host = {
     joinGate: lock(),
     joinInFlight: false,

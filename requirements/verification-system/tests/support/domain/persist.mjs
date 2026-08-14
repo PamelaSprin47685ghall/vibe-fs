@@ -24,9 +24,9 @@ import { runtimeId, providerRun, idValue } from './identity.mjs'
 import { createLocalEventStore } from '../local-event-store.mjs'
 
 const [EsWriter, LocalLog, JournalCodec] = await Promise.all([
-  prod('Persistence/Journal/EventStoreJournalWriter'),
+  prod('Journal/EventStoreJournalWriter'),
   prod('Infrastructure/Persist/ProcessEventLog'),
-  prod('Persistence/Journal/EventStoreJournalCodec'),
+  prod('Journal/EventStoreJournalCodec'),
 ])
 
 const resolveExport = (mod, prefixes) => {

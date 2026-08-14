@@ -661,7 +661,7 @@ export const orchestratorProgram = (() => {
 // ── Join direct CE (P0-RECOVERY-JOIN-001 + EXEC-018 / PR5) ───────────────────
 // Domain JoinProgram AST deleted. Application/Reconciliation/Join.fs is the sole
 // permit-gated entry. Tests assert production surface, not AST case names.
-const JoinModule = await prod('Execution/Delegation/Join')
+const JoinModule = await prod('Application/Reconciliation/Join')
 // AgentCompletion loaded early (AgentCompletionModuleEarly) for mailbox dual-channel.
 const AgentCompletionModule = AgentCompletionModuleEarly
 const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
