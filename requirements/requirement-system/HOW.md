@@ -4,7 +4,7 @@
 
 ## 实现模型
 
-本包无 runtime 源码（META 包正确形态，见 `requirements-design/EVIDENCE.md` §1：证据 =
+本包无 runtime 源码（META 包正确形态，见 `archive/requirements-design/EVIDENCE.md` §1：证据 =
 `AGENTS.md` + `scripts/checks` + CI）。机制由三块组成：
 
 ### 1. meta-verifier（`tests/meta-verifier.test.mjs`）
@@ -23,7 +23,7 @@
 
 设计要点：
 
-- 包清单来源 = `requirements/README.md` 树入口链接 ∪ `requirements-design/INDEX.md` 表格；
+- 包清单来源 = `requirements/README.md` 树入口链接 ∪ `archive/requirements-design/INDEX.md` 表格；
   两源必须一致（45 = 45）。
 - 依赖骨架解析 `INDEX.md`「# 依赖骨架」后第一个 code block（87 edge）；cutover 后骨架迁入
   requirements/ 树时把解析源指向新位置（SPLIT@cutover）。
@@ -88,7 +88,7 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时两条
 
 ## 遗留风险 / cutover 待办
 
-- **SPLIT@cutover**：meta-verifier 的依赖骨架解析源从 `requirements-design/INDEX.md` 迁入
+- **SPLIT@cutover**：meta-verifier 的依赖骨架解析源从 `archive/requirements-design/INDEX.md` 迁入
   requirements/ 树；`archive/docs/README.md` 导航职责移交 `requirements/README.md`；archive/docs/changes
   归档后 spec gate 的 archive/docs/changes 检查面整体重写为 requirements/ 树治理。
 - **GAP@cutover**：WHAT-013/014/015 的机器落点（change-lifecycle verifier）cutover 后补；

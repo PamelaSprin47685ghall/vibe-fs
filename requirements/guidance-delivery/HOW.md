@@ -114,6 +114,6 @@ node requirements/verification-system/tests/run.mjs                             
 | 每次 Full 或仅 Identity | GARBAGE（被拒方案：烧上下文 or 首次不可执行） | `archive/docs/why/enforcer.md` 备选与被拒 |
 | 单一 durable bool 压 Frontier+Coverage | GARBAGE（reanchor 后误删/假装仍在） | `archive/docs/why/enforcer.md` 交付前沿 vs 语义覆盖 |
 | 历史 pair 随 main.md 版本改写 | GARBAGE（byte-identical replay 冻结） | `archive/changes/completed/rulebook.md` §17 |
-| enforcer-cross-family-collision.mjs | KEEP proof（机械 A40 替代，不冒充人类 tournament） | `requirements-design/PROOF-MAP.md` Phase D；`archive/changes/completed/rulebook.md` Final outcome |
-| `enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；本包不依赖任何 prose 形状门 | `requirements-design/HANDOFF.md` §24 |
+| enforcer-cross-family-collision.mjs | KEEP proof（机械 A40 替代，不冒充人类 tournament） | `archive/requirements-design/PROOF-MAP.md` Phase D；`archive/changes/completed/rulebook.md` Final outcome |
+| `enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；本包不依赖任何 prose 形状门 | `archive/requirements-design/HANDOFF.md` §24 |
 | 当前实现中 TipSemanticCoverage 与 TipDeliveryProjection 同投影（applyReanchor 清空） | HOW（horizon 可恢复性以投影近似表达；字节级 horizon 探测是未来增强，不改变两轴分离合同） | 本文件 §1 诚实性注 |

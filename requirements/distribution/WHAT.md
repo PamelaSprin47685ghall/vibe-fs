@@ -77,7 +77,7 @@
 
 **规范陈述**：所有声明 runtime resource 的 semantic packages，其资源必须在 shipped artifact 中完整可得——`resources/enforcer/<TipName>/{enforcer.md,main.md}`（→ `behavior-diagnosis`）、`resources/provider/**` 双语树（→ 各 provider 语义包：`office-capability`/`provider-language`/`cognitive-environment`/`action-affordance`/`delegation`/…）。本包保证"存在且被 artifact 携带"，**不获得**这些资源的语义 ownership。
 
-**含义/动机**：这是依赖骨架的特殊 edge（`requirements-design/INDEX.md`）：distribution 对每个声明 runtime resource 的包有一条薄依赖——"你的资源必须随 artifact 可得"。语义包负责资源**内容**；本包负责资源**到达**。二者缺一不可，且不能合并 ownership。
+**含义/动机**：这是依赖骨架的特殊 edge（`requirements/INDEX.md`）：distribution 对每个声明 runtime resource 的包有一条薄依赖——"你的资源必须随 artifact 可得"。语义包负责资源**内容**；本包负责资源**到达**。二者缺一不可，且不能合并 ownership。
 
 **边界**：资源内容的正确性/双语锚点/语义深度归各 semantic owner（`provider-language` Gate C、`behavior-diagnosis` rulebook 契约等）。
 

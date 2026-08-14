@@ -89,9 +89,9 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 | `archive/docs/what/glory.md` GLORY-004/006/072/074 | WHAT-008/009/015/016 |
 | `archive/docs/why/companion.md` | WHY §4.2/4.4；WHAT-012 证据 |
 | `archive/docs/how/companion.md` / `archive/docs/shape/companion.md` | HOW §1.1/1.3/1.4 |
-| `requirements-design/21-work-record.md` | 全部 WHAT 的 owner 裁决（OWNS 表） |
-| `requirements-design/13-context-continuity.md` | 边界裁决（DOES NOT OWN） |
-| `requirements-design/COVERAGE.md` COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行 | WHAT 命题归属 |
+| `archive/requirements-design/21-work-record.md` | 全部 WHAT 的 owner 裁决（OWNS 表） |
+| `archive/requirements-design/13-context-continuity.md` | 边界裁决（DOES NOT OWN） |
+| `archive/requirements-design/COVERAGE.md` COMPANION-003/014/015、REVIEW-016、TODO-001/008、GLORY-004 行 | WHAT 命题归属 |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

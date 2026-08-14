@@ -136,7 +136,7 @@ Answer 不复制 transcript，也不把 candidate/value estimate/method score �
 
 ## 10. 依赖（DEPENDS ON，逐条理由）
 
-来自 `requirements-design/INDEX.md` 依赖骨架（不增删 edge）：
+来自 `requirements/INDEX.md` 依赖骨架（不增删 edge）：
 
 - `participant-horizon`：只有会改变合法行动的最小事实应穿过 horizon——investigation 得到的新
   世界事实经 evidence-acquisition contract 注入为 observation。具体是 repository、external 还是

@@ -144,7 +144,7 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
 
 ## 4. 依赖
 
-无产品语义依赖（`requirements-design/INDEX.md`）。历史上 `structured-workflow →
+无产品语义依赖（`archive/requirements-design/INDEX.md`）。历史上 `structured-workflow →
 causal-wait` hard edge 已删（Phase E）：CE builder 是实现耦合；event-driven wake /
 deadline escape 都是消费关系，非定义前提。
 
@@ -159,9 +159,9 @@ deadline escape 都是消费关系，非定义前提。
 | `archive/changes/completed/fsharp-dsl-governance.md`（mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
 | `archive/changes/completed/dsl-structured-program-gap.md`（DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
 | `archive/docs/{why,what,shape,how,proof}/{dsl-structured-program,flow,architecture,loop,execution}.md` | WHAT.md 反向覆盖清单 + 各命题 |
-| `requirements-design/COVERAGE.md`（flow/dsl/arch/execution/loop 小节） | WHAT.md 反向覆盖清单 |
-| `requirements-design/EVIDENCE.md` §2 行 | README.md HOW 概览 |
-| `requirements-design/PROOF-MAP.md`（dsl-ownership SPLIT、g4r-ce-vocabulary KEEP、g4r-freeze DELETE、domain/kernel/temporal/verify family） | PROOF.md §4/§6 |
+| `archive/requirements-design/COVERAGE.md`（flow/dsl/arch/execution/loop 小节） | WHAT.md 反向覆盖清单 |
+| `archive/requirements-design/EVIDENCE.md` §2 行 | README.md HOW 概览 |
+| `archive/requirements-design/PROOF-MAP.md`（dsl-ownership SPLIT、g4r-ce-vocabulary KEEP、g4r-freeze DELETE、domain/kernel/temporal/verify family） | PROOF.md §4/§6 |
 
 ### 5.2 GARBAGE（弃权记录）
 

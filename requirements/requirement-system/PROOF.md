@@ -31,7 +31,7 @@ anchor id**；本包的机器事实由 meta-verifier + spec-rules 承担。
 
 ## SPLIT@cutover 清单
 
-- 依赖骨架解析源：`requirements-design/INDEX.md` → requirements/ 树新权威位置
+- 依赖骨架解析源：`archive/requirements-design/INDEX.md` → requirements/ 树新权威位置
   （meta-verifier 同步迁移）。
 - `archive/docs/README.md` 导航职责 → `requirements/README.md`。
 - spec gate 的 archive/docs/changes 检查面 → requirements/ 树治理（archive/docs/changes 归档后整体重写）。

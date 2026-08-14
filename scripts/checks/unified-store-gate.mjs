@@ -71,8 +71,8 @@ export const DUAL_WRITE_ALLOWLIST = Object.freeze([])
  */
 export const NO_MIGRATOR_PATH_ALLOWLIST = Object.freeze([
   'scripts/checks/unified-store-gate.mjs',
-  'tests/unit/verify/unified-store-gate.test.mjs',
-  'tests/unit/verify/fixtures/',
+  'requirements/durable-events/tests/unified-store-gate.test.mjs',
+  'requirements/durable-events/tests/fixtures/',
 ])
 
 export const SCANNER_IDS = Object.freeze([

@@ -84,6 +84,6 @@ Journal，就会把「模型窗口猜测」写成产品事实——这属于 `co
 - `archive/docs/why/host.md`、`archive/docs/what/host.md`（HOST-005）、`archive/docs/what/companion.md`（COMPANION-003/007/014）
 - `archive/docs/why/context.md`、`archive/docs/what/context.md`（CTX-015/016 交叉）
 - `archive/docs/why/strength.md`（Candidate ≠ 历史）、`archive/changes/completed/strength.md`
-- `requirements-design/13-context-continuity.md`（semantic-trace card）
-- `requirements-design/COVERAGE.md`（HOST-005 / COMPANION-003 / COMPANION-007 行）
-- `requirements-design/EVIDENCE.md`（semantic-trace 行：`Domain/XTrace.fs` 等）
+- `archive/archive/archive/requirements-design/13-context-continuity.md`（semantic-trace card）
+- `archive/archive/archive/requirements-design/COVERAGE.md`（HOST-005 / COMPANION-003 / COMPANION-007 行）
+- `archive/archive/archive/requirements-design/EVIDENCE.md`（semantic-trace 行：`Domain/XTrace.fs` 等）

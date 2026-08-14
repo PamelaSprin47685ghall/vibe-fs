@@ -118,4 +118,4 @@ request-specific 工具集合。现有 `fast-ROLE/deep-ROLE` 与 `AttemptExecuti
 - 当前 Strength 名字、same-role-fast 模型选择、具体 budget/predictor algorithm → HOW，不进 WHAT。
 - 大 material 存储 substrate（EventStore envelope / payload_refs 语义）→ `durable-events`。
 
-边界卡片：`requirements-design/18-optimization-epistemics.md`。
+边界卡片：`archive/archive/archive/requirements-design/18-optimization-epistemics.md`。

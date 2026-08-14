@@ -46,4 +46,4 @@
 
 ## DEPENDS ON
 
-- 特殊依赖（`requirements-design/INDEX.md` 依赖骨架末行）：**所有声明 runtime resource 的 semantic packages**——`resources/enforcer/**` 归 `behavior-diagnosis`；`resources/provider/**` 各子树归对应 provider 语义包。逐条理由见 `HOW.md` §依赖。
+- 特殊依赖（`requirements/INDEX.md` 依赖骨架末行）：**所有声明 runtime resource 的 semantic packages**——`resources/enforcer/**` 归 `behavior-diagnosis`；`resources/provider/**` 各子树归对应 provider 语义包。逐条理由见 `HOW.md` §依赖。

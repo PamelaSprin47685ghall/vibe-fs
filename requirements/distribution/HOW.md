@@ -77,7 +77,7 @@ fantomas → scripts/check.mjs（L0 静态门）
 
 ## 6. 依赖（DEPENDS ON — 特殊 edge）
 
-`requirements-design/INDEX.md` 依赖骨架末行：
+`requirements/INDEX.md` 依赖骨架末行：
 
 ```text
 distribution → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）

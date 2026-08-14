@@ -199,7 +199,7 @@ Browser 有权从外部世界建立带 provenance 的事实（ARCH-017 Browser �
 `stealth-browser-mcp_*` 的 schema 投影 → `capability-enforcement`。
 
 证据：`tests/office-capability-integrity.test.mjs`（browser consequence 双语文档命中）+ 交叉：
-`requirements-design/20-capability-external.md`（external-investigation 引用本包 Browser consequence）。
+`archive/requirements-design/20-capability-external.md`（external-investigation 引用本包 Browser consequence）。
 
 ## OFF-014：Inquiry consequence = 对未决问题的语义理解；non-consequence = 改变 source/执行世界/把思想变成证据
 

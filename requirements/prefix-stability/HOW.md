@@ -113,8 +113,8 @@ type ActivePrefixEpoch =
 | `archive/changes/completed/cache.md` | WHY §4.1；WHAT-001/010/011/013 |
 | `archive/changes/completed/cursor-pair-hint.md` §12 | WHY §4.2；WHAT-013 边界 |
 | `archive/changes/completed/pair-parallel-tools.md` | 只取 prefix 相关：placement 不破坏 bracket；正文 craft 归 cognitive-environment |
-| `requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
-| `requirements-design/COVERAGE.md`（PROMPT-014/HOST-013/HOST-006/COMPANION-009..013/CTX-010..015 行） | WHAT 命题归属 |
+| `archive/requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
+| `archive/requirements-design/COVERAGE.md`（PROMPT-014/HOST-013/HOST-006/COMPANION-009..013/CTX-010..015 行） | WHAT 命题归属 |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

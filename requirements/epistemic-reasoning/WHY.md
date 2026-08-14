@@ -125,4 +125,4 @@ LLM 自报 confidence、开局一次性生成候选，全部在 corrective round
   （`managed-session-lifecycle` 相关）。
 - 组件名 Sphinx、A*/Bayes/MCTS 算法、MCP 工具名 → HOW，不进 WHAT。
 
-边界卡片：`requirements-design/18-optimization-epistemics.md`。
+边界卡片：`archive/archive/archive/requirements-design/18-optimization-epistemics.md`。

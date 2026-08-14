@@ -58,12 +58,12 @@ WHAT 命题在 PROOF.md 里找不到行——「绿」无法被检查，只能�
 
 | 来源 | 吸收为什么 |
 |---|---|
-| `requirements-design/01-meta-programming.md`（boundary card） | 唯一 owner、同时为真、proof 唯一 owner、无裸权威、包 verifier |
+| `archive/requirements-design/01-meta-programming.md`（boundary card） | 唯一 owner、同时为真、proof 唯一 owner、无裸权威、包 verifier |
 | `archive/docs/what/document-governance.md` GOV-002/005/006/007/008/009/011/012 | 分域权威、条款 ID、单文件生命周期、用户所有权、Active/Completed、blocker、层归属、直接闭环 |
 | `archive/docs/shape|how/proof/document-governance.md` | 所有权与边界、执行程序、机器检查/人工评审义务 |
 | `archive/changes/README.md` + `AGENTS.md` 文档生命周期节 | 变更工作协议的执行文本 |
-| `requirements-design/COVERAGE.md` GOV 行 | GOV-001/003/004/010 判 HOW/GARBAGE（当前 5 层载体 + clean break 历史），不迁入永久 WHAT |
-| `requirements-design/PROOF-MAP.md` Meta 行 | spec.mjs + spec-rules.mjs 机制归本包；未来新增 meta-verifier |
+| `archive/requirements-design/COVERAGE.md` GOV 行 | GOV-001/003/004/010 判 HOW/GARBAGE（当前 5 层载体 + clean break 历史），不迁入永久 WHAT |
+| `archive/requirements-design/PROOF-MAP.md` Meta 行 | spec.mjs + spec-rules.mjs 机制归本包；未来新增 meta-verifier |
 
 ## 被拒方向（为什么不是别的样子）
 

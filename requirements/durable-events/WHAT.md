@@ -2,7 +2,7 @@
 
 条款前缀 `DURABLE-EVENTS-`。每条的落点测试见 `PROOF.md`。
 来源：`archive/docs/{why,what,shape,how,proof}/persist.md`（PERSIST-001..010）、
-`archive/changes/completed/storage.md`（§1–§48）、`requirements-design/COVERAGE.md` persist 小节。
+`archive/changes/completed/storage.md`（§1–§48）、`archive/requirements-design/COVERAGE.md` persist 小节。
 
 ## DURABLE-EVENTS-001 —— Event 是唯一 durable truth；append-only
 

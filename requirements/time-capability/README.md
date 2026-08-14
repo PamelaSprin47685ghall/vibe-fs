@@ -55,4 +55,4 @@
 
 ## DEPENDS ON
 
-无。本包不依赖任何其它 package 的 guarantee（`requirements-design/INDEX.md` 依赖骨架 Phase E 结论）。
+无。本包不依赖任何其它 package 的 guarantee（`requirements/INDEX.md` 依赖骨架 Phase E 结论）。

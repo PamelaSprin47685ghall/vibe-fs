@@ -69,7 +69,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
 
 ## DEPENDS ON
 
-无产品语义依赖（`requirements-design/INDEX.md` 依赖骨架为唯一来源）。历史上曾有一条
+无产品语义依赖（`requirements/INDEX.md` 依赖骨架为唯一来源）。历史上曾有一条
 `structured-workflow → causal-wait` hard edge，Phase E 已审计删除：CE builder 是
 implementation coupling，不是定义前提；event-driven wake 与 deadline escape 都是消费关系。
 

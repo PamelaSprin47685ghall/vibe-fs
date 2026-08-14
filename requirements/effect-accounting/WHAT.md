@@ -3,7 +3,7 @@
 条款前缀 `EFFECT-ACCOUNTING-`。每条的落点测试见 `PROOF.md`。
 来源：`archive/docs/{why,what,shape,how,proof}/persist.md`（PERSIST-009）、
 `archive/docs/why/execution.md`（EXEC-020/021/022）、`archive/docs/what/execution.md`（EXEC-020）、
-`requirements-design/COVERAGE.md` persist 小节、`requirements-design/PROOF-MAP.md`
+`archive/requirements-design/COVERAGE.md` persist 小节、`archive/requirements-design/PROOF-MAP.md`
 （p0-recovery-join SPLIT）。
 
 ## EFFECT-ACCOUNTING-001 —— Requested/Claimed 与 Accepted/Created/Published 分型

@@ -81,8 +81,8 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 | `archive/docs/why/strength.md` + `archive/changes/completed/strength.md` | WHAT-008；WHY §4.1 |
 | `archive/changes/completed/cursor-pair-hint.md` §12（prefix/idempotence scope） | 与 HOST-013 互斥 → 本包只记「XTrace 无 synthetic 正文」；主体归 prefix-stability（见该包 HOW §5） |
 | `archive/changes/completed/cache.md`（HOST-013 anchored prefix） | 同上；anchor 语义归 prefix-stability |
-| `requirements-design/COVERAGE.md` HOST-005 / COMPANION-003/007/008 行 | WHAT-001..010 的 owner 裁决 |
-| `requirements-design/EVIDENCE.md` semantic-trace 行 | HOW §1 的实现路径 |
+| `archive/archive/archive/requirements-design/COVERAGE.md` HOST-005 / COMPANION-003/007/008 行 | WHAT-001..010 的 owner 裁决 |
+| `archive/archive/archive/requirements-design/EVIDENCE.md` semantic-trace 行 | HOW §1 的实现路径 |
 
 ### 5.2 弃权（GARBAGE / 明确不归本包）
 

@@ -12,7 +12,7 @@
 4. 与这个等待直接相关的最后一个已发生事实是什么？（Last causal progress）
 5. 如果永远不发生，谁负责结束它？（Termination）
 
-但若为了可诊断而把这些观测**升级为业务事实**（写 Journal、进 prompt、驱动分支），会摧毁整个语义层：诊断状态变成第二套真相，与 durable facts 竞争 authority——「观察可以看程序，程序绝不可以看观察」。这就是本包不可替代的 WHY：**等待既要可观测可诊断，观测又必须永久是非权威的 process-local 信息**。两个方向是同一枚硬币的两面，不能拆成两个包（`requirements-design/01-meta-programming.md` causal-wait 卡注）。
+但若为了可诊断而把这些观测**升级为业务事实**（写 Journal、进 prompt、驱动分支），会摧毁整个语义层：诊断状态变成第二套真相，与 durable facts 竞争 authority——「观察可以看程序，程序绝不可以看观察」。这就是本包不可替代的 WHY：**等待既要可观测可诊断，观测又必须永久是非权威的 process-local 信息**。两个方向是同一枚硬币的两面，不能拆成两个包（`archive/requirements-design/01-meta-programming.md` causal-wait 卡注）。
 
 ## 独立变化测试（Independent Change Test）
 

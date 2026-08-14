@@ -138,7 +138,7 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 
 ## 7. 依赖（DEPENDS ON，逐条理由）
 
-来自 `requirements-design/INDEX.md` 依赖骨架（不增删 edge）：
+来自 `requirements/INDEX.md` 依赖骨架（不增删 edge）：
 
 - `repository-investigation`：投机的是「接下来需要哪些只读调查」；被消费后的 frame 是
   repository fact acquisition 的合法输入。

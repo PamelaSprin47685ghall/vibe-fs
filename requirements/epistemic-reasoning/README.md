@@ -46,7 +46,7 @@ shape 只停在 codec 边界；`Session.fs` 是唯一 handle 索引。
 
 ## DEPENDS ON
 
-`participant-horizon`（依赖骨架唯一来源：`requirements-design/INDEX.md`）。新世界事实通过
+`participant-horizon`（依赖骨架唯一来源：`requirements/INDEX.md`）。新世界事实通过
 evidence-acquisition contracts 注入为 observation；具体是 repository、external 还是其它来源，
 不构成 epistemic core 的 hard dependency（逐条理由见 HOW.md「依赖」）。
 

@@ -75,7 +75,7 @@ normative authority」= 连元规则都有归属文件。
 
 **规范陈述**：requirements/ 树只含 INDEX 列出的包目录；45 个包每个都有
 `{README,WHY,WHAT,HOW,PROOF}.md`；树入口（requirements/README.md）与
-requirements-design/INDEX.md 命名同一包集。
+archive/requirements-design/INDEX.md 命名同一包集。
 
 **含义/动机**：包清单是机器可校验的边界；目录级越界（INDEX 外神秘包）与文件级残缺
 （缺 WHY）都必须可红。
@@ -209,7 +209,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **规范陈述**：每个包 README/WHY/WHAT 中出现的 DEPENDS ON 引用集合是 INDEX 依赖骨架的子集
 （允许子集，不允许多出边）；引用别的包用包名，不得复制别的包的命题。
 
-**含义/动机**：依赖骨架（requirements-design/INDEX.md，87 edge / 0 cycle）是唯一来源；
+**含义/动机**：依赖骨架（archive/requirements-design/INDEX.md，87 edge / 0 cycle）是唯一来源；
 多出的边 = 未裁决的 coupling。子集允许 = 包可以只声明它实际消费的 guarantee。
 
 **边界**：骨架是迁移期协调文件；cutover 后骨架迁入 requirements/ 树，解析源同步迁移
@@ -227,6 +227,6 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 003/004/006/007/016 变成可红测试。「绿」可以检查，「红」有失败价值。
 
 **边界**：meta-verifier 只查结构事实，不裁决语义归属内容；归属裁决在设计期完成
-（requirements-design/）。
+（archive/requirements-design/）。
 
 **证据指针**：→ PROOF.md L24。

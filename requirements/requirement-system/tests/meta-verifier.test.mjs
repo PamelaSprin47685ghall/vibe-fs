@@ -3,7 +3,7 @@
 // REQUIREMENT-SYSTEM-003 / 004 / 006 / 007 / 016 / 017 的机器落点。
 //
 // 本测试扫描 requirements/ 全树，断言五个结构事实：
-//   1. INDEX（requirements-design/INDEX.md 表 + requirements/README.md 树入口）
+//   1. INDEX（requirements/INDEX.md 表 + requirements/README.md 树入口）
 //      中全部 45 个包都有 requirements/<pkg>/{README,WHY,WHAT,HOW,PROOF}.md；
 //   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 PROOF.md
 //      表格中有行（按包名 + ID 交叉检查）；
@@ -22,8 +22,7 @@
 //   - `全量迁移状态`：45 包 × 5 文档 + 无 INDEX 外目录。迁移中途必然红，
 //     红的内容精确到「哪个包缺哪个文件」，cutover 全量落地后转绿。
 //
-// 依赖骨架源是 requirements-design/INDEX.md（迁移期协调文件）；cutover 后
-// 骨架迁入 requirements/ 树时，把骨架解析源指向新权威位置即可（SPLIT@cutover）。
+// 依赖骨架源是 requirements/INDEX.md（live manifest，2026-08-14 cutover 迁入）。
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -33,7 +32,7 @@ import test from 'node:test'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const REQUIREMENTS = join(ROOT, 'requirements')
-const INDEX_FILE = join(ROOT, 'requirements-design/INDEX.md')
+const INDEX_FILE = join(ROOT, 'requirements/INDEX.md')
 const TREE_ENTRY = join(REQUIREMENTS, 'README.md')
 
 const read = (path) => readFileSync(path, 'utf8')

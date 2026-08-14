@@ -92,4 +92,4 @@ TodoCheckpoint lag-1 rebase。禁止按容量/token 主动切换 epoch。
 - `archive/docs/what/context.md`（CTX-010/011/012/015）、`archive/docs/why/context.md`（ActivePrefixEpoch 理由）
 - `archive/docs/what/prompt.md`（PROMPT-014）、`archive/docs/what/todo.md`（TODO-009）、`archive/docs/what/architecture.md`（ARCH-004）
 - `archive/changes/completed/cache.md`、`archive/changes/completed/cursor-pair-hint.md`（§12）、`archive/changes/completed/pair-parallel-tools.md`（prefix 相关）
-- `requirements-design/13-context-continuity.md`（prefix-stability card）
+- `archive/requirements-design/13-context-continuity.md`（prefix-stability card）

@@ -57,4 +57,4 @@
 
 ## DEPENDS ON
 
-无 hard 产品依赖（`requirements-design/INDEX.md` 依赖骨架 Phase E 结论）：wait 的 deadline 是**可选 escape**（需要时消费 `time-capability`），event-driven wake **不依赖** `structured-workflow`。
+无 hard 产品依赖（`requirements/INDEX.md` 依赖骨架 Phase E 结论）：wait 的 deadline 是**可选 escape**（需要时消费 `time-capability`），event-driven wake **不依赖** `structured-workflow`。

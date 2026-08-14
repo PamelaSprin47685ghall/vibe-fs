@@ -119,7 +119,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements-design/INDEX.md` 的 87-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 87-edge 骨架一致（0 cycle）。
 
 ## 运行与验证
 
@@ -130,4 +130,4 @@ node scripts/check.mjs           # 全 static gates
 ```
 
 - 每条 WHAT 命题的测试落点见该包 PROOF.md。
-- 迁移状态：旧 `docs/`、`changes/` 已归档至 `archive/`；`tests/` 仍在逐包迁移中（SPLIT@cutover 收尾后删除，见各包 PROOF.md 与 `requirements-design/MIGRATION-CONTRACT.md`）。
+- 迁移状态：旧 `docs/`、`changes/` 已归档至 `archive/`；`tests/` 仍在逐包迁移中（SPLIT@cutover 收尾后删除，见各包 PROOF.md 与 `archive/requirements-design/MIGRATION-CONTRACT.md`）。

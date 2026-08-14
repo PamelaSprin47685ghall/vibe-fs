@@ -31,7 +31,7 @@ const SOFT_LIMIT = 200
 const FUNCTION_WARN = 60
 const SMALL_WARN = 15
 
-const SCOPES = ['src/Wanxiangshu', 'tests', 'scripts']
+const SCOPES = ['src/Wanxiangshu', 'requirements', 'scripts']
 const EXTENSIONS = ['.fs', '.mjs', '.js']
 const DEFAULT_OUT = join(dirname(fileURLToPath(import.meta.url)), 'kolmogorov-size-baseline.json')
 

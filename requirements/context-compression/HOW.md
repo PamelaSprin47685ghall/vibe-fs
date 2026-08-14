@@ -86,8 +86,8 @@
 | `archive/docs/shape/context.md` | HOW §2（coverage 读边界、ActivePrefixEpoch 所有权） |
 | `archive/docs/what/companion.md` COMPANION-005/006/007/008/013 | WHAT-010/011/012/014/015/016 |
 | `archive/docs/what/host.md` HOST-006 | WHAT-002；HOW §1.5 |
-| `requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
-| `requirements-design/COVERAGE.md` CTX-* 行 | WHAT 命题归属（CTX-011 → prefix-stability + →context-compression 的交界） |
+| `archive/requirements-design/13-context-continuity.md` | 全部 OWNS/DOES NOT OWN 裁决 |
+| `archive/requirements-design/COVERAGE.md` CTX-* 行 | WHAT 命题归属（CTX-011 → prefix-stability + →context-compression 的交界） |
 
 ### 4.2 弃权（GARBAGE / 明确不归本包）
 

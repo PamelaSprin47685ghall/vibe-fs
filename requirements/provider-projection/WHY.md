@@ -40,7 +40,7 @@ representation；representation 绝不能反向创造 authority 或 state。
 替换 TOML/wire renderer 或 planner，只要 semantic intent、horizon 与 equality contract
 不变 → 本包可独立重大变化；反之亦然（`07-projection.md` INDEPENDENT CHANGE）。
 
-## DEPENDS ON（`requirements-design/INDEX.md` 依赖骨架唯一来源）
+## DEPENDS ON（`archive/requirements-design/INDEX.md` 依赖骨架唯一来源）
 
 - `participant-horizon`：投影输入是「已获准进入 experience」的最小事实集；admission
   过滤是前提。

@@ -70,5 +70,5 @@ RED = 满足下列任一：
 - `archive/docs/how/context.md`、`archive/docs/shape/context.md`
 - `archive/docs/why/companion.md`、`archive/docs/what/companion.md`（COMPANION-005/006/007/008/013）
 - `archive/docs/what/host.md`（HOST-006 containment 层）
-- `requirements-design/13-context-continuity.md`（context-compression card）
-- `requirements-design/COVERAGE.md`（CTX-*、COMPANION-005/006/007/008 行）
+- `archive/requirements-design/13-context-continuity.md`（context-compression card）
+- `archive/requirements-design/COVERAGE.md`（CTX-*、COMPANION-005/006/007/008 行）

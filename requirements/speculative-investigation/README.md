@@ -49,7 +49,7 @@ Candidate → Promotion 边界，以及让投机永远不改变「没有 Strengt
 ## DEPENDS ON
 
 `repository-investigation`、`participant-identity`、`participant-horizon`、
-`provider-projection`、`semantic-trace`（依赖骨架唯一来源：`requirements-design/INDEX.md`）。
+`provider-projection`、`semantic-trace`（依赖骨架唯一来源：`requirements/INDEX.md`）。
 逐条理由见 HOW.md「依赖」。
 
 ## 阅读顺序

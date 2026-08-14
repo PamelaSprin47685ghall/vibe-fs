@@ -44,5 +44,5 @@ projection 的任何命题；反之亦然。语言语义可以独立重大变化
 ## DEPENDS ON
 
 - `session-ontology`：语言是 **session** 级事实（`SessionProviderLanguage`），绑定与
-  继承发生在 session 创建时；session 的存在与归属是前提（`requirements-design/INDEX.md`
+  继承发生在 session 创建时；session 的存在与归属是前提（`archive/requirements-design/INDEX.md`
   依赖骨架唯一来源）。一个理由：没有 session 概念，「session 创建绑定不可变」无处落点。
