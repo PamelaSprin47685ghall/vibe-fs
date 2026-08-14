@@ -12,7 +12,7 @@ import { lib } from '../../verification-system/tests/support/domain.mjs'
 const { acquire, getCount, release } = await import('../../../dist/Process/LargeGate.js')
 
 // Fable's CancellationToken polyfill lives in the versioned fable-library dir;
-// resolved through the shared support facade so no dist/fable_modules path leaks
+// resolved through the shared support facade so no compiler-runtime path leaks
 // into package scope (test-boundary gate).
 const { createCancellationToken, cancel, isCancellationRequested } = await lib('Async.js')
 
