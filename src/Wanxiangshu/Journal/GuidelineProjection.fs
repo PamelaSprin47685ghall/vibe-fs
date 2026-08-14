@@ -16,10 +16,12 @@ type PairProgrammingGuideline =
       ResultGap: TranscriptGap }
 
 type GuidelineProjectionState =
-    { /// Stored newest-first so replay cons is O(1). `pairs` restores oldest-first.
-      Pairs: PairProgrammingGuideline list
-      CallIds: Set<string>
-      Placements: Set<string> }
+    {
+        /// Stored newest-first so replay cons is O(1). `pairs` restores oldest-first.
+        Pairs: PairProgrammingGuideline list
+        CallIds: Set<string>
+        Placements: Set<string>
+    }
 
 [<RequireQualifiedAccess>]
 type GuidelineFoldRejection =

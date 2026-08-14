@@ -263,10 +263,7 @@ module PairProgrammingThoughtTransform =
     let private isString (value: obj) : bool =
         not (isNull value) && emitJsExpr value "typeof $0 === 'string'"
 
-    let private appendCursorGuidanceToTerminalToolResult
-        (markerTexts: string list)
-        (rawMsg: obj)
-        : obj option =
+    let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
         let parts = rawParts rawMsg
 
         let targetIndex =
@@ -296,12 +293,10 @@ module PairProgrammingThoughtTransform =
             let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
 
             match partStatus originalPart with
-            | Some "completed" ->
-                clonedState?output <- box ((unbox<string> originalState?output) + suffix)
+            | Some "completed" -> clonedState?output <- box ((unbox<string> originalState?output) + suffix)
             | Some "error" when isString originalState?error ->
                 clonedState?error <- box ((unbox<string> originalState?error) + suffix)
-            | Some "error" ->
-                clonedState?output <- box ((unbox<string> originalState?output) + suffix)
+            | Some "error" -> clonedState?output <- box ((unbox<string> originalState?output) + suffix)
             | _ -> ()
 
             let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"

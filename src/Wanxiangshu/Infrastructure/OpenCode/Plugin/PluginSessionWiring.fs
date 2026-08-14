@@ -35,6 +35,7 @@ module PluginSessionWiring =
                 )
 
             let dispatcher = PromptDispatcher.forJournal durable
+
             let promptModelFor agent =
                 scope.Strength.ManagedAgentInventory
                 |> Option.bind (fun inventory -> ManagedAgentConfig.tryOpencodeModel inventory agent None)

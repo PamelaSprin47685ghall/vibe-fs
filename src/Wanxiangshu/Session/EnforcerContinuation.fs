@@ -129,10 +129,7 @@ module EnforcerContinuation =
             /// No cursor movement here. Whether the observed terminal is a confirmed
             /// model failure (ENFORCER-065/068) or Host abort residue (LOOP-006) is the
             /// caller's evidence to read, and only the former may spend AABB.
-            let projectRepairInstruction
-                (live: BloggerRequestContext)
-                (reason: string)
-                : Task<ContinuationOutcome> =
+            let projectRepairInstruction (live: BloggerRequestContext) (reason: string) : Task<ContinuationOutcome> =
                 task {
                     if mainSealedNow () then
                         BloggerRuntimeHost.forceSealRuntime ctx.Scope key
@@ -195,8 +192,7 @@ module EnforcerContinuation =
                                     | Error err ->
                                         Diagnostic.emit
                                             "enforcer-aabb-bridge"
-                                            [ "session_id", key
-                                              "result", "confirmedFailure port rejected: " + err ]
+                                            [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
 
                                         return None
                                 }
@@ -365,8 +361,7 @@ module EnforcerContinuation =
 
             let resumeWithContext live =
                 task {
-                    let! rebuilt =
-                        EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
+                    let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
 
                     return rebuilt |> Option.defaultValue ctx.RawMessages
                 }
@@ -377,10 +372,7 @@ module EnforcerContinuation =
             /// Catch-up drain: one ≤200 KiB window from durable coverage; None = caught up.
             /// Stale PendingOffer is discarded — context must recompute from coverage (COMPANION-008).
             /// Caught-up / sealed → StopPhysicalRun so Host does not loop on tool calls.
-            let resumeCatchUp
-                (fallback: obj list)
-                (caughtUpReason: string)
-                : Task<ContinuationOutcome> =
+            let resumeCatchUp (fallback: obj list) (caughtUpReason: string) : Task<ContinuationOutcome> =
                 task {
                     if mainBlocks () then
                         BloggerRuntimeHost.forceSealRuntime ctx.Scope key
@@ -590,8 +582,7 @@ module EnforcerContinuation =
                                 | Error err ->
                                     Diagnostic.emit
                                         "enforcer-aabb-bridge"
-                                        [ "session_id", key
-                                          "result", "confirmedFailure port rejected: " + err ]
+                                        [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
 
                                     return None
                             }

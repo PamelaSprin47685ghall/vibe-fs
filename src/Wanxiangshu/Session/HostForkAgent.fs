@@ -249,8 +249,7 @@ module HostForkAgent =
                     | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                     | _, Some childId ->
                         let sendAgent =
-                            this.BoundManagedAgent(agentId, childId)
-                            |> Option.defaultValue agentName
+                            this.BoundManagedAgent(agentId, childId) |> Option.defaultValue agentName
 
                         return!
                             HostForkChildDispatch.sendToExistingChild

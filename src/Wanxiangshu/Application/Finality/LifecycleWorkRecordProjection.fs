@@ -69,8 +69,7 @@ module LifecycleWorkRecordProjection =
                     let latestNaturalAssistant =
                         ordered
                         |> List.filter (fun part ->
-                            part.Role = "assistant"
-                            && (part.Kind = "text" || part.Kind = "reasoning"))
+                            part.Role = "assistant" && (part.Kind = "text" || part.Kind = "reasoning"))
                         |> List.tryLast
 
                     let! alreadyCaptured =
@@ -253,7 +252,9 @@ module LifecycleWorkRecordProjection =
                 // Recent-work TRACE sliced to the invocation's range so prior
                 // invocations never appear.
                 let! resolvedTrace = resolveTrace durable xTrace
-                let trace = XTrace.sliceBetween range.StartInclusive range.EndExclusive resolvedTrace
+
+                let trace =
+                    XTrace.sliceBetween range.StartInclusive range.EndExclusive resolvedTrace
 
                 match xTrace.Opening with
                 | None -> return None
@@ -290,5 +291,4 @@ module LifecycleWorkRecordProjection =
         : Task<string option> =
         match journal with
         | None -> Task.FromResult None
-        | Some durable ->
-            lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
+        | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range

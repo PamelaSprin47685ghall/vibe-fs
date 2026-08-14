@@ -156,8 +156,7 @@ module CoderTool =
                                             prepareProviderPrompt
                                         )
                                     with
-                                    | Ok workRecord ->
-                                        return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
+                                    | Ok workRecord -> return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
                                     | Error error -> return Error error
                                 }
 

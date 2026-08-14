@@ -53,11 +53,9 @@ module FallbackLedger =
                         current
                 with
                 | Error FallbackAdvanceRejection.AlreadyObserved
-                | Error FallbackAdvanceRejection.AlreadyExhausted ->
-                    return Ok ConfirmedFailureOutcome.AlreadyRecorded
+                | Error FallbackAdvanceRejection.AlreadyExhausted -> return Ok ConfirmedFailureOutcome.AlreadyRecorded
                 | Error FallbackAdvanceRejection.DifferentRun
-                | Error FallbackAdvanceRejection.NoCursor ->
-                    return Ok ConfirmedFailureOutcome.NoActiveRun
+                | Error FallbackAdvanceRejection.NoCursor -> return Ok ConfirmedFailureOutcome.NoActiveRun
                 | Error FallbackAdvanceRejection.InvalidTransition ->
                     return Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
                 | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
@@ -76,12 +74,13 @@ module FallbackLedger =
                                ConsecutiveFailureCount = next.ConsecutiveFailureCount
                                Reason = reason |}
 
-                    match! AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal with
+                    match!
+                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
+                    with
                     | Error failure -> return Error(JournalAppendFailure.describe failure)
                     | Ok _ ->
                         match AgentPairCursor.recoveryVerdict budget next with
-                        | AgentPairCursor.MayContinue _ ->
-                            return Ok ConfirmedFailureOutcome.RecoveryAdvanced
+                        | AgentPairCursor.MayContinue _ -> return Ok ConfirmedFailureOutcome.RecoveryAdvanced
                         | AgentPairCursor.Exhausted cursor ->
                             let exhausted =
                                 FallbackFact.FallbackExhausted
@@ -92,7 +91,11 @@ module FallbackLedger =
                                        FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte cursor.Offset |}
 
                             match!
-                                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
+                                AgentJournal.appendAgent
+                                    (StreamId.Session sessionId)
+                                    (Some providerRun)
+                                    exhausted
+                                    journal
                             with
                             | Error failure -> return Error(JournalAppendFailure.describe failure)
                             | Ok _ -> return Ok ConfirmedFailureOutcome.RecoveryExhausted

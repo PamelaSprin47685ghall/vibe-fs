@@ -12,12 +12,7 @@ module Representation =
     let private provenanceStrength action =
         action.Provenance |> List.distinct |> List.length
 
-    let private dominatesWith
-        (left: CognitiveAction)
-        leftStrength
-        (right: CognitiveAction)
-        rightStrength
-        =
+    let private dominatesWith (left: CognitiveAction) leftStrength (right: CognitiveAction) rightStrength =
         left.ExpectedRootGain >= right.ExpectedRootGain
         && left.GatewayGain >= right.GatewayGain
         && left.Value >= right.Value
@@ -33,19 +28,12 @@ module Representation =
         dominatesWith left (provenanceStrength left) right (provenanceStrength right)
 
     let paretoFrontier actions =
-        let scored =
-            actions
-            |> List.map (fun action -> action, provenanceStrength action)
+        let scored = actions |> List.map (fun action -> action, provenanceStrength action)
 
         let ordered =
             scored
             |> List.sortBy (fun (action, strength) ->
-                -action.ExpectedRootGain,
-                -action.GatewayGain,
-                -action.Value,
-                action.Cost,
-                -strength,
-                action.Id)
+                -action.ExpectedRootGain, -action.GatewayGain, -action.Value, action.Cost, -strength, action.Id)
 
         ordered
         |> List.fold
@@ -56,10 +44,7 @@ module Representation =
                         other.Id <> candidate.Id
                         && dominatesWith other otherStrength candidate candidateStrength)
 
-                if dominated then
-                    frontier
-                else
-                    item :: frontier)
+                if dominated then frontier else item :: frontier)
             []
         |> List.sortBy (fun (action, strength) -> -action.Value, action.Cost, -strength, action.Id)
         |> List.map fst

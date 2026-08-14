@@ -80,10 +80,12 @@ type ReviewRequirementInput =
       AuthorityRootUserMessageId: AuthorityRootUserMessageId }
 
 type ReviewRequirementProjection =
-    { /// Stored newest-first so replay cons is O(1). `inputs` restores oldest-first.
-      HumanPromptInputs: ReviewRequirementInput list
-      InputKeys: Set<string>
-      LastConfirmedProviderRun: ProviderRunIdentity option }
+    {
+        /// Stored newest-first so replay cons is O(1). `inputs` restores oldest-first.
+        HumanPromptInputs: ReviewRequirementInput list
+        InputKeys: Set<string>
+        LastConfirmedProviderRun: ProviderRunIdentity option
+    }
 
 /// Why a verdict or witness was not applied.
 type VerdictRejection =
@@ -315,7 +317,9 @@ module ReviewRequirementProjection =
           LastConfirmedProviderRun = None }
 
     let private inputKey (sourceSessionId: SessionId) (authorityRoot: AuthorityRootUserMessageId) =
-        SessionId.value sourceSessionId + "\x1f" + AuthorityRootUserMessageId.value authorityRoot
+        SessionId.value sourceSessionId
+        + "\x1f"
+        + AuthorityRootUserMessageId.value authorityRoot
 
     /// Oldest-first. The stored field is newest-first.
     let inputs (current: ReviewRequirementProjection) = List.rev current.HumanPromptInputs

@@ -212,8 +212,7 @@ module JoinDrain =
                             | Error(NotJoinable _) -> return None
                             | Error(AppendFailed err) -> return Some(Error(ForkError.NotFound err))
                         | ChildFinality.Abandoned _ -> return None
-                    | LegacyFalseAbort _ ->
-                        return! rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
+                    | LegacyFalseAbort _ -> return! rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
                     | Invalid _ -> return None
                 | Ok(Some _, _, _) ->
                     return Some(Error(ForkError.NotFound "completion blob ref/digest pair is incomplete"))
@@ -270,12 +269,9 @@ module JoinDrain =
                                         | Some id -> not (Set.contains (AgentHandleId.value id) takenIds)
                                         | None -> true)
 
-                                if List.isEmpty refreshed then
-                                    return Ok(List.rev acc)
-                                elif refreshed = records then
-                                    return! consumeSafe acc n rest
-                                else
-                                    return! consumeSafe acc n refreshed
+                                if List.isEmpty refreshed then return Ok(List.rev acc)
+                                elif refreshed = records then return! consumeSafe acc n rest
+                                else return! consumeSafe acc n refreshed
                     }
 
                 return! consumeSafe [] cap (orderedCandidates projection)

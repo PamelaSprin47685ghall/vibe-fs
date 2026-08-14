@@ -58,8 +58,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                     { Blog = blog
                                       EffectiveFrames = latestB
                                       BloggerSessionId =
-                                        session.Companion
-                                        |> Option.bind (fun companion -> companion.BloggerSessionId)
+                                        session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId)
                                       XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
                             )
             }

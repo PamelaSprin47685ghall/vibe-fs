@@ -207,12 +207,7 @@ module ForkTool =
             let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
 
             let basePrompt =
-                ForkChildPayload.relay
-                    (forkInstructions runtime.ParentId)
-                    request.Charge
-                    parentWorkRecord
-                    []
-                    None
+                ForkChildPayload.relay (forkInstructions runtime.ParentId) request.Charge parentWorkRecord [] None
 
             match!
                 RepositoryWarmStart.appendToBase

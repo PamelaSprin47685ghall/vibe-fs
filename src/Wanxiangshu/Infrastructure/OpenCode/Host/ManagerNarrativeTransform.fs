@@ -284,8 +284,7 @@ module ManagerNarrativeTransform =
                                 match List.tryHead lifecycle.CompletedLives with
                                 | None -> return None
                                 | Some completedLife ->
-                                    let openingId =
-                                        PhysicalUserMessageId.value completedLife.OpeningUserMessageId
+                                    let openingId = PhysicalUserMessageId.value completedLife.OpeningUserMessageId
 
                                     match
                                         rawMessages
@@ -306,13 +305,7 @@ module ManagerNarrativeTransform =
                                                 else
                                                     reawakeningProjection sid rawText
 
-                                            return
-                                                Some(
-                                                    rewriteMessage
-                                                        rawMessages
-                                                        completedOpeningIndex
-                                                        narrative
-                                                )
+                                            return Some(rewriteMessage rawMessages completedOpeningIndex narrative)
                             else
                                 let messageIdValue = PhysicalUserMessageId.create messageId
 
@@ -338,8 +331,7 @@ module ManagerNarrativeTransform =
                                                         opening.AssignmentText
                                                         (XTraceProjection.headSequence state + 1L)
                                                 with
-                                                | Error error ->
-                                                    return raise (InvalidOperationException error)
+                                                | Error error -> return raise (InvalidOperationException error)
                                                 | Ok() -> return true
                                             | _ -> return false
                                         | None -> return false
@@ -381,8 +373,7 @@ module ManagerNarrativeTransform =
                                                 cursor
                                         with
                                         | Error error -> return raise (InvalidOperationException error)
-                                        | Ok() ->
-                                            return Some(rewriteMessage rawMessages messageIndex narrative)
+                                        | Ok() -> return Some(rewriteMessage rawMessages messageIndex narrative)
         }
 
     /// GLORY-021 legacy: if a historical Activation message is still in the wire,
@@ -419,8 +410,7 @@ module ManagerNarrativeTransform =
                                 |> List.exists (function
                                     | WireText text ->
                                         workActivationAnchors.Value
-                                        |> List.exists (fun anchor ->
-                                            text.Contains(anchor, StringComparison.Ordinal))
+                                        |> List.exists (fun anchor -> text.Contains(anchor, StringComparison.Ordinal))
                                     | _ -> false)
                             | _ -> false)
 
@@ -435,12 +425,7 @@ module ManagerNarrativeTransform =
                             | None -> PromptKey.create ""
 
                         match!
-                            ManagerLifeWorkflow.acceptActivation
-                                durable
-                                sid
-                                life.LifeId
-                                promptKey
-                                protectedPrefixEnd
+                            ManagerLifeWorkflow.acceptActivation durable sid life.LifeId promptKey protectedPrefixEnd
                         with
                         | Error error -> return raise (InvalidOperationException error)
                         | Ok() -> ()

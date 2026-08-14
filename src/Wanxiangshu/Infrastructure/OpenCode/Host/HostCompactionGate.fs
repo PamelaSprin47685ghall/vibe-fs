@@ -147,7 +147,9 @@ module HostCompactionGate =
             // "Already reanchored" is answered from the durable projection, not a runtime
             // set: the observation repeats on every reconcile, and a memory-only set would
             // let a restart reanchor the same compaction a second time.
-            match HostCompactionPolicy.nextReanchor observed (fun run -> PrefixEpochProjection.isReanchored run epoch) with
+            match
+                HostCompactionPolicy.nextReanchor observed (fun run -> PrefixEpochProjection.isReanchored run epoch)
+            with
             | None -> return Ok None
             | Some run ->
                 let fact =

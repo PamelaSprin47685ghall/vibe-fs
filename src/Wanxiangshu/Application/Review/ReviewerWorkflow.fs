@@ -73,7 +73,9 @@ module ReviewerWorkflow =
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
                 else
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (TerminalOutcome.Failed "completed with empty terminal output")
                     |> ignore
         }
 
@@ -128,5 +130,4 @@ module ReviewerWorkflow =
                 reportContinuationFailure eventPort turn.SessionId outcome
             }
             :> Task
-        | ReviewerEvidence.Need.CompleteRevision ->
-            completeReviewer eventPort journal turn false
+        | ReviewerEvidence.Need.CompleteRevision -> completeReviewer eventPort journal turn false

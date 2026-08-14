@@ -80,8 +80,7 @@ let invoke
               StartCursor = None }
 
         match store.Admit invocation with
-        | SyncDelegateAdmission.Rejected error ->
-            AsyncSupport.trySetResult completion (Error error) |> ignore
+        | SyncDelegateAdmission.Rejected error -> AsyncSupport.trySetResult completion (Error error) |> ignore
         | SyncDelegateAdmission.Waiting -> ()
         | SyncDelegateAdmission.Ready invocations ->
             let first = List.head invocations
@@ -134,18 +133,10 @@ let invoke
                         let combinedProviderPrompt = preparedPrompts |> String.concat "\n\n"
 
                         let sendAgent =
-                            deps.ResolveBoundAgent delegateSession
-                            |> Option.defaultValue attachedAgent
+                            deps.ResolveBoundAgent delegateSession |> Option.defaultValue attachedAgent
 
                         match
-                            store.BeginCall(
-                                batchOwner,
-                                ownerScope,
-                                role,
-                                delegateSession,
-                                sendAgent,
-                                invocations
-                            )
+                            store.BeginCall(batchOwner, ownerScope, role, delegateSession, sendAgent, invocations)
                         with
                         | Error error ->
                             store.ReleaseAdmission(ownerScope, role)

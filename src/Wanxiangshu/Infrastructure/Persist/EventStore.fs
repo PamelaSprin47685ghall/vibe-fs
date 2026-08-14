@@ -7,7 +7,10 @@ open Wanxiangshu.Kernel.Identity
 /// Application-facing event store port (§2.4 / §9 / §10).
 type IEventStore =
     abstract OpenSnapshot: unit -> Task<StoreSnapshot>
-    abstract Append: baseSnapshot: StoreSnapshot * events: EventEnvelope list -> Task<Result<StoreSnapshot, AppendError>>
+
+    abstract Append:
+        baseSnapshot: StoreSnapshot * events: EventEnvelope list -> Task<Result<StoreSnapshot, AppendError>>
+
     abstract Refresh: unit -> Task<StoreSnapshot>
     abstract Merge: snapshots: StoreSnapshot list -> Task<Result<StoreSnapshot, MergeError>>
     abstract Publish: candidate: AppendCandidate -> Task<Result<StoreSnapshot, PublishError>>

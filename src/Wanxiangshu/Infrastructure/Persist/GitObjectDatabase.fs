@@ -140,12 +140,9 @@ module GitObjectDatabase =
                 with error ->
                     let! already = exists file
 
-                    if already then
-                        return ()
-                    elif remaining > 0 then
-                        return! write (remaining - 1)
-                    else
-                        return raise error
+                    if already then return ()
+                    elif remaining > 0 then return! write (remaining - 1)
+                    else return raise error
             }
 
         write 1
@@ -171,8 +168,7 @@ module GitObjectDatabase =
             else
                 let! fileBytes = readBytes file
 
-                let framed: byte[] =
-                    emitJsExpr (inflateSync (asBuffer fileBytes)) "Buffer.from($0)"
+                let framed: byte[] = emitJsExpr (inflateSync (asBuffer fileBytes)) "Buffer.from($0)"
 
                 let separator = Array.IndexOf(framed, 0uy)
 
@@ -207,8 +203,7 @@ module GitObjectDatabase =
             return oid
         }
 
-    let writeBlob (objectsDir: string) (content: byte[]) : Task<string> =
-        writeLoose objectsDir "blob" content
+    let writeBlob (objectsDir: string) (content: byte[]) : Task<string> = writeLoose objectsDir "blob" content
 
     /// Canonical tree body: `<mode> <name>\0<20-byte oid>` records in Git's own entry order,
     /// no separators. Git writes tree modes without the leading zero (`40000`, not `040000`).
@@ -346,7 +341,12 @@ module GitObjectDatabase =
     /// Git's own lockfile protocol: create `<ref>.lock` exclusively, verify the current value is
     /// still what the caller expected, write the new value into the lock, rename it over the ref.
     /// A lost race — lock taken, or the ref moved — returns false, which is the CAS answer.
-    let compareAndSwapRef (gitDir: string) (refName: string) (expectedOld: string option) (newOid: string) : Task<bool> =
+    let compareAndSwapRef
+        (gitDir: string)
+        (refName: string)
+        (expectedOld: string option)
+        (newOid: string)
+        : Task<bool> =
         task {
             let refPath = gitDir + "/" + refName
             let lockPath = refPath + ".lock"

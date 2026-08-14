@@ -160,7 +160,8 @@ module RevisionWorkflow =
                 |> Option.map (fun active -> active.SiblingSteers)
                 |> Option.defaultValue Map.empty
 
-            let prepared = ResizeArray<SessionId * ReviewBarrierId * string * BlobWriteReceipt option>()
+            let prepared =
+                ResizeArray<SessionId * ReviewBarrierId * string * BlobWriteReceipt option>()
             // DSL-MUTABLE: algorithm-scratch — first preparation failure while preserving input order
             let mutable failure: string option = None
 
@@ -196,12 +197,7 @@ module RevisionWorkflow =
                                        WorkRecordRef = blob.BlobRef
                                        WorkRecordDigest = blob.BlobDigest |})
 
-                return
-                    Ok(
-                        prepared
-                        |> Seq.map (fun (sid, _, text, _) -> sid, text)
-                        |> Seq.toList
-                    )
+                return Ok(prepared |> Seq.map (fun (sid, _, text, _) -> sid, text) |> Seq.toList)
         }
 
     let private sendSiblingSteers
@@ -294,7 +290,9 @@ module RevisionWorkflow =
                         match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
                         | Ok workRecord -> return Some workRecord
                         | Error _ ->
-                            match! RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true with
+                            match!
+                                RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true
+                            with
                             | RecordReadiness.Ready record -> return Some record
                             | _ -> return None
                     }

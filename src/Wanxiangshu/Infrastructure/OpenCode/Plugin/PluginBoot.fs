@@ -26,50 +26,50 @@ module PluginBoot =
 
     let create (input: obj) : Task<Boot> =
         task {
-        // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
-        RuntimeResources.install (RuntimeResources.load ())
+            // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
+            RuntimeResources.install (RuntimeResources.load ())
 
-        let portOpt = OpenCodePort.create input
+            let portOpt = OpenCodePort.create input
 
-        let! journalResult = PluginHost.createJournal input
+            let! journalResult = PluginHost.createJournal input
 
-        let journal =
-            match journalResult with
-            | Ok value -> value
-            | Error err -> raise (InvalidOperationException err)
+            let journal =
+                match journalResult with
+                | Ok value -> value
+                | Error err -> raise (InvalidOperationException err)
 
-        let scope = new PluginRuntimeScope(journal)
+            let scope = new PluginRuntimeScope(journal)
 
-        let strengthFailClosed (reason: string) : unit =
-            scope.Strength.TripStrengthFuse reason
-            raise (InvalidOperationException reason)
+            let strengthFailClosed (reason: string) : unit =
+                scope.Strength.TripStrengthFuse reason
+                raise (InvalidOperationException reason)
 
-        PluginHost.restoreSessionParents journal scope.Sessions.SessionParents
+            PluginHost.restoreSessionParents journal scope.Sessions.SessionParents
 
-        let familyParent (sessionId: SessionId) =
-            match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
-            | true, parentId -> Some(SessionId.create parentId)
-            | false, _ -> None
+            let familyParent (sessionId: SessionId) =
+                match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
+                | true, parentId -> Some(SessionId.create parentId)
+                | false, _ -> None
 
-        // The stable workspace, captured once at plugin init. The transform
-        // input carries no directory; the blogger must be pinned to this
-        // path (not the manager worktree) so its system prompt survives the
-        // worktree release at publish. First boot wins: the main workspace
-        // instance starts before the manager worktree instances.
-        let workspaceDirectory = PluginHost.workspaceDirectory input
+            // The stable workspace, captured once at plugin init. The transform
+            // input carries no directory; the blogger must be pinned to this
+            // path (not the manager worktree) so its system prompt survives the
+            // worktree release at publish. First boot wins: the main workspace
+            // instance starts before the manager worktree instances.
+            let workspaceDirectory = PluginHost.workspaceDirectory input
 
-        let gitTreePort =
-            match PluginHost.gitTreePortFromInput input with
-            | Some port -> Some port
-            | None -> workspaceDirectory |> Option.map GitTree.create
+            let gitTreePort =
+                match PluginHost.gitTreePortFromInput input with
+                | Some port -> Some port
+                | None -> workspaceDirectory |> Option.map GitTree.create
 
-        return
-            { Input = input
-              PortOpt = portOpt
-              Journal = journal
-              Scope = scope
-              StrengthFailClosed = strengthFailClosed
-              WorkspaceDirectory = workspaceDirectory
-              GitTreePort = gitTreePort
-              FamilyParent = familyParent }
+            return
+                { Input = input
+                  PortOpt = portOpt
+                  Journal = journal
+                  Scope = scope
+                  StrengthFailClosed = strengthFailClosed
+                  WorkspaceDirectory = workspaceDirectory
+                  GitTreePort = gitTreePort
+                  FamilyParent = familyParent }
         }

@@ -19,17 +19,19 @@ type internal SyncDelegateCall =
 /// A single caller's pending invocation to a sync delegate.
 /// DSL-state-combination: physical — StartCursor is a process-local resource coordinate fixed after the delegate session exists.
 and internal SyncDelegateInvocation =
-    { Owner: SessionId
-      OwnerScope: ReuseScopeId
-      Role: SyncDelegateRole
-      Charge: string
-      PrepareProviderPrompt: unit -> Task<string>
-      Batch: SyncDelegateBatch option
-      Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>
-      /// EXEC-031: XTrace head (one-past last part, 0 when empty) captured at
-      /// send. Inclusive start of the per-batch WorkRecord range; the
-      /// exclusive end is the same head captured at completion.
-      mutable StartCursor: int64 option }
+    {
+        Owner: SessionId
+        OwnerScope: ReuseScopeId
+        Role: SyncDelegateRole
+        Charge: string
+        PrepareProviderPrompt: unit -> Task<string>
+        Batch: SyncDelegateBatch option
+        Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>
+        /// EXEC-031: XTrace head (one-past last part, 0 when empty) captured at
+        /// send. Inclusive start of the per-batch WorkRecord range; the
+        /// exclusive end is the same head captured at completion.
+        mutable StartCursor: int64 option
+    }
 
 type private PendingBatch =
     { ProviderRun: ProviderRunIdentity
@@ -55,7 +57,8 @@ type internal SyncDelegateCallStore() as this =
     // DSL-MUTABLE: mailbox — incomplete semantic batches by (scope, role)
     let pendingBatches = Dictionary<string * SyncDelegateRole, PendingBatch>()
     // DSL-MUTABLE: reservation — complete/admitted batch through ordinary completion
-    let activeBatches = Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>()
+    let activeBatches =
+        Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>()
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
     let scopeKey (scope: ReuseScopeId) = ReuseScopeId.value scope
@@ -115,16 +118,20 @@ type internal SyncDelegateCallStore() as this =
                     let orderedKeys = batch.CallOrder |> List.map callKey
                     let currentKey = callKey batch.CurrentCall
 
-                    if List.isEmpty orderedKeys
-                       || Set.count (Set.ofList orderedKeys) <> List.length orderedKeys
-                       || not (List.contains currentKey orderedKeys) then
+                    if
+                        List.isEmpty orderedKeys
+                        || Set.count (Set.ofList orderedKeys) <> List.length orderedKeys
+                        || not (List.contains currentKey orderedKeys)
+                    then
                         SyncDelegateAdmission.Rejected "sync delegate rejected: invalid ProviderRun batch"
                     else
                         let pending =
                             match pendingBatches.TryGetValue key with
-                            | true, existing
-                                when ProviderRunIdentity.value existing.ProviderRun = ProviderRunIdentity.value batch.ProviderRun
-                                     && sameCallOrder existing.CallOrder batch.CallOrder ->
+                            | true, existing when
+                                ProviderRunIdentity.value existing.ProviderRun = ProviderRunIdentity.value
+                                                                                     batch.ProviderRun
+                                && sameCallOrder existing.CallOrder batch.CallOrder
+                                ->
                                 Ok existing
                             | true, _ -> Error "sync delegate rejected: another ProviderRun batch is pending"
                             | false, _ ->

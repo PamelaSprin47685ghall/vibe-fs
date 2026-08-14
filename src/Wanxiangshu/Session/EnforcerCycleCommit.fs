@@ -59,8 +59,7 @@ module EnforcerCycleCommit =
                 match declared with
                 | None ->
                     return
-                        CycleCommitOutcome.KnownNotCommitted
-                            "blog cycle has no staged coverage context (ENFORCER-045)"
+                        CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
                 | Some coverage ->
                     // PERSIST-010 precheck (writer-side CAS): fold rejects IngestCursorMismatch
                     // only AFTER the line is durable, which poisons the journal. Staged
@@ -157,11 +156,13 @@ module EnforcerCycleCommit =
                                                BloggerSessionId = bloggerSessionId
                                                RequestId = coverage.RequestId
                                                FrameEpochId = coverage.FrameEpochId
-                                               PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
+                                               PreviousIngestedThroughSequence =
+                                                coverage.PreviousIngestedThroughSequence
                                                NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
                                                PreviousCoverableTurnCutoffExclusive =
                                                 coverage.PreviousCoverableTurnCutoffExclusive
-                                               NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
+                                               NextCoverableTurnCutoffExclusive =
+                                                coverage.NextCoverableTurnCutoffExclusive
                                                NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
                                                TextRef = textBlob.BlobRef
                                                TextDigest = textBlob.BlobDigest
@@ -231,7 +232,9 @@ module EnforcerCycleCommit =
                             let digests = selected |> List.map (fun f -> f.Digest)
 
                             if digests <> squash.FrameDigests then
-                                return CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame digests mismatch"
+                                return
+                                    CycleCommitOutcome.KnownNotCommitted
+                                        "BlogObservationsSquashed frame digests mismatch"
                             else
                                 match! journal.WriteBlob squashText with
                                 | Error error -> return CycleCommitOutcome.KnownNotCommitted error

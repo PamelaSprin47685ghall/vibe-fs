@@ -14,7 +14,10 @@ open Wanxiangshu.Kernel.Identity
 module ChatParamsHook =
 
     let private nonEmpty (value: string) =
-        if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(value.Trim())
 
     let private readString (source: obj) (name: string) =
         if isNull source || isNull (source?(name)) then

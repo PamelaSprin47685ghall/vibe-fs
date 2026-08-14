@@ -106,11 +106,7 @@ module PluginTransforms =
                         | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
                             task {
                                 match!
-                                    XTraceCapture.captureMessageViewStable
-                                        journal
-                                        sessionIdentity
-                                        ids
-                                        capturedMessages
+                                    XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages
                                 with
                                 | Ok state -> return state
                                 | Error error -> return strengthFailClosed error

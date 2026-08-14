@@ -87,9 +87,7 @@ module EnforcerFrameRecovery =
             let projections = AgentJournal.snapshot journal
 
             let mainSessionId =
-                SessionAssociationProjection.tryMainSessionOf
-                    bloggerSessionId
-                    projections.AgentProjections.Associations
+                SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
 
             match mainSessionId with
             | None -> return None
@@ -107,7 +105,10 @@ module EnforcerFrameRecovery =
                         match ctx with
                         | BloggerRequestContext.Main main ->
                             let messageId =
-                                CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
+                                CompanionIdentity.newWorkMessageId
+                                    HostDigest.sha256Hex
+                                    bloggerSessionId
+                                    main.DeltaDigest
 
                             "normal", 0, Some(messageId, main.Toml)
                         | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
@@ -200,8 +201,7 @@ module EnforcerFrameRecovery =
                                                                 "synthetic-projection"
                                                         ) ]
                                               )
-                                              "parts",
-                                              box [| createObj [ "type", box "text"; "text", box text ] |] ]
+                                              "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
 
                                     toHost (hostMsg :: acc) tail
 
@@ -299,7 +299,10 @@ module EnforcerFrameRecovery =
                                 elif emitJsExpr value "typeof $0 === 'string'" then
                                     let text = unbox<string> value
 
-                                    if String.IsNullOrWhiteSpace text then None else Some(int64 (float text))
+                                    if String.IsNullOrWhiteSpace text then
+                                        None
+                                    else
+                                        Some(int64 (float text))
                                 else
                                     None
 
@@ -316,7 +319,10 @@ module EnforcerFrameRecovery =
                                 elif emitJsExpr value "typeof $0 === 'string'" then
                                     let text = unbox<string> value
 
-                                    if String.IsNullOrWhiteSpace text then None else Some(int (float text))
+                                    if String.IsNullOrWhiteSpace text then
+                                        None
+                                    else
+                                        Some(int (float text))
                                 else
                                     None
 
@@ -353,8 +359,7 @@ module EnforcerFrameRecovery =
                                 |> Option.defaultValue openReq.PreviousIngestedThroughSequence
 
                             let nextIngest =
-                                asInt64 "next_ingest"
-                                |> Option.defaultValue openReq.NextIngestedThroughSequence
+                                asInt64 "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
 
                             Some(
                                 BloggerRequestContext.Main
@@ -366,8 +371,7 @@ module EnforcerFrameRecovery =
                                       NextIngestedThroughSequence = nextIngest
                                       PreviousCoverableTurnCutoffExclusive =
                                         asInt "prev_cutoff" |> Option.defaultValue 0
-                                      NextCoverableTurnCutoffExclusive =
-                                        asInt "next_cutoff" |> Option.defaultValue 0
+                                      NextCoverableTurnCutoffExclusive = asInt "next_cutoff" |> Option.defaultValue 0
                                       NextCoveredPrefixDigest = asString "next_prefix_digest"
                                       FrameEpochId = openReq.FrameEpochId
                                       DeltaDigest = deltaDigest

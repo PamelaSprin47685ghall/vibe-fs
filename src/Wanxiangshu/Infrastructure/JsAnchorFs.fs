@@ -71,7 +71,8 @@ module JsAnchorFs =
         offsets.Add 0
 
         for i in 0 .. text.Length - 1 do
-            if text.[i] = '\n' then offsets.Add(i + 1)
+            if text.[i] = '\n' then
+                offsets.Add(i + 1)
 
         offsets.ToArray()
 
@@ -87,8 +88,7 @@ module JsAnchorFs =
         while lo < hi do
             let mid = (lo + hi + 1) / 2
 
-            if offsets.[mid] <= index then lo <- mid
-            else hi <- mid - 1
+            if offsets.[mid] <= index then lo <- mid else hi <- mid - 1
 
         lo + 1, index - offsets.[lo] + 1
 

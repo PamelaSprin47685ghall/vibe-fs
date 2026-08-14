@@ -121,7 +121,9 @@ module ReviewSeal =
                            CanonicalVersion = pending.CanonicalVersion
                            IncludedToolResultDigests = pending.IncludedToolResultDigests |}
 
-                match! AgentJournal.appendAgent (StreamId.Session pending.SessionId) (Some providerRun) fact journal with
+                match!
+                    AgentJournal.appendAgent (StreamId.Session pending.SessionId) (Some providerRun) fact journal
+                with
                 | Ok _ -> return Ok()
                 | Error failure -> return Error(AppendFailed(JournalAppendFailure.describe failure))
         }

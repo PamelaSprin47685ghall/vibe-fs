@@ -18,7 +18,9 @@ module ObservationProjection =
     let private frameDigests (blog: BlogProjectionState option) : string list =
         match blog with
         | None -> []
-        | Some state -> BlogProjection.frames state |> List.map (fun frame -> BlobDigest.value frame.Digest)
+        | Some state ->
+            BlogProjection.frames state
+            |> List.map (fun frame -> BlobDigest.value frame.Digest)
 
     /// Tip identities oldest → newest from Enforcement RecentTips (empty when absent).
     let private tipIdentities (enforcement: EnforcementProjectionState option) : (string * string) list =

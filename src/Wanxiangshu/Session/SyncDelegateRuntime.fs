@@ -53,6 +53,7 @@ type SyncDelegateRuntime
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let boundPromptModel = promptModel
     let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> Task.FromResult None)
+
     let modelFor (agent: string) =
         match boundPromptModel with
         | Some model -> Some model

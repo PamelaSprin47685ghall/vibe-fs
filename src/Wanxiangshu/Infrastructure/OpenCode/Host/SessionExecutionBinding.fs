@@ -5,9 +5,7 @@ open System.Collections.Generic
 open Wanxiangshu.Kernel.Identity
 
 module SessionExecutionBinding =
-    type private ExpectedBinding =
-        { Agent: string
-          Model: OpencodeModel }
+    type private ExpectedBinding = { Agent: string; Model: OpencodeModel }
 
     let private gate = obj ()
     let private parents = Dictionary<string, string>()
@@ -60,23 +58,28 @@ module SessionExecutionBinding =
     let private rememberModel (sessionId: SessionId) (model: OpencodeModel) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-            if not (models.ContainsKey key) then models.[key] <- model)
+
+            if not (models.ContainsKey key) then
+                models.[key] <- model)
 
     let beginInternalSend (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match opts.Agent, opts.Model with
         | Some agent, Some model when not (String.IsNullOrWhiteSpace agent) ->
             lock gate (fun () ->
                 let key = SessionId.value sessionId
+
                 let previous =
                     match internalBindings.TryGetValue key with
                     | true, value -> value
                     | false, _ -> []
+
                 internalBindings.[key] <- { Agent = agent.Trim(); Model = model } :: previous)
         | _ -> invalidOp "PROMPT-006: internal send has no concrete agent/model binding"
 
     let endInternalSend (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
+
             match internalBindings.TryGetValue key with
             | true, _ :: remaining when not (List.isEmpty remaining) -> internalBindings.[key] <- remaining
             | true, _ -> internalBindings.Remove key |> ignore
@@ -103,7 +106,10 @@ module SessionExecutionBinding =
             internalBindings.Remove key |> ignore)
 
     let private nonEmpty (value: string) =
-        if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(value.Trim())
 
     let private configuredModel agent = ManagedAgentConfig.tryBoundModel agent
 
@@ -158,7 +164,11 @@ module SessionExecutionBinding =
             | _ ->
                 match configured |> Option.orElse opts.Model with
                 | None -> Error(sprintf "PROMPT-006: execution override for '%s' has no provable model" agent)
-                | Some model -> Ok { opts with Agent = Some agent; Model = Some model }
+                | Some model ->
+                    Ok
+                        { opts with
+                            Agent = Some agent
+                            Model = Some model }
 
     let private preserveBinding label baseAgent baseModel (opts: OpenCodePromptOptions) =
         let requestedAgent = opts.Agent |> Option.bind nonEmpty
@@ -186,7 +196,11 @@ module SessionExecutionBinding =
                             requested.providerID
                             requested.modelID
                     )
-                | _ -> Ok { opts with Agent = Some baseAgent; Model = Some model }
+                | _ ->
+                    Ok
+                        { opts with
+                            Agent = Some baseAgent
+                            Model = Some model }
 
     let normalizeManagedPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match tryAgent sessionId |> Option.bind nonEmpty with

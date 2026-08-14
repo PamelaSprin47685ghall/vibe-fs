@@ -206,8 +206,7 @@ module EventStoreFold =
             match snapshotHeads heads idOf with
             | [] -> StreamHeadState.Empty
             | [ head ] -> StreamHeadState.Unique head
-            | many ->
-                StreamHeadState.Conflict(DomainConflict.ConcurrentHeads(EventStreamId.create stream, many))
+            | many -> StreamHeadState.Conflict(DomainConflict.ConcurrentHeads(EventStreamId.create stream, many))
 
     /// Structural DAG + vocabulary validation without building projection.
     let validate (events: EventEnvelope list) : Result<unit, FoldError> =

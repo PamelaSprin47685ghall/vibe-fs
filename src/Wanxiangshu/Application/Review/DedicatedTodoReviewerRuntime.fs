@@ -129,8 +129,7 @@ module DedicatedTodoReviewerRuntime =
                 { MagicTodoLwr.BoundedRange.StartInclusive = start
                   MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
 
-            let! record =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
+            let! record = LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
 
             return record |> Option.defaultValue ""
         }
@@ -440,7 +439,11 @@ module DedicatedTodoReviewerRuntime =
                                                     | MagicTodoAfter.AssignmentDelivery.AwaitHead when beforeHead > 0L ->
                                                         Task.FromResult(Ok { Sequence = beforeHead })
                                                     | _ ->
-                                                        waitHeadAdvanced timerPort journal enlisted.ReviewerSessionId beforeHead
+                                                        waitHeadAdvanced
+                                                            timerPort
+                                                            journal
+                                                            enlisted.ReviewerSessionId
+                                                            beforeHead
 
                                                 match reviewWorkStart with
                                                 | Error reason -> return Error reason

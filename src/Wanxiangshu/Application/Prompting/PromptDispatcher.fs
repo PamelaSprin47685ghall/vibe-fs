@@ -190,8 +190,7 @@ module PromptDispatcher =
             | None ->
                 match projection.ActiveLogicalRun with
                 | Some profile -> Task.FromResult(Ok profile)
-                | None ->
-                    Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
+                | None -> Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
 
         /// PROMPT-003: a continuation reached physical acceptance. Returns the
         /// kind it was claimed as, read before the fact is written because writing

@@ -106,12 +106,9 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                     let! code, stdout, _ = runText [ "rev-parse"; "--git-path"; "objects" ]
                     let trimmed = stdout.Trim()
 
-                    if code <> 0 || trimmed = "" then
-                        return None
-                    elif trimmed.StartsWith "/" then
-                        return Some trimmed
-                    else
-                        return Some(_repoPath + "/" + trimmed)
+                    if code <> 0 || trimmed = "" then return None
+                    elif trimmed.StartsWith "/" then return Some trimmed
+                    else return Some(_repoPath + "/" + trimmed)
                 }))
 
     /// The git directory that owns refs, resolved once. `--git-common-dir` rather than
@@ -121,8 +118,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
         lazy
             (ProcessGitLayout.resolve (_repoPath + "\u001fcommon") (fun () ->
                 task {
-                    let! code, stdout, _ =
-                        runText [ "rev-parse"; "--path-format=absolute"; "--git-common-dir" ]
+                    let! code, stdout, _ = runText [ "rev-parse"; "--path-format=absolute"; "--git-common-dir" ]
 
                     let trimmed = stdout.Trim()
 

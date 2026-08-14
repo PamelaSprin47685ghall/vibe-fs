@@ -108,10 +108,7 @@ module EnforcerTipGuidance =
     ///
     /// `mainOrBloggerSession` may be the Main session id (SpikePlugin) or the Blogger
     /// satellite id; owner is resolved through SessionAssociation.
-    let resolveTipGuidance
-        (journal: AgentJournal)
-        (mainOrBloggerSession: SessionId)
-        : Task<TipGuidance option> =
+    let resolveTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : Task<TipGuidance option> =
         task {
             match tryOwnerMainSession journal mainOrBloggerSession with
             | None -> return None

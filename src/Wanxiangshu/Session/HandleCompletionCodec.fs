@@ -273,7 +273,8 @@ module HandleCompletionCodec =
                     | Error err -> return Error err
                     | Ok body ->
                         if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                            return Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
+                            return
+                                Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
                         else
                             return tryDecode record agentId body completedAt |> Result.map Some
                 | Some _, None
@@ -298,7 +299,8 @@ module HandleCompletionCodec =
                     | Error err -> return Error err
                     | Ok body ->
                         if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                            return Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
+                            return
+                                Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
                         else
                             return Ok(Some body, Some blobRef, Some expectedDigest)
                 | Some _, None

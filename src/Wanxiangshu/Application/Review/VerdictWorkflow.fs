@@ -100,7 +100,9 @@ module VerdictWorkflow =
             else
                 match submission.Verdict with
                 | ReviewGuardVerdict.Revise ->
-                    match! append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal with
+                    match!
+                        append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+                    with
                     | Error error -> return Error error
                     | Ok _ -> return Ok VerdictDecision.Revised
 
@@ -118,7 +120,13 @@ module VerdictWorkflow =
                             let challengePrompt = ProviderProse.document lang ReviewChallenge.Path Map.empty
                             let challengeDigest = ReviewChallenge.contentDigest sha256 challengePrompt
 
-                            match! append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal with
+                            match!
+                                append
+                                    submission.ReviewerSessionId
+                                    submission.ProviderRun
+                                    (verdictFact submission)
+                                    journal
+                            with
                             | Error error -> return Error error
                             | Ok _ ->
                                 let issued =
@@ -139,7 +147,13 @@ module VerdictWorkflow =
                         match provenSeal challenge submission.ProviderRun guard with
                         | None -> return Ok VerdictDecision.ChallengeUnproven
                         | Some seal ->
-                            match! append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal with
+                            match!
+                                append
+                                    submission.ReviewerSessionId
+                                    submission.ProviderRun
+                                    (verdictFact submission)
+                                    journal
+                            with
                             | Error error -> return Error error
                             | Ok _ ->
                                 let witness =
@@ -161,4 +175,3 @@ module VerdictWorkflow =
                                 | Error error -> return Error error
                                 | Ok _ -> return Ok VerdictDecision.Confirmed
         }
-

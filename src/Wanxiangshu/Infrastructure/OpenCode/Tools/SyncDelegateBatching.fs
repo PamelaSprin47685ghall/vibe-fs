@@ -19,11 +19,7 @@ module SyncDelegateBatching =
         | "repair-behavior" -> Some SyncDelegateRole.Coder
         | _ -> None
 
-    let resolve
-        (scope: ToolRuntimeScope)
-        (role: SyncDelegateRole)
-        (context: HostToolContext)
-        =
+    let resolve (scope: ToolRuntimeScope) (role: SyncDelegateRole) (context: HostToolContext) =
         task {
             match scope.Snapshot, context.ProviderRunId, context.ToolCallId with
             | Some snapshot, Some providerRun, Some currentCall when not (String.IsNullOrWhiteSpace context.SessionId) ->
@@ -55,7 +51,4 @@ module SyncDelegateBatching =
         }
 
     let mergedInstruction language canonicalCall =
-        ProviderProse.render
-            language
-            MergedReference
-            (Map [ "call", ToolCallId.value canonicalCall ])
+        ProviderProse.render language MergedReference (Map [ "call", ToolCallId.value canonicalCall ])

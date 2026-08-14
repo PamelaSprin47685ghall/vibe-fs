@@ -61,16 +61,14 @@ module SharedAgentJournal =
             | Ok journal ->
                 lock gate (fun () ->
                     match shared.TryGetValue directory with
-                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) ->
-                        entry.Instance <- Some journal
+                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> entry.Instance <- Some journal
                     | _ -> ())
 
                 return Ok journal
             | Error err ->
                 lock gate (fun () ->
                     match shared.TryGetValue directory with
-                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) ->
-                        shared.Remove directory |> ignore
+                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> shared.Remove directory |> ignore
                     | _ -> ())
 
                 return Error err

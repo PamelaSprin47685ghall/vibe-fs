@@ -293,6 +293,7 @@ module ManagedAgentConfig =
                 printfn "Legacy model environment variables are ignored."
 
             Ok inventory
+
     /// Parse Host-final agent model binding into an OpencodeModel.
     ///
     /// `provider/modelID` is the ordinary opencode.json form. A bare model id
@@ -313,6 +314,7 @@ module ManagedAgentConfig =
             | Some binding when String.IsNullOrWhiteSpace binding.Model -> None
             | Some binding ->
                 let text = binding.Model.Trim()
+
                 match text.IndexOf '/' with
                 | index when index > 0 && index < text.Length - 1 ->
                     Some
@@ -322,9 +324,7 @@ module ManagedAgentConfig =
                 | _ ->
                     match current with
                     | Some existing when not (String.IsNullOrWhiteSpace existing.providerID) ->
-                        Some
-                            { existing with
-                                modelID = text }
+                        Some { existing with modelID = text }
                     | _ -> None
 
     /// PROMPT-006 Host resolution: Dispatcher sends `Model = None`; the transport
@@ -335,4 +335,3 @@ module ManagedAgentConfig =
         match !liveInventory with
         | Some inventory -> tryOpencodeModel inventory agent None
         | None -> None
-

@@ -146,7 +146,9 @@ module BloggerDelta =
 
             let overhead =
                 let dummyDoc = renderChunk [ rendered 0 ]
-                SyntheticToml.byteCount dummyDoc - SyntheticToml.byteCount (SyntheticToml.renderString suffix)
+
+                SyntheticToml.byteCount dummyDoc
+                - SyntheticToml.byteCount (SyntheticToml.renderString suffix)
 
             let documentBytes prefixLength =
                 overhead

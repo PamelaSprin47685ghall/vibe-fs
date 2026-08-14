@@ -128,11 +128,15 @@ module ToolResultBound =
             // Locate this segment's start: one past the previous '\n'.
             // DSL-MUTABLE: algorithm-scratch — backward newline-scan cursor
             let mutable p = segEnd - 1
+
             while p >= 0 && text.[p] <> '\n' do
                 p <- p - 1
+
             let segStart = p + 1
 
-            let lineBytes = SyntheticToml.byteCount (text.Substring(segStart, segEnd - segStart))
+            let lineBytes =
+                SyntheticToml.byteCount (text.Substring(segStart, segEnd - segStart))
+
             let size = lineBytes + (if count = 0 then 0 else 1)
 
             if count >= ContentMaxLines || accBytes + size > ContentMaxBytes then
@@ -140,15 +144,13 @@ module ToolResultBound =
                     // The single line overflows bytes on its own: UTF-8-safe tail.
                     let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) ContentMaxBytes
                     if tail = "" then segments <- [] else segments <- [ tail ]
+
                 stop <- true
             else
                 accBytes <- accBytes + size
                 segments <- text.Substring(segStart, segEnd - segStart) :: segments
                 count <- count + 1
-                if p < 0 then
-                    stop <- true
-                else
-                    segEnd <- p
+                if p < 0 then stop <- true else segEnd <- p
 
         String.concat "\n" segments
 
@@ -163,8 +165,11 @@ module ToolResultBound =
             let totalLines =
                 // DSL-MUTABLE: algorithm-scratch — newline-derived line counter
                 let mutable n = 1
+
                 for c in text do
-                    if c = '\n' then n <- n + 1
+                    if c = '\n' then
+                        n <- n + 1
+
                 n
 
             if totalLines <= HostMaxLines && totalBytes <= HostMaxBytes then

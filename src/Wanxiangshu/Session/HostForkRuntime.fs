@@ -77,8 +77,13 @@ type HostForkRuntime
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
     let childCreatedDir = defaultArg onChildCreatedDir (fun _ _ _ -> ())
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
-    let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
-    let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
+
+    let parentWorkRecordOf =
+        defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
+
+    let childWorkRecordOf =
+        defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
+
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())

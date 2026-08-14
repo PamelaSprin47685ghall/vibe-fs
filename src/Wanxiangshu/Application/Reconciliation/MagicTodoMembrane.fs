@@ -210,7 +210,11 @@ module MagicTodoMembrane =
                         | Some concluded ->
                             task {
                                 match!
-                                    readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
+                                    readText
+                                        journal
+                                        "ProcessReviewLWR"
+                                        concluded.WorkRecordRef
+                                        concluded.WorkRecordDigest
                                 with
                                 | Error error -> return Error error
                                 | Ok report ->
@@ -246,15 +250,18 @@ module MagicTodoMembrane =
                         match admission with
                         | AdmissionOutcome.AwaitingConsumableReview pending ->
                             return Error(PrepareRejection.AwaitingConsumableReview pending)
-                        | AdmissionOutcome.Rejected rejection ->
-                            return Error(PrepareRejection.Admission rejection)
+                        | AdmissionOutcome.Rejected rejection -> return Error(PrepareRejection.Admission rejection)
                         | AdmissionOutcome.IdempotentReplay replayWriteId ->
                             match Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints with
                             | None ->
                                 return Error(PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
                             | Some checkpoint ->
                                 match!
-                                    readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+                                    readList
+                                        journal
+                                        "ProposedTodo"
+                                        checkpoint.ProposedTodoRef
+                                        checkpoint.ProposedTodoDigest
                                 with
                                 | Error error -> return Error error
                                 | Ok proposal ->
@@ -384,7 +391,10 @@ module MagicTodoMembrane =
                 let enrichedResult =
                     if isT1Commitment then
                         ManagerNarrative.wrapT1AcceptedResult
-                            (ProviderProse.documentFor bridge.ManagerSessionId ManagerNarrative.Path.T1Revelation Map.empty)
+                            (ProviderProse.documentFor
+                                bridge.ManagerSessionId
+                                ManagerNarrative.Path.T1Revelation
+                                Map.empty)
                             rendered
                     else
                         rendered
@@ -396,14 +406,14 @@ module MagicTodoMembrane =
                         (MagicTodoFact.TodoWriteAccepted accepted)
                         journal
                 with
-                | Error failure ->
-                    return Error(AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
+                | Error failure -> return Error(AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
                 | Ok _ ->
                     return
                         Ok
                             { EnrichedResult = enrichedResult
                               NeedsDedicatedEnlist = life.Dedicated.IsNone
-                              NeedsEnsureReview = checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
+                              NeedsEnsureReview =
+                                checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
         }
 
 /// Physical OpenCode V1 hook overlay for Magic Todo. The Host builtin remains
@@ -655,7 +665,9 @@ module MagicTodoHostHooks =
                                     outputDigest
                             with
                             | Error reason ->
-                                fatalInfrastructure sessionText (sprintf "Magic Todo accept invariant failed: %A" reason)
+                                fatalInfrastructure
+                                    sessionText
+                                    (sprintf "Magic Todo accept invariant failed: %A" reason)
                             | Ok accepted ->
                                 if not (String.IsNullOrEmpty accepted.EnrichedResult) then
                                     MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
@@ -663,7 +675,9 @@ module MagicTodoHostHooks =
                                 if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
                                     match processReview with
                                     | None ->
-                                        fatalInfrastructure sessionText "Magic Todo process review runtime disappeared after before"
+                                        fatalInfrastructure
+                                            sessionText
+                                            "Magic Todo process review runtime disappeared after before"
                                     | Some port ->
                                         match!
                                             port.EnsureReview

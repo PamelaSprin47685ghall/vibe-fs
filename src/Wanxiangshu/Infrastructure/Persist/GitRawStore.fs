@@ -115,8 +115,7 @@ module PayloadClosure =
                 | [] -> return Ok()
                 | head :: tail ->
                     match! store.ReadObject head with
-                    | None ->
-                        return Error(StorageInvalid.MissingPayload(PayloadRef.create (GitObjectId.value head)))
+                    | None -> return Error(StorageInvalid.MissingPayload(PayloadRef.create (GitObjectId.value head)))
                     | Some _ -> return! loop tail
             }
 
@@ -334,10 +333,7 @@ module GitRawStore =
                 let! oid = store.WriteBlob(CanonicalEventCodec.encodeUtf8 normalized)
                 written.Add((EventIdShard.prefix normalized.EventId, EventIdShard.fileName normalized.EventId, oid))
 
-            let byPrefix =
-                written
-                |> Seq.toList
-                |> List.groupBy (fun (shard, _, _) -> shard)
+            let byPrefix = written |> Seq.toList |> List.groupBy (fun (shard, _, _) -> shard)
 
             let prefixEntries = ResizeArray<TreeEntry>()
 
@@ -357,7 +353,7 @@ module GitRawStore =
                       Oid = leaf }
                 )
 
-            return! store.WriteTree (Seq.toList prefixEntries)
+            return! store.WriteTree(Seq.toList prefixEntries)
         }
 
     let private buildPayloadsTree (store: IGitRawStore) (refs: GitObjectId list) : Task<GitObjectId> =
@@ -464,10 +460,7 @@ module GitRawStore =
     /// Production loaders (journal boot, feature adapters, converge validate)
     /// must use this walk — O(|events|) tree + blob reads — not
     /// EventStoreMergeSpec, which is the contract-test set-union oracle.
-    let loadEventEnvelopes
-        (store: IGitRawStore)
-        (root: RootOid)
-        : Task<Result<EventEnvelope list, StorageInvalid>> =
+    let loadEventEnvelopes (store: IGitRawStore) (root: RootOid) : Task<Result<EventEnvelope list, StorageInvalid>> =
         task {
             match! listEventBlobs store root with
             | Error err -> return Error err

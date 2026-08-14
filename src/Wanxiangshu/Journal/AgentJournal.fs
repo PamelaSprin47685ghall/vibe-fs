@@ -202,12 +202,10 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             let! result, notify =
                 task {
                     match lock gate (fun () -> rejected) with
-                    | Some(eventId, rejection) ->
-                        return Error(FactRejected(eventId, rejection)), []
+                    | Some(eventId, rejection) -> return Error(FactRejected(eventId, rejection)), []
                     | None ->
                         match! writer.Append stream providerRun fact with
-                        | CommitUnknown(eventId, failure) ->
-                            return Error(WriteUnknown(eventId, failure)), []
+                        | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure)), []
                         | Committed envelope ->
                             return
                                 lock gate (fun () ->

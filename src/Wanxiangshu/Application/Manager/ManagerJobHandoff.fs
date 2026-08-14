@@ -72,8 +72,7 @@ module ManagerJobHandoff =
             | ReconcileProgram.TurnCompleted ->
                 match tryJobProgress journal turn.SessionId with
                 | Some progress when isTransferred turn.Outcome progress ->
-                    let! _, terminalValid =
-                        TerminalReporter.complete eventPort journal abortedSessions turn
+                    let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
 
                     if terminalValid then
                         AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId

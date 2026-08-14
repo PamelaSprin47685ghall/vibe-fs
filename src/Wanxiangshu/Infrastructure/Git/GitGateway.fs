@@ -271,7 +271,8 @@ module GitGateway =
         : IGitGateway =
         ignore repoPath
 
-        let converge remote = convergeStore store run maxRetries remote
+        let converge remote =
+            convergeStore store run maxRetries remote
 
         { new IGitGateway with
             member _.Fetch(remote) =
@@ -315,11 +316,7 @@ module GitGateway =
     let bindEventStore (store: IGitRawStore) (run: GitGatewayRunner) (maxRetries: int) : IEventStore =
         EventStore.createWithConverge store maxRetries (convergeStore store run maxRetries)
 
-    let bindEventStoreWithSyncRunner
-        (store: IGitRawStore)
-        (run: GitGatewaySyncRunner)
-        (maxRetries: int)
-        : IEventStore =
+    let bindEventStoreWithSyncRunner (store: IGitRawStore) (run: GitGatewaySyncRunner) (maxRetries: int) : IEventStore =
         let asyncRun: GitGatewayRunner = fun argsAndEnv -> Task.FromResult(run argsAndEnv)
         bindEventStore store asyncRun maxRetries
 

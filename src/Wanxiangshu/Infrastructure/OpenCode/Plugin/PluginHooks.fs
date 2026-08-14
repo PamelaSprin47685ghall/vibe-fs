@@ -52,7 +52,13 @@ module PluginHooks =
                 MagicTodoHostHooks.create
                     journal
                     snapshotOpt
-                    (Some(DedicatedTodoReviewerRuntime.port (PtyTiming.nodeTimerPort ()) sessionPort snapshotOpt gitTreePort))
+                    (Some(
+                        DedicatedTodoReviewerRuntime.port
+                            (PtyTiming.nodeTimerPort ())
+                            sessionPort
+                            snapshotOpt
+                            gitTreePort
+                    ))
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput

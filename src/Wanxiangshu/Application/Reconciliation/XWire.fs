@@ -27,10 +27,7 @@ module XWire =
     let private isCompanionSession (journal: AgentJournal) (sessionId: SessionId) =
         SessionAssociationProjection.isCompanion sessionId (AgentJournal.snapshot journal).AgentProjections.Associations
 
-    let private readFrameBodies
-        (journal: AgentJournal)
-        (frames: BlogFrame list)
-        : Task<Result<string list, string>> =
+    let private readFrameBodies (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string list, string>> =
         let rec loop remaining collected =
             task {
                 match remaining with
@@ -40,8 +37,7 @@ module XWire =
                     | Error reason -> return Error reason
                     | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
                         return! loop tail (text :: collected)
-                    | Ok _ ->
-                        return Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest))
+                    | Ok _ -> return Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest))
             }
 
         loop frames []

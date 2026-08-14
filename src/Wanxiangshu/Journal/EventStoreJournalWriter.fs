@@ -142,7 +142,10 @@ type EventStoreJournalWriter
     /// Walks `events/` linearly via GitRawStore.loadEventEnvelopes. Must not
     /// go through EventStoreMergeSpec — that module is the contract-test
     /// set-union oracle, and its previous list-append decoder was O(|history|²).
-    static member loadJournalEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Task<Result<Envelope list, string>> =
+    static member loadJournalEnvelopes
+        (raw: IGitRawStore)
+        (snapshot: StoreSnapshot)
+        : Task<Result<Envelope list, string>> =
         task {
             match! GitRawStore.loadEventEnvelopes raw snapshot.RootOid with
             | Error detail -> return Error(sprintf "storage invalid: %A" detail)
@@ -166,8 +169,11 @@ type EventStoreJournalWriter
     /// create(runtimeId, processId, startedAt, store, raw) → writer * RuntimeStarted envelope.
     /// Pass `None` for raw when blob writes are unavailable (tests that only append facts).
     static member create
-        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore option)
-        : Task<IJournalWriter * Envelope> =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore option) : Task<
+                                                                                                                              IJournalWriter *
+                                                                                                                              Envelope
+                                                                                                                           >
+        =
         task {
             let blobWriter =
                 match raw with
@@ -217,8 +223,15 @@ type EventStoreJournalWriter
     /// Replays prior journal envelopes, publishes a fresh RuntimeStarted, and
     /// returns writer + init envelope + folded projection.
     static member resumeOrCreate
-        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore)
-        : Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>> =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore) : Task<
+                                                                                                                       Result<
+                                                                                                                           IJournalWriter *
+                                                                                                                           Envelope *
+                                                                                                                           ProjectionSet,
+                                                                                                                           FoldRejection
+                                                                                                                        >
+                                                                                                                    >
+        =
         task {
             let blobWriter = EventStoreBlobWriter.Create raw
             let! baseSnapshot = store.OpenSnapshot()

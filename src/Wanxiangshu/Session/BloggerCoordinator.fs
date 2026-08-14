@@ -197,11 +197,7 @@ module BloggerCoordinator =
                 | Ok _ -> return Ok()
         }
 
-    let private abandonRequest
-        (journal: AgentJournal option)
-        (ctx: BloggerRequestContext)
-        (reason: string)
-        : Task =
+    let private abandonRequest (journal: AgentJournal option) (ctx: BloggerRequestContext) (reason: string) : Task =
         match journal with
         | None -> Task.FromResult(()) :> Task
         | Some j ->

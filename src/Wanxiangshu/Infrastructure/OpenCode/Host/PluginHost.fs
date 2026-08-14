@@ -43,14 +43,14 @@ module PluginHost =
                     task {
                         match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
                         | Error err -> return Error err
-                        | Ok(writer, _, projection) ->
-                            return AgentJournal.createFromProjection writer projection
+                        | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
                     }
 
                 match! SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
                 | Ok journal -> return Ok(Some journal)
                 | Error rejection ->
-                    return Error(sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact)
+                    return
+                        Error(sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact)
         }
 
 

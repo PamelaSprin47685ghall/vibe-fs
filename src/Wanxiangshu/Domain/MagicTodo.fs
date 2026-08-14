@@ -201,7 +201,11 @@ module MagicTodo =
             | None -> XTrace.nextCursor t1CallCursor
 
         let minimum = workRecordStart openingCursor
-        if candidate.Sequence > minimum.Sequence then candidate else minimum
+
+        if candidate.Sequence > minimum.Sequence then
+            candidate
+        else
+            minimum
 
     /// Pre-T1 uses the dynamic XTrace head; post-T1 uses the constitutive T1 boundary.
     let effectiveOpeningFloor

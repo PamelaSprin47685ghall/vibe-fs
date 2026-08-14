@@ -82,8 +82,7 @@ module SyntheticToml =
 
         safe
 
-    let private literalSafe (text: string) =
-        literalSafeRange text 0 text.Length
+    let private literalSafe (text: string) = literalSafeRange text 0 text.Length
 
     /// ARCH-010 string selection. Deterministic, and genuinely parseable:
     ///
@@ -475,12 +474,9 @@ module SyntheticToml =
         let total = headLen + tail.Length
 
         let charAt i =
-            if i < 0 || i >= total then
-                Char.MinValue
-            elif i < headLen then
-                head.[i]
-            else
-                tail.[i - headLen]
+            if i < 0 || i >= total then Char.MinValue
+            elif i < headLen then head.[i]
+            else tail.[i - headLen]
 
         let startsAt i =
             charAt i = '\'' && charAt (i + 1) = '\'' && charAt (i + 2) = '\''
@@ -503,8 +499,7 @@ module SyntheticToml =
             elif length > text.Length then text.Length
             else length
 
-        let hasNewline =
-            suffix.Contains "\n" || rangeContainsNewline text 0 headLen
+        let hasNewline = suffix.Contains "\n" || rangeContainsNewline text 0 headLen
 
         let safe =
             literalSafeRange text 0 headLen
@@ -512,11 +507,15 @@ module SyntheticToml =
             && not (tripleQuoteJoins text headLen suffix)
 
         if not hasNewline then
-            2 + escapeBasicByteCountRange text 0 headLen + escapeBasicByteCountRange suffix 0 suffix.Length
+            2
+            + escapeBasicByteCountRange text 0 headLen
+            + escapeBasicByteCountRange suffix 0 suffix.Length
         elif safe then
             8 + byteCountRange text 0 headLen + byteCountRange suffix 0 suffix.Length
         else
-            2 + escapeBasicByteCountRange text 0 headLen + escapeBasicByteCountRange suffix 0 suffix.Length
+            2
+            + escapeBasicByteCountRange text 0 headLen
+            + escapeBasicByteCountRange suffix 0 suffix.Length
 
     /// UTF-8 byte count of rendered text.
     ///
@@ -531,7 +530,4 @@ module SyntheticToml =
     /// An unpaired surrogate counts as 3, matching what both runtimes emit for the U+FFFD
     /// replacement they substitute.
     let byteCount (text: string) : int =
-        if isNull text then
-            0
-        else
-            byteCountRange text 0 text.Length
+        if isNull text then 0 else byteCountRange text 0 text.Length

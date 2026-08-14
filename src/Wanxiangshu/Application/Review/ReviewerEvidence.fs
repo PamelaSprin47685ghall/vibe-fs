@@ -117,8 +117,7 @@ module ReviewerEvidence =
 
         match processReviewEvidence, guard journal reviewerKey with
         | Some _, None -> Need.EnsureVerdictSubmitted
-        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttemptKeys ->
-            Need.EnsureVerdictSubmitted
+        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttemptKeys -> Need.EnsureVerdictSubmitted
         | Some _, Some _ ->
             // REVIEW-013: process PERFECT/REVISE is terminal. No confirmation nudge.
             Need.CompleteRevision

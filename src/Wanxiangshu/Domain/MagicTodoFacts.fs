@@ -70,22 +70,24 @@ module MagicTodoFacts =
     /// ConsumableReview ≡ TodoReviewConcluded.
     /// Append ONLY when VerdictKnown ∧ ProcessReviewLWR record-ready in same snapshot.
     type TodoReviewConcluded =
-        { ManagerLifeId: ManagerLifeId
-          TodoWriteId: TodoWriteId
-          TodoReviewId: TodoReviewId
-          DedicatedReviewerId: DedicatedReviewerId
-          ReviewerSessionId: SessionId
-          Verdict: ProcessReviewVerdict
-          WorkRecordRef: BlobRef
-          WorkRecordDigest: BlobDigest
-          /// Legacy persisted-wire compatibility echo. New v2 writers copy the
-          /// reviewed checkpoint's ProposedTodo locator here; projection ignores
-          /// these fields as CurrentObligations writers (TODO-005).
-          SettledTodoRef: BlobRef
-          SettledTodoDigest: BlobDigest
-          ReviewerRecordFrontier: XTraceCursor
-          ProviderRunId: ProviderRunIdentity
-          ToolCallId: ToolCallId }
+        {
+            ManagerLifeId: ManagerLifeId
+            TodoWriteId: TodoWriteId
+            TodoReviewId: TodoReviewId
+            DedicatedReviewerId: DedicatedReviewerId
+            ReviewerSessionId: SessionId
+            Verdict: ProcessReviewVerdict
+            WorkRecordRef: BlobRef
+            WorkRecordDigest: BlobDigest
+            /// Legacy persisted-wire compatibility echo. New v2 writers copy the
+            /// reviewed checkpoint's ProposedTodo locator here; projection ignores
+            /// these fields as CurrentObligations writers (TODO-005).
+            SettledTodoRef: BlobRef
+            SettledTodoDigest: BlobDigest
+            ReviewerRecordFrontier: XTraceCursor
+            ProviderRunId: ProviderRunIdentity
+            ToolCallId: ToolCallId
+        }
 
     type DedicatedTodoReviewerEnlisted =
         { ManagerLifeId: ManagerLifeId

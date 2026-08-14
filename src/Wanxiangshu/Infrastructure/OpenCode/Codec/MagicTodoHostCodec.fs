@@ -81,7 +81,10 @@ module MagicTodoHostCodec =
         let args: obj = output?args
 
         if isNull args then
-            Diagnostic.fatal "magic-todo-infrastructure-failed" [ "result", "todowrite before hook output.args is required" ]
+            Diagnostic.fatal
+                "magic-todo-infrastructure-failed"
+                [ "result", "todowrite before hook output.args is required" ]
+
             failwith "unreachable after Diagnostic.fatal"
 
         let todos =

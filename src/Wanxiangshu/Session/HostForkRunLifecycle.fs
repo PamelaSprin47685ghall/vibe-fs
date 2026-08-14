@@ -124,9 +124,7 @@ module HostForkRunLifecycle =
                                             (Some run.Role)
                                             (Some childId)
                                             "PERSIST"
-                                            (sprintf
-                                                "EXEC-009/PERSIST-002 HandleCompleted append failed: %s"
-                                                error)
+                                            (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
                             }
 
                     run.Source.SetResult finalOutcome

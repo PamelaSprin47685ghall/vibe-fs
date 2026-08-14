@@ -164,7 +164,8 @@ module ManagerLifeWorkflow =
                                                 {| SessionId = sessionId
                                                    LifeId = lifeId
                                                    ActivationPromptKey = PromptKey.create ""
-                                                   ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
+                                                   ProtectedPrefixEndSequence =
+                                                    XTraceProjection.headSequence xTrace + 1L |})
                                     with
                                     | Error error -> return Error error
                                     | Ok() -> return Ok(Some lifeId)
@@ -250,7 +251,9 @@ module ManagerLifeWorkflow =
                                     providerRun
 
                         let authorityRoot =
-                            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
+                            PromptAuthorityLedger.activeProfile
+                                sessionId
+                                (AgentJournal.snapshot journal).AgentProjections
                             |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
                             |> Option.defaultValue (AuthorityRootUserMessageId.create "")
 

@@ -73,9 +73,7 @@ module EventStoreMerge =
 
             let acc = ResizeArray<TreeEntry>()
 
-            let rec mergeGroups
-                (remaining: (string * TreeEntry list) list)
-                : Task<Result<TreeEntry list, MergeError>> =
+            let rec mergeGroups (remaining: (string * TreeEntry list) list) : Task<Result<TreeEntry list, MergeError>> =
                 task {
                     match remaining with
                     | [] -> return Ok(Seq.toList acc)
@@ -88,7 +86,8 @@ module EventStoreMerge =
 
                         let normalized = entries |> List.map normalize
 
-                        let modes = normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
+                        let modes =
+                            normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
 
                         match modes with
                         | [ mode ] when StoreTree.isTreeMode mode ->
@@ -120,7 +119,9 @@ module EventStoreMerge =
                                 if missing then
                                     return
                                         Error(
-                                            asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" path))
+                                            asMergeError (
+                                                StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" path)
+                                            )
                                         )
                                 else
                                     match! mergeEntryLists store path (Seq.toList childTrees) with
@@ -158,7 +159,9 @@ module EventStoreMerge =
                                 if bodyList |> List.exists (fun (_, body) -> Option.isNone body) then
                                     return
                                         Error(
-                                            asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing blob at %s" path))
+                                            asMergeError (
+                                                StorageInvalid.MalformedEnvelope(sprintf "missing blob at %s" path)
+                                            )
                                         )
                                 else
                                     let contents = bodyList |> List.map (fun (oid, body) -> oid, Option.get body)
@@ -176,7 +179,9 @@ module EventStoreMerge =
                                         return
                                             Error(
                                                 asMergeError (
-                                                    StorageInvalid.NonCanonical(sprintf "payload path conflict at %s" path)
+                                                    StorageInvalid.NonCanonical(
+                                                        sprintf "payload path conflict at %s" path
+                                                    )
                                                 )
                                             )
                         | _ ->

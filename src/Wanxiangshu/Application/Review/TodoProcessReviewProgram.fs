@@ -49,11 +49,7 @@ module TodoProcessReviewProgram =
 
     /// Append TodoReviewConcluded when VerdictKnown ∧ ProcessReviewLWR record-ready
     /// share this snapshot. Pending is a wait signal, not a provider-visible reject.
-    let tryConclude
-        (journal: AgentJournal)
-        (lifeId: ManagerLifeId)
-        (writeId: TodoWriteId)
-        : Task<ConcludeOutcome> =
+    let tryConclude (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : Task<ConcludeOutcome> =
         task {
             let snapshot = AgentJournal.snapshot journal
 
@@ -168,8 +164,7 @@ module TodoProcessReviewProgram =
             | ConcludeOutcome.Failed reason -> return Error reason
             | ConcludeOutcome.Pending _ ->
                 match producerPresence journal lifeId writeId with
-                | ProducerPresence.Absent detail ->
-                    return Error("process review cannot progress: " + detail)
+                | ProducerPresence.Absent detail -> return Error("process review cannot progress: " + detail)
                 | ProducerPresence.Present ->
                     let revision = AgentJournal.revision journal
                     let! _ = AgentJournal.awaitChangeFrom revision journal

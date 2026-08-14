@@ -31,14 +31,10 @@ module Search =
             None
         else
             let neighborsOf =
-                problem.Edges
-                |> List.groupBy (fun edge -> edge.FromNode)
-                |> Map.ofList
+                problem.Edges |> List.groupBy (fun edge -> edge.FromNode) |> Map.ofList
 
             let neighbors node =
-                neighborsOf
-                |> Map.tryFind node
-                |> Option.defaultValue []
+                neighborsOf |> Map.tryFind node |> Option.defaultValue []
 
             let heuristic node =
                 problem.Heuristic |> Map.tryFind node |> Option.defaultValue 0.0

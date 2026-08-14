@@ -435,7 +435,8 @@ module StrengthSpeculate =
 
                                                                         return ()
                                                                     | Ok bundle ->
-                                                                        match! durability.PublishPrepared
+                                                                        match!
+                                                                            durability.PublishPrepared
                                                                                 { OwnerSessionId = owner
                                                                                   DecisionId = id
                                                                                   TargetProviderRun = target

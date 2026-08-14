@@ -114,9 +114,7 @@ module LifecycleWorkRecord =
         let gapStart =
             { Sequence = max coverage.IngestedThrough.Sequence openingEnd.Sequence }
 
-        let gap =
-            XTrace.sliceFrom gapStart trace
-            |> XTrace.forWorkRecord
+        let gap = XTrace.sliceFrom gapStart trace |> XTrace.forWorkRecord
 
         render
             includeOpening

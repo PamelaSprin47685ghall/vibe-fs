@@ -378,7 +378,8 @@ module MagicTodoProjection =
         let life, state = ensureLife payload.ManagerLifeId state
 
         match life.LegacySeed with
-        | Some(seedRef, seedDigest) when seedRef = payload.SeedTodoRef && seedDigest = payload.SeedTodoDigest -> Ok state
+        | Some(seedRef, seedDigest) when seedRef = payload.SeedTodoRef && seedDigest = payload.SeedTodoDigest ->
+            Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
         | None when not (Map.isEmpty life.Checkpoints) -> Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
         | None ->

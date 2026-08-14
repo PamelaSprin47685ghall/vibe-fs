@@ -54,11 +54,7 @@ module BloggerCrashRecovery =
                 |> Map.toList
                 |> List.map (fun (_, openReq) -> mainSessionId, openReq))
 
-    let private abandon
-        (journal: AgentJournal)
-        (openReq: OpenBloggerRequest)
-        (reason: string)
-        : Task =
+    let private abandon (journal: AgentJournal) (openReq: OpenBloggerRequest) (reason: string) : Task =
         BloggerAbandon.byRequestId journal openReq.RequestId openReq.MainSessionId openReq.BloggerSessionId reason
 
     /// <summary>Pure decision for window A/B/C given Host tool-call presence and

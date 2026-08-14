@@ -135,7 +135,11 @@ module CasebookStore =
 
         appendEvent store parents RefreshedEventType payload
 
-    let appendAccessed (store: IEventStore) (parents: EventId list) (sessionId: string) : Task<Result<EventId, string>> =
+    let appendAccessed
+        (store: IEventStore)
+        (parents: EventId list)
+        (sessionId: string)
+        : Task<Result<EventId, string>> =
         appendEvent store parents AccessedEventType (Encode.object [ "session_id", Encode.string sessionId ])
 
     let appendEvicted (store: IEventStore) (parents: EventId list) (sessionId: string) : Task<Result<EventId, string>> =
@@ -203,7 +207,8 @@ module CasebookStore =
                              get.Required.Field "observations" (Decode.list decodeObservation)))
 
                     match Decode.fromValue "$" decoder payload with
-                    | Ok(sessionId, q, a, observations) -> Ok(CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
+                    | Ok(sessionId, q, a, observations) ->
+                        Ok(CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
                     | Error err -> Error err
 
                 let rec decodeAll
