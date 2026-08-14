@@ -79,7 +79,7 @@ Reviewer prose + judge(verdict)
 
 ### 被拒方案（保留考古，不进入 WHAT）
 
-来自 `archive/docs/why/review.md`「备选与被拒」与 `archive/docs/why/glory.md`：
+来自历史 why/review「备选与被拒」与历史 why/glory 条款：
 
 - **固定 8 维 report schema / Pass 表**：拒。审查退化为填表（REVIEW-011）。→ 由 REVIEW-JUDGEMENT-007 正面规定。
 - **tiny typo → 自动 REVISE**：拒。把无关痛感抬成 withhold。→ REVIEW-JUDGEMENT-004。
@@ -96,7 +96,7 @@ Reviewer prose + judge(verdict)
 | 旧工具名 `verdict` 非法、无 alias | HOW | 当前 vocabulary；参数名非永久 contract（COVERAGE review.md GARBAGE 行） | 本 HOW §1；不进入 WHAT 命题 |
 | 双 PERFECT 屏障由 Host 执行、Reviewer 提示词不灌输 | HOW | 实现位置，非 ontology（COVERAGE） | 本 HOW §2（装载权威 → cognitive-environment） |
 | `ChallengeTextVersion=1`、英文 canonical 字节不变版本保持 | HOW | 文案世代机制（COVERAGE）；challenge 代数归 review-assurance | 本包不持有；见 `review-assurance` HOW |
-| `archive/changes/completed/fix-revise.md` | GARBAGE（review transcript） | REVISE follow-up 登记；其 Gap A（record-ready fail-closed 回归）已由 review-assurance 命题 + `tests/unit/execution|temporal` 回归与 `requirements/review-assurance/tests/consumable-review.test.mjs` 承接 | 本 HOW；`review-assurance` HOW「历史与弃权」 |
-| `archive/changes/completed/ce-revise-review.md` | GARBAGE（review transcript） | CE 复审记录；Student–Teacher 争议已被 `universal.md` / `ce-student-teacher-collapse.md` 处理（session-ontology/delegation），与本包无 normative 关系 | 本 HOW；CHANGES-AUDIT 对应行 |
+| 历史 change（fix-revise） | GARBAGE（review transcript） | REVISE follow-up 登记；其 Gap A（record-ready fail-closed 回归）已由 review-assurance 命题 + `tests/unit/execution|temporal` 回归与 `requirements/review-assurance/tests/consumable-review.test.mjs` 承接 | 本 HOW；`review-assurance` HOW「历史与弃权」 |
+| 历史 change（ce-revise-review） | GARBAGE（review transcript） | CE 复审记录；Student–Teacher 争议已被 `universal.md` / `ce-student-teacher-collapse.md` 处理（session-ontology/delegation），与本包无 normative 关系 | 本 HOW；CHANGES-AUDIT 对应行 |
 | `fast-reviewer` / `deep-reviewer` 机器名 | GARBAGE | HANDOFF §12：当前 machine names 不进入永久 WHAT | 本 HOW §4 不提及；PROOF.md 不落点 |
 | 八维判断方向的 exact 标题清单 | HOW | 当前 craft guidance 措辞；方向集可整体重写（INDEPENDENT CHANGE） | WHAT REVIEW-JUDGEMENT-007 只冻结「非 checklist」，不冻结八个名字 |

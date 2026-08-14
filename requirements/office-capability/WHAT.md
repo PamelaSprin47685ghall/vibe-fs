@@ -23,7 +23,7 @@ Manager 当前可 fork 的五类 Office（Coder / Inspector / DevOps / Browser /
 
 | Office | 有权产生 | 不做 |
 |--------|----------|------|
-| Coder / Engineer | repository source mutation（实现、修复、重构、tests-as-source、受托含义的 archive/docs/source/config） | 运行项目；执行测试/构建；铸造或认证 runtime evidence；未被托付的产品/架构决定 |
+| Coder / Engineer | repository source mutation（实现、修复、重构、tests-as-source、受托含义的 requirements/source/config） | 运行项目；执行测试/构建；铸造或认证 runtime evidence；未被托付的产品/架构决定 |
 | Inspector / Scout·Investigator | 关于本地已存在事实的证据 | 修改 source；实现修复；跑测试/构建/应用；创造新的行为证据 |
 | DevOps / Technician·Operator | 运维行动与行为证据 | 发明产品含义；在若干实质不同的合法行为之间作产品选择 |
 | Browser / Navigator·Researcher | 带 provenance 的外部事实 | 实现仓库工作；把外部可能性变成仓库义务 |
@@ -119,7 +119,7 @@ repository-witness` 锚点（`do not establish repository facts with your own ha
 
 ## OFF-008：Coder consequence = repository source mutation；non-consequence = 运行项目/认证证据/未被托付的决定
 
-Coder 有权改变书写出来的世界（实现、修复、重构、tests-as-source、受托含义的 archive/docs/source/config）；
+Coder 有权改变书写出来的世界（实现、修复、重构、tests-as-source、受托含义的 requirements/source/config）；
 不运行项目、不执行测试/构建、不铸造或认证 runtime evidence、不作未被托付的产品/架构决定。
 `mv`/`rm` 只进 Coder（AGENT-016）；`bash-honeypot` 仅 Coder 且不执行 shell、只是越权拒绝文本
 （AGENT-023，非放行 bash）。
@@ -191,14 +191,14 @@ Orchestrator 只 commission fast/deep-manager（新路）或按 Byname 续做既
 Browser 有权从外部世界建立带 provenance 的事实（ARCH-017 Browser 行）；不实现仓库工作；外部可能性
 不自动变成 repository/product obligation。
 
-含义/动机：`archive/docs/why/agent.md` Browser 网络面选型（stealth-browser MCP vs 插件 network 工具）：
+含义/动机：历史 why/agent 条款 Browser 网络面选型（stealth-browser MCP vs 插件 network 工具）：
 工具必须真实可执行且仅 Browser 可寻址；本地文件/仓库不是 web evidence。
 
 边界：provenance 合同的建立细节（source-closest、disagreement、visual）→ `external-investigation`；
 `stealth-browser-mcp_*` 的 schema 投影 → `capability-enforcement`。
 
 证据：`tests/office-capability-integrity.test.mjs`（browser consequence 双语文档命中）+ 交叉：
-`archive/requirements-design/20-capability-external.md`（external-investigation 引用本包 Browser consequence）。
+历史 requirements-design card（20-capability-external）（external-investigation 引用本包 Browser consequence）。
 
 ## OFF-014：Inquiry consequence = 对未决问题的语义理解；non-consequence = 改变 source/执行世界/把思想变成证据
 

@@ -42,11 +42,11 @@ RED = consumer 安装的 artifact 缺少运行所需 code/resource
 
 ## 历史考古（为什么长这样）
 
-历史 completed changes 中无 distribution 专属 completed change（CHANGES-AUDIT 结论：36 份 completed 均无 distribution 行）。本包语义的 WHY 考古来自 `archive/docs/why/enforcer.md` 的分发裁决：
+历史 completed changes 中无 distribution 专属 completed change（CHANGES-AUDIT 结论：36 份 completed 均无 distribution 行）。本包语义的 WHY 考古来自历史 why/enforcer 条款的分发裁决：
 
 > **分发：单一打包 vs dist 双副本/代码 fallback。** 拒双副本：掩盖打包错误；拒代码内 fallback catalog：让坏的打包静默成功。resource 随 npm pack 单份发布。
 
-即：历史上确实考虑过「把资源复制进 dist/ 双份」与「代码内嵌 fallback 清单」两种方案，均被拒——前者掩盖打包错误（测试可能读 src 副本而消费者拿到坏 dist），后者让缺资源的包静默运行。当前实现=单份发布 + 目录即清单 + fail fast，正是这两次拒绝的正面形态。`catalog.json` 作为 rulebook 元数据第二真相也被废止（`archive/docs/why/enforcer.md`、ENFORCER-002/072/073 → GARBAGE）。
+即：历史上确实考虑过「把资源复制进 dist/ 双份」与「代码内嵌 fallback 清单」两种方案，均被拒——前者掩盖打包错误（测试可能读 src 副本而消费者拿到坏 dist），后者让缺资源的包静默运行。当前实现=单份发布 + 目录即清单 + fail fast，正是这两次拒绝的正面形态。`catalog.json` 作为 rulebook 元数据第二真相也被废止（历史 why/enforcer 条款、ENFORCER-002/072/073 → GARBAGE）。
 
 ## 世界什么时候变绿（guarantee 成立）
 

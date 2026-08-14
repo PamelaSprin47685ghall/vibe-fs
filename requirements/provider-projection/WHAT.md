@@ -151,7 +151,7 @@ digest。同语义对话跨 ID 产出同一 digest。
 transport-only 剔除）不得改 digest。
 **边界**：CoveredPrefixDigest 的消费点（fail-closed、canary、Review 双 PERFECT）归各
 消费 owner；「digest 从 Semantic 算」的投影侧归本包。
-**证据**：COMPANION-007/012、`archive/docs/how/projection.md`「Canonical digest」。
+**证据**：COMPANION-007/012、历史 how/projection「Canonical digest」。
 
 ## PROVIDER-PROJECTION-012：确定性 renderer：同 semantic 输入同 bytes
 
@@ -162,7 +162,7 @@ literal 选择由规则决定、文档顺序固定、`byteCount` 按 UTF-8 字�
 **含义**：确定性是 digest/seal/前缀缓存成立的底座。
 **边界**：前缀 byte 稳定性跨请求的保证归 `prefix-stability`；单次投影内「同输入同 bytes」
 归本包。
-**证据**：ARCH-010、`archive/docs/why/synthetic-toml.md`。
+**证据**：ARCH-010、历史 why/synthetic-toml 条款。
 
 ---
 

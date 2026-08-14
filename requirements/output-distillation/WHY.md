@@ -31,7 +31,7 @@ process execution contract。独立变化测试双向成立，故拆两包。
   「切割的私务」外泄。
 - **无界缓冲**（`ProcessOutput.fs` 注释）：跨 OutputLimit 瞬间一次性 dump 积压字节，曾把内存峰值
   与输出预算脱钩；`MemoryBufferBudget` 提前流式落盘。
-- **JSON 当字符串叠信封**（`archive/changes/completed/js-tools-toml-result.md`）：工具结果以 `result="{\"...}"`
+- **JSON 当字符串叠信封**（历史 change（js-tools-toml-result））：工具结果以 `result="{\"...}"`
   字符串返回，截断语义与值树分离；TTR 后结果走值树 + ARCH-012 确定性留尾截断。
 
 ## 与相邻包的边界

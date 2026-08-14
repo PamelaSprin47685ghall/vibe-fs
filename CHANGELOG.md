@@ -4,7 +4,7 @@
 
 - Requirement Package cutover 收尾：`docs/`、`changes/`、`tests/` 全部腾空。
   - 45 包 normative 树 `requirements/<package>/{WHY,WHAT,HOW,PROOF}.md` 为唯一语义权威；
-    旧 Clause 与变更记录归档于 `archive/docs/`、`archive/changes/`。
+    旧 Clause 与变更记录已归档（2026-08-14 cutover；git 历史可回溯）。
   - 测试全部分包：`tests/unit` 146 文件 MOVE/SPLIT/DELETE 归各包 `tests/`；
     `tests/eval` → `office-capability`；`tests/integration` suites 归 owner 包；
     e2e Long Stroke、support harness、unit/integration runner 归 `verification-system/tests/`。

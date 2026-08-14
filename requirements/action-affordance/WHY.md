@@ -6,7 +6,7 @@ participant 在做决定的那一点上，唯一可靠的输入是**当前 decis
 被调用方（另一个 office）的 Role Law 不在调用方眼前；正确理解长期 world model（`cognitive-environment`）
 也不等于知道「此刻这个 verb 到底做什么」。
 
-历史教训（archive/docs/why/prompt.md「Tool description：tooltip vs 调用合同」）：
+历史教训（历史 why/prompt 条款「Tool description：tooltip vs 调用合同」）：
 
 > 拒一句正向描述。调用方看不见被调用方 Role Law；`inspect` 若只说 "Ask an Inspector to establish a
 > repository fact"，Coder 会把修复写进 charge。
@@ -29,7 +29,7 @@ consequence 重写也不应要求每个 description 语义重写——mirror 机
 
 | 症状 | 历史出处 |
 |---|---|
-| `inspect` 只说正向（"Ask an Inspector to establish a repository fact"），无因果只读/不修码负边界 → Coder 把修复写进 charge | archive/docs/why/prompt.md；office-boundary eval case `coder-inspect-ownership` |
+| `inspect` 只说正向（"Ask an Inspector to establish a repository fact"），无因果只读/不修码负边界 → Coder 把修复写进 charge | 历史 why/prompt 条款；office-boundary eval case `coder-inspect-ownership` |
 | `repair-behavior` 把 mechanical 理解成「物理上很小」→ DevOps 用 repair 做产品含义选择 | PROMPT-020；TOOL_DESCRIPTION_ANCHORS `meaning-decided` |
 | 同一名字两个 contract（`join` 两处语义不同、legacy `executor` 角色名/工具名共用） | ARCH-006/007：`A tool name names one contract everywhere.` |
 | `calling` 当裸 enum → 模型看不出它是 authority/capability 选择 | PROMPT-020：`calling` 不是普通 enum（ARCH-017） |
@@ -46,7 +46,7 @@ semantic ownership。
 
 - **tooltip 式一句话正向描述。** 拒绝（见上）。
 - **DRY 掉调用方合同。** 拒绝：`Single semantic ownership does not require single presentation.`
-  机器已知的 office ontology 必须完整成为 participant 能够据以行动的世界知识（archive/docs/why/prompt.md）。
+  机器已知的 office ontology 必须完整成为 participant 能够据以行动的世界知识（历史 why/prompt 条款）。
 - **同工具名复用（schema 相同即可）。** 拒绝：`join` 可在 Manager 与 Orchestrator 共享，当且仅当
   语义合同完全同一（ARCH-007）。仅 schema 相同不足。
 - **名字当 authority 证据。** 拒绝：禁止让模型从词汇推断 authority；世界已经知道合同时，必须把合同

@@ -4,7 +4,7 @@
 
 ## 实现模型
 
-无 runtime 源码（META 包正确形态，见 `archive/requirements-design/EVIDENCE.md` §1）。证据面
+无 runtime 源码（META 包正确形态，见 2026-08-14 cutover 设计期 EVIDENCE §1）。证据面
 分布在四个机制层：
 
 ### 1. proof ladder（`tests/proof-ladder.test.mjs`）

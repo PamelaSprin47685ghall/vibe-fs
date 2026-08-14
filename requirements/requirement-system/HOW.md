@@ -58,7 +58,7 @@ requirements/ 树治理与归档脱离合同：
 ### 4. change-lifecycle（`tests/change-lifecycle.test.mjs`）
 
 锁 WHAT-015 AGENTS.md 小修复豁免、WHAT-014 blocker 四步原文、WHAT-013 Completed 不作当前依据。
-live `changes/active/` 若存在必须声明 origin 标题。不扫 `archive/changes/`，不读正文推断生命周期。
+live `changes/active/` 若存在必须声明 origin 标题。不扫归档 changes 树，不读正文推断生命周期。
 
 ## 依赖与理由
 

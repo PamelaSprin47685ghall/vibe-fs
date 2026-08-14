@@ -7,7 +7,7 @@
 
 ## 不可替代的存在理由
 
-历史教训（`archive/changes/completed/universal.md` §13.5、`archive/docs/shape/host.md` HOST-008）：
+历史教训（历史 change（universal）§13.5、历史 shape/host HOST-008）：
 
 1. **单轴 SatelliteKind 装不下现实**。旧模型只有 `SatelliteKind = { Companion, Teacher }`。当
    Dedicated Inspector / Coder 出现——它们是长期 hot-knowledge Work Session，需要 Companion /
@@ -21,7 +21,7 @@
 4. **runtime topology 不决定 Role/Persona/Authority**。一个 session 是 Work 还是 InternalLeaf、
    是 Root 还是 Attached，只由 `SessionExecutionClass × SessionOwnership` 决定；Role / Tier /
    工具面 / Logical Run / Authority / Fallback 一律不参与分类。否则「换执行者」会被误写成「换人」，
-   把机器拓扑泄漏成业务身份（`archive/docs/why/host.md` §15、boundary card DO-NOT-OWN）。
+   把机器拓扑泄漏成业务身份（历史 why/host §15、boundary card DO-NOT-OWN）。
 
 ## RED 是什么样
 

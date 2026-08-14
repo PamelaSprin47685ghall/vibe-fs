@@ -47,7 +47,7 @@ replica 同时存在，且任一 process crash 后其内存可以全部消失。
 
 | 方案 | 为什么拒 |
 |---|---|
-| revision + wall_clock LWW 裁决同 Case 冲突 | Store 保存 immutable facts 不是 mutable snapshot；timestamp 不证明内容未变；LWW = 丢分支（历史 change（storage）） |ge.md §19、§10.10；archive/docs/why/casebook.md） |
+| revision + wall_clock LWW 裁决同 Case 冲突 | Store 保存 immutable facts 不是 mutable snapshot；timestamp 不证明内容未变；LWW = 丢分支（历史 change（storage）§19、§10.10；历史 why/casebook 条款） |
 | 单向 PullStore/PushStore/Download/Upload | 永远双向是永久 architecture invariant；任何同步入口都必须 fetch→union→validate→CAS→push（storage.md §11/§17） |
 | server-side merge / pre-receive domain reducer | dumb remote 只懂 objects/refs/CAS/auth；智能全在 client（storage.md §12/§38） |
 | Process Registry / leader / writer election | 所有并发知识只通过 snapshot/root/CAS/remote-tracking 显现（storage.md §10.7） |

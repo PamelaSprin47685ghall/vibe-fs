@@ -4,7 +4,7 @@
 > 唯一拥有的 WHAT 命题、显式 hard dependencies，以及 package-local 的可执行 proof。
 > 全部 packages 同时为真；dependency 只表示 guarantee consumption，不表示优先级。
 
-本树由 `archive/docs/`、`archive/changes/`、`src/` 综合迁移而来（非机械改名）；
+本树由旧 docs/、旧 changes/、`src/` 综合迁移而来（2026-08-14 cutover，非机械改名）；
 旧 `tests/` 已全部分包（2026-08-14 Wave 2a/2b cutover）：测试全部包自有
 `<package>/tests/`，共享 harness（support adapters、unit runner、integration
 orchestrator、Long Stroke e2e）归 `verification-system/tests/`。每个包目录：
@@ -133,4 +133,4 @@ node scripts/check.mjs           # 全 static gates
 ```
 
 - 每条 WHAT 命题的测试落点见该包 PROOF.md。
-- 迁移状态：旧 `docs/`、`changes/` 已归档至 `archive/`；`tests/` 仍在逐包迁移中（SPLIT@cutover 收尾后删除，见各包 PROOF.md 与 `archive/requirements-design/MIGRATION-CONTRACT.md`）。
+- 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包（见各包 PROOF.md）。
