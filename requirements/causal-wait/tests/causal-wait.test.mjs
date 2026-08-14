@@ -11,7 +11,7 @@ import {
   CausalWaitRegistry,
   listItems,
   taskSource,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const owner = (id) => causalWait.owner('flow', [['id', id]])
 const external = (id) => causalWait.externalProducer('capability', [['id', id]])

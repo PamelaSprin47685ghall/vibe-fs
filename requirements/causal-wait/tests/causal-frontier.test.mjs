@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, causalWait, listItems } from '../support/domain.mjs'
+import { caseOf, causalWait, listItems } from '../../../tests/unit/support/domain.mjs'
 
 const flow = (id) => causalWait.owner('flow', [['id', id]])
 
