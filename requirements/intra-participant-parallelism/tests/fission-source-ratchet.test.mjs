@@ -18,7 +18,7 @@ test('V1 Fission has no OpenCode session-fork path and owns durable replay ancho
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 
   const facts = read('src/Wanxiangshu/Kernel/Fact.fs')
-  const fold = read('src/Wanxiangshu/Journal/FissionProjection.fs') + read('src/Wanxiangshu/Journal/FissionFactFold.fs')
+  const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs') + read('src/Wanxiangshu/Execution/Fission/FissionFactFold.fs')
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)
   assert.match(facts, /FissionCompletionDelivered/)

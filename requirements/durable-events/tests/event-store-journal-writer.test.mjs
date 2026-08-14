@@ -69,7 +69,7 @@ test('BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Gi
 
 test('journal_writer_source_has_no_snapshot_CAS_or_Git_raw_store', async () => {
   const { readFile } = await import('node:fs/promises')
-  const source = await readFile(new URL('../../../src/Wanxiangshu/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /OpenSnapshot|CompareAndSwapRef|IGitRawStore|RootOid|StoreSnapshot/)
   assert.match(source, /store\.Append/)
 })

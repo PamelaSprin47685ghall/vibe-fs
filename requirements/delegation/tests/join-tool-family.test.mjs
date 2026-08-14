@@ -23,9 +23,9 @@ const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F:
 )
 const { OrchestratorVerdict } = await import('../../../dist/Application/Orchestration/Types.js')
 const { FamilyRecovery, FamilyRecoveryPermit } = await import('../../../dist/Domain/SessionRecovery.js')
-const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
-const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
+const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
 
 const context = (session = 'ses_join') =>
   new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => { })

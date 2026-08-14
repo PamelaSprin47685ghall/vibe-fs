@@ -38,7 +38,7 @@ test('DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_
     'src/Wanxiangshu/Infrastructure/CasebookStore.fs',
     'src/Wanxiangshu/Infrastructure/CasebookIndex.fs',
     'src/Wanxiangshu/Infrastructure/JsToolsTransactionStore.fs',
-    'src/Wanxiangshu/Journal/EventStoreJournalWriter.fs',
+    'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
   ]
 
   const forbiddenHistoryTokens = [

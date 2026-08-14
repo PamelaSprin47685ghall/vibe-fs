@@ -52,7 +52,7 @@ test('empty_boot_publishes_only_RuntimeStarted_into_local_writer_truth', async (
 test('boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Infrastructure/Persist/CanonicalIntegrator.fs', import.meta.url), 'utf8')
-  const writer = await readFile(new URL('../../../src/Wanxiangshu/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
+  const writer = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
   assert.match(integrator, /EventKWayMerge\.merge/)
   assert.match(integrator, /integrateOne/)
   assert.match(integrator, /integrateLive/)
