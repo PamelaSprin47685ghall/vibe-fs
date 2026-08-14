@@ -4,9 +4,9 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
-  "main": "./dist/Infrastructure/OpenCode/Plugin/Plugin.js",
+  "main": "./dist/OpenCode/Plugin/Plugin.js",
   "exports": {
-    ".": "./dist/Infrastructure/OpenCode/Plugin/Plugin.js"
+    ".": "./dist/OpenCode/Plugin/Plugin.js"
   },
   "files": [
     "dist/",

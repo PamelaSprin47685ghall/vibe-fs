@@ -18,7 +18,7 @@ const {
   SessionStartedAtProjection_startedAt: startedAt,
 } = await import('../../../dist/Execution/Session/SessionStartedAtProjection.js')
 const { composeWithElapsed, renderElapsed } = await import(
-  '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js'
+  '../../../dist/OpenCode/Host/PairProgrammingCalibration.js'
 )
 
 test('TIME_007_session_started_at_is_bind_once_to_first_prompt_sample', () => {

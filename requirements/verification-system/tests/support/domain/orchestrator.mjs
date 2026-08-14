@@ -638,7 +638,7 @@ export const orchestratorProgram = (() => {
   let cached
   const load = async () => {
     if (cached) return cached
-    cached = await prod('Application/Orchestration/Program')
+    cached = await prod('Change/Program')
     return cached
   }
   return {
@@ -664,8 +664,8 @@ export const orchestratorProgram = (() => {
 const JoinModule = await prod('Execution/Delegation/Join')
 // AgentCompletion loaded early (AgentCompletionModuleEarly) for mailbox dual-channel.
 const AgentCompletionModule = AgentCompletionModuleEarly
-const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
-const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
+const JoinResultRendererModule = await prod('Execution/Delegation/Fork/OpenCode/JoinResultRenderer')
+const ManagerJobModule = await prod('Change/Job')
 // EXEC-017 cases live on CompletionMailboxModule (already loaded above).
 const JoinInterruptReason = CompletionMailboxModule.JoinInterruptReason
 
@@ -889,7 +889,7 @@ export const verdictMailbox = (() => {
 // ── Reconcile pure Domain (FLOW-001 / PR4) ───────────────────────────────────
 // Domain/ReconcileProgram keeps Evidence → Decision + publish seals only.
 // Command/Reply/Step AST + TraceInterpreter deleted; workflow is Reconciler.fs.
-const ReconcileProgramModule = await prod('Domain/ReconcileProgram')
+const ReconcileProgramModule = await prod('Composition/Turn/Program')
 
 export const reconcileProgram = (() => {
   const mod = ReconcileProgramModule

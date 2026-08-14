@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Context.Companion
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -17,7 +18,6 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Tools
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Fable.Core.JsInterop

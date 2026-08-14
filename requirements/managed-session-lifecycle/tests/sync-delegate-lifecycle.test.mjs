@@ -14,24 +14,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
-import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
-import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
+import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/OpenCode/Host/SessionQuiescenceGate.js'
+import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Participant/Persona/SessionPersona.js'
+import { TurnOutcome } from '../../../dist/Composition/Turn/Program.js'
 import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
-import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
-import {
-  AttachedSessionRuntime_$ctor_Z5DA00426 as createAttached,
-} from '../../../dist/Session/AttachedSessionRuntime.js'
-import {
-  SyncDelegateRuntime,
-  SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
-  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
-  SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
-  SyncDelegateRuntime__StageDeletedInspector_59B1A0C0 as stageDeletedInspector,
-  SyncDelegateRuntime__TryFind_636E3F87 as tryFind,
-  SyncDelegateRuntime__TryFindForScopeClose_636E3F87 as tryFindForScopeClose,
-  SyncDelegateRuntime__Dispose as disposeRuntime,
-} from '../../../dist/Session/SyncDelegateRuntime.js'
+import { SyncDelegateRole } from '../../../dist/Execution/Delegation/SyncDelegate/Model.js'
+const attachedModule = await import('../../../dist/Execution/Session/Attachment/AttachedRuntime.js')
+const createAttached = Object.entries(attachedModule).find(([k]) => k.startsWith('AttachedSessionRuntime_$ctor'))?.[1]
+const syncDelegateModule = await import('../../../dist/Execution/Delegation/SyncDelegate/Runtime.js')
+const { SyncDelegateRuntime, SyncDelegateRuntime__Dispose: disposeRuntime } = syncDelegateModule
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const syncDelegateMemberOf = (name) => Object.entries(syncDelegateModule).find(([k]) => k.startsWith(`SyncDelegateRuntime__${name}_`))?.[1]
+const invoke = syncDelegateMemberOf('Invoke')
+const handleTurn = syncDelegateMemberOf('HandleTurn')
+const cancelSession = syncDelegateMemberOf('CancelSession')
+const stageDeletedInspector = syncDelegateMemberOf('StageDeletedInspector')
+const tryFind = syncDelegateMemberOf('TryFind')
+const tryFindForScopeClose = syncDelegateMemberOf('TryFindForScopeClose')
 import {
   agentJournal,
   authorityRoot,

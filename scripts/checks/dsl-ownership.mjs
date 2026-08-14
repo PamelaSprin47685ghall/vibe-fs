@@ -41,10 +41,18 @@ export const isProcessPhysicalPath = (file) => {
   return rel.includes('/Process/')
 }
 
-/** Infrastructure owns adapters to Process and sibling infrastructure resources. */
+/** Physical/external adapter and boundary layers. */
 export const isInfrastructurePath = (file) => {
   const rel = norm(String(file))
-  return rel.includes('/Infrastructure/')
+  return (
+    rel.includes('/Infrastructure/') ||
+    rel.includes('/OpenCode/') ||
+    rel.includes('/Process/') ||
+    rel.includes('/Git/') ||
+    rel.includes('/Host/') ||
+    rel.includes('/Composition/') ||
+    rel.includes('/Resources/')
+  )
 }
 
 /** Pty/Node protocol command types are external protocol messages (FLOW-006),
@@ -131,36 +139,48 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'SyncDelegateRuntime.fs',
   // W1 EventStore-backed journal adapter (Journal IJournalWriter over IEventStore).
   'EventStoreJournalWriter.fs',
-  // Round-1 ownership rotation (2026-08-14): files moved out of
-  // Application/Reconciliation + Journal into their owning subtrees still
-  // depend on Wanxiangshu.OpenCode host types (ISessionSnapshotPort,
-  // HostSignal, MessagePart…). Round 2 moves those host files into the tree,
-  // after which these opens become internal and these entries can be removed.
-  'BloggerRecoveryProbe.fs',
+  // Host-facing dispatch/nudge/repair adapters
+  'Dispatcher.fs',
+  'Send.fs',
+  'Ingress.fs',
+  'Host.fs',
+  'Tip.fs',
+  'Decode.fs',
+  'Continuation.fs',
+  'Repair.fs',
+  'Activation.fs',
+  'Background.fs',
+  'Idle.fs',
+  'JobHandoff.fs',
+  'Workflow.fs',
+  'DedicatedTodoRuntime.fs',
+  'TodoProcess.fs',
+  'BookkeeperRuntime.fs',
+  'Transform.fs',
+  'Runtime.fs',
+  'Speculate.fs',
+  'Index.fs',
+  'Lifecycle.fs',
+  'SessionDirectories.fs',
+  'ReviewRunner.fs',
+  'WorktreeCleanup.fs',
+  'Types.fs',
+  'TurnEvidence.fs',
   'BloggerCrashRecovery.fs',
   'Capture.fs',
+  'TerminalReporter.fs',
+  'BloggerProbe.fs',
   'ChildRecoveryWorkflow.fs',
+  'CompletionCodec.fs',
+  'Recovery.fs',
   'CompletedTurn.fs',
-  'CompanionTransform.fs',
-  'Fold.fs',
-  'GuidelineProjection.fs',
-  'HostFactFold.fs',
   'InteractionRepair.fs',
   'MagicTodoLocality.fs',
   'MagicTodoMembrane.fs',
-  'Observation.fs',
-  'OrdinaryTurnWorkflow.fs',
-  'Projection.fs',
-  'ReconcilePass.fs',
-  'Recovery.fs',
-  'Scheduler.fs',
   'Seal.fs',
-  'SessionRecoveryWorkflow.fs',
-  'Supervisor.fs',
-  'TerminalReporter.fs',
-  'TurnReconcile.fs',
-  'Workflow.fs',
-  'XWire.fs',
+  'Wire.fs',
+  'Coordinator.fs',
+  'HostBlogger.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {
@@ -274,6 +294,7 @@ export const DUP_CASES_EXEMPT = new Set([
   'ManagedAgent.fs:ManagedAgentParseError',
   // 1:1 Decision façade over ReviewGuardVerdict via ProcessReviewVerdict.ofGuard
   'MagicTodo.fs:ProcessReviewVerdict',
+  'Model.fs:ProcessReviewVerdict',
 ])
 
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)

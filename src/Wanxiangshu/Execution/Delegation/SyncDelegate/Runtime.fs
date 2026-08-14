@@ -57,8 +57,6 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Tools
-
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///

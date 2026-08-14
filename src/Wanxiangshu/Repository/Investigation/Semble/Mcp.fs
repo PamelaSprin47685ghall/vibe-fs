@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Sphinx
 
 open System

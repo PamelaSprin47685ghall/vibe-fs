@@ -39,15 +39,15 @@ runtimeResources.installFromPackage()
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
   '../../../dist/Persistence/Journal/AgentJournal.js'
 )
-const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
-const { RepairInstruction } = await import('../../../dist/Session/EnforcerRepair.js')
-const { resolveCycleContext } = await import('../../../dist/Session/EnforcerFrameRecovery.js')
-const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
-const FallbackLedger = await import('../../../dist/Application/Recovery/FallbackLedger.js')
-const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
-const BloggerRecoveryProbe = await import('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js')
-const { lastAssistantStep } = await import('../../../dist/Session/EnforcerCycleDecode.js')
-const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/ChronicleTool.js')
+const { handleContinuation } = await import('../../../dist/Enforcer/Host.js')
+const { RepairInstruction } = await import('../../../dist/Enforcer/Repair.js')
+const { resolveCycleContext } = await import('../../../dist/Enforcer/Cycle/Recovery.js')
+const HostSessionNudge = await import('../../../dist/Interaction/Dispatch/OpenCode/SessionNudge.js')
+const FallbackLedger = await import('../../../dist/Participant/Provider/Attempt/Fallback/Ledger.js')
+const AgentPairCursor = await import('../../../dist/Participant/Provider/Attempt/Cursor.js')
+const BloggerRecoveryProbe = await import('../../../dist/Enforcer/Cycle/BloggerProbe.js')
+const { lastAssistantStep } = await import('../../../dist/Enforcer/Cycle/Decode.js')
+const BlogTool = await import('../../../dist/OpenCode/Tools/ChronicleTool.js')
 
 /**
  * Production wiring: close sessionPort into InteractionRepairNudge (ENFORCER-066).

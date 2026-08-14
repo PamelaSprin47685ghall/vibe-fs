@@ -10,7 +10,7 @@ import {
   sessionId,
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
-import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
+import { ToolCallIdModule_create as toolCallId } from '../../../dist/Foundation/Identity.js'
 
 const {
   DelegatedToolEstimateProjection_remaining: remaining,

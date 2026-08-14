@@ -75,7 +75,7 @@ test('C0_blogger_lifecycle_authority_is_physical_ownership', () => {
   )
   // 3. The coordinator must route via decideMaterial and must not reference the
   //    shadow state (Get/SetBloggerRuntime, BloggerRuntimeState, cell .State).
-  const coordinator = prodText('src/Wanxiangshu/Session/BloggerCoordinator.fs')
+  const coordinator = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
   assert.match(coordinator, /BloggerRuntime\.decideMaterial/,
     'BloggerCoordinator must route via decideMaterial')
   assert.equal(
@@ -96,7 +96,7 @@ test('C0_blogger_lifecycle_authority_is_physical_ownership', () => {
 test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
   // Companion send Task must not decide busy. Production busy is host HasFlight only.
   // PR7 D6: BloggerRuntimeState/Cell deleted — zero residual shadow ownership.
-  const companion = prodText('src/Wanxiangshu/Session/Companion.fs')
+  const companion = prodText('src/Wanxiangshu/Context/Companion/Runtime.fs')
   assert.equal(
     /mutable inFlightTask/.test(companion),
     false,
@@ -107,16 +107,16 @@ test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
     false,
     'Companion.inFlightCompleted must not decide Blogger busy',
   )
-  const coordinator = prodText('src/Wanxiangshu/Session/BloggerCoordinator.fs')
+  const coordinator = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
   assert.match(
     coordinator,
     /scope\.HasFlight key/,
     'onMainMaterial busy must use HasFlight',
   )
-  const runtimeSrc = prodText('src/Wanxiangshu/Session/BloggerRuntimeState.fs')
+  const runtimeSrc = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs')
   assert.doesNotMatch(runtimeSrc, /BloggerRuntimeState\b/, 'BloggerRuntimeState DU must be deleted')
   assert.doesNotMatch(runtimeSrc, /BloggerRuntimeCell\b/, 'BloggerRuntimeCell must be deleted')
-  const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+  const scope = prodText('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   assert.doesNotMatch(scope, /GetBloggerRuntime|SetBloggerRuntime/, 'scope must not expose cell Get/Set')
 })
 
@@ -124,7 +124,7 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   // Dual slots: PendingOffer dictionary + flight ownership registry.
   // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
   // Blogger parking/flight/drain state moved to PluginBloggerScope (Wave 2).
-  const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginBloggerScope.fs')
+  const scope = prodText('src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
   // Flights are process-shared (HOST-012 / worktree↔root BlogTool) via SharedState.
@@ -152,8 +152,8 @@ test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   // is not in the list). Commit must peek InFlight only — healing open here
   // rebinds a new RequestId onto an old provider run (stale-cycle race).
   // Durable open reload stays for rebuild / crash recovery, not cycle commit.
-  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
-  const recovery = prodText('src/Wanxiangshu/Session/EnforcerFrameRecovery.fs')
+  const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
+  const recovery = prodText('src/Wanxiangshu/Enforcer/Cycle/Recovery.fs')
   assert.match(host, /tryLiveCycleContext/, 'commit authority is live InFlight peek')
   assert.match(
     host,
@@ -204,7 +204,7 @@ test('C0_no_BloggerNeedsReset_full_X_replay', () => {
 })
 
 test('C0_first_request_does_not_extract_raw_user_toml', () => {
-  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
+  const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const extractsRawToml =
     /Extract the TOML from the raw messages/.test(host) ||
     /last user[\s\S]{0,80}toml/i.test(host) ||
@@ -219,7 +219,7 @@ test('C0_first_request_does_not_extract_raw_user_toml', () => {
 // ── squash tool loop ────────────────────────────────────────────────────────
 
 test('C0_squash_path_does_not_SubscribeTerminal', () => {
-  const blogger = prodText('src/Wanxiangshu/Session/CompanionHostBlogger.fs')
+  const blogger = prodText('src/Wanxiangshu/Context/Companion/HostBlogger.fs')
   assert.equal(
     /SubscribeTerminal/.test(blogger),
     false,
@@ -243,7 +243,7 @@ test('C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', ()
 // ── commit / park ───────────────────────────────────────────────────────────
 
 test('C0_park_only_after_KnownCommitted', () => {
-  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
+  const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
   // P1-3: not-committed paths are CycleDisposition arms (Working/InjectRepair/
@@ -282,7 +282,7 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
   // without waiting for a new main-session wake. Stale PendingOffer is not enough.
-  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
+  const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   // EnforcerHost injects the re-chunk through ctx.RefreshMainContext; the
   // commit branch must use it before parking.
   const refresh = host.lastIndexOf('RefreshMainContext', host.indexOf('ParkTransform'))

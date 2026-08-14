@@ -13,7 +13,7 @@ const {
   IntegrationGateModule_acquire,
   IntegrationGateModule_lockPath,
   IntegrationGate__Release,
-} = await import('../../../dist/Infrastructure/Git/IntegrationGate.js')
+} = await import('../../../dist/Git/IntegrationGate.js')
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-gate-'))

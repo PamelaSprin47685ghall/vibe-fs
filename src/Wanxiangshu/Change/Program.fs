@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Change
+open Wanxiangshu.Git
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality

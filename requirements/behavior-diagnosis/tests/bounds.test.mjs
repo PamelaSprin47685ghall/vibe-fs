@@ -40,7 +40,7 @@ import {
 runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
+const { handleContinuation } = await import('../../../dist/Enforcer/Host.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'

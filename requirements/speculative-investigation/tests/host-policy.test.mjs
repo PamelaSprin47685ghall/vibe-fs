@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import * as StrengthScope from '../../../dist/Infrastructure/OpenCode/Host/PluginStrengthScope.js'
-import * as Settings from '../../../dist/Infrastructure/OpenCode/Host/StrengthSettings.js'
+import * as StrengthScope from '../../../dist/Strength/OpenCode/PluginScope.js'
+import * as Settings from '../../../dist/Strength/OpenCode/Settings.js'
 
 const packageJson = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
 

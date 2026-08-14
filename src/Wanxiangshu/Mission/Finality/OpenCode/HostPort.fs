@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Mission.Finality.OpenCode
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -53,7 +55,8 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Finality
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation

@@ -195,7 +195,7 @@ export const handleProjection = (() => {
  *  mailbox is notification-only; these are the production exports C6 added.
  *  There is no `tryJoin` on the projection — reality uses `joinable` + consume. */
 // P0-RECOVERY-JOIN-001: recordCompletion requires JoinableCompletion proof.
-const ChildRecoveryModule = await prod('Domain/ChildRecovery')
+const ChildRecoveryModule = await prod('Execution/Delegation/Fork/ChildRecovery')
 const terminalEvidenceCompleted = member(ChildRecoveryModule, 'TerminalEvidence', 'completed')
 const terminalEvidenceFailed = member(ChildRecoveryModule, 'TerminalEvidence', 'failed')
 const tryFromProvenTerminal = member(
@@ -523,7 +523,7 @@ export const clockPort = (() => {
 
 /** Structural markers for HostSignalSubscribe reconnect + heartbeat (emitJsExpr body). */
 export const hostSignalSubscribe = (() => {
-  const sourcePath = join(BUILD_ROOT, 'Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
+  const sourcePath = join(BUILD_ROOT, 'OpenCode/Signals/HostSignalSubscribe.js')
   const trySubscribeFn = bind(HostSignalSubscribeModule, 'HostSignalSubscribe', ['trySubscribe']).trySubscribe
   return {
     source: () => readFileSync(sourcePath, 'utf8'),
@@ -1041,7 +1041,7 @@ export const parkedTransform = (() => {
     dispose: (scope) => scope.Dispose(),
   }
 })()
-const SessionRecoveryModule = await prod('Domain/SessionRecovery')
+const SessionRecoveryModule = await prod('Execution/Session/Recovery/Model')
 
 export const sessionRecovery = (() => {
   const authorize = member(SessionRecoveryModule, 'SessionRecovery', 'authorizeFamilyResume')

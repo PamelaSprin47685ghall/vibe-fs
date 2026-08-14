@@ -206,7 +206,7 @@ test('IA_009_a_human_root_is_never_inferred_by_a_pure_function', () => {
 
 test('IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_active', () => {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const ingress = readFileSync(join(repoRoot, 'src/Wanxiangshu/Application/Prompting/PromptIngress.fs'), 'utf8')
+  const ingress = readFileSync(join(repoRoot, 'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs'), 'utf8')
 
   assert.match(ingress, /ActiveProfile sessionId/, 'HumanRoot 提升必须 gate 在 ActiveLogicalRun 缺席')
   assert.match(ingress, /Some agent, None when isValidAgent agent/, 'HumanRoot 仅当显式 agent 有效且无 active run')

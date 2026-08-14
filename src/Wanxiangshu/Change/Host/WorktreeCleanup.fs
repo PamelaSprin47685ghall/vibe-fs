@@ -22,7 +22,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Change
-open Wanxiangshu.Orchestrator
 
 /// Remove worktrees and branches no active ManagerJob owns.
 ///

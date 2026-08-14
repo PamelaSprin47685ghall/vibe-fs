@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -50,7 +51,8 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
@@ -83,8 +85,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Wanxiangshu.Tools
-
 /// AGENT-031 / HOST-027: reconciled-turn assistance workflow.
 ///
 /// The stream sensor only arms/aborts. This owner consumes that exact provider

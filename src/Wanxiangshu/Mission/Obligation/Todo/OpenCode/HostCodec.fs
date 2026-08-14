@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Obligation.Todo.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook

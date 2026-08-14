@@ -9,8 +9,8 @@ import { walk } from '../lib/walk.mjs'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const SRC_ROOT = 'src'
 const FSPROJ = 'src/Wanxiangshu/Wanxiangshu.fsproj'
-const PURE_DIRS = [`${PRODUCTION_ROOT}/Kernel/`, `${PRODUCTION_ROOT}/Domain/`]
-const RESOURCE_DIR = `${PRODUCTION_ROOT}/Infrastructure/Resources/`
+const PURE_DIRS = [`${PRODUCTION_ROOT}/Foundation/`]
+const RESOURCE_DIR = `${PRODUCTION_ROOT}/Resources/`
 const UPPER_NAMESPACES = ['Wanxiangshu.OpenCode', 'Wanxiangshu.Session', 'Wanxiangshu.Process']
 const LEGACY_TOKENS = [
   'docs/evidence',
@@ -159,7 +159,7 @@ for (const file of productionFs) {
   for (const file of productionFs) {
     const text = read(file)
     // Domain DSL may name RecoveryGate only as history; production wiring must not.
-    if (file.includes('/Domain/SessionRecovery.fs')) continue
+    if (file.includes('/Execution/Session/Recovery/Model.fs')) continue
     for (const token of forbiddenCallers) {
       if (text.includes(token)) {
         fail('recovery-family', `${file}: forbidden local recovery gate '${token}'`)
@@ -167,7 +167,7 @@ for (const file of productionFs) {
     }
   }
 
-  const forkRuntime = `${PRODUCTION_ROOT}/Session/HostForkRuntime.fs`
+  const forkRuntime = `${PRODUCTION_ROOT}/Execution/Delegation/Fork/Host/Runtime.fs`
   if (existsSync(forkRuntime)) {
     const text = read(forkRuntime)
     if (/do\s+recoveryTask\s*<-\s*restoreChildren/.test(text)) {
@@ -186,7 +186,7 @@ for (const file of productionFs) {
     }
   }
 
-  const dsl = `${PRODUCTION_ROOT}/Domain/SessionRecovery.fs`
+  const dsl = `${PRODUCTION_ROOT}/Execution/Session/Recovery/Model.fs`
   if (!existsSync(dsl)) {
     fail('recovery-family', `${dsl}: SessionRecovery DSL missing`)
   } else {

@@ -8,9 +8,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { caseOf, eventId, idValue, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
-const Persist = await import('../../../dist/Infrastructure/Persist/StoreTypes.js')
-const Codec = await import('../../../dist/Infrastructure/Persist/CanonicalEventCodec.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
+const Persist = await import('../../../dist/Persistence/EventStore/StoreTypes.js')
+const Codec = await import('../../../dist/Persistence/EventStore/CanonicalEventCodec.js')
 
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const payloadRef = (v) => Domain.PayloadRefModule_create(v)

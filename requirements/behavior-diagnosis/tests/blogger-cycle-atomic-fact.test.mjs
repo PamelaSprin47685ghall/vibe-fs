@@ -14,7 +14,7 @@ const ROOT = new URL('../../../', import.meta.url).pathname
 const prodText = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 test('C0_no_EnforcementCycleCommitted_fact', () => {
-  const fact = prodText('src/Wanxiangshu/Kernel/Fact.fs')
+  const fact = prodText('src/Wanxiangshu/Composition/Durable/Fact.fs')
   assert.equal(
     /\| EnforcementCycleCommitted\b/.test(fact),
     false,

@@ -10,8 +10,8 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { liveToken } from '../../verification-system/tests/support/domain.mjs'
 
-const { ToolContext } = await import('../../../dist/Tools/ToolContext.js')
-const { fileReadTool, fileWriteTool, fileEditTool } = await import('../../../dist/Tools/FileTools.js')
+const { ToolContext } = await import('../../../dist/OpenCode/Tools/ToolContext.js')
+const { fileReadTool, fileWriteTool, fileEditTool } = await import('../../../dist/OpenCode/Tools/FileTools.js')
 
 const context = (workspace) =>
   new ToolContext(

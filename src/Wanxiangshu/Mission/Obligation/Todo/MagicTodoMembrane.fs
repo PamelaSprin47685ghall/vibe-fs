@@ -67,8 +67,10 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Manager
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Obligation
+open Wanxiangshu.Mission.Obligation.Todo.OpenCode
+open Wanxiangshu.Mission.Manager
+open Wanxiangshu.Mission.Review
 
 /// Durable half of the GrandRewrite Magic Todo membrane.
 ///

@@ -4,7 +4,7 @@ import test from 'node:test'
 import { providerLanguage } from '../../verification-system/tests/support/domain.mjs'
 
 const { compose, renderToolEstimate } = await import(
-  '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingCalibration.js'
+  '../../../dist/OpenCode/Host/PairProgrammingCalibration.js'
 )
 
 test('GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {

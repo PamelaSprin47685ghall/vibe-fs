@@ -48,7 +48,7 @@ import {
   extractInspectorIdFromOwnerRequests,
 } from './support/long-stroke-oracles.mjs';
 import { countFactCase, factPayloads, readJournal } from './support/journal-observer.js';
-import { shelfmarkFor as casebookShelfmarkFor } from '../../../../dist/Infrastructure/CasebookIndex.js';
+import { shelfmarkFor as casebookShelfmarkFor } from '../../../../dist/Repository/Knowledge/Casebook/Index.js';
 import { WAIT_FACT_WINDOW_MS } from './support/time-budget.js';
 import {
   getOpencodeSpawnCount,

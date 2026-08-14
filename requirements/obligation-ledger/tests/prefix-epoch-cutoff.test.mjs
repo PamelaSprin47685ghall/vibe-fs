@@ -8,7 +8,7 @@ import test from 'node:test'
 import {
   requiresLag1Rebase,
   todoCheckpointEvidence,
-} from '../../../dist/Domain/MagicTodoPrefixEpoch.js'
+} from '../../../dist/Mission/Obligation/Todo/PrefixEpoch.js'
 import { magicTodo, managerLifeId, toolCallId } from '../../verification-system/tests/support/domain.mjs'
 
 const sha256 = (value) => `digest:${value}`

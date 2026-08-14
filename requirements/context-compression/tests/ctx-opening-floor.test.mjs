@@ -11,7 +11,7 @@ import test from 'node:test'
 import { envelope, stream, sessionId, physicalUser, managerLifeId, blobRef, blobDigest, providerRun, fact, fold, managerLifecycleFact } from '../../verification-system/tests/support/domain.mjs'
 
 const { floorSequence } = await import('../../../dist/Mission/Manager/Life/OpeningFloor.js')
-const { bloggerEffectiveStart } = await import('../../../dist/Domain/MagicTodo.js')
+const { bloggerEffectiveStart } = await import('../../../dist/Mission/Obligation/Todo/Model.js')
 
 const SESSION = sessionId('ses_floor')
 const LIFE = managerLifeId('life-1')

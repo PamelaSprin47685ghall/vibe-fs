@@ -13,8 +13,8 @@ test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => 
   // Definition: stopPhysicalRun (messages) (fallback) (reason).
   // Call sites must pass (rawMessages, fallback, reason), not swapped.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const host = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerHost.fs'), 'utf8')
-  const continuation = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerContinuation.fs'), 'utf8')
+  const host = readFileSync(join(root, 'src/Wanxiangshu/Enforcer/Host.fs'), 'utf8')
+  const continuation = readFileSync(join(root, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
 
   assert.match(
     host,

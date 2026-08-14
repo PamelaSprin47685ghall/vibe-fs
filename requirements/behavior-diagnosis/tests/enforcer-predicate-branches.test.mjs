@@ -35,8 +35,8 @@ const {
   AgentJournalModule_appendAgent,
   AgentJournalModule_snapshot,
 } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
-const { lastAssistantStep } = await import('../../../dist/Session/EnforcerCycleDecode.js')
+const { handleContinuation } = await import('../../../dist/Enforcer/Host.js')
+const { lastAssistantStep } = await import('../../../dist/Enforcer/Cycle/Decode.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'

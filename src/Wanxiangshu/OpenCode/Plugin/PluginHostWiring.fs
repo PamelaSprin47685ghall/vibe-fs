@@ -69,7 +69,7 @@ module PluginHostWiring =
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
-          GitTreePort: Wanxiangshu.Review.GitTreePort option
+          GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
           StrengthDurability: StrengthDurabilityPort option }
 
     let create (boot: PluginBoot.Boot) : Task<Host> =

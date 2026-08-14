@@ -10,7 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

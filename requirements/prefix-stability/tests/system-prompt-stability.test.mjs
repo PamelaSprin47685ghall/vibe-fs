@@ -9,9 +9,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { Role } from '../../../dist/Kernel/Roles.js'
-import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
-import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
+import { Role } from '../../../dist/Foundation/Roles.js'
+import { systemPromptIdFor } from '../../../dist/Interaction/Authority/Model.js'
+import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Foundation/Identity.js'
 import {
   attemptPlanner as planner,
   cursor,

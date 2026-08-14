@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -63,7 +64,8 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -83,8 +85,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Wanxiangshu.Tools
-
 /// judge(verdict) — Reviewer judgment surface. Durable identity/witness details
 /// stay internal; provider-visible outcomes are natural review consequences.
 module JudgeTool =

@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -51,7 +53,8 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation

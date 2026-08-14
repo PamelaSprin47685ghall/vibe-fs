@@ -7,9 +7,9 @@ import test from 'node:test'
 import { listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } =
-  await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+  await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 const { spec: bashHoneypotSpec } =
-  await import('../../../dist/Infrastructure/OpenCode/Tools/BashHoneypotTool.js')
+  await import('../../../dist/OpenCode/Tools/BashHoneypotTool.js')
 
 const context = (sessionId) =>
   new HostToolContext(sessionId, undefined, undefined, undefined, undefined, () => () => {})

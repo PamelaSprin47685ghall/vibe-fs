@@ -16,11 +16,11 @@ import {
   isTool,
   uvxCommand,
   fixtureCommand,
-} from '../../../dist/Kernel/StealthBrowserMcp.js'
+} from '../../../dist/OpenCode/Host/StealthBrowserMcp.js'
 import {
   apply as applyMcp,
   launchFromVars,
-} from '../../../dist/Infrastructure/OpenCode/Host/StealthBrowserMcpConfig.js'
+} from '../../../dist/OpenCode/Host/StealthBrowserMcpConfig.js'
 import { managedAgentConfig, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 const ROLES = [

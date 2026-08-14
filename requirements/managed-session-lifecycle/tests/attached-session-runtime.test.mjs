@@ -10,16 +10,18 @@ import test from 'node:test'
 
 import { caseOf, sessionId, syncDelegate } from '../../verification-system/tests/support/domain.mjs'
 
-const {
-  AttachedSessionRuntime,
-  AttachedSessionRuntime__GetOrCreate_Z39C7657D: getOrCreate,
-  AttachedSessionRuntime__TryFind_636E3F87: tryFind,
-  AttachedSessionRuntime__TryFindByScope_15D6D21F: tryFindByScope,
-  AttachedSessionRuntime__Remove_636E3F87: remove,
-  AttachedSessionRuntime__RemoveByDelegateSession_Z31B28506: removeByDelegateSession,
-} = await import('../../../dist/Session/AttachedSessionRuntime.js')
+const attachedModule = await import('../../../dist/Execution/Session/Attachment/AttachedRuntime.js')
+const { AttachedSessionRuntime } = attachedModule
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const attachedMemberOf = (name) => Object.entries(attachedModule).find(([k]) => k.startsWith(`AttachedSessionRuntime__${name}_`))?.[1]
+const getOrCreate = attachedMemberOf('GetOrCreate')
+const tryFind = attachedMemberOf('TryFind')
+const tryFindByScope = attachedMemberOf('TryFindByScope')
+const remove = attachedMemberOf('Remove')
+const removeByDelegateSession = attachedMemberOf('RemoveByDelegateSession')
 
-const { ofSession, compatible, sameScope } = await import('../../../dist/Session/ReuseScope.js')
+const { ofSession, compatible, sameScope } = await import('../../../dist/Execution/Session/Attachment/ReuseScope.js')
 
 const ok = (value) => ({ tag: 0, fields: [value] })
 

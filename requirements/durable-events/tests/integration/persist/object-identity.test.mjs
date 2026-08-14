@@ -16,8 +16,8 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { isSome, listItems, toList } from '../../../../verification-system/tests/support/domain.mjs'
 
-const Persist = await import('../../../../../dist/Infrastructure/Persist/StoreTypes.js')
-const Odb = await import('../../../../../dist/Infrastructure/Persist/GitObjectDatabase.js')
+const Persist = await import('../../../../../dist/Persistence/EventStore/StoreTypes.js')
+const Odb = await import('../../../../../dist/Persistence/EventStore/GitObjectDatabase.js')
 
 const oidText = (oid) => Persist.GitObjectIdModule_value(oid)
 const gitObjectId = (text) => Persist.GitObjectIdModule_create(text)

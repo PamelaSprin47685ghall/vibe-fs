@@ -17,11 +17,10 @@ const { agentFact, agentJournal, authorityRoot, logicalRunId, resultOf, sessionI
   '../../verification-system/tests/support/domain.mjs'
 )
 
-const { create } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ChatParamsHook.js'))
-const { validate } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js'))
-const { InjectedSessionPort_$ctor_Z60D0357E: createSessionPort } = await import(
-  join(here, '../../../dist/Infrastructure/OpenCode/Host/Sessions.js')
-)
+const { create } = await import(join(here, '../../../dist/OpenCode/Host/ChatParamsHook.js'))
+const { validate } = await import(join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js'))
+const sessionsModule = await import(join(here, '../../../dist/OpenCode/Host/Sessions.js'))
+const createSessionPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
 
 const NAMES = [
   'fast-orchestrator', 'deep-orchestrator',

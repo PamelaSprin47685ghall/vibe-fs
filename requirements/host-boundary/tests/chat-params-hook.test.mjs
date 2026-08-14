@@ -12,8 +12,8 @@ import test from 'node:test'
 const here = dirname(fileURLToPath(import.meta.url))
 const { mapOf, resultOf } = await import('../../verification-system/tests/support/domain.mjs')
 
-const { create } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ChatParamsHook.js'))
-const { validate } = await import(join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js'))
+const { create } = await import(join(here, '../../../dist/OpenCode/Host/ChatParamsHook.js'))
+const { validate } = await import(join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js'))
 
 const NAMES = [
   'fast-orchestrator', 'deep-orchestrator',

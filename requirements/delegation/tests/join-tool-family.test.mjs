@@ -9,22 +9,23 @@ import test from 'node:test'
 
 import { agentJournal, attemptPlanner, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
-const {
-  ToolRuntimeScope,
-  ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery,
-  ToolRuntimeScope__RoleFor_Z939596C: roleFor,
-} = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { forJournal, Runtime__RegisterAuthority_Z6B6240E7: registerAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
-  '../../../dist/Application/Orchestration/ManagerJob.js'
-)
-const { OrchestratorVerdict } = await import('../../../dist/Application/Orchestration/Types.js')
-const { FamilyRecovery, FamilyRecoveryPermit } = await import('../../../dist/Domain/SessionRecovery.js')
+const { HostToolContext } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinTool.js')
+const toolRuntimeModule = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { ToolRuntimeScope } = toolRuntimeModule
+const attachFamilyRecovery = Object.entries(toolRuntimeModule).find(([k]) => k.startsWith('ToolRuntimeScope__AttachFamilyRecovery_'))?.[1]
+const roleFor = Object.entries(toolRuntimeModule).find(([k]) => k.startsWith('ToolRuntimeScope__RoleFor_'))?.[1]
+const dispatcherModule = await import('../../../dist/Interaction/Dispatch/Dispatcher.js')
+const { forJournal } = dispatcherModule
+const registerAuthority = Object.entries(dispatcherModule).find(([k]) => k.startsWith('Runtime__RegisterAuthority_'))?.[1]
+const { Role } = await import('../../../dist/Foundation/Roles.js')
+const jobModule = await import('../../../dist/Change/Job.js')
+const verdictMailbox = Object.entries(jobModule).find(([k]) => k.startsWith('VerdictMailbox_$ctor'))?.[1]
+const publish = Object.entries(jobModule).find(([k]) => k.startsWith('VerdictMailbox__Publish_'))?.[1]
+const { OrchestratorVerdict } = await import('../../../dist/Change/Types.js')
+const { FamilyRecovery, FamilyRecoveryPermit } = await import('../../../dist/Execution/Session/Recovery/Model.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
+const { JournalRevisionModule_value } = await import('../../../dist/Foundation/Identity.js')
 const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
 
 const context = (session = 'ses_join') =>

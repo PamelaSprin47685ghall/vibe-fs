@@ -22,9 +22,9 @@ import {
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
 const Codec = await import('../../../dist/Persistence/Journal/EventStoreJournalCodec.js')
-const Canonical = await import('../../../dist/Infrastructure/Persist/CanonicalEventCodec.js')
+const Canonical = await import('../../../dist/Persistence/EventStore/CanonicalEventCodec.js')
 
 const SESSION = sessionId('ses_a')
 const CLOSED = fact('CompanionBloggerClosed', { SessionId: SESSION })

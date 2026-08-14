@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Context.Companion.Blogger.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook

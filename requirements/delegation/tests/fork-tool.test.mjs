@@ -26,23 +26,22 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents, HostForkRuntime__get_PendingRuns: pendingRunsOf, HostForkRuntime__FailRun_1B5DABF9: failRun } =
-  await import('../../../dist/Session/HostForkRuntime.js')
-const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: forkRuntime } = await import(
-  '../../../dist/Session/HostForkAgent.js'
-)
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { managerSpec, orchestratorSpec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/Tool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
+const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents, HostForkRuntime__get_PendingRuns: pendingRunsOf } = hostRuntimeModule
+const failRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__FailRun_'))?.[1]
+const agentModule = await import('../../../dist/Execution/Delegation/Fork/Host/Agent.js')
+const forkRuntime = Object.entries(agentModule).find(([k]) => k.includes('HostForkRuntime_Fork_'))?.[1]
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
   '../../../dist/Execution/Delegation/DelegatedToolEstimateProjection.js'
 )
-const { OrchestratorHost, OrchestratorHost__JoinPublished: hostJoinPublished } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
-const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
-const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
-  '../../../dist/Application/Orchestration/Runtime.js'
-)
+const { OrchestratorHost, OrchestratorHost__JoinPublished: hostJoinPublished } = await import('../../../dist/Change/Host/Host.js')
+const { OrchestratorHostDeps } = await import('../../../dist/Change/Host/Types.js')
+const changeRuntimeModule = await import('../../../dist/Change/Runtime.js')
+const createOrchestrator = Object.entries(changeRuntimeModule).find(([k]) => k.startsWith('Orchestrator_$ctor'))?.[1] ?? ((...args) => new changeRuntimeModule.Orchestrator(...args))
 const { targetRef, commitHash, managerJobId, sessionId: makeSessionId, fact, stream } = await import('../../verification-system/tests/support/domain.mjs')
 
 const chain = (kind, extra = {}) => ({

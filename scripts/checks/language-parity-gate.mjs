@@ -23,8 +23,8 @@ import {
 export const PROVIDER_ROOT = 'resources/provider'
 export const ENFORCER_ROOT = 'resources/enforcer'
 export const LOCALE_FILES = Object.freeze(['en.md', 'zh-CN.md'])
-export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Infrastructure/Resources/ProviderResources.fs'
-export const STATIC_TOOLS_REL = 'src/Wanxiangshu/Tools/StaticTools.fs'
+export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Resources/ProviderResources.fs'
+export const STATIC_TOOLS_REL = 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs'
 
 const norm = (p) => p.replace(/\\/g, '/')
 

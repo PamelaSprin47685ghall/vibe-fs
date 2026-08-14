@@ -28,18 +28,18 @@ import {
   sessionId,
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
-import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
+import { TurnOutcome } from '../../../dist/Composition/Turn/Program.js'
 import {
   ReconciledTurn,
   ReconciledTurnContext,
   ReconciledTurnDelivery,
 } from '../../../dist/Composition/Turn/Observation.js'
-import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
+import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Interaction/Dispatch/Dispatcher.js'
 import { captureOpening } from '../../../dist/Context/Trace/Capture.js'
 
-import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
-import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'
-import * as QuiescenceModule from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
+import * as NeedHelpSensorModule from '../../../dist/Interaction/Dispatch/OpenCode/NeedHelpSensor.js'
+import * as AssistanceHostModule from '../../../dist/Interaction/Dispatch/OpenCode/AssistanceHost.js'
+import * as QuiescenceModule from '../../../dist/OpenCode/Host/SessionQuiescenceGate.js'
 
 const sensorMethod = (name) => {
   const prefix = `NeedHelpSensor__${name}`

@@ -97,19 +97,19 @@ function makeRun(agentId, childId) {
 
 // Fable union constructor for TerminalOutcome.Failed (tag 2).
 async function failedOutcome(error) {
-  const Events = await importDist('Infrastructure/OpenCode/Host/Events.js')
+  const Events = await importDist('OpenCode/Host/Events.js')
   return new Events.TerminalOutcome(/* Failed */ 2, [error])
 }
 
-// Fable Record constructor for AgentRunResult (dist/Kernel/Outcome.js).
+// Fable Record constructor for AgentRunResult (dist/Foundation/Outcome.js).
 // Order: SessionId, AuthorityRootUserMessageId, ProviderRun, Role, Directory,
 // TerminalText, TurnFormalText. TerminalText empty => IsValid=false.
 async function completedOutcome(terminalText) {
   const [Outcome, Events, roots] = await Promise.all([
-    importDist('Kernel/Outcome.js'),
-    importDist('Infrastructure/OpenCode/Host/Events.js'),
+    importDist('Foundation/Outcome.js'),
+    importDist('OpenCode/Host/Events.js'),
     (async () => {
-      const Identity = await importDist('Kernel/Identity.js')
+      const Identity = await importDist('Foundation/Identity.js')
       return {
         session: sessionId,
         authorityRoot: (v) => {

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Finality.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -55,7 +56,8 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Finality
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Composition.Durable
@@ -83,8 +85,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Wanxiangshu.Tools
-
 /// GLORY-034/035/037/041: the Manager's end-of-life tool.
 ///
 /// The tool is deliberately opaque to the Manager: the description never

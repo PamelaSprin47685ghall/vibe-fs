@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Intent from '../../../dist/Domain/ProjectionIntent.js'
-import * as Renderer from '../../../dist/Domain/ProjectionRenderer.js'
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as Intent from '../../../dist/Participant/Provider/Projection/Intent.js'
+import * as Renderer from '../../../dist/Participant/Provider/Projection/Renderer.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import * as Frame from '../../../dist/Strength/Frame.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const P = { ...Intent, ...Renderer }

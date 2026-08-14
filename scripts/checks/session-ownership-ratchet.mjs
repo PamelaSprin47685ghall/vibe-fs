@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 
-export const SESSION_OWNERSHIP_REL = 'src/Wanxiangshu/Kernel/SessionOwnership.fs'
+export const SESSION_OWNERSHIP_REL = 'src/Wanxiangshu/Execution/Session/Ownership.fs'
 export const SESSION_OWNERSHIP_MATRIX_REL = 'scripts/checks/session-ownership-matrix.json'
 
 /** Required AttachmentKind / ownership tokens that must appear in SessionOwnership.fs. */

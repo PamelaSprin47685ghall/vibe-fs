@@ -23,21 +23,21 @@ import {
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const {
   joinWithPermit,
   joinAvailableWithPermit,
   awaitAgentWithPermit,
-} = await import('../../../dist/Session/HostForkJoin.js')
+} = await import('../../../dist/Execution/Delegation/Fork/Host/Join.js')
 const {
   FamilyRecoveryPermit,
   FamilyRecoveryPermitModule_missingFrom,
   RecoveryClosureModule_members,
-} = await import('../../../dist/Domain/SessionRecovery.js')
+} = await import('../../../dist/Execution/Session/Recovery/Model.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import(
   '../../../dist/Persistence/Journal/AgentJournal.js'
 )
-const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
+const { JournalRevisionModule_value } = await import('../../../dist/Foundation/Identity.js')
 const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
 
 const PARENT = sessionId('ses_hfrt')

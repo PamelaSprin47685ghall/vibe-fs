@@ -1,9 +1,5 @@
 namespace Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Sphinx
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Domain error / context values used by direct CE programs (not a Flow AST).

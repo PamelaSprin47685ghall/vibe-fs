@@ -2,7 +2,7 @@
 // DISTRIBUTION-002 oracle：runtime resource lookup 必须独立于 caller cwd。
 //
 // 生产实现是 fixed package-relative lookup（import.meta.url → ../../../resources），
-// 见 src/Wanxiangshu/Infrastructure/Resources/PackageResources.fs。无 cwd walk、
+// 见 src/Wanxiangshu/Resources/PackageResources.fs。无 cwd walk、
 // 无 candidate search、无 dist/src fallback。
 //
 // 本测试不 spawn `npm pack`（与 tests/integration/package/* 头注释同一设计决定）；
@@ -19,10 +19,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const packageResourcesUrl = pathToFileURL(
-  path.join(root, 'dist/Infrastructure/Resources/PackageResources.js'),
+  path.join(root, 'dist/Resources/PackageResources.js'),
 ).href
 const entryUrl = pathToFileURL(
-  path.join(root, 'dist/Infrastructure/OpenCode/Plugin/Plugin.js'),
+  path.join(root, 'dist/OpenCode/Plugin/Plugin.js'),
 ).href
 
 // 每个语义包声明的 runtime resource 的代表样本：
@@ -76,7 +76,7 @@ test('DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', (
   // PackageResources 的 ../../../resources 必须恰好是仓库/安装根的 resources/。
   // 这是「单份发布、无 dist 双副本、无 fallback」的实现证据（docs/why/enforcer.md）。
   const moduleDir = path.dirname(fileURLToPath(packageResourcesUrl))
-  const resolvedResources = path.resolve(moduleDir, '../../..', 'resources')
+  const resolvedResources = path.resolve(moduleDir, '../..', 'resources')
   const expected = path.join(root, 'resources')
   assert.equal(path.normalize(resolvedResources), path.normalize(expected))
 

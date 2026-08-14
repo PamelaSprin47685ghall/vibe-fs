@@ -48,8 +48,8 @@ import {
   sessionId,
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
-import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import * as HandleControllerModule from '../../../dist/Execution/Delegation/Handle/Controller.js'
+import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 const PARENT = sessionId('ses_parent_clean_break')
 const CHILD = sessionId('ses_child_clean_break')

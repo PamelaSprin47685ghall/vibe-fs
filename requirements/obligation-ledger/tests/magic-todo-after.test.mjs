@@ -7,12 +7,12 @@ import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 import {
   assignmentDelivery,
   AssignmentDelivery,
-} from '../../../dist/Domain/MagicTodoAfter.js'
+} from '../../../dist/Mission/Obligation/Todo/After.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const runtimeSource = join(
   here,
-  '../../../src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs',
+  '../../../src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
 )
 
 test('HOST-021 first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {

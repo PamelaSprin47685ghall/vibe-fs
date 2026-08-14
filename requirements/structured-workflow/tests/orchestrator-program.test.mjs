@@ -15,7 +15,7 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
 test('ORCHESTRATOR_PROGRAM_001: Application Program is the sole direct-CE entrypoint', async () => {
-  const mod = await load('Application/Orchestration/Program')
+  const mod = await load('Change/Program')
   assert.deepEqual(surfaceOf(mod).sort(), ['run'])
   assert.equal(typeof mod.run, 'function')
 })
@@ -54,8 +54,8 @@ test('ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', async () => {
 
 test('ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
   // Fail closed if a second-runtime protocol sneaks back into the vertical slice.
-  const files = walk('src/Wanxiangshu/Application/Orchestration', ['.fs'])
-  assert.ok(files.length > 0, 'expected Application/Orchestration/*.fs')
+  const files = walk('src/Wanxiangshu/Change', ['.fs'])
+  assert.ok(files.length > 0, 'expected Change/*.fs')
   const forbidden =
     /\b(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(?:\w*(?:Command|Reply)(?:<[^=>]*>)?|(?:\w*Program)<[^=>]*>)\s*=|\|\s*(?:Step|Suspend)\s+of\b|\bProtocolMismatch\b|\bmodule\s+(?:private\s+|internal\s+)?(?:\w+\.)*\w*Interpreter\s*=/
   const hits = []

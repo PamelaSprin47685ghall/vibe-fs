@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Git
@@ -56,7 +57,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

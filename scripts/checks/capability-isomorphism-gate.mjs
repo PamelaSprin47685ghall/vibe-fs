@@ -17,10 +17,10 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const TOOL_REGISTRY_REL = 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs'
-export const JS_TOOLS_REL = 'src/Wanxiangshu/Domain/JsCapability.fs'
+export const TOOL_REGISTRY_REL = 'src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'
+export const JS_TOOLS_REL = 'src/Wanxiangshu/Repository/Programming/Js/Capability.fs'
 export const JS_SURFACE_TEST_REL = 'requirements/repository-programming/tests/js-surface.test.mjs'
-export const ROLES_REL = 'src/Wanxiangshu/Kernel/Roles.fs'
+export const ROLES_REL = 'src/Wanxiangshu/Foundation/Roles.fs'
 
 /** Member fragments projected from ToolPermission (JS-004 / JS-020). */
 export const REQUIRED_FRAGMENT_CAPS = Object.freeze([

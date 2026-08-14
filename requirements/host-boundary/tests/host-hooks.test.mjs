@@ -37,7 +37,7 @@ import { parse as parseToml } from 'smol-toml'
 import { withPlugin, withPluginClient } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
-const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)
+const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)
 
 /** AGENT-002/003: the Host-final `opencode.json` names every managed agent. */
 const ROLES = [
@@ -216,7 +216,7 @@ export const assertMagicTodoHookShape = (hooks) => {
 test('STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
   // normalTransform + replica route live in PluginTransforms (Wave 3).
   const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginTransforms.fs', import.meta.url),
+    new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url),
     'utf8',
   )
   const normalStart = source.indexOf('let normalTransform')

@@ -8,11 +8,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { create as transformSystem } from '../../../dist/Infrastructure/OpenCode/Host/ProviderSystemTransform.js'
+import { create as transformSystem } from '../../../dist/OpenCode/Host/ProviderSystemTransform.js'
 import {
   BookkeeperRuntime_bindSession as bindBookkeeper,
   BookkeeperRuntime_unbindSession as unbindBookkeeper,
-} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+} from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 import { promptResources, providerLanguage, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const SID = 'provider-system-i18n-bookkeeper'

@@ -10,16 +10,16 @@ import test from 'node:test'
 
 import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const {
-  SessionQuiescenceGate,
-  // Fable lifts class members to module functions with a signature hash (the
-  // LoopSensor precedent); the class instance is passed as the receiver.
-  SessionQuiescenceGate__BeginProviderAttempt_Z31B28506: beginAttempt,
-  SessionQuiescenceGate__ObserveIdle_Z31B28506: observeIdle,
-  SessionQuiescenceGate__TryConsume_39B5CDAB: tryConsume,
-  SessionQuiescenceGate__RevokeCurrentAttempt_Z31B28506: revokeCurrentAttempt,
-  SessionQuiescenceGate__DropSession_Z31B28506: dropSession,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js')
+const quiescenceModule = await import('../../../dist/OpenCode/Host/SessionQuiescenceGate.js')
+const { SessionQuiescenceGate } = quiescenceModule
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const memberOf = (name) => Object.entries(quiescenceModule).find(([k]) => k.startsWith(`SessionQuiescenceGate__${name}_`))?.[1]
+const beginAttempt = memberOf('BeginProviderAttempt')
+const observeIdle = memberOf('ObserveIdle')
+const tryConsume = memberOf('TryConsume')
+const revokeCurrentAttempt = memberOf('RevokeCurrentAttempt')
+const dropSession = memberOf('DropSession')
 
 const S = sessionId('ses-q')
 

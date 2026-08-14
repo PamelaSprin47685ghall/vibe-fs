@@ -8,23 +8,23 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CasebookWorkflow_archiveInspectorResult as archive, CasebookWorkflow_fetchCase as fetchCase } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { refreshStale } from '../../../dist/Infrastructure/CasebookBookkeeper.js'
-import { collector, cleanupInspector, noteAnswer, notePrompt, setEnabled, tryFinalizeInspector } from '../../../dist/Infrastructure/CasebookLifecycle.js'
-import { ObservationCollector__Collect_Z15AE2BE0 as collect } from '../../../dist/Infrastructure/ObservationCollector.js'
-import { contentHash as hash } from '../../../dist/Infrastructure/CasebookCapture.js'
-import { Observation } from '../../../dist/Domain/Casebook.js'
-import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
+import { CasebookWorkflow_archiveInspectorResult as archive, CasebookWorkflow_fetchCase as fetchCase } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { refreshStale } from '../../../dist/Repository/Knowledge/Casebook/Bookkeeper.js'
+import { collector, cleanupInspector, noteAnswer, notePrompt, setEnabled, tryFinalizeInspector } from '../../../dist/Repository/Knowledge/Casebook/Lifecycle.js'
+import { ObservationCollector__Collect_Z15AE2BE0 as collect } from '../../../dist/Enforcer/ObservationCollector.js'
+import { contentHash as hash } from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
+import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
+import { acquire } from '../../../dist/OpenCode/Host/WorkspaceEventStore.js'
 import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { idValue, resultOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort, BookkeeperRuntime_txIdFor as txIdFor } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort, BookkeeperRuntime_txIdFor as txIdFor } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
-const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsBookkeeperTool.js')
-const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
-const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { execute } = await import('../../../dist/Repository/Programming/Js/OpenCode/BookkeeperTool.js')
+const { TerminalOutcome } = await import('../../../dist/OpenCode/Host/Events.js')
+const { AgentRunResult } = await import('../../../dist/Foundation/Outcome.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])

@@ -265,7 +265,7 @@ test('DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', (
     'let takePending supervisor id = []',
     'let hasPendingActivation journal sessionId = false',
   ].join('\n')
-  const hits = scanText(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/Change/Host/Host.fs')
   assert.ok(
     !hits.some((h) => h.gate === 'behaviour-bool'),
     'verb-named functions ending in Pending/Probe are pure operations, not stage latch names',
@@ -283,7 +283,7 @@ test('DSL_OWNERSHIP_physical_pending_latch_and_estimate_fields_are_not_behaviour
     'type GuardNudgeOutcome = | AlreadyOutstanding | Sent',
     'type PendingSeal = { ReviewerId: string }',
   ].join('\n')
-  const hits = scanText(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs')
   assert.ok(
     !hits.some((h) => h.gate === 'behaviour-bool'),
     'physical Pending/Already/Running names must not fire behaviour-bool',
@@ -367,7 +367,7 @@ test('DSL_OWNERSHIP_qualified_process_reference_is_clean_inside_infra', () => {
   // Infrastructure may use Process FQN without leaking across the boundary.
   const hits = scanText(
     'module Sample\nlet x = Wanxiangshu.Process.ProcessRunner.run',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
+    'src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs',
   ).filter((h) => h.gate === 'infrastructure-leak')
   assert.deepEqual(hits, [], 'Infrastructure path must stay clean for Process FQN')
 })
@@ -590,13 +590,13 @@ test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HandleCompletionCodec.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('BloggerCoordinator.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('RuntimePath.fs'))
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/HostForkRuntime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SatelliteRuntime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SyncDelegateRuntime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/BloggerCoordinator.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Journal/RuntimePath.fs'), true)
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), [])
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs'), [])
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), [])
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs'), [])
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Journal/RuntimePath.fs'), [])
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
@@ -718,7 +718,7 @@ test('DSL_OWNERSHIP_cross_file_duplicate_case_set_exemption_stays_clean', () => 
       text: ['module Sample', 'type AgentNameRejection =', '    | LegacyAgentName', '    | UnknownManagedAgent', '    | Malformed'].join('\n'),
     },
     {
-      file: 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs',
+      file: 'src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs',
       text: ['module Sample', 'type ManagedAgentParseError =', '    | UnknownManagedAgent', '    | LegacyAgentName', '    | Malformed'].join('\n'),
     },
   ])

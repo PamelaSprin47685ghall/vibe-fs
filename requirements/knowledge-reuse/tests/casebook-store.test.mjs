@@ -12,8 +12,8 @@ import {
   appendRefreshed,
   appendAccessed,
   appendEvicted,
-} from '../../../dist/Infrastructure/CasebookStore.js'
-import { Observation } from '../../../dist/Domain/Casebook.js'
+} from '../../../dist/Repository/Knowledge/Casebook/Store.js'
+import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { caseOf, listItems, mapEntries, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
@@ -71,13 +71,13 @@ test('CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan',
 
 test('CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
   const { readFileSync } = await import('node:fs')
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Infrastructure/CasebookStore.fs', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|loadEnvelopes|project\s*\(|OpenSnapshot|readStreams/)
   assert.match(source, /tryDecodeEnvelope/)
 })
 
 test('CASE009_marker_gates_the_surface', async () => {
-  const { CasebookFeature_isEnabled: isEnabled } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const { CasebookFeature_isEnabled: isEnabled } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbmarker-'))
   try {
     assert.equal(isEnabled(dir), false)
@@ -93,7 +93,7 @@ test('CASE004_005_workflow_archive_fetch_freshness_reads_Current_only', async ()
     CasebookWorkflow_archiveInspectorResult: archive,
     CasebookWorkflow_fetchCase: fetchCase,
     CasebookWorkflow_checkFreshness: checkFreshness,
-  } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const local = createLocalEventStore()
   try {
     assert.equal(resultOf(await archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))).ok, true)
@@ -113,8 +113,8 @@ test('CASE006_refresh_and_needsRefresh_use_the_same_Current', async () => {
     CasebookWorkflow_fetchCase: fetchCase,
     CasebookWorkflow_refreshCase: refreshCase,
     CasebookWorkflow_needsRefresh: needsRefresh,
-  } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
-  const { contentHash: hash } = await import('../../../dist/Infrastructure/CasebookCapture.js')
+  } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
+  const { contentHash: hash } = await import('../../../dist/Repository/Knowledge/Casebook/Capture.js')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbrefresh-'))
   const local = createLocalEventStore()
   try {
@@ -132,7 +132,7 @@ test('CASE006_refresh_and_needsRefresh_use_the_same_Current', async () => {
 })
 
 test('CASE010_finalize_is_exactly_once_per_scope', async () => {
-  const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const local = createLocalEventStore()
   try {
     assert.equal(resultOf(await finalizeCase(local.store, caseRec('scope-1', 'Q', 'A', []))).ok, true)

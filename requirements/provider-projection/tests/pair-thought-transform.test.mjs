@@ -18,7 +18,7 @@ const {
   source,
   text,
   stableCallId,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
+} = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const inject = async (session, raw, markerText = text) => {
   const result = resultOf(await tryInject(undefined, session, markerText, toList(raw)))

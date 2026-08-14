@@ -36,7 +36,7 @@ const {
   source,
   text,
   stableCallId,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
+} = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 

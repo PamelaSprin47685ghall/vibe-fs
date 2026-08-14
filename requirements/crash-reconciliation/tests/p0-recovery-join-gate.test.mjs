@@ -381,30 +381,30 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
 
 test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [
-    'src/Wanxiangshu/Session/HostForkRunLifecycle.fs',
-    'src/Wanxiangshu/Session/ForkRecovery.fs',
-    'src/Wanxiangshu/Session/HostForkRestart.fs',
-    'src/Wanxiangshu/Session/ForkRuntime.fs',
-    'src/Wanxiangshu/Session/HostForkRuntime.fs',
-    'src/Wanxiangshu/Session/HostForkAgent.fs',
-    'src/Wanxiangshu/Session/HandleController.fs',
-    'src/Wanxiangshu/Session/AgentCompletion.fs',
-    'src/Wanxiangshu/Session/HandleCompletionCodec.fs',
-    'src/Wanxiangshu/Session/CompletionMailbox.fs',
-    'src/Wanxiangshu/Session/JoinDrain.fs',
-    'src/Wanxiangshu/Domain/ChildRecovery.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs',
+    'src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs',
+    'src/Wanxiangshu/Execution/Session/AgentCompletion.fs',
+    'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs',
+    'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
+    'src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs',
     'src/Wanxiangshu/Execution/Delegation/Join.fs',
-    'src/Wanxiangshu/Domain/SessionRecovery.fs',
-    'src/Wanxiangshu/Kernel/Fact.fs',
+    'src/Wanxiangshu/Execution/Session/Recovery/Model.fs',
+    'src/Wanxiangshu/Composition/Durable/Fact.fs',
     'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
-    'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/Distillation.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/DistillationRuntime.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
+    'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
+    'src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs',
+    'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',
+    'src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs',
+    'src/Wanxiangshu/OpenCode/Tools/Distillation.fs',
+    'src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
   ]
   const entries = files.map((rel) => ({
     file: rel,
@@ -419,10 +419,10 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
 })
 
 test('P0_RECOVERY_JOIN_GATE_positive_recovery_shapes_present', () => {
-  const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/ChildRecovery.fs'), 'utf8')
-  const mailbox = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/CompletionMailbox.fs'), 'utf8')
+  const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs'), 'utf8')
+  const mailbox = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs'), 'utf8')
   const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
     'utf8',
   )
   const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Join.fs'), 'utf8')

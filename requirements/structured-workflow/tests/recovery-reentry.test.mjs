@@ -15,7 +15,7 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
 test('SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async () => {
-  const mod = await load('Domain/ReconcileProgram')
+  const mod = await load('Composition/Turn/Program')
 
   // The pure reconcile surface is bounded reread + publish decisions
   // (HOST-004): decision from evidence, consume keys, terminal classification.
@@ -46,10 +46,10 @@ test('SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () =>
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the
   // thin per-context TurnWorkflow router. None of them is a stored position.
-  const sessionRecovery = await load('Execution/Session/SessionRecoveryWorkflow')
+  const sessionRecovery = await load('Execution/Session/Recovery/Workflow')
   assert.equal(typeof sessionRecovery.recoverFamilyDirect, 'function')
 
-  const providerRecovery = await load('Application/Recovery/ProviderRecoveryWorkflow')
+  const providerRecovery = await load('Participant/Provider/Attempt/Fallback/Workflow')
   for (const n of ['continueAfterConfirmedFailure', 'continueAfterLoopKill', 'awaitRecoveryMaterial']) {
     assert.equal(typeof providerRecovery[n], 'function', `ProviderRecoveryWorkflow must export ${n}`)
   }
@@ -57,8 +57,8 @@ test('SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () =>
   const turn = await load('Composition/Turn/Workflow')
   assert.equal(typeof turn.observe, 'function')
 
-  const manager = await load('Application/Manager/ManagerWorkflow')
+  const manager = await load('Mission/Manager/Workflow')
   assert.equal(typeof manager.observe, 'function')
-  const reviewer = await load('Application/Review/ReviewerWorkflow')
+  const reviewer = await load('Mission/Review/Judgement/Workflow')
   assert.equal(typeof reviewer.observe, 'function')
 })

@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as DomainStore from '../../../dist/Domain/EventStore.js'
-import * as Events from '../../../dist/Domain/StrengthEvents.js'
-import * as StrengthStore from '../../../dist/Infrastructure/Persist/StrengthStore.js'
-import * as Vocabulary from '../../../dist/Infrastructure/Persist/EventVocabulary.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
-import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
+import * as DomainStore from '../../../dist/Persistence/EventStore/Model.js'
+import * as Events from '../../../dist/Strength/Events.js'
+import * as StrengthStore from '../../../dist/Strength/Persistence/Store.js'
+import * as Vocabulary from '../../../dist/Persistence/EventStore/EventVocabulary.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
+import { StrengthBudget } from '../../../dist/Strength/Budget.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { toList, listItems, resultOf, caseOf } from '../../verification-system/tests/support/domain.mjs'
 

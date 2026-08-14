@@ -12,8 +12,8 @@ import test from 'node:test'
 
 import { hostCompaction, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const { sha256Hex } = await import('../../../dist/Host/HostDigest.js')
-const { HostSignal, RetrySignal } = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignal.js')
+const { sha256Hex } = await import('../../../dist/Host/Digest.js')
+const { HostSignal, RetrySignal } = await import('../../../dist/OpenCode/Signals/HostSignal.js')
 
 test('HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off', () => {
   // Three keys close the four behaviours: compaction.auto closes both threshold

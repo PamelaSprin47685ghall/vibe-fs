@@ -6,7 +6,7 @@ import test from 'node:test'
 
 import { caseOf } from '../../verification-system/tests/support/domain.mjs'
 
-const mod = await import('../../../dist/Domain/SessionRecovery.js')
+const mod = await import('../../../dist/Execution/Session/Recovery/Model.js')
 const {
   SessionRecovery,
   RecoveryBlock,
@@ -15,7 +15,7 @@ const {
 } = mod
 const combine = mod.combine ?? mod.SessionRecovery_combine ?? mod.SessionRecoveryModule_combine
 
-const { SessionIdModule_create: sid } = await import('../../../dist/Kernel/Identity.js')
+const { SessionIdModule_create: sid } = await import('../../../dist/Foundation/Identity.js')
 
 const receipt = (id = 's') => makeReceipt(sid(id), 1n, null, [], [])
 const blocked = (reason = 'x') =>

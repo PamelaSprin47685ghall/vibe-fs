@@ -10,17 +10,17 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { JsToolWorkflow_run as workflowRun } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
-import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
-import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
-import { ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { JsToolWorkflow_run as workflowRun } from '../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
+import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
+import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
+import { ToolPermission } from '../../../dist/Foundation/Roles.js'
 import { FsSet } from '../../verification-system/tests/support/domain.mjs'
 import { parse as parseToml } from 'smol-toml'
 import { caseOf, listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-import { JsTransactionProjectionModule_pending as pendingTransactions } from '../../../dist/Domain/JsTransaction.js'
-import { JsToolsTransactionStore_createPersistence as createPersistence } from '../../../dist/Infrastructure/JsToolsTransactionStore.js'
+import { JsTransactionProjectionModule_pending as pendingTransactions } from '../../../dist/Repository/Programming/Js/Transaction.js'
+import { JsToolsTransactionStore_createPersistence as createPersistence } from '../../../dist/Repository/Programming/Js/TransactionStore.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
@@ -120,7 +120,7 @@ test('JS085_workflow_file_missing_fails_the_program', async () => {
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'FILE_NOT_FOUND')
     assert.equal(failed.reason.includes('missing.txt'), true)
@@ -184,7 +184,7 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     assert.equal(toml.startsWith('# ok\n'), true)
     assert.equal(/(?:^|\n)status =/m.test(toml), false)
@@ -222,7 +222,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     const doc = parseToml(toml)
     assert.deepEqual(doc.data.paths, ['a.txt'])
@@ -242,7 +242,7 @@ test('JS010_016_primitive_return_uses_data_field', async () => {
   async run() { return 42 }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     assert.equal(parseToml(toml).data, 42)
   } finally {
@@ -264,7 +264,7 @@ test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'INVALID_RETURN_VALUE')
   } finally {
@@ -281,7 +281,7 @@ test('JS010_mixed_object_array_is_invalid', async () => {
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(caseName(outcome), 'Failed')
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
   } finally {
     cleanup()
@@ -300,7 +300,7 @@ test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
     assert.equal(failed.reason.includes('anchor 1'), true)
@@ -329,7 +329,7 @@ test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.window, 'hello ')
     assert.equal(doc.data.before, 'hello')
@@ -356,7 +356,7 @@ test('JS005_offset_N_is_string_index_not_line_number', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.twoUnits, 'ab')
     assert.equal(doc.data.threeLen, 3)

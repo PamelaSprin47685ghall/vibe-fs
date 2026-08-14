@@ -17,7 +17,6 @@ open Wanxiangshu.Strength.Replica
 open System.Threading.Tasks
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Review
 
 /// Vocabulary: Reviewer continuation sends (rabbit §9.2).
 ///

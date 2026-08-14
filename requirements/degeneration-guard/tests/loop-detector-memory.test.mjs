@@ -11,7 +11,7 @@ import test from 'node:test'
 
 import { loopDetector } from '../../verification-system/tests/support/domain.mjs'
 
-const { LoopEffectiveThreshold } = await import('../../../dist/Session/LoopDetector.js')
+const { LoopEffectiveThreshold } = await import('../../../dist/Execution/Session/LoopDetector.js')
 
 const diverse = () => {
   const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}();,.='

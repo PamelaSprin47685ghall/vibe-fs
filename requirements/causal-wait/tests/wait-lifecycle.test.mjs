@@ -12,7 +12,7 @@ import {
   CausalWaitRegistry,
   listItems,
 } from '../../verification-system/tests/support/domain.mjs'
-import { CausalWaitRegistry__get_HistoryCapacity } from '../../../dist/Session/CausalWaitRegistry.js'
+import { CausalWaitRegistry__get_HistoryCapacity } from '../../../dist/Execution/Session/Wait/Registry.js'
 
 const owner = (id) => causalWait.owner('flow', [['id', id]])
 const external = (id) => causalWait.externalProducer('capability', [['id', id]])

@@ -1,7 +1,4 @@
 namespace Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Sphinx
 
 open System
 open System.Threading.Tasks

@@ -20,6 +20,7 @@ open Wanxiangshu.Strength
 
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal

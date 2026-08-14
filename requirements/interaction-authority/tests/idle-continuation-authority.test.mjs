@@ -21,13 +21,12 @@ import {
   transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
-import * as HostSessionNudge from '../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js'
+import * as HostSessionNudge from '../../../dist/Interaction/Dispatch/OpenCode/SessionNudge.js'
 
-const {
-  SessionQuiescenceGate,
-  SessionQuiescenceGate__BeginProviderAttempt_Z31B28506: beginAttempt,
-  SessionQuiescenceGate__ObserveIdle_Z31B28506: observeIdle,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js')
+const quiescenceModule = await import('../../../dist/OpenCode/Host/SessionQuiescenceGate.js')
+const { SessionQuiescenceGate } = quiescenceModule
+const beginAttempt = Object.entries(quiescenceModule).find(([k]) => k.startsWith('SessionQuiescenceGate__BeginProviderAttempt_'))?.[1]
+const observeIdle = Object.entries(quiescenceModule).find(([k]) => k.startsWith('SessionQuiescenceGate__ObserveIdle_'))?.[1]
 
 const seedRoot = async (journal, sid) => {
   const result = await agentJournal.appendAgent(

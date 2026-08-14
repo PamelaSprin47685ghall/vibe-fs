@@ -9,14 +9,14 @@ import test from 'node:test'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const { ToolRegistry_rolePredicate: rolePredicate, ToolRegistry_all: allTools } =
-  await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRegistry.js')
+  await import('../../../dist/OpenCode/Tools/ToolRegistry.js')
 const {
   toolName,
   reprimandText,
   sanitizeActiveToolCalls,
   tryInject,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+} = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 test('AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', () => {
   assert.equal(toolName, '-')

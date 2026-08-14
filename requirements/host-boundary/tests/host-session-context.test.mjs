@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { read, roleOf } = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionContext.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { read, roleOf } = await import('../../../dist/OpenCode/Host/HostSessionContext.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 test('HOST_CTX_roleOf_rejects_absent_and_blank_agents', () => {
   assert.equal(roleOf(null), undefined)

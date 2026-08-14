@@ -41,7 +41,7 @@ test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
   // OneShotAgentTool must not await completion.Task unbounded.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const oneshot = readFileSync(
-    join(root, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs'),
+    join(root, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs'),
     'utf8',
   )
 

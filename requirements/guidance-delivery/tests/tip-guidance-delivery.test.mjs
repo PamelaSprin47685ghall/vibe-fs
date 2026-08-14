@@ -29,7 +29,7 @@ const {
   EnforcerTipGuidance_latestTipGuidance: latestTipGuidance,
   EnforcerTipGuidance_latestTipNudge: latestTipNudge,
   EnforcerTipGuidance_resolveTipGuidance: resolveTipGuidance,
-} = await import('../../../dist/Session/EnforcerTipGuidance.js')
+} = await import('../../../dist/Enforcer/Guidance/Tip.js')
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const MAIN_MD = readFileSync(

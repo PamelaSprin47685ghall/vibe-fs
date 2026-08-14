@@ -24,22 +24,22 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostToolContext, ToolHostCodec_digest: digest } = await import(
-  '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
+  '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 )
 const {
   Request,
   run,
-} = await import('../../../dist/Infrastructure/OpenCode/Tools/OneShotAgentTool.js')
+} = await import('../../../dist/Execution/Delegation/Handle/OpenCode/OneShotTool.js')
 const { ManagedAgentModule_peer: peerOf } = await import(
-  '../../../dist/Infrastructure/OpenCode/Tools/ManagedAgent.js'
+  '../../../dist/OpenCode/Tools/ManagedAgent.js'
 )
-const { coderToolNames, wireTierLabel } = await import('../../../dist/Domain/ManagedAgentCatalog.js')
+const { coderToolNames, wireTierLabel } = await import('../../../dist/Participant/Persona/ManagedCatalog.js')
 const {
   ToolRuntimeScope,
   ToolRuntimeScope__DirectoryFor_Z721C83C5: directoryFor,
-} = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
-const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
+} = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { TerminalOutcome } = await import('../../../dist/OpenCode/Host/Events.js')
+const { AgentRunResult } = await import('../../../dist/Foundation/Outcome.js')
 
 const context = (session = 'ses-call', attachAbort) =>
   new HostToolContext(session, undefined, undefined, undefined, undefined, attachAbort ?? (() => () => {}))

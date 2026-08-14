@@ -37,7 +37,7 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
     'package.json',
     'README.md',
     'LICENSE',
-    'dist/Infrastructure/OpenCode/Plugin/Plugin.js',
+    'dist/OpenCode/Plugin/Plugin.js',
     'resources/enforcer/primitive-obsession/enforcer.md',
     'resources/enforcer/primitive-obsession/main.md',
     'resources/provider/world/common-law/en.md',

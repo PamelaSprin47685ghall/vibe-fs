@@ -12,11 +12,11 @@ import { listItems } from '../../verification-system/tests/support/domain.mjs'
 const {
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ChronicleTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec } = await import('../../../dist/OpenCode/Tools/ChronicleTool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const { RuntimeResourcesModule_load: loadResources, RuntimeResourcesModule_install: installResources } = await import(
-  '../../../dist/Infrastructure/Resources/RuntimeResources.js'
+  '../../../dist/Resources/RuntimeResources.js'
 )
 
 installResources(loadResources())

@@ -15,7 +15,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { ForkError } from '../../../dist/Session/ForkTypes.js'
+import { ForkError } from '../../../dist/Execution/Delegation/Fork/Model.js'
 import {
   agentCompletion,
   distillation,

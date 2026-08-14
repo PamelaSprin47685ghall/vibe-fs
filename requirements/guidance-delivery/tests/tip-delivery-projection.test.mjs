@@ -12,8 +12,8 @@ import {
   TipDeliveryProjection_apply as apply,
   TipDeliveryProjection_applyReanchor as applyReanchor,
   TipDeliveryProjection_hasFullDelivered as hasFullDelivered,
-} from '../../../dist/Feedback/Enforcer/Guidance/DeliveryProjection.js'
-import { TipPresentation } from '../../../dist/Kernel/Fact.js'
+} from '../../../dist/Enforcer/Guidance/DeliveryProjection.js'
+import { TipPresentation } from '../../../dist/Composition/Durable/Fact.js'
 
 test('TDP_001_empty_state_has_nothing_delivered', () => {
   assert.equal(hasFullDelivered('primitive-obsession', empty), false)

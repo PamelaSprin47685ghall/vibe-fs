@@ -4,11 +4,11 @@ import test from 'node:test'
 
 import { listItems } from '../../verification-system/tests/support/domain.mjs'
 
-const { ToolHostCodec_factory } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
-const { spec: inspectSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/InspectorTool.js')
-const { establishSpec, repairSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/CoderTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const { ToolHostCodec_factory } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { managerSpec, orchestratorSpec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/Tool.js')
+const { spec: inspectSpec } = await import('../../../dist/OpenCode/Tools/InspectorTool.js')
+const { establishSpec, repairSpec } = await import('../../../dist/OpenCode/Tools/CoderTool.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 
 const chain = (kind, extra = {}) => ({
   kind,
@@ -89,10 +89,10 @@ test('DELEG_021_attach_belongs_only_to_fork_not_commission_or_sync_delegate', ()
 
 test('DELEG_022_never_reuses_host_maxSteps_as_the_estimate', () => {
   const files = [
-    '../../../src/Wanxiangshu/Infrastructure/OpenCode/Tools/ForkTool.fs',
-    '../../../src/Wanxiangshu/Infrastructure/OpenCode/Tools/InspectorTool.fs',
-    '../../../src/Wanxiangshu/Infrastructure/OpenCode/Tools/CoderTool.fs',
-    '../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginHooks.fs',
+    '../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs',
+    '../../../src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs',
+    '../../../src/Wanxiangshu/OpenCode/Tools/CoderTool.fs',
+    '../../../src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs',
   ]
 
   for (const relative of files) {

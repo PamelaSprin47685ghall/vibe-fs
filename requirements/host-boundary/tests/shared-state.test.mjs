@@ -11,12 +11,12 @@ const {
   SessionDirectories,
   SessionParents,
   VerdictSessions,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/SharedState.js')
+} = await import('../../../dist/OpenCode/Host/SharedState.js')
 
 test('SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
   // A second import of the same module must observe the first import's writes:
   // fork→verdict causality depends on the cross-instance single reference.
-  const again = await import('../../../dist/Infrastructure/OpenCode/Host/SharedState.js')
+  const again = await import('../../../dist/OpenCode/Host/SharedState.js')
   const key = 'shared-test-ses-parents'
   try {
     SessionParents.set(key, 'parent-of-' + key)

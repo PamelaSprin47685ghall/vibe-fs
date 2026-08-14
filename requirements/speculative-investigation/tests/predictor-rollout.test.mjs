@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Predictor from '../../../dist/Domain/StrengthPredictor.js'
-import * as Rollout from '../../../dist/Domain/StrengthRollout.js'
-import * as Policy from '../../../dist/Domain/StrengthPolicy.js'
-import * as HostDigest from '../../../dist/Host/HostDigest.js'
-import { Role } from '../../../dist/Kernel/Roles.js'
+import * as Predictor from '../../../dist/Strength/Prediction/Predictor.js'
+import * as Rollout from '../../../dist/Strength/Rollout.js'
+import * as Policy from '../../../dist/Strength/Policy.js'
+import * as HostDigest from '../../../dist/Host/Digest.js'
+import { Role } from '../../../dist/Foundation/Roles.js'
 import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const S = Predictor.StrengthPrimarySymbol

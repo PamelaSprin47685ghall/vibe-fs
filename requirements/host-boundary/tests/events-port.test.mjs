@@ -4,9 +4,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { Events_HostEventPort, TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
-const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { Events_HostEventPort, TerminalOutcome } = await import('../../../dist/OpenCode/Host/Events.js')
+const { AgentRunResult } = await import('../../../dist/Foundation/Outcome.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 const { providerRun, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
 
 const completed = (sid, run) =>

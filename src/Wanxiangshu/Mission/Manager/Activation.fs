@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Manager
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch

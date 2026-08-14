@@ -12,12 +12,12 @@ import {
   AnchorRules_validateDeclaration as validateDeclaration,
   AnchorRules_validateOccurrence as validateOccurrence,
   AnchorSpec,
-} from '../../../dist/Domain/JsAnchor.js'
+} from '../../../dist/Repository/Programming/Js/Anchor.js'
 import {
   JsFailure,
   JsFailureModule_code as failureCode,
   JsFailureModule_reason as failureReason,
-} from '../../../dist/Domain/JsFailure.js'
+} from '../../../dist/Repository/Programming/Js/Failure.js'
 import { resultOf } from '../../verification-system/tests/support/domain.mjs'
 
 const declaration = (spec, occurrence) => ({ Spec: spec, Occurrence: occurrence })

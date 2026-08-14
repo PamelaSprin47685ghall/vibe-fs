@@ -12,15 +12,15 @@ const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 const { spec, tryCanonicalText, hasLiveCycle, tipFieldNames } = await import(
-  '../../../dist/Infrastructure/OpenCode/Tools/ChronicleTool.js'
+  '../../../dist/OpenCode/Tools/ChronicleTool.js'
 )
-const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const { RuntimeResourcesModule_load: loadResources, RuntimeResourcesModule_install: installResources } = await import(
-  '../../../dist/Infrastructure/Resources/RuntimeResources.js'
+  '../../../dist/Resources/RuntimeResources.js'
 )
-const { EnforcerCodec } = await import('../../../dist/Domain/EnforcerCodec.js')
+const { EnforcerCodec } = await import('../../../dist/Enforcer/Codec.js')
 
 installResources(loadResources())
 

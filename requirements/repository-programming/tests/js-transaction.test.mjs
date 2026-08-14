@@ -17,8 +17,8 @@ import {
   JsTransaction_preflight as preflight,
   JsTransaction_commitPlan as commitPlan,
   JsTransaction_rollbackPlan as rollbackPlan,
-} from '../../../dist/Domain/JsTransaction.js'
-import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
+} from '../../../dist/Repository/Programming/Js/Transaction.js'
+import { JsFailureModule_code as failureCode } from '../../../dist/Repository/Programming/Js/Failure.js'
 import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const ok = (result) => resultOf(result).ok

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Collector from '../../../dist/Domain/StrengthBatchCollector.js'
-import * as Provider from '../../../dist/Domain/ProviderProjection.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as Collector from '../../../dist/Strength/Prediction/BatchCollector.js'
+import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const call = (id, name, args) => new Provider.WirePart(2, [Id.ToolCallIdModule_create(id), name, args])

@@ -31,7 +31,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Wanxiangshu.Tools
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix

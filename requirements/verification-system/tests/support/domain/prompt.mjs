@@ -221,10 +221,11 @@ export const authorityRun = {
  * they are absorbed here rather than at the call site (VERIFY-008).
  */
 export const promptDispatcher = (() => {
-  const sendAgentOwnerRoot = PromptDispatcherSendModule
-    .Wanxiangshu_OpenCode_PromptDispatcher_Runtime__Runtime_SendAgentOwnerRoot
-  const sendContinuation = PromptDispatcherSendModule
-    .Wanxiangshu_OpenCode_PromptDispatcher_Runtime__Runtime_SendContinuation
+  const memberOfSend = (name) => Object.entries(PromptDispatcherSendModule).find(
+    ([k]) => k.includes(`_Runtime_${name}`) || k.endsWith(`_${name}`) || k === name,
+  )?.[1]
+  const sendAgentOwnerRoot = memberOfSend('SendAgentOwnerRoot')
+  const sendContinuation = memberOfSend('SendContinuation')
   // Instance members on Runtime: Fable may emit
   //   Runtime__ProjectionFor
   //   Runtime__ProjectionFor_<hash>   (overload hash)

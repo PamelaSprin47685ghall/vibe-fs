@@ -26,7 +26,7 @@ import {
   runtimeNudge,
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as PromptDispatcher from '../../../dist/Application/Prompting/PromptDispatcher.js'
+import * as PromptDispatcher from '../../../dist/Interaction/Dispatch/Dispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // Slow prior: enough single-character 4-grams to pull N_eff under 140.

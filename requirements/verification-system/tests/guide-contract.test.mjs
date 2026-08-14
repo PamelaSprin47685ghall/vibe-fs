@@ -46,21 +46,21 @@ const assertCallable = (mod, modulePath, names) => {
 // ── directly executable workflow surfaces (ARCH-001) ───────────────────────
 
 test('VERIFY_005_AgentProgram_publishes_its_flow_entrypoints', async () => {
-  const mod = await load('Agent/AgentProgram')
+  const mod = await load('Execution/Agent/Program')
 
   // FLOW pilot: forkAgent + Flow.lift wrapper removed; plain task entrypoints remain.
   assert.deepEqual(surfaceOf(mod).sort(), ['runAgentFlow', 'validateSession'])
-  assertCallable(mod, 'Agent/AgentProgram', ['validateSession', 'runAgentFlow'])
+  assertCallable(mod, 'Execution/Agent/Program', ['validateSession', 'runAgentFlow'])
 })
 
 test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
-  const mod = await load('Session/CompanionProgram')
+  const mod = await load('Context/Companion/Program')
 
   // Exactly two. `shouldReplacePrefix` was the third until package X9 deleted it:
   // it compared a token estimate against a context limit, which CTX-001 forbids
   // outright. A reappearance here is the whole mechanism coming back.
   assert.deepEqual(surfaceOf(mod).sort(), ['buildDelta', 'runCompanionFlow'])
-  assertCallable(mod, 'Session/CompanionProgram', ['buildDelta', 'runCompanionFlow'])
+  assertCallable(mod, 'Context/Companion/Program', ['buildDelta', 'runCompanionFlow'])
 })
 
 test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async () => {
@@ -93,16 +93,16 @@ test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async ()
     'OrchestratorInterpreter must stay deleted',
   )
 
-  const mod = await load('Application/Orchestration/Program')
+  const mod = await load('Change/Program')
 
   // One public `run`. Publish-loop details stay private so ORCH-005's short CAS
   // window cannot acquire a second caller.
   assert.deepEqual(surfaceOf(mod).sort(), ['run'])
-  assertCallable(mod, 'Application/Orchestration/Program', ['run'])
+  assertCallable(mod, 'Change/Program', ['run'])
 })
 
 test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => {
-  const mod = await load('Domain/ReconcileProgram')
+  const mod = await load('Composition/Turn/Program')
   const names = surfaceOf(mod)
 
   assert.ok(
@@ -129,13 +129,13 @@ test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
 // ── the bounded parallelism kernel the workflows fan out through ────────────
 
 test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async () => {
-  const mod = await load('Kernel/Parallel')
+  const mod = await load('Foundation/Parallel')
 
   // docs/what/flow.md (Direct CE) superseded the Flow monad; its monadic surface
   // (Flow_run / Flow_fail / Flow_attempt / Flow_create / Flow_lift and the
   // FlowBuilder) is no longer a demanded contract. Bounded concurrency is still
   // legal, so `Parallel.mapBounded` remains the only required export here.
-  assertCallable(mod, 'Kernel/Parallel', ['Parallel_mapBounded'])
+  assertCallable(mod, 'Foundation/Parallel', ['Parallel_mapBounded'])
 
   // `Parallel.mapBounded` is emitted from the same file. Unbounded fan-out is how
   // a canary starts failing on machine load rather than on logic, so the bounded
@@ -191,12 +191,12 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
 })
 
 test('VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results', async () => {
-  const mod = await load('Kernel/Outcome')
+  const mod = await load('Foundation/Outcome')
 
   // PERSIST-002 has exactly two append outcomes, so `CommitResult` is one generic
   // union rather than a bool plus an error field.
   assert.equal(typeof mod['Outcome_CommitResult$1'], 'function')
-  assertCallable(mod, 'Kernel/Outcome', ['AgentRunResult__get_IsValid'])
+  assertCallable(mod, 'Foundation/Outcome', ['AgentRunResult__get_IsValid'])
 })
 
 // ── the plugin entrypoint package.json points at ────────────────────────────
@@ -205,9 +205,9 @@ test('VERIFY_008_the_published_plugin_entrypoint_loads', async () => {
   // `package.json` `main` / `exports["."]` resolve here. A build that emits every
   // domain module but not this one produces an installable package that does
   // nothing, and no other test would notice.
-  const mod = await load('Infrastructure/OpenCode/Plugin/Plugin')
+  const mod = await load('OpenCode/Plugin/Plugin')
 
-  assert.ok(surfaceOf(mod).length > 0, 'Infrastructure/OpenCode/Plugin/Plugin must publish at least one export')
+  assert.ok(surfaceOf(mod).length > 0, 'OpenCode/Plugin/Plugin must publish at least one export')
 })
 
 test('VERIFY_008_every_emitted_module_actually_loads', async () => {

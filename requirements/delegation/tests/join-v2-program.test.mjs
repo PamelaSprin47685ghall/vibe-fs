@@ -18,7 +18,7 @@ import {
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
 import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
-import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 /** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs
  *  facade bind is stale, so tests call the dist entry directly. */
@@ -37,10 +37,10 @@ const link = (handle, child, targetAgent, role, current) => {
 }
 
 test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
-  const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), 'utf8')
-  const joinHost = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkJoin.fs'), 'utf8')
+  const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), 'utf8')
+  const joinHost = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs'), 'utf8')
   const orchestrator = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs'),
+    join(ROOT, 'src/Wanxiangshu/Change/Host/Host.fs'),
     'utf8',
   )
   assert.match(runtime, /let mutable joinInFlight = false/)

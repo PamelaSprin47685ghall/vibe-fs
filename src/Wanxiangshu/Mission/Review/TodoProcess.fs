@@ -42,7 +42,8 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace

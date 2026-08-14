@@ -372,9 +372,9 @@ export const parallel = {
 // JoinAttemptRegistry is re-exported as the class from dist; CausalWaitRegistry
 // follows the same shape. Construction helpers absorb Fable list/union spellings.
 
-const CausalWaitModule = await prod('Kernel/CausalWait')
-const CausalWaitRegistryModule = await prod('Session/CausalWaitRegistry')
-const CausalAwaitModule = await prod('Session/CausalAwait')
+const CausalWaitModule = await prod('Execution/Session/Wait/CausalWait')
+const CausalWaitRegistryModule = await prod('Execution/Session/Wait/Registry')
+const CausalAwaitModule = await prod('Execution/Session/Wait/Await')
 
 const buildCausalProducer = unionCase(CausalWaitModule.CausalProducerRef, 'CausalProducerRef')
 const buildWaitEscape = unionCase(CausalWaitModule.WaitEscape, 'WaitEscape')

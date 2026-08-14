@@ -11,22 +11,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
-import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
-import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
-import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
+import { ToolCallIdModule_create as toolCallId } from '../../../dist/Foundation/Identity.js'
+import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/OpenCode/Host/SessionQuiescenceGate.js'
+import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Participant/Persona/SessionPersona.js'
+import { TurnOutcome } from '../../../dist/Composition/Turn/Program.js'
 import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
-import { SyncDelegateBatch, SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
-import {
-  AttachedSessionRuntime_$ctor_Z5DA00426 as createAttached,
-} from '../../../dist/Session/AttachedSessionRuntime.js'
-import {
-  SyncDelegateRuntime,
-  SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
-  SyncDelegateRuntime__InvokeBatchPrepared_Z2E60ED39 as invokeBatchPrepared,
-  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
-  SyncDelegateRuntime__Dispose as disposeRuntime,
-} from '../../../dist/Session/SyncDelegateRuntime.js'
+import { SyncDelegateBatch, SyncDelegateRole } from '../../../dist/Execution/Delegation/SyncDelegate/Model.js'
+const attachedModule = await import('../../../dist/Execution/Session/Attachment/AttachedRuntime.js')
+const createAttached = Object.entries(attachedModule).find(([k]) => k.startsWith('AttachedSessionRuntime_$ctor'))?.[1]
+const syncDelegateRuntimeModule = await import('../../../dist/Execution/Delegation/SyncDelegate/Runtime.js')
+const { SyncDelegateRuntime, SyncDelegateRuntime__Dispose: disposeRuntime } = syncDelegateRuntimeModule
+const invoke = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__Invoke_'))?.[1]
+const invokeBatchPrepared = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__InvokeBatchPrepared_'))?.[1]
+const handleTurn = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__HandleTurn_'))?.[1]
 import {
   agentJournal,
   authorityRoot,

@@ -12,9 +12,9 @@ import test from 'node:test'
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
 test('DURABLE_CONVERGENCE_002_003_one_k_way_primitive_is_shared_by_integrator_and_sync', async () => {
-  const primitive = await read('src/Wanxiangshu/Infrastructure/Persist/EventKWayMerge.fs')
-  const integrator = await read('src/Wanxiangshu/Infrastructure/Persist/CanonicalIntegrator.fs')
-  const sync = await read('src/Wanxiangshu/Infrastructure/Persist/WriterStreamSync.fs')
+  const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
+  const integrator = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
+  const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
   assert.match(primitive, /module EventKWayMerge/)
   assert.match(primitive, /checkIdentity/)
@@ -25,7 +25,7 @@ test('DURABLE_CONVERGENCE_002_003_one_k_way_primitive_is_shared_by_integrator_an
 })
 
 test('DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_without_segments_or_index', async () => {
-  const source = await read('src/Wanxiangshu/Infrastructure/Persist/WriterStreamSync.fs')
+  const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
   assert.match(source, /WriterId|writerId/)
   assert.match(source, /WriteBlob/)
@@ -37,10 +37,10 @@ test('DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_with
 })
 
 test('DURABLE_CONVERGENCE_008_startup_only_ensures_hooks_and_user_Git_process_runs_full_sync', async () => {
-  const boot = await read('src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginBoot.fs')
-  const hook = await read('src/Wanxiangshu/Infrastructure/Git/HookDispatcher.fs')
+  const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
+  const hook = await read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   const runner = await read('resources/git/wanxiang-hook.mjs')
-  const hookSync = await read('src/Wanxiangshu/Infrastructure/Git/HookSync.fs')
+  const hookSync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
 
   assert.match(boot, /ensure.*hook|HookDispatcher.*ensure/is)
   assert.match(hook, /ReferenceTransaction/)
@@ -52,25 +52,25 @@ test('DURABLE_CONVERGENCE_008_startup_only_ensures_hooks_and_user_Git_process_ru
   assert.match(runner, /pre-push/)
   assert.match(runner, /HookSync/)
   assert.match(hookSync, /GitGateway\.converge/)
-  assert.match(await read('src/Wanxiangshu/Infrastructure/Git/GitGateway.fs'), /WriterStreamSync\.syncWriterStreams/)
+  assert.match(await read('src/Wanxiangshu/Git/Gateway.fs'), /WriterStreamSync\.syncWriterStreams/)
   assert.doesNotMatch(runner, /WorkspaceEventStore|CanonicalIntegrator|PluginHost/,
     'hook runner must work when Wanxiangshu/OpenCode is not running')
 
-  const productGit = await read('src/Wanxiangshu/Infrastructure/Git/GitGateway.fs')
+  const productGit = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.doesNotMatch(productGit, /member _\.(Fetch|Pull|Push)\(/,
     'Wanxiangshu product process must not own user fetch/pull/push triggers')
 
   const persistSources = [
-    await read('src/Wanxiangshu/Infrastructure/Persist/EventStore.fs'),
-    await read('src/Wanxiangshu/Infrastructure/Persist/ProcessEventLog.fs'),
+    await read('src/Wanxiangshu/Persistence/EventStore/Store.fs'),
+    await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs'),
   ].join('\n')
   assert.doesNotMatch(persistSources, /Converge\(|Fetch\(|Pull\(|Push\(/, 'ordinary local append/replay must not trigger remote sync')
 })
 
 test('DURABLE_CONVERGENCE_003_runtime_append_and_external_hook_share_one_physical_store_gate', async () => {
-  const log = await read('src/Wanxiangshu/Infrastructure/Persist/ProcessEventLog.fs')
-  const store = await read('src/Wanxiangshu/Infrastructure/Persist/EventStore.fs')
-  const hook = await read('src/Wanxiangshu/Infrastructure/Git/HookSync.fs')
+  const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
+  const store = await read('src/Wanxiangshu/Persistence/EventStore/Store.fs')
+  const hook = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
 
   assert.match(log, /proper-lockfile/)
   assert.match(store, /ProcessEventLog\.withStoreLock/)
@@ -79,7 +79,7 @@ test('DURABLE_CONVERGENCE_003_runtime_append_and_external_hook_share_one_physica
 })
 
 test('DURABLE_CONVERGENCE_007_sync_does_not_integrate_business_history', async () => {
-  const source = await read('src/Wanxiangshu/Infrastructure/Persist/WriterStreamSync.fs')
+  const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
   assert.doesNotMatch(source, /StrengthProjection|CasebookProjection|AgentProjection|MagicTodo|JsTransactionPrepared/)
   assert.doesNotMatch(source, /Fold\.apply|StrengthProjection\.fold|CasebookProjection\.fold/)
 })

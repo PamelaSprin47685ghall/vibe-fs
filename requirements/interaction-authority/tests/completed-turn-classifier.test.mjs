@@ -25,7 +25,7 @@ import {
   partsText,
   roleOfAgent,
 } from '../../../dist/Interaction/Repair/CompletedTurn.js'
-import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
+import { SessionMessage } from '../../../dist/OpenCode/Host/SessionSnapshotPort.js'
 
 const text = (value) => xTraceCapture.text(value)
 const reasoning = (value) => xTraceCapture.reasoning(value)
@@ -169,7 +169,7 @@ test('RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
     'finish=None must classify as SnapshotObservation.TurnUnknown, not TurnOutcome',
   )
 
-  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   assert.equal(typeof mod.SnapshotObservation, 'function')
   assert.ok(
     observation instanceof mod.SnapshotObservation,

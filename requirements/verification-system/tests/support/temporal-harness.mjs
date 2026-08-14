@@ -424,7 +424,7 @@ export const assertPureConfluence = (envelopeSeqA, envelopeSeqB, projectionReade
 // workflow / controller; the harness will not duplicate their business logic.
 //
 // 1. ManagerWorkflow.tryObserve
-//      src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs
+//      src/Wanxiangshu/Mission/Manager/Workflow.fs
 //      tryObserve : sessionPort -> eventPort -> journal -> Task<ManagerObservation>
 //      Owner of Manager terminal sequencing. Wakes on Host signals; decides on
 //      durable facts (Signal wakes; Fact decides).
@@ -444,14 +444,14 @@ export const assertPureConfluence = (envelopeSeqA, envelopeSeqB, projectionReade
 //      confirmed witness — no program-counter field.
 //
 // 4. FinalityController
-//      src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityController.fs
+//      src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs
 //      src/Wanxiangshu/Journal/FinalityReviewCohort.fs  (rosterOf)
 //      Owner of finality request lifecycle and cohort assembly. Trace theorems
 //      will prove cohort confluence across races (e.g. cancel-before-sibling-observe).
 //
 // 5. OrchestratorProgram + SessionRecovery
-//      src/Wanxiangshu/Application/Orchestration/Program.fs  (run)
-//      src/Wanxiangshu/Domain/SessionRecovery.fs  (authorizeFamilyResume)
+//      src/Wanxiangshu/Change/Program.fs  (run)
+//      src/Wanxiangshu/Execution/Session/Recovery/Model.fs  (authorizeFamilyResume)
 //      Owner of publish reconciliation and durable family recovery. Temporal
 //      tests will use dropEphemeral to prove no duplicate publish / no
 //      resurrected handle after crash.

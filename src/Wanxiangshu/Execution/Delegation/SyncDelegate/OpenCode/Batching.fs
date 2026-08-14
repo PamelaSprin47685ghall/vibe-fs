@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode

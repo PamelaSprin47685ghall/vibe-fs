@@ -9,9 +9,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { caseOf, listItems, setItems, stringSet, toList } from '../../verification-system/tests/support/domain.mjs'
-import { SessionIdModule_create as sid } from '../../../dist/Kernel/Identity.js'
-import { AgentHandleIdModule_create as hid } from '../../../dist/Kernel/Identity.js'
-import { ManagerJobIdModule_create as jobId } from '../../../dist/Kernel/Identity.js'
+import { SessionIdModule_create as sid } from '../../../dist/Foundation/Identity.js'
+import { AgentHandleIdModule_create as hid } from '../../../dist/Foundation/Identity.js'
+import { ManagerJobIdModule_create as jobId } from '../../../dist/Foundation/Identity.js'
 import {
   FamilyRecoveryPermit,
   FamilyRecoveryPermitModule_missingFrom,
@@ -21,7 +21,7 @@ import {
   RecoveryNodeModule_token,
   ValidatedClosureModule_value,
   validateClosurePure,
-} from '../../../dist/Domain/SessionRecovery.js'
+} from '../../../dist/Execution/Session/Recovery/Model.js'
 
 const root = sid('ses_root')
 

@@ -18,7 +18,7 @@ const branch = (source, start, end) => {
 }
 
 test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
-  const source = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+  const source = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(source, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
 
   assert.match(dry, /StartDryRun/)
@@ -28,7 +28,7 @@ test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_te
 })
 
 test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
-  const source = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
+  const source = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const start = source.indexOf('member this.StartDryRun')
   assert.ok(start >= 0, 'runtime must expose a distinct StartDryRun capability')
   const dry = source.slice(start)
@@ -48,20 +48,20 @@ test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_obs
 })
 
 test('SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
-  const runtime = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
+  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   assert.match(runtime, /TimedOut/)
   assert.match(runtime, /CancelOwner/)
   assert.match(runtime, /AbortSession/)
 
-  const host = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+  const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
   assert.doesNotMatch(dry, /HostMessageProjection\.replaceMessagesInPlace/)
   assert.doesNotMatch(dry, /TripStrengthFuse\([^)]*TimedOut/i)
 })
 
 test('SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
-  const runtime = await read('src/Wanxiangshu/Application/Strength/StrengthReplicaRuntime.fs')
-  const host = await read('src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs')
+  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
+  const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
 
   assert.match(runtime, /CreateChildSession/)
   assert.match(runtime, /StrengthReplicaBinding/)

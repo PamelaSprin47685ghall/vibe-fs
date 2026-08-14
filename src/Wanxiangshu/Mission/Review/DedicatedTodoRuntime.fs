@@ -43,7 +43,9 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAfter
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProcessReview
-open Wanxiangshu.Finality
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
@@ -57,7 +59,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources
-open Wanxiangshu.Review
+open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

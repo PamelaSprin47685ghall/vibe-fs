@@ -6,8 +6,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { InjectedSessionPort_$ctor_Z60D0357E as createPort } from '../../../dist/Infrastructure/OpenCode/Host/Sessions.js'
-import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
+const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
+import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
 
 const eventPort = { SubscribeTerminalListener: () => ({ Dispose: () => {} }) }
 const preserve = { tag: 0, fields: [] }

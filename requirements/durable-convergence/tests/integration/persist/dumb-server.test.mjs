@@ -12,7 +12,7 @@ import { createBareWorkspace, readRemoteStoreOid, remoteHasObject } from '../../
 import { createLocalEventStore } from '../../../../verification-system/tests/support/local-event-store.mjs'
 import { eventId, resultOf, toList } from '../../../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../../../dist/Persistence/EventStore/Model.js')
 const runner = fileURLToPath(new URL('../../../../../resources/git/wanxiang-hook.mjs', import.meta.url))
 const streamId = (v) => Domain.EventStreamIdModule_create(v)
 const envelope = (id, writer) => new Domain.EventEnvelope(
@@ -95,7 +95,7 @@ test('two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempoten
 })
 
 test('reference_transaction_is_also_full_bidirectional_convergence', async () => {
-  const source = readFileSync(new URL('../../../../../src/Wanxiangshu/Infrastructure/Git/HookSync.fs', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../../../src/Wanxiangshu/Git/Hook/Sync.fs', import.meta.url), 'utf8')
   assert.match(source, /runReferenceTransaction/)
   assert.match(source, /converge remote observed/)
   assert.doesNotMatch(source, /downloadOnly|importOnly|ConvergeObserved/)

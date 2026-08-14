@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Commit from '../../../dist/Domain/StrengthCommit.js'
-import * as Promotion from '../../../dist/Domain/StrengthPromotion.js'
-import * as Id from '../../../dist/Kernel/Identity.js'
+import * as Commit from '../../../dist/Strength/Replica/Commit.js'
+import * as Promotion from '../../../dist/Strength/Replica/Promotion.js'
+import * as Id from '../../../dist/Foundation/Identity.js'
 
 const caseOf = (value) => value.cases()[value.tag]
 const run = (value) => Id.ProviderRunIdentityModule_create(value)

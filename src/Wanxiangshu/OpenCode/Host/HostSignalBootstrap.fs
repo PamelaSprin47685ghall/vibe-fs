@@ -66,6 +66,11 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+open Wanxiangshu.Strength.Persistence
+open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
 

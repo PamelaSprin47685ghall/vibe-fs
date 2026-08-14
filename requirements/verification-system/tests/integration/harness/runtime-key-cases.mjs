@@ -24,7 +24,7 @@ import { listItems } from '../../support/domain.mjs';
 import {
   source as pairProgrammingThoughtSource,
   text as pairProgrammingThoughtText,
-} from '../../../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
+} from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([

@@ -8,11 +8,11 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { languageOf, substitute } from '../../../dist/Infrastructure/Resources/ProviderProse.js'
+import { languageOf, substitute } from '../../../dist/Resources/ProviderProse.js'
 import {
   ensureInherited,
   ensureRoot,
-} from '../../../dist/Infrastructure/OpenCode/Host/ProviderLanguageBinding.js'
+} from '../../../dist/OpenCode/Host/ProviderLanguageBinding.js'
 import {
   caseOf,
   mapOf,

@@ -51,7 +51,7 @@ test('OBLIGATION-LEDGER-005 empty placeholders remain invalid while concrete pla
     assert.match(text, /TBD|deferred|延后|推迟/i, `${label}: must reject deferred substance`)
   }
 
-  const host = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+  const host = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
   assert.doesNotMatch(host, /placeholder:\s*planning|\bTBD\b/, 'Host must not classify natural-language placeholder keywords')
 })
 
@@ -64,7 +64,7 @@ test('OBLIGATION-LEDGER-004 committed mode rejects planning-only debt by consequ
     assert.match(text, /mission|用户|deliverable|交付物/i)
   }
 
-  const host = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+  const host = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
   assert.doesNotMatch(host, /survey-startup-and-complexity|O\(N\^2\)|placeholder:\s*planning/, 'Host must not classify planning language')
 })
 
@@ -79,7 +79,7 @@ test('OBLIGATION-LEDGER-012 process reviewer is told the effective planning-vs-m
     assert.match(text, /true/i, `${path}: reviewer must switch to mission-debt review after commitment`)
   }
 
-  const request = read('src/Wanxiangshu/Domain/MagicTodoProcessReview.fs')
+  const request = read('src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs')
   assert.match(request, /EffectivePlanComplete/, 'typed process-review request must carry the effective relation')
 })
 
@@ -99,7 +99,7 @@ test('TODO-005 provider wording says Accepted becomes Current without reviewer s
 
 test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
   const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
-  const hostCodec = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+  const hostCodec = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
 
   assert.match(membrane, /Diagnostic\.fatal "magic-todo-infrastructure-failed"/)
   assert.match(membrane, /\| Error reason -> invalidOp reason/, 'schema decode is allowed to reject the tool call')
@@ -112,7 +112,7 @@ test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrast
 })
 
 test('TODO-003 clean break removes the legacy todo ontology from the production graph', () => {
-  const algebra = read('src/Wanxiangshu/Domain/MagicTodo.fs')
+  const algebra = read('src/Wanxiangshu/Mission/Obligation/Todo/Model.fs')
   const project = read('src/Wanxiangshu/Wanxiangshu.fsproj')
 
   assert.doesNotMatch(
@@ -121,13 +121,13 @@ test('TODO-003 clean break removes the legacy todo ontology from the production 
     'MagicTodo algebra must stay obligation-only',
   )
   assert.doesNotMatch(project, /MagicTodoListCodec|MagicTodoLegacySeed|MagicTodoSuicide/)
-  assert.match(project, /MagicTodoObligationCodec\.fs/)
+  assert.match(project, /ObligationCodec\.fs/)
 })
 
 test('TODO-005 production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-    'src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs',
+    'src/Wanxiangshu/Mission/Review/TodoProcess.fs',
     'src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs',
   ]) {
     const text = read(path)

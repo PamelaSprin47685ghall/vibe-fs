@@ -7,18 +7,18 @@ const root = resolve(import.meta.dirname, '../../..')
 const read = (p) => readFileSync(resolve(root, p), 'utf8')
 
 const fissionProduction = () => [
-  'src/Wanxiangshu/Domain/Fission.fs',
-  'src/Wanxiangshu/Session/FissionAdmission.fs',
-  'src/Wanxiangshu/Session/FissionRuntime.fs',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FissionTool.fs',
+  'src/Wanxiangshu/Execution/Fission/Model.fs',
+  'src/Wanxiangshu/Execution/Fission/Admission.fs',
+  'src/Wanxiangshu/Execution/Fission/Runtime.fs',
+  'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
 test('V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
   const code = fissionProduction()
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 
-  const facts = read('src/Wanxiangshu/Kernel/Fact.fs')
-  const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs') + read('src/Wanxiangshu/Execution/Fission/FissionFactFold.fs')
+  const facts = read('src/Wanxiangshu/Composition/Durable/Fact.fs')
+  const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs') + read('src/Wanxiangshu/Execution/Fission/Fold.fs')
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)
   assert.match(facts, /FissionCompletionDelivered/)
@@ -28,8 +28,8 @@ test('V1 Fission has no OpenCode session-fork path and owns durable replay ancho
 })
 
 test('Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
-  const roles = read('src/Wanxiangshu/Kernel/Roles.fs')
-  const registry = read('src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs')
+  const roles = read('src/Wanxiangshu/Foundation/Roles.fs')
+  const registry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
   assert.match(registry, /"fission"\s*->\s*fun r -> Roles\.isAllowed r ToolPermission\.Fission/)
 
   for (const role of ['Manager', 'Coder', 'Inspector', 'Browser', 'Inquiry']) {
@@ -44,8 +44,8 @@ test('Fission role eligibility comes from ToolPermission.Fission for current off
 })
 
 test('sibling creation is a distinct Host capability from managed-child creation', () => {
-  const sessions = read('src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs')
-  const port = read('src/Wanxiangshu/Infrastructure/OpenCode/Host/OpenCodePort.fs')
+  const sessions = read('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
+  const port = read('src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs')
   assert.match(sessions, /CreateSiblingSession/)
   assert.match(sessions, /TryGetParentSession/)
   assert.match(port, /CreateSession/)

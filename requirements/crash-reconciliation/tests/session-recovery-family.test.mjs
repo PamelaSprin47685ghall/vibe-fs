@@ -10,7 +10,7 @@ import { join } from 'node:path'
 const ROOT = new URL('../../../', import.meta.url).pathname
 
 test('RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
-  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
+  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   assert.match(src, /module SessionRecovery/)
   assert.match(src, /type FamilyRecoveryPermit\s*=\s*\n\s*private/)
     assert.match(src, /authorizeFamilyResume/)
@@ -19,7 +19,7 @@ test('RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
 })
 
 test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
-  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), 'utf8')
+  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), 'utf8')
   const code = src
     .split('\n')
     .filter((l) => !/^\s*\/\//.test(l) && !/^\s*\*/.test(l))
@@ -35,14 +35,14 @@ test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
 
 test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
   // Family recovery ports are wired in PluginRecoveryWiring (Wave 3).
-  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
+  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   // Family recovery + attempt planning live in PluginRecoveryScope (Wave 2).
   const scope = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRecoveryScope.fs'),
+    join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs'),
     'utf8',
   )
   const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
     'utf8',
   )
   assert.match(spike, /AttachFamilyRecoveryPorts/)
@@ -64,13 +64,13 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
 })
 
 test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
-  const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
+  const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const workflow = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
     'utf8',
   )
   const coordinator = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Session/FamilyRecoveryCoordinator.fs'),
+    join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs'),
     'utf8',
   )
   const fsproj = readFileSync(join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
@@ -85,11 +85,11 @@ test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   assert.match(coordinator, /let runOnce/)
   assert.doesNotMatch(coordinator, /recoverFamilyDirect|SessionRecoveryPorts|authorizeFamilyResume/)
   assert.doesNotMatch(workflow, /module Coordinator/)
-  assert.match(fsproj, /Session\/FamilyRecoveryCoordinator\.fs/)
+  assert.match(fsproj, /Execution\/Session\/Recovery\/Coordinator\.fs/)
 })
 
 test('RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {
-  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
+  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   assert.match(src, /type HandleFamilyRecovery/)
   assert.match(src, /NoLinkedHandles/)
   assert.match(src, /HandlesRecovered/)
@@ -98,7 +98,7 @@ test('RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {
   assert.match(src, /type JobFamilyRecovery/)
   assert.match(src, /NoRelatedJobs/)
   assert.match(src, /JobsRecovered/)
-  const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/ChildRecovery.fs'), 'utf8')
+  const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs'), 'utf8')
   assert.match(child, /type ChildRecoveryResult/)
   assert.match(child, /RecoveredActive/)
   assert.match(child, /RecoveryIncomplete/)
@@ -151,7 +151,7 @@ test('RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', async ()
 })
 
 test('RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async () => {
-  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
+  const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   // Extract the HandlesWaiting match arm body (up to the next arm) and assert its outcome.
   const waitingArm = src.match(
     /HandleFamilyRecovery\.HandlesWaiting[\s\S]*?(?=HandleFamilyRecovery\.HandlesBlocked)/,

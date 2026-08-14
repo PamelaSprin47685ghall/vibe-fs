@@ -4,9 +4,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { tryGet, refresh, invalidate, resolve, shelfmarkFor } from '../../../dist/Infrastructure/CasebookIndex.js'
-import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { Observation } from '../../../dist/Domain/Casebook.js'
+import { tryGet, refresh, invalidate, resolve, shelfmarkFor } from '../../../dist/Repository/Knowledge/Casebook/Index.js'
+import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 

@@ -13,10 +13,10 @@ import {
   BuiltinToolDescriptionHook_validateRecommendation as validateRecommendation,
   BuiltinToolDescriptionHook_BuiltinFilesystemTools as builtinTools,
   JsDescriptionAssets_load as loadJsProse,
-} from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
-import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
-import { ToolPermission } from '../../../dist/Kernel/Roles.js'
+} from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
+import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
+import { ToolPermission } from '../../../dist/Foundation/Roles.js'
 import { FsSet } from '../../verification-system/tests/support/domain.mjs'
 import { resultOf, stringSet } from '../../verification-system/tests/support/domain.mjs'
 
@@ -56,7 +56,7 @@ test('JS073_spec_executes_program_and_renders_result', async () => {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const surface = generate('Coder', coderCaps, jsProse())
     // Build the spec with the real Host tool factory, like ToolRegistry does.
-    const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+    const codec = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
     const tool = (definition) => definition
     tool.schema = {
       string: () => ({
@@ -65,7 +65,7 @@ test('JS073_spec_executes_program_and_renders_result', async () => {
       }),
     }
     const factory = codec.ToolHostCodec_factory({ tool })
-    const { JsToolSpec_create: create } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js')
+    const { JsToolSpec_create: create } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js')
     const spec = create(factory, surface, dir, undefined)
     const registered = codec.ToolHostCodec_register(factory, spec)
 

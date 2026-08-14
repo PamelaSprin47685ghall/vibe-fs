@@ -5,15 +5,15 @@ import { listItems, resultOf } from '../../verification-system/tests/support/dom
 import {
   BookkeeperRuntime_bindSession as bindSession,
   BookkeeperRuntime_resetSessionPort as resetSessionPort,
-} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+} from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
   HostToolContext,
   ToolHostCodec_factory,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec, execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsBookkeeperTool.js')
-const { beginTransaction, snapshot, take, abort } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
+} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec, execute } = await import('../../../dist/Repository/Programming/Js/OpenCode/BookkeeperTool.js')
+const { beginTransaction, snapshot, take, abort } = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperStaging.js')
 
 const schemaNode = (kind, extra = {}) => ({
   kind,

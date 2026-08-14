@@ -14,18 +14,15 @@ import test from 'node:test'
 
 import { agentJournal, caseOf, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const {
-  HostForkRuntime__InstallRun_7AC6F164: installRun,
-  HostForkRuntime__get_IsCancelled: runtimeIsCancelled,
-  HostForkRuntime__Cancel: cancelRuntime,
-} = await import('../../../dist/Session/HostForkRuntime.js')
+const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
+const { HostForkRuntime, HostForkRuntime__get_IsCancelled: runtimeIsCancelled, HostForkRuntime__Cancel: cancelRuntime } = hostRuntimeModule
+const installRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__InstallRun_'))?.[1]
 const {
   join: joinAny,
   joinAvailable,
   awaitAgent,
-} = await import('../../../dist/Session/HostForkJoin.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+} = await import('../../../dist/Execution/Delegation/Fork/Host/Join.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 const PARENT = sessionId('ses_hfrt')
 

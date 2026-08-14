@@ -15,8 +15,8 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
 test('SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
-  const manager = await load('Application/Manager/ManagerWorkflow')
-  const reviewer = await load('Application/Review/ReviewerWorkflow')
+  const manager = await load('Mission/Manager/Workflow')
+  const reviewer = await load('Mission/Review/Judgement/Workflow')
   const turn = await load('Composition/Turn/Workflow')
 
   assert.deepEqual(surfaceOf(manager).sort(), ['observe', 'observeIdle'])
@@ -34,8 +34,8 @@ test('SW_002_workflow_modules_export_no_program_counter_shaped_names', async () 
   // exported tag. The workflow modules must expose only story entrypoints.
   const programCounterShape = /(Stage|Phase|NextAction|Disposition|ProgramCounter|ProgramStep)$/
   for (const modulePath of [
-    'Application/Manager/ManagerWorkflow',
-    'Application/Review/ReviewerWorkflow',
+    'Mission/Manager/Workflow',
+    'Mission/Review/Judgement/Workflow',
     'Composition/Turn/Workflow',
   ]) {
     const names = surfaceOf(await load(modulePath))
@@ -45,14 +45,14 @@ test('SW_002_workflow_modules_export_no_program_counter_shaped_names', async () 
 })
 
 test('SW_003_domain_flow_and_outcome_types_are_domain_facts', async () => {
-  const flow = await load('Kernel/DomainFlow')
-  const outcome = await load('Kernel/Outcome')
+  const flow = await load('Foundation/Flow')
+  const outcome = await load('Foundation/Outcome')
 
   // AgentContext/CompanionContext are the physical/domain context handed to a
   // direct CE program; the error types are closed domain vocabularies, not
   // "which step we are at" tags.
   for (const t of ['AgentContext', 'CompanionContext', 'AgentError', 'CompanionError']) {
-    assert.equal(typeof flow[t], 'function', `Kernel/DomainFlow must export ${t}`)
+    assert.equal(typeof flow[t], 'function', `Foundation/Flow must export ${t}`)
   }
 
   // AgentRunResult is the completion payload of a successful agent run

@@ -30,17 +30,17 @@ import {
   toList,
   xTraceCapture,
 } from '../../verification-system/tests/support/domain.mjs'
-import { applyTransform, reconcileAttempt } from '../../../dist/Context/Prefix/XWire.js'
-import {
-  PluginRuntimeScope,
-  PluginRuntimeScope__ArmRecovery_Z31B28506 as armRecovery,
-  PluginRuntimeScope__TryAttemptPlan,
-  PluginRuntimeScope__TryRecoveryArming_Z31B28506 as tryRecoveryArming,
-} from '../../../dist/Infrastructure/OpenCode/Host/PluginRuntimeScope.js'
+import { applyTransform, reconcileAttempt } from '../../../dist/Context/Prefix/Wire.js'
+const scopeModule = await import('../../../dist/OpenCode/Host/PluginRuntimeScope.js')
+const { PluginRuntimeScope, PluginRuntimeScope__TryAttemptPlan } = scopeModule
+// Resolve Fable-exported members by prefix; the hash suffix is a compiler
+// artifact and must not be pinned in tests (VERIFY-008).
+const armRecovery = Object.entries(scopeModule).find(([k]) => k.startsWith('PluginRuntimeScope__ArmRecovery_'))?.[1]
+const tryRecoveryArming = Object.entries(scopeModule).find(([k]) => k.startsWith('PluginRuntimeScope__TryRecoveryArming_'))?.[1]
 
 const makeScope = (journal) => new PluginRuntimeScope(journal)
-import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
-import { sha256Hex } from '../../../dist/Host/HostDigest.js'
+import { SessionMessage } from '../../../dist/OpenCode/Host/SessionSnapshotPort.js'
+import { sha256Hex } from '../../../dist/Host/Digest.js'
 import { buildTurn } from '../../../dist/Interaction/Repair/CompletedTurn.js'
 
 const SESSION = 'ses_x'

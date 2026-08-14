@@ -7,16 +7,16 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { CasebookWorkflow_fetchCase as fetchCase } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { CasebookWorkflow_needsRefresh as needsRefresh } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { refreshStale } from '../../../dist/Infrastructure/CasebookBookkeeper.js'
-import { contentHash as hash } from '../../../dist/Infrastructure/CasebookCapture.js'
-import { Observation } from '../../../dist/Domain/Casebook.js'
+import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { CasebookWorkflow_fetchCase as fetchCase } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { CasebookWorkflow_needsRefresh as needsRefresh } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { refreshStale } from '../../../dist/Repository/Knowledge/Casebook/Bookkeeper.js'
+import { contentHash as hash } from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
+import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])

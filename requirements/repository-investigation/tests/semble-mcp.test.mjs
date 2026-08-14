@@ -10,10 +10,10 @@ import { caseOf, listItems, managedAgentConfig, payloadOf, runtimeResources } fr
 const here = dirname(fileURLToPath(import.meta.url))
 const dist = join(here, '../../../dist')
 const fixturePath = join(here, '../../verification-system/tests/support/semble-mcp-fixture.js')
-const kernel = await import(join(dist, 'Kernel/SembleMcp.js'))
+const kernel = await import(join(dist, 'Repository/Investigation/Semble/Mcp.js'))
 const { serverName, defaultRef, repo, toolName, maxSnippetLines, uvxCommand, fixtureCommand } = kernel
-const { parseText, parseToolResult } = await import(join(dist, 'Infrastructure/SembleSearchCodec.js'))
-const { launchFromVars, search } = await import(join(dist, 'Infrastructure/SembleMcpClient.js'))
+const { parseText, parseToolResult } = await import(join(dist, 'Repository/Investigation/Semble/SearchCodec.js'))
+const { launchFromVars, search } = await import(join(dist, 'Repository/Investigation/Semble/Client.js'))
 const ROLES = ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger', 'Bookkeeper']
 const TIERS = ['fast', 'deep']
 const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`

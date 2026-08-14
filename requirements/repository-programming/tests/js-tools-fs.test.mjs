@@ -12,21 +12,21 @@ import { join } from 'node:path'
 
 import {
   readUtf8Classified as readUtf8,
-} from '../../../dist/Infrastructure/JsUtf8Fs.js'
+} from '../../../dist/Repository/Programming/Js/Utf8Fs.js'
 import {
   glob as glob,
-} from '../../../dist/Infrastructure/JsGlobFs.js'
+} from '../../../dist/Repository/Programming/Js/GlobFs.js'
 import {
   findAnchor as findAnchor,
   requireUnique as requireUnique,
   grep as grep,
-} from '../../../dist/Infrastructure/JsAnchorFs.js'
+} from '../../../dist/Repository/Programming/Js/AnchorFs.js'
 import {
   commitPlan as commitPlan,
   rollbackPlan as rollbackPlan,
-} from '../../../dist/Infrastructure/JsMutationFs.js'
-import { AnchorSpec } from '../../../dist/Domain/JsAnchor.js'
-import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
+} from '../../../dist/Repository/Programming/Js/MutationFs.js'
+import { AnchorSpec } from '../../../dist/Repository/Programming/Js/Anchor.js'
+import { JsFailureModule_code as failureCode } from '../../../dist/Repository/Programming/Js/Failure.js'
 import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const anchorCaseIndex = (name) => Object.create(AnchorSpec.prototype).cases().indexOf(name)

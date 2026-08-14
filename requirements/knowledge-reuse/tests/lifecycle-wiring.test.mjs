@@ -8,14 +8,14 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { collector, setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cleanupInspector, touchAccess } from '../../../dist/Infrastructure/CasebookLifecycle.js'
-import { CasebookWorkflow_fetchCase as fetchCase, CasebookWorkflow_touchCaseAccess as touchCaseAccess } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import { ObservationCollector__Collect_Z15AE2BE0 as collect, ObservationCollector__Count_Z721C83C5 as count } from '../../../dist/Infrastructure/ObservationCollector.js'
-import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
+import { collector, setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cleanupInspector, touchAccess } from '../../../dist/Repository/Knowledge/Casebook/Lifecycle.js'
+import { CasebookWorkflow_fetchCase as fetchCase, CasebookWorkflow_touchCaseAccess as touchCaseAccess } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
+import { ObservationCollector__Collect_Z15AE2BE0 as collect, ObservationCollector__Count_Z721C83C5 as count } from '../../../dist/Enforcer/ObservationCollector.js'
+import { acquire } from '../../../dist/OpenCode/Host/WorkspaceEventStore.js'
 import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
 import { listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))

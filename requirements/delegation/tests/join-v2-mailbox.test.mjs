@@ -22,12 +22,12 @@ import {
   payloadOf,
   verdictMailbox,
 } from '../../verification-system/tests/support/domain.mjs'
-import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
+import { JoinInterruptReason } from '../../../dist/Execution/Session/Wait/CompletionMailbox.js'
 import {
   JoinAttemptRegistry,
   JoinAttemptLease__get_Wait as leaseWait,
-} from '../../../dist/Session/JoinInterruptRegistry.js'
-import { SessionIdModule_create } from '../../../dist/Kernel/Identity.js'
+} from '../../../dist/Execution/Delegation/Handle/JoinInterruptRegistry.js'
+import { SessionIdModule_create } from '../../../dist/Foundation/Identity.js'
 
 const assertPending = async (wait, message) => {
   let settled = false

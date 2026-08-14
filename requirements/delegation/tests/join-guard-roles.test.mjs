@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { sessionId } from '../../verification-system/tests/support/domain.mjs'
-import * as TerminalPolicyModule from '../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js'
-import * as ForkTypesModule from '../../../dist/Session/ForkTypes.js'
-import * as RolesModule from '../../../dist/Kernel/Roles.js'
+import * as TerminalPolicyModule from '../../../dist/OpenCode/Host/TerminalPolicy.js'
+import * as ForkTypesModule from '../../../dist/Execution/Delegation/Fork/Model.js'
+import * as RolesModule from '../../../dist/Foundation/Roles.js'
 
 const outstandingBackground = (() => {
   const names = Object.keys(TerminalPolicyModule)

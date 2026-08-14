@@ -11,7 +11,7 @@ import test from 'node:test'
 import { eventId, resultOf, toList } from '../../../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../../../dist/Domain/EventStore.js')
+const Domain = await import('../../../../../dist/Persistence/EventStore/Model.js')
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'
 const fingerprint = (p) => {
   const s = statSync(p)
@@ -52,8 +52,8 @@ test('local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
 
 test('shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async () => {
   const { readFile } = await import('node:fs/promises')
-  const eventStore = await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/EventStore.fs', import.meta.url), 'utf8')
-  const sync = await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/WriterStreamSync.fs', import.meta.url), 'utf8')
+  const eventStore = await readFile(new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
+  const sync = await readFile(new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs', import.meta.url), 'utf8')
   const tombstones = [
     await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs', import.meta.url), 'utf8'),
     await readFile(new URL('../../../../../src/Wanxiangshu/Infrastructure/Persist/UniversalGitRawStore.fs', import.meta.url), 'utf8'),

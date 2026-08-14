@@ -9,7 +9,7 @@ import { caseOf, payloadOf, resultOf, okResult, errorResult } from '../../verifi
 
 const {
   PtyPort,
-  PtyPort__AddMailboxSender_15902874,
+  PtyPort__AddMailboxSender_6A484C48,
   PtyPort__get_MailboxSender,
   PtyPort__get_Handler,
   PtyPort__get_AgentProvider,
@@ -75,8 +75,8 @@ test('PORT_ctor_keeps_supplied_sender_handler_and_agent_provider', async () => {
 test('PORT_AddMailboxSender_reaches_every_registered_sender', () => {
   const p = new PtyPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(caseOf(item)))
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(caseOf(item)))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(caseOf(item)))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(caseOf(item)))
   forkDefault(p, 'pty-s1')
   PtyPort__Complete_3BA7AC67(p, id('pty-s1'), okResult('done'))
   assert.deepEqual(got, ['PtyExited', 'PtyExited'])
@@ -179,7 +179,7 @@ test('PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => 
   for (const sig of [PtySignal.Terminate, PtySignal.Kill, PtySignal.Interrupt]) {
     const p = new PtyPort()
     const got = []
-    PtyPort__AddMailboxSender_15902874(p, (item) => got.push(item))
+    PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
     const pid = forkDefault(p, `pty-ab${sig.tag}`)
     const sent = resultOf(await PtyPort__Send_Z13021A56(p, pid, signalOf(sig)))
     assert.equal(sent.ok, true)
@@ -191,7 +191,7 @@ test('PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => 
 test('PORT_send_plain_signal_does_not_abort_the_completion', async () => {
   const p = new PtyPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
   const pid = forkDefault(p, 'pty-hup')
   await PtyPort__Send_Z13021A56(p, pid, signalOf(PtySignal.Hangup))
   PtyPort__Complete_3BA7AC67(p, pid, okResult('closed'))
@@ -282,7 +282,7 @@ test('PORT_read_result_and_fail_read_without_waiter_are_noops', () => {
 
 const completedItem = (p, pid, outcome) => {
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
   PtyPort__Complete_3BA7AC67(p, pid, outcome)
   return got[0]
 }
@@ -340,7 +340,7 @@ test('PORT_complete_abort_with_error_outcome_carries_the_error_text', async () =
 test('PORT_complete_on_inactive_id_publishes_nothing', () => {
   const p = new PtyPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
   PtyPort__Complete_3BA7AC67(p, id('pty-ghost'), okResult('x'))
   assert.equal(got.length, 0)
 })
@@ -348,10 +348,10 @@ test('PORT_complete_on_inactive_id_publishes_nothing', () => {
 test('PORT_complete_isolates_failing_senders', () => {
   const p = new PtyPort()
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, () => {
+  PtyPort__AddMailboxSender_6A484C48(p, () => {
     throw new Error('sender exploded')
   })
-  PtyPort__AddMailboxSender_15902874(p, (item) => got.push(item))
+  PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
   const pid = forkDefault(p, 'pty-th')
   PtyPort__Complete_3BA7AC67(p, pid, okResult('done'))
   assert.deepEqual(got.map(caseOf), ['PtyExited'])
@@ -377,7 +377,7 @@ test('PORT_complete_aborted_forces_abort_without_terminate_mark', () => {
   // A fresh fork of the same id is active again; CompleteAborted needs no TERM mark.
   forkDefault(p, 'pty-cab', 'again')
   const second = []
-  PtyPort__AddMailboxSender_15902874(p, (i) => second.push(i))
+  PtyPort__AddMailboxSender_6A484C48(p, (i) => second.push(i))
   PtyPort__CompleteAborted_20FBD4C9(p, pid, 'owner interrupt')
   assert.equal(caseOf(second[0]), 'PtyAborted')
   const info = payloadOf(second[0])
@@ -388,7 +388,7 @@ test('PORT_complete_aborted_defaults_message_and_clears_active', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-cab2')
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (i) => got.push(i))
+  PtyPort__AddMailboxSender_6A484C48(p, (i) => got.push(i))
   PtyPort__CompleteAborted_20FBD4C9(p, pid)
   assert.equal(payloadOf(got[0]).Message, 'PTY aborted')
   assert.equal(PtyPort__Exists_Z33F80F6F(p, pid), false)
@@ -404,7 +404,7 @@ test('PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
   })
   const pid = forkDefault(p, 'pty-cs')
   const got = []
-  PtyPort__AddMailboxSender_15902874(p, (i) => got.push(i))
+  PtyPort__AddMailboxSender_6A484C48(p, (i) => got.push(i))
   PtyPort__Close_3BA7AC67(p, pid)
   assert.deepEqual(seen, [['pty-cs', 'Signal', 0]]) // Terminate
   assert.equal(PtyPort__Exists_Z33F80F6F(p, pid), true, 'close does not drop active')

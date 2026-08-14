@@ -37,13 +37,13 @@ const readProviderRaw = (semanticPath) =>
 
 const readProviderDocument = (semanticPath) => syntheticDocument(readProviderRaw(semanticPath))
 
-const narrative = await load('Domain/ManagerNarrative.js', [
+const narrative = await load('Mission/Manager/Narrative.js', [
   'wrapT1AcceptedResult',
   'firstBirth',
   'reawakening',
   'renderText',
 ])
-const finality = await load('Domain/FinalityPrompt.js', ['rejected', 'blessed'])
+const finality = await load('Mission/Finality/Prompt.js', ['rejected', 'blessed'])
 
 /** F# list → array (Fable list has head/tail). */
 const listToArray = (list) => {

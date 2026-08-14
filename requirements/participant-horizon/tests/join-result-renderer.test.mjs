@@ -13,7 +13,7 @@ const {
   renderCompletedBatch,
   renderForkError,
   renderInterrupted,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/JoinResultRenderer.js')
+} = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.js')
 
 const {
   JoinItem,
@@ -26,12 +26,12 @@ const {
   PtyAbort,
   RunCompletion,
   AgentCompletionOutcome,
-} = await import('../../../dist/Session/AgentCompletion.js')
+} = await import('../../../dist/Execution/Session/AgentCompletion.js')
 
-const { ForkError } = await import('../../../dist/Session/ForkTypes.js')
-const { JoinInterruptReason } = await import('../../../dist/Session/CompletionMailbox.js')
-const { NonEmptyBatch_ofHeadTail: batchOf } = await import('../../../dist/Session/CompletionMailbox.js')
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { ForkError } = await import('../../../dist/Execution/Delegation/Fork/Model.js')
+const { JoinInterruptReason } = await import('../../../dist/Execution/Session/Wait/CompletionMailbox.js')
+const { NonEmptyBatch_ofHeadTail: batchOf } = await import('../../../dist/Execution/Session/Wait/CompletionMailbox.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 
 const lang = providerLanguage.english
 

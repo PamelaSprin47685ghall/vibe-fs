@@ -17,11 +17,11 @@ import {
   caseOf, roles, completionKind, managerJobId, worktreeIdentity, worktreePath, targetRef,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const { Role } = await import('../../../dist/Kernel/Roles.js')
+const { Role } = await import('../../../dist/Foundation/Roles.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const {
   sessionDead, tryLinkedChild, isLinkedChild, mainSealedForBlogger, outstandingBackground,
-} = await import('../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js')
+} = await import('../../../dist/OpenCode/Host/TerminalPolicy.js')
 
 const MAIN = sessionId('ses_main')
 const CHILD = sessionId('ses_child')

@@ -8,14 +8,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { ToolPermission } from '../../../dist/Foundation/Roles.js'
 import {
   JsToolGenerator_generate as generate,
   JsToolGenerator_isGeneratedToolName as isGeneratedToolName,
   JsToolGenerator_memberBinding as memberBinding,
-} from '../../../dist/Domain/JsSurface.js'
-import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
-import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
+} from '../../../dist/Repository/Programming/Js/Surface.js'
+import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
+import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
 import { FsSet } from '../../verification-system/tests/support/domain.mjs'
 import { isNone, isSome, listItems, roles } from '../../verification-system/tests/support/domain.mjs'
 

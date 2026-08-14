@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Interaction.Repair
 
 open System.Threading.Tasks
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -40,7 +42,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Resources
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

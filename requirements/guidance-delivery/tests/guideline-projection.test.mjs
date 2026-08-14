@@ -13,12 +13,12 @@ import {
   GuidelineProjection_apply as apply,
   GuidelineProjection_pairs as pairs,
   GuidelineProjection_nextOrdinal as nextOrdinal,
-} from '../../../dist/OpenCode/Contract/GuidelineProjection.js'
+} from '../../../dist/Composition/Durable/GuidelineProjection.js'
 import {
   ToolCallIdModule_create as toolCallId,
   TranscriptGap,
   TranscriptMessageAddress,
-} from '../../../dist/Kernel/Identity.js'
+} from '../../../dist/Foundation/Identity.js'
 
 const addr = (value) => new TranscriptMessageAddress(value)
 const gapBefore = (value) => new TranscriptGap(1, [addr(value)])

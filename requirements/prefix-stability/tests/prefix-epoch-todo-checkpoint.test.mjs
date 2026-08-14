@@ -16,7 +16,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { requiresLag1Rebase, buildTodoCheckpointCommit } = await import(
-  '../../../dist/Domain/MagicTodoPrefixEpoch.js'
+  '../../../dist/Mission/Obligation/Todo/PrefixEpoch.js'
 )
 
 const t = (id) => magicTodo.todoWriteIdCreate(id)

@@ -9,26 +9,28 @@ import { parse as parseToml } from 'smol-toml'
 
 import { agentJournal, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
-const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
-  await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
+const { HostToolContext } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { spec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinTool.js')
+const toolRuntimeModule = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { ToolRuntimeScope } = toolRuntimeModule
+const attachFamilyRecovery = Object.entries(toolRuntimeModule).find(([k]) => k.startsWith('ToolRuntimeScope__AttachFamilyRecovery_'))?.[1]
+  await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const {
   FamilyRecovery,
   FamilyRecoveryPermit,
   NonEmpty_one: nonEmptyOne,
   RecoveryBlock,
-} = await import('../../../dist/Domain/SessionRecovery.js')
+} = await import('../../../dist/Execution/Session/Recovery/Model.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } =
   await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
+const { JournalRevisionModule_value } = await import('../../../dist/Foundation/Identity.js')
 const { discover } = await import('../../../dist/Execution/Session/RecoveryClosureProjection.js')
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { PtyPort, PtyPort__Complete_3BA7AC67: completePty } = await import('../../../dist/Process/Pty.js')
-const {
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_ForkPty_Z27B191B4: forkPty,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_TryBindTerminalName_Z79AB0CF6: bindTerminalName,
-} = await import('../../../dist/Session/HostForkPty.js')
+const hostPtyModule = await import('../../../dist/Execution/Delegation/Fork/Host/Pty.js')
+const hostPtyMemberOf = (name) => Object.entries(hostPtyModule).find(([k]) => k.includes(`HostForkRuntime_${name}_`))?.[1]
+const forkPty = hostPtyMemberOf('ForkPty')
+const bindTerminalName = hostPtyMemberOf('TryBindTerminalName')
 const { PtyId__get_Value: ptyIdValue } = await import('../../../dist/Process/PtyTypes.js')
 
 const context = (session = 'ses_join') =>

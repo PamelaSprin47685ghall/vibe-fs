@@ -15,7 +15,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Tools
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Fable.Core.JsInterop
@@ -54,7 +53,9 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
-open Wanxiangshu.Recovery
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.OpenCode
 
 type CompanionHost
     (

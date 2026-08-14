@@ -6,7 +6,7 @@ import test from 'node:test'
 import {
   observationsOf,
   observationsAfterSquash,
-} from '../../../dist/Feedback/Enforcer/Observation.js'
+} from '../../../dist/Enforcer/Observation.js'
 import {
   blogProjection as blog,
   enforcementProjection as enf,

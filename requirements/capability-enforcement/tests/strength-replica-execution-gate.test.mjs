@@ -9,11 +9,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Frame from '../../../dist/Domain/StrengthFrame.js'
-import { toolCapabilitiesFor } from '../../../dist/Domain/PromptAuthority.js'
-import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
-import { Role, ToolPermission } from '../../../dist/Kernel/Roles.js'
+import * as Frame from '../../../dist/Strength/Frame.js'
+import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
+import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
+import * as Runtime from '../../../dist/Strength/Runtime.js'
+import { Role, ToolPermission } from '../../../dist/Foundation/Roles.js'
 import { mapEntries } from '../../verification-system/tests/support/domain.mjs'
 
 const caseOf = (value) => value.cases()[value.tag]

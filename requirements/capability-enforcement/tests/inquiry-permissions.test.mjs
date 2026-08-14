@@ -13,11 +13,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import { toolCapabilitiesFor } from '../../../dist/Domain/PromptAuthority.js'
-import { ToolRegistry_rolePredicate as rolePredicate } from '../../../dist/Infrastructure/OpenCode/Tools/ToolRegistry.js'
-import { Role, Roles_isAllowed as isAllowed, ToolPermission } from '../../../dist/Kernel/Roles.js'
-import { StaticTools_toolName as toolName } from '../../../dist/Tools/StaticTools.js'
+import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
+import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
+import { ToolRegistry_rolePredicate as rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistry.js'
+import { Role, Roles_isAllowed as isAllowed, ToolPermission } from '../../../dist/Foundation/Roles.js'
+import { StaticTools_toolName as toolName } from '../../../dist/OpenCode/Tools/StaticTools.js'
 
 import { managedAgentConfig, roles, runtimeResources, setItems } from '../../verification-system/tests/support/domain.mjs'
 

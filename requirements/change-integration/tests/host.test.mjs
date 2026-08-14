@@ -29,10 +29,10 @@ import {
 } from '../../verification-system/tests/support/orchestrator-host-harness.mjs'
 
 const { OrchestratorHost__JoinPublished: hostJoinPublished } = await import(
-  '../../../dist/Infrastructure/OpenCode/Orchestration/Host.js'
+  '../../../dist/Change/Host/Host.js'
 )
 const { OrchestratorHost__Cancel: hostCancel } = await import(
-  '../../../dist/Infrastructure/OpenCode/Orchestration/Host.js'
+  '../../../dist/Change/Host/Host.js'
 )
 
 // ── initializeEngine / engine() ───────────────────────────────────────────────
@@ -105,7 +105,7 @@ test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
 })
 
 test('HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(
     source,
     /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/,
@@ -173,7 +173,7 @@ test('HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', asyn
   try {
     const started = resultOf(
       await live.host.managerPort.StartManager(
-        new (await import('../../../dist/Application/Orchestration/Types.js')).ManagerStart(
+        new (await import('../../../dist/Change/Types.js')).ManagerStart(
           managerJobId('hostfw10'),
           'fast-manager',
           worktreePath(worktree),

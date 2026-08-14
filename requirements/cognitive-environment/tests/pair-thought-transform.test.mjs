@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { text } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
+const { text } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 test('PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
   assert.match(text, /\[NEEDHELP\]/)

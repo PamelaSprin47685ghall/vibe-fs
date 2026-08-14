@@ -54,8 +54,8 @@ test('office_boundary_eval_oracles_are_not_wired_into_production_tools', () => {
   }
 
   const dirs = [
-    join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools'),
-    join(ROOT, 'src/Wanxiangshu/Tools'),
+    join(ROOT, 'src/Wanxiangshu/OpenCode/Tools'),
+    join(ROOT, 'src/Wanxiangshu/OpenCode/Tools'),
   ]
   for (const dir of dirs) {
     for (const name of readdirSync(dir)) {
