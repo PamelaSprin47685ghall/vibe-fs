@@ -235,8 +235,31 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
     },
     { id: 'far-shore', en: /far shore/i, zh: /远岸/ },
     { id: 'source-closest', en: /source closest to the fact/i, zh: /最接近.*事实/ },
-    { id: 'visual-truth', en: /only visible|screenshots/i, zh: /只有通过视觉才能看见|Screenshot/ },
-    { id: 'disagreement', en: /disagreement/i, zh: /分歧/ },
+    {
+      id: 'visual-truth',
+      en: /Some truths are only visible|Read visual evidence when the charge depends/i,
+      zh: /有些事实只有看见才成立|读取视觉证据/,
+    },
+    {
+      id: 'condition-preserved',
+      en: /Preserve the conditions that make a fact true|Carry the condition with the claim/i,
+      zh: /保留使事实成立的条件|把条件与主张一起带走/,
+    },
+    {
+      id: 'inference-not-observation',
+      en: /Inference is not a second observation|promote a plausible inference into a witnessed fact/i,
+      zh: /Inference 不是第二次 observation|升格为已被见证的事实/,
+    },
+    {
+      id: 'disagreement-not-averaged',
+      en: /Disagreement is not a confidence average|Do not average conflicting authorities/i,
+      zh: /分歧不是置信度的平均|不要把互相冲突的权威平均/,
+    },
+    {
+      id: 'no-cross-sea-certainty',
+      en: /Do not cross the sea with more certainty/i,
+      zh: /带着比远岸本身提供得更多的确定性渡海归来/,
+    },
   ]),
   blogger: Object.freeze([
     { id: 'occurrence-selection', en: /changed the continuing road/i, zh: /什么改变了继续前进的道路/ },
@@ -260,10 +283,19 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
     },
     {
       id: 'fragment-humility',
-      en: /fragment cannot establish the whole|fragment silence/i,
-      zh: /fragment 的谦逊|沉默的 fragment/,
+      en: /fragment cannot establish the whole|fragment silence|Do not manufacture success/i,
+      zh: /fragment 的谦逊|沉默的 fragment|不要制造 success/,
     },
-    { id: 'merge-conflicts', en: /Conflicting observations|preserve conflicts/i, zh: /保留冲突/ },
+    {
+      id: 'merge-conflicts',
+      en: /Conflicting observations|preserve conflicts|not outvoted/i,
+      zh: /保留冲突|投票否决/,
+    },
+    {
+      id: 'locatable-to-unseen-reader',
+      en: /usable by a reader who never sees the original/i,
+      zh: /对从未见过原始大体量文本的读者仍然可用/,
+    },
     {
       id: 'no-invented-causality',
       en: /Do not guess causes|what the material before you can establish/i,

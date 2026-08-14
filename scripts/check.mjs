@@ -29,6 +29,7 @@ const checks = [
   join(root, 'checks/g4r-freeze.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
   join(root, 'checks/test-boundary.mjs'),
+  join(root, 'checks/e2e-watchdog-feed.mjs'),
 ]
 
 for (const script of checks) {

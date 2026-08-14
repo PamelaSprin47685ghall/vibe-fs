@@ -115,7 +115,7 @@ ORPHAN          = 断言存在但无 package owner（缺陷，需修）
 | `dsl-ownership.mjs`（+ratchet） | SPLIT | structured-workflow（positive：无程序计数器/语义 vocabulary）+ DELETE（legacy symbol blacklist 部分） |
 | `e2e-watchdog-feed.mjs` | MECHANISM | verification-system（proof harness；因果续期语义借 causal-wait） |
 | `enforcer-cross-family-collision.mjs` | KEEP | guidance-delivery（detection/remediation audience 分离） |
-| `enforcer-rulebook-gate.mjs` | KEEP | behavior-diagnosis（tip 目录 SSOT / 唯一 TipName） |
+| `enforcer-rulebook-gate.mjs` | DELETE/retired | behavior-diagnosis（retired stub；tip 目录 SSOT / 唯一 TipName 由 `tests/unit/enforcer/**` catalog 测试承担） |
 | `g4r-ce-vocabulary.mjs` | KEEP | structured-workflow（CE vocabulary）；ratchet 基线稳定后弱化 |
 | `g4r-freeze.mjs` | DELETE | migration freeze ratchet |
 | `js-surface-gate.mjs` | KEEP | repository-programming（surface 应用 capability-enforcement 同构律） |
@@ -174,7 +174,7 @@ ORPHAN          = 断言存在但无 package owner（缺陷，需修）
 | `integration/package/`（4） | KEEP | distribution |
 | `integration/persist/`（3） | KEEP | durable-events + durable-convergence（dumb-server） |
 | `integration/plugin/`（5） | SPLIT | repository-programming（file-mutation）+ capability-enforcement（manager-tool/bash-honeypot/auto-injected）+ obligation-ledger（magic-todo-sink） |
-| `integration/resources/`（2） | KEEP | distribution + behavior-diagnosis（enforcer-rulebook） |
+| `integration/resources/`（2） | KEEP | distribution + behavior-diagnosis（enforcer-rulebook 资源，tip SSOT） |
 | `integration/strength/`（1） | KEEP | speculative-investigation |
 | `e2e/entry`（1） | MECHANISM | verification-system（Long Stroke harness） |
 | `eval/provider-office-boundary`（1） | KEEP | office-capability + participant-horizon |

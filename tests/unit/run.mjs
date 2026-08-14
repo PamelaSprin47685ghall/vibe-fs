@@ -29,6 +29,7 @@ import { walk } from '../../scripts/lib/walk.mjs'
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
 const TESTS_ROOT = 'tests/unit'
+const REQUIREMENTS_ROOT = 'requirements'
 const EVAL_ROOT = 'tests/eval'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const BUILD_ROOT = 'dist'
@@ -119,7 +120,13 @@ const files = override
       .split(',')
       .map((file) => file.trim())
       .filter(Boolean)
-  : [...walk(TESTS_ROOT, ['.test.mjs']), ...walk(EVAL_ROOT, ['.test.mjs'])]
+  : [
+      ...walk(TESTS_ROOT, ['.test.mjs']),
+      ...walk(EVAL_ROOT, ['.test.mjs']),
+      // Package-owned proof: every migrated/package-local oracle lives under
+      // requirements/<package>/tests/*.test.mjs and joins the same suite.
+      ...walk(REQUIREMENTS_ROOT, ['.test.mjs']),
+    ]
 
 if (override) console.error(`runner: discovery OVERRIDDEN by TESTS_MJS_FILES (${files.length} file(s))`)
 

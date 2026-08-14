@@ -56,4 +56,4 @@ FAILURE MEANING: RED = guidance 可无限重复、reanchor 后永久丢失，或
 
 INDEPENDENT CHANGE: 从 Full/Identity 改成摘要+按需展开，而 diagnosis ontology 不变。
 
-CURRENT EVIDENCE: type `Journal/{TipDeliveryProjection,GuidelineProjection,ObservationProjection}.fs`；wiring `Session/{EnforcerTipGuidance,EnforcerRepair,EnforcerContinuation}.fs`、`Domain/EnforcerCycle.fs`（Full/Identity）；failure `scripts/checks/{enforcer-cross-family-collision,enforcer-rulebook-gate}.mjs`；tests `tests/unit/enforcer/**`。
+CURRENT EVIDENCE: type `Journal/{TipDeliveryProjection,GuidelineProjection,ObservationProjection}.fs`；wiring `Session/{EnforcerTipGuidance,EnforcerRepair,EnforcerContinuation}.fs`、`Domain/EnforcerCycle.fs`（Full/Identity）；failure `scripts/checks/enforcer-cross-family-collision.mjs`；tests `tests/unit/enforcer/**`。

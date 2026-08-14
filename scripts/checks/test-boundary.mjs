@@ -79,9 +79,12 @@ const argValue = (flag) => {
 /** { "<file>": "<trimmed violating line>", ... } for every violating line. */
 const scanViolations = (root) => {
   const out = {}
-  const scopes = ['unit', 'integration']
-  for (const scope of scopes) {
-    const base = join(root, 'tests', scope)
+  const scopes = [
+    ['unit', join(root, 'tests', 'unit')],
+    ['integration', join(root, 'tests', 'integration')],
+    ['requirements', join(root, 'requirements')],
+  ]
+  for (const [, base] of scopes) {
     if (!existsSync(base)) continue
     for (const abs of walk(base, ['.test.mjs'])) {
       const rel = relative(root, abs).replace(/\\/g, '/')

@@ -135,7 +135,7 @@ FANTASY 0
 | Package | Evidence | Verdict |
 |---|---|---|
 | `behavior-diagnosis` | type: `Domain/{EnforcerCatalog,EnforcerCodec,EnforcerCycle,RulebookObservation}.fs`；resource: `resources/enforcer/**`（124 tip 目录 = Diagnosis 检测边界）；wiring: `Session/{EnforcerHost,EnforcerCycleCommit,EnforcerFrameRecovery}.fs`；tests: `tests/unit/enforcer/**` | REAL |
-| `guidance-delivery` | type: `Journal/{TipDeliveryProjection,GuidelineProjection,ObservationProjection}.fs`；wiring: `Session/{EnforcerTipGuidance,EnforcerRepair,EnforcerContinuation}.fs`、`Domain/EnforcerCycle.fs`（Full/Identity）；failure: `scripts/checks/enforcer-cross-family-collision.mjs`、`enforcer-rulebook-gate.mjs`；tests: `tests/unit/enforcer/**` | REAL |
+| `guidance-delivery` | type: `Journal/{TipDeliveryProjection,GuidelineProjection,ObservationProjection}.fs`；wiring: `Session/{EnforcerTipGuidance,EnforcerRepair,EnforcerContinuation}.fs`、`Domain/EnforcerCycle.fs`（Full/Identity）；failure: `scripts/checks/enforcer-cross-family-collision.mjs`；tests: `tests/unit/enforcer/**` | REAL |
 
 ---
 

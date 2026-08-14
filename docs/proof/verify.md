@@ -504,7 +504,7 @@ Review confirmed                           → 只能派生，不能赋值
 | `scripts/checks/capability-isomorphism-gate.mjs` | Playbook §24.3 Agent×RequestKind×AttemptExecutionProfile 五层同构静态门；`tests/unit/verify/capability-isomorphism-gate.test.mjs` |
 | `scripts/checks/unified-store-gate.mjs` | Playbook §24.1/24.2 Storage：feature-owned `refs/wanxiang/*`、Casebook custom ref、legacy Journal/Blob reader、dual-write、student-qa revival |
 | `scripts/checks/js-surface-gate.mjs` | G3 rebase：无 js-student/js-teacher、无手写 per-role js-* |
-| `scripts/checks/enforcer-rulebook-gate.mjs` | mechanical A37/A38（`check.mjs` 以 `--require-headings --strict` 接线）= G7 machine Exit；HUMAN_ONLY（paired-history 120 / A39 / A40）为目录质量过程，不伪造、不阻断 Gate |
+| `scripts/checks/enforcer-rulebook-gate.mjs` | ~~retired 2026-08-12~~（空壳保留，见文件头注释；RuleBook 散文质量属编辑/判断关切，不设机械门）。A37/A38 的 tip-SSOT proof 由 `tests/unit/enforcer/**` catalog 测试承担；HUMAN_ONLY（paired-history 120 / A39 / A40）为目录质量过程，不伪造、不阻断 Gate |
 | `scripts/checks/tool-referential-integrity.mjs` | **Gate A**（ARCH-016）：same tool name → 唯一 schema + 唯一 semantic contract；pin `tests/unit/verify/tool-referential-integrity.test.mjs`（code phase 新建） |
 | `scripts/checks/provider-leak-gate.mjs` | **Gate B**（ARCH-016）：provider 输出禁 leak vocabulary；pin `tests/unit/verify/provider-leak-gate.test.mjs`（code phase 新建） |
 | `scripts/checks/language-parity-gate.mjs` | **Gate C**（ARCH-016 / HOST-026 / PROMPT-019/020）：∀ provider semantic resource EN + zh-CN；`{{placeholder}}` 集合一致；Role Law 与高风险 tool description semantic-anchor 同 ID 双语命中；pin `tests/unit/verify/language-parity-gate.test.mjs` |
