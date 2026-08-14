@@ -18,8 +18,7 @@
    unit/run.mjs → integration/run.mjs → integration/package/run.mjs →
    warmup-opencode.mjs → e2e/entry.test.mjs(L4，恰一个) → npm pack --dry-run(L5)）
 2. check.mjs wired gate 清单：每个 wired 路径存在；
-   scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib), semantic-anchors.mjs(catalog),
-   enforcer-rulebook-gate.mjs(retired stub)}
+   scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib), semantic-anchors.mjs(catalog)}
 3. check.mjs fail-closed：process.exit(result.status ?? 1) 传播非零；
    行为面：必败 gate 退出码传播、不可 spawn 的 gate 判 exit 1
 ```
@@ -33,21 +32,16 @@ VERIFY-004 因果 watchdog feed 门禁的永久回归：top-level e2e 测试不�
 `watchdog.advance(`；唯一入口 `requirements/verification-system/tests/e2e/entry.test.mjs` 必须在扫描范围内。
 （自 `tests/unit/verify/` 迁移，import 深度不变。）
 
-### 3. 行数 advisory（`tests/kolmogorov-size-advisory.test.mjs`）
-
-Kolmogorov size 是 advisory：超过基线只给 suggestion，0 blocking finding——行数不是
-门禁（VERIFY-005 不设行数门禁）。（自 `tests/unit/verify/` 迁移，ROOT 深度不变。）
-
-### 4. physical contract 声明面（`tests/physical-contract.test.mjs`）
+### 3. physical contract 声明面（`tests/physical-contract.test.mjs`）
 
 唯一 Long Stroke 入口必须写出它依赖的不可模拟 physical contract（OpenCode lifetime /
 HOST-010 messageID / Repeat-until-pass forbidden）；删声明即红。`format-build-test` 禁止
 repeat-until-pass。答不出则不得留在 e2e。
 
-### 5. 运行器机制（lead 集成时执行，本包 REUSE 登记）
+### 4. 运行器机制（lead 集成时执行，本包 REUSE 登记）
 
 ```text
-node scripts/check.mjs              # 22 个 wired layer-0 gate（proof-ladder pin 清单）
+node scripts/check.mjs              # 18 个 wired layer-0 gate（proof-ladder pin 清单）
 node requirements/verification-system/tests/run.mjs             # L1–3 入口：staleness gate + verdict-silence 监督
 node requirements/verification-system/tests/run.mjs --coverage  # VERIFY-009 覆盖门禁（run-inner 判阈值）
 tests/e2e/support/*                 # watchdog / readiness / 因果原语（VERIFY-004）
@@ -64,7 +58,6 @@ tests/e2e/support/*                 # watchdog / readiness / 因果原语（VERI
 ```text
 node --test requirements/verification-system/tests/proof-ladder.test.mjs
 node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs
-node --test requirements/verification-system/tests/kolmogorov-size-advisory.test.mjs
 ```
 
 proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 `node requirements/verification-system/tests/run.mjs` /

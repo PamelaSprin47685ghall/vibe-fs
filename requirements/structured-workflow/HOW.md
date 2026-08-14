@@ -218,8 +218,6 @@ nudge-vs-complete 分支。
 
 - `scripts/checks/architecture.mjs`（ARCH-001 分层、fsproj、资源读取位置）→
   verification-system MECHANISM。
-- `scripts/checks/kolmogorov-size.mjs` → verification-system MECHANISM（advisory，
-  无 semantic owner）。
 - `scripts/checks/test-boundary.mjs` → verification-system MECHANISM：`requirements/`
   scope 内测试禁止直接 import `dist/fable_modules/**`。
 - `scripts/checks/g4r-freeze.mjs` → migration freeze ratchet，**不归本包**。
@@ -250,7 +248,7 @@ deadline escape 都是消费关系，非定义前提。
 | 源 | 弃权理由 | 记录位置 |
 |---|---|---|
 | 历史 transcript（ChatGPT-时序控制流修复提案，4310 行 raw chat export） | **GARBAGE（transcript）**：ChatGPT 对话原始导出，非规范源。其中 2N Finality cohort、REVISE 立即短路、Blessed 后 rest-in-peace、Reviewer HostOwnedHidden、Join 中断仅 OperatorAbort\|DeadlineExpired 等决策的**规范结果**已落旧五层 docs（GLORY/EXEC-017/EXEC-020 等）并由对应 owner 拥有；transcript 本身不携带任何独立 normative 内容，不迁移为命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 56 |
-| 历史 transcript（refactor，1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（kolmogorov-size.mjs ratchet、god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属 verification-system MECHANISM / 各 semantic owner；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
+| 历史 transcript（refactor，1821 行 raw chat export） | **GARBAGE（transcript）**：按知识主权重新装箱的施工对话导出。其工程结果（god-module 拆分、domain.mjs family 化）已是当前仓库事实并分别归属各 semantic owner；kolmogorov-size.mjs advisory 于 2026-08-15 删除（行数不做机械检查）；transcript 不产生本包新命题 | HOW.md §5.2；CHANGES-AUDIT.md 行 57 |
 | 历史 LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
 | 历史 EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
 | 历史 ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |

@@ -1,8 +1,5 @@
 /**
  * diagnostics-format.js — Format a diagnostic record as console output.
- * Kept in its own module so diagnostics.js stays under the
- * 200-line Kolmogorov advisory target and individual helpers stay
- * near the 50-line function advisory target.
  */
 
 import { DIAG_CONSTANTS } from './diagnostics-collect.js';

@@ -67,17 +67,7 @@ type PairProgrammingGuideline =
 - occurrence 组装在 `PluginTransforms` + `PairProgrammingCalibration`：`latest tip guidance` → TIME-007 `elapsed` → DELEG-022 `remaining expected tool calls` → canonical pair-programming guideline，各动态 owner 只做 O(1) projection read；无 estimate 时省略该 fragment。
 - `composeWithElapsed` 的结果立即交给 `tryInject`，成功后由 `PairProgrammingGuidelineAnchored.MarkerText` 原样 durable；replay 不再调用 elapsed/estimate renderer。
 
-## 5. 检测冲突门：`scripts/checks/enforcer-cross-family-collision.mjs`（GD-010）
-
-- 解析 `resources/enforcer/*/enforcer.md` 的 `Trigger When` + `Definition` 段，
-  tokenize（去 stopword、短 token），算 jaccard/cosine/levenshtein。
-- fail 判据：trigger Jaccard ≥ 0.90 或 trigger Levenshtein ≥ 0.95，且非 mutual
-  siblings（`Distinguish From` 互相承认）；warn/note 级照常输出 top-N evidence。
-- 本体测试：`requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`（KEEP，
-  合成 temp dir，不依赖生产文案）。**不冒充**人类 A40 tournament（Rulebook
-  Final outcome 诚实声明）。
-
-## 6. 失败模式速查（红了说明什么）
+## 5. 失败模式速查（红了说明什么）
 
 | 症状 | 断裂的命题 | 排查入口 |
 |---|---|---|
@@ -86,16 +76,15 @@ type PairProgrammingGuideline =
 | restart 后第一次判定漂移 | GD-004 | 交付决策是否读进程内存 |
 | main.md 进了 Blogger system | GD-008 | `composeBloggerSystemPromptFor` 是否混入 MainText |
 | 历史 marker 字节被改写 | GD-011 | `GuidelineProjection` 是否按原文存储/重放 |
-| 非 sibling 触发词撞车 | GD-010 | `enforcer-cross-family-collision.mjs` fail 判定 |
 
-## 7. 验证命令
+## 6. 验证命令
 
 ```text
 node --test requirements/guidance-delivery/tests/<file>   # 单文件（每文件必须绿）
 node requirements/verification-system/tests/run.mjs                                    # 全单元（cutover 时由 lead 执行）
 ```
 
-## 8. 依赖
+## 7. 依赖
 
 - `behavior-diagnosis`：交付消费已成立的 diagnosis occurrence（RecentTip）。
 - `participant-horizon`：Coverage 是 horizon-relative 概念；本包只区分
@@ -103,7 +92,7 @@ node requirements/verification-system/tests/run.mjs                             
 - `durable-events`：交付事实（TipGuidanceDelivered）与历史 pair 是 durable fold
   的输入。
 
-## 9. 历史与弃权
+## 8. 历史与弃权
 
 | 源 | 裁决 | 记录 |
 |---|---|---|
@@ -111,8 +100,8 @@ node requirements/verification-system/tests/run.mjs                             
 | `delivered-tips.json` / process-local HashSet / 文件 tip ledger | GARBAGE（交付 substrate 只能是 EventStore fold） | 历史 change（rulebook）§16 |
 | Main fake-user enforcement overlay / NudgeAnchored / NudgeConsumed | GARBAGE（clean break；交付不 mint authority） | 历史 change（enforcer）§10；历史 why/enforcer 条款 |
 | 每次 Full 或仅 Identity | GARBAGE（被拒方案：烧上下文 or 首次不可执行） | 历史 why/enforcer 备选与被拒 |
-| 单一 durable bool 压 Frontier+Coverage | GARBAGE（reanchor 后误删/假装仍在） | 历史 why/enforcer 交付前沿 vs 语义覆盖 |
+| 单一 durable bool 压 Frontier+Coverage | GARBAGE（reanchor 后误删/假装仍在） | 历史 change（rulebook）§17 |
 | 历史 pair 随 main.md 版本改写 | GARBAGE（byte-identical replay 冻结） | 历史 change（rulebook）§17 |
-| enforcer-cross-family-collision.mjs | KEEP proof（机械 A40 替代，不冒充人类 tournament） | 历史 PROOF-MAP Phase D；历史 change（rulebook）Final outcome |
+| enforcer-cross-family-collision.mjs | 已删除（2026-08-15）：机械 A40 替代噪音大于价值，按用户要求移除；A40 归人类 tournament，本包不再设机器载体（原 PROOF-MAP Phase D 裁决作废） | 本文件历史；CHANGELOG |
 | `enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；本包不依赖任何 prose 形状门 | 历史 HANDOFF §24 |
 | 当前实现中 TipSemanticCoverage 与 TipDeliveryProjection 同投影（applyReanchor 清空） | HOW（horizon 可恢复性以投影近似表达；字节级 horizon 探测是未来增强，不改变两轴分离合同） | 本文件 §1 诚实性注 |

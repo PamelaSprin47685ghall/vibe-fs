@@ -8,8 +8,7 @@
  * Server lifecycle / web endpoints live in strict-mock-server.js; SSE chunks in
  * strict-mock-sse.js; request-body inspection (diagnostics + request-kind
  * classification) in strict-mock-matches.js; state record in
- * strict-mock-state.js. This file stays under the 200-line Kolmogorov line
- * budget.
+ * strict-mock-state.js.
  */
 
 import { sendJSON } from './strict-mock-sse.js';

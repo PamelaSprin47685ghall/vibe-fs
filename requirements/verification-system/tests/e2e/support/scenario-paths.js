@@ -1,7 +1,6 @@
 /**
  * scenario-paths.js — Resolves the on-disk Plugin.js path for a given
- * variant. Extracted from scenario.js so the main file stays under
- * the 200-line Kolmogorov advisory target.
+ * variant. Extracted from scenario.js so path resolution lives in its own module.
  */
 
 import fs from 'node:fs';

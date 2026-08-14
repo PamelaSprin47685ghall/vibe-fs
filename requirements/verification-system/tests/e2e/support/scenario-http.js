@@ -1,7 +1,6 @@
 /**
  * scenario-http.js — Plain HTTP and FS helpers for E2E scenarios.
- * Extracted from scenario.js so the main file stays under the
- * 200-line Kolmogorov advisory target.
+ * Extracted from scenario.js so HTTP/FS helpers live in their own module.
  */
 
 import fs from 'node:fs';

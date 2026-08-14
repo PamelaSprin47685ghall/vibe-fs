@@ -37,16 +37,13 @@ mechanics（`provider-projection`）；horizon admission general law
 | 交付决策 | `src/Wanxiangshu/Session/EnforcerTipGuidance.fs` | `resolveTipGuidance`：读 Frontier+Coverage → Full/Identity；只 fold durable facts |
 | 投影 | `src/Wanxiangshu/Journal/{TipDeliveryProjection,GuidelineProjection}.fs` | Full 历史（reanchor 可清）、auto-injected pair 历史（byte 冻结） |
 | marker 注入 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs` | `tryInject`：auto-injected tool pair |
-| 检测冲突门 | `scripts/checks/enforcer-cross-family-collision.mjs` | A40 机械替代：Trigger When/Definition 词法冲突 fail-closed |
 
 ## Proof 概览（落点表见 `PROOF.md`）
 
-- 本包自有测试：`requirements/guidance-delivery/tests/`（5 文件，全部 `node --test`
+- 本包自有测试：`requirements/guidance-delivery/tests/`（7 文件，全部 `node --test`
   单跑绿）。
 - 交叉证明（REUSE）：`tests/unit/enforcer/{tip-v2-contract,enforcer-cycle-protocol,
-  blogger-convergence-gaps}.test.mjs` 中的 delivery 锚点；
-  `requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`（gate 本体测试，
-  KEEP）。
+  blogger-convergence-gaps}.test.mjs` 中的 delivery 锚点。
 - 本包无 semantic-anchors.mjs anchor id。
 
 ## 阅读顺序（保姆级导航）

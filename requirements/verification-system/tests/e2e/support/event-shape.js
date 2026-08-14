@@ -3,8 +3,7 @@
  * to the EventProbe's internal event shape.
  *
  * Side-effect free: no I/O, no shared state. Extracted from
- * event-probe.js to keep that file under the 200-line Kolmogorov
- * line budget.
+ * event-probe.js as a pure mapping layer.
  */
 
 function pickSessionID(parsed) {

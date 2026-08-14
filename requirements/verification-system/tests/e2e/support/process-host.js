@@ -5,8 +5,7 @@
  * or a leaked child process tree after stop() throws an error.
  *
  * Side-effect-free helpers (child lifecycle, socket/PID checks, git init,
- * listen-port parsing) live in process-host-utils.js and process-host-checks.js
- * so this file stays near the 200-line Kolmogorov advisory target.
+ * listen-port parsing) live in process-host-utils.js and process-host-checks.js.
  */
 
 import fs from 'node:fs';

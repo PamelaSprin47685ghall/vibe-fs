@@ -100,7 +100,9 @@ const wiredGates = (checkSource) => {
 test('VERIFY_001_every_wired_gate_path_exists', () => {
   const checkSource = read('scripts/check.mjs')
   const wired = wiredGates(checkSource)
-  assert.ok(wired.length >= 20, `expected a substantial wired gate list, found ${wired.length}`)
+  // 2026-08-15：kolmogorov-size 与 enforcer-cross-family-collision 两门按用户要求
+  // 删除，18 = 当前 wired 数；再删任何 gate 必须显式下调本下限（ratchet 语义）。
+  assert.ok(wired.length >= 18, `expected a substantial wired gate list, found ${wired.length}`)
   for (const name of wired) {
     assert.ok(
       existsSync(join(ROOT, 'scripts/checks', name)),

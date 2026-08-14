@@ -2,8 +2,7 @@
  * process-host-utils.js — Pure helpers for ProcessHost: child lifecycle,
  * socket/PID/process-tree checks, listen-port parsing.
  *
- * Side-effect-free functions live here so the main class file stays under
- * the 200-line Kolmogorov advisory target.
+ * Side-effect-free functions live here; the main class file imports them.
  */
 
 import { spawn } from "node:child_process";

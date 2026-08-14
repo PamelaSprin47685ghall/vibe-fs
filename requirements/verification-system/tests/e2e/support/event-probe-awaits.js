@@ -1,8 +1,6 @@
 /**
  * event-probe-awaits.js — Async wait/assert helpers for EventProbe.
- * Attached to the EventProbe prototype via mixin so the main class file
- * stays near the 200-line Kolmogorov advisory target and individual helpers
- * stay near the 60-line function advisory target.
+ * Attached to the EventProbe prototype via mixin.
  */
 
 import { DEFAULT_AWAIT_TIMEOUT_MS, DEFAULT_NEVER_TIMEOUT_MS } from './time-budget.js';

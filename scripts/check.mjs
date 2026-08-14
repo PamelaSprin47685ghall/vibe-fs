@@ -15,8 +15,6 @@ const checks = [
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
-  join(root, 'checks/kolmogorov-size.mjs'),
-  join(root, 'checks/enforcer-cross-family-collision.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
   join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
@@ -43,11 +41,6 @@ for (const script of checks) {
       `--baseline=${join(root, 'checks/dsl-ownership-ratchet-baseline.json')}`,
       '--root=src/Wanxiangshu',
     )
-  }
-  // Kolmogorov size is advisory only. The baseline gives comparative context
-  // (growth is a stronger suggestion) but no line/function threshold can fail check.
-  if (script.endsWith('kolmogorov-size.mjs')) {
-    args.push(`--baseline=${join(root, 'checks/kolmogorov-size-baseline.json')}`)
   }
   // ARCH-016 Gate B: grandfathered Join/horizon migration debt — counts must only shrink.
   if (script.endsWith('provider-leak-gate.mjs')) {

@@ -1,7 +1,7 @@
 /**
  * strict-mock-server.js — Server lifecycle + web endpoints for
- * StrictMockProvider. Kept separate so the main class file
- * stays near the 300-line Kolmogorov advisory target.
+ * StrictMockProvider. Kept separate so server lifecycle and web endpoints
+ * live in their own module.
  */
 
 import http from 'node:http';

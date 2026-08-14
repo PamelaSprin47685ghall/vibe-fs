@@ -124,19 +124,11 @@ Root；delivery 不改变 authority/personhood。
   （auto-injected marker 机制）；`audience-separation.test.mjs` `AUDIENCE_003`；
   `PROOF.md` 行 19。
 
-### GD-010 检测语料跨 family 冲突门（A40 机械替代）
+### GD-010（已删除 2026-08-15）
 
-`scripts/checks/enforcer-cross-family-collision.mjs` 解析每篇 enforcer.md 的
-Trigger When + Definition，对非 sibling 的近义词法重叠 fail closed（trigger
-Jaccard ≥ 0.90 或 Levenshtein ≥ 0.95）；warn/note 级证据照常输出保证 A40 被记录
-而非跳过。
-
-- 含义：detection 语料的可区分性是 delivery 质量的前置——选择一条 tip 时不能被
-  另一条的同词触发条件污染（Rulebook A40；PROOF-MAP Phase D 归属本包）。
-- 边界：门是词法机械替代，**不冒充**人类 tournament（历史 change（rulebook）
-  Final outcome 诚实声明）。
-- 证据：REUSE `requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`
-  `enforcer_collision_*`；`PROOF.md` 行 20。
+机械 A40 替代检查（`enforcer-cross-family-collision.mjs`）按用户要求删除：词法
+重叠告警噪音大于价值，检测语料可区分性改由 review 判断（Rulebook A40 仍属人类
+tournament 范畴，本包不再设机器载体）。编号保留不回收。
 
 ## D. 历史字节
 
