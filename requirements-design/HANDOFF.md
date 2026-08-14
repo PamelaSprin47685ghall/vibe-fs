@@ -118,6 +118,8 @@ requirements-design/
 ├── INDEX.md
 ├── AUDIT.md
 ├── PROOF-MAP.md
+├── COVERAGE.md
+├── EVIDENCE.md
 ├── 01-meta-programming.md
 ├── 02-session-host.md
 ├── 03-participant-core.md
@@ -1281,6 +1283,7 @@ CURRENT EVIDENCE
 - 没有重写现有 tests/gates；
 - ~~没有完成 Clause-by-Clause 全仓 reverse coverage~~ —— 已完成（Phase A），结果见 `requirements-design/COVERAGE.md`：~418 条款、0 新包、0 ORPHAN、45 包不需增删并；
 - ~~没有完成 WHY 反审计~~ —— 已完成（Phase B），见 `requirements-design/COVERAGE.md` Phase B 节：45 包单-WHY 全通过、0 double-WHY、0 假边界；修复 1 处 OVERLAP（`repository-programming` 不再重复拥有 capability 同构律，新增 `capability-enforcement` edge）+ 删除 1 处假依赖（`finality → managed-session-lifecycle`）；4 处弱依赖转入 Phase E；
+- ~~没有完成 Source/runtime evidence~~ —— 已完成（Phase C），见 `requirements-design/EVIDENCE.md`：43 REAL + 2 META、0 THIN、0 FANTASY；无文档幻想包；
 - 没有最终确定 45 是最终数量；
 - 没有决定正式 package manifest schema；
 - 没有执行 normative cutover；

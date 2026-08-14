@@ -241,3 +241,11 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 
 - 「failure-domain separation」（tool red / semantic REVISE / infra fatal）是三态各归 `capability-enforcement` / `review-judgement` / `host-boundary`+`crash-reconciliation` 的硬边界纪律，不构成第四个独立 WHY；`review-assurance` 的「infra failure 不伪装 REVISE」是其 review-side 本地负边界。
 - `INDEX.md` 依赖骨架是示意；精确 hard edge 以各 boundary card `DEPENDS ON` 为准（已加注），Phase E 统一重画。
+
+## Phase C — Source / runtime evidence（已完）
+
+逐包映射六证据轴（canonical type / wiring / Host boundary / resource / durable fact / failure path）。完整 ledger 见 `EVIDENCE.md`。
+
+- **43 REAL + 2 META + 0 THIN + 0 FANTASY**：无文档幻想包。
+- `requirement-system` / `verification-system` 是治理元契约，证据 = `AGENTS.md` + `scripts/checks/**` + CI，正确无 runtime 源码。
+- 最薄点（非幻想）：`external-investigation` 真实 browsing 在外部 `stealth-browser-mcp`，WHAT 由 Browser Role Law + semantic anchors + `capability-enforcement` role-lock 固化；Phase D 需补 browser provenance oracle（当前测试默认 disabled）。
