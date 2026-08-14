@@ -122,6 +122,14 @@ Clause 级结果见 `COVERAGE.md`：AGENT-002（22 catalog）/AGENT-004（legacy
 15 条 NEEDS-SPLIT（AGENT-001/009/011..016/023..026/030..032）均被现有包分解；
 AGENT-031（NEEDHELP）仍维持 WATCH，未发现独立 WHY，不立 `collaboration-guidance`。
 
+### `docs/what/host.md`
+
+至少混合：Host capability assumptions、session ontology/lifecycle、ProviderLanguage、pair guideline projection、Magic Todo membrane、provider/tool physical identity、compaction/reanchor、NEEDHELP assistance。
+
+Clause 级结果见 `COVERAGE.md`：HOST-001..003/005/007..009/011/012/016/022..026 单 owner；
+11 条 NEEDS-SPLIT（HOST-004/006/010/013/015/017..021/027）均被现有包分解；
+HOST-014（Student/Teacher absence）+ HOST-008 历史字段判 GARBAGE。NEEDHELP（HOST-027）维持 WATCH，不立新包。
+
 ### `docs/what/architecture.md`
 
 - Horizon → `participant-horizon`。

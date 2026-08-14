@@ -22,8 +22,9 @@ Evidence notes
 |---|---|---|
 | `prompt.md`（含 shape PROMPT-005/008、how PROMPT-009） | DONE | 21 条款；3 条 NEEDS-SPLIT，无新包 |
 | `agent.md`（含 shape AGENT-007/019/021、how 装配） | DONE | 32 条款；15 NEEDS-SPLIT、12 OWNED、5 GARBAGE、0 ORPHAN |
+| `host.md`（含 shape HOST-003/008/011/012、how HOST-004/009/010） | DONE | 27 条款；11 NEEDS-SPLIT、15 OWNED、1 GARBAGE、0 ORPHAN |
 
-下一 topic：`host.md`。
+下一 topic：`companion.md`。
 
 ---
 
@@ -246,3 +247,119 @@ student-teacher-absence.mjs      → DELETE（migration-only）
 
 1. AGENT-031（NEEDHELP）继续维持 WATCH：四类 guarantee（interaction-authority / delegation / provider-projection+prefix-stability / cognitive-environment）已能组合解释，本轮未发现独立 WHY → 不立 `collaboration-guidance`（HANDOFF §10.2 维持）。
 2. agent.md 的「office consequence + capability matrix」双层（如 AGENT-011/013/016）确认 §7.1 person/office/execution 边界：consequence 属 `office-capability`，matrix/gate 属 `capability-enforcement`，二者不同 WHY。
+
+---
+
+# `docs/what/host.md`（+ shape/host.md + how/host.md）
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| HOST-001 | 事件分层：业务层不消费流式碎片，只碎片→粗粒度信号→single-flight→SDK 完整消息→纯策略 | `host-boundary` | host-boundary OWNS「stream fragment 只可作窄传感器输入，不能积分成业务真相」 |
+| HOST-002 | 仅 idle/retry/abort/deleted 信号可入生命周期与 Reconciler；abort 解码 typed `AttemptAborted` 不推进 fallback；`TurnUnknown` 是私有观测非 `TurnOutcome` | `host-boundary` | 信号 admission + observation boundary。无 PromptKey 用户消息 signal JoinAttempt → `dispatch-protocol` 交叉 |
+| HOST-003 | `Transport ≠ Domain`：typed `HostSignal`，业务不观察 raw payload | `host-boundary` | Host capability contract |
+| HOST-005 | XTrace 是唯一 append-only 原始语义轨迹：含 prompt/assistant/reasoning/tool/omission，不含 UI delta/usage/timestamp；provenance 按 provider run 分段 | `semantic-trace` | semantic-trace OWNS append-only semantic history + typed capture boundary |
+| HOST-007 | 日志只记诊断；禁写 stage/phase/owner/lease/generation 当控制状态 | `crash-reconciliation` | 日志≠恢复协议；「状态标签只允许物理/领域事实」→ `structured-workflow` 交叉 |
+| HOST-008 | Session 关联所有权：`ExecutionClass(Work|InternalLeaf) × AttachmentKind` 正交；durable association 为事实、派生视图 | `session-ontology` | session-ontology OWNS 正交分类轴。`TeacherSessionId` absent → GARBAGE |
+| HOST-009 | Attached 创建/复用/Replacement/retire 唯一 owner；重启按 journal 关联匹配，无关联新建，冲突 fail-closed | `managed-session-lifecycle` | lifecycle OWNS create/reuse/replacement。dispose 杀 PTY → `process-execution` 交叉 |
+| HOST-011 | Tool 身份两个半边：ToolContext 有 message+call id，before/after 只有 call id；缺一 fail closed | `host-boundary` | provider/tool 物理 identity 取得边界 |
+| HOST-012 | 多实例共享 vs 每实例独有；共享表单事件循环同步片段、禁跨 await RMW | `host-boundary` | Host 按 directory 实例化的边界契约 |
+| HOST-016 | 空 Content 预防：assistant/user 无 text 时用 reasoning/占位填充，避免上游 400 | `host-boundary` | Host adapter sanitization |
+| HOST-022 | physical-success 双路径 Accepted：live after ∨ recovery completed ToolPart，收敛同一 id+digest | `effect-accounting` | effect-accounting OWNS Requested/物理发生/Accepted 分型 |
+| HOST-023 | reviewing sink 决策与 reconciliation：sink=compatibility projection，canonical=obligations；REVISE 消费后幂等投影 | `obligation-ledger` | canonical obligation truth；review 交叉 → `review-assurance` |
+| HOST-024 | V2 runner fail-closed：无 proven definition+before+after 则 Attempt construction 拒绝 | `obligation-ledger` | admission gate；canary 证明 → `verification-system` |
+| HOST-025 | sessionID+callID 经 SDK 快照唯一定位 ToolPart/assistant/run/ordinal/XTrace；不能唯一 → fail closed | `host-boundary` | Host SDK 定位 canary |
+| HOST-026 | `SessionProviderLanguage` 创建瞬间绑定不可变；child 继承；事后改全局只影响新 session | `provider-language` | provider-language OWNS bind-once + inheritance |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| HOST-004 | `QuiescencePermit`：idle-derived 副作用准入，process-local、不写 Journal、不参与 crash recovery；观测稳定≠静止资格 | `causal-wait` | wait observation 非权威 + 重启安全消失 |
+| HOST-004 | Reconciler single-flight/dirty/有界因果重读/`TurnOutcome` 分类（`TurnUnknown` 私有） | `host-boundary` | Host 快照观测 machinery |
+| HOST-006 | `ContextReanchored`：`PrefixEpoch+1`、`Snapshot=None`、`PrefixCoverage` 归零 | `prefix-stability` | prefix epoch/cold boundary |
+| HOST-006 | Host compaction 不得当恢复失败/容量信号；唯一合法恢复是失败驱动协议 | `context-compression` | context pressure recovery policy |
+| HOST-006 | compaction 观测 gate（关闭自动/overflow/prune，否则启动失败） | `host-boundary` | Host compaction observation |
+| HOST-010 | Transform → ProviderRunIdentity 因果读唯一未完成 assistant，用于 ReviewSeal | `review-assurance` | witness identity binding |
+| HOST-010 | 唯一性靠单 actor 写 assistant；命中 0/≥2 → 不写 seal fail-closed | `host-boundary` | Host 观测唯一性 + causal-read |
+| HOST-013 | durable anchored pair 序列（append-only、Ordinal/CallId/Gap、幂等 replay） | `prefix-stability` | append-only prefix law；substrate → `durable-events` |
+| HOST-013 | renderer（ordinary completed auto-injected；Cursor `NUL+BOM` suffix） | `provider-projection` | deterministic wire renderer |
+| HOST-013 | Pair Hint 正文 craft payload（中文思考/NEEDHELP 正常/parallel wave） | `cognitive-environment` | craft content |
+| HOST-013 | occurrence + tip nudge 语义 | `guidance-delivery` | occurrence/coverage/dedupe |
+| HOST-013 | `SessionStartedAt → now` wall-clock elapsed（`IClockPort`，禁 ambient） | `time-capability` | 时间显式 capability |
+| HOST-015 | 物理 parent 恒为 family root（深度 2）；逻辑归属只由 journal 关联承载 | `session-ontology` | 物理 topology ≠ logical ownership |
+| HOST-015 | 重启按 journal 关联匹配复用/新建，冲突 fail closed | `managed-session-lifecycle` | restore matching |
+| HOST-017 | Magic Todo canonical/checkpoint/review/Finality 语义；Host 不改本体、不覆盖 builtin、sink 降级 compatibility | `obligation-ledger` | canonical todo protocol |
+| HOST-017 | `TodoWriteAccepted` 必须 physical success | `effect-accounting` | Accepted 分型 |
+| HOST-017 | V1 三钩子 overlay 可观察合同与 canary | `host-boundary` | Host membrane 合同 |
+| HOST-018 | `tool.definition` 三处同步（parameters/jsonSchema/description） | `obligation-ledger` | V2 schema 唯一广告点 |
+| HOST-018 | description 覆盖 Manager 可见纪律 | `action-affordance` | 调用合同 |
+| HOST-018 | description 禁泄露 hidden reviewer/cohort/barrier | `participant-horizon` | hidden orchestration 不进 horizon |
+| HOST-019 | pending+`{}` 不得降级当输入；deferred prepare 等 materialize、digest 对齐 | `obligation-ledger` | admission canonical |
+| HOST-019 | before 可能落在 pending/`{}` 与 final input 之间（Hook 时序 barrier） | `host-boundary` | Host hook 行为 |
+| HOST-020 | decode obligations + durable `TodoWritePrepared`（尚非 checkpoint） | `obligation-ledger` | admission |
+| HOST-020 | executor 只观察原地 mutation、non-enumerable compatibility 投影 | `host-boundary` | Host hook 语义 |
+| HOST-021 | after 顺序：Accepted → ensureReview → 富化 result（ConsumableReview LWR、merge preview） | `obligation-ledger` | todo protocol |
+| HOST-021 | Accepted 必须 physical success（幂等 live/recovery） | `effect-accounting` | Accepted 分型 |
+| HOST-021 | 富化 result 消费上次 `ConsumableReview` | `review-assurance` | judgement 可消费 |
+| HOST-027 | Host 只从 reasoning delta 识别 sentinel `[NEEDHELP]`，rolling suffix，每 run 一次 | `host-boundary` | reasoning sensor |
+| HOST-027 | assistance abort 不是 ProviderFailure/LoopKill，不推进 fallback/retry budget | `interaction-authority` | authority continuity |
+| HOST-027 | abort cause 分离（assistance vs loop vs provider failure，一个 abort 一个 cause） | `degeneration-guard` | detector 边界 |
+| HOST-027 | deep 命中 → 真实 consultation child + advice 返回 | `delegation` | consultation = 委托 |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| HOST-014 全条（Student/Teacher Host 行为、QA bootstrap、teacher 双 await、Learn/Compile nudge） | GARBAGE | migration absence ratchet；`student-teacher-absence.mjs` 基线稳定后删 |
+| HOST-008 `TeacherSessionId`/`StudentTeacherLinked`/`SatelliteKind` 历史字段 | GARBAGE | 历史过渡字段，G3 gone |
+| HOST-010 OpenCode 源码锚定引理（commit e024e2ef、`session/prompt.ts` 行号） | HOW | Host source canary，绑定具体版本；「因果读唯一」才是 WHAT |
+| HOST-013 `NUL+BOM` 分隔符、`source="pair-programming-auto-injected"`、`auto-injected` 工具名 | HOW | wire representation 机制 |
+| HOST-004 `rereadsRemaining = maxCausalRereads + 1`、3 次因果重读 | HOW | 具体预算值；「有界因果重读」才是 WHAT |
+
+---
+
+# host.md 轮 delta
+
+## Boundary delta
+
+```text
+UNCHANGED  45 包全部不变
+SPLIT      无（11 条 NEEDS-SPLIT 均被现有包分解吸收）
+MERGED     无
+NEW        无
+REMOVED    无
+```
+
+## Coverage delta
+
+```text
+new OWNED     15 条（HOST-001/002/003/005/007/008/009/011/012/016/022/023/024/025/026）
+new NEEDS-SPLIT  11 条（HOST-004/006/010/013/015/017/018/019/020/021/027）
+new GARBAGE   HOST-014（Student/Teacher absence）+ HOST-008 历史字段
+new ORPHAN   0
+new OVERLAP  0（clause 级已定位）
+```
+
+## Proof delta
+
+```text
+provider-leak-gate / horizon-surface → participant-horizon（已知）
+host canaries / transform snapshot    → host-boundary
+session-ownership-matrix / ratchet    → session-ontology
+prompt-stability（prefix byte）       → prefix-stability
+MagicTodo membrane canary D..G        → obligation-ledger + effect-accounting + host-boundary（拆 oracle）
+```
+
+## Dependency delta
+
+```text
+无新增/删除 hard edge。
+```
+
+## 边界观察
+
+1. HOST-013（结对编程 marker）是 host.md 最重混合：prefix-stability（anchored append-only）+ provider-projection（renderer）+ cognitive-environment（craft 正文）+ guidance-delivery（occurrence/nudge）+ time-capability（elapsed）。五个 WHY 均已有 owner，不立新包；`NUL+BOM`、`auto-injected` 等 wire 机制判 HOW。
+2. HOST-017..025（Magic Todo membrane）确认 HANDOFF §13.4：membrane 不是单包，canonical → `obligation-ledger`，Accepted → `effect-accounting`，review 可消费 → `review-assurance`，description → `action-affordance`，hidden 编排 → `participant-horizon`，SDK 定位 canary → `host-boundary`。
+3. HOST-027（NEEDHELP sensor）与 AGENT-031 同构，继续维持 WATCH：interaction-authority + delegation + degeneration-guard + host-boundary 已能组合解释，不立 `collaboration-guidance`。
