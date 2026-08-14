@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../support/domain.mjs'
+import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../../../tests/unit/support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const hostForkAgentModule = await import('../../../dist/Session/HostForkAgent.js')
@@ -88,13 +88,13 @@ const link = async (j, agentId, child, agent = 'fast-coder') => {
 }
 
 const abandon = async (j, agentId) => {
-  const { handleController } = await import('../support/domain.mjs')
+  const { handleController } = await import('../../../tests/unit/support/domain.mjs')
   const result = await handleController.recordAbandon(j, PARENT, agentId, 'DeadlineExceeded')
   assert.equal(result.ok, true, result.ok ? '' : result.error)
 }
 
 const retire = async (j, agentId) => {
-  const { agentCompletion, handleCompletionCodec, handleController, handleId } = await import('../support/domain.mjs')
+  const { agentCompletion, handleCompletionCodec, handleController, handleId } = await import('../../../tests/unit/support/domain.mjs')
   const sealed = agentCompletion.completedRun({ runId: `run-${agentId}`, agentId, agentName: 'fast-coder', workRecord: 'w' })
   const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
   const recorded = await handleController.recordCompletion(j, PARENT, agentId, 'Terminal', body, sessionId('ses_c'))
