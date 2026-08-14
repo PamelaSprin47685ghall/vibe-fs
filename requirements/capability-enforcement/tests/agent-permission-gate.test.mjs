@@ -1,4 +1,5 @@
-// tests/unit/Plugin/agent-permission-gate.test.mjs — AGENT-002 / AGENT-006 / AGENT-007.
+// requirements/capability-enforcement/tests/agent-permission-gate.test.mjs —
+// AGENT-002 / AGENT-006 / AGENT-007, moved from tests/unit/plugin/.
 //
 // Regression: the plugin's `config` hook (ManagedAgentConfig.configureFromHostConfig)
 // writes Wanxiangshu-owned mode/permission/prompt onto the Host's live config
@@ -13,7 +14,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { managedAgentConfig, roles, runtimeResources } from '../support/domain.mjs'
+import { managedAgentConfig, roles, runtimeResources } from '../../../tests/unit/support/domain.mjs'
 
 const ROLES = [
   'Manager',

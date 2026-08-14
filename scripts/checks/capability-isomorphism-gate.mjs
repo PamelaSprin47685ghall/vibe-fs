@@ -6,7 +6,7 @@
  *   1. ToolRegistry.fs projects js-* only via JsToolGenerator.generate
  *   2. JsCapability.fs JsFragmentRegistry declares the member caps:
  *      read / glob / grep / rewrite / write
- *   3. tests/unit/js-tools/js-surface.test.mjs keeps JS004 / layersOf /
+ *   3. requirements/repository-programming/tests/js-surface.test.mjs keeps JS004 / layersOf /
  *      memberBinding layer tokens
  *   4. Roles.fs has no Student / Teacher role surface
  *
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url'
 
 export const TOOL_REGISTRY_REL = 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs'
 export const JS_TOOLS_REL = 'src/Wanxiangshu/Domain/JsCapability.fs'
-export const JS_SURFACE_TEST_REL = 'tests/unit/js-tools/js-surface.test.mjs'
+export const JS_SURFACE_TEST_REL = 'requirements/repository-programming/tests/js-surface.test.mjs'
 export const ROLES_REL = 'src/Wanxiangshu/Kernel/Roles.fs'
 
 /** Member fragments projected from ToolPermission (JS-004 / JS-020). */
