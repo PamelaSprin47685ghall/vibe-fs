@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { handleId, handleProjection, roles, sessionId } from '../../verification-system/tests/support/domain.mjs'
-import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 /** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs

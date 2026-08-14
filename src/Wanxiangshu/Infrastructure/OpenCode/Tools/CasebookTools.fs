@@ -2,7 +2,6 @@ namespace Wanxiangshu.Infrastructure
 
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 
 /// CASE-009: assembles the conditional Casebook tool specs. This module is

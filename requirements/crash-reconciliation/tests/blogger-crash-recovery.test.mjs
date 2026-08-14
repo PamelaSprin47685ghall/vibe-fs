@@ -37,10 +37,10 @@ const loadRecovery = async () => {
   // ENFORCER-153 derivation lives in BloggerRecoveryProbe; the crash window
   // classify/restore stays in BloggerCrashRecovery.
   const crash = await import(
-    new URL('../../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
+    new URL('../../../dist/Context/Companion/Blogger/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const probe = await import(
-    new URL('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js', import.meta.url).pathname
+    new URL('../../../dist/Feedback/Enforcer/BloggerRecoveryProbe.js', import.meta.url).pathname
   )
   return { crash, probe }
 }

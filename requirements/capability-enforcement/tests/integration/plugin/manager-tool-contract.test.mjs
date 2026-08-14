@@ -683,7 +683,7 @@ test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
   // HOST-013 scope: durable Companion (Blogger) transcripts must not receive
   // pair-programming auto-injected pairs — they pollute the blog tool contract.
   const { agentFact, sessionId, caseOf, stream } = await import('../../../../verification-system/tests/support/domain.mjs')
-  const { AgentJournalModule_appendAgent } = await import('../../../../../dist/Journal/AgentJournal.js')
+  const { AgentJournalModule_appendAgent } = await import('../../../../../dist/Persistence/Journal/AgentJournal.js')
 
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const main = sessionId('ses-main-no-auto-injected')

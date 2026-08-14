@@ -17,7 +17,7 @@ import {
   sessionId,
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
-import { Ports, resolveAndCommit } from '../../../dist/Application/Reconciliation/ChildRecoveryWorkflow.js'
+import { Ports, resolveAndCommit } from '../../../dist/Execution/Delegation/ChildRecoveryWorkflow.js'
 
 const PARENT = sessionId('ses_child_recovery_parent')
 const CHILD = sessionId('ses_child_recovery_child')

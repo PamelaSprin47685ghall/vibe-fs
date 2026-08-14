@@ -9,7 +9,7 @@ const {
   DelegatedToolEstimateProjection_observe: observe,
   DelegatedToolEstimateProjection_remaining: remaining,
   DelegatedToolEstimateProjection_countedCallCount: countedCallCount,
-} = await import('../../../dist/Journal/DelegatedToolEstimateProjection.js')
+} = await import('../../../dist/Execution/Delegation/DelegatedToolEstimateProjection.js')
 
 test('DELEG_022_replace_sets_exact_remaining_and_clears_prior_counted_calls', () => {
   let state = replace(3)

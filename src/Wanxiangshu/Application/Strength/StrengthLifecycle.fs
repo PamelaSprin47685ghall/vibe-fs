@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 

@@ -1,6 +1,9 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain.ChildRecovery
@@ -11,7 +14,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 open Wanxiangshu.Process
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow

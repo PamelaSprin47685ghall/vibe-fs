@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
+import { SatelliteKind } from '../../../dist/Execution/Session/Association.js'
 
 test('HOST_014_SatelliteKind_is_Companion_only', () => {
   assert.deepEqual(SatelliteKind.Companion.cases(), ['Companion'])

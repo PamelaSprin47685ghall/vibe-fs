@@ -2,7 +2,6 @@ namespace Wanxiangshu.Infrastructure
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 
 /// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,

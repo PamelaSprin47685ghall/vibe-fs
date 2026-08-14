@@ -1,12 +1,13 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 open Wanxiangshu.Recovery
 open Wanxiangshu.Session
 

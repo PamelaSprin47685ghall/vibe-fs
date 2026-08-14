@@ -12,7 +12,7 @@ import {
   TipDeliveryProjection_apply as apply,
   TipDeliveryProjection_applyReanchor as applyReanchor,
   TipDeliveryProjection_hasFullDelivered as hasFullDelivered,
-} from '../../../dist/Journal/TipDeliveryProjection.js'
+} from '../../../dist/Feedback/Enforcer/Guidance/DeliveryProjection.js'
 import { TipPresentation } from '../../../dist/Kernel/Fact.js'
 
 test('TDP_001_empty_state_has_nothing_delivered', () => {

@@ -10,10 +10,10 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { agentFact, caseOf, fold, payloadOf, sessionId, stream } from '../../verification-system/tests/support/domain.mjs'
 
-const RuntimePath = await import('../../../dist/Journal/RuntimePath.js')
-const Shared = await import('../../../dist/Journal/SharedAgentJournal.js')
+const RuntimePath = await import('../../../dist/Persistence/Journal/RuntimePath.js')
+const Shared = await import('../../../dist/Persistence/Journal/SharedAgentJournal.js')
 const Workspace = await import('../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
-const AgentJournal = await import('../../../dist/Journal/AgentJournal.js')
+const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'
 const SESSION = sessionId('ses_host_es')

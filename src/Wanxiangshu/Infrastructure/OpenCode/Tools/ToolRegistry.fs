@@ -8,7 +8,6 @@ open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

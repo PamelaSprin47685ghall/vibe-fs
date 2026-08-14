@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Execution.Session
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 

@@ -39,7 +39,7 @@ import {
 // Production installs at SpikePlugin.init; this suite drives Host without init.
 runtimeResources.installFromPackage()
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
 
 const MAIN = 'ses-main'

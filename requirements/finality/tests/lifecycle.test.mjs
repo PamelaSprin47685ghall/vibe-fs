@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ManagerLifecycleProjection_isLifeArchived as isLifeArchived } from '../../../dist/Journal/ManagerLifecycleProjection.js'
+import { ManagerLifecycleProjection_isLifeArchived as isLifeArchived } from '../../../dist/Mission/Manager/Life/Projection.js'
 import {
   blobDigest,
   blobRef,

@@ -31,7 +31,7 @@ runtimeResources.installFromPackage()
 const {
   AgentJournalModule_appendAgent,
   AgentJournalModule_snapshot,
-} = await import('../../../dist/Journal/AgentJournal.js')
+} = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
 const { loadEffectiveFrames } = await import('../../../dist/Session/EnforcerFrameRecovery.js')
 

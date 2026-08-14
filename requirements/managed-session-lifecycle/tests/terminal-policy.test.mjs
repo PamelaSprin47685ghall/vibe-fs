@@ -18,7 +18,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { Role } = await import('../../../dist/Kernel/Roles.js')
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const {
   sessionDead, tryLinkedChild, isLinkedChild, mainSealedForBlogger, outstandingBackground,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js')

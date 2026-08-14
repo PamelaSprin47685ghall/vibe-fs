@@ -35,7 +35,7 @@ const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: for
 )
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { DelegatedToolEstimateProjection_remaining: estimateRemaining } = await import(
-  '../../../dist/Journal/DelegatedToolEstimateProjection.js'
+  '../../../dist/Execution/Delegation/DelegatedToolEstimateProjection.js'
 )
 const { OrchestratorHost } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
 const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System
+open Wanxiangshu.Composition.Turn
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop

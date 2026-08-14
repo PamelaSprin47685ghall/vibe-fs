@@ -30,7 +30,7 @@ import {
   toList,
   xTraceCapture,
 } from '../../verification-system/tests/support/domain.mjs'
-import { applyTransform, reconcileAttempt } from '../../../dist/Application/Reconciliation/XWire.js'
+import { applyTransform, reconcileAttempt } from '../../../dist/Context/Prefix/XWire.js'
 import {
   PluginRuntimeScope_$ctor_Z47771AD0 as makeScope,
   PluginRuntimeScope__ArmRecovery_Z31B28506 as armRecovery,
@@ -39,7 +39,7 @@ import {
 } from '../../../dist/Infrastructure/OpenCode/Host/PluginRuntimeScope.js'
 import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { sha256Hex } from '../../../dist/Host/HostDigest.js'
-import { buildTurn } from '../../../dist/Application/Reconciliation/CompletedTurnClassifier.js'
+import { buildTurn } from '../../../dist/Interaction/Repair/CompletedTurn.js'
 
 const SESSION = 'ses_x'
 const session = sessionId(SESSION)

@@ -14,7 +14,7 @@ import {
   SatelliteSpec,
 } from '../../../dist/Session/SatelliteRuntime.js'
 import { OpenCodeChildInfo } from '../../../dist/Infrastructure/OpenCode/Host/OpenCodePort.js'
-import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
+import { SatelliteKind } from '../../../dist/Execution/Session/Association.js'
 import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
 import { errorResult, okResult, toList } from '../../verification-system/tests/support/domain.mjs'
 

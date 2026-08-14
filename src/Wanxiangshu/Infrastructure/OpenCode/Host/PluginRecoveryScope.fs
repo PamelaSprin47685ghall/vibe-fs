@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Execution.Session
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain

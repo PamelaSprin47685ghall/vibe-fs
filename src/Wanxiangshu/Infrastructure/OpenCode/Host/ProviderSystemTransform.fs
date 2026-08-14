@@ -7,7 +7,6 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Session
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

@@ -33,9 +33,9 @@ import {
   ReconciledTurn,
   ReconciledTurnContext,
   ReconciledTurnDelivery,
-} from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
+} from '../../../dist/Composition/Turn/Observation.js'
 import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
-import { captureOpening } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
+import { captureOpening } from '../../../dist/Context/Trace/Capture.js'
 
 import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
 import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'

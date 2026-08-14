@@ -1,13 +1,14 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 open Wanxiangshu.Session
 
 /// EXEC-016: join-capable roles must join outstanding work before terminal idle.

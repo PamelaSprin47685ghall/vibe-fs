@@ -1,10 +1,11 @@
 namespace Wanxiangshu.Orchestrator
 
 open System
+open Wanxiangshu.Change.Orchestration
+open Wanxiangshu.Persistence.Journal
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
@@ -9,7 +10,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Process
 open Wanxiangshu.Session

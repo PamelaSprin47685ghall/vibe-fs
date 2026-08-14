@@ -1,8 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

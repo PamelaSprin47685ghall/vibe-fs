@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Session
 
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

@@ -8,8 +8,8 @@ import {
   LocalizedToolCall,
   XTraceRange,
   materializeInput,
-} from '../../../dist/Application/Reconciliation/MagicTodoLocality.js'
-import { MagicTodoHostHooks_create } from '../../../dist/Application/Reconciliation/MagicTodoMembrane.js'
+} from '../../../dist/Mission/Obligation/Todo/MagicTodoLocality.js'
+import { MagicTodoHostHooks_create } from '../../../dist/Mission/Obligation/Todo/MagicTodoMembrane.js'
 import { Obligation } from '../../../dist/Domain/MagicTodo.js'
 import {
   SessionMessage,

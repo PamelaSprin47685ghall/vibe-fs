@@ -1,8 +1,9 @@
 namespace Wanxiangshu.Recovery
 
 open System.Threading.Tasks
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Kernel.Identity
 
 /// Physical runtime cleanup before Application turn observation (rabbit §19).

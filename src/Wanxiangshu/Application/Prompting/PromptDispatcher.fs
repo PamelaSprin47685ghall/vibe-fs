@@ -1,6 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
@@ -9,7 +11,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Journal
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =

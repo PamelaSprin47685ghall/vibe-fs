@@ -11,7 +11,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Persist
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery

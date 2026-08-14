@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.Journal
 open System.Collections.Generic
 open System.Threading.Tasks
 open Microsoft.FSharp.Control
@@ -10,7 +12,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Journal
 
 /// Existing-child dispatch + parent teardown helpers.
 module HostForkChildDispatch =

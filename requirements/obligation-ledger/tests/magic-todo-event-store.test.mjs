@@ -18,8 +18,8 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const EsWriter = await import('../../../dist/Journal/EventStoreJournalWriter.js')
-const AgentJournal = await import('../../../dist/Journal/AgentJournal.js')
+const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
+const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const resolveExport = (mod, prefix) => {
   const entry = Object.entries(mod).find(([name]) => name.startsWith(prefix))

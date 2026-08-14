@@ -15,7 +15,7 @@ import {
   roles,
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const CHILD = sessionId('ses_race_c')

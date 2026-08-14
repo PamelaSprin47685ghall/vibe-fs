@@ -23,7 +23,7 @@ import {
 } from '../../verification-system/tests/support/domain.mjs'
 
 const Domain = await import('../../../dist/Domain/EventStore.js')
-const Codec = await import('../../../dist/Journal/EventStoreJournalCodec.js')
+const Codec = await import('../../../dist/Persistence/Journal/EventStoreJournalCodec.js')
 const Canonical = await import('../../../dist/Infrastructure/Persist/CanonicalEventCodec.js')
 
 const SESSION = sessionId('ses_a')

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Context.Trace
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

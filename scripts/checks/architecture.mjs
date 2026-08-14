@@ -202,8 +202,8 @@ for (const file of productionFs) {
 // hold bounded-context Manager/Reviewer/Finality policy. TurnCompletionProgram deleted.
 {
   const plumbingFiles = [
-    `${PRODUCTION_ROOT}/Application/Reconciliation/OrdinaryTurnWorkflow.fs`,
-    `${PRODUCTION_ROOT}/Application/Reconciliation/TerminalReporter.fs`,
+    `${PRODUCTION_ROOT}/Composition/Turn/OrdinaryTurnWorkflow.fs`,
+    `${PRODUCTION_ROOT}/Context/Trace/TerminalReporter.fs`,
   ]
   const forbidden = [
     'Role.Manager',
@@ -230,10 +230,10 @@ for (const file of productionFs) {
       }
     }
   }
-  if (existsSync(`${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs`)) {
+  if (existsSync(`${PRODUCTION_ROOT}/Composition/Turn/TurnCompletionProgram.fs`)) {
     fail(
       'turn-completion-plumbing',
-      `${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs must be deleted (rabbit S2)`,
+      `${PRODUCTION_ROOT}/Composition/Turn/TurnCompletionProgram.fs must be deleted (rabbit S2)`,
     )
   }
 }

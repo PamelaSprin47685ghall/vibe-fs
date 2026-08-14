@@ -13,7 +13,7 @@ const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
 const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
+const { SessionAgentProjection } = await import('../../../dist/Composition/Durable/Projection.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'

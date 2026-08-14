@@ -1,6 +1,11 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -10,7 +15,6 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Session.AgentRoleIdentity
 

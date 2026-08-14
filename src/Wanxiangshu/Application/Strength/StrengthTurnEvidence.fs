@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Domain
 
 /// STRENGTH-007: maps Host reconciliation material onto the domain's causal

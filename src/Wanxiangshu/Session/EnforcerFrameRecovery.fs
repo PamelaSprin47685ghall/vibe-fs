@@ -1,6 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Feedback.Enforcer
+open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -8,7 +14,6 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

@@ -30,7 +30,7 @@ const {
   StrengthReplicaAssociationHints_executionClass: strengthExecutionClass,
   StrengthReplicaAssociationHints_ownership: strengthOwnership,
   StrengthReplicaAssociationHints_isStrengthReplicaAttachment: isStrengthReplicaAttachment,
-} = await import('../../../dist/Journal/SessionAssociation.js')
+} = await import('../../../dist/Execution/Session/Association.js')
 
 const { roleName } = await import('../../../dist/Session/AgentRoleIdentity.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')

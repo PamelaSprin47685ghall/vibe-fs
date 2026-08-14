@@ -1,8 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Infrastructure.Resources
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Resources
 

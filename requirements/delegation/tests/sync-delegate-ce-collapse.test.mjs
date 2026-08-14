@@ -13,7 +13,7 @@ import test from 'node:test'
 
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
-import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
+import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
 import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
 import {
   AttachedSessionRuntime_$ctor_Z5DA00426 as createAttached,

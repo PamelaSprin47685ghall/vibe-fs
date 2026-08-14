@@ -1,11 +1,15 @@
 namespace Wanxiangshu.Finality
 
 open System
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Persistence.Journal
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 
 /// COMPANION-003 / EXEC-006 / EXEC-008: session LifecycleWorkRecord as opaque text.

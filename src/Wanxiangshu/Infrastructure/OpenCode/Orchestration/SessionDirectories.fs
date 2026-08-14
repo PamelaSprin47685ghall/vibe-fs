@@ -1,7 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
-open Wanxiangshu.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

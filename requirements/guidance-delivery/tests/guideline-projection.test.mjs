@@ -13,7 +13,7 @@ import {
   GuidelineProjection_apply as apply,
   GuidelineProjection_pairs as pairs,
   GuidelineProjection_nextOrdinal as nextOrdinal,
-} from '../../../dist/Journal/GuidelineProjection.js'
+} from '../../../dist/OpenCode/Contract/GuidelineProjection.js'
 import {
   ToolCallIdModule_create as toolCallId,
   TranscriptGap,

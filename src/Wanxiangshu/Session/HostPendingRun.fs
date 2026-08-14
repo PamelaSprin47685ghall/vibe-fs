@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 
 /// DSL-state-combination: physical — subscription handle + finished latch are runtime resources
 type PendingHostRun =

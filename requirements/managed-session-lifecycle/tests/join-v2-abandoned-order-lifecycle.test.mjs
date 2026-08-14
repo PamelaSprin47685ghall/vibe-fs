@@ -21,7 +21,7 @@ import {
   sessionId,
   utcOffset,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import * as LinkageProjectionModule from '../../../dist/Execution/Delegation/LinkageProjection.js'
 import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
 import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 

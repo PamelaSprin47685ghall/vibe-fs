@@ -1,8 +1,10 @@
 namespace Wanxiangshu.Review
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain
-open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session

@@ -1,12 +1,15 @@
 namespace Wanxiangshu.Review
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Domain
 open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 
 /// One `verdict` tool call, with every identity needed for durable judgement.
 type VerdictSubmission =
