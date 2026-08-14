@@ -248,6 +248,15 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 - `guidance-delivery`：DOES NOT OWN 补「interaction authority 创建/继续权不归本包（delivery 不 mint authority）」。
 - `causal-wait`：WHY 补单侧不变量的闭式表述「观察可以看程序，程序绝不可以看观察」，显式回答 double-WHY 质疑。
 
+## Phase D — Test / gate reverse coverage（已完）
+
+以 `PROOF-MAP.md` 为起点，逐 test family 标 KEEP/SPLIT/MECHANISM/DELETE。完整分类表见 `PROOF-MAP.md` Phase D 节。
+
+- **family 级 0 ORPHAN**：全部 24 gates + 35 test families 均有 owner。
+- **3 missing oracle 待补（不是 DELETE）**：`external-investigation`（缺 browser provenance canary，测试默认 disabled）、`output-distillation`（缺 behavioral fixtures）、`verification-system`（proof ladder 是否真被分层执行待验）。
+- **DELETE 清单已固化**：`student-teacher-absence.mjs`、`g4r-freeze.mjs`、dsl-ownership legacy blacklist、provider-leak 历史 DTO blacklist、各 absence/clean-break tests。
+- 最大混合 dir = `tests/unit/verify/`（24 文件），需按断言逐条拆 owner；file-level ORPHAN 审计推迟到 cutover。
+
 ## Phase C — Source / runtime evidence（已完）
 
 逐包映射六证据轴（canonical type / wiring / Host boundary / resource / durable fact / failure path）。完整 ledger 见 `EVIDENCE.md`。
