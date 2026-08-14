@@ -1,9 +1,10 @@
-// tests/unit/orchestrator/program.test.mjs — FLOW-001 Orchestrator direct CE.
+// Moved from tests/unit/orchestrator/program.test.mjs (cutover Wave 2a); owner: structured-workflow.
 //
-// PR3 clean break: Domain Command/Reply/Step AST and OrchestratorInterpreter
-// are deleted. Application/Orchestration/Program.fs is the sole production
-// workflow entrypoint (task CE). Recovery pure decisions stay in projection
-// tests (job.test.mjs); end-to-end effects stay in runtime.test.mjs.
+// FLOW-001 Orchestrator direct CE (STRUCTURED-WORKFLOW-001/002): the workflow
+// is the exported surface of Application/Orchestration/Program.fs (task CE),
+// never a Command/Reply/Step AST + interpreter. PR3 clean break: the Domain
+// OrchestratorProgram AST module and OrchestratorInterpreter are deleted and
+// must not return.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'

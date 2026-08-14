@@ -1,3 +1,10 @@
+// Split from tests/unit/orchestrator/runtime.test.mjs (cutover Wave 2a); owner: change-integration.
+//
+// ORCH_007_NeedsReview_preserves_the_active_worktree — the NeedsReview verdict
+// keeps the job's worktree (CHGINT-002/006/012). The PERSIST-009 fact-order
+// half of the source test moved to
+// requirements/effect-accounting/tests/runtime-persist-order.test.mjs.
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -6,11 +13,10 @@ import {
   sessionId,
   targetRef,
   worktreeIdentity,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
   let removeCalls = 0
-  const appended = []
 
   const runtime = orchestratorRuntime.create({
     repoPath: '/repo',
@@ -39,10 +45,7 @@ test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
       resumeManager: async () => orchestratorRuntime.ok(),
     },
     journal: {
-      append: async () => {
-        appended.push('ManagerJobCreated')
-        return orchestratorRuntime.ok({})
-      },
+      append: async () => orchestratorRuntime.ok({}),
     },
   })
 
@@ -61,7 +64,5 @@ test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
     jobId: 'job-1',
     details: 'review barrier was not confirmed',
   })
-  assert.equal(removeCalls, 0)
-  // PERSIST-009 order: WorktreeCreateRequested → WorktreeCreated → ManagerJobCreated.
-  assert.equal(appended.length, 3)
+  assert.equal(removeCalls, 0, 'a NeedsReview verdict must keep the active worktree')
 })
