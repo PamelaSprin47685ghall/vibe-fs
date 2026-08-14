@@ -1,0 +1,56 @@
+# speculative-investigation — PROOF
+
+> 每条 WHAT 命题恰好一行落点。类型：`MOVE`（物理移入本包 `tests/`，删原文件）、
+> `REUSE`（留在原处，记精确锚点 + SPLIT@cutover 计划）、`NEW`（本包新写）。
+> 单跑命令：`node --test <file>`。全量：`node tests/unit/run.mjs`（自动发现
+> `requirements/<package>/tests/**/*.test.mjs`）。
+
+## 落点表
+
+| 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
+|---|---|---|---|
+| SPEC-INV-001 零影响基线 | `tests/unit/strength/host-canary-k0.test.mjs`（`STRENGTH_001_014_policy_nested_replica_cannot_speculate`、`STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven`）+ 本包 `host-policy.test.mjs`（`STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement`） | REUSE + MOVE | `node --test tests/unit/strength/host-canary-k0.test.mjs`；`node --test requirements/speculative-investigation/tests/host-policy.test.mjs` |
+| SPEC-INV-002 Eligible opportunity | 本包 `authority-policy.test.mjs`（`STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities`）+ `tests/unit/strength/host-canary-k0.test.mjs`（`STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0`、`STRENGTH_002_003_target_unbound_and_replica_request_kind_are_k0`） | MOVE + REUSE | 对应两文件 `node --test` |
+| SPEC-INV-003 预算单位 K | `tests/unit/strength/batch-collector.test.mjs`（`STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order`）+ `tests/unit/strength/replica-transform.test.mjs`（`STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch`、`STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3`、`STRENGTH_003_K2_counts_parallel_OpenCode_tool_parts_as_one_request_then_stops_before_request_3`） | REUSE | `node --test tests/unit/strength/batch-collector.test.mjs`；`node --test tests/unit/strength/replica-transform.test.mjs` |
+| SPEC-INV-004 Replica authority | 本包 `authority-policy.test.mjs`（`STRENGTH_004_<role>_replica_has_exact_readonly_capabilities`、`STRENGTH_004_<role>_replica_is_fail_closed`、`STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence`）+ `tests/unit/strength/runtime.test.mjs`（`STRENGTH_014_runtime_is_owner_single_flight_and_decision_local`、`STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority`）+ `tests/unit/strength/host-canary-k0.test.mjs`（`STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network`、`STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking`、`STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity`、`STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind`） | MOVE + REUSE | 对应文件 `node --test` |
+| SPEC-INV-005 Candidate frame | `tests/unit/strength/frame-projection.test.mjs`（`STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches`、`STRENGTH_005_frame_digest_and_owner_wire_ids_are_restart_stable`）+ `tests/unit/strength/projection-adapter.test.mjs`（`STRENGTH_009_media_mirror_fails_closed_instead_of_reconstructing_from_digest`） | REUSE | `node --test tests/unit/strength/frame-projection.test.mjs`；`node --test tests/unit/strength/projection-adapter.test.mjs` |
+| SPEC-INV-006 Prepared ≠ 历史 | 本包 `commit-promotion.test.mjs`（`STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing`）+ `tests/unit/strength/store.test.mjs`（`STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs`、`STRENGTH_006_same_decision_different_prepared_material_is_store_identity_collision`）+ `tests/unit/strength/durability-port.test.mjs`（`STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle`）+ `tests/unit/strength/lifecycle-recovery.test.mjs`（`STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed`）+ `tests/integration/strength/lifecycle.test.mjs`（Candidate 永不进入 XTrace/LWR） | MOVE + REUSE | 对应文件 `node --test` |
+| SPEC-INV-007 Promotion 只由消费证据 | 本包 `turn-evidence.test.mjs`（`STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping`）+ 本包 `commit-promotion.test.mjs`（`STRENGTH_007_promotion_commit_unknown_never_allows_continuation_without_durable_fact`、`STRENGTH_007_promotion_requires_the_exact_target_run_and_real_provider_output`）+ `tests/unit/strength/lifecycle-recovery.test.mjs`（`STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output`）+ `tests/unit/strength/store.test.mjs`（`STRENGTH_007_promotion_without_prepared_is_store_missing_parent`） | MOVE + REUSE | 对应文件 `node --test` |
+| SPEC-INV-008 Replay 与 XTrace closure | `tests/unit/strength/lifecycle-recovery.test.mjs`（`STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor`、`STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage`、`STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match`）+ `tests/unit/strength/projection-algebra.test.mjs`（`STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order_independent`）+ `tests/integration/strength/lifecycle.test.mjs`（restart 后仍见 frame、Companion 只在 Promotion 后 ingestion） | REUSE | `node --test tests/unit/strength/lifecycle-recovery.test.mjs`；`node --test tests/integration/strength/lifecycle.test.mjs` |
+| SPEC-INV-009 Projection 与 no-reflection | `tests/unit/strength/projection-algebra.test.mjs`（`STRENGTH_009_mirror_conflicts_with_normal_work_base_selection`、`STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict`、`STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place`）+ `tests/unit/strength/projection-adapter.test.mjs`（`STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids`）+ `tests/unit/strength/frame-projection.test.mjs`（`STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics`） | REUSE | 对应文件 `node --test` |
+| SPEC-INV-010 Predictor 与 control | 本包 `authority-policy.test.mjs`（`STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk`）+ `tests/unit/strength/predictor-rollout.test.mjs`（`STRENGTH_010_feature_key_has_no_replica_or_score_provenance`、`STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key`、`STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input`、`STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment`、`STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout`、`STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof`） | MOVE + REUSE | 对应文件 `node --test` |
+| SPEC-INV-011 失败、取消与熔断 | 本包 `host-policy.test.mjs`（`STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode`、`STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in`、`STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract`、`STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup`）+ 本包 `commit-promotion.test.mjs`（`STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing` fail-closed 行） | MOVE | `node --test requirements/speculative-investigation/tests/host-policy.test.mjs` |
+| SPEC-INV-012 模型不可见、系统可审计 | `tests/unit/strength/invisibility.test.mjs`（`STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance`）+ `tests/unit/strength/projection-algebra.test.mjs`（`STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place`） | REUSE | `node --test tests/unit/strength/invisibility.test.mjs` |
+
+补充 REUSE 交叉引用（非本包命题落点，供追踪）：
+
+- `tests/unit/verify/session-ownership-ratchet.test.mjs`（`| StrengthReplica` 为允许 kind；
+  StrengthReplica 是 `InternalLeaf × Attached` 的机械证明）→ owner `session-ontology`。
+- `tests/unit/verify/student-teacher-absence.test.mjs`（`| StrengthReplica` token absence ratchet）→
+  GARBAGE ratchet，owner `session-ontology`。
+- `tests/e2e/entry.test.mjs` long-stroke `strength-canary-*`（K2 恰好两轮、第 3 轮物理不外发、
+  `StrengthCandidatePrepared=0`）→ `verification-system` MECHANISM（HOW.md §8 交叉引用）。
+
+## Semantic anchor ids
+
+本包在 `scripts/checks/semantic-anchors.mjs` 中**当前无已声明 anchor 组**（catalog 的
+inquiry 组归 `epistemic-reasoning`；Strength 无对应 anchor id）。如未来为 speculation 增加
+anchor，应在 `ROLE_SEMANTIC_ANCHORS` 声明并在此登记。
+
+## SPLIT@cutover 待办
+
+1. `tests/unit/strength/**` 12 个文件直接 import `dist/fable_modules/**`（test-boundary 门
+   baseline 内），**禁止物理移动**；cutover 时改为经 `tests/unit/support/**` adapter 表达后再
+   逐文件移入本包 `tests/`。
+2. `tests/integration/strength/lifecycle.test.mjs` 同样含 fable_modules import，留在原处；
+   cutover 时按本表落点拆分（Candidate∉XTrace 断言 → `semantic-trace` 侧副本，
+   Promotion/replay 断言 → 本包）。
+3. `unpromoted ≠ history` 断言目前全部由本包（及 strength REUSE）测试证明；cutover 时
+   `semantic-trace` 应在自己 tests/ 建立 trace 侧断言，本包保留 Candidate 侧断言，二者交叉
+   引用不重复收（HANDOFF §18.6）。
+
+## 验证状态
+
+- 4 个 MOVE 文件单跑绿：`authority-policy` 13 pass、`commit-promotion` 3 pass、
+  `host-policy` 5 pass、`turn-evidence` 1 pass（2026-08-14）。
+- REUSE 文件不动，仍在 `tests/unit/strength/**`，由 `node tests/unit/run.mjs` 覆盖。
