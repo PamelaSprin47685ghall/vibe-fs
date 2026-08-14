@@ -13,11 +13,15 @@ const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JoinTool.js')
 const { ToolRuntimeScope, ToolRuntimeScope__AttachFamilyRecovery_3A336721: attachFamilyRecovery } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { forJournal, Runtime__RegisterAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
+const { forJournal, Runtime__RegisterAuthority_Z6B6240E7: registerAuthority } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
 const { VerdictMailbox_$ctor: verdictMailbox, VerdictMailbox__Publish_Z699F102F: publish } = await import(
   '../../../dist/Application/Orchestration/ManagerJob.js'
 )
 const { OrchestratorVerdict } = await import('../../../dist/Application/Orchestration/Types.js')
+const { FamilyRecovery, FamilyRecoveryPermit } = await import('../../../dist/Domain/SessionRecovery.js')
+const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import('../../../dist/Journal/AgentJournal.js')
+const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
+const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
 
 const context = (session = 'ses_join') =>
   new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})
@@ -28,7 +32,7 @@ const scopeFor = async ({ engineTask, mailbox }) => {
   const opened = await agentJournal.create({ directory: `join-family-${Math.random()}` })
   assert.equal(opened.ok, true, opened.ok ? '' : opened.error)
   const dispatcher = forJournal(opened.journal)
-  const accepted = await Runtime__RegisterAuthority(
+  const accepted = await registerAuthority(
     dispatcher,
     attemptPlanner.authority({
       session: 'ses_join',
@@ -57,7 +61,16 @@ const scopeFor = async ({ engineTask, mailbox }) => {
     undefined,
     undefined,
   )
-  attachFamilyRecovery(scope, async () => ({ tag: 0, fields: [{}] })) // FamilyReady permit
+  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(opened.journal))
+  const closure = discover(
+    sessionId('ses_join'),
+    AgentJournalModule_snapshot(opened.journal).AgentProjections,
+    sequence,
+  )
+  attachFamilyRecovery(
+    scope,
+    async () => new FamilyRecovery(0, [new FamilyRecoveryPermit(sessionId('ses_join'), sequence, closure.Digest)]),
+  )
   const host = {
     joinGate: lock(),
     joinInFlight: false,
