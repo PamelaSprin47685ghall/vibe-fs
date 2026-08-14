@@ -1279,7 +1279,7 @@ CURRENT EVIDENCE
 - 没有迁移/删除现行 `docs/`；
 - 没有修改 source code；
 - 没有重写现有 tests/gates；
-- 没有完成 Clause-by-Clause 全仓 reverse coverage；
+- ~~没有完成 Clause-by-Clause 全仓 reverse coverage~~ —— 已完成（Phase A），结果见 `requirements-design/COVERAGE.md`：~418 条款、0 新包、0 ORPHAN、45 包不需增删并；
 - 没有最终确定 45 是最终数量；
 - 没有决定正式 package manifest schema；
 - 没有执行 normative cutover；

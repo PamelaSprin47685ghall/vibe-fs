@@ -25,8 +25,25 @@ Evidence notes
 | `host.md`（含 shape HOST-003/008/011/012、how HOST-004/009/010） | DONE | 27 条款；11 NEEDS-SPLIT、15 OWNED、1 GARBAGE、0 ORPHAN |
 | `companion.md`（含 shape COMPANION-009、how COMPANION-005） | DONE | 15 条款；3 NEEDS-SPLIT、12 OWNED、0 ORPHAN |
 | `execution.md`（含 shape EXEC-009/014/023/024/026、how EXEC-010..013/018/019/025） | DONE | 32 条款；8 NEEDS-SPLIT、23 OWNED、1 GARBAGE、0 ORPHAN |
-
-下一 topic：`persist.md`。
+| `persist.md`（含 shape PERSIST-006、how PERSIST-007/009） | DONE | 11 条款；1 NEEDS-SPLIT、9 OWNED、1 GARBAGE、0 ORPHAN |
+| `context.md`（含 shape CTX-007/008、how CTX-011/012） | DONE | 16 条款；3 NEEDS-SPLIT、13 OWNED、0 ORPHAN |
+| `review.md`（含 shape REVIEW-006/007/010/012、how REVIEW-004/005） | DONE | 20 条款；2 NEEDS-SPLIT、18 OWNED、0 ORPHAN |
+| `todo.md`（TODO-001..015；shape/how 无独立条款） | DONE | 15 条款；7 NEEDS-SPLIT、8 OWNED、0 ORPHAN |
+| `glory.md`（GLORY-001..076 + SURFACE-001..006） | DONE | 82 条款；分组覆盖：finality 主导 + 8 跨域 + legacy GARBAGE，0 ORPHAN |
+| `enforcer.md`（ENFORCER-*，24 条款） | DONE | behavior-diagnosis + guidance-delivery 主导；2 GARBAGE |
+| `casebook.md`（CASE-001..012） | DONE | knowledge-reuse 主导 |
+| `strength.md`（STRENGTH-001..012） | DONE | speculative-investigation 主导 |
+| `sphinx.md`（SPHINX-001..010） | DONE | epistemic-reasoning 主导 |
+| `js-tools.md`（JS-001..020） | DONE | repository-programming 主导 |
+| `fallback.md`（FALLBACK-*，9 条款） | DONE | provider-attempt-recovery 主导 |
+| `architecture.md`（ARCH-002..017） | DONE | 多域：host-boundary/prefix-stability/office-capability/participant-horizon 等 |
+| `flow.md`（FLOW-*，5 条款） | DONE | structured-workflow |
+| `loop.md`（LOOP-*，4 条款） | DONE | degeneration-guard |
+| `orchestrator.md`（ORCH-*，4 条款） | DONE | change-integration |
+| `projection.md`（PROJ-*，9 条款） | DONE | provider-projection |
+| `dsl-structured-program.md`（DSL-001..015） | DONE | structured-workflow + causal-wait |
+| `document-governance.md`（GOV-001..012） | DONE | requirement-system + verification-system；当前 5-layer = HOW |
+| `synthetic-toml.md` / `glossary.md` | DONE | 导航/路由，无独立条款 |
 
 ---
 
@@ -564,3 +581,403 @@ canonical LWR materializer       → work-record
 
 1. execution.md 的 SyncDelegate 条款（EXEC-026/028/031）确认「同步委派 = delegation + work-record + managed-session-lifecycle」三方：delegation 拥有语义 batch/canonical/serialization，work-record 拥有 bounded WorkRecord = 答案，managed-session-lifecycle 拥有 reusable vs dispose-after 生命周期。无独立 `sync-delegate` package。
 2. EXEC-004/005/014/030 的「禁止 DTO / 机器拓扑穿过 provider」反复确认 `participant-horizon` 是 execution 面所有 leak 禁令的 owner，不是每个工具的附属字段。
+
+---
+
+# `docs/what/persist.md`（+ shape/persist.md + how/persist.md）
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| PERSIST-001 | EventEnvelope 版本无关；additive event_type vocabulary；canonical JSON 是 identity 协议 | `durable-events` | immutable fact + stable identity + canonical bytes |
+| PERSIST-002 | Append/Publish 以 `refs/wanxiang/store` CAS 为唯一提交原语；无部分写入 | `durable-events` | append/publish atomicity |
+| PERSIST-004 | 任一 event 校验失败 → 拒绝构建投影/启动；禁跳坏对象继续 fold | `durable-events` | corrupt history fail closed |
+| PERSIST-005 | 无 schema/store/migration generation；旧 NDJSON/blobs leave-unread、不迁不读 | `durable-events` | additive vocabulary；legacy leave-unread = migration |
+| PERSIST-006 | Domain/Persist/GitGateway/AgentJournal 分层所有权；单一 durable 边界 | `durable-events` | 单一 substrate；分层→`structured-workflow` |
+| PERSIST-007 | PayloadRef 经 Git raw blob；committed root `payloads/` = payload_refs 并集；dangling → StorageInvalid | `durable-events` | payload closure |
+| PERSIST-008 | Projection 查询 O(1) 积分不扫全历史；投影非第二真相源 | `durable-events` | query from projection |
+| PERSIST-009 | Durable Effect：Requested/Claimed → Accepted/Created/Published + Reconcile；unknown 不自动重试 | `effect-accounting` | effect-accounting 核心（HANDOFF §7.5） |
+| PERSIST-010 | 上下文恢复 fold 不变量所有者：OpeningPrompt/XTrace/BlogEntry/Terminal/BlogSquash/PrefixRebase/ContextReanchored | `durable-events` | fold invariant owner；各 fact 语义→respective owner（prefix-stability/semantic-trace/work-record/obligation-ledger/speculative-investigation） |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| PERSIST-003 | 提交结局 durable witness = canonical root；StorageInvalid fail closed | `durable-events` | fail closed |
+| PERSIST-003 | DomainConflict 非 StorageInvalid：保留 competing heads，resolution event 收敛 | `durable-convergence` | 并发分叉显式冲突，非 LWW |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| PERSIST-011 全条（StudentQaStore / QA.md / Student QA 权威文件已删） | GARBAGE | migration absence ratchet |
+| 旧 NDJSON `wanxiangshu-next`/`*.ndjson`、目录 `blobs/`、`Boot.fs`、`createFromBoot` | GARBAGE | leave-unread clean-break；`unified-store-gate` dual-write/no-migrator 是迁移 proof |
+| `events/<hex-prefix>/<EventId>.jsonl` 分片路径 | HOW | 物理布局 |
+
+---
+
+# persist.md 轮 delta
+
+```text
+Boundary: UNCHANGED 45；无新/拆/并/删。
+Coverage: 9 OWNED、1 NEEDS-SPLIT（PERSIST-003）、1 GARBAGE（PERSIST-011）、0 ORPHAN。
+Proof: EventStore append/publish/fold/corruption → durable-events；PERSIST-009 → effect-accounting；unified-store-gate dual-write/no-migrator → migration-only。
+Dependency: 无新增/删除。
+```
+
+## 边界观察
+
+1. PERSIST-009 是 §7.5「durable-events ≠ effect-accounting」的直接证据：EventStore 不拥有 Requested/Accepted/unknown 语义，PERSIST-009 属 `effect-accounting`。
+2. PERSIST-010 是 fold 不变量 owner，但其承载的每类 fact（XTrace/BlogEntry/PrefixRebase/Todo/Strength）语义分属各自 package；fold 只拥有「不满足即拒绝」的完整性规则。
+
+---
+
+# `docs/what/context.md`（+ shape/context.md + how/context.md）
+
+核心裁决「不预测，只恢复」→ `context-compression`。
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| CTX-001 | 不观察容量：禁读/查/推导模型窗口大小，禁 tokenizer/换算 | `context-compression` | 不把窗口估算当产品真相 |
+| CTX-002 | 不主动预测溢出：请求前不判断「是否近上限」，真实失败是唯一触发 | `context-compression` | failure-driven |
+| CTX-003 | 最低环境合同：≥200 KiB provider-visible 动态输入 | `context-compression` | 输入合同；200 KiB = HOW |
+| CTX-004 | 输出预算属 provider：不算 squash token/压缩比 | `context-compression` | bounded output contract |
+| CTX-005 | 失败不分类：只看 Outcome，不按错误文字分叉 | `context-compression` | 不靠 error prose 分类 |
+| CTX-006 | 恢复槽 = armed∧primed∧hasMaterial；是机会不是必然压缩 | `context-compression` | armed/primed 由 fallback→`provider-attempt-recovery` |
+| CTX-007 | 按 RequestKind 分派结局：同 RequestKind 同结局同一分派，禁错误字符串分叉 | `context-compression` | 穷尽分派→`structured-workflow` |
+| CTX-008 | 恢复槽失败仍走 Fallback 连续失败计数；不为压缩另造预算 | `provider-attempt-recovery` | 单一失败预算；recovery slot→`context-compression` |
+| CTX-009 | X 不发压缩请求：压缩只在 Y squash 或 X prefix 替换 | `context-compression` | compression 只发生在 Y/X projection |
+| CTX-011 | 候选严格新于已提交 epoch；无候选走正常请求；digest 失配 fail closed | `prefix-stability` | candidate coverage；→`context-compression` |
+| CTX-013 | Blogger delta TOML：data-only 冻结、硬上限、decision-relevant reasoning、与 LWR gap 分投影 | `context-compression` | delta 输入；TOML 渲染→`provider-projection` |
+| CTX-014 | 诊断边界：可观测诊断不得成控制输入，不用日志字段驱动 Fallback/probe/squash | `causal-wait` | diagnostic observation 非权威 |
+| CTX-016 | WorkRecordStart Opening floor：Opening = 交托关闭前区间，结构性 cursor 非 Stage | `work-record` | Opening preserved；BlindPlan T1→`obligation-ledger`；Blogger effectiveStart→`context-compression` |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| CTX-010 | 候选只进 ProjectionChoice，成功才提升，失败丢弃，无 PrefixProbeRolledBack | `context-compression` | candidate≠committed |
+| CTX-010 | probe 成功 → PrefixRebaseCommitted(Probe) → ActivePrefixEpoch | `prefix-stability` | epoch promotion |
+| CTX-012 | X probe 成功提交 epoch/失败无事实；Y squash 成功 BlogSquashCommitted | `prefix-stability` + `context-compression` | commit semantics 分属 |
+| CTX-015 | ActivePrefixEpoch/PrefixRebaseCommitted 是唯一 epoch SSOT（Probe\|TodoCheckpoint）；commit 时点 seal 前、provider 成败不回滚 | `prefix-stability` | epoch SSOT |
+| CTX-015 | desired cutoff 仅由 Accepted 链纯推导 | `obligation-ledger` | accepted obligation chain |
+| CTX-015 | Y prefix materialize（PrefixCoverage-complete-turn，禁 RawGap） | `context-compression` | materialization |
+
+---
+
+# context.md 轮 delta
+
+```text
+Boundary: UNCHANGED 45。Coverage: 13 OWNED、3 NEEDS-SPLIT（CTX-010/012/015）、0 ORPHAN。
+Proof: context failure-driven probe/squash/coverage → context-compression；prompt-stability prefix byte → prefix-stability。
+Dependency: 无新增/删除。
+```
+
+## 边界观察
+
+1. CTX-015 是「prefix-stability vs obligation-ledger vs context-compression」三方的精确交界：epoch SSOT 属 prefix-stability，desired cutoff 属 obligation-ledger（Accepted 链），Y materialization 属 context-compression。无独立 `todo-rebase` package。
+
+---
+
+# `docs/what/review.md`（+ shape/review.md + how/review.md）
+
+`review-protocol` 已拆 `review-judgement` + `review-assurance`（HANDOFF §6.4）。
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| REVIEW-001 | `judge` 工具：typed `verdict = PERFECT\|REVISE`；无描述字段；回执不 echo | `review-judgement` | PERFECT/REVISE 语义合同 |
+| REVIEW-002 | 任一 durable REVISE 立即关 cohort 与 continuation capability；FinalityRejected 另行 record-ready | `finality` | rejection 语义；record-ready→`review-assurance` |
+| REVIEW-003 | 第二次 PERFECT 需 9 条件（同 Session/Barrier/tree、不同 run/call、seal 含 challenge…） | `review-assurance` | challenge 因果确认 |
+| REVIEW-004 | ReviewAttemptIdentity 五元组；同 run 额外 PERFECT 不计数 | `review-assurance` | attempt identity |
+| REVIEW-005 | 两条独立因果链：ConfirmationPrompt（发送） vs ChallengeEvidence（消费） | `review-assurance` | causal confirmation |
+| REVIEW-006 | 自包含 ReviewWitness：独立回答谁审/哪 tree/两次 run/是否看 challenge | `review-assurance` | witness self-containment |
+| REVIEW-007 | Manager 面无 Review Guard：ManagerWorkflow 只判 join/finality/planning/handedOff | `finality` | Manager 面 hidden review（GLORY-070） |
+| REVIEW-008 | Git tree 变化使 witness 无效（pending 拒绝/confirmed 不可再 guard） | `review-assurance` | reviewed object 变化失效 |
+| REVIEW-009 | Orchestrator 复审：rebase 后旧 witness 无效，须重新双 PERFECT | `review-assurance` | re-review；ff publish→`change-integration` |
+| REVIEW-010 | ProviderInputSeal fail-closed：无法绑定 ProviderRunIdentity 则不确认 | `review-assurance` | seal 绑定；Host 因果读→`host-boundary` |
+| REVIEW-011 | Examiner's Ledger 是判断方向非 checklist；PERFECT+minor 共存；material defect 才 REVISE | `review-judgement` | discrimination + proportionate |
+| REVIEW-012 | Reviewer 提示词权威 = Role Law + Examiner's Ledger；双 PERFECT 流程不入提示词 | `cognitive-environment` | prompt 组合；双 PERFECT 不入提示→`review-assurance` |
+| REVIEW-014 | VerdictKnown 与 ConsumableReview 两段式，禁单 Stage/bool | `review-assurance` | 可消费分型 |
+| REVIEW-016 | 有界 canonical LWR + safety seal；三 request-range 用途 includeOpening=false | `work-record` | bounded canonical statement |
+| REVIEW-017 | 同 snapshot record-ready；禁 timer/sleep/wall-clock 轮询 | `review-assurance` | fresh witness；event-driven→`causal-wait` |
+| REVIEW-018 | 基础设施失败永远不是 PERFECT/REVISE，不伪造 settlement | `review-assurance` | infra failure ≠ REVISE（HANDOFF §18.8） |
+| REVIEW-019 | 仅 proven loss 后替换 Dedicated；不确定 fail closed | `managed-session-lifecycle` | proven-loss replacement |
+| REVIEW-020 | process verdict 不是终末 witness；process PERFECT ≠ terminal PERFECT | `review-assurance` | 代数分离；judgement 语义→`review-judgement` |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| REVIEW-013 | TodoProcessReview 派生（每 Accepted 一次）、一次 terminal | `obligation-ledger` | process review cadence |
+| REVIEW-013 | 过程判断语义（无 challenge、无 dual-PERFECT） | `review-judgement` | process verdict |
+| REVIEW-013 | FinalityReview 的 challenge/witness/cohort 代数 | `review-assurance` | terminal witness |
+| REVIEW-015 | 每 Life 一个 logical DedicatedTodoReviewer + enlist/replacement | `obligation-ledger` | Rk obligation |
+| REVIEW-015 | dedicated session create/retire/graduate ≠ Dispose | `managed-session-lifecycle` | hidden session lifecycle |
+| REVIEW-015 | Manager 不可见 dedicated session/barrier/witness | `participant-horizon` | hidden surface |
+
+## GARBAGE / HOW — 不进入未来 WHAT
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| `verdict`（旧工具名）非法、`verdict` 参数字段保留 | HOW | 当前 vocabulary；参数名非永久 contract |
+| 双 PERFECT 屏障由 Host 执行、Reviewer 提示词不灌输 | HOW | 实现位置，非 ontology |
+| `ChallengeTextVersion=1`、英文 canonical 字节不变版本保持 | HOW | 文案世代机制 |
+
+---
+
+# review.md 轮 delta
+
+```text
+Boundary: UNCHANGED 45。Coverage: 18 OWNED、2 NEEDS-SPLIT（REVIEW-013/015）、0 ORPHAN。
+Proof: seal/witness/challenge → review-assurance；judge/judgement semantics → review-judgement；canonical LWR → work-record。
+Dependency: 无新增/删除。
+```
+
+## 边界观察
+
+1. review.md 是 §6.4「review-protocol → review-judgement + review-assurance」的直接证据：REVIEW-001/011 属 judgement（判断语义），REVIEW-003..010/014/017/018/020 属 assurance（witness/seal/可消费），REVIEW-013/015 是 judgement×assurance×obligation-ledger×lifecycle 的交界。
+2. REVIEW-018 确认 §18.8「infrastructure failure 不是 semantic REVISE」：基础设施失败 owner 在 `review-assurance`，不在 `review-judgement`。
+
+---
+
+# `docs/what/todo.md`（TODO-001..015）
+
+Magic Todo 语义唯一 owner = `obligation-ledger`；跨域机制只引用不复制。
+
+## OWNED — 单 owner
+
+| Clause | Proposition | Future owner | Evidence / 边界 |
+|---|---|---|---|
+| TODO-002 | `todowrite(obligations:[{name,work}])`；CurrentObligations=last accepted；obligation 层级/可托付完整性/T1 特例 | `obligation-ledger` | obligation authoring surface + 语义；schema 是当前 surface |
+| TODO-003 | 义务账禁 status 枚举机；duplicate name 语法拒绝；禁按 work 文本猜 identity | `obligation-ledger` | obligation identity/continuity |
+| TODO-004 | Admission/replay/V2 门禁；同 message 多 todowrite 全拒；Same ToolCallId 幂等；失败分型（syntax/semantic REVISE/infra fatal） | `obligation-ledger` | admission；physical success→`effect-accounting`；infra fatal→`crash-reconciliation` |
+| TODO-005 | Accepted 立即 supersede CurrentObligations；REVISE 不回滚 Tk、不 semanticMerge | `obligation-ledger` | accepted account supersession |
+| TODO-007 | Canonical 投影 vs Host TodoTable compatibility sink；sink 永不反推 canonical | `obligation-ledger` | canonical single truth |
+| TODO-011 | 新 Life CurrentObligations 空；升级瞬间一次 LegacyTodoSeedAdopted | `obligation-ledger` | 初始 account；migration-scoped |
+| TODO-012 | 恢复只从 durable facts；禁止 Stage/布尔/时间猜；禁第二套 SSOT | `obligation-ledger` | recovery；no Stage PC→`structured-workflow`、durable→`crash-reconciliation` |
+| TODO-014 | TODO-* 语义只在本文件定义一次；跨域只引用不复制 | `requirement-system` | single semantic ownership |
+
+## NEEDS-SPLIT — 一个 Clause 多个独立 WHY
+
+| Clause | 分出的 proposition | 各自 Future owner | Evidence / 边界 |
+|---|---|---|---|
+| TODO-001 | Manager BlindPlan lifecycle + T1 checkpoint 节拍 | `obligation-ledger` | mission lifecycle |
+| TODO-001 | WorkRecordStart = OpeningBoundary 结构性 floor（非 Stage） | `work-record` | Opening floor |
+| TODO-006 | 1:1 lag-1 process review cadence（Rk 不阻塞 Tk） | `obligation-ledger` | review cadence |
+| TODO-006 | VerdictKnown vs ConsumableReview 两段式 | `review-assurance` | 可消费分型 |
+| TODO-008 | dedicated reviewer 每 Life 一个 + frontier | `obligation-ledger` | Rk obligation |
+| TODO-008 | canonical LWR includeOpening=false 三段 | `work-record` | bounded statement |
+| TODO-008 | RecordCoverage（RawGap 允许）vs PrefixCoverage（禁 RawGap）分型 | `context-compression` | coverage 分型 |
+| TODO-009 | PrefixRebaseCommitted → ActivePrefixEpoch SSOT；provider 成败不回滚 | `prefix-stability` | epoch SSOT |
+| TODO-009 | desiredCutoff 仅由 Accepted 链推导 | `obligation-ledger` | accepted chain |
+| TODO-009 | rebase 只消费 PrefixCoverage proven Y | `context-compression` | materialization |
+| TODO-010 | suicide 是唯一 tail drain；零 checkpoint fail closed | `finality` | drain rule |
+| TODO-010 | latest ConsumableReview await；REVISE → Life 继续 | `obligation-ledger` | checkpoint obligation |
+| TODO-013 | MagicTodoManagerGuideline Manager-only fragment | `obligation-ledger` | guideline |
+| TODO-013 | 隐藏 reviewer 表面（outcome/report 可见，身份/barrier/witness 不可见） | `participant-horizon` | hidden surface |
+| TODO-013 | ProcessReviewLWR 复用 Finality safety-seal | `finality` | safety seal |
+| TODO-015 | T1 = 第一次 Accepted = commitment；revelation 只经 conversation tool result | `obligation-ledger` | T1 commitment |
+| TODO-015 | T1 call/result 属 constitutive OpeningMaterial | `work-record` | preserved Opening |
+
+---
+
+# todo.md 轮 delta
+
+```text
+Boundary: UNCHANGED 45。Coverage: 8 OWNED、7 NEEDS-SPLIT、0 ORPHAN。
+Proof: MagicTodoProjection/admission/checkpoint/CurrentObligations → obligation-ledger；ConsumableReview → review-assurance；epoch → prefix-stability。
+Dependency: 无新增/删除。
+```
+
+## 边界观察
+
+1. todo.md 是 `obligation-ledger` 的语义核心，但 7 条 NEEDS-SPLIT 显示它严格限制在「账本」：review 可消费→`review-assurance`、epoch→`prefix-stability`、LWR→`work-record`、coverage→`context-compression`、hidden 面→`participant-horizon`、drain→`finality`。TODO-014 本身承认「跨域只引用不复制」= `requirement-system`。
+2. TODO-012 的「禁止程序计数器」与 TODO-004 的「infra fatal vs semantic REVISE vs syntax red-text」三态失败分型，是 obligation-ledger 依赖 `structured-workflow`/`crash-reconciliation`/`review-judgement` 的关键证据。
+
+---
+
+# `docs/what/glory.md`（GLORY-001..076 + SURFACE-001..006，82 条款）
+
+glory.md 是 `finality` 语义主载体；因条款密集且同域，采用分组覆盖。
+
+## 分组 OWNED — 主 owner
+
+| Clause 范围 | 主 owner | 说明 |
+|---|---|---|
+| GLORY-001/003/005/008/010/011/012/013/015/026/027/028/029/033/034/035/036/037/038/039/040/041/042/043/044/045/046/052/053/054/055/057/060/061/062/063/064/065/066/067/068/069/070/076 | `finality` | terminal lifecycle：suicide/cohort/roster/rejection/blessing/rest/Reawakening/Life 隔离/三种经验 |
+| GLORY-004/006/022/023/024/025/047/049/050 | `work-record` | canonical LWR、Opening raw、三段标题、compression floor |
+| GLORY-051/056/058/059/072/073 | `review-assurance` | request 绑定、dual-PERFECT 证明、tree fresh、record-ready |
+| GLORY-002/030/031/032/048 + SURFACE-005 | `participant-horizon` | 隐藏 reviewer/barrier/witness 不进 Manager 面 |
+| GLORY-009 | `structured-workflow` | 无持久程序计数器 |
+| GLORY-074 | `obligation-ledger` | OpeningPolicy=BlindPlan、T1 commitment（跨域→`work-record`/`finality`） |
+| GLORY-075 | `participant-identity` + `prefix-stability` | system prompt byte-identical + Persona 冻结 |
+| GLORY-071 | `prefix-stability` | cold prompt boundary |
+| SURFACE-001/002 | `provider-language` | 新增固定文案英文/LF |
+| SURFACE-003/004 | `provider-projection` | typed data 不可反解；surface 唯一 owner（跨→`requirement-system`） |
+| SURFACE-006 | `verification-system` | surface proof gate |
+
+## 显著 NEEDS-SPLIT 条款（已分解进现有包）
+
+| Clause | 分出的 proposition | Future owner |
+|---|---|---|
+| GLORY-002 | Manager 不得控制隐藏 Reviewer | `finality` + `participant-horizon` |
+| GLORY-004 | REVISE/Blessing 反馈只来自 canonical LWR | `work-record` + `finality` |
+| GLORY-030 | checkpoint 过程评审 outcome/report 窄例外 | `participant-horizon` + `obligation-ledger` + `finality` |
+| GLORY-037/040/062 | TODO-010 尾抽干（await ConsumableReview） | `finality` + `obligation-ledger` |
+| GLORY-044 | REVISE 立即 cohort 关闭 + 双轨交付 | `finality` + `review-assurance` |
+| GLORY-056/057 | infra failure 非 REVISE + undecidable 恢复 | `review-assurance` + `crash-reconciliation` |
+| GLORY-058 | dual-PERFECT 证明（process PERFECT 不计入） | `review-assurance` + `review-judgement` |
+| GLORY-072/073 | record-ready 等待与 recovery | `review-assurance` + `work-record` + `causal-wait` |
+| GLORY-074 | BlindPlan T1 = commitment；交托只在 conversation | `obligation-ledger` + `work-record` |
+| GLORY-075 | 同 Life system prompt byte-identical；Persona 冻结 | `participant-identity` + `prefix-stability` |
+
+## GARBAGE — legacy Activation / Birth / Labor
+
+| 内容 | 判定 | 说明 |
+|---|---|---|
+| GLORY-014 `ManagerNarrative.PlanningTail`（legacy 冻结字节） | GARBAGE | 仅 legacy decode；生产 cutover 后不用 |
+| GLORY-018 无生产 Activation + GLORY-019 Activation 文本 + GLORY-020 Activation continuation | GARBAGE | planning-only 两阶段已删 |
+| GLORY-021 `WorkActivated` inert legacy fact + 历史 `ProtectedPrefixEnd` | GARBAGE | inert；Opening floor 由 WorkRecordStart 取代 |
+| GLORY-016/017/023/024 中「Birth/Labor floor」「Activation 前置」措辞 | GARBAGE | 措辞退役；Opening protection 语义→`work-record` 保留 |
+
+---
+
+# glory.md 轮 delta
+
+```text
+Boundary: UNCHANGED 45。Coverage: 82 条款分组覆盖，0 ORPHAN；legacy Activation/Birth/Labor 判 GARBAGE。
+Proof: suicide/finality/cohort/last_words → finality；seal/witness/challenge → review-assurance；LWR → work-record。
+Dependency: 无新增/删除。
+```
+
+## 边界观察
+
+1. glory.md 确认 `finality` 是「终结资格/cohort/rejection/blessing/rest」的 owner，但它的边界必须让出：record-ready→`review-assurance`、LWR→`work-record`、BlindPlan T1→`obligation-ledger`、hidden reviewer→`participant-horizon`、system prompt 字节→`participant-identity`/`prefix-stability`。
+2. 大量 legacy Activation/Birth/Labor/PlanningTail/WorkActivated 条款（GLORY-014/016..021/023/024）判 GARBAGE——它们正是 HANDOFF §12「clean world 正面定义，不背历史墓碑」的对象。
+
+---
+
+# 单-owner 主导文件（分组覆盖）
+
+## `docs/what/enforcer.md`（24 条款）
+
+| 范围 | Future owner | 说明 |
+|---|---|---|
+| ENFORCER-001/003/004/020..025/040/060/061/062/063/070/170 | `behavior-diagnosis` | tip = diagnosis occurrence；cycle 原子提交、tip→RuleId、Observation 配对、rulebook folder SSOT |
+| ENFORCER-071 | `guidance-delivery` | TipDeliveryFrontier vs TipSemanticCoverage 两轴、Full/Identity、reanchor redelivery |
+| ENFORCER-010/011 | `capability-enforcement` | Blogger 工具面仅 chronicle；旧名 blog 非法 |
+| ENFORCER-026 | `provider-projection` | Transport ≠ Semantic schema |
+| ENFORCER-030 | `cognitive-environment` | Blogger 统一 system（Role Law 组合） |
+| ENFORCER-002/072/073 | GARBAGE | score-vector 删除、catalog.json 废止（clean break） |
+
+## `docs/what/casebook.md`（CASE-001..012）
+
+`knowledge-reuse` 主导全部 12 条：Case = Q+A+可重放 observations、fetch 重放、freshness≠correctness、Bookkeeper、EventStore 权威、LRU、feature gating、并发 DomainConflict 收敛、低信任 index。交叉：EventStore→`durable-events`、observation capture→`repository-investigation`。
+
+## `docs/what/strength.md`（STRENGTH-001..012）
+
+`speculative-investigation` 主导全部 12 条：零影响基线、eligible opportunity、K0/K1/K2 预算、Replica authority、Candidate frame、Prepared≠历史、Promotion 由消费证据、Replay/XTrace closure、no-reflection、Predictor/control、熔断。交叉：persona/language 继承→`participant-identity`、read/glob/grep 同源→`capability-enforcement`、payload_refs→`durable-events`。
+
+## `docs/what/sphinx.md`（SPHINX-001..010）
+
+`epistemic-reasoning` 主导全部 10 条：生成式认识状态求解器、handle 绑定、MCP start/resume、EpistemicState 全局闭包、Proposal≠Evidence（No Free Information）、RootContract 保留分布、概率合格数值证据、经典算法可验证退化。MCP/wire 身份→`host-boundary`。
+
+## `docs/what/js-tools.md`（JS-001..020）
+
+`repository-programming` 主导全部 20 条：capability-projected surface、generated base-class exactness、file/glob/grep/rewrite/write、JSON return、sandbox、transaction staging、all-or-nothing commit、conflict/rollback、failure algebra。交叉：Synthetic TOML 渲染→`provider-projection`、事务 staging→`effect-accounting`/`durable-events`。
+
+## `docs/what/fallback.md`（FALLBACK-001/004/005/008/010/011/012/013/014）
+
+`provider-attempt-recovery` 主导全部 9 条：Fallback 属 Logical Run、推进不变量、有限预算、空/XML-only 不计、abort 残留不计、Host Attempt≠领域计数、槽内维护子请求、armed 合取、Persona/language/system prompt 跨 cursor 不变。交叉：身份字节不变→`participant-identity`/`provider-language`/`prefix-stability`。
+
+---
+
+# `docs/what/architecture.md`（ARCH-002..017，15 条款）
+
+| Clause | Future owner | 说明 |
+|---|---|---|
+| ARCH-002 事件是信号不是数据 | `host-boundary` | 碎片事件不进业务层 |
+| ARCH-003 不修改 OpenCode 本体 | `host-boundary` | 只现有 Hook/SDK |
+| ARCH-004 前缀缓存保护 | `prefix-stability` | 单一 ActivePrefixEpoch SSOT、冷边界三证据源 |
+| ARCH-005 恢复哲学 | `crash-reconciliation` + `structured-workflow` | 恢复重入普通程序，不恢复协程 |
+| ARCH-006 命名（人名词/工具动词） | `action-affordance` | 动作名表达 semantic act；commission≠fork |
+| ARCH-007 工具名引用完整性 | `action-affordance` + `capability-enforcement` | same tool name = same contract everywhere |
+| ARCH-008 禁止词 Stage/Phase/Lease/Owner/Generation | `structured-workflow` | 无程序计数器 |
+| ARCH-010 合成文本 TOML Instruction/Data | `provider-projection` | layout/escaping 只拥有 representation |
+| ARCH-011 状态先于表示 | `provider-projection` | representation 不反向创造 authority/state |
+| ARCH-012 自定义 Tool 文本结果有界 | `host-boundary` | tool result wire bound（2000 行/51200 字节） |
+| ARCH-013（空缺 Student/Teacher） | GARBAGE | migration absence |
+| ARCH-014 Provider Horizon | `participant-horizon` | decision filter + 小法则 |
+| ARCH-015 WorkRecord 散文非 schema | `work-record` | prose claim，无固定 DTO |
+| ARCH-016 静态 Gates A–F | `verification-system`（机制）+ 各 semantic owner（A→capability-enforcement、B→participant-horizon、C→provider-language、D→prefix-stability/participant-identity、E→provider-language、F→office-capability） | gate 机制可共享，语义 oracle 唯一 owner |
+| ARCH-017 Office Capability Model | `office-capability` | canonical 五分法 + entitled consequence |
+
+## `docs/what/flow.md`（FLOW-001/002/004/005/008）→ `structured-workflow` 全部 5 条
+
+流程由语言表达、DSL 直接执行、纯决策与效果分离、恢复重入普通流程、用可观察效果测试。
+
+## `docs/what/loop.md`（LOOP-001/006/007/008）→ `degeneration-guard` 全部 4 条
+
+低多样性/短句循环检测、LoopKill→FallbackController 桥接（不另造预算）、作用域与豁免、与既有恢复协议关系。
+
+## `docs/what/orchestrator.md`（ORCH-001/002/007/008）→ `change-integration` 全部 4 条
+
+commission 委托（→`delegation`）、Clean Gate、target ref 安全、崩溃恢复从 Journal 事实 fold（→`crash-reconciliation`）。
+
+## `docs/what/projection.md`（PROJ-001..009）→ `provider-projection` 主导
+
+投影是代数（无 AST+Interpreter）、输入事实快照、输出管线（SemanticEventTree→Semantic→Wire→Seal）、DSL 不负责生命周期。PROJ-009 MagicTodoProjection：canonical todo→`obligation-ledger`、禁止第二 LWR renderer→`work-record`、coverage 分型→`context-compression`。
+
+## `docs/what/dsl-structured-program.md`（DSL-001..015）
+
+| 范围 | Future owner | 说明 |
+|---|---|---|
+| DSL-001..007/013/014/015 | `structured-workflow` | 语言结构表达、状态标签对应物理事物、纯决策/效果分层、恢复重入、mutable 仅物理资源、Semantic Vocabulary/Compression/Decorator |
+| DSL-012 业务异步等待因果观测 | `causal-wait` | process-local diagnostic observation 非权威 |
+
+## `docs/what/document-governance.md`（GOV-001..012）
+
+| 范围 | Future owner | 说明 |
+|---|---|---|
+| GOV-002/005/006/007/008/009/011/012 | `requirement-system` | 唯一 owner、唯一定义位置、单文件 lifecycle、层归属、直接闭环小变更 |
+| GOV-002/011（proof 层） | `verification-system` | 证明义务层级 |
+| GOV-001/003/004/010（当前 docs/ 5-layer + changes/ 目录机制 + clean break 引用） | HOW/GARBAGE | 当前文件层级；未来由 `requirements/<package>/` 取代，不迁入永久 WHAT |
+
+## `docs/what/synthetic-toml.md` + `docs/what/glossary.md`
+
+均无独立条款：synthetic-toml.md 只把 ARCH-010/011/012 路由到 surface（→`provider-projection`）；glossary.md 只做术语导航，冲突时以被指正式定义为准（→各 semantic owner）。不产生新 owner。
+
+---
+
+# 全仓反向覆盖 — 完成总结
+
+## 范围
+
+`docs/what/` 全部 25 个文件（含 shape/how 同前缀条款）已逐 proposition 判 future owner。
+累计 ~418 条款。
+
+## 全局结论
+
+```text
+current accepted truth = conjunction of 45 packages，无一新增/删除/合并
+```
+
+- **0 新包、0 ORPHAN、0 OVERLAP、0 dependency delta**：每一条现行规范命题都能映射到现有 45 包之一；无命题需要新 semantic owner。
+- **所有 NEEDS-SPLIT 均已被现有包分解吸收**：现行 Clause 里的多 WHY（如 PROMPT-008、HOST-013、REVIEW-013、TODO-006、CTX-015）在 future ontology 中已是不同 package，无需改包集合。
+- **GARBAGE 集中确认**：Student/Teacher/Meditator/Executor absence、exact 22-agent catalog、legacy Activation/Birth/Labor/WorkActivated、ScoreVector、旧 NDJSON/目录 blob、`OpeningPromptRaw`、旧标题/`Closing report` DTO——均为 migration/clean-break sediment，不进入永久 WHAT。
+- **HOW 常数确认**：`MaxJoinBatch=32`、`RecoveryTailWindow=50`、`200 KiB`、`MaxKeywords=8`、MCP uvx/ref/env、wire 分隔符——具体数值非永久 contract。
+
+## 维持的 WATCH / DEFERRED
+
+1. `intra-participant-parallelism`（Fission）— DEFERRED：MVP capacity refusal 不立包（HANDOFF §10.1）。
+2. NEEDHELP / Pair Hint — WATCH：interaction-authority + delegation + provider-projection + prefix-stability + cognitive-environment + degeneration-guard + host-boundary 已能组合解释，未发现独立 WHY，不立 `collaboration-guidance`（HANDOFF §10.2）。
+3. `runtime-resource-integrity` — open question：distribution 与 provider-language 的 resource closure 仍需在 Phase C/D 观察是否形成独立 failure meaning（HANDOFF §10.3）。
+
+## Phase A 完成标志
+
+HANDOFF §23 Definition of Done 第 1 条（全部 `docs/what` propositions 已 reverse-classify，无未解释 ORPHAN）现已满足。后续 Phase B（WHY 反审计）、C（source/runtime evidence）、D（test/gate 覆盖）、E（dependency audit）、F（cutover 设计）仍待进行。

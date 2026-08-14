@@ -88,6 +88,8 @@ TOML comment/field、literal/basic escaping、value tree 是 representation HOW�
 
 ## Known OVERLAP in current docs/tests
 
+> Phase A（Clause-by-Clause 全仓反向覆盖）已完：`docs/what/` 全部 25 文件（含 shape/how 同前缀条款）逐 proposition 判 owner，累计 ~418 条款。结论：0 新包、0 ORPHAN、0 OVERLAP、0 dependency delta；全部 NEEDS-SPLIT 均被现有 45 包分解吸收；GARBAGE/HOW 集中确认（legacy absence、exact catalog、tuning 常数、wire 机制）。完整 ledger 见 `COVERAGE.md`。
+
 ### `docs/what/prompt.md`
 
 至少混合：
@@ -208,6 +210,8 @@ algebra/order/conflict/deterministic rendering → `provider-projection`；具�
 4. PROMPT-006 execution-binding 解析律（managed 冻结 / user-facing 追真实用户 / ExplicitExecutionOverride 单次 / fail-closed）当前归 `participant-identity`，但其 send 海关机制与 `dispatch-protocol`、`provider-attempt-recovery` 共用。语义 owner 唯一故暂不立包；若未来 dispatch 层需独立重写 binding 海关而不动 identity，重做 independent-change test。
 
 ## Recently resolved questions
+
+- Phase A reverse coverage 全仓完成（见 `COVERAGE.md`）：45 包不需增删并；Fission/NEEDHELP/runtime-resource-integrity 三个 WATCH 项维持原 verdict。
 
 - `semantic-trace` **不**依赖 `participant-horizon`：canonical trace 位于 horizon 之前，horizon 只治理后续 provider-visible projection/record delivery。
 - bounded canonical LWR 已抽成独立 `work-record` package；`semantic-trace` 拥有原始历史，`context-compression` 拥有可替代 coverage，`work-record` 拥有 bounded cross-boundary statement。
