@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
+
 open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Turn
@@ -93,9 +94,11 @@ module MagicTodoProjection =
         }
 
     type MagicTodoProjectionState =
-        { ByLife: Map<string, LifeMagicTodoState>
-          /// O(1) reverse locator for reviewer-session authority lookup.
-          ReviewerLifeBySession: Map<string, ManagerLifeId> }
+        {
+            ByLife: Map<string, LifeMagicTodoState>
+            /// O(1) reverse locator for reviewer-session authority lookup.
+            ReviewerLifeBySession: Map<string, ManagerLifeId>
+        }
 
     [<RequireQualifiedAccess>]
     type MagicTodoFoldRejection =
@@ -143,10 +146,14 @@ module MagicTodoProjection =
         | Some life -> life, state
         | None ->
             let life = emptyLife lifeId
-            life, { state with ByLife = Map.add (lifeKey lifeId) life state.ByLife }
+
+            life,
+            { state with
+                ByLife = Map.add (lifeKey lifeId) life state.ByLife }
 
     let private putLife (life: LifeMagicTodoState) (state: MagicTodoProjectionState) =
-        { state with ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
+        { state with
+            ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
 
     let isPlanCommitted (life: LifeMagicTodoState) : bool = life.FirstPlanCommitment.IsSome
 
@@ -292,11 +299,9 @@ module MagicTodoProjection =
 
             let firstCommitment, previousCommitted, latestCommitted =
                 match life.FirstPlanCommitment with
-                | None when cp.PlanCompleteDeclared ->
-                    Some payload.TodoWriteId, None, Some payload.TodoWriteId
+                | None when cp.PlanCompleteDeclared -> Some payload.TodoWriteId, None, Some payload.TodoWriteId
                 | None -> None, None, None
-                | Some first ->
-                    Some first, life.LatestCommittedCheckpoint, Some payload.TodoWriteId
+                | Some first -> Some first, life.LatestCommittedCheckpoint, Some payload.TodoWriteId
 
             Ok(
                 putLife
@@ -391,8 +396,7 @@ module MagicTodoProjection =
         | _ ->
             let indexedState =
                 { state with
-                    ReviewerLifeBySession =
-                        Map.add reviewerKey payload.ManagerLifeId state.ReviewerLifeBySession }
+                    ReviewerLifeBySession = Map.add reviewerKey payload.ManagerLifeId state.ReviewerLifeBySession }
 
             match life.Dedicated with
             | Some d when

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Strength.Prediction
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace

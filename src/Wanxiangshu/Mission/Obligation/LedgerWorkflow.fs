@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Obligation
+
 open Wanxiangshu.Change
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -50,8 +51,7 @@ module ObligationLedgerWorkflow =
 
             match firstAttempt with
             | PreparationAttempt.Prepared prepared -> return Ok prepared
-            | PreparationAttempt.Failed failure ->
-                return Error(PreparationFailure.AttemptFailed failure)
+            | PreparationAttempt.Failed failure -> return Error(PreparationFailure.AttemptFailed failure)
             | PreparationAttempt.AwaitPreviousReview ->
                 match currentPendingReview () with
                 | None -> return Error PreparationFailure.MissingPendingReview
@@ -65,10 +65,8 @@ module ObligationLedgerWorkflow =
 
                         match secondAttempt with
                         | PreparationAttempt.Prepared prepared -> return Ok prepared
-                        | PreparationAttempt.Failed failure ->
-                            return Error(PreparationFailure.AttemptFailed failure)
-                        | PreparationAttempt.AwaitPreviousReview ->
-                            return Error PreparationFailure.ReviewDidNotConverge
+                        | PreparationAttempt.Failed failure -> return Error(PreparationFailure.AttemptFailed failure)
+                        | PreparationAttempt.AwaitPreviousReview -> return Error PreparationFailure.ReviewDidNotConverge
         }
 
     [<RequireQualifiedAccess>]

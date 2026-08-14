@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Resources
+
 open Wanxiangshu.Change
 open Wanxiangshu.Git
 open Wanxiangshu.Repository.Investigation.Semble

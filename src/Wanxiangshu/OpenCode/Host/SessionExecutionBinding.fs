@@ -76,7 +76,14 @@ module SessionExecutionBinding =
     /// declaring the lane a managed child of the logical owner. The Host parent
     /// edge is handled separately by CreateSiblingSession.
     let bindInternalRoot (sessionId: SessionId) (agent: string option) =
-        match agent |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some(value.Trim())) with
+        match
+            agent
+            |> Option.bind (fun value ->
+                if String.IsNullOrWhiteSpace value then
+                    None
+                else
+                    Some(value.Trim()))
+        with
         | None -> invalidOp "PROMPT-006: internal root requires a managed agent binding"
         | Some selected ->
             lock gate (fun () ->
@@ -303,7 +310,8 @@ module SessionExecutionBinding =
     let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match tryAgent sessionId with
         | Some baseAgent ->
-            let baseModel = tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent)
+            let baseModel =
+                tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent)
 
             match baseModel with
             | None -> Error "PROMPT-006: user-facing session has no provable model binding"

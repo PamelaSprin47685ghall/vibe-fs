@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Sphinx
+
 open Wanxiangshu.Foundation
 
 open System

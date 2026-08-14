@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Finality
+
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Programming.Js
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -134,10 +135,7 @@ module JsToolsTransactionStore =
         | other -> Error(sprintf "not a JsTransaction event: %s" other)
 
     /// Append the Prepared fact using the Integrator-owned structural head.
-    let appendPrepared
-        (store: IEventStore)
-        (prepared: JsTransactionPrepared)
-        : Task<Result<EventId, string>> =
+    let appendPrepared (store: IEventStore) (prepared: JsTransactionPrepared) : Task<Result<EventId, string>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
             let streamId = EventStreamId.create TransactionStream
@@ -157,10 +155,7 @@ module JsToolsTransactionStore =
         }
 
     /// Append the Committed fact for a prepared transaction.
-    let appendCommitted
-        (store: IEventStore)
-        (transactionId: JsTransactionId)
-        : Task<Result<EventId, string>> =
+    let appendCommitted (store: IEventStore) (transactionId: JsTransactionId) : Task<Result<EventId, string>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
             let streamId = EventStreamId.create TransactionStream

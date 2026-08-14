@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -22,10 +23,7 @@ module WriterStreamSync =
     let private asStorage reason =
         ConvergeError.StorageInvalid(StorageInvalid.NonCanonical reason)
 
-    let private writeBlobEntries
-        (raw: IGitRawStore)
-        (items: (string * byte[]) list)
-        : Task<TreeEntry list> =
+    let private writeBlobEntries (raw: IGitRawStore) (items: (string * byte[]) list) : Task<TreeEntry list> =
         let rec loop remaining acc =
             task {
                 match remaining with
@@ -82,7 +80,7 @@ module WriterStreamSync =
         task {
             match! raw.ReadTree oid with
             | Some entries -> return Ok entries
-            | None -> return Error(asStorage(sprintf "missing %s tree" label))
+            | None -> return Error(asStorage (sprintf "missing %s tree" label))
         }
 
     let private readBlobList
@@ -95,10 +93,9 @@ module WriterStreamSync =
                 | [] -> return Ok(List.rev acc)
                 | entry :: tail when entry.Mode = blobMode ->
                     match! raw.ReadObject entry.Oid with
-                    | None -> return Error(asStorage(sprintf "missing sync blob: %s" entry.Name))
+                    | None -> return Error(asStorage (sprintf "missing sync blob: %s" entry.Name))
                     | Some bytes -> return! loop tail ((entry.Name, bytes) :: acc)
-                | entry :: _ ->
-                    return Error(asStorage(sprintf "sync leaf is not a blob: %s" entry.Name))
+                | entry :: _ -> return Error(asStorage (sprintf "sync leaf is not a blob: %s" entry.Name))
             }
 
         loop entries []
@@ -111,8 +108,13 @@ module WriterStreamSync =
             match! readRequiredTree raw (RootOid.value snapshot.RootOid) "root" with
             | Error error -> return Error error
             | Ok rootEntries ->
-                let writers = rootEntries |> List.tryFind (fun entry -> entry.Name = "writers" && entry.Mode = treeMode)
-                let payloads = rootEntries |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
+                let writers =
+                    rootEntries
+                    |> List.tryFind (fun entry -> entry.Name = "writers" && entry.Mode = treeMode)
+
+                let payloads =
+                    rootEntries
+                    |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
 
                 match writers, payloads with
                 | Some writerTree, Some payloadTree ->
@@ -132,7 +134,11 @@ module WriterStreamSync =
                                         writerBlobs
                                         |> List.map (fun (name, bytes) ->
                                             if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
-                                                raise (InvalidOperationException(sprintf "invalid writer filename: %s" name))
+                                                raise (
+                                                    InvalidOperationException(
+                                                        sprintf "invalid writer filename: %s" name
+                                                    )
+                                                )
 
                                             let writerId = name.Substring(0, name.Length - ".ndjson".Length)
                                             writerId, Encoding.UTF8.GetString bytes)
@@ -162,7 +168,8 @@ module WriterStreamSync =
         | Error error, _ -> Error(ConvergeError.StorageInvalid error)
         | _, Error error -> Error error
         | Ok local, Ok remote ->
-            let taggedLocal = local |> List.map (fun (writerId, events) -> "local:" + writerId, events)
+            let taggedLocal =
+                local |> List.map (fun (writerId, events) -> "local:" + writerId, events)
 
             match EventKWayMerge.merge (taggedLocal @ remote) with
             | Error error -> Error(ConvergeError.StorageInvalid error)

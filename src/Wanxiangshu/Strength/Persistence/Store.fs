@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Strength.Persistence
+
 open Wanxiangshu.Repository.Investigation.Semble
 
 open System.Text

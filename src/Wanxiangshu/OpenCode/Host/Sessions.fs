@@ -28,10 +28,13 @@ type ISessionHostPort =
     /// managed children. The later TurnAborted is classified by FissionRuntime.
     abstract InterruptSessionOnly: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
+
     /// Fission-only physical sibling creation. `physicalParentId` is the old
     /// caller's Host parent; no managed-child registry/linkage is created.
     abstract CreateSiblingSession:
-        ownerSessionId: SessionId * physicalParentId: SessionId option * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+        ownerSessionId: SessionId * physicalParentId: SessionId option * options: OpenCodeChildOptions ->
+            Task<Result<SessionId, string>>
+
     abstract TryGetParentSession: sessionId: SessionId -> Task<Result<SessionId option, string>>
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
@@ -185,9 +188,7 @@ type InjectedSessionPort
 
         member _.InterruptSessionOnly(sessionId) =
             task {
-                Diagnostic.emit
-                    "session-fission-interrupt"
-                    [ "session_id", SessionId.value sessionId ]
+                Diagnostic.emit "session-fission-interrupt" [ "session_id", SessionId.value sessionId ]
 
                 match underlyingPort with
                 | Some port -> return! port.AbortSession sessionId

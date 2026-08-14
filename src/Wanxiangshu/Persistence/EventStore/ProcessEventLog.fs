@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
@@ -144,10 +145,10 @@ module ProcessEventLog =
                         [ "realpath" ==> false
                           "retries"
                           ==> createObj
-                              [ "forever" ==> true
-                                "minTimeout" ==> 20
-                                "maxTimeout" ==> 200
-                                "factor" ==> 1 ] ])
+                                  [ "forever" ==> true
+                                    "minTimeout" ==> 20
+                                    "maxTimeout" ==> 200
+                                    "factor" ==> 1 ] ])
 
             return new StoreFileGate(release)
         }
@@ -318,9 +319,13 @@ module ProcessEventLog =
     let readPayload (commonDir: string) (payloadRef: PayloadRef) : byte[] option =
         let path = join2 (payloadsDirectory commonDir) (PayloadRef.value payloadRef)
 
-        if existsSync path then Some(readBytesFileSync path) else None
+        if existsSync path then
+            Some(readBytesFileSync path)
+        else
+            None
 
-    let payloadExists commonDir payloadRef = readPayload commonDir payloadRef |> Option.isSome
+    let payloadExists commonDir payloadRef =
+        readPayload commonDir payloadRef |> Option.isSome
 
     let readPayloadFiles (commonDir: string) : (string * byte[]) list =
         let directory = payloadsDirectory commonDir

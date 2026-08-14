@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Git.Hook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Git
@@ -74,7 +75,10 @@ module HookDispatcher =
         | HookKind.PrePush -> "pre-push"
 
     let private tryReadHook path =
-        if existsSync path then Some(readFileSync path "utf8") else None
+        if existsSync path then
+            Some(readFileSync path "utf8")
+        else
+            None
 
     let private containsOwnershipMarker (body: string) = body.Contains OwnershipMarker
 
@@ -127,10 +131,7 @@ module HookDispatcher =
             [ "#!/bin/sh"
               shimHeaderComment
               sprintf "if [ \"${%s:-}\" = \"1\" ]; then exit 0; fi" SyncActiveEnv
-              sprintf
-                  "exec /usr/bin/env node %s %s \"$@\""
-                  (shellQuote (runnerPath ()))
-                  (hookRunnerArgument kind)
+              sprintf "exec /usr/bin/env node %s %s \"$@\"" (shellQuote (runnerPath ())) (hookRunnerArgument kind)
               "" ]
 
     let private hooksDirectory workspace =
@@ -163,9 +164,7 @@ module HookDispatcher =
         if remoteFetchSpecs workspace remote |> List.contains expected then
             ()
         else
-            GitSubject.execIn
-                workspace
-                [| "config"; "--add"; sprintf "remote.%s.fetch" remote; expected |]
+            GitSubject.execIn workspace [| "config"; "--add"; sprintf "remote.%s.fetch" remote; expected |]
             |> ignore
 
     /// Startup-only ensure. There is intentionally no fetch/pull/push here.

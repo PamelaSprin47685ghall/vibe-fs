@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -285,11 +286,7 @@ module HostForkRunLifecycle =
     /// this runs. Settle only the in-memory waiter/subscription; routing the same
     /// run through `complete(Failed "cancelled")` would incorrectly compete with
     /// Abandoned by attempting a HandleCompleted(CANCELLED) commit.
-    let settleParentCancelled
-        (gate: obj)
-        (pendingRuns: Dictionary<string, PendingHostRun>)
-        (run: PendingHostRun)
-        =
+    let settleParentCancelled (gate: obj) (pendingRuns: Dictionary<string, PendingHostRun>) (run: PendingHostRun) =
         let claimed, subscriptionToDispose =
             lock gate (fun () ->
                 match pendingRuns.TryGetValue run.AgentId with
@@ -300,7 +297,9 @@ module HostForkRunLifecycle =
                 | _ -> false, None)
 
         if claimed then
-            subscriptionToDispose |> Option.iter (fun subscription -> subscription.Dispose())
+            subscriptionToDispose
+            |> Option.iter (fun subscription -> subscription.Dispose())
+
             run.Source.SetResult(AgentCompletion.abandoned run.AgentId "ParentCancelled")
 
     let failRun

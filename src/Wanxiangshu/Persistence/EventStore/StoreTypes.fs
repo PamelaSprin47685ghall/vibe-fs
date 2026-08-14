@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
@@ -90,7 +91,12 @@ module GitTree =
             { entry with
                 Mode = normalizeMode entry.Mode })
         |> List.sortWith (fun a b ->
-            let key entry = if isTreeMode entry.Mode then entry.Name + "/" else entry.Name
+            let key entry =
+                if isTreeMode entry.Mode then
+                    entry.Name + "/"
+                else
+                    entry.Name
+
             compare (key a) (key b))
 
 [<RequireQualifiedAccess>]
@@ -114,11 +120,21 @@ module StoreRef =
         let prefix = template.Substring(0, markerAt)
         let suffix = template.Substring(markerAt + marker.Length)
 
-        if refName.StartsWith(prefix, System.StringComparison.Ordinal)
-           && refName.EndsWith(suffix, System.StringComparison.Ordinal)
-           && refName.Length > prefix.Length + suffix.Length then
-            let remote = refName.Substring(prefix.Length, refName.Length - prefix.Length - suffix.Length)
-            try Some(remoteTracking remote |> ignore; remote) with _ -> None
+        if
+            refName.StartsWith(prefix, System.StringComparison.Ordinal)
+            && refName.EndsWith(suffix, System.StringComparison.Ordinal)
+            && refName.Length > prefix.Length + suffix.Length
+        then
+            let remote =
+                refName.Substring(prefix.Length, refName.Length - prefix.Length - suffix.Length)
+
+            try
+                Some(
+                    remoteTracking remote |> ignore
+                    remote
+                )
+            with _ ->
+                None
         else
             None
 

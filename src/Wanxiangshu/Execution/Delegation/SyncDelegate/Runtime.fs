@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
+
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Handle
@@ -57,6 +58,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
@@ -246,15 +248,8 @@ type SyncDelegateRuntime
     member _.Invoke
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke
-            store
-            deps
-            ownerSessionKey
-            role
-            charge
-            expectedToolCalls
-            None
-            (fun () -> Task.FromResult charge)
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None (fun () ->
+            Task.FromResult charge)
         |> singletonResult
 
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
@@ -267,15 +262,7 @@ type SyncDelegateRuntime
             prepareProviderPrompt: unit -> Task<string>,
             ?expectedToolCalls: int
         ) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke
-            store
-            deps
-            ownerSessionKey
-            role
-            charge
-            expectedToolCalls
-            None
-            prepareProviderPrompt
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None prepareProviderPrompt
         |> singletonResult
 
     member _.InvokeBatchPrepared

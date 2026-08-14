@@ -85,8 +85,7 @@ module ManagerOpeningFloor =
         | Some current ->
             let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
 
-            let planCommitted =
-                magic |> Option.exists MagicTodoProjection.isPlanCommitted
+            let planCommitted = magic |> Option.exists MagicTodoProjection.isPlanCommitted
 
             let callCursor, callId =
                 match magic |> Option.bind t1Anchor with

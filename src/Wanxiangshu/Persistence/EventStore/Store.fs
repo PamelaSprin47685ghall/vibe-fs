@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
@@ -71,7 +72,8 @@ module EventStore =
         loop events
 
     let private validateBatchDag (events: EventEnvelope list) : Result<unit, StorageInvalid> =
-        let keys = events |> List.map (fun event -> EventId.value event.EventId) |> Set.ofList
+        let keys =
+            events |> List.map (fun event -> EventId.value event.EventId) |> Set.ofList
 
         let parentsById =
             events
@@ -150,7 +152,10 @@ module EventStore =
             match remaining with
             | [] -> Ok()
             | parent :: tail ->
-                if Set.contains (EventId.value parent) batchIds || Option.isSome (integrator.TryEvent parent) then
+                if
+                    Set.contains (EventId.value parent) batchIds
+                    || Option.isSome (integrator.TryEvent parent)
+                then
                     parents tail
                 else
                     Error(StorageInvalid.MissingParent parent)
@@ -165,10 +170,7 @@ module EventStore =
 
         eventsLeft events
 
-    let private validatePayloadClosure
-        (commonDir: string)
-        (events: EventEnvelope list)
-        : Result<unit, StorageInvalid> =
+    let private validatePayloadClosure (commonDir: string) (events: EventEnvelope list) : Result<unit, StorageInvalid> =
         let refs =
             events
             |> List.collect (fun envelope -> envelope.PayloadRefs)
@@ -200,11 +202,7 @@ module EventStore =
                         | Error error -> Error error
                         | Ok() -> Ok fresh
 
-    let createLocal
-        (commonDir: string)
-        (writerId: string)
-        (integrator: ICanonicalIntegrator)
-        : IEventStore =
+    let createLocal (commonDir: string) (writerId: string) (integrator: ICanonicalIntegrator) : IEventStore =
         let log = ProcessEventLog.create commonDir writerId
         let gate = obj ()
 

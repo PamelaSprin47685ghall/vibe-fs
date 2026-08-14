@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Programming.Js.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -272,9 +273,7 @@ module JsToolWorkflow =
                                 | Ok() ->
                                     // 5. the commit fact (JS-012): its absence after
                                     // Prepared is what recovery uses to undo
-                                    match!
-                                        durable.AppendCommitted prepared.TransactionId
-                                    with
+                                    match! durable.AppendCommitted prepared.TransactionId with
                                     | Error _ -> return Failed JsFailure.TransactionCommitFailed
                                     | Ok _ ->
                                         let written =

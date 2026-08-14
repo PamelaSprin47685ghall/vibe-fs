@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -76,7 +77,6 @@ module CasebookTools =
             try
                 let store = WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
 
-                [ FetchTool.spec factory workspaceRoot store
-                  JsBookkeeperTool.spec factory ]
+                [ FetchTool.spec factory workspaceRoot store; JsBookkeeperTool.spec factory ]
             with _ ->
                 []

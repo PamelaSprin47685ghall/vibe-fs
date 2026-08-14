@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Programming.Js.OpenCode
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode

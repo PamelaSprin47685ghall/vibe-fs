@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Composition.Turn
+
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle

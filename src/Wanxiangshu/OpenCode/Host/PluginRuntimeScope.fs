@@ -173,8 +173,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             handleTurn: ReconciledTurnContext -> Task<AssistanceTurnDisposition>,
             dropSignals: SessionId -> unit,
             dropSession: SessionId -> Task
-        )
-        =
+        ) =
         assistanceTurnHandler <- Some handleTurn
         assistanceDropSignals <- Some dropSignals
         assistanceDropSession <- Some dropSession
@@ -361,8 +360,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 disposeTask <- Some running
                 running)
 
-    member this.Dispose() =
-        this.DisposeAsync() |> ignore
+    member this.Dispose() = this.DisposeAsync() |> ignore
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

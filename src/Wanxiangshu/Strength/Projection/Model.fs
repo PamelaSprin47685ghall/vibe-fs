@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Strength.Projection
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -170,5 +171,5 @@ module StrengthProjection =
                     { ByDecision = Map.add dkey { view with Abandoned = true } projection.ByDecision
                       ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
 
-    // No history-fold API by design. CanonicalIntegrator is the sole history
-    // enumerator and registers `apply` as this module's one-event oracle.
+// No history-fold API by design. CanonicalIntegrator is the sole history
+// enumerator and registers `apply` as this module's one-event oracle.

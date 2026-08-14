@@ -148,11 +148,7 @@ module PluginHooks =
 
                     match journal, context.ToolCallId with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        do!
-                            DelegatedToolEstimateLedger.observe
-                                durable
-                                (SessionId.create context.SessionId)
-                                toolCallId
+                        do! DelegatedToolEstimateLedger.observe durable (SessionId.create context.SessionId) toolCallId
                     | _ -> ()
 
                     do! magicTodo.Before toolInput toolOutput

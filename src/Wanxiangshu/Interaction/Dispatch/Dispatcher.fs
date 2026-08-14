@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Interaction.Dispatch
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Change

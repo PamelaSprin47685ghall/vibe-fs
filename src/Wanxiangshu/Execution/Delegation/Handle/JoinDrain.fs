@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Handle
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -388,12 +389,13 @@ module JoinDrain =
         : Task<Result<RunCompletion list, ForkError>> =
         let filtered () =
             let projection = AgentJournal.handleProjection durable parentId
-            { projection with Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
+
+            { projection with
+                Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
 
         task {
             do! reconcileFalseAborts durable parentId
             let projection = filtered ()
 
-            return!
-                drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
+            return! drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
         }

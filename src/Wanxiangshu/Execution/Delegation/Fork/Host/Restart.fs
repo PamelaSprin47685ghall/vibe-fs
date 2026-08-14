@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
+
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -107,7 +108,9 @@ module HostForkRestart =
 
                 return
                     ChildRecoveryResult.RecoveryBlocked(
-                        Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (ChildRecoveryBlock.Reason reason)
+                        Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (
+                            ChildRecoveryBlock.Reason reason
+                        )
                     )
         }
 

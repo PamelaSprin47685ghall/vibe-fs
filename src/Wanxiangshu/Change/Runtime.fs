@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Change
+
 open Wanxiangshu.Git
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -233,8 +234,7 @@ type Orchestrator
             ?worktreePath: WorktreePath,
             ?byname: string,
             ?expectedToolCalls: int
-        )
-        =
+        ) =
         let providerByname =
             match byname with
             | Some value when not (System.String.IsNullOrWhiteSpace value) -> value.Trim()

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
+
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change

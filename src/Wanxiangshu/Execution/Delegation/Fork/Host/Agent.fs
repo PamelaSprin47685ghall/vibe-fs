@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
@@ -441,8 +442,7 @@ module HostForkAgent =
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | _, Some childId ->
                     match this.Journal, expectedToolCalls with
-                    | Some journal, Some expected ->
-                        do! DelegatedToolEstimateLedger.replace journal childId expected
+                    | Some journal, Some expected -> do! DelegatedToolEstimateLedger.replace journal childId expected
                     | _ -> ()
 
                     // The record carries the managed name this handle was forked
@@ -470,8 +470,7 @@ module HostForkAgent =
                                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
                                 |> Option.defaultValue agentName
 
-                            let activeRun =
-                                lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
+                            let activeRun = lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
 
                             if activeRun then
                                 return!

@@ -156,7 +156,10 @@ module SessionRecoveryWorkflow =
                                 | PromptRecovery.ClaimOutcome.Proven _ -> Some item.PromptKey
                                 | _ -> None)
 
-                        return SessionRecovery.SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None keys [])
+                        return
+                            SessionRecovery.SessionRecovery.Recovered(
+                                RecoveryReceipt.create sessionId sequence None keys []
+                            )
             }
 
     let private recoverManagerJobOutcome (ports: SessionRecoveryPorts) (jobId: ManagerJobId) : Task<SessionRecovery> =

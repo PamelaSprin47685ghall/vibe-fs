@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Cycle
+
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Execution.Delegation.SyncDelegate

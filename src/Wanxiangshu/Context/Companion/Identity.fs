@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Context.Companion
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix

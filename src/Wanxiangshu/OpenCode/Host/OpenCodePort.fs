@@ -43,9 +43,12 @@ type OpenCodeChildInfo =
 type IOpenCodePort =
     inherit IPromptPort
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
+
     /// Create a physical Host session with an optional Host parent. Unlike
     /// CreateChildSession this carries no Wanxiangshu managed-child semantics.
-    abstract CreateSession: parentId: SessionId option -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    abstract CreateSession:
+        parentId: SessionId option -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+
     abstract GetSessionParent: sessionId: SessionId -> Task<Result<SessionId option, string>>
     abstract CreateChildSession: parentId: SessionId -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
@@ -161,8 +164,12 @@ module OpenCodePort =
 
                     let bodyFields =
                         parentFields
-                        @ (opts.Title |> Option.map (fun title -> [ "title", box title ]) |> Option.defaultValue [])
-                        @ (opts.Agent |> Option.map (fun agent -> [ "agent", box agent ]) |> Option.defaultValue [])
+                        @ (opts.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (opts.Agent
+                           |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
 
                     let payload =
                         createObj (
@@ -175,7 +182,12 @@ module OpenCodePort =
                         let sessObj = client?session
                         let createFn = sessObj?create
                         let! res = unbox<Task<obj>> (createFn?call (sessObj, payload))
-                        let body = if not (isNull res) && not (isNull res?data) then res?data else res
+
+                        let body =
+                            if not (isNull res) && not (isNull res?data) then
+                                res?data
+                            else
+                                res
 
                         if not (isNull body) && not (isNull body?id) then
                             return Ok(SessionId.create (unbox<string> body?id))
@@ -192,13 +204,20 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let getFn = sessObj?get
+
                         let payload =
                             createObj
                                 [ "path", box (createObj [ "id", box sId ])
                                   "sessionID", box sId
                                   "headers", box (headersObj None) ]
+
                         let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
-                        let body = if not (isNull res) && not (isNull res?data) then res?data else res
+
+                        let body =
+                            if not (isNull res) && not (isNull res?data) then
+                                res?data
+                            else
+                                res
 
                         if isNull body then
                             return Error "Missing session response"
@@ -441,8 +460,12 @@ module OpenCodePort =
                         (parentId
                          |> Option.map (fun parent -> [ "parentID", box (SessionId.value parent) ])
                          |> Option.defaultValue [])
-                        @ (opts.Title |> Option.map (fun title -> [ "title", box title ]) |> Option.defaultValue [])
-                        @ (opts.Agent |> Option.map (fun agent -> [ "agent", box agent ]) |> Option.defaultValue [])
+                        @ (opts.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (opts.Agent
+                           |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
 
                     let! res = postJson "/session" (createObj bodyFields)
 

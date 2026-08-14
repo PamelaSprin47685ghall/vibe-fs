@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Manager
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Mission.Review.Barrier

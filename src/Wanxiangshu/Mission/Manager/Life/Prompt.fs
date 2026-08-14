@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Manager.Life
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
@@ -49,8 +50,7 @@ type IntegrationRule =
 /// Structural event-graph Current is one registered Integrator slot, not a
 /// second history fold. It preserves every stream frontier so conflict remains
 /// distinguishable from an empty stream after the online-Git projector removal.
-type StructuralProjection =
-    { Heads: Map<string, Set<EventId>> }
+type StructuralProjection = { Heads: Map<string, Set<EventId>> }
 
 [<RequireQualifiedAccess>]
 module StructuralProjection =
@@ -65,8 +65,14 @@ module StructuralProjection =
     let apply (projection: StructuralProjection) (envelope: EventEnvelope) =
         let key = EventStreamId.value envelope.StreamId
         let prior = Map.tryFind key projection.Heads |> Option.defaultValue Set.empty
-        let next = envelope.Parents |> List.fold (fun heads parent -> Set.remove parent heads) prior |> Set.add envelope.EventId
-        { projection with Heads = Map.add key next projection.Heads }
+
+        let next =
+            envelope.Parents
+            |> List.fold (fun heads parent -> Set.remove parent heads) prior
+            |> Set.add envelope.EventId
+
+        { projection with
+            Heads = Map.add key next projection.Heads }
 
 /// Read-only view exposed by the unique canonical Integrator.
 type ICanonicalIntegrator =

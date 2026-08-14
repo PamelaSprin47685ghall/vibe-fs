@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
+
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

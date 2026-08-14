@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
+
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -36,7 +37,10 @@ module FissionRuntime =
     let private lanes = Dictionary<string, FissionLaneBinding>()
     let private silentInterrupts = HashSet<string>()
     let private handleAffinities = Dictionary<string, int>()
-    let private childObservers = Dictionary<string, int -> string -> SessionId -> unit>()
+
+    let private childObservers =
+        Dictionary<string, int -> string -> SessionId -> unit>()
+
     let private groupResources = Dictionary<string, ResizeArray<IDisposable>>()
     let private deliveryClaims = HashSet<string>()
 
@@ -64,9 +68,11 @@ module FissionRuntime =
             | true, binding -> Some binding
             | false, _ -> None)
 
-    let tryOwner laneSessionId = tryLane laneSessionId |> Option.map (fun binding -> binding.OwnerSessionId)
+    let tryOwner laneSessionId =
+        tryLane laneSessionId |> Option.map (fun binding -> binding.OwnerSessionId)
 
-    let logicalOwner sessionId = tryOwner sessionId |> Option.defaultValue sessionId
+    let logicalOwner sessionId =
+        tryOwner sessionId |> Option.defaultValue sessionId
 
     let markSilentInterrupt ownerSessionId =
         lock gate (fun () -> silentInterrupts.Add(SessionId.value ownerSessionId) |> ignore)
@@ -121,7 +127,10 @@ module FissionRuntime =
                 | false, _ -> [])
 
         for resource in resources do
-            try resource.Dispose() with _ -> ()
+            try
+                resource.Dispose()
+            with _ ->
+                ()
 
     let notifyChildCreated laneSessionId handleId childSessionId =
         match tryLane laneSessionId with
@@ -135,7 +144,8 @@ module FissionRuntime =
                     | true, callback -> Some callback
                     | false, _ -> None)
 
-            observer |> Option.iter (fun callback -> callback binding.LaneIndex handleId childSessionId)
+            observer
+            |> Option.iter (fun callback -> callback binding.LaneIndex handleId childSessionId)
 
     let tryHandleAffinity ownerSessionId handleId =
         lock gate (fun () ->
@@ -167,7 +177,10 @@ module FissionRuntime =
                 match groupResources.TryGetValue groupId with
                 | true, resources ->
                     for resource in resources do
-                        try resource.Dispose() with _ -> ()
+                        try
+                            resource.Dispose()
+                        with _ ->
+                            ()
 
                     groupResources.Remove groupId |> ignore
                 | false, _ -> ())

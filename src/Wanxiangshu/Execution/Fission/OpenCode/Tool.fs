@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
@@ -227,7 +228,10 @@ module FissionTool =
 
                                 delivered, Map.containsKey lane.Index group.LaneWork
 
-                        if not alreadyDelivered && FissionRuntime.tryBeginDelivery groupId completionId lane.Index then
+                        if
+                            not alreadyDelivered
+                            && FissionRuntime.tryBeginDelivery groupId completionId lane.Index
+                        then
                             try
                                 if laneClosed then
                                     let! _ = appendDelivery durable owner None groupId completionId lane.Index
@@ -356,9 +360,13 @@ module FissionTool =
                                 match item with
                                 | PtyJoinItem.PtyExited exit -> exit.Outcome
                                 | PtyJoinItem.PtyFailed failure ->
-                                    String.concat "\n" [ "status=failed"; "code=" + failure.Code; "error=" + failure.Message ]
+                                    String.concat
+                                        "\n"
+                                        [ "status=failed"; "code=" + failure.Code; "error=" + failure.Message ]
                                 | PtyJoinItem.PtyAborted aborted ->
-                                    String.concat "\n" [ "status=aborted"; "code=" + aborted.Code; "error=" + aborted.Message ]
+                                    String.concat
+                                        "\n"
+                                        [ "status=aborted"; "code=" + aborted.Code; "error=" + aborted.Message ]
 
                             captureAndBroadcast
                                 scope
@@ -405,11 +413,17 @@ module FissionTool =
                         | Some profile, Ok ownerRuntime ->
                             let effectiveAgent = currentEffectiveAgent profile ctx
                             let groupId = groupIdFor owner toolCallId
-                            let directory = scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+                            let directory =
+                                scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
                             let preAgents = ownerRuntime.SnapshotOutstandingAgentRuns()
                             let prePtys = ownerRuntime.SnapshotOutstandingPtyRuns()
 
-                            if (not (List.isEmpty preAgents) || not (List.isEmpty prePtys)) && scope.EventPort.IsNone then
+                            if
+                                (not (List.isEmpty preAgents) || not (List.isEmpty prePtys))
+                                && scope.EventPort.IsNone
+                            then
                                 return consequence language Path.Unavailable
                             else
                                 let preCompletionIds =
@@ -422,7 +436,8 @@ module FissionTool =
                                         (fun sessionId ->
                                             task {
                                                 match! scope.ParentWorkRecordFor(SessionId.value sessionId) with
-                                                | Some record when not (String.IsNullOrWhiteSpace record) -> return Ok record
+                                                | Some record when not (String.IsNullOrWhiteSpace record) ->
+                                                    return Ok record
                                                 | _ -> return Error "lifecycle_work_record_unavailable"
                                             })
                                       CreateLane =
@@ -432,7 +447,13 @@ module FissionTool =
                                                     scope.Sessions.CreateSiblingSession(
                                                         logicalOwner,
                                                         physicalParent,
-                                                        { Title = Some(sprintf "Fission lane %d/%d" (lane.Index + 1) parsed.Count)
+                                                        { Title =
+                                                            Some(
+                                                                sprintf
+                                                                    "Fission lane %d/%d"
+                                                                    (lane.Index + 1)
+                                                                    parsed.Count
+                                                            )
                                                           Agent = Some effectiveAgent
                                                           Directory = directory }
                                                     )
@@ -440,11 +461,18 @@ module FissionTool =
                                                 | Error error -> return Error error
                                                 | Ok laneId ->
                                                     scope.RegisterPhysicalParent(laneId, physicalParent)
+
                                                     directory
                                                     |> Option.iter (fun path ->
                                                         scope.RegisterDirectory(SessionId.value laneId, path))
 
-                                                    FissionRuntime.bindLane groupId owner lane.Index parsed.Count laneId
+                                                    FissionRuntime.bindLane
+                                                        groupId
+                                                        owner
+                                                        lane.Index
+                                                        parsed.Count
+                                                        laneId
+
                                                     return Ok laneId
                                             })
                                       StartLane =
@@ -511,8 +539,10 @@ module FissionTool =
                                                                    ParentSessionId = physicalParent
                                                                    OriginToolCallId = toolCallId
                                                                    LaneCount = parsed.Count
-                                                                   LaneSessions = ordered |> List.map (fun lane -> lane.SessionId)
-                                                                   LanePrompts = ordered |> List.map (fun lane -> lane.Prompt)
+                                                                   LaneSessions =
+                                                                    ordered |> List.map (fun lane -> lane.SessionId)
+                                                                   LanePrompts =
+                                                                    ordered |> List.map (fun lane -> lane.Prompt)
                                                                    OwnerWorkRecordRef = blob.BlobRef
                                                                    OwnerWorkRecordDigest = blob.BlobDigest
                                                                    PreFissionCompletionIds = preCompletionIds |})
@@ -555,10 +585,7 @@ module FissionTool =
                                         prePtys
                                         ownerRuntime
 
-                                    return
-                                        tomlObject
-                                            [ "status", TString "fissioned"
-                                              "lane_count", TInt parsed.Count ]
+                                    return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

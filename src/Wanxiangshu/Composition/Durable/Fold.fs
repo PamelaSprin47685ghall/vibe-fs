@@ -169,6 +169,6 @@ module Fold =
                 { Fact = "ManagerLifecycle"
                   Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
 
-    // Historical enumeration intentionally has no Journal-owned API. Boot and
-    // live facts both enter through CanonicalIntegrator, which invokes only
-    // foldEnvelope for one already-ordered durable event at a time.
+// Historical enumeration intentionally has no Journal-owned API. Boot and
+// live facts both enter through CanonicalIntegrator, which invokes only
+// foldEnvelope for one already-ordered durable event at a time.

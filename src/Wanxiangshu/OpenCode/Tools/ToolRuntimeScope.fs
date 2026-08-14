@@ -1,4 +1,5 @@
 namespace Wanxiangshu.OpenCode
+
 open Wanxiangshu.Composition.Durable
 
 open System
@@ -145,9 +146,7 @@ type ToolRuntimeScope
         |> Option.orElseWith (fun () ->
             journal
             |> Option.bind (fun durable ->
-                FissionProjection.tryOwnerOfLane
-                    sessionId
-                    (AgentJournal.snapshot durable).AgentProjections.Fission))
+                FissionProjection.tryOwnerOfLane sessionId (AgentJournal.snapshot durable).AgentProjections.Fission))
         |> Option.defaultValue sessionId
 
     let activeProfileFor sessionId =
@@ -259,10 +258,12 @@ type ToolRuntimeScope
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
     member _.DirectoryFor(sessionId) = directoryFor sessionId
     member _.LogicalOwnerFor(sessionId: SessionId) = logicalOwnerFor sessionId
+
     member _.RegisterPhysicalParent(sessionId: SessionId, parentId: SessionId option) =
         match parentId with
         | Some parent -> sessionParents.[SessionId.value sessionId] <- SessionId.value parent
         | None -> sessionParents.Remove(SessionId.value sessionId) |> ignore
+
     member _.ParentWorkRecordFor(sessionId) = parentRecord sessionId
     member _.ChildWorkRecordFor(sessionId) = childRecord sessionId
 
@@ -297,10 +298,7 @@ type ToolRuntimeScope
         if String.IsNullOrWhiteSpace ctx.SessionId then
             Error "Missing sessionID"
         else
-            let ownerKey =
-                SessionId.create ctx.SessionId
-                |> logicalOwnerFor
-                |> SessionId.value
+            let ownerKey = SessionId.create ctx.SessionId |> logicalOwnerFor |> SessionId.value
 
             lock gate (fun () ->
                 if disposed then
@@ -407,9 +405,7 @@ type ToolRuntimeScope
                     disposed <- true
 
                     let ownedForkRuntimes =
-                        Seq.append runtimes.Values executorRuntimes.Values
-                        |> Seq.distinct
-                        |> Seq.toList
+                        Seq.append runtimes.Values executorRuntimes.Values |> Seq.distinct |> Seq.toList
 
                     let ownedOrchestrators = orchestratorHosts.Values |> Seq.toList
 
@@ -429,8 +425,7 @@ type ToolRuntimeScope
         }
         :> Task
 
-    member this.Dispose() =
-        this.DisposeAsync() |> ignore
+    member this.Dispose() = this.DisposeAsync() |> ignore
 
     interface ISessionRuntimeOwner with
         member this.DisposeSession sessionId = this.DisposeSession sessionId

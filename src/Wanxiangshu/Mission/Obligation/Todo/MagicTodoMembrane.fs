@@ -632,13 +632,17 @@ module MagicTodoHostHooks =
                                                             obligations
                                                     with
                                                     | Ok value ->
-                                                        return ObligationLedgerWorkflow.PreparationAttempt.Prepared value
+                                                        return
+                                                            ObligationLedgerWorkflow.PreparationAttempt.Prepared value
                                                     | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
-                                                        return ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
+                                                        return
+                                                            ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
                                                     | Error reason ->
                                                         match syntaxPrepareFailure reason with
                                                         | Some syntax ->
-                                                            return ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
+                                                            return
+                                                                ObligationLedgerWorkflow.PreparationAttempt.Failed
+                                                                    syntax
                                                         | None ->
                                                             return
                                                                 fatalInfrastructure
@@ -739,10 +743,7 @@ module MagicTodoHostHooks =
                                         prepared.Prepared.TodoWriteId
 
                             match!
-                                ObligationLedgerWorkflow.acceptCheckpoint
-                                    acceptDurably
-                                    shouldEnsureReview
-                                    ensureReview
+                                ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
                             with
                             | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed reason) ->
                                 fatalInfrastructure

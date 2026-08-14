@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation
+
 open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Foundation

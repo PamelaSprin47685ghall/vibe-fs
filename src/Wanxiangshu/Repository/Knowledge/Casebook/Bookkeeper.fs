@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -66,11 +67,7 @@ module CasebookBookkeeper =
     /// Returns Ok true when a Refreshed event was published; Ok false when
     /// Fresh / no-case (nothing to do). Error on store, transaction, or
     /// stability-verify failure — the old Case is left intact.
-    let refreshStale
-        (store: IEventStore)
-        (root: string)
-        (sessionId: string)
-        : Task<Result<bool, string>> =
+    let refreshStale (store: IEventStore) (root: string) (sessionId: string) : Task<Result<bool, string>> =
         task {
             match! CasebookWorkflow.needsRefresh store 256 sessionId root with
             | Error err -> return Error err

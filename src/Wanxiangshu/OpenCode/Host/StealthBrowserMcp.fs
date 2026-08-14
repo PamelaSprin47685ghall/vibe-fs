@@ -1,4 +1,5 @@
 namespace Wanxiangshu.OpenCode
+
 open Wanxiangshu.Foundation
 
 open System

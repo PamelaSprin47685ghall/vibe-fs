@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Git
+
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Persistence.EventStore

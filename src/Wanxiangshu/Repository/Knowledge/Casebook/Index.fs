@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -146,11 +147,7 @@ module CasebookIndex =
     /// Resolve a public shelfmark to its internal Case without exposing the
     /// durable session key. The generated shelfmark is collision-free for the
     /// process identity inputs because it carries the full 32-bit discriminator.
-    let resolve
-        (store: IEventStore)
-        (capacity: int)
-        (shelfmark: string)
-        : Task<Result<Case option, string>> =
+    let resolve (store: IEventStore) (capacity: int) (shelfmark: string) : Task<Result<Case option, string>> =
         task {
             match project store capacity with
             | Error error -> return Error error

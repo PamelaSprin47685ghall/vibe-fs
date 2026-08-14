@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review
+
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -197,7 +198,8 @@ module TodoProcessReviewProgram =
                             // retired Host work-unit.
                             ProducerPresence.Present
                         | HandleLifecycle.Abandoned _
-                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle ended before durable verdict"
+                        | HandleLifecycle.Retired ->
+                            ProducerPresence.Absent "reviewer handle ended before durable verdict"
                     | None -> ProducerPresence.Present
             | _ -> ProducerPresence.Absent "assignment missing"
 

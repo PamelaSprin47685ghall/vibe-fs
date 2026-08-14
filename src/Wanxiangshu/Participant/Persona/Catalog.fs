@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Participant.Persona
+
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Host
 

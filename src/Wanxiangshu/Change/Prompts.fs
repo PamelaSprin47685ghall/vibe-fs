@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Change
+
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Change
+
 open Wanxiangshu.Git
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Interaction.Authority

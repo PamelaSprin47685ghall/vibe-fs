@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
+
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle

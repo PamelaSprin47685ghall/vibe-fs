@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
@@ -270,7 +271,9 @@ module FissionHost =
     /// deduped by the shared Host event port on (owner SessionId, ProviderRun).
     let tryConverge (eventPort: IEventObservationPort) (durable: AgentJournal) (owner: SessionId) =
         task {
-            match FissionProjection.tryLatestForOwner owner (AgentJournal.snapshot durable).AgentProjections.Fission with
+            match
+                FissionProjection.tryLatestForOwner owner (AgentJournal.snapshot durable).AgentProjections.Fission
+            with
             | None -> return false
             | Some group ->
                 match group.Terminal with
@@ -450,6 +453,7 @@ module FissionHost =
                                             ()
                                         else
                                             let effectiveAgent = authority.SelectedAgent
+
                                             let prompt =
                                                 String.concat
                                                     "\n"
@@ -582,14 +586,7 @@ module FissionHost =
                     let! _ = sessionPort.InterruptSessionOnly group.OwnerSessionId
 
                     for completionId in group.PreFissionCompletionIds |> Set.toList do
-                        do!
-                            recoverPreCompletion
-                                sessionPort
-                                eventPort
-                                durable
-                                directoryFor
-                                group.GroupId
-                                completionId
+                        do! recoverPreCompletion sessionPort eventPort durable directoryFor group.GroupId completionId
 
                         match agentIdOfExternal completionId with
                         | None -> ()
@@ -599,7 +596,8 @@ module FissionHost =
                                 |> HandleProjection.tryFind (HandleController.agentHandle agentId)
 
                             match handle with
-                            | Some { Lifecycle = HandleLifecycle.Active; ChildSessionId = childSessionId } ->
+                            | Some { Lifecycle = HandleLifecycle.Active
+                                     ChildSessionId = childSessionId } ->
                                 let subscription =
                                     eventPort.SubscribeTerminalListener(fun sessionId outcome ->
                                         if sessionId = childSessionId then
@@ -615,6 +613,7 @@ module FissionHost =
                                                     | None -> ()
                                                     | Some current ->
                                                         let payload = "status = failed\nerror = " + error
+
                                                         let! captured =
                                                             capturePayload durable current completionId payload
 
@@ -762,10 +761,7 @@ module FissionHost =
                                 return true
                             else
                                 match!
-                                    LifecycleWorkRecordProjection.lifecycleWorkRecord
-                                        (Some durable)
-                                        turn.SessionId
-                                        true
+                                    LifecycleWorkRecordProjection.lifecycleWorkRecord (Some durable) turn.SessionId true
                                 with
                                 | None ->
                                     do!

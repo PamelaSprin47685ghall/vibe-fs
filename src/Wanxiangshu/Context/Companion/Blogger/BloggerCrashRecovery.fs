@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Context.Companion.Blogger
+
 open Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks

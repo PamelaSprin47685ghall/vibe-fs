@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review
+
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Strength.Persistence
@@ -283,8 +284,7 @@ module DedicatedTodoReviewerRuntime =
             | Some record ->
                 match record.Lifecycle with
                 | HandleLifecycle.Active -> Task.FromResult(Ok())
-                | HandleLifecycle.Abandoned _ ->
-                    Task.FromResult(Error "dedicated reviewer work-unit is abandoned")
+                | HandleLifecycle.Abandoned _ -> Task.FromResult(Error "dedicated reviewer work-unit is abandoned")
                 | HandleLifecycle.CompletedAwaitingJoin _
                 | HandleLifecycle.Retired ->
                     // HandleController.linkNamed is the sole HandleLinked writer.

@@ -151,7 +151,11 @@ module PluginTransforms =
                                     [ "session_id", sessionId; "result", reason ]
 
                                 let! _ = sessionPort.AbortSession(SessionId.create sessionId)
-                                return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
+
+                                return
+                                    raise (
+                                        InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason)
+                                    )
                         }
                     | _ -> Task.FromResult None
 

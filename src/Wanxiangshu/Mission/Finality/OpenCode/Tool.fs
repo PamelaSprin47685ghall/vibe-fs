@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Finality.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -85,6 +86,7 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+
 /// GLORY-034/035/037/041: the Manager's end-of-life tool.
 ///
 /// The tool is deliberately opaque to the Manager: the description never

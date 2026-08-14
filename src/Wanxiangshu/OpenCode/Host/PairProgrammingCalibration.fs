@@ -84,7 +84,4 @@ module PairProgrammingCalibration =
             sprintf "%d %s %d %s" minutes minuteUnit seconds secondUnit
 
     let renderElapsed language elapsedMilliseconds =
-        ProviderProse.render
-            language
-            ElapsedPath
-            (Map [ "elapsed", elapsedLabel language elapsedMilliseconds ])
+        ProviderProse.render language ElapsedPath (Map [ "elapsed", elapsedLabel language elapsedMilliseconds ])

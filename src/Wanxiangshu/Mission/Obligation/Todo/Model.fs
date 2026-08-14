@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Prefix
@@ -255,4 +256,7 @@ module MagicTodo =
 
     /// First unblessed suicide must not bypass the plan commitment protocol.
     let requirePlanCommitmentBeforeFirstSuicide (planCommitted: bool) : Result<unit, MagicTodoReject> =
-        if planCommitted then Ok() else Error MagicTodoReject.FirstSuicideWithoutCheckpoint
+        if planCommitted then
+            Ok()
+        else
+            Error MagicTodoReject.FirstSuicideWithoutCheckpoint

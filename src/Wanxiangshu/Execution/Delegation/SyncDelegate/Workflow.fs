@@ -42,7 +42,9 @@ module internal SyncDelegateWorkflow =
                 let canonicalCall = List.head batch.CallOrder
 
                 for sibling in siblings do
-                    AsyncSupport.trySetResult sibling.Completion (Ok(SyncDelegateInvocationResult.MergedInto canonicalCall))
+                    AsyncSupport.trySetResult
+                        sibling.Completion
+                        (Ok(SyncDelegateInvocationResult.MergedInto canonicalCall))
                     |> ignore
             | None ->
                 for sibling in siblings do
@@ -167,7 +169,9 @@ module internal SyncDelegateWorkflow =
                                         | Error error -> return Error error
                                         | Ok _ ->
                                             if role = SyncDelegateRole.Inspector then
-                                                deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
+                                                deps.NoteInspectorPrompt
+                                                    (SessionId.value delegateSession)
+                                                    request.Charge
 
                                             return!
                                                 CausalAwait.awaitTask

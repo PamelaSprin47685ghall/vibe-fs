@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer
+
 open Wanxiangshu.Enforcer.Guidance
 
 open Wanxiangshu.Composition.Turn

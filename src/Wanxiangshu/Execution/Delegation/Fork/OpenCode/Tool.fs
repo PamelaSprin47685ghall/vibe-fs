@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Composition.Durable
 
@@ -458,8 +459,7 @@ module ForkTool =
                                         match forkResult with
                                         | Ok _ ->
                                             match! recordFissionAffinity scope context handleId with
-                                            | Error _ ->
-                                                return consequence (prose language Path.Fork.ChargeNotPlaced)
+                                            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
                                             | Ok() ->
                                                 runtime.TryFindAgent handleId
                                                 |> Option.bind (fun created -> created.ChildSessionId)
@@ -471,7 +471,10 @@ module ForkTool =
 
                                                 return
                                                     successInstruction (
-                                                        namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                        namedProse
+                                                            language
+                                                            Path.Fork.ChargeCarried
+                                                            (request.Name.Trim())
                                                     )
                                         | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
                     else
@@ -559,7 +562,10 @@ module ForkTool =
 
                                                     return
                                                         successInstruction (
-                                                            namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
+                                                            namedProse
+                                                                language
+                                                                Path.Fork.ChargeCarried
+                                                                (request.Name.Trim())
                                                         )
         }
 

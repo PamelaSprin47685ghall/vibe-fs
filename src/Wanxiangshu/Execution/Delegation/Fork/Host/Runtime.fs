@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -151,8 +152,12 @@ type HostForkRuntime
                 runtime.UnregisterPty id
 
                 let observers = lock gate (fun () -> ptyCompletionObservers |> Seq.toList)
+
                 for observer in observers do
-                    try observer item with _ -> ())
+                    try
+                        observer item
+                    with _ ->
+                        ())
     // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryWorkflow
     // RestoreHandles → HostForkRestart.restoreLinkedChildren is the sole path.
 
@@ -180,6 +185,7 @@ type HostForkRuntime
         { new IDisposable with
             member _.Dispose() =
                 lock gate (fun () -> ptyCompletionObservers.Remove listener |> ignore) }
+
     member internal _.HandleOwnership = handleOwnership
     member internal _.DeferredFirstPrompts = deferredFirstPrompts
     member internal _.Clock = clockPort
@@ -348,8 +354,7 @@ type HostForkRuntime
                 cancelDrainTask <- Some drain
                 drain)
 
-    member this.Cancel() : unit =
-        this.CancelAndDrain() |> ignore
+    member this.Cancel() : unit = this.CancelAndDrain() |> ignore
 
     member _.List() = runtime.List()
 

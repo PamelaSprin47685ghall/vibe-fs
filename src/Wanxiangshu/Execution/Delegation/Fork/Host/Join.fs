@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
@@ -316,13 +317,10 @@ module HostForkJoin =
                 match HandleId.tryAgent record.Handle with
                 | None -> false
                 | Some handleId ->
-                    let externalId =
-                        FissionExternalId.agent (AgentHandleId.value handleId)
+                    let externalId = FissionExternalId.agent (AgentHandleId.value handleId)
 
                     match
-                        FissionProjection.tryGroup
-                            groupId
-                            (AgentJournal.snapshot durable).AgentProjections.Fission
+                        FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
                     with
                     | Some group -> Map.tryFind externalId group.ExternalAffinities = Some laneIndex
                     | None -> false
@@ -340,12 +338,7 @@ module HostForkJoin =
             let tryDrain () =
                 task {
                     match!
-                        JoinDrain.drainFromJournalWhere
-                            durable
-                            runtime.ParentId
-                            cap
-                            (runtime.Clock.UtcNow())
-                            allowed
+                        JoinDrain.drainFromJournalWhere durable runtime.ParentId cap (runtime.Clock.UtcNow()) allowed
                     with
                     | Error error -> return Some(Error error)
                     | Ok items ->
@@ -373,11 +366,11 @@ module HostForkJoin =
                                     "$0.then(function () { return { kind: 0 }; })"
 
                             let interruptTask: Task<obj> =
-                                emitJsExpr interrupt "$0.then(function (reason) { return { kind: 1, reason: reason }; })"
+                                emitJsExpr
+                                    interrupt
+                                    "$0.then(function (reason) { return { kind: 1, reason: reason }; })"
 
-                            let! winner =
-                                emitJsExpr (changeTask, interruptTask) "Promise.race([$0, $1])"
-                                : Task<obj>
+                            let! winner = emitJsExpr (changeTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
 
                             match! tryDrain () with
                             | Some result -> return result

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Git
+
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Repository.Investigation.Semble
@@ -29,7 +30,13 @@ module GitGateway =
 
     let private transportError stdout stderr =
         let detail = if String.IsNullOrWhiteSpace stderr then stdout else stderr
-        ConvergeError.Transport(if String.IsNullOrWhiteSpace detail then "git transport failed" else detail.Trim())
+
+        ConvergeError.Transport(
+            if String.IsNullOrWhiteSpace detail then
+                "git transport failed"
+            else
+                detail.Trim()
+        )
 
     let private parseLsRemote (stdout: string) : GitObjectId option =
         stdout.Split('\n')
@@ -41,12 +48,13 @@ module GitGateway =
                 None
             else
                 let fields = trimmed.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries)
-                if fields.Length < 1 then None else Some(GitObjectId.create fields.[0]))
 
-    let private fetchRemoteRoot
-        (run: GitGatewayRunner)
-        (remote: string)
-        : Task<Result<GitObjectId, ConvergeError>> =
+                if fields.Length < 1 then
+                    None
+                else
+                    Some(GitObjectId.create fields.[0]))
+
+    let private fetchRemoteRoot (run: GitGatewayRunner) (remote: string) : Task<Result<GitObjectId, ConvergeError>> =
         task {
             let tracking = trackingRef remote
             let refspec = sprintf "+%s:%s" StoreRef.canonical tracking
@@ -103,8 +111,7 @@ module GitGateway =
             let lease =
                 match expectedRemote with
                 | None -> "--force-with-lease=" + StoreRef.canonical + ":"
-                | Some oid ->
-                    "--force-with-lease=" + StoreRef.canonical + ":" + GitObjectId.value oid
+                | Some oid -> "--force-with-lease=" + StoreRef.canonical + ":" + GitObjectId.value oid
 
             let refspec = GitObjectId.value next + ":" + StoreRef.canonical
 
@@ -139,8 +146,7 @@ module GitGateway =
                     | Error _ when retriesLeft > 0 ->
                         match! discoverRemote run remote with
                         | Error error -> return Error error
-                        | Ok(nextSnapshot, nextExpected) ->
-                            return! loop nextSnapshot nextExpected (retriesLeft - 1)
+                        | Ok(nextSnapshot, nextExpected) -> return! loop nextSnapshot nextExpected (retriesLeft - 1)
                     | Error _ when maxRetries <= 0 -> return Error ConvergeError.ConvergeCasRejected
                     | Error _ -> return Error ConvergeError.ConvergeRetryExhausted
             }
@@ -175,7 +181,9 @@ module GitGateway =
         fun args ->
             let tcs = TaskCompletionSource<int * string * string>()
             let argv = Array.append [| "-C"; repoPath |] (List.toArray args)
-            let options = createObj [ "encoding" ==> "utf8"; "maxBuffer" ==> (64 * 1024 * 1024) ]
+
+            let options =
+                createObj [ "encoding" ==> "utf8"; "maxBuffer" ==> (64 * 1024 * 1024) ]
 
             try
                 execFile GitSubject.Executable argv options (fun error stdout stderr ->

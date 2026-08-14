@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Guidance
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Composition.Durable
 

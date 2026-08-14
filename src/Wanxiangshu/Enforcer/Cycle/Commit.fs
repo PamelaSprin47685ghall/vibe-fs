@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Cycle
+
 open Wanxiangshu.Composition.Durable
 
 open System

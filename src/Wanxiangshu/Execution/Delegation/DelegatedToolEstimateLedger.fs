@@ -15,7 +15,8 @@ module DelegatedToolEstimateLedger =
         |> Option.bind (fun session -> session.DelegatedToolEstimate)
 
     let tryRemaining journal sessionId =
-        tryState journal sessionId |> Option.map DelegatedToolEstimateProjection.remaining
+        tryState journal sessionId
+        |> Option.map DelegatedToolEstimateProjection.remaining
 
     let private append journal sessionId fact =
         task {

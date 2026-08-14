@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Change.Host
+
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -469,13 +470,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     task)
 
     member _.ForkManagerJob
-        (
-            jobId: ManagerJobId,
-            managerAgent: string,
-            prompt: string,
-            ?byname: string,
-            ?expectedToolCalls: int
-        )
+        (jobId: ManagerJobId, managerAgent: string, prompt: string, ?byname: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
         task {
             let providerByname =

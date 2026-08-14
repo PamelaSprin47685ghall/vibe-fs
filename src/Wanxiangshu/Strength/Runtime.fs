@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Strength
+
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Handle

@@ -247,7 +247,8 @@ module ToolRegistry =
               for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
                   match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
                   | Some surface ->
-                      yield JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
+                      yield
+                          JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
                   | None -> () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on

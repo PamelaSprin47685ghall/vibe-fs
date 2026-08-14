@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer.Guidance
+
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle

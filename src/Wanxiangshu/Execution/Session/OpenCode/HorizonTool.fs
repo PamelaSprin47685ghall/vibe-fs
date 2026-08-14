@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -175,9 +176,7 @@ module HorizonTool =
                 | Ok runtime ->
                     let agents, ptys = runtime.List()
                     let snapshot = AgentJournal.snapshot journal
-                    let parentSessionId =
-                        SessionId.create context.SessionId
-                        |> scope.LogicalOwnerFor
+                    let parentSessionId = SessionId.create context.SessionId |> scope.LogicalOwnerFor
 
                     let durableHandles =
                         AgentProjection.tryFind parentSessionId snapshot.AgentProjections

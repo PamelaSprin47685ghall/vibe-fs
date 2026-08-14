@@ -347,7 +347,10 @@ module ProjectionMessageEdit =
     /// (PROJ-005) and never assemble messages themselves; this function turns the
     /// renderer's instruction into the Host object list, preserving the untouched tail
     /// verbatim so byte equality with what the provider saw is never re-derived.
-    let applyRenderedPrefix (rawMessages: obj list) (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix) : obj list =
+    let applyRenderedPrefix
+        (rawMessages: obj list)
+        (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix)
+        : obj list =
         match rendered with
         | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.PhysicalPrefix -> rawMessages
         | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.SyntheticPrefix activation ->

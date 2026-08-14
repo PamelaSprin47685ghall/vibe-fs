@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -32,19 +33,20 @@ module DelegatedToolEstimate =
     let ArgumentPath = "delegation/expected-tool-calls-argument"
     let InvalidPath = "delegation/expected-tool-calls-invalid"
 
-    let decode (args: HostToolArguments) = args.OptionalNonNegativeInteger "expected_tool_calls"
+    let decode (args: HostToolArguments) =
+        args.OptionalNonNegativeInteger "expected_tool_calls"
 
     let schema language factory =
         ToolHostCodec.optionalNonNegativeIntegerSchemaDescribed
             (ProviderProse.render language ArgumentPath Map.empty)
             factory
 
-    let invalid language = ProviderProse.render language InvalidPath Map.empty
+    let invalid language =
+        ProviderProse.render language InvalidPath Map.empty
 
     let replaceIfSpecified journal sessionId expectedToolCalls : Task<unit> =
         task {
             match journal, expectedToolCalls with
-            | Some durable, Some expected ->
-                do! DelegatedToolEstimateLedger.replace durable sessionId expected
+            | Some durable, Some expected -> do! DelegatedToolEstimateLedger.replace durable sessionId expected
             | _ -> ()
         }

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Git.Hook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Git
@@ -27,13 +28,15 @@ module HookSync =
     [<Emit("process.env.WANXIANG_GIT_SYNC_ACTIVE = '1'")>]
     let private markSyncActive () : unit = jsNative
 
-    let private trim (value: string) = if isNull value then "" else value.Trim()
+    let private trim (value: string) =
+        if isNull value then "" else value.Trim()
 
     let private repositoryRoot () =
         GitSubject.execIn "." [| "rev-parse"; "--show-toplevel" |] |> trim
 
     let private commonDir repo =
-        GitSubject.execIn repo [| "rev-parse"; "--path-format=absolute"; "--git-common-dir" |] |> trim
+        GitSubject.execIn repo [| "rev-parse"; "--path-format=absolute"; "--git-common-dir" |]
+        |> trim
 
     let private snapshot oid =
         if String.IsNullOrWhiteSpace oid || Seq.forall (fun ch -> ch = '0') oid then
@@ -41,7 +44,8 @@ module HookSync =
         else
             Some { RootOid = RootOid.create (GitObjectId.create oid) }
 
-    let private formatError remote error = sprintf "Wanxiang EventStore sync failed for remote '%s': %A" remote error
+    let private formatError remote error =
+        sprintf "Wanxiang EventStore sync failed for remote '%s': %A" remote error
 
     let private converge remote observed =
         task {

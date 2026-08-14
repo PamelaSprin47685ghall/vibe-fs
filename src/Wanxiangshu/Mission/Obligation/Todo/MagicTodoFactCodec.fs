@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
+
 open Wanxiangshu.Composition.Durable
 
 open Thoth.Json
@@ -249,7 +250,8 @@ module MagicTodoFactCodec =
                           // protocol defined every accepted checkpoint as the
                           // complete plan, so absence migrates to true.
                           PlanCompleteDeclared =
-                            get.Optional.Field "PlanCompleteDeclared" Decode.bool |> Option.defaultValue true
+                            get.Optional.Field "PlanCompleteDeclared" Decode.bool
+                            |> Option.defaultValue true
                           ProviderInputDigest = get.Required.Field "ProviderInputDigest" Decode.string
                           ReviewFrontier = get.Required.Field "ReviewFrontier" cursorDecoder
                           SemanticVersion = get.Required.Field "SemanticVersion" Decode.string }

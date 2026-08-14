@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Participant.Persona
+
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Session

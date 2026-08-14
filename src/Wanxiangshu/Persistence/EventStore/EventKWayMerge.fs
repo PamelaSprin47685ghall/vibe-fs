@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
+
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
@@ -68,9 +69,7 @@ module EventKWayMerge =
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
-    let merge
-        (streams: (string * EventEnvelope list) list)
-        : Result<EventEnvelope list, StorageInvalid> =
+    let merge (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
         let queues = streams |> Map.ofList
 
         let rec loop
@@ -93,11 +92,15 @@ module EventKWayMerge =
                         | [] -> None
                         | head :: _ ->
                             let duplicateReady = Map.containsKey (eventKey head.EventId) seen
+
                             let parentsReady =
                                 head.Parents
                                 |> List.forall (fun parent -> Map.containsKey (eventKey parent) seen)
 
-                            if duplicateReady || parentsReady then Some(writerId, head) else None)
+                            if duplicateReady || parentsReady then
+                                Some(writerId, head)
+                            else
+                                None)
                     |> List.sortBy (fun (writerId, event) -> eventKey event.EventId, writerId)
 
                 match ready with
@@ -111,10 +114,7 @@ module EventKWayMerge =
                         if duplicate then
                             loop nextQueues seen acc
                         else
-                            loop
-                                nextQueues
-                                (Map.add (eventKey head.EventId) head seen)
-                                (head :: acc)
+                            loop nextQueues (Map.add (eventKey head.EventId) head seen) (head :: acc)
                 | [] ->
                     let pendingIds = allPendingIds remaining
 
@@ -134,8 +134,7 @@ module EventKWayMerge =
                     | Some parent -> Error(StorageInvalid.MissingParent parent)
                     | None ->
                         Error(
-                            StorageInvalid.NonCanonical
-                                "writer-stream order has a cyclic or backward causal frontier"
+                            StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier"
                         )
 
         loop queues Map.empty []

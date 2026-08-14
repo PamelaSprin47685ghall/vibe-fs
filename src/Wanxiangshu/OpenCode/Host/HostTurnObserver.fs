@@ -183,8 +183,9 @@ module HostTurnObserver =
                             |> Option.isSome)
 
                     match turn.Outcome with
-                    | ReconcileProgram.TurnAborted _
-                        when FissionRuntime.isSilentInterrupt turn.SessionId || durableFissionReplacement ->
+                    | ReconcileProgram.TurnAborted _ when
+                        FissionRuntime.isSilentInterrupt turn.SessionId || durableFissionReplacement
+                        ->
                         // Physical-present replacement, not logical failure. The old
                         // owner completion remains open for Fission convergence.
                         // Durable admission is enough to recover the classification
@@ -210,12 +211,7 @@ module HostTurnObserver =
                     TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
                     let! fissionHandled =
-                        FissionHost.observeLaneTurn
-                            sessionPort
-                            eventPort
-                            journal
-                            scope.Sessions.JoinGuardNudges
-                            turn
+                        FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn
 
                     if not fissionHandled then
                         // Sole Application turn entry (rabbit §6.5 / §18): Host no longer

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -95,11 +96,7 @@ module CasebookWorkflow =
         }
 
     /// Fetch one Case by session id (CASE-004).
-    let fetchCase
-        (store: IEventStore)
-        (capacity: int)
-        (sessionId: string)
-        : Task<Result<Case option, string>> =
+    let fetchCase (store: IEventStore) (capacity: int) (sessionId: string) : Task<Result<Case option, string>> =
         task {
             let cases =
                 match store.TryCurrent "Casebook" with

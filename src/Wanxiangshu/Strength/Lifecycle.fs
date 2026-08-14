@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Strength
+
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

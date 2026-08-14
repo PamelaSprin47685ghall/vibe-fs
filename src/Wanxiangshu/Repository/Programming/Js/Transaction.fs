@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Programming.Js
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -174,9 +175,7 @@ type JsTransactionProjection =
       Pending: Map<JsTransactionId, JsTransactionPrepared> }
 
 module JsTransactionProjection =
-    let empty =
-        { Head = None
-          Pending = Map.empty }
+    let empty = { Head = None; Pending = Map.empty }
 
     let prepared (eventId: EventId) (value: JsTransactionPrepared) (projection: JsTransactionProjection) =
         { Head = Some eventId
@@ -186,7 +185,8 @@ module JsTransactionProjection =
         { Head = Some eventId
           Pending = Map.remove value.TransactionId projection.Pending }
 
-    let pending projection = projection.Pending |> Map.toList |> List.map snd
+    let pending projection =
+        projection.Pending |> Map.toList |> List.map snd
 
 module JsTransactionFacts =
 

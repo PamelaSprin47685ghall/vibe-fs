@@ -103,13 +103,7 @@ type EventStoreBlobWriter private (store: IEventStore) =
 /// owns both boot replay and live integration; this type only assigns journal
 /// envelope identity/sequence and appends one universal EventEnvelope.
 type EventStoreJournalWriter
-    private
-    (
-        runtimeId: RuntimeId,
-        blobWriter: IBlobWriter,
-        store: IEventStore,
-        initialCurrentSeq: int64
-    ) =
+    private (runtimeId: RuntimeId, blobWriter: IBlobWriter, store: IEventStore, initialCurrentSeq: int64) =
     let gate = obj ()
     // DSL-MUTABLE: resource — next LocalSeq for this fresh RuntimeId only.
     let mutable currentSeq = initialCurrentSeq
@@ -133,10 +127,7 @@ type EventStoreJournalWriter
         | AppendError.StorageInvalid detail -> sprintf "storage invalid: %A" detail
         | AppendError.AppendFailed reason -> "append failed: " + reason
 
-    static member private commitEnvelope
-        (store: IEventStore)
-        (envelope: Envelope)
-        : Task<Result<unit, AppendError>> =
+    static member private commitEnvelope (store: IEventStore) (envelope: Envelope) : Task<Result<unit, AppendError>> =
         let streamId = EventStoreJournalCodec.encodeStreamId envelope.Stream
         let parents = store.TryHead streamId |> Option.toList
         let encoded = EventStoreJournalCodec.encode parents [] envelope
@@ -147,11 +138,7 @@ type EventStoreJournalWriter
         | Some current -> Ok(unbox<ProjectionSet> current)
         | None -> Ok Fold.empty
 
-    static member private initEnvelope
-        (runtimeId: RuntimeId)
-        (processId: int)
-        (startedAt: DateTimeOffset)
-        : Envelope =
+    static member private initEnvelope (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : Envelope =
         { RuntimeId = runtimeId
           LocalSeq = LocalSeq.create 1L
           ObservedAt = startedAt
@@ -254,7 +241,12 @@ type EventStoreJournalWriter
                     return! work ()
                 }
 
-            serial <- task { let! _ = running in return () }
+            serial <-
+                task {
+                    let! _ = running
+                    return ()
+                }
+
             running)
 
     member this.Append

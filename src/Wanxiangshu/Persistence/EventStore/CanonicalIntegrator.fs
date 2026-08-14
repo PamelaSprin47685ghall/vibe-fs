@@ -118,7 +118,8 @@ module CasebookIntegration =
           Integrate =
             fun current envelope ->
                 CasebookStore.tryDecodeEnvelope envelope
-                |> Result.map (fun event -> CasebookProjection.apply (unbox<CasebookProjection.State> current) event |> box) }
+                |> Result.map (fun event ->
+                    CasebookProjection.apply (unbox<CasebookProjection.State> current) event |> box) }
 
 [<RequireQualifiedAccess>]
 module JsTransactionIntegration =
@@ -133,9 +134,13 @@ module JsTransactionIntegration =
                 match JsToolsTransactionStore.tryDecodeEnvelope envelope with
                 | Error error -> Error error
                 | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Prepared prepared) ->
-                    JsTransactionProjection.prepared envelope.EventId prepared projection |> box |> Ok
+                    JsTransactionProjection.prepared envelope.EventId prepared projection
+                    |> box
+                    |> Ok
                 | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Committed committed) ->
-                    JsTransactionProjection.committed envelope.EventId committed projection |> box |> Ok }
+                    JsTransactionProjection.committed envelope.EventId committed projection
+                    |> box
+                    |> Ok }
 
 /// Tiny registration CE. Business modules contribute only single-event oracles;
 /// this is the only place that assembles a history integration program.
@@ -213,9 +218,7 @@ module CanonicalIntegrator =
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
     /// This module alone turns that ordered history into business Current.
-    let private replay
-        (streams: (string * EventEnvelope list) list)
-        : Result<IntegratorState, string> =
+    let private replay (streams: (string * EventEnvelope list) list) : Result<IntegratorState, string> =
         match EventKWayMerge.merge streams with
         | Error error -> Error(sprintf "writer-stream replay invalid: %A" error)
         | Ok ordered ->
@@ -260,7 +263,8 @@ module CanonicalIntegrator =
                 |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
 
             match missingPayload with
-            | Some payloadRef -> Error(sprintf "missing durable payload during replay: %s" (PayloadRef.value payloadRef))
+            | Some payloadRef ->
+                Error(sprintf "missing durable payload during replay: %s" (PayloadRef.value payloadRef))
             | None -> Ok()
 
     let create () : ICanonicalIntegrator =
@@ -301,7 +305,8 @@ module CanonicalIntegrator =
                                 state <- prepared
                                 generation <- generation + 1L)))
 
-            member _.TryCurrent(key) = lock gate (fun () -> Map.tryFind key state.Currents)
+            member _.TryCurrent(key) =
+                lock gate (fun () -> Map.tryFind key state.Currents)
 
             member _.TryEvent(eventId) =
                 lock gate (fun () -> Map.tryFind (eventKey eventId) state.Events)

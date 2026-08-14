@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Resources
+
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Git

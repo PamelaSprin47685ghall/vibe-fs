@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Persistence.Journal
+
 open Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
+
 open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
@@ -78,8 +79,7 @@ module FissionProjection =
     let tryMembershipOfLane lane state =
         Map.tryFind lane state.LaneMembership
         |> Option.bind (fun (groupId, laneIndex) ->
-            Map.tryFind groupId state.Groups
-            |> Option.map (fun group -> group, laneIndex))
+            Map.tryFind groupId state.Groups |> Option.map (fun group -> group, laneIndex))
 
     let private allBroadcastsDelivered group =
         group.PreFissionCompletionIds
@@ -93,38 +93,39 @@ module FissionProjection =
 
     let private convergenceReady group =
         group.LaneWork.Count = group.LaneCount
-        && (group.LaneWork |> Map.forall (fun laneIndex _ -> laneIndex >= 0 && laneIndex < group.LaneCount))
+        && (group.LaneWork
+            |> Map.forall (fun laneIndex _ -> laneIndex >= 0 && laneIndex < group.LaneCount))
         && allBroadcastsDelivered group
 
     let fold (state: FissionProjectionState) (fact: FissionFactCases) =
         match fact with
         | FissionFactCases.FissionAdmitted payload ->
             match Map.tryFind payload.GroupId state.Groups with
-            | Some existing
-                when existing.OwnerSessionId = payload.OwnerSessionId
-                     && existing.ParentSessionId = payload.ParentSessionId
-                     && existing.OriginToolCallId = payload.OriginToolCallId
-                     && existing.LaneCount = payload.LaneCount
-                     && (existing.LaneSessions |> Map.toList |> List.map snd) = payload.LaneSessions
-                     && (existing.LanePrompts |> Map.toList |> List.map snd) = payload.LanePrompts
-                     && existing.OwnerWorkRecordRef = payload.OwnerWorkRecordRef
-                     && existing.OwnerWorkRecordDigest = payload.OwnerWorkRecordDigest
-                     && existing.PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds ->
+            | Some existing when
+                existing.OwnerSessionId = payload.OwnerSessionId
+                && existing.ParentSessionId = payload.ParentSessionId
+                && existing.OriginToolCallId = payload.OriginToolCallId
+                && existing.LaneCount = payload.LaneCount
+                && (existing.LaneSessions |> Map.toList |> List.map snd) = payload.LaneSessions
+                && (existing.LanePrompts |> Map.toList |> List.map snd) = payload.LanePrompts
+                && existing.OwnerWorkRecordRef = payload.OwnerWorkRecordRef
+                && existing.OwnerWorkRecordDigest = payload.OwnerWorkRecordDigest
+                && existing.PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds
+                ->
                 Ok state
             | Some _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
             | None when
                 payload.LaneCount < 2
                 || List.length payload.LaneSessions <> payload.LaneCount
-                || List.length payload.LanePrompts <> payload.LaneCount ->
+                || List.length payload.LanePrompts <> payload.LaneCount
+                ->
                 Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
             | None ->
                 match Map.tryFind payload.OwnerSessionId state.ActiveByOwner with
                 | Some _ -> Error(FissionProjectionRejection.DuplicateOwnerActive payload.OwnerSessionId)
                 | None ->
                     let laneSessions =
-                        payload.LaneSessions
-                        |> List.mapi (fun index lane -> index, lane)
-                        |> Map.ofList
+                        payload.LaneSessions |> List.mapi (fun index lane -> index, lane) |> Map.ofList
 
                     let group =
                         { GroupId = payload.GroupId
@@ -133,7 +134,10 @@ module FissionProjection =
                           OriginToolCallId = payload.OriginToolCallId
                           LaneCount = payload.LaneCount
                           LaneSessions = laneSessions
-                          LanePrompts = payload.LanePrompts |> List.mapi (fun index prompt -> index, prompt) |> Map.ofList
+                          LanePrompts =
+                            payload.LanePrompts
+                            |> List.mapi (fun index prompt -> index, prompt)
+                            |> Map.ofList
                           OwnerWorkRecordRef = payload.OwnerWorkRecordRef
                           OwnerWorkRecordDigest = payload.OwnerWorkRecordDigest
                           PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds
@@ -170,19 +174,25 @@ module FissionProjection =
                 | None -> Error(FissionProjectionRejection.LaneSessionMismatch payload.LaneIndex)
                 | Some _ ->
                     match Map.tryFind payload.LaneIndex group.LaneWork with
-                    | Some existing
-                        when existing = (payload.WorkRecordRef, payload.WorkRecordDigest)
-                             && Map.tryFind payload.LaneIndex group.LaneProviderRuns = Some payload.ProviderRun ->
+                    | Some existing when
+                        existing = (payload.WorkRecordRef, payload.WorkRecordDigest)
+                        && Map.tryFind payload.LaneIndex group.LaneProviderRuns = Some payload.ProviderRun
+                        ->
                         Ok state
                     | Some _ -> Error(FissionProjectionRejection.ConflictingLaneWork payload.LaneIndex)
                     | None ->
                         let next =
                             { group with
                                 LaneWork =
-                                    Map.add payload.LaneIndex (payload.WorkRecordRef, payload.WorkRecordDigest) group.LaneWork
+                                    Map.add
+                                        payload.LaneIndex
+                                        (payload.WorkRecordRef, payload.WorkRecordDigest)
+                                        group.LaneWork
                                 LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
 
-                        Ok { state with Groups = Map.add payload.GroupId next state.Groups }
+                        Ok
+                            { state with
+                                Groups = Map.add payload.GroupId next state.Groups }
 
         | FissionFactCases.FissionCompletionCaptured payload ->
             match Map.tryFind payload.GroupId state.Groups with
@@ -197,9 +207,14 @@ module FissionProjection =
                     let next =
                         { group with
                             CapturedCompletions =
-                                Map.add payload.CompletionId (payload.PayloadRef, payload.PayloadDigest) group.CapturedCompletions }
+                                Map.add
+                                    payload.CompletionId
+                                    (payload.PayloadRef, payload.PayloadDigest)
+                                    group.CapturedCompletions }
 
-                    Ok { state with Groups = Map.add payload.GroupId next state.Groups }
+                    Ok
+                        { state with
+                            Groups = Map.add payload.GroupId next state.Groups }
 
         | FissionFactCases.FissionCompletionDelivered payload ->
             match Map.tryFind payload.GroupId state.Groups with
@@ -219,7 +234,9 @@ module FissionProjection =
                         CompletionDeliveries =
                             Map.add payload.CompletionId (Set.add payload.LaneIndex current) group.CompletionDeliveries }
 
-                Ok { state with Groups = Map.add payload.GroupId next state.Groups }
+                Ok
+                    { state with
+                        Groups = Map.add payload.GroupId next state.Groups }
 
         | FissionFactCases.FissionExternalAffinityBound payload ->
             match Map.tryFind payload.GroupId state.Groups with
@@ -233,21 +250,23 @@ module FissionProjection =
                 | None ->
                     let next =
                         { group with
-                            ExternalAffinities =
-                                Map.add payload.ExternalId payload.LaneIndex group.ExternalAffinities }
+                            ExternalAffinities = Map.add payload.ExternalId payload.LaneIndex group.ExternalAffinities }
 
-                    Ok { state with Groups = Map.add payload.GroupId next state.Groups }
+                    Ok
+                        { state with
+                            Groups = Map.add payload.GroupId next state.Groups }
 
         | FissionFactCases.FissionConverged payload ->
             match Map.tryFind payload.GroupId state.Groups with
             | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
             | Some group ->
                 match group.Terminal with
-                | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest)
-                    when existingLane = payload.TerminalLaneSessionId
-                         && existingRun = payload.TerminalProviderRun
-                         && existingRef = payload.AggregateWorkRecordRef
-                         && existingDigest = payload.AggregateWorkRecordDigest ->
+                | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest) when
+                    existingLane = payload.TerminalLaneSessionId
+                    && existingRun = payload.TerminalProviderRun
+                    && existingRef = payload.AggregateWorkRecordRef
+                    && existingDigest = payload.AggregateWorkRecordDigest
+                    ->
                     Ok state
                 | FissionGroupTerminal.Converged _
                 | FissionGroupTerminal.Failed _ -> Error(FissionProjectionRejection.TerminalAlreadySet payload.GroupId)
@@ -276,7 +295,9 @@ module FissionProjection =
                 match group.Terminal with
                 | FissionGroupTerminal.Failed existing when existing = payload.Reason -> Ok state
                 | FissionGroupTerminal.Open ->
-                    let next = { group with Terminal = FissionGroupTerminal.Failed payload.Reason }
+                    let next =
+                        { group with
+                            Terminal = FissionGroupTerminal.Failed payload.Reason }
 
                     Ok
                         { state with

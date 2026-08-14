@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
+
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -41,9 +42,7 @@ type FissionRejectReason =
     | RuntimeUnavailable of string
 
 [<CLIMutable>]
-type FissionLanePrompt =
-    { Index: int
-      Prompt: string }
+type FissionLanePrompt = { Index: int; Prompt: string }
 
 [<CLIMutable>]
 type ParsedFissionPrompts =
@@ -78,11 +77,7 @@ module FissionPrompt =
             | None ->
                 Ok
                     { Count = List.length lines
-                      Lanes =
-                        lines
-                        |> List.mapi (fun index prompt ->
-                            { Index = index
-                              Prompt = prompt }) }
+                      Lanes = lines |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) }
 
 [<RequireQualifiedAccess>]
 type FissionCompletionAffinity =
@@ -106,8 +101,7 @@ module FissionCompletionRouting =
         | FissionCompletionAffinity.Lane _ -> []
 
 [<RequireQualifiedAccess>]
-type FissionDeliveryError =
-    | InvalidLane of int
+type FissionDeliveryError = InvalidLane of int
 
 [<CLIMutable>]
 type FissionDelivery =
@@ -125,9 +119,7 @@ module FissionDelivery =
             Error(FissionDeliveryError.InvalidLane laneIndex)
         else
             let current =
-                delivery.Delivered
-                |> Map.tryFind completionId
-                |> Option.defaultValue Set.empty
+                delivery.Delivered |> Map.tryFind completionId |> Option.defaultValue Set.empty
 
             Ok
                 { delivery with
@@ -135,16 +127,13 @@ module FissionDelivery =
 
     let pendingTargets completionId delivery =
         let delivered =
-            delivery.Delivered
-            |> Map.tryFind completionId
-            |> Option.defaultValue Set.empty
+            delivery.Delivered |> Map.tryFind completionId |> Option.defaultValue Set.empty
 
         [ 0 .. delivery.LaneCount - 1 ]
         |> List.filter (fun lane -> not (Set.contains lane delivered))
 
 [<RequireQualifiedAccess>]
-type FissionBundleError =
-    | ConflictingLaneRecord of laneIndex: int * existingRef: string * proposedRef: string
+type FissionBundleError = ConflictingLaneRecord of laneIndex: int * existingRef: string * proposedRef: string
 
 [<Struct>]
 type FissionWorkBundle = private FissionWorkBundle of Map<int, string>
@@ -169,7 +158,8 @@ module FissionWorkBundle =
 
         value right |> Map.toList |> List.fold folder (Ok left)
 
-    let keys bundle = value bundle |> Map.toList |> List.map fst
+    let keys bundle =
+        value bundle |> Map.toList |> List.map fst
 
     let entries bundle = value bundle |> Map.toList
 
@@ -178,8 +168,7 @@ module FissionWorkBundle =
 module FissionConvergence =
 
     let ready laneCount preFissionCompletionIds bundle delivery =
-        let completeLaneSet =
-            FissionWorkBundle.keys bundle = [ 0 .. laneCount - 1 ]
+        let completeLaneSet = FissionWorkBundle.keys bundle = [ 0 .. laneCount - 1 ]
 
         let allBroadcastsDelivered =
             preFissionCompletionIds

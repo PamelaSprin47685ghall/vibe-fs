@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Mission.Review.Barrier
+
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Strength.Persistence

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
+
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Handle
@@ -70,8 +71,7 @@ type FissionAdmissionDependencies =
 
 [<CLIMutable>]
 type FissionAdmissionHooks =
-    { OnLanesCreated:
-        SessionId -> SessionId option -> string -> FissionStartedLane list -> Task<Result<unit, string>>
+    { OnLanesCreated: SessionId -> SessionId option -> string -> FissionStartedLane list -> Task<Result<unit, string>>
       OnFailed: SessionId -> string -> Task }
 
 type FissionAdmissionRuntime internal (deps: FissionAdmissionDependencies, hooks: FissionAdmissionHooks) =
@@ -187,7 +187,9 @@ module FissionAdmission =
                             do! rollback runtime ownerSessionId created
                             return dependencyError ("lane create failed: " + error)
                         | Ok created ->
-                            match! runtime.Hooks.OnLanesCreated ownerSessionId parentSessionId ownerWorkRecord created with
+                            match!
+                                runtime.Hooks.OnLanesCreated ownerSessionId parentSessionId ownerWorkRecord created
+                            with
                             | Error error ->
                                 do! rollback runtime ownerSessionId created
                                 return dependencyError ("fission admission commit failed: " + error)
@@ -216,7 +218,11 @@ module FissionAdmission =
                                 | Ok() ->
                                     match! runtime.Dependencies.SilentInterruptOwner ownerSessionId with
                                     | Error error ->
-                                        do! runtime.Hooks.OnFailed ownerSessionId ("silent owner interrupt failed: " + error)
+                                        do!
+                                            runtime.Hooks.OnFailed
+                                                ownerSessionId
+                                                ("silent owner interrupt failed: " + error)
+
                                         do! rollback runtime ownerSessionId created
                                         return dependencyError ("silent owner interrupt failed: " + error)
                                     | Ok() ->

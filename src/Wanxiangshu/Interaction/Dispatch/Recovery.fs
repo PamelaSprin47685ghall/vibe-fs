@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Interaction.Dispatch
+
 open Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks

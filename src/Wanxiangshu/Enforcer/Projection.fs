@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Enforcer
+
 open Wanxiangshu.Enforcer.Cycle
 
 open Wanxiangshu.Foundation

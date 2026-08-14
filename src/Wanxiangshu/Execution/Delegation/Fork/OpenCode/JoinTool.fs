@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -241,8 +242,7 @@ module JoinTool =
                                         waitTask
                                 | None -> Join.joinAvailable runtime permit JoinBatch.Max waitTask
 
-                            let! joined =
-                                CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
+                            let! joined = CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
 
                             let resolveAgentName agentId =
                                 let durableByname =

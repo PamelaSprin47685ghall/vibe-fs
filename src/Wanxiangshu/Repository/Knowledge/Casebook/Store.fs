@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
+
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -166,7 +167,8 @@ module CasebookStore =
     let tryDecodeEnvelope (envelope: EventEnvelope) : Result<CasebookEvent, string> =
         match envelope.EventType with
         | eventType when eventType = CapturedEventType ->
-            Decode.fromValue "$" decodeCase envelope.Payload |> Result.map CasebookEvent.CaseCaptured
+            Decode.fromValue "$" decodeCase envelope.Payload
+            |> Result.map CasebookEvent.CaseCaptured
         | eventType when eventType = RefreshedEventType -> decodeRefreshed envelope.Payload
         | eventType when eventType = AccessedEventType ->
             Decode.fromValue "$" (Decode.field "session_id" Decode.string) envelope.Payload
