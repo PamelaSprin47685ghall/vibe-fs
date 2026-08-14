@@ -10,7 +10,7 @@ import test from 'node:test'
 import { CASES } from './corpus.mjs'
 import { ORACLES, evaluateCase } from './oracles.mjs'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 test('office_boundary_eval_corpus_has_id_setup_oracles_and_synthetic_traces', () => {
