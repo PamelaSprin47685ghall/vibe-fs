@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapOfEntries, toList } from '../support/domain.mjs'
+import { mapOfEntries, toList } from '../../../tests/unit/support/domain.mjs'
 import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
 
 const map = (entries) => mapOfEntries(entries)
