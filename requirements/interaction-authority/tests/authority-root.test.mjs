@@ -224,6 +224,26 @@ test('IA_003_agent_owner_root_claim_has_no_run_until_physical_acceptance', () =>
   assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, false, projection), 'UnknownOrigin')
 })
 
+// ── INTERACTION-AUTHORITY：root 建立 run 的身份派生（stableLogicalRunId）─────
+
+test('PROMPT_011_stable_logical_run_id_is_a_function_of_runtime_session_and_root', () => {
+  // Split from tests/unit/prompt/authority.test.mjs (cutover Wave 2a): LogicalRunId
+  // 是 runtime + session + authority root 的确定函数；任一输入变化必须产生新 id，
+  // 否则两个不同 run 会共享一个身份。
+  const id = (rt, ses, root) =>
+    idValue.logicalRun(
+      authority.stableLogicalRunId(H, runtimeId(rt), sessionId(ses), promoteToAuthorityRoot(physicalUser(root))),
+    )
+
+  assert.equal(id('rt_1', 'ses_a', 'msg_u1'), 'H(rt_1\nses_a\nmsg_u1)')
+  assert.equal(id('rt_1', 'ses_a', 'msg_u1'), id('rt_1', 'ses_a', 'msg_u1'))
+
+  const base = id('rt_1', 'ses_a', 'msg_u1')
+  assert.notEqual(id('rt_2', 'ses_a', 'msg_u1'), base)
+  assert.notEqual(id('rt_1', 'ses_b', 'msg_u1'), base)
+  assert.notEqual(id('rt_1', 'ses_a', 'msg_u2'), base)
+})
+
 // ── INTERACTION-AUTHORITY-016：continuation 用 promptOrigin 构造可解析 ──────
 
 test('IA_005_needhelp_kinds_are_continuations_not_roots', () => {
