@@ -23,7 +23,7 @@ fail-closed（006）、placeholder parity（007）、tool prose 同 session 语�
 
 ## HOW 概览
 
-类型 `Domain/ProviderLanguage.fs`（`English | SimplifiedChinese` + `SessionProviderLanguage`
+类型 `Session/ProviderLanguage.fs`（`English | SimplifiedChinese` + `SessionProviderLanguage`
 bind-once 字典）；绑定 `Infrastructure/OpenCode/Host/ProviderLanguageBinding.fs`
 （`ensureRoot` / `ensureInherited`）；装载 `Infrastructure/Resources/{ProviderResources,
 ProviderProse}.fs`；结构 parity 门 `scripts/checks/language-parity-gate.mjs`（Gate C）；

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Infrastructure.Resources
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 
 /// Bilingual provider assets: `resources/provider/<semantic>/<en.md|zh-CN.md>` (PROMPT-017 §4.7.8).
 [<RequireQualifiedAccess>]

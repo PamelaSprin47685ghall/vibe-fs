@@ -8,7 +8,7 @@
 |------|------|------|
 | `Role` DU + `AgentTier` | `src/Wanxiangshu/Kernel/Roles.fs` | 10 个 office 身份 + Fast/Deep 两档 |
 | 名称/peer/分组公式 | `src/Wanxiangshu/Domain/ManagedAgentCatalog.fs` | `nameOf`/`peerNameOf`/`managerForkableRoles`/`bookkeeperNames`；peer 是公式不是表 |
-| Persona 解析 | `src/Wanxiangshu/Domain/PersonaCatalog.fs` | `persona role tier`（Role × initial tier）；`bookkeeperPersona`；`inheritFrom` |
+| Persona 解析 | `src/Wanxiangshu/Session/PersonaCatalog.fs` | `persona role tier`（Role × initial tier）；`bookkeeperPersona`；`inheritFrom` |
 | Persona 冻结 | `PersonaCatalog.SessionPersona` | `bindOnce`：同值幂等、异值拒绝；`clearAllForTests`（测试钩子） |
 | agent 名解析 | `src/Wanxiangshu/Domain/PromptAuthority.fs` `parseAgentNameTyped` | `fast-ROLE`/`deep-ROLE` → `{Name; Role; Tier; PeerName}`；legacy/未知/畸形三分拒绝 |
 | prompt identity | `PromptAuthority.systemPromptIdFor` | 只依赖 `CanonicalRole`（tier 不参与，PID-005） |

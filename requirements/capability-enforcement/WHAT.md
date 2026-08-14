@@ -88,15 +88,14 @@ strength family KEEP speculative-investigation，本断言 enforcement 侧归本
 ## ENF-006：internal-only participants/actions 不进无资格 participant 的工具面
 
 Blogger 工具面恰为 `{chronicle}`、Distiller 为空、Bookkeeper 仅 `js-bookkeeper`；其它角色不得获得
-这些面（ENFORCER-010/011、AGENT-006 表）。`auto-injected` 只进 Work 角色，Blogger/Distiller 不含。
+这些面（ENFORCER-010/011、AGENT-006 表）。内部占位标记 `-`（原 `auto-injected`）不注册为工具定义，禁止作为真实工具暴露给模型。
 
 含义/动机：内部路径（运行时合成）不得被模型当作可选工具（`archive/docs/why/agent.md`「内部 Agent 从 public
 enum 消失」）；admission（不进 choice surface）归 `participant-horizon`，本包拥有 schema/gate 拒绝。
 
 边界：可见性过滤的认知面 → `participant-horizon`（AGENT-008）；本包拥有工具面拒绝的执行面。
 
-证据：`tests/agent-permission-gate.test.mjs` `ROLE_ALLOW`（Distiller: []、Blogger: [chronicle]，MOVE）
-+ `requirements/capability-enforcement/tests/auto-injected-tool.test.mjs` `AUTOINJ_rolePredicate_allows_work_roles_and_denies_blogger_distiller`（REUSE）。
+证据：`tests/agent-permission-gate.test.mjs` `ROLE_ALLOW`（Distiller: []、Blogger: [chronicle]，MOVE）。
 
 ## ENF-007：Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 

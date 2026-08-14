@@ -5,7 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 
 /// ARCH-009: bounded fan-out only. No Flow monad.
-module ParallelHelpers =
+module Defer =
     open Fable.Core
 
     [<Emit("Promise.resolve().then($0)")>]

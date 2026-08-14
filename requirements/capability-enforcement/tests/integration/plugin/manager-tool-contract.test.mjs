@@ -65,7 +65,6 @@ const hostFinalConfig = () => {
 
 /** Every argument of every tool, so a new or renamed argument fails here first. */
 const EXPECTED_ARGUMENTS = {
-  'auto-injected': {},
   'bash-honeypot': {},
   chronicle: {
     entry: 'required',
@@ -181,14 +180,13 @@ const KNOWN_TOOL_KEYS = [
   'mv',
   'rm',
   'bash-honeypot',
-  'auto-injected',
   'inspect',
   'establish-behavior',
   'repair-behavior',
   'run',
   'query-shell',
-  'sphinx_*',
   'stealth-browser-mcp_*',
+  'sphinx_*',
   'judge',
   'chronicle',
   'fetch',
@@ -208,10 +206,10 @@ const KNOWN_TOOL_KEYS = [
 
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
 const ALLOWED_TOOLS = {
-  orchestrator: ['commission', 'join', 'horizon', 'auto-injected'],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'auto-injected'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'auto-injected'],
-  inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'auto-injected'],
+  orchestrator: ['commission', 'join', 'horizon'],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
+  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
+  inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
   devops: [
     'open-terminal',
     'send-terminal',
@@ -226,11 +224,10 @@ const ALLOWED_TOOLS = {
     'establish-behavior',
     'repair-behavior',
     'run',
-    'auto-injected',
   ],
-  browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'auto-injected'],
-  inquiry: ['inspect', 'sphinx_*', 'auto-injected'],
-  reviewer: ['read', 'glob', 'grep', 'judge', 'auto-injected'],
+  browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
+  inquiry: ['inspect', 'sphinx_*'],
+  reviewer: ['read', 'glob', 'grep', 'judge'],
   // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
   blogger: ['chronicle'],
   distiller: [],
@@ -320,8 +317,6 @@ const toolKeysForPermission = (role, permission) => {
       return ['rm']
     case 'BashHoneypot':
       return ['bash-honeypot']
-    case 'AutoInjected':
-      return ['auto-injected']
     case 'Inspect':
       return ['inspect']
     case 'Behavior':
@@ -539,7 +534,7 @@ test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
     const pair = transformed.messages[0]
     const user = transformed.messages[1]
     assert.equal(pair.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(pair.parts[0].tool, 'auto-injected')
+    assert.equal(pair.parts[0].tool, '-')
     assert.equal(pair.parts[0].state.status, 'completed')
     assert.notEqual(pair.parts[0].state.status, 'pending')
     assert.equal(pair.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
@@ -597,7 +592,7 @@ test('HOST_013_empty_messages_still_append_pair', async () => {
 
     assert.equal(markerCount(transformed.messages) >= 1, true)
     // no trailing user → pair at end
-    assert.equal(transformed.messages.at(-1).parts[0].tool, 'auto-injected')
+    assert.equal(transformed.messages.at(-1).parts[0].tool, '-')
   })
 })
 

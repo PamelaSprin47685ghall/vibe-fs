@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -65,6 +66,116 @@ module PairProgrammingThoughtTransform =
 
     let private idPrefix = "pair-programming-auto-injected-"
 
+    /// Marker tool name on the wire (HOST-013). Meaningless identifier to prevent LLM abuse.
+    let toolName = "-"
+
+    let private legacyToolName = "auto-injected"
+
+    /// HOST-013：marker 身份仅按 `info.source`。
+    let isPairProgrammingThought (rawMsg: obj) : bool =
+        if isNull rawMsg then
+            false
+        else
+            match rawMsg?info with
+            | null -> false
+            | info ->
+                let markerSource = unbox<string> info?source
+                markerSource = source || markerSource = legacySource
+
+    /// Scolding text for active model calls to the non-executable placeholder.
+    let reprimandText (lang: ProviderLanguage option) : string =
+        match lang with
+        | Some ProviderLanguage.SimplifiedChinese ->
+            "DENIED. `-` 不是可执行工具，禁止主动调用。这是系统内部占位标记，没有任何功能。请专注于你的本职任务，不要尝试调用内部标记符号。"
+        | _ ->
+            "DENIED. `-` is not an executable tool. Do not call this symbol. This is an internal system marker with no functionality. Focus on your assigned tasks and do not attempt to invoke non-existent internal symbols."
+
+    let private isHyphenToolPart (part: obj) : bool =
+        if isNull part then
+            false
+        else
+            let isMatchingName (name: obj) =
+                if isNull name then
+                    false
+                else
+                    let s = unbox<string> name
+                    s = toolName || s = legacyToolName
+
+            let toolMatches = isMatchingName part?tool || isMatchingName part?name
+
+            let typeMatches =
+                match part?``type`` with
+                | null -> false
+                | t ->
+                    let kind = (unbox<string> t).ToLowerInvariant()
+                    kind = "tool--" || kind = "tool-auto-injected"
+
+            toolMatches || typeMatches
+
+    let private reprimandToolPart (lang: ProviderLanguage option) (part: obj) : obj =
+        if not (isHyphenToolPart part) then
+            part
+        else
+            let reprimand = reprimandText lang
+            let originalState = part?state
+
+            if isNull originalState then
+                let s =
+                    createObj
+                        [ "status", box "completed"
+                          "input", box (createObj [])
+                          "output", box reprimand
+                          "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
+
+                part?state <- s
+            else
+                originalState?status <- box "completed"
+                originalState?output <- box reprimand
+                emitJsExpr originalState "delete $0.error; delete $0.errorText" |> ignore
+
+            if not (isNull part?error) then
+                emitJsExpr part "delete $0.error; delete $0.errorText" |> ignore
+
+            if not (isNull part?output) then
+                part?output <- box reprimand
+
+            part
+
+    let private isJsArray (value: obj) : bool =
+        not (isNull value) && emitJsExpr value "Array.isArray($0)"
+
+    let private rawParts (rawMsg: obj) : obj array =
+        if isNull rawMsg then
+            [||]
+        else
+            match rawMsg?parts with
+            | null ->
+                match rawMsg?content with
+                | null -> [||]
+                | content when isJsArray content -> unbox<obj array> content
+                | _ -> [||]
+            | parts when isJsArray parts -> unbox<obj array> parts
+            | _ -> [||]
+
+    let private sanitizeActiveHyphenMessage (lang: ProviderLanguage option) (rawMsg: obj) : obj =
+        if isNull rawMsg || isPairProgrammingThought rawMsg then
+            rawMsg
+        else
+            let parts = rawParts rawMsg
+
+            if Array.isEmpty parts then
+                rawMsg
+            else
+                for part in parts do
+                    if isHyphenToolPart part then
+                        reprimandToolPart lang part |> ignore
+
+                rawMsg
+
+    /// Transform any active LLM calls to `-` on real messages from failed into completed with reprimand.
+    let sanitizeActiveToolCalls (lang: ProviderLanguage option) (rawMessages: obj list) : obj list =
+        rawMessages |> List.map (sanitizeActiveHyphenMessage lang)
+
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =
         { Ordinal: int64
@@ -77,17 +188,6 @@ module PairProgrammingThoughtTransform =
     /// Keyed by transcript identity; append-only within process.
     let private memoryLedger =
         Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
-
-    /// HOST-013：marker 身份仅按 `info.source`。
-    let isPairProgrammingThought (rawMsg: obj) : bool =
-        if isNull rawMsg then
-            false
-        else
-            match rawMsg?info with
-            | null -> false
-            | info ->
-                let markerSource = unbox<string> info?source
-                markerSource = source || markerSource = legacySource
 
     let private transcriptKey (sessionId: string option) : string = defaultArg sessionId ""
 
@@ -102,7 +202,7 @@ module PairProgrammingThoughtTransform =
         let part =
             createObj
                 [ "type", box "tool"
-                  "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
+                  "tool", box toolName
                   "callID", box callId
                   "state",
                   box (
@@ -143,22 +243,6 @@ module PairProgrammingThoughtTransform =
 
             defaultArg fromInfo (defaultArg fromTop "")
             |> fun value -> value.ToLowerInvariant()
-
-    let private isJsArray (value: obj) : bool =
-        not (isNull value) && emitJsExpr value "Array.isArray($0)"
-
-    let private rawParts (rawMsg: obj) : obj array =
-        if isNull rawMsg then
-            [||]
-        else
-            match rawMsg?parts with
-            | null ->
-                match rawMsg?content with
-                | null -> [||]
-                | content when isJsArray content -> unbox<obj array> content
-                | _ -> [||]
-            | parts when isJsArray parts -> unbox<obj array> parts
-            | _ -> [||]
 
     let private isToolPart (part: obj) : bool =
         if isNull part then
@@ -545,7 +629,17 @@ module PairProgrammingThoughtTransform =
                 |> List.filter isPairProgrammingThought
                 |> List.choose syntheticCallIdOf
 
-            let realMessages = rawMessages |> List.filter (isPairProgrammingThought >> not)
+            let lang =
+                if markerText.Contains "以" || markerText.Contains "我" || markerText.Contains "结对" then
+                    Some ProviderLanguage.SimplifiedChinese
+                else
+                    Some ProviderLanguage.English
+
+            let realMessages =
+                rawMessages
+                |> List.filter (isPairProgrammingThought >> not)
+                |> sanitizeActiveToolCalls lang
+
             let providerId = providerIdFromMessages realMessages
 
             let history, append =

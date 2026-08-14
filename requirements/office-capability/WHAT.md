@@ -105,8 +105,7 @@ oracle 即为可红的行为判据。
 ## OFF-007：Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect
 
 Manager 的 entitled consequence 是协调（think / entrust / integrate），不是亲手建立 repository
-事实（AGENT-011）；工具面只有 fork / join / horizon / todowrite / fission / suicide + auto-injected
-（后者是 HOST-013 no-op，非业务能力）。
+事实（AGENT-011）；工具面只有 fork / join / horizon / todowrite / fission / suicide。
 
 含义/动机：Manager 若可亲手取证/改库，分层（推理→证据）会塌成「便宜证据自己看」；`no-personal-
 repository-witness` 锚点（`do not establish repository facts with your own hands`）是该 non-consequence
@@ -173,7 +172,7 @@ Reviewer 有权审阅（只读工具 + `judge`），不能写文件、不能跑�
 边界：PERFECT/REVISE 的判断标准 → `review-judgement`；judge 工具合同 → `action-affordance`。
 
 证据：`requirements/capability-enforcement/tests/agent-permission-gate.test.mjs`
-`ROLE_ALLOW.Reviewer = [read, glob, grep, judge, auto-injected]`（矩阵投影，交叉 REUSE）。
+`ROLE_ALLOW.Reviewer = [read, glob, grep, judge]`（矩阵投影，交叉 REUSE）。
 
 ## OFF-012：Orchestrator consequence = commission manager；不 commission 其它 office
 
@@ -185,7 +184,7 @@ Orchestrator 只 commission fast/deep-manager（新路）或按 Byname 续做既
 边界：commission 的委托语义（新路/续做）→ `delegation`；机器字段隐藏 → `participant-horizon`。
 
 证据：`requirements/capability-enforcement/tests/agent-permission-gate.test.mjs`
-`ROLE_ALLOW.Orchestrator = [commission, join, horizon, auto-injected]`（矩阵投影，交叉 REUSE）。
+`ROLE_ALLOW.Orchestrator = [commission, join, horizon]`（矩阵投影，交叉 REUSE）。
 
 ## OFF-013：Browser consequence = 带 provenance 的外部事实；non-consequence = 实现仓库工作/把外部可能性变成仓库义务
 

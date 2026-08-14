@@ -463,8 +463,12 @@ module SessionSnapshotPort =
     let create (input: obj) : ISessionSnapshotPort option =
         let workDir =
             if not (isNull input) && not (isNull input?directory) then
-                let d = unbox<string> input?directory
-                if String.IsNullOrWhiteSpace d then None else Some d
+                let directory = unbox<string> input?directory
+
+                if String.IsNullOrWhiteSpace directory then
+                    None
+                else
+                    Some directory
             else
                 None
 

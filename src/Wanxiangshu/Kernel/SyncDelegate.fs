@@ -43,6 +43,19 @@ module DedicatedDelegateKey =
 
 module SyncDelegate =
 
+    /// EXEC-026: canonical wire role label for a dedicated SyncDelegate
+    /// (`inspector` / `coder`). Sole definition — Session/ layer references this.
+    let roleLabel (role: SyncDelegateRole) : string =
+        match role with
+        | SyncDelegateRole.Inspector -> "inspector"
+        | SyncDelegateRole.Coder -> "coder"
+
+    /// EXEC-026: canonical wire tier label (`fast` / `deep`).
+    let tierLabel (tier: AgentTier) : string =
+        match tier with
+        | AgentTier.Fast -> "fast"
+        | AgentTier.Deep -> "deep"
+
     /// HOST-008: SyncDelegateRole → AttachmentKind for Work+Attached registration.
     let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind =
         match role with
@@ -55,14 +68,4 @@ module SyncDelegate =
 
     /// Wire agent name for a dedicated SyncDelegate (`fast-inspector`, …).
     let agentNameFor (role: SyncDelegateRole) (tier: AgentTier) : string =
-        let tierLabel =
-            match tier with
-            | AgentTier.Fast -> "fast"
-            | AgentTier.Deep -> "deep"
-
-        let roleLabel =
-            match role with
-            | SyncDelegateRole.Inspector -> "inspector"
-            | SyncDelegateRole.Coder -> "coder"
-
-        sprintf "%s-%s" tierLabel roleLabel
+        sprintf "%s-%s" (tierLabel tier) (roleLabel role)

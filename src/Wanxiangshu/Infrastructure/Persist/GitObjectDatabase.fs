@@ -385,7 +385,23 @@ module GitObjectDatabase =
                                 do! unlinkQuietly lockPath
                                 return false
                             else
-                                return true
+                                // rename 失败但 ref 已存在时，CAS 只有确认 ref 现在持有的正是 newOid
+                                // 才可报成功（DURABLE-EVENTS-004/006：CAS 未见证 newOid 不得假装提交）。
+                                // ref 内容是 40 位 hex + "\n"，Trim 后即为 oid。
+                                let! current =
+                                    task {
+                                        try
+                                            let! text = readFileText refPath "utf8"
+                                            return Some(text.Trim())
+                                        with _ ->
+                                            return None
+                                    }
+
+                                if current = Some newOid then
+                                    return true
+                                else
+                                    do! unlinkQuietly lockPath
+                                    return false
                 with error ->
                     do! closeQuietly handle
                     do! unlinkQuietly lockPath

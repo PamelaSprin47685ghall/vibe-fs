@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoAdmission
 open Wanxiangshu.Domain.MagicTodoFacts

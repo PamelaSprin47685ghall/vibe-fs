@@ -131,7 +131,7 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () =
 
   // round 1: Req1 Req2 Resp1 Resp2 → FakePair1 (one completed Host row)
   const round1Wire = await inject(undefined, session, round1Real)
-  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', 'auto-injected'])
+  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', '-'])
   const call1 = stableCallId(session, 1n)
   assert.equal(round1Wire[4].parts[0].state.status, 'completed')
   assert.notEqual(round1Wire[4].parts[0].state.status, 'pending')
@@ -146,8 +146,8 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () =
   ]
   const round2Wire = await inject(undefined, session, round2Real)
   assert.deepEqual(toolNames(round2Wire), [
-    'bash', 'read', 'bash', 'read', 'auto-injected',
-    'write', 'write', 'auto-injected',
+    'bash', 'read', 'bash', 'read', '-',
+    'write', 'write', '-',
   ])
   const call2 = stableCallId(session, 2n)
   assert.equal(callIdOf(round2Wire, 7), call2)
@@ -164,15 +164,15 @@ test('H13_02_historical_pair_never_relocates_to_current_batch', async () => {
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
   const wire1 = await inject(undefined, session, round1)
   // Req1 Resp1 FakePair1
-  assert.deepEqual(toolNames(wire1), ['bash', 'bash', 'auto-injected'])
+  assert.deepEqual(toolNames(wire1), ['bash', 'bash', '-'])
 
   const round2 = [...wire1, toolCall('c2', 'read', 't2'), toolResult('r2', 'read', 't2')]
   const wire2 = await inject(undefined, session, round2)
   // Req1 Resp1 FakePair1 Req2 Resp2 FakePair2
   // A historyBlock implementation would move pair1 next to the current batch.
   assert.deepEqual(toolNames(wire2), [
-    'bash', 'bash', 'auto-injected',
-    'read', 'read', 'auto-injected',
+    'bash', 'bash', '-',
+    'read', 'read', '-',
   ])
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
 })

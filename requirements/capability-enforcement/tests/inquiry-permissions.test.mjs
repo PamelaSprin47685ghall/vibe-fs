@@ -32,7 +32,7 @@ test.before(() => {
 
 test('Inquiry_permissions_are_inspect_and_sphinx', () => {
   const allowed = roles.permissions(roles.of('Inquiry'))
-  assert.deepEqual(allowed, ['AutoInjected', 'Inspect', 'Sphinx'])
+  assert.deepEqual(allowed, ['Inspect', 'Sphinx'])
   assert.equal(allowed.includes('Read'), false)
   assert.equal(allowed.includes('Glob'), false)
   assert.equal(allowed.includes('Grep'), false)
@@ -48,7 +48,7 @@ test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx', () => 
 
 test('Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
   const caps = names(toolCapabilitiesFor(Role.Inquiry, ProviderRequestKind.WorkMain))
-  assert.deepEqual(caps, ['auto-injected', 'inspect', 'sphinx_*'])
+  assert.deepEqual(caps, ['inspect', 'sphinx_*'])
   for (const tool of READ_TOOLS) {
     assert.equal(caps.includes(tool), false, `toolCapabilitiesFor must omit ${tool}`)
   }
@@ -103,7 +103,6 @@ test('Inquiry_host_schema_allow_list_is_inspect_and_sphinx', () => {
     assert.equal(permission['*'], 'deny')
     assert.equal(permission.inspect, 'allow')
     assert.equal(permission['sphinx_*'], 'allow')
-    assert.equal(permission['auto-injected'], 'allow')
     for (const tool of READ_TOOLS) {
       assert.notEqual(permission[tool], 'allow', `${name} must not allow ${tool}`)
     }

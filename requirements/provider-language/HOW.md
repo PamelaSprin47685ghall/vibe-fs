@@ -7,7 +7,7 @@
 ### 类型与绑定
 
 ```text
-ProviderLanguage = English | SimplifiedChinese        Domain/ProviderLanguage.fs
+ProviderLanguage = English | SimplifiedChinese        Session/ProviderLanguage.fs
 SessionProviderLanguage                                process-local Dictionary(sessionId → language)
     bindOnce:   未绑 → 绑定；同值 → Ok 同值；异值 → Error（fail-closed）
     inheritFromOwner(ownerLang, childId) = bindOnce childId ownerLang

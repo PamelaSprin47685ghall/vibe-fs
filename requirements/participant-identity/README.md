@@ -12,7 +12,7 @@ Persona 一次冻结不可变；换模型/换 tier/换 peer 只改 ExecutionBind
 
 ## HOW 概览
 
-- 类型：`src/Wanxiangshu/Kernel/Roles.fs`（`Role` DU、`AgentTier`）、`Domain/PersonaCatalog.fs`
+- 类型：`src/Wanxiangshu/Kernel/Roles.fs`（`Role` DU、`AgentTier`）、`Session/PersonaCatalog.fs`
   （`PersonaCatalog.persona`、`SessionPersona.bindOnce`）、`Domain/ManagedAgentCatalog.fs`
   （名称/peer/角色分组公式）、`Domain/PromptAuthority.fs`（`parseAgentNameTyped`、`systemPromptIdFor`、
   `buildAttemptExecutionProfile`）。

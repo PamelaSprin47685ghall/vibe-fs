@@ -8,22 +8,23 @@ import test from 'node:test'
 
 import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
+import * as SessionPersona from '../../../dist/Session/SessionPersona.js'
 import { systemPromptIdFor } from '../../../dist/Domain/PromptAuthority.js'
 import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
 import { resultOf, unwrapOption } from '../../verification-system/tests/support/domain/interop.mjs'
 import { sessionId } from '../../verification-system/tests/support/domain.mjs'
 
-const persona = PersonaCatalog.PersonaCatalog_persona
-const bindOnce = (id, value) => resultOf(PersonaCatalog.SessionPersona_bindOnce(id, value))
+const persona = PersonaCatalog.persona
+const bindOnce = (id, value) => resultOf(SessionPersona.bindOnce(id, value))
 const inheritFromOwner = (ownerPersona, childId) =>
-  resultOf(PersonaCatalog.SessionPersona_inheritFromOwner(ownerPersona, childId))
-const tryGet = (id) => unwrapOption(PersonaCatalog.SessionPersona_tryGet(id))
-const clearAll = PersonaCatalog.SessionPersona_clearAllForTests
+  resultOf(SessionPersona.inheritFromOwner(ownerPersona, childId))
+const tryGet = (id) => unwrapOption(SessionPersona.tryGet(id))
+const clearAll = SessionPersona.clearAllForTests
 
 test('AGENT_028_persona_matrix_resolves_role_times_initial_tier', () => {
   assert.equal(persona(Role.Coder, AgentTier.Fast), 'Coder')
   assert.equal(persona(Role.Coder, AgentTier.Deep), 'Engineer')
-  assert.equal(PersonaCatalog.PersonaCatalog_bookkeeperPersona(AgentTier.Fast), 'Clerk')
+  assert.equal(PersonaCatalog.bookkeeperPersona(AgentTier.Fast), 'Clerk')
 })
 
 test('AGENT_028_SessionPersona_bind_once_and_inherit', () => {

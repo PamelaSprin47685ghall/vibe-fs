@@ -2,6 +2,7 @@ namespace Wanxiangshu.Infrastructure
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Resources

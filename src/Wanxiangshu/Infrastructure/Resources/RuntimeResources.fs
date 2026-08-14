@@ -2,6 +2,7 @@ namespace Wanxiangshu.Infrastructure.Resources
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 
 /// Bundle of package runtime data loaded once at plugin init.
 type RuntimeResources =

@@ -20,8 +20,12 @@ module PluginHost =
         if isNull input || isNull input?directory then
             None
         else
-            let d = unbox<string> input?directory
-            if String.IsNullOrWhiteSpace d then None else Some d
+            let directory = unbox<string> input?directory
+
+            if String.IsNullOrWhiteSpace directory then
+                None
+            else
+                Some directory
 
     /// PERSIST-004/005: a rejected boot is a startup failure, not an absent journal.
     ///

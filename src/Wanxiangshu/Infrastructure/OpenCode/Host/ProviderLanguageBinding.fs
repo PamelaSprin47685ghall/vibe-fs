@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Kernel.Identity
 
 /// HOST-026: global preference → root bind; child inherits owner.

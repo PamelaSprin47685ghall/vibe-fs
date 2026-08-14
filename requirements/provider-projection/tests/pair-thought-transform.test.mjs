@@ -39,7 +39,7 @@ const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.synthetic, true)
   assert.equal(msg.parts.length, 1)
   assert.equal(msg.parts[0].type, 'tool')
-  assert.equal(msg.parts[0].tool, 'auto-injected')
+  assert.equal(msg.parts[0].tool, '-')
   assert.equal(msg.parts[0].callID, callId)
   assert.equal(msg.parts[0].state.status, 'completed')
   assert.notEqual(msg.parts[0].state.status, 'pending')

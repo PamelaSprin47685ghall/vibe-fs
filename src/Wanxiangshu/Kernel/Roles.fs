@@ -52,9 +52,6 @@ type ToolPermission =
     | BashHoneypot
     /// AGENT-030: Inquiry-only Sphinx MCP wildcard (`sphinx_*`).
     | Sphinx
-    /// HOST-013: Work-role no-op entity named auto-injected. Always returns OK.
-    /// Not a business capability. Blogger and Distiller must not hold this.
-    | AutoInjected
 
 module Roles =
 
@@ -67,14 +64,8 @@ module Roles =
                   ToolPermission.Horizon
                   ToolPermission.TodoWrite
                   ToolPermission.Fission
-                  ToolPermission.Finality
-                  ToolPermission.AutoInjected ]
-        | Role.Orchestrator ->
-            set
-                [ ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.AutoInjected ]
+                  ToolPermission.Finality ]
+        | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
         | Role.Coder ->
             set
                 [ ToolPermission.Read
@@ -86,31 +77,27 @@ module Roles =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Inspect
-                  ToolPermission.Fetch
-                  ToolPermission.AutoInjected ]
+                  ToolPermission.Fetch ]
         | Role.Inspector ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Exec
-                  ToolPermission.Fetch
-                  ToolPermission.AutoInjected ]
+                  ToolPermission.Fetch ]
         | Role.Browser ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Network
-                  ToolPermission.AutoInjected ]
-        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx; ToolPermission.AutoInjected ]
+                  ToolPermission.Network ]
+        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx ]
         | Role.Reviewer ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Judge
-                  ToolPermission.AutoInjected ]
+                  ToolPermission.Judge ]
         | Role.DevOps ->
             set
                 [ ToolPermission.Pty
@@ -121,8 +108,7 @@ module Roles =
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Inspect
-                  ToolPermission.Behavior
-                  ToolPermission.AutoInjected ]
+                  ToolPermission.Behavior ]
         | Role.Distiller -> Set.empty
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
         | Role.Blogger -> set [ ToolPermission.Chronicle ]

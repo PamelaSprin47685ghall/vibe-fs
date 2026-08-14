@@ -3,6 +3,7 @@ namespace Wanxiangshu.Infrastructure.Resources
 open System
 open System.Text.RegularExpressions
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 
 /// Loads the localized Enforcer Rulebook from `resources/enforcer/<tip>/`.
 /// English leaves are `enforcer.md` + `main.md`; zh-CN leaves are

@@ -167,17 +167,17 @@ const isAssistant = (message) => {
   // a legacy pending FakeReq row.
   const isGuidelineToolPart = (part) =>
     part?.type === 'tool'
-    && part?.tool === 'auto-injected';
+    && (part?.tool === '-' || part?.tool === 'auto-injected');
   if (Array.isArray(message?.parts) && message.parts.some(isGuidelineToolPart)) return false;
   const content = message?.content;
   if (Array.isArray(content) && content.some(isGuidelineToolPart)) return false;
-  // OpenAI HTTP wire: FakeReq is an assistant with tool_calls named auto-injected
+  // OpenAI HTTP wire: FakeReq is an assistant with tool_calls named - or auto-injected
   // (FakeResp is often role tool and already non-assistant). Skip only when every
-  // named call is synthetic so a mixed real+auto-injected message still counts.
+  // named call is synthetic so a mixed real+hyphen message still counts.
   const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
   if (toolCalls.length > 0) {
     const names = toolCalls.map((call) => call?.function?.name ?? call?.name);
-    if (names.every((name) => name === 'auto-injected')) return false;
+    if (names.every((name) => name === '-' || name === 'auto-injected')) return false;
   }
   return true;
 };

@@ -67,7 +67,6 @@ module ToolRegistry =
         | "mv" -> fun r -> Roles.isAllowed r ToolPermission.Move
         | "rm" -> fun r -> Roles.isAllowed r ToolPermission.Remove
         | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
-        | "auto-injected" -> fun r -> Roles.isAllowed r ToolPermission.AutoInjected
         | "establish-behavior"
         | "repair-behavior" -> fun r -> r = Role.DevOps
         | "chronicle" -> fun r -> r = Role.Blogger && ChronicleTool.hasLiveCycle parkedHost sessionId
@@ -158,8 +157,6 @@ module ToolRegistry =
               yield FileMutationTools.rmSpec factory
               // Coder-only bash honeypot: visible denial, never a shell.
               yield BashHoneypotTool.spec
-              // HOST-013: real no-op entity so a live model call cannot miss Tool.Def.
-              yield AutoInjectedTool.spec
               // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield ChronicleTool.spec factory runtime parkedHost

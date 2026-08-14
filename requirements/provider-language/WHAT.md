@@ -10,7 +10,7 @@
 ## PROVIDER-LANGUAGE-001：ProviderLanguage 是二元封闭类型
 
 **规范**：`ProviderLanguage` 是 `English | SimplifiedChinese` 的封闭类型
-（`src/Wanxiangshu/Domain/ProviderLanguage.fs`）。第一版 EN / zh-CN 双语同时上线。
+（`src/Wanxiangshu/Session/ProviderLanguage.fs`）。第一版 EN / zh-CN 双语同时上线。
 locale leaf 文件名与资源目录名由类型决定：`English → en.md`、`SimplifiedChinese →
 zh-CN.md`。
 

@@ -15,10 +15,7 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     let register = defaultArg registerParent (fun _ _ -> ())
     let usable = defaultArg isUsable (fun _ -> true)
 
-    let roleLabel =
-        function
-        | SyncDelegateRole.Inspector -> "inspector"
-        | SyncDelegateRole.Coder -> "coder"
+    let roleLabel = SyncDelegate.roleLabel
 
     let bindingKey (scope: ReuseScopeId) (role: SyncDelegateRole) =
         ReuseScopeId.value scope + "\u001f" + roleLabel role

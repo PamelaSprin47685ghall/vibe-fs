@@ -3,6 +3,7 @@ namespace Wanxiangshu.Resources
 open System
 open System.Text.RegularExpressions
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel.Identity
 

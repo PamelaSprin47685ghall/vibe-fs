@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
+import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
 import { OpencodeModel } from '../../../dist/Infrastructure/OpenCode/Codec/OpencodeTypes.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'

@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources

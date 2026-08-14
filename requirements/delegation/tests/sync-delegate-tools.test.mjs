@@ -18,7 +18,7 @@ import {
   SnapshotToolPartState,
 } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
-import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
+import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'

@@ -47,6 +47,8 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Kernel/Temporal.fs"/>
+    <Compile Include="Domain/PersonaCatalog.fs"/>
+    <Compile Include="Domain/ProviderLanguage.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/TerminalValidity.fs"/>
     <Compile Include="Domain/PrefixCandidate.fs"/>
@@ -104,8 +106,6 @@
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/ManagedAgentCatalog.fs"/>
-    <Compile Include="Domain/PersonaCatalog.fs"/>
-    <Compile Include="Domain/ProviderLanguage.fs"/>
     <Compile Include="Domain/SyncDelegatePrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
@@ -180,6 +180,8 @@
     <Compile Include="Infrastructure/Git/GitSubject.fs"/>
     <Compile Include="Journal/RuntimePath.fs"/>
     <Compile Include="Agent/AgentProgram.fs"/>
+    <Compile Include="Session/SessionPersona.fs"/>
+    <Compile Include="Session/SessionProviderLanguage.fs"/>
     <Compile Include="Session/ForkTypes.fs"/>
     <Compile Include="Session/AgentCompletion.fs"/>
     <Compile Include="Session/AgentRoleIdentity.fs"/>
@@ -411,7 +413,6 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/AutoInjectedTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FissionTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
     <Compile Include="Infrastructure/JsUtf8Fs.fs"/>

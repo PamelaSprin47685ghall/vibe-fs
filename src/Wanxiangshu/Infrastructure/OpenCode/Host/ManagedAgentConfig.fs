@@ -256,7 +256,6 @@ module ManagedAgentConfig =
                         experimental?chatMaxRetries <- n
                     | _ -> ()
 
-    let private loggedSource = ref false
     let private liveInventory: ManagedAgentInventory option ref = ref None
 
     /// Best-effort bindings for the Error path: role knowledge only, no model
@@ -285,12 +284,7 @@ module ManagedAgentConfig =
             Error err
         | Ok inventory ->
             applyOwnedFields config inventory
-            liveInventory := Some inventory
-
-            if not loggedSource.Value then
-                loggedSource.Value <- true
-                printfn "Model configuration source: OpenCode config.agent"
-                printfn "Legacy model environment variables are ignored."
+            liveInventory.Value <- Some inventory
 
             Ok inventory
 
@@ -332,6 +326,6 @@ module ManagedAgentConfig =
     /// otherwise treats an agent-less / history-inferred request as the default
     /// Fast model and overwrites a Deep child mid-conversation.
     let tryBoundModel (agent: string) : OpencodeModel option =
-        match !liveInventory with
+        match liveInventory.Value with
         | Some inventory -> tryOpencodeModel inventory agent None
         | None -> None

@@ -218,6 +218,11 @@ export const runtimeKeyCases = [
       const rawShape = {
         role: 'assistant',
         info: { source: pairProgrammingThoughtSource },
+        parts: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+      };
+      const legacyRawShape = {
+        role: 'assistant',
+        info: { source: pairProgrammingThoughtSource },
         parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
       const legacySourceShape = {
@@ -226,23 +231,24 @@ export const runtimeKeyCases = [
       };
       const contentShape = {
         role: 'assistant',
-        content: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        content: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
       // Provider wire often strips `info.source`; a legacy FakeReq half is status
       // pending with no output and must not count as a real step either.
       const pendingFakeReq = {
         role: 'assistant',
-        parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'pending' } }],
+        parts: [{ type: 'tool', tool: '-', state: { status: 'pending' } }],
       };
       const completedFakeResp = {
         role: 'assistant',
-        parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        parts: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
-      // OpenAI HTTP wire FakeReq: assistant with tool_calls named auto-injected
+      // OpenAI HTTP wire FakeReq: assistant with tool_calls named - or auto-injected
       // (no completed status/output required). FakeResp is often role tool.
-      const openAiFakeReq = toolCall('auto-injected');
+      const openAiFakeReq = toolCall('-');
+      const openAiLegacyFakeReq = toolCall('auto-injected');
 
-      for (const marker of [rawShape, legacySourceShape, contentShape, pendingFakeReq, completedFakeResp, openAiFakeReq]) {
+      for (const marker of [rawShape, legacyRawShape, legacySourceShape, contentShape, pendingFakeReq, completedFakeResp, openAiFakeReq, openAiLegacyFakeReq]) {
         assertEq(stepOf(request([user('go'), marker])), 0, 'marker alone is not a step');
         assertEq(
           stepOf(request([user('go'), marker, assistant('r1')])),

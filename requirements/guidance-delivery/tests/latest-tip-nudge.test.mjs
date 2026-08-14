@@ -124,8 +124,8 @@ const guideline = '# Pair programming auto-injected'
 const anchor = toList([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }])
 const markerOutput = (messages) => {
   const items = listItems(messages)
-  // pair sits before trailing user: completed auto-injected, user
-  const result = items.find((m) => m?.parts?.[0]?.tool === 'auto-injected' && m?.parts?.[0]?.state?.status === 'completed')
+  // pair sits before trailing user: completed -, user
+  const result = items.find((m) => m?.parts?.[0]?.tool === '-' && m?.parts?.[0]?.state?.status === 'completed')
   return result?.parts?.[0]?.state?.output
 }
 

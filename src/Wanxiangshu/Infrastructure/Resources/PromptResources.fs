@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Infrastructure.Resources
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

@@ -13,7 +13,7 @@ import test from 'node:test'
 
 import { ToolCallIdModule_create as toolCallId } from '../../../dist/Kernel/Identity.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
-import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
+import { clearAllForTests as SessionPersona_clearAllForTests } from '../../../dist/Session/SessionPersona.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { SyncDelegateBatch, SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'

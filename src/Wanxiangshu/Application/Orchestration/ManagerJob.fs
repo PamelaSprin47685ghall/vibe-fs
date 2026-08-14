@@ -106,13 +106,13 @@ type VerdictMailbox() =
         lock gate (fun () ->
             let kept =
                 [ while waiters.Count > 0 do
-                      let w = waiters.Dequeue()
+                      let poppedWaiter = waiters.Dequeue()
 
-                      if not (obj.ReferenceEquals(w, waiter)) then
-                          yield w ]
+                      if not (obj.ReferenceEquals(poppedWaiter, waiter)) then
+                          yield poppedWaiter ]
 
-            for w in kept do
-                waiters.Enqueue w
+            for keptWaiter in kept do
+                waiters.Enqueue keptWaiter
 
             AsyncSupport.trySetResult waiter () |> ignore)
 

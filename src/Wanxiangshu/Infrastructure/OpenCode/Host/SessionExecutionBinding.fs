@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
 module SessionExecutionBinding =
@@ -113,6 +114,22 @@ module SessionExecutionBinding =
 
     let private configuredModel agent = ManagedAgentConfig.tryBoundModel agent
 
+    let private tryPeerName (agentName: string) : string option =
+        if ManagedAgentCatalog.isBookkeeperName agentName then
+            ManagedAgentCatalog.bookkeeperPeerName agentName
+        else
+            let trimmed = agentName.Trim()
+
+            match trimmed.IndexOf '-' with
+            | index when index > 0 && index < trimmed.Length - 1 ->
+                let tierText = trimmed.Substring(0, index)
+                let roleText = trimmed.Substring(index + 1)
+
+                match ManagedAgentCatalog.tryParseTier tierText, ManagedAgentCatalog.tryParseRole roleText with
+                | Some tier, Some role -> Some(ManagedAgentCatalog.peerNameOf tier role)
+                | _ -> None
+            | _ -> None
+
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID
         && left.modelID = right.modelID
@@ -130,30 +147,41 @@ module SessionExecutionBinding =
         lock gate (fun () ->
             let key = SessionId.value sessionId
 
-            let expected =
-                match internalBindings.TryGetValue key with
-                | true, current :: _ -> Ok(Some current)
-                | _ when parents.ContainsKey key ->
-                    match agents.TryGetValue key, models.TryGetValue key with
-                    | (true, baseAgent), (true, baseModel) -> Ok(Some { Agent = baseAgent; Model = baseModel })
-                    | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
-                | _ -> Ok None
-
-            expected
-            |> Result.bind (function
-                | None -> Ok false
-                | Some binding when binding.Agent <> agent.Trim() ->
-                    Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" binding.Agent agent)
-                | Some binding when not (sameModel binding.Model model) ->
-                    Error(
-                        sprintf
-                            "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
-                            binding.Model.providerID
-                            binding.Model.modelID
-                            model.providerID
-                            model.modelID
-                    )
-                | Some _ -> Ok true))
+            match internalBindings.TryGetValue key with
+            | true, current :: _ when current.Agent = agent.Trim() && sameModel current.Model model -> Ok true
+            | _ when parents.ContainsKey key ->
+                match agents.TryGetValue key, models.TryGetValue key with
+                | (true, baseAgent), (true, baseModel) ->
+                    if baseAgent = agent.Trim() then
+                        if sameModel baseModel model then
+                            Ok true
+                        else
+                            Error(
+                                sprintf
+                                    "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
+                                    baseModel.providerID
+                                    baseModel.modelID
+                                    model.providerID
+                                    model.modelID
+                            )
+                    else
+                        match tryPeerName baseAgent with
+                        | Some peer when peer = agent.Trim() ->
+                            match configuredModel peer with
+                            | Some peerModel when sameModel peerModel model -> Ok true
+                            | Some peerModel ->
+                                Error(
+                                    sprintf
+                                        "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
+                                        peerModel.providerID
+                                        peerModel.modelID
+                                        model.providerID
+                                        model.modelID
+                                )
+                            | None -> Error(sprintf "PROMPT-006: peer agent '%s' has no configured model binding" peer)
+                        | _ -> Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent agent)
+                | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
+            | _ -> Ok false)
 
     let private normalizeOverride (opts: OpenCodePromptOptions) =
         match opts.Agent |> Option.bind nonEmpty with

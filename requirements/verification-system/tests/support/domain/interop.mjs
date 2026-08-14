@@ -218,7 +218,7 @@ export const [
   prod('Journal/MagicTodoFactCodec'),
   prod('Domain/LifecycleWorkRecord'),
   prod('Domain/ManagedAgentCatalog'),
-  prod('Domain/ProviderLanguage'),
+  Promise.all([prod('Domain/ProviderLanguage'), prod('Session/SessionProviderLanguage')]).then(([p, s]) => ({ ...p, ...s })),
   prod('Application/Reconciliation/XTraceCapture'),
   prod('Application/Finality/LifecycleWorkRecordProjection'),
   prod('Infrastructure/OpenCode/Codec/HostMessageCodec'),

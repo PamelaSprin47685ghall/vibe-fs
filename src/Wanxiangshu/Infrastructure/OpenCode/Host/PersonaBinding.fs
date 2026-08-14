@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Kernel.Identity
 
 /// AGENT-028 / FALLBACK-014: Authority Root resolve-once; child inherits owner.

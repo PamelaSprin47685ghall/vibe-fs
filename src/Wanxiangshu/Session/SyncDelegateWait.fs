@@ -9,10 +9,7 @@ type SyncDelegateWait = DelegateCompletion of owner: SessionId * delegateSession
 
 /// Diagnostic wait descriptor for the SyncDelegate CE await point.
 let describe (wait: SyncDelegateWait) : DiagnosticWait =
-    let roleLabel =
-        function
-        | SyncDelegateRole.Inspector -> "inspector"
-        | SyncDelegateRole.Coder -> "coder"
+    let roleLabel = SyncDelegate.roleLabel
 
     let toolOwner (owner: SessionId) =
         CausalOwner.create "sync-delegate-tool" [ "session", SessionId.value owner ]

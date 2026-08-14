@@ -99,7 +99,6 @@ const allowList = (config, name) => {
   const tools = [
     'bash',
     'bash-honeypot',
-    'auto-injected',
     'read',
     'write',
     'edit',
@@ -134,13 +133,13 @@ const allowList = (config, name) => {
 
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'auto-injected'],
-  Orchestrator: ['commission', 'join', 'horizon', 'auto-injected'],
-  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'auto-injected'],
-  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'auto-injected'],
-  Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'auto-injected'],
-  Inquiry: ['inspect', 'sphinx_*', 'auto-injected'],
-  Reviewer: ['read', 'glob', 'grep', 'judge', 'auto-injected'],
+  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
+  Orchestrator: ['commission', 'join', 'horizon'],
+  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch'],
+  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
+  Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
+  Inquiry: ['inspect', 'sphinx_*'],
+  Reviewer: ['read', 'glob', 'grep', 'judge'],
   DevOps: [
     'read',
     'glob',
@@ -155,7 +154,6 @@ const ROLE_ALLOW = {
     'send-terminal',
     'read-terminal',
     'signal-terminal',
-    'auto-injected',
   ],
   Distiller: [],
   Blogger: ['chronicle'],
@@ -278,7 +276,6 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       mv: 'Move',
       rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
-      'auto-injected': 'AutoInjected',
       inspect: 'Inspect',
       'sphinx_*': 'Sphinx',
       run: 'Exec',

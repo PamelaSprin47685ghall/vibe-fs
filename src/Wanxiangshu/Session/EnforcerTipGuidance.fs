@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
