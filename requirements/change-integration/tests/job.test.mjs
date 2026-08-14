@@ -31,7 +31,7 @@ import {
   toList,
   worktreeIdentity,
   worktreePath,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 const JOB = managerJobId('job_1')
 const MANAGER = sessionId('ses_m')

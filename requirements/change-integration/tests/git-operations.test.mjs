@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { commitHash, listItems, managerJobId, resultOf, targetRef, worktreeIdentity, worktreePath } from '../support/domain.mjs'
+import { commitHash, listItems, managerJobId, resultOf, targetRef, worktreeIdentity, worktreePath } from '../../../tests/unit/support/domain.mjs'
 
 const { createWithRepo, createWithRunner } = await import('../../../dist/Infrastructure/Git/GitOperations.js')
 
