@@ -28,9 +28,9 @@ provider history 可能超过可用上下文。压缩若靠猜模型窗口、先
 
 ## proof 概览（→ PROOF.md）
 
-- MOVE：`tests/unit/context/{blog-projection,companion-projection,blogger-delta,probe-selection,recovery-slot,host-compaction-policy,ctx014,terminal-validity}.test.mjs`（8 文件）
-- REUSE：`tests/unit/context/{synthetic-toml,blogger-toml}.test.mjs`（TOML 渲染 → provider-projection）、
-  `tests/unit/context/fold-context-recovery.test.mjs`（fold → durable-events）、`tests/unit/enforcer/**`（blogger 收敛）
+- MOVE（已执行 Wave 2a）：`tests/unit/context/{blog-projection,companion-projection,blogger-delta,probe-selection,recovery-slot,host-compaction-policy,ctx014,terminal-validity}.test.mjs`（8 文件）
+- REUSE：`tests/unit/context/{synthetic-toml,blogger-toml}.test.mjs`（TOML 渲染 → provider-projection，已迁）
+  `requirements/durable-events/tests/fold-context-recovery.test.mjs`（fold → durable-events）、`requirements/context-compression/tests/**`（blogger 收敛，已迁）
 - NEW：`ctx-capacity-observation-forbidden.test.mjs`（CTX-001）、`ctx-opening-floor.test.mjs`（CTX-016）
 
 ## 阅读顺序

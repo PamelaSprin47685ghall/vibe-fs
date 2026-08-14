@@ -30,8 +30,8 @@
 
 ## proof 概览（→ PROOF.md）
 
-- MOVE：`tests/unit/context/lifecycle-work-record*.test.mjs`（2 文件）→ `requirements/work-record/tests/`
-- REUSE：`tests/unit/glory/lifecycle.test.mjs`（canonical LWR materializer）、
+- MOVE（已执行 Wave 2a）：`tests/unit/context/lifecycle-work-record*.test.mjs`（2 文件）→ `requirements/work-record/tests/`
+- REUSE：`requirements/finality/tests/lifecycle.test.mjs`（canonical LWR materializer）、
   `tests/unit/execution/**`（EXEC-028/031 SyncDelegate 交叉）、`tests/unit/todo/**`（TODO-008 交叉）
 - NEW：`lwr-prose-claim-no-schema.test.mjs`、`lwr-record-coverage-vs-prefix-coverage.test.mjs`
 

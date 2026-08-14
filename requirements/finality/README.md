@@ -30,7 +30,7 @@ participant 自己认为 mission 完成 ≠ 世界允许不可逆结束。
 ## proof 概览（→ PROOF.md）
 
 - MOVE：无（glory 测试族是多 owner 家族，按 PROOF-MAP 保留原位，SPLIT@cutover）
-- REUSE：`tests/unit/glory/lifecycle.test.mjs`（lifecycle 事实代数）、`tests/unit/temporal/finality-cohort-law.test.mjs`（roster/graduate）、`tests/unit/glory/rewrite-consistency.test.mjs`（Opening 改写幂等）、`tests/unit/glory/manager-lifecycle-gate.test.mjs`（Activation 缺席，GARBAGE 侧）
+- REUSE：`requirements/finality/tests/lifecycle.test.mjs`（lifecycle 事实代数）、`requirements/finality/tests/finality-cohort-law.test.mjs`（roster/graduate）、`requirements/finality/tests/rewrite-consistency.test.mjs`（Opening 改写幂等）、~~`tests/unit/glory/manager-lifecycle-gate.test.mjs`~~（Activation 缺席，GARBAGE 侧，已 DELETE@cutover）
 - NEW：`manager-finality-disposition.test.mjs`（`ManagerFinality.classifyEnding` / `admitLabor` 纯代数：drain 门禁、in-motion、rejection 续命、blessed-rest、Life 隔离）
 
 ## 阅读顺序

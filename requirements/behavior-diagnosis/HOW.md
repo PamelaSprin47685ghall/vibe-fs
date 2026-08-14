@@ -127,7 +127,7 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 
 ```text
 node --test requirements/behavior-diagnosis/tests/<file>   # 单文件（每文件必须绿）
-node tests/unit/run.mjs                                    # 全单元（cutover 时由 lead 执行）
+node requirements/verification-system/tests/run.mjs                                    # 全单元（cutover 时由 lead 执行）
 ```
 
 ## 6. 依赖
@@ -145,4 +145,4 @@ node tests/unit/run.mjs                                    # 全单元（cutover
 | `archive/docs/what/enforcer.md` 声称「无 evidence 字段」 | HOW 漂移：当前 codec 仍保留 optional evidence（merge 去重 + 128 KiB 界）；occurrence 身份不因 evidence 改变 | 本文件 §1.2；cutover 时需与文档统一 |
 | `scripts/checks/enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；tip-SSOT proof 由 `tests/unit/enforcer/**` catalog 测试承担，不再有 prose 形状机器门 | `requirements-design/HANDOFF.md` §24 |
 | enforcer.md 写作宪法 A4–A30（mandatory headings / token budget / sibling 校准） | HOW（authoring 规范，非 runtime 合同）；不再有机械门 | `archive/changes/completed/rulebook.md` Appendix A |
-| Blogger 生命周期物理所有权（HasFlight / HasParked / PendingOffer / DrainWindow） | 归 Blogger convergence 交叉（`context-compression` 侧）；本包只消费 cycle 提交事实 | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs` |
+| Blogger 生命周期物理所有权（HasFlight / HasParked / PendingOffer / DrainWindow） | 归 Blogger convergence 交叉（`context-compression` 侧）；本包只消费 cycle 提交事实 | `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs` |

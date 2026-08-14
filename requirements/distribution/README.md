@@ -35,8 +35,8 @@
 ## proof 概览
 
 - 本包测试：`tests/cwd-independent-resources.test.mjs`（NEW，DISTRIBUTION-002 核心 oracle）、`tests/pack-closure.test.mjs`（NEW，DISTRIBUTION-003/004/005/007/008）。
-- 复用现有 proof：`tests/integration/package/{contents,install,import,resources}.test.mjs`（REUSE，integration 本轮不迁）、`tests/integration/resources/enforcer-rulebook.test.mjs`、`scripts/checks/architecture.mjs`（resource-boundary gate）、`tests/unit/run.mjs`（fresh-dist staleness）；release 发布关 = `format-build-test` 末级 `npm pack --dry-run`。
-- 单跑：`node --test requirements/distribution/tests/<file>`。全套：`node tests/unit/run.mjs`。
+- 复用现有 proof：`requirements/distribution/tests/integration/package/{contents,install,import,resources}.test.mjs`（Wave 2b 已迁入本包）、`requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`、`scripts/checks/architecture.mjs`（resource-boundary gate）、`requirements/verification-system/tests/run.mjs`（fresh-dist staleness）；release 发布关 = `format-build-test` 末级 `npm pack --dry-run`。
+- 单跑：`node --test requirements/distribution/tests/<file>`。全套：`node requirements/verification-system/tests/run.mjs`。
 
 ## 边界（DOES NOT OWN）
 

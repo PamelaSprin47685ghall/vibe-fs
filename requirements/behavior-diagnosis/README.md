@@ -42,7 +42,7 @@ negative evidence 与 distinction，且每一次 diagnosis 是一次有独立身
   单跑绿）。
 - 交叉证明（REUSE）：`tests/unit/enforcer/{tip-v2-contract,enforcer-cycle-protocol,
   blogger-convergence-gaps,paired-history-eval}.test.mjs` 中本包断言锚点；
-  `tests/integration/resources/enforcer-rulebook.test.mjs`（打包资源）。
+  `requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`（打包资源）。
 - 本包无 semantic-anchors.mjs anchor id（该 catalog 只有 ROLE/TOOL/OFFICE 三组，
   与本包无关）。
 

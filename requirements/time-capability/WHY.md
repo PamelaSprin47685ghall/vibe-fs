@@ -30,7 +30,7 @@ Reconciler 曾按 `[50; 100; 250; 500; 1000; 2000; 3000; 5000]` ms 退避 `setTi
 
 JS `setTimeout` 的 Int32 上限（`0x7FFFFFFF` ms ≈ 24.8 天）意味着「长预算必须分段等待」；长预算（≥1000ms）若 `unref()` 不恰当，干净进程会被 timer 持住不退出。这些物理事实如果散落在各业务调用点，就会各自写出边界错误；集中在 `Deadline.nextWaitMs`（封顶）+ `PtyTiming.timerTask`/`nodeTimerPort`（unref 策略）后，业务只面对一个不会溢出的 typed deadline。
 
-### 4. 时区/裸 Date 陷阱（tests/unit/domain.meta.test.mjs hazard 1）
+### 4. 时区/裸 Date 陷阱（requirements/verification-system/tests/domain.meta.test.mjs hazard 1）
 
 Fable 的 `DateTimeOffset` 比较依赖 `offset` 字段；测试若用裸 `new Date(iso)` 构造时刻，在非 UTC 时区下 `Deadline.isExpired` 会对未到期的 deadline 返回 true——测试静默错误。教训：时刻值必须带显式 offset（`utcOffset`/`clockAt` facade），deadline 判定必须对进程时区不敏感。这也是「时间值本身不是 authority」的反面教材：值若没有正确语义（offset），连被规则消费的资格都没有。
 

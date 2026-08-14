@@ -87,7 +87,7 @@ gate 由 `node scripts/check.mjs` 接线；本轮不移动 `scripts/checks/` 文
 | `archive/docs/what/glory.md` GLORY-072/073 | 消费（不拥有） | record-ready 等待与 recovery → `review-assurance` + `work-record` + 本包（事件驱动/非权威）交叉 |
 | `archive/docs/what/loop.md` | GARBAGE（对本包） | 循环检测/强杀归 `degeneration-guard`；`LoopKillArmed` 进程内事实是 degeneration 的，不是等待诊断 |
 | `archive/docs/what/orchestrator.md` | GARBAGE（对本包） | ORCH 条款归 `change-integration` / `delegation`；无等待诊断内容 |
-| `tests/unit/session/causal-wait-bridge.test.mjs` | REUSE（含多 owner） | bridge 文件断言 + E2E diagnostics 格式化（`formatDiagnostics`/`formatCausalSection`/watchdog onTimeout）与 verification-system MECHANISM 混合 → SPLIT@cutover |
+| `requirements/verification-system/tests/causal-diagnostics.test.mjs` | REUSE（含多 owner） | bridge 文件断言 + E2E diagnostics 格式化（`formatDiagnostics`/`formatCausalSection`/watchdog onTimeout）与 verification-system MECHANISM 混合 → SPLIT@cutover |
 | `scripts/checks/causal-wait-boundary.mjs` | 机制保留（本包拥有语义） | 不可移动（scripts/checks 禁止改）；REUSE 经 check.mjs |
 
 ## 阅读实现代码的入口

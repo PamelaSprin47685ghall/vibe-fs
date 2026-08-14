@@ -129,7 +129,7 @@ T1 交托只走 conversation tool result；改 system 字节 = 废前缀缓存 +
 **边界**：Persona 内容语义归 participant-identity；「字节稳定」是本命题（与
 prefix identity 的交界）。
 
-**证据**：PROMPT-014；GLORY-075；`tests/unit/invariants/prompt-stability.test.mjs`（REUSE）。
+**证据**：PROMPT-014；GLORY-075；`requirements/prefix-stability/tests/system-prompt-stability.test.mjs`（REUSE）。
 
 ---
 
@@ -179,7 +179,7 @@ anchor 再 replay。legacy 无 anchor journal → fail closed（incompatible）�
 **边界**：occurrence 的 wire 形状（NUL+BOM、fake-tool 展开）归 provider-projection；
 本命题拥有「位置与字节的稳定性」。
 
-**证据**：HOST-013；cache.md §4/§5；`tests/unit/host/pair-thought-anchored.test.mjs`
+**证据**：HOST-013；cache.md §4/§5；`requirements/prefix-stability/tests/pair-thought-anchored.test.mjs`
 （REUSE：`H13_02_historical_pair_never_relocates_to_current_batch`、`H13_05_missing_anchor_pair_is_omitted_not_relocated`）。
 
 ---
@@ -240,7 +240,7 @@ work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-01
 **边界**：XTrace 的 capture 边界归 semantic-trace（SEMANTIC-TRACE-002）；本命题拥有
 「HOST-013 与 trace 系互斥」这一半。
 
-**证据**：HOST-013 行为约束 4；`tests/unit/host/pair-thought-anchored.test.mjs`（REUSE 交叉）。
+**证据**：HOST-013 行为约束 4；`requirements/prefix-stability/tests/pair-thought-anchored.test.mjs`（REUSE 交叉）。
 
 ---
 

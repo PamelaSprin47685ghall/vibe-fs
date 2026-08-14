@@ -45,7 +45,7 @@ mechanics（`provider-projection`）；horizon admission general law
   单跑绿）。
 - 交叉证明（REUSE）：`tests/unit/enforcer/{tip-v2-contract,enforcer-cycle-protocol,
   blogger-convergence-gaps}.test.mjs` 中的 delivery 锚点；
-  `tests/unit/verify/enforcer-cross-family-collision.test.mjs`（gate 本体测试，
+  `requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`（gate 本体测试，
   KEEP）。
 - 本包无 semantic-anchors.mjs anchor id。
 

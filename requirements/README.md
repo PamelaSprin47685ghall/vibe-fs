@@ -124,7 +124,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 ## 运行与验证
 
 ```text
-node tests/unit/run.mjs          # 单元套件（自动发现 requirements/<package>/tests/**/*.test.mjs）
+node requirements/verification-system/tests/run.mjs          # 单元套件（自动发现 requirements/<package>/tests/**/*.test.mjs）
 node --test requirements/<pkg>/tests/<file>.test.mjs   # 单包单文件
 node scripts/check.mjs           # 全 static gates
 ```

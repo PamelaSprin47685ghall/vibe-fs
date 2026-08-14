@@ -2,7 +2,7 @@
 // owner: managed-session-lifecycle. MANAGED-SESSION-003 反向覆盖：abort 级联
 // 以 family root 为键 —— 逻辑中间层无物理 children，abort family root 级联到
 // 每个扁平后代。物理扁平断言归 session-ontology（SESSION-ONTOLOGY-006）。
-// 原文件直接 import dist/fable_modules（ofArray/ok）已改写为 support 等价调用
+// 原文件直接 import 编译器运行时（ofArray/ok）已改写为 support 等价调用
 // （toList/okResult）。
 
 import assert from 'node:assert/strict'

@@ -32,15 +32,16 @@ gate 清单；两者被 `tests/proof-ladder.test.mjs` 钉住，层序重排即�
 
 ## VERIFICATION-SYSTEM-002：One World——恰一个 Long Stroke
 
-**规范陈述**：第 4 层恰好一个真实 E2E 入口（`tests/e2e/entry.test.mjs`）、全程恰好一次
+**规范陈述**：第 4 层恰好一个真实 E2E 入口（`requirements/verification-system/tests/e2e/entry.test.mjs`）、全程恰好一次
 OpenCode spawn/lifetime；E2E case 天花板（`E2E_CASE_CEILING = 0`）只降不升；禁止并行
 multi-canary / worker pool / 每 scenario 一个 world 冒充覆盖面。
 
 **含义/动机**：证明世界至多一个。语义命题在 Pure/Temporal 层证明；物理世界只承担不可
 模拟的组合契约。并行 canary 曾让「证明覆盖」退化成「跑得多」。
 
-**边界**：`format-build-test` 中 `tests/e2e/` 引用恰一次；g4r-freeze 是当前执行该天花板的
-迁移期 ratchet（cutover 后由永久 One World 门承接）。
+**边界**：`format-build-test` 中 `tests/e2e/` 引用恰一次；g4r-freeze 迁移期 ratchet 已于
+2026-08-14 退休，由永久 One World 门 `e2e-watchdog-feed`（sole top-level entry、无 cases/ 通道）
+与 proof-ladder 层序 pin 承接。
 
 **证据指针**：→ PROOF.md L9。
 
@@ -55,8 +56,8 @@ physical contract」，答不出则降回 Pure/Temporal/Adapter。
 「重跑直到通过」= 用运气代替证明。
 
 **边界**：禁止跨级的机器可红面 = case 天花板 0 + 唯一入口 + 精确 event 天花板（由
-g4r-freeze / e2e-event-ceiling 承接）；「答不出物理契约」的人工裁决面由 VERIFY-002 文本
-+ review 过程承接。
+e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）；「答不出物理契约」的人工
+裁决面由 VERIFY-002 文本 + review 过程承接。
 
 **证据指针**：→ PROOF.md L10。
 
@@ -115,7 +116,7 @@ e2e top-level 测试不得直接调用 `watchdog.advance`（只经 support 因�
 race 是代数（可枚举的交错），不是调度彩票。
 
 **边界**：时钟/定时 capability 本身归 `time-capability`；本命题管「证明不得依赖墙钟」。
-facade 层的时区无关性（`tests/unit/domain.meta.test.mjs`）是本命题在契约面的落点之一。
+facade 层的时区无关性（`requirements/verification-system/tests/domain.meta.test.mjs`）是本命题在契约面的落点之一。
 
 **证据指针**：→ PROOF.md L14。
 
@@ -123,7 +124,7 @@ facade 层的时区无关性（`tests/unit/domain.meta.test.mjs`）是本命题�
 
 **规范陈述**：生产代码是 `.fs`；第 1–3 层测试全部是 `.mjs`，直接消费 `dist` 发布产物
 （生产入口与测试入口同一份字节）。Fable 输出形状（`Module_` 前缀、DU tag、FSharpMap）
-隔离在唯一 facade `tests/unit/support/domain.mjs`；测试只经契约面进入（序列化文本、纯
+隔离在唯一 facade `requirements/verification-system/tests/support/domain.mjs`；测试只经契约面进入（序列化文本、纯
 函数、公开 Port、Host hook 对象、发布产物 export）。断言必须比对完整结构或完整序列化
 文本，不得只断言真值。`.mjs` 消费的 `dist` 早于 `.fs` 源时运行器拒绝运行（陈旧产物
 fail closed）。
@@ -154,7 +155,8 @@ owner。
 ## VERIFICATION-SYSTEM-010：验收判据不可放宽
 
 **规范陈述**：已冻结的验收判据（case 天花板、timeout 预算、ratchet 基线、断言强度）只能
-收紧不能放宽：`G4R_FREEZE_case_ceiling_may_only_decrease`、timeout 天花板拒绝膨胀。
+收紧不能放宽：case 天花板只降不升（g4r-freeze ratchet 已退休 2026-08-14，sole-entry scope
+由 `e2e-watchdog-feed` 承接）、timeout 预算拒绝膨胀。
 执行者不得自降 close 判据（Deferred 不阻塞 close 需用户 Amendment——过程面归
 `requirement-system` 的 blocker 协议）。
 
@@ -177,7 +179,7 @@ Amendment 协议双保险。
 **含义/动机**：node:test 的 V8 覆盖率只统计被加载文件；不预导入，分母缩水让百分比虚高。
 豁免通道 = 伪门（没锁的门不是门）。
 
-**边界**：覆盖门禁的机器载体是 `tests/unit/run.mjs --coverage`（MECHANISM，lead 集成时
+**边界**：覆盖门禁的机器载体是 `requirements/verification-system/tests/run.mjs --coverage`（MECHANISM，lead 集成时
 执行）；本命题的落点当前为 REUSE + cutover 拆分计划（SPLIT@cutover）。
 
 **证据指针**：→ PROOF.md L18。

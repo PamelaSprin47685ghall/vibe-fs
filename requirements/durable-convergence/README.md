@@ -64,9 +64,9 @@ HookDispatcher：reference-transaction / pre-push shim + WANXIANG_GIT_SYNC_ACTIV
 ```bash
 node --test requirements/durable-convergence/tests/replica-merge-laws.test.mjs
 # 物理律的既有证明（REUSE，留在原处）：
-node --test tests/unit/persist/event-store-merge.test.mjs
-node --test tests/unit/persist/event-store-converge.test.mjs
-node --test tests/integration/persist/dumb-server.test.mjs
+node --test requirements/durable-convergence/tests/event-store-merge.test.mjs
+node --test requirements/durable-convergence/tests/event-store-converge.test.mjs
+node --test requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs
 ```
 
 ## DEPENDS ON `durable-events`

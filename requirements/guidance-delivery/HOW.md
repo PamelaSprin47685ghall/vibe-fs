@@ -74,7 +74,7 @@ type PairProgrammingGuideline =
   tokenize（去 stopword、短 token），算 jaccard/cosine/levenshtein。
 - fail 判据：trigger Jaccard ≥ 0.90 或 trigger Levenshtein ≥ 0.95，且非 mutual
   siblings（`Distinguish From` 互相承认）；warn/note 级照常输出 top-N evidence。
-- 本体测试：`tests/unit/verify/enforcer-cross-family-collision.test.mjs`（KEEP，
+- 本体测试：`requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`（KEEP，
   合成 temp dir，不依赖生产文案）。**不冒充**人类 A40 tournament（Rulebook
   Final outcome 诚实声明）。
 
@@ -93,7 +93,7 @@ type PairProgrammingGuideline =
 
 ```text
 node --test requirements/guidance-delivery/tests/<file>   # 单文件（每文件必须绿）
-node tests/unit/run.mjs                                    # 全单元（cutover 时由 lead 执行）
+node requirements/verification-system/tests/run.mjs                                    # 全单元（cutover 时由 lead 执行）
 ```
 
 ## 8. 依赖

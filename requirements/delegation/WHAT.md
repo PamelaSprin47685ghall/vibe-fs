@@ -65,8 +65,8 @@ fork/commission/join/horizon/inspect 的成功后果与参数**不得**包含：
 
 边界：准入过滤的完整法则（哪些字段可以穿过）→ `participant-horizon`；本包只声明委托面的泄漏禁令。
 
-证据：REUSE `tests/unit/tools/fork-tool.test.mjs`（`FORK_calling_creates_machine_agent_but_returns_only_byname`、
-`FORK_unknown_byname_does_not_echo_internal_identity`）、`tests/unit/execution/join-v2-wire.test.mjs`。
+证据：REUSE `requirements/delegation/tests/fork-tool.test.mjs`（`FORK_calling_creates_machine_agent_but_returns_only_byname`、
+`FORK_unknown_byname_does_not_echo_internal_identity`）、`requirements/delegation/tests/join-v2-wire.test.mjs`。
 
 ## DELEG-006：fork 成功仅 Byname 承接 charge；续做沿用已绑定 binding
 
@@ -79,7 +79,7 @@ fork/commission/join/horizon/inspect 的成功后果与参数**不得**包含：
 含义/动机：同一 Byname 是逻辑 owner 的稳定名；换 binding 会暗中改变 personhood，违反 DELEG-002。
 
 证据：MOVE `tests/fork-child-payload.test.mjs`（fork child 首 prompt 的 charge/commissioner record 渲染）；
-REUSE `tests/unit/tools/fork-tool.test.mjs`（`FORK_existing_person_is_resolved_by_byname_not_agent_id`、
+REUSE `requirements/delegation/tests/fork-tool.test.mjs`（`FORK_existing_person_is_resolved_by_byname_not_agent_id`、
 `FORK_engineer_continuation_keeps_deep_coder`、`FORK_same_byname_cannot_be_reborn_with_a_new_calling`）。
 
 ## DELEG-007：SyncDelegate DAG 有环即错
@@ -92,7 +92,7 @@ REUSE `tests/unit/tools/fork-tool.test.mjs`（`FORK_existing_person_is_resolved_
 
 边界：具体角色能力面（Inquiry 只有 inspect+sphinx MCP）→ `capability-enforcement`。
 
-证据：REUSE `tests/unit/session/sync-delegate-runtime.test.mjs`（嵌套无 deadlock 场景）。
+证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（嵌套无 deadlock 场景）。
 
 ## DELEG-008：sync batch 成员与顺序由 Host tool-call 集合决定
 
@@ -102,7 +102,7 @@ scheduler 到达时序猜批次边界；batch 的 charges / provider prompts 按
 
 含义/动机：批次边界是「Host 已完成的 assistant message」这一语义事实，不是调度竞态。
 
-证据：REUSE `tests/unit/session/sync-delegate-runtime.test.mjs`（`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`）。
+证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`）。
 
 ## DELEG-009：serialization key = immediate caller ReuseScope；同 key 至多一个 active batch
 
@@ -112,7 +112,7 @@ dedicated Session 排队/叠发第二轮。嵌套 `DevOps → Coder → Inspecto
 
 含义/动机：按 family root 串行会不必要地阻塞兄弟路径；immediate caller key 让嵌套合法且互不饿死。
 
-证据：REUSE `tests/unit/session/sync-delegate-runtime.test.mjs`（G2 overlap fail-closed / serial reuse）。
+证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（G2 overlap fail-closed / serial reuse）。
 
 ## DELEG-010：owner effective tier → deterministic delegate tier
 
@@ -121,9 +121,9 @@ dedicated Session 排队/叠发第二轮。嵌套 `DevOps → Coder → Inspecto
 
 含义/动机：`(OwnerReuseScopeId, role)` 必须对应唯一 dedicated Session，否则 prefix/context 复用崩溃。
 
-证据：REUSE `tests/unit/kernel/sync-delegate.test.mjs`（`EXEC_026_tierForOwner_is_identity_for_fast_and_deep`、
+证据：REUSE `requirements/delegation/tests/sync-delegate.test.mjs`（`EXEC_026_tierForOwner_is_identity_for_fast_and_deep`、
 `EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder`）与
-`tests/unit/session/sync-delegate-runtime.test.mjs`（`EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names`、
+`requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names`、
 `EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast`）。
 
 ## DELEG-011：无 `return` 通道；ordinary completion 结束 batch
@@ -134,7 +134,7 @@ Dedicated SyncDelegate 无独立 `return(message)` 工具、无 `Returned → Co
 
 含义/动机：「结束协议」不是工具能力；双出口逼调用方解码双通道并污染 self-model（见 WHY.md 历史）。
 
-证据：REUSE `tests/unit/session/sync-delegate-runtime.test.mjs`、`tests/unit/tools/sync-delegate-tools.test.mjs`
+证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`、`requirements/delegation/tests/sync-delegate-tools.test.mjs`
 （`INSPECT_happy_path_invokes_inspector_and_returns_work_record`）。
 
 ## DELEG-012：同步返回 = canonical 得 WorkRecord，siblings 只引用
@@ -146,8 +146,8 @@ batch 内 exactly one canonical caller（provider 顺序第一项）接收 bound
 含义/动机：一份正文一份真相；N 份复制会让 caller 对「同一份知识」产生多份漂移副本。
 
 证据：MOVE `tests/fork-child-payload.test.mjs`（无 answer 字段的 child payload 形状）；REUSE
-`tests/unit/session/sync-delegate-runtime.test.mjs`（`EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message`）、
-`tests/unit/tools/sync-delegate-tools.test.mjs`（merged-reference wire）。
+`requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message`）、
+`requirements/delegation/tests/sync-delegate-tools.test.mjs`（merged-reference wire）。
 
 ## DELEG-013：Join 消费 owner 可用 completion，有界批次、稳定排序、逐项 CAS
 
@@ -160,15 +160,15 @@ agent 完成项为 entry-local WorkRecord（`includeOpening=false`），禁止�
 边界：具体预算数值（如 32）是 HOW；「有界批次 + 确定性收敛」才是 WHAT。DTO 禁令的准入法则 →
 `participant-horizon`；WorkRecord 物化格式 → `work-record`。
 
-证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_018_max_join_batch_is_32`、
-`EXEC_018_thirty_three_completions_split_across_two_drains`）、`tests/unit/execution/join-v2-wire.test.mjs`。
+证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_018_max_join_batch_is_32`、
+`EXEC_018_thirty_three_completions_split_across_two_drains`）、`requirements/delegation/tests/join-v2-wire.test.mjs`。
 
 ## DELEG-014：commission 批量 join 与 EXEC-018 同界
 
 Orchestrator 的 commission 批量 join：FIFO 排空、上限与 EXEC-018 相同（EXEC-019）。
 
-证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_019_verdict_mailbox_try_join_batch_preserves_publish_fifo`）、
-`tests/unit/execution/join-v2-wire.test.mjs`（`EXEC_019_orchestrator_batch_is_natural_language_only`）。
+证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_019_verdict_mailbox_try_join_batch_preserves_publish_fifo`）、
+`requirements/delegation/tests/join-v2-wire.test.mjs`（`EXEC_019_orchestrator_batch_is_natural_language_only`）。
 
 ## DELEG-015：join 中断是 Interrupted，不是 ForkError
 
@@ -184,8 +184,8 @@ authority、不产生 `TurnAborted`；operator abort 先打断当前 attempt，�
 
 边界：Esc 的 authority 语义与 TurnAborted 级联 → `interaction-authority` / `managed-session-lifecycle`。
 
-证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_017_user_message_interrupt_does_not_cancel_mailbox`、
-`EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join`）、`tests/unit/execution/join-v2-wire.test.mjs`
+证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_017_user_message_interrupt_does_not_cancel_mailbox`、
+`EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join`）、`requirements/delegation/tests/join-v2-wire.test.mjs`
 （`EXEC_017_interrupted_wire_is_natural_language_not_error`）。
 
 ## DELEG-016：horizon 是 pull-only snapshot
@@ -199,7 +199,7 @@ watcher 或自动刷新（EXEC-005）。返回当前在场名册（Byname/Termin
 边界：最新 frame 的 blob 校验/缺失 fail-closed 规则 → `context-compression`；无 DTO 的准入法则 →
 `participant-horizon`。
 
-证据：REUSE `tests/unit/execution/join-v2-wire.test.mjs`（`EXEC_004_join_prefers_durable_byname_over_machine_agent_name`）。
+证据：REUSE `requirements/delegation/tests/join-v2-wire.test.mjs`（`EXEC_004_join_prefers_durable_byname_over_machine_agent_name`）。
 
 ## DELEG-017：返回结果只改变 caller 认识，不自动转移 authority
 
@@ -211,7 +211,7 @@ advice continuation 明确「这是独立视角；继续你的原 charge；不�
 
 含义/动机：委托的返回是认识更新，不是 authority 转移；否则 caller 可借委托自授权限。
 
-证据：anchor `returned-record`（manager 组）；REUSE `tests/unit/tools/sync-delegate-tools.test.mjs`。
+证据：anchor `returned-record`（manager 组）；REUSE `requirements/delegation/tests/sync-delegate-tools.test.mjs`。
 
 ## DELEG-018：NEEDHELP consultation 是真实独立 child 委托
 
@@ -231,7 +231,7 @@ owner 生命周期约束保证咨询不脱管。
 边界：sentinel 的 delta 识别与 assistance abort 分型 → `interaction-authority`（HOST-027）；
 advice 的 prompt 渲染 → `provider-projection` + `prefix-stability`；「何时鼓励求助」→ `cognitive-environment`。
 
-证据：REUSE `requirements/host-boundary/tests/needhelp-sensor.test.mjs` 与 `tests/unit/host/assistance-host.test.mjs`
+证据：REUSE `requirements/host-boundary/tests/needhelp-sensor.test.mjs` 与 `requirements/delegation/tests/assistance-host.test.mjs`
 （host 面，见 PROOF.md SPLIT@cutover 注记：sentinel 识别归 `interaction-authority`，consultation 委托语义归本包）。
 
 ## DELEG-019：fork child 首 prompt 是 typed 语义载荷，不是自由文本

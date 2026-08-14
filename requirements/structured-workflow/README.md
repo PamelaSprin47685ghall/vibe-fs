@@ -55,7 +55,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
 - NEW（3 文件，已单跑绿）：`workflow-surface.test.mjs`、`recovery-reentry.test.mjs`、
   `semantic-vocabulary.test.mjs`
 - REUSE：`tests/unit/verify/{dsl-ownership,dsl-ownership-ratchet,g4r-ce-vocabulary}.test.mjs`、
-  `tests/unit/guide-contract.test.mjs`、`tests/unit/execution/join-aborted-not-terminal.test.mjs`
+  `requirements/verification-system/tests/guide-contract.test.mjs`、`requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs`
   （effect-accounting 交叉）、`tests/unit/temporal/**`（time-capability/causal-wait 交叉）
 
 单跑：`node --test requirements/structured-workflow/tests/<file>`。

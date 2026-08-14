@@ -73,11 +73,11 @@ Application/Reconciliation/   PromptRecovery（先 snapshot 核对再决定）�
 ```bash
 node --test requirements/effect-accounting/tests/effect-facts.test.mjs
 # 主要 REUSE 落点：
-node --test tests/unit/execution/join-aborted-not-terminal.test.mjs
-node --test tests/unit/verify/p0-recovery-join-gate.test.mjs
+node --test requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs
+node --test requirements/effect-accounting/tests/p0-recovery-join-clean-break.test.mjs
 node --test tests/unit/temporal/orchestrator-conflict-confluence.test.mjs
 node --test requirements/change-integration/tests/job.test.mjs
-node --test tests/unit/reconciliation/magic-todo-membrane.test.mjs
+node --test requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs
 ```
 
 ## DEPENDS ON `durable-events`

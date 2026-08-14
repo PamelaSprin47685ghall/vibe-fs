@@ -70,7 +70,7 @@ RAW_TIME_SCAN_LAYERS = ['Domain', 'Application', 'Session']
 RAW_TIME_TOKENS = ['DateTimeOffset.UtcNow', 'DateTime.Now', 'DateTime.UtcNow', 'Date.now', 'setTimeout', 'timerTask']
 ```
 
-- 生产侧红/绿由 `tests/unit/verify/g4r-ce-vocabulary.test.mjs` 证明（RED on synthetic tokens；`G4R_CE_S14_production_is_clean_in_hard_phase`）。
+- 生产侧红/绿由 `requirements/structured-workflow/tests/g4r-ce-vocabulary.test.mjs` 证明（RED on synthetic tokens；`G4R_CE_S14_production_is_clean_in_hard_phase`）。
 - allowlist 当前为空（物理适配器在 Process/Infrastructure 层，天然不在扫描层内）。
 - **本包不重复拥有该 gate**；它证明的是「业务层无 ambient 时间」这条 TIME-004 事实，机制 owner 是 `structured-workflow` / `verification-system`。
 

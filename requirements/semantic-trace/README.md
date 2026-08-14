@@ -26,8 +26,8 @@ X 的「当时到底发生了什么」必须可长期定位、可重建。若只
 
 ## proof 概览（→ PROOF.md）
 
-- MOVE：`tests/unit/context/x-trace*.test.mjs`（5 文件）→ `requirements/semantic-trace/tests/`
-- REUSE：`tests/unit/strength/**`（unpromoted ≠ history 交叉）、`tests/unit/context/fold-context-recovery.test.mjs`（durable-events fold）、`tests/unit/enforcer/**`（blogger 收敛交叉）
+- MOVE（已执行 Wave 2a）：`tests/unit/context/x-trace*.test.mjs`（5 文件）→ `requirements/semantic-trace/tests/`
+- REUSE：`requirements/speculative-investigation/tests/**`（unpromoted ≠ history 交叉）、`requirements/durable-events/tests/fold-context-recovery.test.mjs`（durable-events fold）、`requirements/context-compression/tests/**`（blogger 收敛交叉）
 - NEW：`x-trace-capture-boundary.test.mjs`、`x-trace-compaction-survival.test.mjs`、`x-trace-provider-run-provenance.test.mjs`
 
 ## 阅读顺序

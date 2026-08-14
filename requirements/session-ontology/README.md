@@ -35,10 +35,10 @@ label            Session/AgentRoleIdentity.fs     canonical durable role label�
 - `tests/session-ownership-ratchet.test.mjs`（MOVE）— 钉死 `scripts/checks/session-ownership-ratchet.mjs`：
   AttachmentKind 封闭面 + 8 类 managed session 问卷（owner/reusable/cancel/retire/…）。
 - `tests/session-ontology-classification.test.mjs`（NEW）— 正交分类派生视图 + hints + canonical label。
-- REUSE：`tests/unit/kernel/sync-delegate.test.mjs`（HOST_008_* 4 锚点）、
-  `tests/unit/context/session-association.test.mjs`（link/unlink 不变量 17 锚点）、
-  `tests/unit/host/session-flattening.test.mjs`（HOST-015 物理扁平）、
-  `tests/unit/session/satellite-runtime.test.mjs`（HOST_014_SatelliteKind_Companion_only）。
+- REUSE：`requirements/session-ontology/tests/sync-delegate.test.mjs`（HOST_008_* 4 锚点）、
+  `requirements/session-ontology/tests/session-association.test.mjs`（link/unlink 不变量 17 锚点）、
+  `requirements/session-ontology/tests/session-flattening.test.mjs`（HOST-015 物理扁平）、
+  `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs`（HOST_014_SatelliteKind_Companion_only）。
 
 ## 阅读顺序
 

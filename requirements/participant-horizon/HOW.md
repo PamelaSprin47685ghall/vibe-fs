@@ -9,10 +9,10 @@
 |---|---|---|
 | 001 | `archive/docs/what/architecture.md` ARCH-014 decision filter（规范本体）；`scripts/checks/provider-leak-gate.mjs` 只做反向 enforcement | filter 六问目前是文档级律；正向可红性由 Gate B + 本包 admission-law 测试承接 |
 | 002/003/004/005 | `scripts/checks/provider-leak-gate.mjs` → `FORBIDDEN_TOKENS` / `FORBIDDEN_DTO_PATTERNS` / `FAST_DEEP_BINDING_RE`，扫描 `PROVIDER_SCAN_ROOTS` 列出的 renderer（JoinResultRenderer、HorizonTool、JoinTool、ForkTool、PtyTool、ExecutorTool、InspectorTool、FetchTool、FinalityTool、BashHoneypotTool、FileMutationTools、ChronicleTool、CoderTool、JudgeTool、JsBookkeeperTool） | Gate B（ARCH-016）；baseline ratchet 见「历史与弃权」 |
-| 003/011 | `Infrastructure/OpenCode/Tools/HorizonTool.fs`、`JoinTool.fs`、`Infrastructure/OpenCode/Codec/JoinResultRenderer.fs` | 自然语言后果渲染；`tests/unit/tools/join-tool-family.test.mjs` 有真实 wire 断言 |
+| 003/011 | `Infrastructure/OpenCode/Tools/HorizonTool.fs`、`JoinTool.fs`、`Infrastructure/OpenCode/Codec/JoinResultRenderer.fs` | 自然语言后果渲染；`requirements/delegation/tests/join-tool-family.test.mjs` 有真实 wire 断言 |
 | 006/007/010 | `Infrastructure/OpenCode/Tools/ForkTool.fs`、`ToolRegistry.fs`（role predicate）；`resources/provider/tool/{fork,commission}/description/*.md` | 可见集合的运行时执行面 + 文案面 |
 | 008 | `Application/Reconciliation/CompanionTransform.fs`（`ProviderWireCapture.decodeMessageView |> ProviderProjection.toSemantic`）：wire→semantic 单向降级丢弃 call id | 语义投影只保留「交换意味着什么」，不留机器身份（provider-projection 消费） |
-| 009 | `Infrastructure/OpenCode/Tools/ForkTool.fs`（generic unavailable 文案）；`tests/unit/tools/fork-tool.test.mjs` | GLORY-032 |
+| 009 | `Infrastructure/OpenCode/Tools/ForkTool.fs`（generic unavailable 文案）；`requirements/delegation/tests/fork-tool.test.mjs` | GLORY-032 |
 | 011 | `Infrastructure/OpenCode/Tools/HorizonTool.fs`（pull-only；名册按 Byname；最新 BlogFrame） | EXEC-005 |
 | 012/013 | `Session/RepositoryWarmStartPrompt.fs`（`RepositoryWarmStartSearch`）；`requirements/repository-investigation/tests/repository-warm-start.test.mjs` | 准入 + data 标注 |
 
@@ -32,7 +32,7 @@
 
 `EXEC-004`：`DevOpsJoinTimeoutMs = 10_000`（`Process/Deadline.fs` 注入）→ 无完成项时结束本次等待
 （Host 事实 `DeadlineExpired`）→ `JoinResultRenderer` 渲染自然语言「等待结束」，不渲染
-`TIMED_OUT` / `status="failed"` / `code=...`。测试：`tests/unit/execution/devops-join-timeout.test.mjs`。
+`TIMED_OUT` / `status="failed"` / `code=...`。测试：`requirements/participant-horizon/tests/devops-join-timeout.test.mjs`。
 
 ## 历史与弃权
 

@@ -34,7 +34,7 @@ prose ownership ratchet `scripts/checks/provider-prose-ownership.mjs`（Gate E�
 - MOVE：`tests/provider-language.test.mjs`（bind-once/inherit/parse/资源根）、
   `tests/provider-prose-ownership.test.mjs`（Gate E）。
 - NEW：`tests/provider-prose-and-preference.test.mjs`（fail-closed 装载 + 偏好作用域）。
-- REUSE：`tests/unit/verify/language-parity-gate.test.mjs`（Gate C 结构 parity 部分，
+- REUSE：`requirements/provider-language/tests/language-parity-gate.test.mjs`（Gate C 结构 parity 部分，
   `SPLIT@cutover` 拆给 office/action 的语义锚点）。
 
 ## 阅读顺序（零上下文读者）

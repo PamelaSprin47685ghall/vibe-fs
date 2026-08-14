@@ -1,14 +1,14 @@
 # PROOF — review-judgement
 
 > 每条 WHAT 命题一行落点。类型：`MOVE`（物理移入本包 tests/）、`REUSE`（留在原处，cutover 拆分）、`NEW`（本包新写）、`MECHANISM`（共享 gate，语义 owner 是本包）。
-> 运行命令：`node --test requirements/review-judgement/tests/<file>`；套件级 `node tests/unit/run.mjs`。
+> 运行命令：`node --test requirements/review-judgement/tests/<file>`；套件级 `node requirements/verification-system/tests/run.mjs`。
 
 ## 落点表
 
 | 命题 | 落点测试（文件 + test 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
 | REVIEW-JUDGEMENT-001（judge 工具形态：typed verdict、无描述字段、不 echo） | `requirements/review-judgement/tests/judge-tool-contract.test.mjs` → `REVIEW_001_*` 4 条（schema 只许 verdict / parse 精确 / spec 单参数 / 回执不 echo） | NEW | `node --test requirements/review-judgement/tests/judge-tool-contract.test.mjs` |
-| REVIEW-JUDGEMENT-001（执行面 fail-closed：非 Reviewer / 无 barrier / 非法值拒绝） | `tests/unit/tools/verdict-tool.test.mjs` → `JUDGE_invalid_input_is_rejected_as_a_natural_consequence`、`JUDGE_missing_input_...`、`JUDGE_is_unavailable_to_non_reviewer_sessions`、`JUDGE_empty_session_...`、`JUDGE_reviewer_requires_a_tool_call_id_...`；`tests/unit/tools/verdict-tool-extras.test.mjs` → `JUDGE_*_fails_closed_without_internal_vocabulary` | REUSE | `node --test tests/unit/tools/verdict-tool.test.mjs tests/unit/tools/verdict-tool-extras.test.mjs` |
+| REVIEW-JUDGEMENT-001（执行面 fail-closed：非 Reviewer / 无 barrier / 非法值拒绝） | `requirements/review-judgement/tests/verdict-tool.test.mjs` → `JUDGE_invalid_input_is_rejected_as_a_natural_consequence`、`JUDGE_missing_input_...`、`JUDGE_is_unavailable_to_non_reviewer_sessions`、`JUDGE_empty_session_...`、`JUDGE_reviewer_requires_a_tool_call_id_...`；`requirements/review-judgement/tests/verdict-tool-extras.test.mjs` → `JUDGE_*_fails_closed_without_internal_vocabulary` | REUSE | `node --test requirements/review-judgement/tests/verdict-tool.test.mjs requirements/review-judgement/tests/verdict-tool-extras.test.mjs` |
 | REVIEW-JUDGEMENT-002（acceptance/rejection 都须挣得；discrimination 不是表演） | `requirements/review-judgement/tests/discrimination-fixtures.test.mjs` → `REVIEW_011_*_earned_both_ways`、`REVIEW_011_*_discrimination_not_rejection_theatre` | NEW | `node --test requirements/review-judgement/tests/discrimination-fixtures.test.mjs` |
 | REVIEW-JUDGEMENT-003（判断相对 root requirement / 当前对象，不是 mood） | `discrimination-fixtures.test.mjs` → `REVIEW_011_*_judged_against_obligation_not_mood`、`REVIEW_011_*_wire_literals_not_moods` | NEW | 同上 |
 | REVIEW-JUDGEMENT-004（material defect 才 withhold；PERFECT+minor 共存） | `discrimination-fixtures.test.mjs` → `REVIEW_011_*_blocking_vs_nonblocking`、`REVIEW_011_*_minor_typo_never_purchases_revise`、`REVIEW_011_*_perfect_does_not_silence_minor`、`REVIEW_011_*_materiality_traces_consequence_not_size` | NEW | 同上 |
@@ -36,8 +36,8 @@ acceptance-not-omniscience
 
 | 现有测试 | 现状 | 计划 |
 |---|---|---|
-| `tests/unit/tools/verdict-tool.test.mjs` | 依赖 `tests/unit/plugin/plugin-fixture.mjs`（不在 `tests/unit/support/**` 白名单），按契约 §4.6 不可随包移动 | cutover 时将 plugin-fixture 提升为共享 support 后移入本包；或按断言逐条搬入 `judge-tool-contract.test.mjs` |
-| `tests/unit/tools/verdict-tool-extras.test.mjs` | 直接 import `dist/fable_modules/...`，契约 §4.1 禁止移动 | cutover 时剥离 fable_modules import 后移入 |
+| `requirements/review-judgement/tests/verdict-tool.test.mjs` | 依赖 `requirements/verification-system/tests/support/plugin-fixture.mjs`（不在 `tests/unit/support/**` 白名单），按契约 §4.6 不可随包移动 | cutover 时将 plugin-fixture 提升为共享 support 后移入本包；或按断言逐条搬入 `judge-tool-contract.test.mjs` |
+| `requirements/review-judgement/tests/verdict-tool-extras.test.mjs` | 直接 import `dist/fable_modules/...`，契约 §4.1 禁止移动 | cutover 时剥离 fable_modules import 后移入 |
 | `tests/unit/verify/...`（language-parity-gate、tool-referential-integrity 等） | MECHANISM/SPLIT 混合 | `judge` 工具名引用完整性断言归 `action-affordance`/`capability-enforcement`（ARCH-007），与本包无 assertion 冲突 |
 
 ## 可红性说明

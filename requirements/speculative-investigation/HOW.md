@@ -166,7 +166,7 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
 - **`archive/docs/why/loop.md` / `archive/docs/{what,how,proof}/loop.md`**：loop 主题是退化循环检测
   （`degeneration-guard`），全篇 grep `speculat/投机/strength` 零命中——无本包可吸收的
   speculation 内容，弃权。
-- **dry-run / e2e**：`tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 是 Host
+- **dry-run / e2e**：`requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` 是 Host
   request-budget 的物理证明（K2 恰好两轮、第 3 轮不外发、`StrengthCandidatePrepared=0`），
   归 `verification-system` MECHANISM，本包 PROOF 交叉引用。
 - **GARBAGE 结论**：旧稿 `FrameBundleRef` / `PredictorSnapshotRef` / Journal NDJSON /

@@ -1,7 +1,7 @@
 # PROOF — 测试落点表
 
 > 每条 WHAT 命题恰好一行落点。类型：`MOVE`（物理移入本包）/ `REUSE`（留在原处，记录锚点与 cutover 计划）。
-> 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/knowledge-reuse/tests/<file>`。全套：`node tests/unit/run.mjs`。
+> 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/knowledge-reuse/tests/<file>`。全套：`node requirements/verification-system/tests/run.mjs`。
 
 ## 落点表
 
@@ -17,7 +17,7 @@
 | `KNOWLEDGE-REUSE-008` | `casebook-domain.test.mjs` → `CASE008_lru_evict_keeps_most_recently_accessed`；交叉 `casebook-store.test.mjs` → `CASE007_accessed_and_evicted_events_round_trip`（evict tombstone 事件往返） | MOVE | `node --test requirements/knowledge-reuse/tests/casebook-domain.test.mjs requirements/knowledge-reuse/tests/casebook-store.test.mjs` |
 | `KNOWLEDGE-REUSE-009` | `casebook-store.test.mjs` → `CASE009_marker_gates_the_surface`（双门）；`lifecycle-wiring.test.mjs` → `lifecycle_disabled_marker_skips_publication` | MOVE | `node --test requirements/knowledge-reuse/tests/casebook-store.test.mjs requirements/knowledge-reuse/tests/lifecycle-wiring.test.mjs` |
 | `KNOWLEDGE-REUSE-010` | `lifecycle-wiring.test.mjs` → `lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once` / `lifecycle_missing_answer_is_noop_finalize` / `lifecycle_cleanupInspector_never_writes_eventstore`（unexpected delete 仅 cleanup）；`universal-loop.test.mjs` → `G6_G_cancel_session_cleanup_no_publication`；`g6-host-reuse-finalize.test.mjs` → `G6_G_host_reusable_inspector_one_finalize_then_cold_fetch`（exactly-one finalize）；`g6-inspector-tool-finalize-fetch.test.mjs` → `G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch` | MOVE | `node --test requirements/knowledge-reuse/tests/lifecycle-wiring.test.mjs requirements/knowledge-reuse/tests/universal-loop.test.mjs requirements/knowledge-reuse/tests/g6-host-reuse-finalize.test.mjs requirements/knowledge-reuse/tests/g6-inspector-tool-finalize-fetch.test.mjs` |
-| `KNOWLEDGE-REUSE-011` | `fetch-tool.test.mjs` → `CASE011_fetch_single_flight_serializes_same_shelfmark`（same-worktree 串行化）；交叉 REUSE `tests/unit/persist/event-store-merge.test.mjs` + `event-store-converge.test.mjs`（set union / DomainConflict / 禁 LWW 的物理 substrate → `durable-convergence`） | MOVE + REUSE | `node --test requirements/knowledge-reuse/tests/fetch-tool.test.mjs`；`node --test tests/unit/persist/event-store-merge.test.mjs tests/unit/persist/event-store-converge.test.mjs` |
+| `KNOWLEDGE-REUSE-011` | `fetch-tool.test.mjs` → `CASE011_fetch_single_flight_serializes_same_shelfmark`（same-worktree 串行化）；交叉 REUSE `requirements/durable-convergence/tests/event-store-merge.test.mjs` + `event-store-converge.test.mjs`（set union / DomainConflict / 禁 LWW 的物理 substrate → `durable-convergence`） | MOVE + REUSE | `node --test requirements/knowledge-reuse/tests/fetch-tool.test.mjs`；`node --test requirements/durable-convergence/tests/event-store-merge.test.mjs requirements/durable-convergence/tests/event-store-converge.test.mjs` |
 | `KNOWLEDGE-REUSE-012` | `casebook-index.test.mjs` → 全部 4 个 test（`CASEBOOK_index_exposes_shelfmark_and_canonical_question_only` / `CASEBOOK_shelfmark_is_stable_and_not_the_session_identity` / `CASEBOOK_invalidate_then_refresh_advances_epoch` / `CASEBOOK_visible_set_change_advances_epoch`） | MOVE | `node --test requirements/knowledge-reuse/tests/casebook-index.test.mjs` |
 
 ## 统计
@@ -49,7 +49,7 @@ GAP：    0
 | `lifecycle-wiring.test.mjs` | 同名 | 8 pass | 绿 |
 | `universal-loop.test.mjs` | 同名 | 6 pass | 绿 |
 
-适配说明：`../support/domain.mjs` 深度修正为 `../../../tests/unit/support/domain.mjs`；包内互导（`./bookkeeper-session.test.mjs` 作为 helper 被 6 个文件引用）保持原样——同一目录内相对引用随族迁移不变。全部文件无 `dist/fable_modules` 直接 import（test-boundary 门不受影响）。
+适配说明：`../support/domain.mjs` 深度修正为 `../../../requirements/verification-system/tests/support/domain.mjs`；包内互导（`./bookkeeper-session.test.mjs` 作为 helper 被 6 个文件引用）保持原样——同一目录内相对引用随族迁移不变。全部文件无 `dist/fable_modules` 直接 import（test-boundary 门不受影响）。
 
 ## semantic anchor 归属（semantic-anchors.mjs）
 
@@ -65,6 +65,6 @@ reusable-knowledge / one-case / question-may-change / zero-mutation / transcript
 
 | 现有文件 | 当前 owner 混合 | cutover 动作 |
 |---|---|---|
-| `tests/unit/persist/event-store-merge.test.mjs` / `event-store-converge.test.mjs` | `durable-convergence`（general set union / DomainConflict 物理律）+ 本包（Case 对象冲突语义） | 留在 `durable-convergence`；本包 PROOF 只引用（REUSE）；不物理移动 |
+| `requirements/durable-convergence/tests/event-store-merge.test.mjs` / `event-store-converge.test.mjs` | `durable-convergence`（general set union / DomainConflict 物理律）+ 本包（Case 对象冲突语义） | 留在 `durable-convergence`；本包 PROOF 只引用（REUSE）；不物理移动 |
 | `tests/unit/casebook/`（已移入本包） | 全部断言归本包（PROOF-MAP：casebook KEEP knowledge-reuse） | 已 **MOVE** 完成；`tests/unit/casebook/` 目录随 cutover 删除 |
 | `g6-host-reuse-finalize.test.mjs` / `g6-inspector-tool-finalize-fetch.test.mjs` / `universal-loop.test.mjs` | 本包（Casebook lifecycle/fetch）+ `managed-session-lifecycle`（ReuseScope）/`delegation`（SyncDelegate）交叉 | **SPLIT**（如需）：ReuseScope close / SyncDelegate 生命周期断言归对应包；Casebook finalize/fetch 断言留本包 |

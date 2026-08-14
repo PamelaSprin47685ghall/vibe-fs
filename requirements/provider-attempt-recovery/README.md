@@ -32,8 +32,8 @@
 - MOVE：`tests/cursor.test.mjs`（原 `requirements/provider-attempt-recovery/tests/cursor.test.mjs`，34 断言）
 - NEW：`tests/fallback-ledger.test.mjs`（4 断言：NoActiveRun / 去重 / admission）
 - REUSE：`requirements/context-compression/tests/recovery-slot.test.mjs`（FALLBACK-008/011/012）、
-  `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（FALLBACK-013）、
-  `tests/unit/invariants/prompt-stability.test.mjs`（FALLBACK-014）等，均含 SPLIT@cutover 计划
+  `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`（FALLBACK-013）、
+  `requirements/prefix-stability/tests/system-prompt-stability.test.mjs`（FALLBACK-014）等，均含 SPLIT@cutover 计划
 
 ## 阅读顺序
 

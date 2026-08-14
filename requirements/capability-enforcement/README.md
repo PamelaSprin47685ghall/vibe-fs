@@ -30,8 +30,8 @@ fail-closed；external_directory 唯一写点。全部命题见 `WHAT.md`（`ENF
   binding 校验。
 - `tests/agent-permission-gate.test.mjs`（自 `tests/unit/plugin/` 移入）：AGENT-006/007/010/019
   矩阵投影 + 双层 fail-closed。
-- REUSE：`tests/unit/context/attempt-plan.test.mjs`、`tests/unit/agent/inquiry-permissions.test.mjs`、
-  `tests/unit/strength/runtime.test.mjs`（replica 收窄）、`tests/unit/verify/tool-referential-integrity.test.mjs`。
+- REUSE：`requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs`、`requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`、
+  `requirements/speculative-investigation/tests/runtime.test.mjs`（replica 收窄）、`requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs`。
 - 落点表见 `PROOF.md`。
 
 ## 阅读顺序

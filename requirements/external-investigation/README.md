@@ -35,7 +35,7 @@ Stroke，落在 unit 套件之外。
 
 - NEW：`tests/browser-provenance-canary.test.mjs`（Oracle 1：pin 8 id、真实散文双语绿、
   删区分变红、`disagreement-not-averaged` 非单词级）。
-- REUSE：`tests/unit/agent/stealth-browser-mcp.test.mjs`（role-lock，capability-enforcement
+- REUSE：`requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs`（role-lock，capability-enforcement
   交叉，`SPLIT@cutover`）。
 
 ## 阅读顺序（零上下文读者）
@@ -49,7 +49,7 @@ Stroke，落在 unit 套件之外。
 
 ```text
 node --test requirements/external-investigation/tests/browser-provenance-canary.test.mjs
-node --test tests/unit/agent/stealth-browser-mcp.test.mjs
+node --test requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs
 ```
 
 ## DEPENDS ON

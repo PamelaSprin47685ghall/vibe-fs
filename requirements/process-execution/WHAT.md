@@ -43,7 +43,7 @@ PTY completion **只**由 backend `onExit` 触发（EXEC-015）。禁止 stdout 
 
 证据：REUSE `requirements/process-execution/tests/pty-port.test.mjs`（`PORT_complete_*` 组：completion 经
 `PtyPort.complete` 发布；`PORT_send_plain_signal_does_not_abort_the_completion`）；
-`tests/unit/execution/process-wait.test.mjs`（`EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill`）。
+`requirements/process-execution/tests/process-wait.test.mjs`（`EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill`）。
 
 ## PROC-004：有界执行——finite hard limit + 确定失败路径
 
@@ -58,8 +58,8 @@ hard limit。
 本包只拥有「执行必须物理有界、超时是确定失败」的义务。
 
 证据：MOVE `tests/pty-port.test.mjs`（`PORT_complete_after_terminate_publishes_aborted`）；REUSE
-`tests/unit/process/process-runner.test.mjs`（`EXEC_011_slow_process_is_killed_and_reports_timeout`）、
-`tests/unit/process/process-output.test.mjs`（`EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit`）。
+`requirements/process-execution/tests/process-runner.test.mjs`（`EXEC_011_slow_process_is_killed_and_reports_timeout`）、
+`requirements/process-execution/tests/process-output.test.mjs`（`EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit`）。
 
 ## PROC-005：Process Request 类型化；无效 estimate 拒绝
 
@@ -68,20 +68,20 @@ PtyOptions）表达（EXEC-010）。无效预算（NaN/零/负 runtime、负 out
 
 含义/动机：类型化请求让「一次执行」在源码层是一个事实；无效预算在 spawn 前被边界拦截。
 
-证据：REUSE `tests/unit/process/process-runner.test.mjs`（`EXEC_011_rejects_nan_runtime_estimate`、
+证据：REUSE `requirements/process-execution/tests/process-runner.test.mjs`（`EXEC_011_rejects_nan_runtime_estimate`、
 `EXEC_011_rejects_zero_and_negative_runtime_estimate`、`EXEC_011_rejects_negative_output_estimate`）、
-`tests/unit/tools/executor-tool.test.mjs`（`RUN_non_positive_deadline_is_rejected`、
+`requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_non_positive_deadline_is_rejected`、
 `RUN_invalid_output_budget_is_rejected`）。
 
 ## PROC-006：cancellation 收束资源，不 hang
 
 mid-wait cancellation：kill 进程组一次，然后拒绝等待方（`ProcessCancelled`），不得在 exit 上挂死；
-已自然退出的进程照常报告真实 exit（`tests/unit/execution/process-wait.test.mjs` D 场景）。cancel
+已自然退出的进程照常报告真实 exit（`requirements/process-execution/tests/process-wait.test.mjs` D 场景）。cancel
 注册在 spawn 时，未退出时 kill 整个进程组（`NodeProcessHost` `ct.Register`）。
 
 含义/动机：取消是控制面；控制面必须收敛，不能把「取消」变成新的无界等待。
 
-证据：REUSE `tests/unit/execution/process-wait.test.mjs`（`EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit`）。
+证据：REUSE `requirements/process-execution/tests/process-wait.test.mjs`（`EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit`）。
 
 ## PROC-007：continuing process ≠ one-shot execution
 
@@ -104,7 +104,7 @@ Mailbox 双通道：agent 完成路径只发 `Pulse`（结果读 Journal）；PT
 
 边界：Journal 的权威性与 fold → `durable-events`；permit 门重入 → `crash-reconciliation`。
 
-证据：REUSE `tests/unit/execution/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 PROOF.md）。
+证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 PROOF.md）。
 
 ## PROC-009：物理输出捕获有界；spool 是蒸馏输入
 
@@ -118,7 +118,7 @@ chunkCount)` 或 `Completed(exitCode, stdout, stderr)`。禁止无界缓冲；sp
 边界：spool 之后的语义压缩（`Distillation.distillSpool`）、`ToolResultBound`、`LargeGate` 输出预算
 合同 → `output-distillation`；spool path 不得进 provider horizon → `participant-horizon`。
 
-证据：REUSE `tests/unit/process/process-output.test.mjs`（`EXEC_011_collector_spools_when_byte_count_crosses_threshold`、
+证据：REUSE `requirements/process-execution/tests/process-output.test.mjs`（`EXEC_011_collector_spools_when_byte_count_crosses_threshold`、
 `EXEC_011_collector_spool_accumulates_later_chunks`、`EXEC_011_spool_chunk_count_rounds_up`）；MOVE
 `tests/pty-session.test.mjs`（PTY session 记录形状）。
 
@@ -133,18 +133,18 @@ terminal 与 `run` 的完成后果 = 自然语言 + `exit_code` + 相关输出�
 边界：join wire 的渲染（自然语言 + WorkRecord）→ `delegation`/`work-record`；DTO 禁令全法则 →
 `participant-horizon`。
 
-证据：REUSE `tests/unit/execution/join-v2-wire.test.mjs`（`EXEC_004_pty_completion_is_natural_language_plus_exit_code`）、
-`tests/unit/tools/executor-tool.test.mjs`（`RUN_completed_command_reports_exit_code_and_streams`）。
+证据：REUSE `requirements/delegation/tests/join-v2-wire.test.mjs`（`EXEC_004_pty_completion_is_natural_language_plus_exit_code`）、
+`requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_completed_command_reports_exit_code_and_streams`）。
 
 ## PROC-011：run 是 DevOps 有界执行，≠ Distiller office
 
 `run` 工具：command + budget 参数（deadline/output budget）；缺失/blank command 在 spawn 前拒绝；
 非正 deadline、无效输出预算拒绝；blank session 报自然执行后果；nonzero exit 是报告不是 throw
-（`tests/unit/tools/executor-tool.test.mjs` RUN_* 组、AGENT-013）。run 的语义是「一次有界执行」，
+（`requirements/process-execution/tests/executor-tool.test.mjs` RUN_* 组、AGENT-013）。run 的语义是「一次有界执行」，
 不是蒸馏、不是审批、不是 Distiller 的摘要 office。
 
 含义/动机：run 的边界 = 执行边界；把执行与蒸馏混在一个工具里会丢失「物理发生」与「语义压缩」的
 分界（HANDOFF §6.6：控制进程 vs 诚实压缩是两个 WHY）。
 
-证据：REUSE `tests/unit/tools/executor-tool.test.mjs`（`RUN_spec_exposes_command_and_budget_arguments`、
+证据：REUSE `requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_spec_exposes_command_and_budget_arguments`、
 `RUN_missing_command_is_rejected_before_spawn`、`RUN_deadline_overrun_returns_the_fixed_timeout_consequence`）。

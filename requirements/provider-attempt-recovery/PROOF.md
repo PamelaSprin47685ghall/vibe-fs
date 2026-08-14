@@ -1,7 +1,7 @@
 # provider-attempt-recovery — 测试落点
 
 运行命令：单文件 `node --test requirements/provider-attempt-recovery/tests/<file>.test.mjs`；
-整包即被 `node tests/unit/run.mjs` 自动发现（requirements 树）。落点类型：MOVE = 从旧
+整包即被 `node requirements/verification-system/tests/run.mjs` 自动发现（requirements 树）。落点类型：MOVE = 从旧
 `tests/unit` 物理移入本包；REUSE = 留在原处（多 owner 或共享 checker），记锚点与 cutover 拆分；
 NEW = 本包新写。
 
@@ -18,13 +18,13 @@ NEW = 本包新写。
 | PAR-005（跨包交叉：预算终点） | `requirements/degeneration-guard/tests/loop-sensor.test.mjs`：`LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact` | MOVE（跨包引用） | `node --test requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | PAR-006 侧序列无界 | `tests/cursor.test.mjs`：`FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction` | MOVE | 同上 cursor |
 | PAR-007 fold 拒绝条件 | `tests/cursor.test.mjs`：`FALLBACK_007_a_valid_advance_moves_the_durable_cursor`、`FALLBACK_007_the_next_offset_must_be_the_modulo_four_successor`、`FALLBACK_007_the_count_must_advance_by_exactly_one_or_restart_at_one_after_success`、`FALLBACK_007_each_rejection_names_a_different_cause`、`FALLBACK_007_a_stale_previous_offset_is_refused_even_when_the_step_is_valid`、`FALLBACK_007_a_corrupt_transition_stops_the_replay_instead_of_being_absorbed`、`FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_applied`、`FALLBACK_007_a_replayed_journal_reaches_the_same_cursor`、`FALLBACK_007_a_replayed_journal_with_intervening_success_streak_restart_reaches_the_same_cursor` | MOVE | 同上 |
-| PAR-008 空/XML-only 不计入 | `requirements/context-compression/tests/recovery-slot.test.mjs`：`FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair`；`tests/unit/prompt/authority.test.mjs`：`FALLBACK_008_one_terminal_provider_run_earns_exactly_one_repair` | REUSE | `node --test requirements/context-compression/tests/recovery-slot.test.mjs`；`node --test tests/unit/prompt/authority.test.mjs`（SPLIT@cutover：authority 属 interaction-authority/dispatch-protocol） |
+| PAR-008 空/XML-only 不计入 | `requirements/context-compression/tests/recovery-slot.test.mjs`：`FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair`；`requirements/interaction-authority/tests/authority-root.test.mjs`：`IA_010_one_terminal_provider_run_earns_exactly_one_repair` | REUSE | `node --test requirements/context-compression/tests/recovery-slot.test.mjs`；`node --test requirements/interaction-authority/tests/authority-root.test.mjs` |
 | PAR-009 Host Attempt ≠ 领域计数 | `tests/cursor.test.mjs`：`FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failure`、`FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_the_attempt` | MOVE | 同上 cursor |
 | PAR-010 槽内维护子请求 | `requirements/context-compression/tests/recovery-slot.test.mjs`：`FALLBACK_011_only_a_business_main_success_clears_the_failure_count`、`CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request`、`CTX_007_a_successful_main_commits_and_does_not_move_the_cursor`、`CTX_007_a_failed_main_fails_the_slot_for_every_kind`、`CTX_008_only_a_failed_slot_advances_the_cursor` | REUSE | `node --test requirements/context-compression/tests/recovery-slot.test.mjs`（SPLIT@cutover：CTX 锚点归 context-compression，FALLBACK-011/008 归本包） |
 | PAR-011 armed 合取 / parked-cursor | `requirements/context-compression/tests/recovery-slot.test.mjs`：`FALLBACK_012_a_new_sequence_always_starts_unarmed`、`FALLBACK_012_only_a_failure_advance_arms_the_next_slot`、`FALLBACK_012_arming_is_lost_across_a_restart_and_the_safe_side_is_unarmed`、`FALLBACK_012_the_facade_offers_no_way_to_derive_arming_from_an_offset`、`FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed`、`FALLBACK_012_parked_cursor_does_not_trigger_compression_acceptance_trace`、`FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes` | REUSE | `node --test requirements/context-compression/tests/recovery-slot.test.mjs`（SPLIT@cutover 同上） |
-| PAR-012 abort 清理残留不计入 | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`：`LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor`、`ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once`；e2e：`tests/e2e/entry.test.mjs`（waitFact FallbackCursorAdvanced eq=4） | REUSE | `node --test tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（SPLIT@cutover：ENFORCER 域锚点归 behavior-diagnosis） |
-| PAR-013 换 Peer 不换身份字节 | `tests/unit/invariants/prompt-stability.test.mjs`：`PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes` | REUSE | `node --test tests/unit/invariants/prompt-stability.test.mjs`（SPLIT@cutover：身份字节 guarantee 归 participant-identity/provider-language/prefix-stability） |
-| PAR-014 continuation 时序与次数 | `tests/cursor.test.mjs`：`FALLBACK_005_may_continue_answers_the_projection_level_question`；`tests/unit/prompt/authority.test.mjs`：`PROMPT_003_a_continuation_never_replaces_the_authority_root`、`PROMPT_003_every_continuation_kind_is_representable_and_none_is_a_root` | MOVE + REUSE | cursor 同上；authority SPLIT@cutover（wire 属 dispatch-protocol） |
+| PAR-012 abort 清理残留不计入 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`：`LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor`、`ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once`；e2e：`requirements/verification-system/tests/e2e/entry.test.mjs`（waitFact FallbackCursorAdvanced eq=4） | REUSE | `node --test requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`（SPLIT@cutover：ENFORCER 域锚点归 behavior-diagnosis） |
+| PAR-013 换 Peer 不换身份字节 | `requirements/prefix-stability/tests/system-prompt-stability.test.mjs`：`PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes` | REUSE | `node --test requirements/prefix-stability/tests/system-prompt-stability.test.mjs`（SPLIT@cutover：身份字节 guarantee 归 participant-identity/provider-language/prefix-stability） |
+| PAR-014 continuation 时序与次数 | `tests/cursor.test.mjs`：`FALLBACK_005_may_continue_answers_the_projection_level_question`；`requirements/interaction-authority/tests/continuation-origin.test.mjs`：`IA_004_a_continuation_never_replaces_the_authority_root`、`IA_005_every_continuation_kind_is_representable_and_none_is_a_root` | MOVE + REUSE | cursor 同上；`node --test requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | PAR-015 StrengthReplica 不进 owner controller | `tests/cursor.test.mjs`：`FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_the_attempt`（identity 含 SessionId → replica session 的 run 在机制上不可能推进/清零 owner cursor） | MOVE（机制锚点） | 同上 cursor。SPLIT@cutover：replica 侧 STRENGTH-004/019 的规范测试归 `speculative-investigation` |
 
 ## 包拥有的 semantic anchor id
@@ -36,10 +36,12 @@ cognition anchors）；本包为空清单。
 
 1. `requirements/context-compression/tests/recovery-slot.test.mjs`：FALLBACK-008/011/012 断言迁入本包；
    CTX-006/007/008/010/012 断言归 `context-compression`；文件按 owner 拆分后删除原文件。
-2. `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`：PAR-012 两条锚点迁入本包或保留为
+2. `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`：PAR-012 两条锚点迁入本包或保留为
    cross-check（ENFORCER 域其余锚点归 `behavior-diagnosis`）。
-3. `tests/unit/prompt/authority.test.mjs`：PAR-008/014 的 FALLBACK 锚点迁出，其余归
+3. `authority.test.mjs` 已拆（Wave 2a）：PAR-008/014 锚点现位于
+   `requirements/interaction-authority/tests/authority-root.test.mjs`（IA_010）与
+   `requirements/interaction-authority/tests/continuation-origin.test.mjs`（IA_004/005）；其余归
    `interaction-authority` / `dispatch-protocol`。
-4. `tests/unit/invariants/prompt-stability.test.mjs`：PAR-013 锚点保留为 cross-check（身份字节
+4. `requirements/prefix-stability/tests/system-prompt-stability.test.mjs`：PAR-013 锚点保留为 cross-check（身份字节
    owner 是 `participant-identity`/`provider-language`/`prefix-stability`）。
-5. `tests/e2e/entry.test.mjs`：e2e 由 lead 在 cutover 阶段归位。
+5. `requirements/verification-system/tests/e2e/entry.test.mjs`：e2e 由 lead 在 cutover 阶段归位。

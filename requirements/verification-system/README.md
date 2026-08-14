@@ -37,7 +37,7 @@ tests/      本包拥有的可执行 proof
    `scripts/check.mjs` 的 wired gate 清单 + fail-closed 传播（Oracle 3）。
 2. `tests/e2e-watchdog-feed.test.mjs`：VERIFY-004 因果 watchdog feed 门禁回归。
 3. `tests/kolmogorov-size-advisory.test.mjs`：行数非门禁（advisory 不阻断）。
-4. 各运行器机制（`tests/unit/run.mjs`、`tests/e2e/support/*`、`scripts/check.mjs`）由 lead
+4. 各运行器机制（`requirements/verification-system/tests/run.mjs`、`tests/e2e/support/*`、`scripts/check.mjs`）由 lead
    集成时执行；本包 PROOF.md 按 REUSE 精确锚点登记。
 
 ## proof 概览

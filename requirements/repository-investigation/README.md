@@ -37,7 +37,7 @@
 
 - 本包测试：`repository-warm-start.test.mjs` + `semble-mcp.test.mjs`（MOVE 自 `tests/unit/agent/`）+ `investigation-resource-laws.test.mjs`（NEW，双语资源律锚点）。
 - 交叉 REUSE：`fetch-tool.test.mjs`（knowledge-reuse 的「fetch 不写 subject」）、`scripts/checks/semantic-anchors.mjs`（inspector 组锚点）。
-- 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/repository-investigation/tests/<file>`。全套：`node tests/unit/run.mjs`。
+- 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/repository-investigation/tests/<file>`。全套：`node requirements/verification-system/tests/run.mjs`。
 
 ## 边界（DOES NOT OWN）
 

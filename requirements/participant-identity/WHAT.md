@@ -29,7 +29,7 @@ ExecutionBinding = 物理模型 / tier / config（可随 Peer Fallback / Strengt
 定义；本包只保证三条轴不会互相冒充。
 
 证据：`catalog.test.mjs`（Role/Tier 轴）+ `session-persona.test.mjs`（Persona 轴）+
-`tests/unit/invariants/prompt-stability.test.mjs` `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes`。
+`requirements/prefix-stability/tests/system-prompt-stability.test.mjs` `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes`。
 
 ## PID-003：Persona 一次冻结，创建时 resolve-once，之后不可变
 
@@ -55,7 +55,7 @@ Persona 不变，system prompt 身份字节不变（AGENT-029、FALLBACK-014、P
 边界：system prompt **字节**稳定本身由 `prefix-stability` 拥有（byte invariant）；本包拥有「身份不随
 binding 变」这一语义。fallback 的预算/算法归 `provider-attempt-recovery`。
 
-证据：`tests/unit/invariants/prompt-stability.test.mjs`
+证据：`requirements/prefix-stability/tests/system-prompt-stability.test.mjs`
 `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes`。
 
 ## PID-005：system prompt identity 是 CanonicalRole 的函数，tier/EffectiveAgent 不参与
@@ -117,7 +117,7 @@ GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
 边界：发送海关机制（Preserve/override 的 wire 语义、fail-closed 的物理实现）与 `dispatch-protocol` /
 `provider-attempt-recovery` 共用，但解析律的语义 owner 在本包（COVERAGE PROMPT-006）。
 
-证据：`tests/unit/host/session-execution-binding.test.mjs`
+证据：`requirements/participant-identity/tests/session-execution-binding.test.mjs`
 `PROMPT_006_parented_session_rejects_agent_and_model_drift_before_host_send` +
 `PROMPT_006_only_external_user_choice_rebinds_root_session`。
 

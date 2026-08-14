@@ -51,13 +51,13 @@ src/Wanxiangshu/Infrastructure/Resources/
 ```
 
 - `PackageResources.readText(rel)`：`dirname(fileURLToPath(import.meta.url))` 上溯 3 层到包根 → `join(packageRoot, "resources", rel)` → `existsSync` 失败抛 `package resource missing: <full>`。**无 cwd walk、无候选搜索、无 dist/src fallback**（DISTRIBUTION-002/006）。
-- 编译后模块位于 `dist/Infrastructure/Resources/`，`../../../resources` 恰好落在包根 `resources/`（`tests/integration/package/resources.test.mjs` 与本包 NEW oracle 双面锁）。
+- 编译后模块位于 `dist/Infrastructure/Resources/`，`../../../resources` 恰好落在包根 `resources/`（`requirements/distribution/tests/integration/package/resources.test.mjs` 与本包 NEW oracle 双面锁）。
 - `RuntimeResources.install` 是唯一安装点：plugin 构造器先 `load()` 再 `install()`，任何 consumer 运行前资源已就位；未安装即 `current()` 抛错（fail fast）。
 - 资源读取只允许出现在 `Infrastructure/Resources/`：`scripts/checks/architecture.mjs` 门 ⑥ `resource-boundary`（`PACKAGE_RESOURCE_READ` 扫描，`src/Wanxiangshu/` 内 `PackageResources.` 引用只能出现在该目录）。
 
 ## 4. fresh-dist 门（测试消费发布字节）
 
-`tests/unit/run.mjs` staleness gate：`dist/**`（除 `fable_modules/`）最新产物必须不早于任何 `src/Wanxiangshu/**/*.fs`/`.fsproj` 源，否则拒绝运行（`dist/ is stale by Ns — run: npm run format-build-test`）。这是「测试与发布消费同一份编译字节」的执行时保证（DISTRIBUTION-005）；机制实现属 `verification-system` 层（runner harness），命题归本包。
+`requirements/verification-system/tests/run.mjs` staleness gate：`dist/**`（除 `fable_modules/`）最新产物必须不早于任何 `src/Wanxiangshu/**/*.fs`/`.fsproj` 源，否则拒绝运行（`dist/ is stale by Ns — run: npm run format-build-test`）。这是「测试与发布消费同一份编译字节」的执行时保证（DISTRIBUTION-005）；机制实现属 `verification-system` 层（runner harness），命题归本包。
 
 ## 5. release proof（L5）
 
@@ -66,8 +66,8 @@ src/Wanxiangshu/Infrastructure/Resources/
 ```text
 fantomas → scripts/check.mjs（L0 静态门）
         → scripts/build.mjs（编译）
-        → tests/unit/run.mjs → tests/integration/run.mjs → tests/integration/package/run.mjs
-        → scripts/warmup-opencode.mjs → tests/e2e/entry.test.mjs（Long Stroke）
+        → requirements/verification-system/tests/run.mjs → requirements/verification-system/tests/integration/run.mjs → requirements/distribution/tests/integration/package/run.mjs
+        → scripts/warmup-opencode.mjs → requirements/verification-system/tests/e2e/entry.test.mjs（Long Stroke）
         → npm pack --dry-run（L5：真实 tarball membership 清单）
 ```
 
@@ -116,5 +116,5 @@ distribution → 特殊：所有声明 runtime resource 的 semantic packages（
 
 ## 8. 已知 GAP 与 cutover 待办
 
-- **tarball membership 只由 release proof 验**：unit/integration 层不 spawn `npm pack`（与 `tests/integration/package/*` 头注释同一设计决定：测试里跑 npm 受 3s watchdog 约束且慢）。发布依赖 `format-build-test` L5 `npm pack --dry-run` 把关。若未来要把它收进自动化 suite，需独立 runner（非 unit watchdog 约束），见 `PROOF.md` SPLIT@cutover。
+- **tarball membership 只由 release proof 验**：unit/integration 层不 spawn `npm pack`（与 `requirements/distribution/tests/integration/package/*` 头注释同一设计决定：测试里跑 npm 受 3s watchdog 约束且慢）。发布依赖 `format-build-test` L5 `npm pack --dry-run` 把关。若未来要把它收进自动化 suite，需独立 runner（非 unit watchdog 约束），见 `PROOF.md` SPLIT@cutover。
 - integration 层 4 文件 + 2 资源文件 + 1 unit 资源文件的 owner 拆分计划见 `PROOF.md` §SPLIT@cutover。

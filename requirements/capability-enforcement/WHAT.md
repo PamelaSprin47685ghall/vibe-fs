@@ -17,7 +17,7 @@ map、fallback projection）互相矛盾。
 边界：RequestKind 的分型本身（WorkMain/Blogger*/StrengthReplica/…）→ `interaction-authority` /
 `dispatch-protocol`；本包只拥有「能力集 = Role × RequestKind 的函数」这一事实。
 
-证据：`tests/unit/context/attempt-plan.test.mjs` `PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority`
+证据：`requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs` `PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority`
 （REUSE）+ `tests/agent-permission-gate.test.mjs` `roles.permissions_agree_with_the_host_schema_matrix`（MOVE）。
 
 ## ENF-002：provider-visible schema 与 runtime execution gate 读同一 capability truth
@@ -51,7 +51,7 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 
 边界：RequestKind 语义归属见 ENF-001 边界；本包拥有「收窄律」（projection ⊆ entitlement）。
 
-证据：`tests/unit/context/attempt-plan.test.mjs` `PROMPT_008_the_request_kind_is_carried_not_inferred`（REUSE）
+证据：`requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs` `PROMPT_008_the_request_kind_is_carried_not_inferred`（REUSE）
 + `tests/agent-permission-gate.test.mjs`（`ROLE_ALLOW` 全表 vs `Roles.permissions` 一致性）。
 
 ## ENF-004：execution tier 不改变同 office 的 authority：permissions(fast-ROLE) = permissions(deep-ROLE)
@@ -65,7 +65,7 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 
 边界：tier 的身份轴语义 → `participant-identity`；本包拥有「权限相等」的执行证明。
 
-证据：`tests/unit/context/attempt-plan.test.mjs` `AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set`（REUSE）
+证据：`requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs` `AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set`（REUSE）
 + `tests/agent-permission-gate.test.mjs` `AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields`
 （fast/deep 同 allow list，MOVE）。
 
@@ -81,8 +81,8 @@ Host-native 只读之外的一切工具在 replica 内 fail-closed。
 边界：replica 的预算/推进/提升 → `speculative-investigation`；本包拥有「replica 能力面精确收窄」
 这一 enforcement 律。
 
-证据：`tests/unit/strength/runtime.test.mjs` `STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly`（REUSE，SPLIT@cutover：
-strength family KEEP speculative-investigation，本断言 enforcement 侧归本包）+ `tests/unit/strength/host-canary-k0.test.mjs`
+证据：`requirements/speculative-investigation/tests/runtime.test.mjs` `STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly`（REUSE，SPLIT@cutover：
+strength family KEEP speculative-investigation，本断言 enforcement 侧归本包）+ `requirements/speculative-investigation/tests/host-canary-k0.test.mjs`
 `STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network`。
 
 ## ENF-006：internal-only participants/actions 不进无资格 participant 的工具面
@@ -96,7 +96,7 @@ enum 消失」）；admission（不进 choice surface）归 `participant-horizon
 边界：可见性过滤的认知面 → `participant-horizon`（AGENT-008）；本包拥有工具面拒绝的执行面。
 
 证据：`tests/agent-permission-gate.test.mjs` `ROLE_ALLOW`（Distiller: []、Blogger: [chronicle]，MOVE）
-+ `tests/unit/tools/auto-injected-tool.test.mjs` `AUTOINJ_rolePredicate_allows_work_roles_and_denies_blogger_distiller`（REUSE）。
++ `requirements/capability-enforcement/tests/auto-injected-tool.test.mjs` `AUTOINJ_rolePredicate_allows_work_roles_and_denies_blogger_distiller`（REUSE）。
 
 ## ENF-007：Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 
@@ -110,8 +110,8 @@ schema wildcard、registry），semantic source 只能一个（`Roles.permission
 边界：MCP 启动/注入机制 → `host-boundary`；域能力 token（Network/Sphinx）属于 `Roles.permissions`
 （Kernel）；本包拥有「schema wildcard 与 gate 服从同一 policy」的 enforcement。
 
-证据：`tests/unit/agent/stealth-browser-mcp.test.mjs` `AGENT_026_browser_only_wildcard_permission`
-+ `tests/unit/agent/sphinx-mcp.test.mjs` `AGENT_030_inquiry_only_wildcard_permission`（REUSE，SPLIT：
+证据：`requirements/capability-enforcement/tests/stealth-browser-mcp-wildcard.test.mjs` `AGENT_026_browser_only_wildcard_permission`
++ `requirements/capability-enforcement/tests/sphinx-mcp-wildcard.test.mjs` `AGENT_030_inquiry_only_wildcard_permission`（REUSE，SPLIT：
 文件同时含 host-boundary 注入断言）。
 
 ## ENF-008：js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
@@ -142,7 +142,7 @@ inspector(tool) 保留 vs commission/horizon/inspect」被拒（DTO 名冒充动
 边界：工具描述的语义合同内容 → `action-affordance`；本包拥有「名称唯一 + schema 结构唯一」的
 enforcement（结构侧）。
 
-证据：`tests/unit/verify/tool-referential-integrity.test.mjs` `gate_a_*`（REUSE，SPLIT：Gate A =
+证据：`requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs` `gate_a_*`（REUSE，SPLIT：Gate A =
 action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scripts/checks/tool-referential-integrity.mjs`。
 
 ## ENF-010：双层 fail-closed：Role 未定 → 工具集空/拒绝执行；Host 配置异常仍写 deny 默认
@@ -160,8 +160,8 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 `bash-honeypot` 仅 Coder 且不执行 shell（AGENT-023）是同一律的 Coder 面。
 
 证据：`tests/agent-permission-gate.test.mjs` `AGENT_007_bash_stays_denied_even_when_the_gate_fails` +
-`AGENT_007_validation_error_is_still_reported`（MOVE）+ `tests/unit/agent/inquiry-permissions.test.mjs`
-`Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap`（REUSE）+ `tests/integration/plugin/manager-tool-contract.test.mjs`
+`AGENT_007_validation_error_is_still_reported`（MOVE）+ `requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`
+`Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap`（REUSE）+ `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs`
 `AGENT_007_unresolved_role_denies_all_tools`（REUSE）。
 
 ## ENF-011：external_directory=allow 是 Host 路径边界元权限：每 managed agent 显式写入、唯一生产写点

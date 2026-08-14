@@ -1,7 +1,7 @@
 # PROOF — causal-wait（测试落点表）
 
 > 每条 WHAT 命题恰好一行落点。类型：`MOVE`（已物理移入本包 `tests/`）/ `REUSE`（留在原处，记录 cutover 拆分）/ `NEW`（本包新写）。
-> 运行命令：`node --test <file>` 单跑；`node tests/unit/run.mjs` 全单元（自动包含 `requirements/**/tests/*.test.mjs`）；`node scripts/check.mjs` 全部静态门。
+> 运行命令：`node --test <file>` 单跑；`node requirements/verification-system/tests/run.mjs` 全单元（自动包含 `requirements/**/tests/*.test.mjs`）；`node scripts/check.mjs` 全部静态门。
 
 ## 落点表
 
@@ -11,30 +11,30 @@
 | CAUSAL-002 跨 owner 等待可诊断 | `tests/causal-wait.test.mjs` — `RED_1_active_wait_visible_after_enter`（owner/producer/kind 可见）+ `tests/wait-lifecycle.test.mjs` — `descriptor_carries_typed_owner_producer_subject` | MOVE + NEW | `node --test requirements/causal-wait/tests/causal-wait.test.mjs requirements/causal-wait/tests/wait-lifecycle.test.mjs` |
 | CAUSAL-003 观测不进 Journal/决策 | REUSE：`scripts/checks/causal-wait-boundary.mjs` 第 3/4/5 条（Fact/Journal codec 干净、诊断不进 PromptDispatcher/TurnCompletionProgram、关键迁移点无裸 TCS.Task await） | REUSE（gate 不可移动） | `node scripts/check.mjs` |
 | CAUSAL-004 Reader/Writer 类型隔离 | `tests/causal-wait.test.mjs` — `RED_8_application_observer_enter_only_snapshot_via_reader` + `tests/wait-lifecycle.test.mjs` — `observer_surface_has_no_snapshot`（`IWaitObserver` 无 Snapshot 成员）+ REUSE：gate 第 1/2 条（Domain/Application 边界） | MOVE + NEW + REUSE | 同上两文件；`node scripts/check.mjs` |
-| CAUSAL-005 event-driven 优先 polling | REUSE：`tests/unit/temporal/until-signal-or-deadline.test.mjs` — `THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline` + `THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline`（无 slice timer/轮询间隔，真实信号 re-arm；SPLIT@cutover：CausalAwait 词汇归本包，deadline 能力归 time-capability） | REUSE（SPLIT@cutover） | `node --test tests/unit/temporal/until-signal-or-deadline.test.mjs` |
+| CAUSAL-005 event-driven 优先 polling | REUSE：`requirements/causal-wait/tests/until-signal-or-deadline.test.mjs` — `THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline` + `THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline`（无 slice timer/轮询间隔，真实信号 re-arm；SPLIT@cutover：CausalAwait 词汇归本包，deadline 能力归 time-capability） | REUSE（SPLIT@cutover） | `node --test requirements/causal-wait/tests/until-signal-or-deadline.test.mjs` |
 | CAUSAL-006 取消/完成后观测终止 | `tests/causal-wait.test.mjs` — `RED_2_resolve_clears_active_and_records_resolved` / `RED_3_fail_clears_active_and_records_failed` / `RED_4_cancel_clears_active_and_records_cancelled` + `tests/wait-lifecycle.test.mjs` — `dispose_defaults_to_wait_disposed` / `mark_exit_once_then_dispose_preserves_exit` / `dispose_is_idempotent_single_leave` / `reenter_is_fresh_observation_not_revival` / `history_default_capacity_is_256` | MOVE + NEW | `node --test requirements/causal-wait/tests/causal-wait.test.mjs requirements/causal-wait/tests/wait-lifecycle.test.mjs` |
 | CAUSAL-007 frontier 纯诊断解释 | `tests/causal-frontier.test.mjs` — `RED_5_nested_graph_walks_to_external_frontier` / `RED_6_missing_producer_reports_broken_causal_edge` / `RED_7_cycle_reports_without_hanging` / `empty_snapshot_yields_empty_frontier` | MOVE | `node --test requirements/causal-wait/tests/causal-frontier.test.mjs` |
-| CAUSAL-008 process-local、重启安全消失 | `tests/causal-wait.test.mjs` — `RED_8_application_observer_enter_only_snapshot_via_reader`（hub 进程内单例）+ `tests/wait-lifecycle.test.mjs` — `fresh_registry_starts_empty_no_durable_state`（新 registry 无任何状态）+ REUSE：`tests/unit/session/causal-wait-bridge.test.mjs` — `CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json`（诊断文件 git-excluded、非 Journal） | MOVE + NEW + REUSE | `node --test requirements/causal-wait/tests/wait-lifecycle.test.mjs`；`node --test tests/unit/session/causal-wait-bridge.test.mjs` |
+| CAUSAL-008 process-local、重启安全消失 | `tests/causal-wait.test.mjs` — `RED_8_application_observer_enter_only_snapshot_via_reader`（hub 进程内单例）+ `tests/wait-lifecycle.test.mjs` — `fresh_registry_starts_empty_no_durable_state`（新 registry 无任何状态）+ REUSE：`requirements/verification-system/tests/causal-diagnostics.test.mjs` — `CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json`（诊断文件 git-excluded、非 Journal） | MOVE + NEW + REUSE | `node --test requirements/causal-wait/tests/wait-lifecycle.test.mjs`；`node --test requirements/verification-system/tests/causal-diagnostics.test.mjs` |
 
 ## 关联 REUSE 落点（边界消费方，不重复拥有）
 
 | 场景 | 落点 | owner |
 |---|---|---|
 | Escape 显式终止路径（CCE-005 渲染） | `tests/escape-taxonomy.test.mjs`（本包 NEW）— WaitEscape 五 case 全区分、bridge JSON tag 全区分 | 本包 |
-| Scheme B 桥 + E2E 诊断首屏 | `tests/unit/session/causal-wait-bridge.test.mjs`（`CAUSAL_DIAG_format_puts_frontier_before_e2e_events` 等） | 本包（bridge 面）+ `verification-system`（format/watchdog harness）SPLIT@cutover |
-| E2E watchdog 因果续期（`renewOn`） | `tests/integration/harness/timeout-cases.mjs`、`tests/e2e/support/scenario-schema.js`（waitFactRenewOnProblems 校验） | `verification-system`（消费 CAUSAL-001） |
-| QuiescencePermit 观测非权威 | `tests/unit/execution/reconcile-idle-early.test.mjs`、`tests/unit/host/**`（host-boundary 的 machinery） | `host-boundary` + 本包（非权威面） |
+| Scheme B 桥 + E2E 诊断首屏 | `requirements/verification-system/tests/causal-diagnostics.test.mjs`（`CAUSAL_DIAG_format_puts_frontier_before_e2e_events` 等） | 本包（bridge 面）+ `verification-system`（format/watchdog harness）SPLIT@cutover |
+| E2E watchdog 因果续期（`renewOn`） | `requirements/verification-system/tests/integration/harness/timeout-cases.mjs`、`requirements/verification-system/tests/e2e/support/scenario-schema.js`（waitFactRenewOnProblems 校验） | `verification-system`（消费 CAUSAL-001） |
+| QuiescencePermit 观测非权威 | `requirements/host-boundary/tests/reconcile-idle-early.test.mjs`、`tests/unit/host/**`（host-boundary 的 machinery） | `host-boundary` + 本包（非权威面） |
 
 ## 运行与红/绿判读
 
 - 单跑：`node --test requirements/causal-wait/tests/<file>`。任一断言失败 → 该命题的当前世界 RED。
-- 全单元：`node tests/unit/run.mjs`（自动包含 `requirements/causal-wait/tests/**`）。
+- 全单元：`node requirements/verification-system/tests/run.mjs`（自动包含 `requirements/causal-wait/tests/**`）。
 - 静态门：`node scripts/check.mjs`（`causal-wait-boundary.mjs` 是本包语义的静态 enforcement）。
 
 ## SPLIT@cutover 清单（本轮 REUSE，cutover 时拆分）
 
-1. `tests/unit/temporal/until-signal-or-deadline.test.mjs` → CausalAwait 词汇断言迁本包；deadline 能力断言迁 `time-capability`。
-2. `tests/unit/session/causal-wait-bridge.test.mjs` → bridge 文件/registry 断言迁本包；`formatDiagnostics`/`formatCausalSection`/watchdog onTimeout 断言迁 `verification-system`。
+1. `requirements/causal-wait/tests/until-signal-or-deadline.test.mjs` → CausalAwait 词汇断言迁本包；deadline 能力断言迁 `time-capability`。
+2. `requirements/verification-system/tests/causal-diagnostics.test.mjs` → bridge 文件/registry 断言迁本包；`formatDiagnostics`/`formatCausalSection`/watchdog onTimeout 断言迁 `verification-system`。
 3. `scripts/checks/causal-wait-boundary.mjs` → cutover 后作为本包静态 gate 保留（文件位置是否移动由 requirement-system 布局裁决）。
 
 ## Semantic anchor ids

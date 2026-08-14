@@ -42,8 +42,7 @@ Candidate → Promotion 边界，以及让投机永远不改变「没有 Strengt
 
 - 本包自有测试 `tests/`：4 个文件（`authority-policy`、`commit-promotion`、`host-policy`、
   `turn-evidence`），单跑命令 `node --test requirements/speculative-investigation/tests/<file>`。
-- 12 个 REUSE 落点留在 `tests/unit/strength/**`（含 fable_modules 直接 import，受
-  test-boundary 门限制不可移动，cutover 时 SPLIT），以及 `tests/integration/strength/lifecycle.test.mjs`。
+- 12 个 strength 测试文件已迁入本包 `tests/`（Wave 2a：MOVE/SPLIT，fable 直连 import 全部改写为 support 等价调用）；`requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs` 为集成面。
 - 交叉边界：`unpromoted ≠ history` 由本包测试证明，同时是 `semantic-trace` 的 cross-boundary
   invariant（见 HANDOFF §18.6）；本包只交叉引用，不复制其命题。
 

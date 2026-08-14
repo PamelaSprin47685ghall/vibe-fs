@@ -21,7 +21,7 @@ Wanxiangshu 只做三件事：
   `Agent/AgentProgram.fs`；矩阵归 `capability-enforcement`，consequence 归
   `office-capability`。
 - Host adapter 机制（uvx command / ref / env / fixture 启动判定）：归 `host-boundary`
-  HOW；`tests/unit/agent/stealth-browser-mcp.test.mjs` 的 `AGENT_026_kernel_identity_and_commands`
+  HOW；`requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs` 的 `AGENT_026_kernel_identity_and_commands`
   等测试锁的是机制。
 - role-lock 断言（`AGENT_026_browser_only_wildcard_permission`）：`capability-enforcement`
   交叉 owner；external-investigation 复用其「Browser 是唯一外部事实采集 office」的事实。
@@ -66,7 +66,7 @@ canary（contract 锁定）+ role-lock（能力归属）+ 散文合同（规范�
 | HANDOFF §29 Oracle 1 | EVIDENCE | 调查结论（lead 已完成，勿重新考古）：8 锚点强化 + canary 要求 + role-lock 已覆盖 + runtime oracle 落套件外。落点：WHY.md 历史病灶 + WHAT 002–009 + 本 HOW + canary 测试 |
 | `resources/provider/role/browser/{en,zh-CN}.md` | EVIDENCE（规范文本） | 散文合同全文吸收为 WHAT 001–010 的规范陈述与锚点 |
 | `scripts/checks/semantic-anchors.mjs` browser 锚点 | EVIDENCE | 8 条锚点 id 与正则，逐条对应 WHAT 002–009 |
-| `tests/unit/agent/stealth-browser-mcp.test.mjs` | REUSE | `AGENT_026_browser_only_wildcard_permission`（role-lock）归 capability-enforcement 交叉；`AGENT_026_kernel_identity_and_commands`（uvx/ref/fixture）归 host-boundary HOW。本包只 REUSE 权限事实 |
+| `requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs` | REUSE | `AGENT_026_browser_only_wildcard_permission`（role-lock）归 capability-enforcement 交叉；`AGENT_026_kernel_identity_and_commands`（uvx/ref/fixture）归 host-boundary HOW。本包只 REUSE 权限事实 |
 | ARCH-017 Browser consequence | EVIDENCE | office 后果投影（`OFFICE_CAPABILITY_ANCHORS.browser` id `browser-external-provenance`）——归属 office-capability，不重复收 |
 | `Kernel/StealthBrowserMcp.fs` uvx command / ref / env 前缀 / fixture 启动判定 | HOW | Host adapter 机制（COVERAGE AGENT-026 HOW 行）；本包不拥有 |
 | 真实 browsing 行为测试（默认 disabled，不打真实 git） | 弃权 | runtime oracle 属 Long Stroke 层，明确落在 unit 套件之外；canary 是 unit 内可红替代 |

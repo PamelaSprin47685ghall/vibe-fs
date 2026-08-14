@@ -1,7 +1,7 @@
 # PROOF — review-assurance
 
 > 每条 WHAT 命题一行落点。类型：`MOVE`（物理移入本包 tests/）、`REUSE`（留在原处，cutover 拆分）、`NEW`（本包新写）、`MECHANISM`（共享 gate）。
-> 运行命令：`node --test requirements/review-assurance/tests/<file>`；套件级 `node tests/unit/run.mjs`。
+> 运行命令：`node --test requirements/review-assurance/tests/<file>`；套件级 `node requirements/verification-system/tests/run.mjs`。
 
 ## 落点表
 
@@ -29,9 +29,9 @@
 
 | 现有测试 | 现状 | 计划 |
 |---|---|---|
-| `tests/unit/reconciliation/magic-todo-membrane.test.mjs` | 多 owner（obligation-ledger 主 + review-assurance 交叉）；`TODO-006 T2 prepare succeeds once T1 process review is Concluded` 断言 ConsumableReview 消费门槛 | cutover 时把 `AwaitingConsumableReview` 阻塞/放行断言按 assertion 拆出（review-assurance 侧）或标注 obligation-ledger 消费侧 |
+| `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs` | 多 owner（obligation-ledger 主 + review-assurance 交叉）；`TODO-006 T2 prepare succeeds once T1 process review is Concluded` 断言 ConsumableReview 消费门槛 | cutover 时把 `AwaitingConsumableReview` 阻塞/放行断言按 assertion 拆出（review-assurance 侧）或标注 obligation-ledger 消费侧 |
 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` | `await ConsumableReview failed: fatalInfrastructure` 断言 REVIEW-018 的 infra fail-fast 出口 | cutover 时确认 fail-fast 分类归 `host-boundary`/`crash-reconciliation`，review 侧负边界归本包 |
-| `tests/unit/glory/lifecycle.test.mjs` | GLORY-057（`FinalityUndecided` / undecidable golden bytes）、GLORY-055（REVISE 关 request）、GLORY-060（blessing 顺序重读 tree）为 finality 主 + review-assurance 交叉 | cutover 时按断言拆分；GLORY-059 tree 重读 → 本包 REVIEW-ASSURANCE-006 交叉 |
+| `requirements/finality/tests/lifecycle.test.mjs` | GLORY-057（`FinalityUndecided` / undecidable golden bytes）、GLORY-055（REVISE 关 request）、GLORY-060（blessing 顺序重读 tree）为 finality 主 + review-assurance 交叉 | cutover 时按断言拆分；GLORY-059 tree 重读 → 本包 REVIEW-ASSURANCE-006 交叉 |
 | `tests/unit/temporal/finality-cohort-law.test.mjs` | roster/graduate 代数 → finality 主 | 无本包 assertion 冲突；challenge/witness 断言如出现按 PROOF 归属拆分 |
 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`（已随 obligation-ledger 迁移） | `TODO-006 rejects a conclusion with no matching assignment` 与本包 `REVIEW_018_concluded_without_assignment_is_rejected` 同源 | 保留 obligation-ledger 版本；本包版本以 review 视角断言（fold 拒绝 = 不伪 Concluded） |
 

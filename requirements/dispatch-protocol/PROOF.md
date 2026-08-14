@@ -6,7 +6,7 @@
 node --test requirements/dispatch-protocol/tests/fire-and-forget.test.mjs   # MOVE（原 requirements/dispatch-protocol/tests/fire-and-forget.test.mjs）
 node --test requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs  # NEW
 node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs  # NEW
-# 全量：node tests/unit/run.mjs（自动包含 requirements/**/tests/*.test.mjs）
+# 全量：node requirements/verification-system/tests/run.mjs（自动包含 requirements/**/tests/*.test.mjs）
 ```
 
 ## 命题 → 落点
@@ -18,15 +18,15 @@ node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs  
 | R3 | DISPATCH-PROTOCOL-006 | `claim-lifecycle.test.mjs::DP_006_claim_sequence_advances_on_registration_not_on_resolution` + `DP_007_recovery_budget_is_folded_from_plugin_starts_not_written` | NEW | 同上 |
 | R4 | DISPATCH-PROTOCOL-007/008 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message`（StillPending 保持 + 绝不重发 + Proven）+ `DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending`（GaveUp） | NEW | `node --test requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
 | R5 | DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::PROMPT_007_detached_claims_and_persists_without_physical_accepted` + `PROMPT_007_detached_continuation_same_claim_path` + `PROMPT_007_await_mode_constructors_exist` | MOVE | `node --test requirements/dispatch-protocol/tests/fire-and-forget.test.mjs` |
-| R6 | DISPATCH-PROTOCOL-001/011 | `tests/unit/prompt/authority.test.mjs::PROMPT_005_submit_records_the_receipt_without_resolving_the_claim` + `tests/unit/prompt/send-format.test.mjs::PROMPT_006_send_payload_carries_agent_and_no_model`（Metadata/PromptKey 锚 + Model=None 半边；agent 绑定半边归 participant-identity） | REUSE | `node --test tests/unit/prompt/authority.test.mjs` / `node --test tests/unit/prompt/send-format.test.mjs` |
-| R7 | DISPATCH-PROTOCOL-007（claim 释放可重试） | `tests/unit/host/join-guard.test.mjs::JNGD_nudge_releases_the_key_when_send_fails_and_retries`（send 失败 → Abandon(SendFailed) 释放 key；JoinGuard continuation 语义归 interaction-authority） | REUSE | `node --test tests/unit/host/join-guard.test.mjs` |
-| R8 | DISPATCH-PROTOCOL-002（budget 派生） | `tests/unit/journal/envelope.test.mjs::PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session`（纯 fold：stamp=折叠位置水印；attempts/budgetSpent） | REUSE | `node --test tests/unit/journal/envelope.test.mjs` |
-| R9 | DISPATCH-PROTOCOL-001/005/006（claim 唯一写入口 + 幂等身份） | `tests/unit/prompt/authority.test.mjs::PROMPT_011_claim_scope_names_exactly_session_run_origin_and_payload` + `PROMPT_011_prompt_key_is_deterministic_and_moves_with_every_component` + `PROMPT_011_claim_sequence_advances_on_registration_not_on_resolution` | REUSE | `node --test tests/unit/prompt/authority.test.mjs` |
+| R6 | DISPATCH-PROTOCOL-001/011 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::DP_002_submit_records_the_receipt_without_resolving_the_claim` + `tests/unit/prompt/send-format.test.mjs::PROMPT_006_send_payload_carries_agent_and_no_model`（Metadata/PromptKey 锚 + Model=None 半边；agent 绑定半边归 participant-identity） | REUSE | `node --test tests/unit/prompt/authority.test.mjs` / `node --test tests/unit/prompt/send-format.test.mjs` |
+| R7 | DISPATCH-PROTOCOL-007（claim 释放可重试） | `requirements/interaction-authority/tests/join-guard.test.mjs::JNGD_nudge_releases_the_key_when_send_fails_and_retries`（send 失败 → Abandon(SendFailed) 释放 key；JoinGuard continuation 语义归 interaction-authority） | REUSE | `node --test requirements/interaction-authority/tests/join-guard.test.mjs` |
+| R8 | DISPATCH-PROTOCOL-002（budget 派生） | `requirements/dispatch-protocol/tests/runtime-start-watermark.test.mjs::PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session`（纯 fold：stamp=折叠位置水印；attempts/budgetSpent） | REUSE | `node --test tests/unit/journal/envelope.test.mjs` |
+| R9 | DISPATCH-PROTOCOL-001/005/006（claim 唯一写入口 + 幂等身份） | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::DP_005_claim_scope_names_exactly_session_run_origin_and_payload` + `PROMPT_011_prompt_key_is_deterministic_and_moves_with_every_component` + `PROMPT_011_claim_sequence_advances_on_registration_not_on_resolution` | REUSE | `node --test tests/unit/prompt/authority.test.mjs` |
 | R10 | DISPATCH-PROTOCOL-007（恢复预算语义） | `claim-lifecycle.test.mjs::DP_007_recovery_budget_is_folded_from_plugin_starts_not_written`（纯函数阈值）+ `recovery-at-most-one.test.mjs`（行为分支） | NEW | 两文件各自命令 |
 
 统计：10 行落点；NEW 2 文件 11 断言 + MOVE 1 文件 3 断言全绿；REUSE 3 个既有文件（SPLIT@cutover 前留在原处）。
 
-## `tests/unit/prompt/authority.test.mjs` SPLIT 计划（本包半边）
+## authority.test.mjs SPLIT（本包半边）已执行（Wave 2a）：锚点并入 claim-lifecycle / send-format
 
 双 owner 文件：**REUSE + SPLIT@cutover**（完整 22 测试归属表见
 [`interaction-authority/PROOF.md`](../interaction-authority/PROOF.md)）。本包 cutover 时接收：

@@ -46,7 +46,7 @@
 - `wait-lifecycle.test.mjs`（NEW）— 取消/完成后观测终止、Dispose 默认 WaitDisposed、MarkExit 幂等、默认容量 256、observer 无 Snapshot 面。
 - `escape-taxonomy.test.mjs`（NEW）— WaitEscape 五 case 与诊断渲染 tag 全区分（CCE-005 显式终止路径可见）。
 
-另有 REUSE：`tests/unit/session/causal-wait-bridge.test.mjs`（bridge 文件 + E2E 诊断格式化，含 verification-system MECHANISM）、`tests/unit/temporal/until-signal-or-deadline.test.mjs`（event-driven 词汇）、`scripts/checks/causal-wait-boundary.mjs`（静态门，经 check.mjs 运行）。
+另有 REUSE：`requirements/verification-system/tests/causal-diagnostics.test.mjs`（bridge 文件 + E2E 诊断格式化，含 verification-system MECHANISM）、`tests/unit/temporal/until-signal-or-deadline.test.mjs`（event-driven 词汇）、`scripts/checks/causal-wait-boundary.mjs`（静态门，经 check.mjs 运行）。
 
 ## 阅读顺序
 

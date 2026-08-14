@@ -24,8 +24,8 @@
 ## PROOF 概览
 
 - 包内：`tests/fork-child-payload.test.mjs`（MOVE，fork child 首 prompt 渲染）。
-- REUSE（SPLIT@cutover）：`tests/unit/session/sync-delegate-runtime.test.mjs`、
-  `tests/unit/session/sync-delegate-ce-collapse.test.mjs`、`tests/unit/tools/{fork-tool,sync-delegate-tools}.test.mjs`、
+- REUSE（SPLIT@cutover）：`requirements/delegation/tests/sync-delegate-runtime.test.mjs`、
+  `requirements/delegation/tests/sync-delegate-ce-collapse.test.mjs`、`tests/unit/tools/{fork-tool,sync-delegate-tools}.test.mjs`、
   `tests/unit/execution/join-*.test.mjs`、`tests/unit/orchestrator/{host,runtime}.test.mjs` 等。完整落点表见 PROOF.md。
 - Semantic anchors（`scripts/checks/semantic-anchors.mjs`）拥有：manager 组 `entrust-by-consequence` /
   `choose-by-return` / `no-omnipotent-charge` / `returned-record`；orchestrator 组 `owns-roads` /

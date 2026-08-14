@@ -42,10 +42,10 @@ Journal/SessionAssociation.fs        关联事实（Work↔Companion；Sync* 走
   `tests/distiller-ownership.test.mjs`（EXEC-014 hidden handle）、
   `tests/host-fork-agent.test.mjs`（Fork/Reuse 错误分支与复用合同）。
 - NEW：`tests/attached-session-runtime.test.mjs`（AttachedSessionRuntime + ReuseScope）。
-- REUSE：`tests/unit/execution/handle.test.mjs`（Handle 四态状态机）、
-  `tests/unit/session/satellite-runtime.test.mjs`、`host-fork-restart/runtime`、
-  `sync-delegate-runtime`、`tests/unit/host/terminal-policy.test.mjs`、
-  `tests/unit/host/session-flattening.test.mjs`、`session-ownership-ratchet` 问卷。
+- REUSE：`requirements/managed-session-lifecycle/tests/handle.test.mjs`（Handle 四态状态机）、
+  `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs`、`host-fork-restart/runtime`、
+  `sync-delegate-runtime`、`requirements/managed-session-lifecycle/tests/terminal-policy.test.mjs`、
+  `requirements/session-ontology/tests/session-flattening.test.mjs`、`session-ownership-ratchet` 问卷。
 
 ## 阅读顺序
 

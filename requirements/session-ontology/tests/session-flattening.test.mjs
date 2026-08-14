@@ -3,7 +3,7 @@
 // session 物理挂在 family root 下（son's son is a son，树恰好两层），ownership
 // 由 journal 链接证明而非 Host parentID；restored journal parents 仍解析 family
 // root。abort 级联断言归 managed-session-lifecycle。
-// 原文件直接 import dist/fable_modules（ofArray/ok）已改写为 support 等价调用
+// 原文件直接 import 编译器运行时（ofArray/ok）已改写为 support 等价调用
 // （toList/okResult）。
 
 import assert from 'node:assert/strict'

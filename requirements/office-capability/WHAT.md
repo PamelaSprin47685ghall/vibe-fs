@@ -78,7 +78,7 @@ Manager 当前可 fork 的五类 Office（Coder / Inspector / DevOps / Browser /
 
 证据：`tests/office-capability-integrity.test.mjs`
 `OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales` +
-`tests/unit/verify/language-parity-gate.test.mjs` `gate_f_*`（fixture 可红性）。
+`requirements/office-capability/tests/office-capability-gate.test.mjs` `gate_f_*`（fixture 可红性）。
 
 ## OFF-006：offices 不可互换：禁止把 office 当可互换通用 agent
 
@@ -100,7 +100,7 @@ oracle 即为可红的行为判据。
 不可互换」这一认知合同。
 
 证据：`tests/office-capability-integrity.test.mjs` `OFF_006_offices_are_not_interchangeable_general_purpose_agents`
-+ `tests/eval/provider-office-boundary/office-boundary-eval.test.mjs`（四个 oracle 全绿）。
++ `requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs`（四个 oracle 全绿）。
 
 ## OFF-007：Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect
 
@@ -147,7 +147,7 @@ evidence becomes a verdict）是「证据 ≠ 判决」的边界。
 `inspect` 工具的调用瞬间合同 → `action-affordance`。
 
 证据：`tests/eval/provider-office-boundary` `inspector-refuses-repair`（oracle：Inspector 拒绝修复）+
-`tests/integration/plugin/manager-tool-contract.test.mjs` `EXEC_002_inspect_tool_description_forbids_mutation_and_execution`。
+`requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs` `EXEC_002_inspect_tool_description_forbids_mutation_and_execution`。
 
 ## OFF-010：DevOps consequence = 运维行动与行为证据；non-consequence = 发明产品含义/直接 write-edit
 
@@ -213,4 +213,4 @@ Inquiry 有权分辨尚未明确的问题（hypotheses、语义区分、竞争�
 （inspect + sphinx_*）投影 → `capability-enforcement`。
 
 证据：`tests/office-capability-integrity.test.mjs`（inquiry consequence 双语文档命中）+ 交叉：
-`tests/unit/agent/inquiry-permissions.test.mjs`（Inquiry 工具面 = inspect + Sphinx，REUSE）。
+`requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`（Inquiry 工具面 = inspect + Sphinx，REUSE）。

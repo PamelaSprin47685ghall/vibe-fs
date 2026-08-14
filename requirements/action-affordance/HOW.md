@@ -10,7 +10,7 @@
 | 003/004/005/006 | `resources/provider/tool/{inspect,repair-behavior,establish-behavior,run,query-shell}/description/*.md` | 具体负边界/后果/参数语义 |
 | 007/008 | `scripts/checks/tool-referential-integrity.mjs`（Gate A：`scanRepo` / `extractToolSpecNames` / `LEGACY_FORBIDDEN_NAMES`）；`src/Wanxiangshu/Infrastructure/OpenCode/Tools/*Tool.fs` | 同 name 唯一 owner；semantic contract 面归本包，schema 执行面归 `capability-enforcement` |
 | 009/010 | `resources/provider/tool/{fork,commission}/description/*.md`（五 Office 后果 + `calling` 语义）；`OFFICE_CAPABILITY_ANCHORS`（Gate F，canonical 归 `office-capability`） | mirror 完整性 |
-| 011/012 | `TOOL_DESCRIPTION_ANCHORS`（`scripts/checks/semantic-anchors.mjs`）；`tests/eval/provider-office-boundary/oracles.mjs`（`evaluateCoderInspectOwnership`） | caller 面 mirror |
+| 011/012 | `TOOL_DESCRIPTION_ANCHORS`（`scripts/checks/semantic-anchors.mjs`）；`requirements/office-capability/tests/eval/provider-office-boundary/oracles.mjs`（`evaluateCoderInspectOwnership`） | caller 面 mirror |
 | 013 | `resources/provider/lifecycle/magic-todo/todowrite-description/*.md`；`scripts/checks/language-parity-gate.mjs`（`scanToolDescriptionAnchorParity` / `scanToolDescriptionAnchorCatalog`） | description 覆盖纪律 + 双语 anchor |
 
 ## 关键机制：description 资源是合同的家

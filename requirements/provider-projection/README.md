@@ -36,10 +36,10 @@ SyntheticToml}.fs`；Y 帧形状源 `Domain/CompanionProjectionBuilder.fs`；hos
 
 - MOVE：`tests/synthetic-toml.test.mjs`（ARCH-010 字符串规则/值树/布局/确定性 + NEW
   `ARCH_011_renderer_exposes_no_parser`）。
-- REUSE：`tests/unit/context/projection-algebra.test.mjs`（algebra oracle，`SPLIT@cutover`
+- REUSE：`requirements/provider-projection/tests/projection-algebra.test.mjs`（algebra oracle，`SPLIT@cutover`
   拆 feature 语义）、`requirements/context-compression/tests/companion-projection.test.mjs`
-  （COMPANION_007 digest，cutover 归本包）、`tests/unit/codec/join-result-renderer.test.mjs`、
-  `tests/unit/context/blogger-toml.test.mjs`、`tests/unit/host/pair-thought-anchored.test.mjs`。
+  （COMPANION_007 digest，cutover 归本包）、`requirements/provider-projection/tests/join-result-renderer-entry-comment.test.mjs`、
+  `requirements/provider-projection/tests/blogger-toml.test.mjs`、`requirements/prefix-stability/tests/pair-thought-anchored.test.mjs`。
 
 ## 阅读顺序（零上下文读者）
 
@@ -52,7 +52,7 @@ SyntheticToml}.fs`；Y 帧形状源 `Domain/CompanionProjectionBuilder.fs`；hos
 
 ```text
 node --test requirements/provider-projection/tests/synthetic-toml.test.mjs
-node --test tests/unit/context/projection-algebra.test.mjs
+node --test requirements/provider-projection/tests/projection-algebra.test.mjs
 ```
 
 ## DEPENDS ON

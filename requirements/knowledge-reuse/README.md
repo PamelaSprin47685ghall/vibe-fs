@@ -40,7 +40,7 @@
 ## proof 概览
 
 - 本包测试（MOVE 自 `tests/unit/casebook/`，14 文件）：capture / domain / store / index / fetch / lifecycle / bookkeeper-{mechanical,session,synthesis} / js-bookkeeper-tool / edit-qa-tool / g6-* / universal-loop。
-- 单跑：`node --test requirements/knowledge-reuse/tests/<file>`（设 `WANXIANGSHU_PROVIDER_LANGUAGE=en`）。全套：`node tests/unit/run.mjs`。
+- 单跑：`node --test requirements/knowledge-reuse/tests/<file>`（设 `WANXIANGSHU_PROVIDER_LANGUAGE=en`）。全套：`node requirements/verification-system/tests/run.mjs`。
 
 ## 边界（DOES NOT OWN）
 

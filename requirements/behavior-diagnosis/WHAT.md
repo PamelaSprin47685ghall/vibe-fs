@@ -26,7 +26,7 @@ TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。�
 
 - 含义：坏包必须当场暴露，不能静默成功（`archive/docs/why/enforcer.md` 三连拒之一）。
 - 证据：`catalog.test.mjs`、`catalog-validation.test.mjs`；打包路径由
-  `tests/integration/resources/enforcer-rulebook.test.mjs`（REUSE）覆盖；`PROOF.md` 行 11。
+  `requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`（REUSE）覆盖；`PROOF.md` 行 11。
 
 ### BD-003 Domain 校验合同
 
@@ -103,7 +103,7 @@ decode 面无 `Scores` / `parseScore` / 数值严重度 surface；额外 numeric
 - 含义：协议违约（多调用）不丢 coverage，但 tip 选择必须确定且唯一
   （ENFORCER-025/042）。lexical ordinal 只描述装载顺序，不参与 tip 优先级。
 - 证据：`cycle-nudge.test.mjs` `ENFORCER_042_*`、`ENFORCER_025_*`；REUSE
-  `tests/unit/enforcer/tip-v2-contract.test.mjs` `ENFORCER_TIP_15`；`PROOF.md` 行 18。
+  `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_15`；`PROOF.md` 行 18。
 
 ### BD-010 Cycle 身份 fail-closed
 
@@ -139,7 +139,7 @@ BlogEntry 派生。
 - 含义：诊断 occurrence 与工作日志、覆盖推进同生共死（ENFORCER-045）；「frame 有
   coverage 没动」或其反面都不可能出现。
 - 证据：MOVE `observation-projection.test.mjs` `OBS_PROJ_002`；REUSE
-  `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`
+  `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs`
   `C0_no_EnforcementCycleCommitted_fact`、`enforcer-cycle-protocol.test.mjs`
   `ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage`；
   `PROOF.md` 行 21。
@@ -164,7 +164,7 @@ cursor/cutoff/epoch 与投影不一致 → `KnownNotCommitted`（可恢复弃置
 第二条 receipt）。
 
 - 含义：occurrence 有独立身份、有界可回溯（ENFORCER-070/154）；重放不重数。
-- 证据：REUSE `tests/unit/enforcer/tip-v2-contract.test.mjs`
+- 证据：REUSE `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs`
   `ENFORCER_TIP_08/09/10/11`；`PROOF.md` 行 23。
 
 ## E. Observation 配对
@@ -192,7 +192,7 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
 - 边界：squash 的压缩调度/触发语义归 `context-compression`；本包只锁「不造新
   occurrence」这一半。
 - 证据：MOVE `observation-projection.test.mjs` `OBS_PROJ_003`；REUSE
-  `tests/unit/enforcer/tip-v2-contract.test.mjs` `ENFORCER_TIP_12`、
+  `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_12`、
   `paired-history-eval.test.mjs` `A42_PAIRED_HISTORY_*`；`PROOF.md` 行 25。
 
 ## F. 无效 cycle 的协议修复（cycle 生命周期一部分）
@@ -210,6 +210,6 @@ abort 清理残留只注入一次 repair、不推进主 cursor、不消耗 AABB 
   065/066/067/068/153）。
 - 边界：FallbackController 本身归 `provider-attempt-recovery`/`crash-reconciliation`；
   本包只锁「无效 cycle 的修复入口与有界性」。
-- 证据：REUSE `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`
+- 证据：REUSE `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`
   `ENFORCER_060_*`、`ENFORCER_061_*`、`ENFORCER_068_*`、`LOOP_006_*`；
   `PROOF.md` 行 26。

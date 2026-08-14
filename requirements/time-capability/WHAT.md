@@ -35,7 +35,7 @@
 
 **含义/动机**：proof 必须确定、可重放、与墙钟无关（VERIFY-004「Temporal Tests Use Virtual Time」）。虚拟实现让测试在毫秒级精确推进时间，无需真实 sleep；race 以显式 trace 枚举，不靠调度器运气。
 
-**边界**：虚拟实现的**测试适配**（`tests/unit/support/domain/host.mjs` 的 `timerPort` / `clockPort` facade）属于 test support，不归本包；虚拟实现的**生产类型**（`PtyTiming.fs`）是本包证据。`PtyTiming.timerTask`（无取消面的 fire-and-forget 延时）是物理适配器内部机制，归 HOW。
+**边界**：虚拟实现的**测试适配**（`requirements/verification-system/tests/support/domain/host.mjs` 的 `timerPort` / `clockPort` facade）属于 test support，不归本包；虚拟实现的**生产类型**（`PtyTiming.fs`）是本包证据。`PtyTiming.timerTask`（无取消面的 fire-and-forget 延时）是物理适配器内部机制，归 HOW。
 
 **证据指针**：→ `PROOF.md` TIME-003 行。
 
@@ -59,7 +59,7 @@
 
 **含义/动机**：G4R 原则「Time is input, never authority」：race 是代数不是调度器彩票——`fold(A;B) == fold(B;A)`。若时间值自身有 authority，同一个 deadline 在不同时钟/不同规则下会「自己决定」结果，proof 与 replay 同时失效。把时间当输入（input）而非权威（authority），是全部 temporal proof 的基石。
 
-**边界**：具体业务规则（如「超过 10s 结束 join 等待」）归消费方（`process-execution` / `delegation`）；「值不等于判断」这条元规则归本包。`tests/unit/temporal/harness.mjs` 的「One World / Pure Time」是这条原则的 proof 侧证据（REUSE）。
+**边界**：具体业务规则（如「超过 10s 结束 join 等待」）归消费方（`process-execution` / `delegation`）；「值不等于判断」这条元规则归本包。`requirements/verification-system/tests/support/temporal-harness.mjs` 的「One World / Pure Time」是这条原则的 proof 侧证据（REUSE）。
 
 **证据指针**：→ `PROOF.md` TIME-005 行。
 

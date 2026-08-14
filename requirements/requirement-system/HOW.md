@@ -66,7 +66,7 @@ archive/docs/README.md 导航精确覆盖正式文件（navigationProblems）
 node --test requirements/requirement-system/tests/meta-verifier.test.mjs
 node --test requirements/requirement-system/tests/spec-rules.test.mjs
 node scripts/check.mjs          # 集成时由 lead 跑；spec gate 是本包机制
-node tests/unit/run.mjs         # 集成时由 lead 跑；自动发现 requirements/**/*.test.mjs
+node requirements/verification-system/tests/run.mjs         # 集成时由 lead 跑；自动发现 requirements/**/*.test.mjs
 ```
 
 meta-verifier 迁移中途红是预期（见测试头注释）；结束时两条命令 + check + unit 全绿。

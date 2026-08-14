@@ -29,7 +29,7 @@
 | `tests/judge-tool-contract.test.mjs` | REVIEW-JUDGEMENT-001（工具形态、schema 无描述字段、不 echo） |
 | `tests/discrimination-fixtures.test.mjs` | REVIEW-JUDGEMENT-002..007/009/010（discrimination / materiality / checklist 禁令） |
 | `tests/process-review-judgement.test.mjs` | REVIEW-JUDGEMENT-008（过程一次判断 terminal） |
-| `tests/unit/tools/verdict-tool.test.mjs`（REUSE） | 工具执行面 fail-closed（REVIEW-001 交叉） |
+| `requirements/review-judgement/tests/verdict-tool.test.mjs`（REUSE） | 工具执行面 fail-closed（REVIEW-001 交叉） |
 
 ## 阅读顺序
 

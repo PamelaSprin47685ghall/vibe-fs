@@ -8,23 +8,23 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
 | HOST-BOUNDARY-001 | `tests/host001-fragment-events.test.mjs` `HOST_001_fragment_events_die_at_earliest_boundary`（fragment 在 codec 边界丢弃） | MOVE | `node --test requirements/host-boundary/tests/host001-fragment-events.test.mjs` |
-| HOST-BOUNDARY-002 | `tests/host001-fragment-events.test.mjs` `HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary`（idle/retry/deleted/aborted 分型）；REUSE `tests/unit/codec/signals.test.mjs`（`MessageAbortedError`/`AbortError` → typed `AttemptAborted`） | MOVE + REUSE | 同上 / `node --test tests/unit/codec/signals.test.mjs` |
+| HOST-BOUNDARY-002 | `tests/host001-fragment-events.test.mjs` `HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary`（idle/retry/deleted/aborted 分型）；REUSE `requirements/host-boundary/tests/signals.test.mjs`（`MessageAbortedError`/`AbortError` → typed `AttemptAborted`） | MOVE + REUSE | 同上 / `node --test requirements/host-boundary/tests/signals.test.mjs` |
 | HOST-BOUNDARY-003 | `tests/host-capability-observation.test.mjs` `HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier`（RetrySignal 诊断字段，无 message id）；`tests/host001-fragment-events.test.mjs`（typed decode） | NEW + MOVE | `node --test requirements/host-boundary/tests/host-capability-observation.test.mjs` |
-| HOST-BOUNDARY-004 | REUSE `requirements/structured-workflow/tests/reconcile-program.test.mjs`（`TurnUnknown` 私有观测）+ `tests/unit/codec/signals.test.mjs` | REUSE | `node --test requirements/structured-workflow/tests/reconcile-program.test.mjs` / `tests/unit/codec/signals.test.mjs` |
-| HOST-BOUNDARY-005 | REUSE `tests/unit/execution/reconcile-idle-early.test.mjs`（因果重读 ≤3、无第二信号恢复）；REUSE `requirements/structured-workflow/tests/reconcile-program.test.mjs` | REUSE | `node --test tests/unit/execution/reconcile-idle-early.test.mjs` |
+| HOST-BOUNDARY-004 | REUSE `requirements/structured-workflow/tests/reconcile-program.test.mjs`（`TurnUnknown` 私有观测）+ `requirements/host-boundary/tests/signals.test.mjs` | REUSE | `node --test requirements/structured-workflow/tests/reconcile-program.test.mjs` / `requirements/host-boundary/tests/signals.test.mjs` |
+| HOST-BOUNDARY-005 | REUSE `requirements/host-boundary/tests/reconcile-idle-early.test.mjs`（因果重读 ≤3、无第二信号恢复）；REUSE `requirements/structured-workflow/tests/reconcile-program.test.mjs` | REUSE | `node --test requirements/host-boundary/tests/reconcile-idle-early.test.mjs` |
 | HOST-BOUNDARY-006 | `tests/session-snapshot-locality.test.mjs` `HOST-004 keeps failed session tool state consistent across Parts and ToolParts`（failed 不进 ToolCall） | MOVE | `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-007 | `tests/host-capability-observation.test.mjs` `HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off` / `HOST_006_first_turn_probe_is_the_only_startup_verdict` / `HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once` | NEW | `node --test requirements/host-boundary/tests/host-capability-observation.test.mjs` |
-| HOST-BOUNDARY-008 | REUSE `tests/unit/review/*`（seal 绑定）+ `archive/docs/proof/host.md` canary（`ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun` journal 代理等式）；REUSE `tests/unit/host/session-execution-binding.test.mjs`（发送边界拒绝漂移） | REUSE | `node --test tests/unit/host/session-execution-binding.test.mjs` |
-| HOST-BOUNDARY-009 | REUSE `tests/unit/plugin/tool-host-codec.test.mjs`（HOST-011：ToolContext 无 user message id、双半边）；`tests/session-snapshot-locality.test.mjs` `TODO-004 rejects a call id observed in more than one persisted ToolPart`（缺一半边 → Ambiguous） | REUSE + MOVE | `node --test tests/unit/plugin/tool-host-codec.test.mjs` / `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
-| HOST-BOUNDARY-010 | REUSE `tests/unit/host/shared-state.test.mjs` `SHARED_dictionaries_are_live_singletons_shared_across_importers` / `SHARED_root_workspace_atom_round_trips_and_restores`（HOST-012 共享面；`SHARED_pending_seal_record...` 归 review-assurance） | REUSE | `node --test tests/unit/host/shared-state.test.mjs` |
+| HOST-BOUNDARY-008 | REUSE `tests/unit/review/*`（seal 绑定）+ `archive/docs/proof/host.md` canary（`ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun` journal 代理等式）；REUSE `requirements/participant-identity/tests/session-execution-binding.test.mjs`（发送边界拒绝漂移） | REUSE | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs` |
+| HOST-BOUNDARY-009 | REUSE `requirements/host-boundary/tests/tool-host-codec.test.mjs`（HOST-011：ToolContext 无 user message id、双半边）；`tests/session-snapshot-locality.test.mjs` `TODO-004 rejects a call id observed in more than one persisted ToolPart`（缺一半边 → Ambiguous） | REUSE + MOVE | `node --test requirements/host-boundary/tests/tool-host-codec.test.mjs` / `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
+| HOST-BOUNDARY-010 | REUSE `requirements/host-boundary/tests/shared-state.test.mjs` `SHARED_dictionaries_are_live_singletons_shared_across_importers` / `SHARED_root_workspace_atom_round_trips_and_restores`（HOST-012 共享面；`SHARED_pending_seal_record...` 归 review-assurance） | REUSE | `node --test requirements/host-boundary/tests/shared-state.test.mjs` |
 | HOST-BOUNDARY-011 | `tests/host-message-projection.test.mjs`（HOST_016 全 7 锚点：reasoning/thinking/ellipsis/hash/untouched/sanitizeMessages） | MOVE | `node --test requirements/host-boundary/tests/host-message-projection.test.mjs` |
 | HOST-BOUNDARY-012 | `tests/session-snapshot-locality.test.mjs` `TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart` / `TODO-004 rejects a call id observed in more than one persisted ToolPart` | MOVE | `node --test requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-013 | `tests/needhelp-sensor.test.mjs`（HOST_027 全 5 锚点：sentinel strip / codec 关联 / 跨碎片触发 / case-variant+visible-text 不触发 / 每 run 一次） | MOVE | `node --test requirements/host-boundary/tests/needhelp-sensor.test.mjs` |
-| HOST-BOUNDARY-014 | REUSE `tests/unit/plugin/host-hooks.test.mjs`（仅现有 Hook；无 Host patch 路径）；`scripts/checks/architecture.mjs`（`host-boundary` gate：Kernel/Domain 禁 Fable.Core.JsInterop） | REUSE | `node --test tests/unit/plugin/host-hooks.test.mjs` / `node scripts/checks/architecture.mjs` |
-| HOST-BOUNDARY-015 | REUSE `tests/unit/context/tool-result-bound.test.mjs`（ARCH-012 有界留尾） | REUSE | `node --test tests/unit/context/tool-result-bound.test.mjs` |
+| HOST-BOUNDARY-014 | REUSE `requirements/host-boundary/tests/host-hooks.test.mjs`（仅现有 Hook；无 Host patch 路径）；`scripts/checks/architecture.mjs`（`host-boundary` gate：Kernel/Domain 禁 Fable.Core.JsInterop） | REUSE | `node --test requirements/host-boundary/tests/host-hooks.test.mjs` / `node scripts/checks/architecture.mjs` |
+| HOST-BOUNDARY-015 | REUSE `requirements/host-boundary/tests/tool-result-bound.test.mjs`（ARCH-012 有界留尾） | REUSE | `node --test requirements/host-boundary/tests/tool-result-bound.test.mjs` |
 | HOST-BOUNDARY-016 | `tests/events-port.test.mjs`（EVT 全 5 锚点：同 run 去重 / 无 run 不去重 / failed+aborted 不去重 / sticky replay / disposal） | MOVE | `node --test requirements/host-boundary/tests/events-port.test.mjs` |
 | HOST-BOUNDARY-017 | `tests/host-session-context.test.mjs`（HOST_CTX 全 6 锚点：read 提取 + roleOf 解析/alias 拒绝）；REUSE `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` `MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model`（external_directory 归属字段） | MOVE + REUSE | `node --test requirements/host-boundary/tests/host-session-context.test.mjs` / `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` |
-| HOST-BOUNDARY-018 | REUSE `tests/unit/plugin/host-hooks.test.mjs`（ARCH-003 只用现有 Hook/SDK） | REUSE | `node --test tests/unit/plugin/host-hooks.test.mjs` |
+| HOST-BOUNDARY-018 | REUSE `requirements/host-boundary/tests/host-hooks.test.mjs`（ARCH-003 只用现有 Hook/SDK） | REUSE | `node --test requirements/host-boundary/tests/host-hooks.test.mjs` |
 | HOST-BOUNDARY-019 | 本包全部 canary（MOVE/NEW 表）；`tests/host-capability-observation.test.mjs`（HostContractUnsupported 显式失败）；REUSE `archive/docs/proof/host.md` membrane canary 清单（H/A/C 未落地 → GAP，见下） | NEW + REUSE | 见各行 |
 | HOST-BOUNDARY-020 | `tests/session-snapshot-locality.test.mjs`（Ambiguous）、`tests/host001-fragment-events.test.mjs`（codec 丢弃）、`tests/needhelp-sensor.test.mjs`（armed 唯一） | MOVE | 见各行 |
 
@@ -69,20 +69,20 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 
 ## SPLIT@cutover 清单
 
-1. `tests/unit/host/shared-state.test.mjs`：`SHARED_dictionaries...` / `SHARED_root_workspace...`
+1. `requirements/host-boundary/tests/shared-state.test.mjs`：`SHARED_dictionaries...` / `SHARED_root_workspace...`
    归本包；`SHARED_pending_seal_record_carries_the_binding_candidate` 归 review-assurance
    （REVIEW-010 PendingSeal shape）。cutover 时拆分。
-2. `tests/unit/host/session-execution-binding.test.mjs`：InjectedSessionPort 发送边界拒绝漂移
+2. `requirements/participant-identity/tests/session-execution-binding.test.mjs`：InjectedSessionPort 发送边界拒绝漂移
    归本包（PROMPT-008 物理身份）；SessionPersona 重绑归 interaction-authority / participant-
    identity；SessionProviderLanguage bind-once 归 provider-language。cutover 时拆分。
-3. `tests/unit/host/chat-params-hook.test.mjs`：chat.params 观察适配归本包；binding 语义归
+3. `requirements/interaction-authority/tests/chat-params-hook.test.mjs`：chat.params 观察适配归本包；binding 语义归
    interaction-authority。cutover 时拆分。
-4. `tests/unit/host/assistance-host.test.mjs`：sensor/armed occasion 边界归本包；authority 语义
+4. `requirements/delegation/tests/assistance-host.test.mjs`：sensor/armed occasion 边界归本包；authority 语义
    归 interaction-authority；consultation child 归 delegation。cutover 时拆分。
 5. `requirements/capability-enforcement/tests/managed-agent-config.test.mjs`：owned-fields / external_directory 边界归
    本包；inventory/model 校验归 capability-enforcement。cutover 时拆分。
-6. `tests/unit/host/session-quiescence-gate.test.mjs`：整体归 causal-wait（QuiescencePermit）。
+6. `requirements/crash-reconciliation/tests/session-quiescence-gate.test.mjs`：整体归 causal-wait（QuiescencePermit）。
 7. `tests/unit/host/pair-thought-*.test.mjs`：归 prefix-stability / provider-projection（HOST-013）。
-8. `tests/unit/host/review-guard.test.mjs`：归 review-assurance。
+8. `requirements/review-assurance/tests/review-guard.test.mjs`：归 review-assurance。
 9. `tests/unit/verify/` 目录：host001-fragment-events / host012-tool-part 已 MOVE；其余 verify
    文件与其它包交叉。

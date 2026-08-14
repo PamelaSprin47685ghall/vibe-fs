@@ -40,8 +40,8 @@ shape 只停在 codec 边界；`Session.fs` 是唯一 handle 索引。
 - 本包自有测试 `tests/`：8 个文件（`kernel`、`semantics`、`mcp-handle`、`bayes`、`search`、
   `mcts`、`represent`、`methodology`）+ helper `support.mjs`，单跑
   `node --test requirements/epistemic-reasoning/tests/<file>`。
-- REUSE：`tests/unit/agent/sphinx-mcp.test.mjs`（Sphinx MCP 身份/注入/权限，SPLIT 家族，
-  cutover 拆分）、`tests/unit/support/sphinx-mcp-fixture.js`。
+- REUSE：`requirements/epistemic-reasoning/tests/sphinx-mcp-kernel.test.mjs`（Sphinx MCP 身份/注入/权限，SPLIT 家族，
+  cutover 拆分）、`requirements/verification-system/tests/support/sphinx-mcp-fixture.js`。
 - anchor id：`semantic-anchors.mjs` 的 `inquiry` 组 7 个 id 归本包（见 PROOF.md）。
 
 ## DEPENDS ON

@@ -2,7 +2,7 @@
 
 > 每条 WHAT 命题恰好一行落点。类型：`MOVE`（物理移入本包 `tests/`，删原文件）、
 > `REUSE`（留在原处，记精确锚点 + SPLIT@cutover 计划）、`NEW`（本包新写）。
-> 单跑命令：`node --test <file>`。全量：`node tests/unit/run.mjs`（自动发现
+> 单跑命令：`node --test <file>`。全量：`node requirements/verification-system/tests/run.mjs`（自动发现
 > `requirements/<package>/tests/**/*.test.mjs`）。
 
 ## 落点表
@@ -28,9 +28,9 @@
 
 | 覆盖 | 落点 | 说明 / cutover 计划 |
 |---|---|---|
-| MCP 身份 / Host 注入 / `sphinx_*` 权限 | `tests/unit/agent/sphinx-mcp.test.mjs`（`AGENT_030_kernel_identity_and_commands`、`AGENT_030_launch_disabled_fixture_test_local`、`AGENT_030_apply_preserves_other_mcp_servers`、`AGENT_030_inquiry_only_wildcard_permission`） | SPLIT 家族（PROOF-MAP `agent/`）：kernel identity/commands 断言 → 本包；launch/injection → `host-boundary`；Inquiry-only 权限 → `capability-enforcement`。cutover 时按断言拆分。 |
-| MCP fixture | `tests/unit/support/sphinx-mcp-fixture.js` | 共享 fixture，`tests/unit/support/**` 不动（契约 §4 规则 4）。 |
-| Host canary / e2e dry-run | `tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` | `verification-system` MECHANISM（与本包无直接落点，供追踪）。 |
+| MCP 身份 / Host 注入 / `sphinx_*` 权限 | `requirements/epistemic-reasoning/tests/sphinx-mcp-kernel.test.mjs`（`AGENT_030_kernel_identity_and_commands`、`AGENT_030_launch_disabled_fixture_test_local`、`AGENT_030_apply_preserves_other_mcp_servers`、`AGENT_030_inquiry_only_wildcard_permission`） | SPLIT 家族（PROOF-MAP `agent/`）：kernel identity/commands 断言 → 本包；launch/injection → `host-boundary`；Inquiry-only 权限 → `capability-enforcement`。cutover 时按断言拆分。 |
+| MCP fixture | `requirements/verification-system/tests/support/sphinx-mcp-fixture.js` | 共享 fixture（harness 已迁 verification-system/tests/support/）。 |
+| Host canary / e2e dry-run | `requirements/verification-system/tests/e2e/entry.test.mjs` long-stroke `strength-canary-*` | `verification-system` MECHANISM（与本包无直接落点，供追踪）。 |
 
 ## Semantic anchor ids（本包拥有）
 
@@ -45,7 +45,7 @@ synthesis-boundary
 
 ## SPLIT@cutover 待办
 
-1. `tests/unit/agent/sphinx-mcp.test.mjs`：按断言拆三份——本包（kernel identity/commands 的
+1. `requirements/epistemic-reasoning/tests/sphinx-mcp-kernel.test.mjs`：按断言拆三份——本包（kernel identity/commands 的
    `sphinx_*`/`dist/Sphinx/McpServer.js` 事实）、`host-boundary`（launch/env/apply）、
    `capability-enforcement`（Inquiry-only wildcard permission）。
 2. 若未来 `semantic-anchors.mjs` 为 speculation 增加 anchor，speculative-investigation 应声明

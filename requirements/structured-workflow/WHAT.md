@@ -157,7 +157,7 @@ Infrastructure 只适配外部协议，不解释业务命令；Vocabulary 只允
 - Host 边界白名单（`HOST_BOUNDARY_OPEN_BASENAMES`）是分层机制的例外登记处
   （DSL-010）：新增业务文件需 open Host/Process/Infrastructure 时先登记 basename，
   未登记 fail closed。
-- 测试对 Fable 产物形状的适配只属于 `tests/unit/support/domain.mjs`（DSL-011）；
+- 测试对 Fable 产物形状的适配只属于 `requirements/verification-system/tests/support/domain.mjs`（DSL-011）；
   不为测试便利新增生产 export。
 
 **证据**：PROOF.md §1 第 7 行。

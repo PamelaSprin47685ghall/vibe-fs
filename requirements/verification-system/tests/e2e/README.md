@@ -1,6 +1,6 @@
 # E2E — One World / The Long Stroke
 
-Sole entry: `node tests/e2e/entry.test.mjs`（经 `npm run format-build-test`）。
+Sole entry: `node requirements/verification-system/tests/e2e/entry.test.mjs`（经 `npm run format-build-test`）。
 
 | File | Role |
 |------|------|
@@ -31,7 +31,7 @@ mechanism.
 
 ## Related unit proof
 
-`tests/unit/execution/join-v2-mailbox.test.mjs` — registry fan-out, latch,
+`requirements/delegation/tests/join-v2-mailbox.test.mjs` — registry fan-out, latch,
 mailbox non-cancel, drain-before-interrupt, anti-cheat against OperatorAbort
 masquerading as user_message.
 

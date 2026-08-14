@@ -25,7 +25,7 @@ UnknownOrigin fail closed。
 
 1. **transport receipt 冒充消息身份**：旧测试曾断言 `accepted-*` 收据能携带 authority。
    `PROMPT-005` 后禁止：`accepted-*` 只是 Host 调用返回的收据，不是物理 `msg_*`。
-   （`tests/unit/prompt/authority.test.mjs` 头部注释记录了这两条被删除的旧断言及其反向重建。）
+   （原 `tests/unit/prompt/authority.test.mjs` 头部注释记录了这两条被删除的旧断言及其反向重建；该文件 Wave 2a 已拆入本包 authority-root / continuation-origin。）
 2. **prompt 丢失 PromptKey 后凭 ExplicitAgent 抬权**：ActiveLogicalRun 存在时，仅凭 `ExplicitAgent`
    把 UnknownOrigin 提升为 HumanRoot 会重置当前 Logical Run 与 Fallback cursor。`corrective.md`
    裁决：mid-run 用户消息可以唤醒 join（低权限 pulse），但**不** AcceptHumanRoot、不 reset LogicalRun、

@@ -78,7 +78,7 @@ node --test requirements/durable-events/tests/event-store-journal-codec.test.mjs
 node --test requirements/durable-events/tests/event-store-journal-writer.test.mjs
 node --test requirements/durable-events/tests/hook-dispatcher.test.mjs
 node --test requirements/durable-events/tests/append-only-laws.test.mjs
-# 全量：node tests/unit/run.mjs（自动包含 requirements/**/tests/*.test.mjs）
+# 全量：node requirements/verification-system/tests/run.mjs（自动包含 requirements/**/tests/*.test.mjs）
 ```
 
 ## DEPENDS ON

@@ -17,7 +17,7 @@
 | EXTERNAL-INVESTIGATION-007（inference-not-observation） | 同上 `removing_one_distinction_from_the_fixture_turns_red`（删掉该区分 → 红，证明锚点有区分力）+ 双语命中 | NEW | 同上 |
 | EXTERNAL-INVESTIGATION-008（disagreement-not-averaged） | 同上 `disagreement_not_averaged_is_not_a_word_level_regex`（「Just average the disagreement.」必须不命中）+ 双语命中 | NEW | 同上 |
 | EXTERNAL-INVESTIGATION-009（no-cross-sea-certainty） | 同上（锚点 `no-cross-sea-certainty` 双语命中 + id pin） | NEW | 同上 |
-| EXTERNAL-INVESTIGATION-010（外部/本地证据分离） | REUSE `tests/unit/agent/stealth-browser-mcp.test.mjs` `AGENT_026_browser_only_wildcard_permission`（Browser 是唯一网络能力 office；其它 role deny）；散文规范文本 Role Law「Reachability is not ownership」节 | REUSE | `node --test tests/unit/agent/stealth-browser-mcp.test.mjs` |
+| EXTERNAL-INVESTIGATION-010（外部/本地证据分离） | REUSE `requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs` `AGENT_026_browser_only_wildcard_permission`（Browser 是唯一网络能力 office；其它 role deny）；散文规范文本 Role Law「Reachability is not ownership」节 | REUSE | `node --test requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs` |
 | EXTERNAL-INVESTIGATION-011（外部事实不自动产生义务） | 散文规范文本（Role Law + `20-capability-external.md` OWNS）；无独立 unit 断言（义务产生归 office-capability/obligation-ledger，本包只持负边界）——GAP 见下 | REUSE/文档 | — |
 
 ## 新写测试清单
@@ -28,7 +28,7 @@
 
 ## SPLIT@cutover（REUSE 项拆 owner 计划）
 
-- `tests/unit/agent/stealth-browser-mcp.test.mjs`：
+- `requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs`：
   - `AGENT_026_browser_only_wildcard_permission` 的「Browser 是唯一 network office」事实
     → external-investigation（010）；「permission 矩阵 allow/deny」→ `capability-enforcement`。
   - `AGENT_026_kernel_identity_and_commands` / `launch_disabled_fixture_test_uvx` /

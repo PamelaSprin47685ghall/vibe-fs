@@ -50,8 +50,8 @@
 ## proof 概览
 
 - 本包测试（MOVE 自 `tests/unit/js-tools/`、`tests/unit/tools/`、`tests/unit/verify/`）：`js-surface`、`js-bindings`、`js-sandbox`、`js-anchors`、`js-tools-fs`、`js-transaction`、`js-tools-transaction-store`、`js-workflow`、`js-tool-host`、`file-mutation-tools`、`js-surface-gate` + NEW `js-parallel-contract`。
-- 复用：`scripts/checks/js-surface-gate.mjs`（static gate）、`tests/integration/plugin/file-mutation-tools.test.mjs`（plugin 级 mv/rm + 角色门禁，REUSE 不移动）。
-- 单跑：`node --test requirements/repository-programming/tests/<file>`（与 runner 一致设 `WANXIANGSHU_PROVIDER_LANGUAGE=en`）。全套：`node tests/unit/run.mjs`。
+- 复用：`scripts/checks/js-surface-gate.mjs`（static gate）、`requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs`（plugin 级 mv/rm + 角色门禁，REUSE 不移动）。
+- 单跑：`node --test requirements/repository-programming/tests/<file>`（与 runner 一致设 `WANXIANGSHU_PROVIDER_LANGUAGE=en`）。全套：`node requirements/verification-system/tests/run.mjs`。
 
 ## 边界（DOES NOT OWN）
 

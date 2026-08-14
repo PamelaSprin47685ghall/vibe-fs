@@ -44,7 +44,7 @@
 - `deadline-typed.test.mjs`（NEW）— Deadline 有界、防溢出、`nextWaitMs` 上限、判定只随注入时钟变化。
 - `clock-port-virtual.test.mjs`（NEW）— IClockPort 虚拟时钟推进/设定，多消费者相互独立，无 ambient。
 
-另有 REUSE 落点：`tests/unit/execution/devops-join-timeout.test.mjs`、`tests/unit/process/**`（EXEC-011）、`tests/unit/temporal/**`、`tests/unit/verify/g4r-ce-vocabulary.test.mjs`（ambient 静态扫描）。
+另有 REUSE 落点：`requirements/participant-horizon/tests/devops-join-timeout.test.mjs`、`tests/unit/process/**`（EXEC-011）、`tests/unit/temporal/**`、`requirements/structured-workflow/tests/g4r-ce-vocabulary.test.mjs`（ambient 静态扫描）。
 
 ## 阅读顺序
 

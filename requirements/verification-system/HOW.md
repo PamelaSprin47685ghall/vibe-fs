@@ -30,7 +30,7 @@
 ### 2. layer-0 gate 回归（`tests/e2e-watchdog-feed.test.mjs`）
 
 VERIFY-004 因果 watchdog feed 门禁的永久回归：top-level e2e 测试不得直接
-`watchdog.advance(`；唯一入口 `tests/e2e/entry.test.mjs` 必须在扫描范围内。
+`watchdog.advance(`；唯一入口 `requirements/verification-system/tests/e2e/entry.test.mjs` 必须在扫描范围内。
 （自 `tests/unit/verify/` 迁移，import 深度不变。）
 
 ### 3. 行数 advisory（`tests/kolmogorov-size-advisory.test.mjs`）
@@ -42,8 +42,8 @@ Kolmogorov size 是 advisory：超过基线只给 suggestion，0 blocking findin
 
 ```text
 node scripts/check.mjs              # 22 个 wired layer-0 gate（proof-ladder pin 清单）
-node tests/unit/run.mjs             # L1–3 入口：staleness gate + verdict-silence 监督
-node tests/unit/run.mjs --coverage  # VERIFY-009 覆盖门禁（run-inner 判阈值）
+node requirements/verification-system/tests/run.mjs             # L1–3 入口：staleness gate + verdict-silence 监督
+node requirements/verification-system/tests/run.mjs --coverage  # VERIFY-009 覆盖门禁（run-inner 判阈值）
 tests/e2e/support/*                 # watchdog / readiness / 因果原语（VERIFY-004）
 ```
 
@@ -61,7 +61,7 @@ node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs
 node --test requirements/verification-system/tests/kolmogorov-size-advisory.test.mjs
 ```
 
-proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 `node tests/unit/run.mjs` /
+proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 `node requirements/verification-system/tests/run.mjs` /
 `node scripts/check.mjs` 于本支线）。
 
 ## 历史与弃权
@@ -71,7 +71,8 @@ proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 
 | multi-canary / parallel pool / shuffle / 三轮 repeat（test.md G4R 之前形态） | GARBAGE（target-delete）：One World 取代；只作反例不成为目标 | WHAT-002/003；本 HOW |
 | `tests/e2e/cases/**`（31 cases） | GARBAGE：已删除；E2E_CASE_CEILING=0 只降不升 | WHAT-002 |
 | `enforcer-rulebook-gate.mjs` | retired stub（2026-08-12）：RuleBook 散文质量属编辑/判断关切，不设机械门；空壳保留在 proof-ladder allowlist | proof-ladder allowlist |
-| g4r-freeze / student-teacher-absence / 旧 symbol blacklist | 迁移期 ratchet（PROOF-MAP 标 DELETE）：新世界基线稳定后删除或由永久门承接；不进入永久 verifier | PROOF SPLIT@cutover |
+| g4r-freeze / student-teacher-absence | 迁移期 ratchet，已删除（2026-08-14 Wave 2b）：由 `e2e-watchdog-feed`（One World 门）与 unified-store `student-qa-revival` scanner 承接 | PROOF SPLIT@cutover |
+| 旧 symbol blacklist（dsl-ownership / provider-leak） | 迁移期 ratchet（PROOF-MAP 标 DELETE）：基线稳定后弱化；不进入永久 verifier | PROOF SPLIT@cutover |
 | canary-unbend / orchestrator-e2e-timeout 的具体场景修复 | 历史证据：证明「断言不可弯曲」「先可解释再修根因」有现实失败模式 | WHY 考古；WHAT-004/005 |
 | waitfact-causal-renewal 的 `renewOn` 记法 | 并入 VERIFY-004 因果续期语义（WHAT-006）；具体 schema 是当前 HOW | WHAT-006 |
 | fix.md 的 DSL 门禁盲区（136/245 文件） | 教训并入 WHAT-009（静态门禁命中真实路径）+ WHAT-010（验收判据不可放宽） | WHAT-009/010 |
@@ -81,8 +82,8 @@ proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 
 
 ## 遗留风险 / cutover 待办
 
-- **SPLIT@cutover**：g4r-freeze 迁移 ratchet → 永久 One World 门；覆盖门禁 → 独立 oracle
-  或包内测试；PROOF-MAP 归属分歧按 assertion 复核后回写协调文件。
+- **SPLIT@cutover**：g4r-freeze 迁移 ratchet → 永久 One World 门（已执行：`e2e-watchdog-feed`）；
+  覆盖门禁 → 独立 oracle 或包内测试；PROOF-MAP 归属分歧按 assertion 复核后回写协调文件。
 - **GAP@cutover**：「禁止跨级」的人工裁决面（物理契约论证）暂无机器落点，若需机器化再补。
 - 本包测试均为文本/文件系统级，不依赖 dist；proof-ladder 对 package.json / check.mjs 的
   格式假设（`&&` 拼接、`const checks = [...]` 形状）若未来改格式需同步适配（属本包独立

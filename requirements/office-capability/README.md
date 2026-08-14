@@ -27,9 +27,9 @@ caller-facing tool）同 ID 命中、consequence 不漂移；offices 不可互�
 - `tests/office-capability-integrity.test.mjs`（NEW，本包自有）：live-repo canary——五分法、
   五个 consequence 在 manager law + fork description 双语文档命中、各 office Role Law 携带
   consequence、offices 不可互换、calling 名只差 persona/depth。
-- REUSE：`tests/unit/verify/language-parity-gate.test.mjs` `gate_f_*`（Gate F fixture 测试）、
+- REUSE：`requirements/office-capability/tests/office-capability-gate.test.mjs` `gate_f_*`（Gate F fixture 测试）、
   `tests/eval/provider-office-boundary/`（四个 office-boundary oracle）、
-  `tests/integration/plugin/manager-tool-contract.test.mjs`（fork description = office capability map）。
+  `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs`（fork description = office capability map）。
 - 落点表见 `PROOF.md`。
 
 ## 阅读顺序

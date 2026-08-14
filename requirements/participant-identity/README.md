@@ -24,8 +24,8 @@ Persona 一次冻结不可变；换模型/换 tier/换 peer 只改 ExecutionBind
 - `tests/catalog.test.mjs`（自 `tests/unit/agent/` 移入）：Role DU、22 名目录、peer 对称、旧名拒绝。
 - `tests/session-persona.test.mjs`（自 `tests/unit/prompt/` 移入）：Persona 矩阵、bind-once、继承、
   prompt identity 不随 tier。
-- REUSE：`tests/unit/invariants/prompt-stability.test.mjs`（Persona/字节稳定性）、
-  `tests/unit/host/session-execution-binding.test.mjs`（PROMPT-006 binding 解析律）。
+- REUSE：`requirements/prefix-stability/tests/system-prompt-stability.test.mjs`（Persona/字节稳定性）、
+  `requirements/participant-identity/tests/session-execution-binding.test.mjs`（PROMPT-006 binding 解析律）。
 - 落点表见 `PROOF.md`。
 
 ## 阅读顺序

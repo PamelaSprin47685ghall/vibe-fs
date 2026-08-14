@@ -22,7 +22,7 @@ count 都留）；保留那些把这次 failure/conflict/未决 condition 与泛
 
 含义/动机：下一动作由这些区分性事实决定；丢一个关键 condition = 下一动作走错方向。
 
-证据：anchor `distinguishing`；REUSE `tests/unit/process/large-gate.test.mjs`（预算合同，见 DISTILL-011）。
+证据：anchor `distinguishing`；REUSE `requirements/output-distillation/tests/large-gate.test.mjs`（预算合同，见 DISTILL-011）。
 
 ## DISTILL-003：fragment 谦逊——沉默的 fragment ≠ 整体成功
 
@@ -123,7 +123,7 @@ map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面
 把二者合一 = 蒸馏者自己制造自己总结的证据。
 
 证据：anchor `no-execution`（distiller Role Law 双语命中，与 `process-execution` 边界互证）；
-REUSE `tests/unit/tools/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
+REUSE `requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
 `process-execution` PROOF.md）。
 
 ## DISTILL-011：Large Gate 与输出预算合同一致；禁无界缓冲
@@ -138,9 +138,9 @@ wins、release 泵队）；输出预算合同（estimate → threshold）与 gat
 边界：gate 的物理位置在 `Process/`，但其语义 owner 是输出预算合同（本包）；spool 采集本身 →
 `process-execution`。
 
-证据：REUSE `tests/unit/process/large-gate.test.mjs`（`VERIFY_009_large_gate_first_acquire_succeeds_immediately`、
+证据：REUSE `requirements/output-distillation/tests/large-gate.test.mjs`（`VERIFY_009_large_gate_first_acquire_succeeds_immediately`、
 `VERIFY_009_large_gate_second_acquire_waits_until_release`、cancelable waiter 组）；
-`tests/unit/process/process-runner.test.mjs`（`EXEC_011_large_estimate_acquires_and_releases_the_gate`）。
+`requirements/process-execution/tests/process-runner.test.mjs`（`EXEC_011_large_estimate_acquires_and_releases_the_gate`）。
 
 ## DISTILL-012：自定义 tool 文本结果确定性留尾截断
 
@@ -152,7 +152,7 @@ wins、release 泵队）；输出预算合同（estimate → threshold）与 gat
 含义/动机：Host head truncation 丢尾部（最新信息）；确定性留尾 = 压缩方向可预测、可测试。
 边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。
 
-证据：REUSE `tests/unit/plugin/tool-host-codec-full.test.mjs`（ToolResultBound 面，SPLIT 注记见
+证据：REUSE `requirements/output-distillation/tests/tool-host-codec-full.test.mjs`（ToolResultBound 面，SPLIT 注记见
 PROOF.md：wire 渲染 owner → `provider-projection`）。
 
 ## DISTILL-013：蒸馏不返回 chunk 统计仪表盘

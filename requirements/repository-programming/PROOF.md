@@ -1,8 +1,8 @@
 # PROOF — 测试落点表
 
 > 每条 WHAT 命题恰好一行落点。类型：`MOVE`（物理移入本包）/ `NEW`（本包新写）/ `REUSE`（留在原处，记录锚点与 cutover 计划）。
-> 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/repository-programming/tests/<file>`（与 `tests/unit/run.mjs` 一致设 en；shell 若导出其它语言值会改变本地化文案断言）。
-> 全套：`node tests/unit/run.mjs`；L0 门：`node scripts/check.mjs`。
+> 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/repository-programming/tests/<file>`（与 `requirements/verification-system/tests/run.mjs` 一致设 en；shell 若导出其它语言值会改变本地化文案断言）。
+> 全套：`node requirements/verification-system/tests/run.mjs`；L0 门：`node scripts/check.mjs`。
 
 ## 落点表
 
@@ -27,7 +27,7 @@
 | `REPOSITORY-PROGRAMMING-017` | `js-parallel-contract.test.mjs`（NEW）→ `JS018_generated_surface_teaches_parallel_safety_for_edits_and_reads` / `JS018_consecutive_transactions_re_snapshot_committed_state_no_lost_update` / `JS018_interleaved_reads_are_immutable_snapshots_not_mutation_aliases`；交叉 REUSE `tests/integration/plugin/`（Host 串行执行面，SPLIT@cutover 下表） | NEW + REUSE | `node --test requirements/repository-programming/tests/js-parallel-contract.test.mjs` |
 | `REPOSITORY-PROGRAMMING-018` | `js-anchors.test.mjs` → `JS019_failure_codes_are_stable_and_unique`；`js-sandbox.test.mjs` → `JS019_invalid_javascript_is_invalid_program` / `JS019_program_throw_is_program_failed`；`js-workflow.test.mjs` → `JS006_019_missing_anchor_is_typed_and_names_the_pattern` | MOVE | `node --test requirements/repository-programming/tests/js-anchors.test.mjs requirements/repository-programming/tests/js-sandbox.test.mjs requirements/repository-programming/tests/js-workflow.test.mjs` |
 | `REPOSITORY-PROGRAMMING-019` | `js-workflow.test.mjs` → `JS010_array_null_is_invalid_and_does_not_commit`（非法 return 零提交）/ `JS085_workflow_program_error_fails_without_commit` / `JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk`（commit 失败不给成功结果） | MOVE | `node --test requirements/repository-programming/tests/js-workflow.test.mjs` |
-| `REPOSITORY-PROGRAMMING-020` | `file-mutation-tools.test.mjs` → 全部 11 个 test（`FILEMUT_mv_moves_a_file` / `FILEMUT_mv_renames_a_directory_with_contents` / `FILEMUT_rm_removes_a_file` / `FILEMUT_rm_refuses_a_non_empty_directory` / `FILEMUT_mv_rename_failure_surfaces_os_message` 等）；交叉 REUSE `tests/integration/plugin/file-mutation-tools.test.mjs`（plugin 级 `AGENT_017_mv_*` / `AGENT_018_rm_*` + 角色门禁 `AGENT_016_*`） | MOVE + REUSE | `node --test requirements/repository-programming/tests/file-mutation-tools.test.mjs` |
+| `REPOSITORY-PROGRAMMING-020` | `file-mutation-tools.test.mjs` → 全部 11 个 test（`FILEMUT_mv_moves_a_file` / `FILEMUT_mv_renames_a_directory_with_contents` / `FILEMUT_rm_removes_a_file` / `FILEMUT_rm_refuses_a_non_empty_directory` / `FILEMUT_mv_rename_failure_surfaces_os_message` 等）；交叉 REUSE `requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs`（plugin 级 `AGENT_017_mv_*` / `AGENT_018_rm_*` + 角色门禁 `AGENT_016_*`） | MOVE + REUSE | `node --test requirements/repository-programming/tests/file-mutation-tools.test.mjs` |
 | `REPOSITORY-PROGRAMMING-021` | `js-surface-gate.test.mjs` → `JS_SURFACE_GATE_handwritten_tokens_use_inquiry_not_meditator` / `JS_SURFACE_GATE_rejects_handwritten_js_coder_outside_permission_matrix` / `JS_SURFACE_GATE_allows_permission_matrix_enumeration`；门禁本体 REUSE `scripts/checks/js-surface-gate.mjs`（`node scripts/check.mjs` 内运行） | MOVE + REUSE | `node --test requirements/repository-programming/tests/js-surface-gate.test.mjs`；`node scripts/checks/js-surface-gate.mjs` |
 
 ## 统计
@@ -36,7 +36,7 @@
 WHAT 命题：21（REPOSITORY-PROGRAMMING-001..021）
 落点：   MOVE 20 个命题（19 个纯 MOVE + 017/020/021 带 REUSE 交叉）
         NEW  1（js-parallel-contract.test.mjs ×3 test，覆盖 017）
-        REUSE 3（scripts/checks/js-surface-gate.mjs、tests/integration/plugin/file-mutation-tools.test.mjs、integration Host 串行面）
+        REUSE 3（scripts/checks/js-surface-gate.mjs、requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs、integration Host 串行面）
 GAP：    0
 ```
 
@@ -56,7 +56,7 @@ GAP：    0
 | `requirements/repository-programming/tests/file-mutation-tools.test.mjs` | `requirements/repository-programming/tests/file-mutation-tools.test.mjs` | 11 pass | 绿 |
 | `requirements/repository-programming/tests/js-surface-gate.test.mjs` | `requirements/repository-programming/tests/js-surface-gate.test.mjs` | 3 pass | 绿 |
 
-适配说明：4 个文件（`js-surface`/`js-bindings`/`js-tool-host`/`js-workflow`）原直接 `import { ofArray } from '../../../dist/fable_modules/.../Set.js'`——该直接 import 是 test-boundary 门（新增 requirements scope）禁止的遗留项；迁移时改写为经 sanctioned 适配层 `tests/unit/support/domain.mjs` 的 `FsSet.ofArray`（同一 comparer 语义），消除 4 条 baseline 遗留，门仍绿。`../support/domain.mjs` 深度修正为 `../../../tests/unit/support/domain.mjs`。
+适配说明：4 个文件（`js-surface`/`js-bindings`/`js-tool-host`/`js-workflow`）原直接 `import { ofArray } from '../../../dist/fable_modules/.../Set.js'`——该直接 import 是 test-boundary 门（新增 requirements scope）禁止的遗留项；迁移时改写为经 sanctioned 适配层 `requirements/verification-system/tests/support/domain.mjs` 的 `FsSet.ofArray`（同一 comparer 语义），消除 4 条 baseline 遗留，门仍绿。`../support/domain.mjs` 深度修正为 `../../../requirements/verification-system/tests/support/domain.mjs`。
 
 ## semantic anchor 归属（semantic-anchors.mjs）
 
@@ -66,6 +66,6 @@ GAP：    0
 
 | 现有文件 | 当前 owner 混合 | cutover 动作 |
 |---|---|---|
-| `tests/integration/plugin/file-mutation-tools.test.mjs` | `repository-programming`（mv/rm POSIX 语义断言：`AGENT_017_*`/`AGENT_018_*`）+ `office-capability`/`capability-enforcement`（角色门禁：`AGENT_016_mv_and_rm_are_denied_for_non_coder_roles`、`AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved`） | **SPLIT**：POSIX 语义断言并入本包（integration 层）；角色门禁断言归 `office-capability`（consequence）/`capability-enforcement`（gate） |
+| `requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs` | `repository-programming`（mv/rm POSIX 语义断言：`AGENT_017_*`/`AGENT_018_*`）+ `office-capability`/`capability-enforcement`（角色门禁：`AGENT_016_mv_and_rm_are_denied_for_non_coder_roles`、`AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved`） | **SPLIT**：POSIX 语义断言并入本包（integration 层）；角色门禁断言归 `office-capability`（consequence）/`capability-enforcement`（gate） |
 | `tests/integration/plugin/`（Host 工具调用串行执行面，REPOSITORY-PROGRAMMING-017 的 Host 侧） | Host 串行执行 = `host-boundary`（物理执行面）+ 本包（编程面合同） | **SPLIT**：模型侧合同断言并入本包；Host 物理串行语义归 `host-boundary` |
 | `scripts/checks/js-surface-gate.mjs` | MECHANISM（共享 checker）；语义唯一归本包（REPOSITORY-PROGRAMMING-021） | 门禁机制留在 `scripts/checks/`；其断言 owner 记为本包；cutover 后可移入本包 tests 或保留共享（机制可共享、断言不双 owner） |

@@ -108,7 +108,7 @@ Main Full/Identity 交付；`previous_enforcer_tip` 是低信任 Blogger 历史
 - 含义：诊断语料与补救语料同源不同权（Rulebook §20/§27/§28）；Main 指导泄漏进
   Blogger system 或检测散文冒充 Main 指令都是违规。
 - 证据：`audience-separation.test.mjs` `AUDIENCE_001/002/003`；REUSE
-  `tests/unit/enforcer/tip-v2-contract.test.mjs` `ENFORCER_TIP_13`
+  `requirements/guidance-delivery/tests/tip-v2-delivery.test.mjs` `ENFORCER_TIP_13`
   （work record 含 previous_enforcer_tip 块）；`PROOF.md` 行 18。
 
 ### GD-009 交付不创建 interaction authority
@@ -135,7 +135,7 @@ Jaccard ≥ 0.90 或 Levenshtein ≥ 0.95）；warn/note 级证据照常输出�
   另一条的同词触发条件污染（Rulebook A40；PROOF-MAP Phase D 归属本包）。
 - 边界：门是词法机械替代，**不冒充**人类 tournament（`archive/changes/completed/rulebook.md`
   Final outcome 诚实声明）。
-- 证据：REUSE `tests/unit/verify/enforcer-cross-family-collision.test.mjs`
+- 证据：REUSE `requirements/guidance-delivery/tests/enforcer-cross-family-collision.test.mjs`
   `enforcer_collision_*`；`PROOF.md` 行 20。
 
 ## D. 历史字节

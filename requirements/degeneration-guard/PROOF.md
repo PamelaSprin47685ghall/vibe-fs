@@ -1,7 +1,7 @@
 # degeneration-guard — 测试落点
 
 运行命令：单文件 `node --test requirements/degeneration-guard/tests/<file>.test.mjs`；整包被
-`node tests/unit/run.mjs` 自动发现。落点类型：MOVE = 从旧 `tests/unit` 物理移入本包；REUSE =
+`node requirements/verification-system/tests/run.mjs` 自动发现。落点类型：MOVE = 从旧 `tests/unit` 物理移入本包；REUSE =
 留在原处（多 owner 或共享 checker），记锚点与 cutover 拆分；NEW = 本包新写。
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
@@ -15,7 +15,7 @@
 | DG-007 命中只停止当前物理 attempt、恰好一次 | `tests/loop-sensor.test.mjs`：`LOOP_006_owned_low_diversity_stream_aborts_exactly_once`、`LOOP_006_unowned_session_never_aborts`、`LOOP_006_clear_armed_allows_next_attempt_to_arm_again` | MOVE | `node --test requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | DG-008 LoopKillArmed 进程内局部 | `tests/loop-sensor.test.mjs`：`LOOP_001_kill_arm_is_process_local_not_persisted` | MOVE | 同上 |
 | DG-009 强杀桥接标准 recovery | `tests/loop-sensor.test.mjs`：`LOOP_006_armed_abort_bridges_to_fallback_advance_once`（armed abort → recordConfirmedFailure 一次、同 run 去重）、`LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller`、`LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact` | MOVE | `node --test requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-009（桥接的静态形状） | `tests/unit/verify/p0-recovery-join-gate.test.mjs`：`P0_RECOVERY_JOIN_GATE_*`（lifecycle-aborted-record / record-completion-single-owner 正负模式） | REUSE | `node --test tests/unit/verify/p0-recovery-join-gate.test.mjs`（SPLIT@cutover：aborted≠terminal 规则归 effect-accounting） |
+| DG-009（桥接的静态形状） | `requirements/degeneration-guard/tests/p0-recovery-join-bridge-shape.test.mjs`：`P0_RECOVERY_JOIN_GATE_*`（lifecycle-aborted-record / record-completion-single-owner 正负模式） | REUSE | `node --test requirements/degeneration-guard/tests/p0-recovery-join-bridge-shape.test.mjs`（SPLIT@cutover：aborted≠terminal 规则归 effect-accounting） |
 | DG-010 作用域与豁免 | `tests/loop-sensor.test.mjs`：`LOOP_007_unowned_and_reasoning_deltas_are_ignored`、`LOOP_006_unowned_session_never_aborts` | MOVE | 同上 sensor |
 | DG-011 continuation 独立叶子 | `tests/loop-sensor.test.mjs`：`LOOP_006_continuation_text_is_the_english_loop_nudge`（loop-continue ≠ provider-retry 正文） | MOVE | 同上 sensor |
 | DG-012 detector 不是业务 truth / retry controller | `tests/loop-sensor.test.mjs`：`LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller`（sensor 无 Journal 句柄、不直接改 Offset） | MOVE | 同上 sensor |
@@ -27,7 +27,7 @@ cognition anchors）；本包为空清单。
 
 ## cutover 待办（SPLIT@cutover）
 
-1. `tests/unit/verify/p0-recovery-join-gate.test.mjs`：本包只 REUSE（LOOP-006 桥接的静态形状）；
+1. `requirements/degeneration-guard/tests/p0-recovery-join-bridge-shape.test.mjs`：本包只 REUSE（LOOP-006 桥接的静态形状）；
    gate 本体的 aborted≠terminal 规则归 `effect-accounting`，recovery 规则归
    `crash-reconciliation`。
 2. e2e（`tests/e2e/cases/fallback-aabb-trace.test.mjs` 中 loop-kill 路径）由 lead 在 cutover

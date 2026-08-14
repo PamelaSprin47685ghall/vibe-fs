@@ -27,7 +27,7 @@ participant 控制真实进程/PTY 时，command、signal、output、exit 与 ca
 - 包内（MOVE）：`tests/pty-types.test.mjs`、`tests/pty-api.test.mjs`、`tests/pty-backend.test.mjs`、
   `tests/pty-port.test.mjs`、`tests/pty-session.test.mjs`。
 - REUSE（SPLIT@cutover）：`tests/unit/process/{process-output,process-runner,pty-supervisor,large-gate}.test.mjs`、
-  `tests/unit/execution/process-wait.test.mjs`、`tests/unit/tools/executor-tool.test.mjs`。
+  `requirements/process-execution/tests/process-wait.test.mjs`、`requirements/process-execution/tests/executor-tool.test.mjs`。
 - Semantic anchors（`scripts/checks/semantic-anchors.mjs`）拥有：devops 组 `operational-closure` /
   `act-vs-observation` / `mechanical-meaning` / `continuing-process` / `signal-not-exit`；
   run 工具组 `command-is-act` / `economic-commitment`。
