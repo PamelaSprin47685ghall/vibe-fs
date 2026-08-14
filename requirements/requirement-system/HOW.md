@@ -4,13 +4,8 @@
 
 ## 实现模型
 
-<<<<<<< HEAD
 本包无 runtime 源码（META 包正确形态，证据 =
-`AGENTS.md` + `scripts/checks` + CI）。机制由三块组成：
-=======
-本包无 runtime 源码（META 包正确形态，见 `archive/requirements-design/EVIDENCE.md` §1：证据 =
 `AGENTS.md` + `scripts/checks` + CI）。机制由四块组成：
->>>>>>> cce0ad6d4180a09efd4b6b289d309ef42a069e6f
 
 ### 1. meta-verifier（`tests/meta-verifier.test.mjs`）
 
@@ -92,33 +87,17 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时三条
 | GOV-004（滚动基线：当前 docs+实现=当前系统） | HOW/GARBAGE：迁移期过渡概念；「不得从 Completed 解释当前语义」的 live 面已并入 WHAT-010 | WHAT-010 |
 | GOV-010（clean break：旧 proposal/status 目录废止） | HOW/GARBAGE：一次性迁移历史；live 面（废止路径不引用）并入 WHAT-010 | WHAT-010；本 HOW |
 | 当前 Clause ID 前缀表（ARCH/GOV/…/VERIFY） | HOW：迁移载体；ID 稳定性原则本身是 WHAT-008 | WHAT-008 |
-<<<<<<< HEAD
 | 旧 docs/README.md 导航职责 | HOW：已由 requirements/README.md 承接（2026-08-14 cutover） | 本 HOW §3 |
-| change 正文内容合同（Active 字段白名单、Completed 原文冻结） | 机制停用；人工评审承接表已收进 PROOF.md | WHAT-013；PROOF L20 |
-| blocker 协议（GOV-009） | 机制停用；过程合同，人工评审承接 | WHAT-014；PROOF L21 |
-| 直接闭环小变更（GOV-012） | 过程合同，人工评审承接（AGENTS.md 文档生命周期节为执行文本） | WHAT-015；PROOF L22 |
+| change 正文内容合同（Active 字段白名单、Completed 原文冻结） | Completed 不作当前依据 + live Active origin 标题：`tests/change-lifecycle.test.mjs`；Active 字段白名单 / 原文不被反向改写仍人工（GOV 禁止检查器读正文推断生命周期） | WHAT-013；PROOF L20 |
+| blocker 协议（GOV-009） | WHAT-014 四步原文由 `tests/change-lifecycle.test.mjs` 锁定；一次实现是否真正停下仍人工 | WHAT-014；PROOF L21 |
+| 直接闭环小变更（GOV-012） | AGENTS.md 豁免句由 `tests/change-lifecycle.test.mjs` 锁定 | WHAT-015；PROOF L22 |
 | 旧 36 工作集 / Proposal 生命周期本身 | 不迁入 WHAT：Git 记历史，未来树只表达当前接受真理 | 本 HOW |
 
 ## 遗留风险 / cutover 待办
 
 - **已闭合（2026-08-14）**：meta-verifier 依赖骨架解析源迁入 `requirements/INDEX.md`；
   `requirements/README.md` 承接树导航；spec gate 已重写为 requirements/ 树治理。
-- **GAP 已关**：WHAT-013/014/015 的 change-lifecycle verifier 无对象可扫（机制停用），
-  人工评审承接表收进 PROOF.md；GAP-003/004/005 记 CLOSED。
-=======
-| `archive/docs/README.md` 导航职责 | HOW：当前由 archive/docs/README.md 承担，cutover 后由 requirements/README.md 承接 | 本 HOW §3 |
-| change 正文内容合同（Active 字段白名单、Completed 原文冻结） | Completed 不作当前依据 + live Active origin 标题：`tests/change-lifecycle.test.mjs`；Active 字段白名单 / 原文不被反向改写仍人工（GOV 禁止检查器读正文推断生命周期） | WHAT-013；PROOF L20 |
-| blocker 协议（GOV-009） | WHAT-014 四步原文由 `tests/change-lifecycle.test.mjs` 锁定；一次实现是否真正停下仍人工 | WHAT-014；PROOF L21 |
-| 直接闭环小变更（GOV-012） | AGENTS.md 豁免句由 `tests/change-lifecycle.test.mjs` 锁定 | WHAT-015；PROOF L22 |
-| 旧 36 工作集 / Proposal 生命周期本身 | 不迁入 WHAT：Git 记历史，未来树只表达当前接受真理（HANDOFF §25.8） | 本 HOW |
-
-## 遗留风险 / cutover 待办
-
-- **SPLIT@cutover**：meta-verifier 的依赖骨架解析源从 `archive/requirements-design/INDEX.md` 迁入
-  requirements/ 树；`archive/docs/README.md` 导航职责移交 `requirements/README.md`；archive/docs/changes
-  归档后 spec gate 的 archive/docs/changes 检查面整体重写为 requirements/ 树治理。
 - **GAP**：WHAT-013 Active 原文冻结 / 正文白名单仍人工（`requirements/GAP.md` GAP-003 PARTIAL）；
   WHAT-014/015 机器面已由 `tests/change-lifecycle.test.mjs` 承接（GAP-004/005 CLOSED）。
->>>>>>> cce0ad6d4180a09efd4b6b289d309ef42a069e6f
 - 命题 ID 前缀规则（`<PACKAGE>-NNN` = 大写包名）由 meta-verifier 强制；若后续裁决改用其它
   格式，需同步改 verifier 与全部 WHAT（属本包独立变化）。

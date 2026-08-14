@@ -30,14 +30,12 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 
 ## GAP 记录
 
-<<<<<<< HEAD
-- 聚合台账见 `requirements/GAP.md`（GAP-007/008）。
-- `HOST-BOUNDARY-008` 的 HOST-010 因果读 canary（「绑定与身份」，见下 canary 表）
-  目前主要靠 review 家族 + journal 代理等式（REUSE），transform 内存 id ≡ ToolContext.messageID
-  的共时等价由 e2e canary 承担（不在 unit 范围）——GAP 标记为「e2e 承担」，cutover 时若 e2e
-  不迁移则需补 unit oracle。
+- 聚合台账见 `requirements/GAP.md`（GAP-007 CLOSED / GAP-008 OPEN）。
+- `HOST-BOUNDARY-008`：unit encoding 由 `tests/host010-run-id-equivalence.test.mjs` 承接
+  （bindableRun id ≡ ToolContext.messageID；0/≥2 无合法 run id）。共时 Host 穿线是不可模拟
+  physical contract，由 Long Stroke 入口声明（VERIFICATION-SYSTEM-003），不另立 unit GAP。
 - `HOST-BOUNDARY-019` 的 Magic Todo membrane canaries（下表 A..R）尚未落地实现（尚无
-  production membrane 或对应 canary 文件）——GAP：release gate 清单，由 obligation-ledger
+  production membrane 或对应 canary 文件）——GAP-008：release gate 清单，由 obligation-ledger
   团队 + host-boundary 的 H（定位）/A（时序）/C（原地 mutation）在实现后补。
 
 ## Magic Todo V1 membrane canaries（A..R，release-gate 清单）
@@ -84,15 +82,6 @@ REVISE settlement 后 sink 永久留否决 Pk                 → M 红
 bridge / Host TodoTable 当 canonical 恢复源             → P/L 红
 plugin tool 名 todowrite 覆盖 builtin                   → O 红
 ```
-=======
-- 聚合台账见 `requirements/GAP.md`（GAP-007 CLOSED / GAP-008 OPEN）。
-- `HOST-BOUNDARY-008`：unit encoding 由 `tests/host010-run-id-equivalence.test.mjs` 承接
-  （bindableRun id ≡ ToolContext.messageID；0/≥2 无合法 run id）。共时 Host 穿线是不可模拟
-  physical contract，由 Long Stroke 入口声明（VERIFICATION-SYSTEM-003），不另立 unit GAP。
-- `HOST-BOUNDARY-019` 的 Magic Todo membrane canaries（`archive/docs/proof/host.md` A..R）尚未落地实现
-  （`tests/unit/host/magic-todo-membrane-canary*.test.mjs` 不存在）——GAP-008：release gate 清单，
-  由 obligation-ledger 团队 + host-boundary 的 H（定位）/A（时序）/C（原地 mutation）在实现后补。
->>>>>>> cce0ad6d4180a09efd4b6b289d309ef42a069e6f
 
 ## 反向覆盖（OWNED / NEEDS-SPLIT clause → 本包命题）
 
