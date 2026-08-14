@@ -25,7 +25,7 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
-  SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
+  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
   SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
   SyncDelegateRuntime__StageDeletedInspector_59B1A0C0 as stageDeletedInspector,
   SyncDelegateRuntime__TryFind_636E3F87 as tryFind,

@@ -27,7 +27,7 @@ import {
 } from '../../../dist/Session/AttachedSessionRuntime.js'
 import {
   SyncDelegateRuntime,
-  SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
+  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
   SyncDelegateRuntime__InvokePrepared_Z13135FAE as invokePrepared,
   SyncDelegateRuntime__Dispose as disposeRuntime,
   SyncDelegateRuntime__TryFind_636E3F87 as tryFind,

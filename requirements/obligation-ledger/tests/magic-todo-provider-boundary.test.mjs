@@ -98,7 +98,7 @@ test('TODO-005 provider wording says Accepted becomes Current without reviewer s
 })
 
 test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
-  const membrane = read('src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs')
+  const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
   const hostCodec = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
 
   assert.match(membrane, /Diagnostic\.fatal "magic-todo-infrastructure-failed"/)
@@ -126,15 +126,15 @@ test('TODO-003 clean break removes the legacy todo ontology from the production 
 
 test('TODO-005 production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
-    'src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs',
+    'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
     'src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs',
-    'src/Wanxiangshu/Journal/MagicTodoProjection.fs',
+    'src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs',
   ]) {
     const text = read(path)
     assert.doesNotMatch(text, /semanticMerge|SettledCurrentRef|RevisePreview/, path)
   }
 
-  const projection = read('src/Wanxiangshu/Journal/MagicTodoProjection.fs')
+  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
   assert.match(
     projection,
     /CurrentObligationsRef\s*=\s*Some\(cp\.ProposedTodoRef, cp\.ProposedTodoDigest\)/,

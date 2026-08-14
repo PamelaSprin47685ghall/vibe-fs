@@ -19,7 +19,7 @@ test('OBLIGATION_LEDGER_018 business sequencing is a direct F# CE, not a second 
 })
 
 test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, never AcceptedOrder replay', () => {
-  const projection = read('src/Wanxiangshu/Journal/MagicTodoProjection.fs')
+  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
   for (const field of [
     'FirstAcceptedCheckpoint',
     'LatestAcceptedCheckpoint',
@@ -36,10 +36,10 @@ test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, n
   assert.doesNotMatch(projection, /ByLife\s*\|>\s*Map\.tryPick|Map\.tryPick/, 'reviewer authority lookup must use ReviewerLifeBySession rather than scan every Life')
 
   for (const path of [
-    'src/Wanxiangshu/Journal/ManagerOpeningFloor.fs',
+    'src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs',
     'src/Wanxiangshu/Application/Manager/ManagerIdle.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs',
-    'src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs',
+    'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
     'src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs',
   ]) {
     assert.doesNotMatch(read(path), /\.AcceptedOrder\b|acceptedOrder\s+/, `${path} must consume O(1) projection queries`)
@@ -48,7 +48,7 @@ test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, n
 
 test('OBLIGATION_LEDGER_018 recovery contract is fact reentry, not a resumable workflow position', () => {
   const facts = read('src/Wanxiangshu/Domain/MagicTodoFacts.fs')
-  const projection = read('src/Wanxiangshu/Journal/MagicTodoProjection.fs')
+  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
 
   assert.doesNotMatch(facts, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter|AwaitingReview\s*:/)
   assert.doesNotMatch(projection, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter/)

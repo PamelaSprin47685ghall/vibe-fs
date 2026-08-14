@@ -101,7 +101,7 @@ test('AC16: XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
 test('AC15 static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {
   for (const rel of [
     'src/Wanxiangshu/Session/BloggerCoordinator.fs',
-    'src/Wanxiangshu/Application/Reconciliation/CompanionTransform.fs',
+    'src/Wanxiangshu/Context/Companion/CompanionTransform.fs',
   ]) {
     const src = readFileSync(join(ROOT, rel), 'utf8')
     assert.equal(

@@ -24,7 +24,7 @@ import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
   SyncDelegateRuntime__InvokeBatchPrepared_Z2E60ED39 as invokeBatchPrepared,
-  SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
+  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
 import {

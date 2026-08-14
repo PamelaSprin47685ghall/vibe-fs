@@ -19,7 +19,7 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_FCBDD42 as invoke,
-  SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
+  SyncDelegateRuntime__HandleTurn_7C364186 as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
 import {
