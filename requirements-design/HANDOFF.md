@@ -1437,6 +1437,32 @@ requirements/
 
 # 29. 进行中：补 3 个 missing oracle（交接快照，未提交）
 
+# 30. 迁移已执行（2026-08-14，lead 集成完成）
+
+> 本节是迁移执行的事实记录，取代 §22「当前未做的事情」中的相关行。
+
+## 30.1 已完成
+
+- `requirements/` normative tree 已建立：**45 包 × {README, WHY, WHAT, HOW, PROOF}.md + tests/**（185 个包测试文件），见 `requirements/README.md` 索引。
+- 迁移契约 `MIGRATION-CONTRACT.md`：保姆级文档标准、WHAT 命题 ID 规范、MOVE/REUSE/NEW 测试规则、不丢失信息规则。
+- 3 个 missing oracle 全部落地：`requirements/verification-system/tests/proof-ladder.test.mjs`、`requirements/external-investigation/tests/browser-provenance-canary.test.mjs`、`requirements/output-distillation/tests/distiller-fragment-humility.test.mjs`；锚点强化与 drift 修复（e2e-watchdog-feed 接入 check.mjs、enforcer-rulebook-gate 标记 retired）已提交。
+- 测试归包：单-owner 测试文件物理移入各包 `tests/`（git mv，import 深度适配）；多-owner 文件留原处并记录 `SPLIT@cutover` 逐断言计划；新 GAP 落点以 NEW 测试补齐。`tests/unit/run.mjs` 已扩展发现 `requirements/*/tests/**/*.test.mjs`；`test-boundary` 门扩展 requirements scope（baseline 37→32）。
+- meta-verifier（`requirements/requirement-system/tests/meta-verifier.test.mjs`）：45 包 × 5 文档、WHAT 命题 ↔ PROOF 行交叉、落点文件存在性、DEPENDS ON ⊆ INDEX 骨架、无 INDEX 外目录——**全绿**。
+- 最终验证：`node scripts/check.mjs` exit 0；`node tests/unit/run.mjs` 2763/2763；`node tests/integration/run.mjs` 275/275；`node tests/integration/package/run.mjs` 全过。
+
+## 30.2 并发执行注记（历史归属）
+
+18 支线共享 checkout 并行提交，多次出现「队友 commit 扫入他人已 staged 的 rename」（`git add` 时序竞态）。全部内容与最终树已逐项核验正确（`git diff HEAD` 干净、测试绿）；仅部分 commit 的路径归属不精确，不构成内容问题。
+
+## 30.3 未做（cutover 阶段，下一步）
+
+- `docs/`、`changes/`、`tests/` 的删除/归档（用户明确「之后将被删除并存档」）——尚未执行，需用户确认后一次性执行。
+- `SPLIT@cutover`：各包 PROOF.md 记录的逐断言拆分（多-owner 测试文件、integration/e2e 层迁移、g4r-freeze/student-teacher-absence 等 migration ratchet 删除、test-boundary baseline `--generate` 收缩）。
+- 已知 GAP（已文档化）：`finality` FINALITY-028、`external-investigation` EXTERNAL-011、`requirement-system` 013/014/015 过程合同、`verification-system` 003 物理契约论证。
+- `requirements-design/` 协调文件（INDEX/PROOF-MAP/COVERAGE/AUDIT）在 cutover 时并入 `requirements/` 树或归档。
+
+
+
 状态：调查完成，尚未落盘。工作树干净（`18a434e9`）。下一个对话直接按本节执行，无需重新考古。
 
 ## 任务来源
