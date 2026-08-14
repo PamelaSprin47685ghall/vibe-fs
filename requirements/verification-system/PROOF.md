@@ -16,6 +16,7 @@
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/proof-ladder.test.mjs`（test: VERIFY_001_every_wired_gate_path_exists / VERIFY_001_every_ladder_step_target_exists） | NEW | node --test requirements/verification-system/tests/proof-ladder.test.mjs |
 | VERIFICATION-SYSTEM-010 | REUSE `requirements/verification-system/tests/proof-ladder.test.mjs`（层序与 sole-entry pin；g4r-freeze case-ceiling ratchet 已退休 2026-08-14，断言强度不缩水） | REUSE | node --test requirements/verification-system/tests/proof-ladder.test.mjs |
 | VERIFICATION-SYSTEM-011 | REUSE `requirements/verification-system/tests/run.mjs`（--coverage 阈值门禁，run-inner COVERAGE_LINE_THRESHOLD）；SPLIT@cutover：覆盖门禁拆分计划见 HOW.md | REUSE | node requirements/verification-system/tests/run.mjs --coverage |
+| VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs`（结构性 absence：本包 tests 与 scripts/checks 内无行数检查指纹 SOFT_LIMIT / exceeds advisory / size-advisory / 行数） | NEW | node --test requirements/verification-system/tests/no-line-count-check.test.mjs |
 
 ## 语义 anchor
 

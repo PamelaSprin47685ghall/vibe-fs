@@ -38,7 +38,14 @@ VERIFY-004 因果 watchdog feed 门禁的永久回归：top-level e2e 测试不�
 HOST-010 messageID / Repeat-until-pass forbidden）；删声明即红。`format-build-test` 禁止
 repeat-until-pass。答不出则不得留在 e2e。
 
-### 4. 运行器机制（lead 集成时执行，本包 REUSE 登记）
+### 4. 行数非门禁 absence 证明（`tests/no-line-count-check.test.mjs`）
+
+VERIFICATION-SYSTEM-012 的机器载体：扫描本包 tests 与 `scripts/checks/*.mjs`
+（本包 MECHANISM），断言不存在行数检查指纹（SOFT_LIMIT / exceeds advisory /
+size-advisory / 行数）。故意不扫泛词——`lineCount` 是 diagnostics 合法字段、覆盖
+门禁（VERIFY-011）按行统计合法、`kolmogorov-principles` 是产品 tool 参数。
+
+### 5. 运行器机制（lead 集成时执行，本包 REUSE 登记）
 
 ```text
 node scripts/check.mjs              # 18 个 wired layer-0 gate（proof-ladder pin 清单）
@@ -58,6 +65,7 @@ tests/e2e/support/*                 # watchdog / readiness / 因果原语（VERI
 ```text
 node --test requirements/verification-system/tests/proof-ladder.test.mjs
 node --test requirements/verification-system/tests/e2e-watchdog-feed.test.mjs
+node --test requirements/verification-system/tests/no-line-count-check.test.mjs
 ```
 
 proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 `node requirements/verification-system/tests/run.mjs` /

@@ -235,5 +235,5 @@ advisory 本身没有失败价值：不判红的「检查」只会让人以为�
 
 **边界**：本命题管「行数不得成为门、不得被机械检查」；各语义门禁的 allowlist 内容归各包。
 
-**证据指针**：无机械载体（advisory 测试已删除 2026-08-15）；本命题由构造满足——仓库内
-不存在任何行数检查脚本。删除记录见 CHANGELOG。
+**证据指针**：`requirements/verification-system/tests/no-line-count-check.test.mjs`
+（结构性 absence：本包 tests 与 scripts/checks 内无行数检查指纹）；→ PROOF.md L19。

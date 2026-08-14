@@ -8,8 +8,8 @@
 //
 // Existing violations (imports of dist/fable_modules/** in *.test.mjs that
 // predate this check) are grandfathered in EMBEDDED_BASELINE and tolerated;
-// NEW violations fail. Unlike Kolmogorov size (which is advisory only), this
-// is a semantic anti-corruption boundary: compiler-runtime imports must not spread.
+// NEW violations fail. This is a semantic anti-corruption boundary, not a
+// size heuristic: compiler-runtime imports must not spread.
 //
 // Modes:
 //   node scripts/checks/test-boundary.mjs
