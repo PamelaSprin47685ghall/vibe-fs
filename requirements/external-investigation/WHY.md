@@ -42,7 +42,7 @@ proof 只有 5 条**松**锚点（`/disagreement/i`、`/far shore/i` 这类单�
 从当前 browser backend 换成另一 browser/search backend，只要 provenance / evidence
 boundary 不变 → 本包可独立重大变化（`20-capability-external.md` INDEPENDENT CHANGE）。
 
-## DEPENDS ON（`archive/requirements-design/INDEX.md` 依赖骨架唯一来源）
+## DEPENDS ON（`requirements/INDEX.md` 依赖骨架唯一来源）
 
 - `office-capability`：Browser office 的 entitled consequence 是前提（external fact
   acquisition 是 office 的职责）。

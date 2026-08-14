@@ -5,9 +5,8 @@
 > 历史断言、迁移沉积、被拒方案**不是**命题（见 HOW.md「历史与弃权」）。
 > 前缀 `SPEC-INV-`。测试落点表见 `PROOF.md`。
 
-源条款：`archive/docs/what/strength.md` STRENGTH-001..012（本包主导全部 12 条，COVERAGE.md 单-owner
-裁决）；`archive/docs/why/strength.md`、`archive/docs/shape/strength.md`、`archive/docs/how/strength.md`、
-`archive/docs/proof/strength.md`、`archive/changes/completed/strength.md`。
+源条款：历史 what/strength STRENGTH-001..012（本包主导全部 12 条，COVERAGE.md 单-owner
+裁决）；历史 why/shape/how/proof strength 条款、历史 change（strength）。
 
 ---
 

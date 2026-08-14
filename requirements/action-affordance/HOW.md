@@ -42,7 +42,7 @@ semantic owner（本包/office-capability/…）
 | 当前高风险 verb 名单与 allowlist（`fork, commission, inspect, run, query-shell, establish-behavior, repair-behavior, fetch, join, horizon, judge, suicide, fission, chronicle, js-*`） | **证据，非永久 ontology**（boundary card DOES NOT OWN：「当前动作名清单与高风险 allowlist」）；「高风险 verb 必须有合同」是命题（002），名单本身可重构 | WHAT 002 |
 | `LEGACY_FORBIDDEN_NAMES`（verdict/list/executor/return/fork-pty/...） | **迁移 ratchet**：已删工具名的 absence 证明迁移完成；新世界基线稳定后 DELETE（PROOF-MAP §92）。schema/name 面归 `capability-enforcement` | HOW + PROOF |
 | `js-capability-projected-tools.md` / `js-tools-toml-result.md` | **不归本包**（`repository-programming` / `provider-projection` / `capability-enforcement`）：JS 工具面是 repository programming 面；本包只取「`js-*` 属高风险 verb、需要合同」的宽命题 | WHAT 002 |
-| `archive/docs/why/js-tools.md` 的 JS-001..020 | 不归本包（repository-programming 的 HOW） | — |
+| 历史 why/js-tools 的 JS-001..020 | 不归本包（repository-programming 的 HOW） | — |
 | exact `calling` 枚举值（navigator/researcher/coordinator/lead/...） | 证据；命题是「calling 是 capability 选择，不是裸 enum」（009） | WHAT 009 |
 
 ## 依赖说明

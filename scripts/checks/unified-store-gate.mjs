@@ -353,7 +353,7 @@ export const scanStudentQaRevival = (text, file = '<synthetic>') => {
     const n = norm(file)
     // Scope: production src/ tree (and synthetic/fixture paths used in unit tests).
     // scripts/docs mentions are out of scope here; this scanner owns storage-path revival.
-    if (n.startsWith('scripts/') || n.startsWith('archive/')) return []
+    if (n.startsWith('scripts/')) return []
   }
 
   const lines = text.split('\n')

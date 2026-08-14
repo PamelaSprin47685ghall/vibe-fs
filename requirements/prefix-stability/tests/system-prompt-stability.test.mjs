@@ -47,10 +47,10 @@ const assertSystemFrozen = ({ catalog, managerPromptId, reviewerPromptId }) => {
 }
 
 test('PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
-  const verify = readFileSync(new URL('../../../archive/docs/proof/verify.md', import.meta.url), 'utf8')
-  assert.match(verify, /prompt-stability\.test\.mjs/)
-  assert.match(verify, /Gate D/)
-  assert.match(verify, /system prompt 字节相同/)
+  const what = readFileSync(new URL('../WHAT.md', import.meta.url), 'utf8')
+  assert.match(what, /system-prompt-stability\.test\.mjs/)
+  assert.match(what, /byte-identical/)
+  assert.match(what, /Peer Fallback/)
 })
 
 test('PROMPT_STABILITY_fallback_peer_switch_keeps_system_prompt_bytes', () => {

@@ -1,7 +1,7 @@
 // Moved from tests/unit/prompt/provider-system-transform.test.mjs (cutover Wave 2a);
 // owner: provider-language（未认领判定：断言 = PROMPT-017 ProviderLanguage 的运行时应用
 // —— session 语言本地化 WXS 自有 system 段、host 段字节不动、English session 稳定。
-// 证据链：provider-language WHAT PROVIDER-LANGUAGE-001/005 证据 archive/docs/what/prompt.md
+// 证据链：provider-language WHAT PROVIDER-LANGUAGE-001/005 证据 历史 PROMPT 条款
 // PROMPT-017；PROOF-MAP prompt/ family 含 provider-language。provider-projection 只拥有
 // 投影确定性、cognitive-environment 只拥有内容组织，均不拥有语言轴。）
 

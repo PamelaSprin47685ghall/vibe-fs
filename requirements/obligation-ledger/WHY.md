@@ -41,7 +41,7 @@ RED = 满足下列任一：
 
 ## 4. 历史考古（为什么曾经 RED）
 
-`archive/changes/completed/magic-todo.md` 的 GrandRewrite 之前，provider 冷状态带
+历史 change（magic-todo）的 GrandRewrite 之前，provider 冷状态带
 `kind/id/status/priority/reviewing`，`settled/proposed/semanticMerge` 三态 + status min-merge 决定
 「preview 是否生效」。被拒方案与裁决：
 
@@ -54,4 +54,4 @@ RED = 满足下列任一：
 | 每 Life 从 Host TodoTable adopt 旧项 | 新 Life canonical 空；仅升级瞬间一次 seed |
 | 用 `TodoStage`/`AwaitingReview` 程序计数器 | 恢复只从 durable facts 推导 |
 
-完整推导见 `archive/docs/why/todo.md`；这些被拒方案记录在 HOW.md「历史与弃权」。
+完整推导见历史 why/todo 条款；这些被拒方案记录在 HOW.md「历史与弃权」。

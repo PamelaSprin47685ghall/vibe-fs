@@ -87,7 +87,7 @@
 
 **规范**：TodoProcessReview（过程评审）是 checkpoint 工作的**真实判断**：一次 durable `judge`（PERFECT 或 REVISE）即 terminal。它**不走** challenge / 二次 PERFECT / dual-PERFECT witness 代数——那是 FinalityReview 的确认协议。过程判断必须于本 request 内产生具体 prose 工作记录（缺陷/应改项，或 PERFECT 时已检查且未发现实质问题）；**无 prose 的过程 PERFECT 无效**，不得形成可消费报告。
 
-**含义/动机**：过程评审是 lag-1 节拍义务（每次 `TodoWriteAccepted` 恰好一次 Rk，节拍规则归 `obligation-ledger`）。若过程也强制 challenge + 二次 PERFECT，会把并行工作压成串行，并与终末 2N 代数混淆（archive/docs/why/review.md「过程一次判断 vs 终末双 PERFECT」）。过程 verdict 仍是判断——它决定该 checkpoint 的业务 outcome（PERFECT/REVISE → settle），只是不需要第二次因果确认。
+**含义/动机**：过程评审是 lag-1 节拍义务（每次 `TodoWriteAccepted` 恰好一次 Rk，节拍规则归 `obligation-ledger`）。若过程也强制 challenge + 二次 PERFECT，会把并行工作压成串行，并与终末 2N 代数混淆（历史 why/review「过程一次判断 vs 终末双 PERFECT」）。过程 verdict 仍是判断——它决定该 checkpoint 的业务 outcome（PERFECT/REVISE → settle），只是不需要第二次因果确认。
 
 **边界**：Rk 的 1:1 派生与消费节拍 → `obligation-ledger`；「过程 verdict 不进入 terminal witness 代数」的计数规则 → `review-assurance`（REVIEW-020 / GLORY-058）；可消费报告的 record-ready 条件 → `review-assurance`（REVIEW-014）。本命题只冻结「过程评审是一次真实、一次性的判断」。
 

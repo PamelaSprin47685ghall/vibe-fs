@@ -3,7 +3,7 @@
 ## 一句话
 
 物理 `role=user` 廉价且可伪造；若不把 authority 收成 typed 来源，continuation 与 repair 会自我抬升
-为 HumanRoot，Fallback/Review 预算被反复重置（`archive/docs/why/prompt.md` §1）。
+为 HumanRoot，Fallback/Review 预算被反复重置（历史 why/prompt §1）。
 
 ## 不可替代性：为什么别的包解释不了
 

@@ -94,7 +94,7 @@ single-flight registry（`IParkedTransformHost.HasFlight` / `bloggerFlights`）�
 | 继续只靠名称黑名单 | 可被等价改名绕过 | `fsharp-dsl-governance.md` Alternatives 1 |
 | 对任何含多个 DU/option 的 record 一律判红 | 误伤合法领域模型，不可接受 | `fsharp-dsl-governance.md` Alternatives 2 |
 | 只做报告不做门禁 | 不能长期替代可执行门禁 | `fsharp-dsl-governance.md` Alternatives 3 |
-| 独立 Loop 恢复机制 | 第二状态机；破坏 FALLBACK-003 唯一写入口；桥接 FallbackController 复用统一预算 | `archive/docs/why/loop.md`（degeneration-guard 交叉） |
+| 独立 Loop 恢复机制 | 第二状态机；破坏 FALLBACK-003 唯一写入口；桥接 FallbackController 复用统一预算 | 历史 why/loop 条款（degeneration-guard 交叉） |
 | 大 `Decision` DU 压扁整个 workflow | 仍是程序计数器；只允许小型真实领域判断（ReviewWitness / ReviewerOutcome / PromptAcceptance / FamilyRecovery） | `ce-temporal-ownership.md` §2 |
 | `TurnCompletionProgram` 什么都管 | 第二运行时；拆成五个独立时序 owner + 薄 router | `ce-temporal-ownership.md` §3/§15 |
 

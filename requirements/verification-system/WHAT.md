@@ -67,7 +67,7 @@ e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）+ 唯一 L
 **规范陈述**：每个 verifier / gate / canary 必须真正可红：每个静态门有永久回归测试，
 且用受控反例证明仓库入口会判红；反例不得进入最终提交。断言不得为绿而削弱。
 
-**含义/动机**：可红性是证明资格的地板。canary 迎合错误生产（`archive/changes/completed/canary-
+**含义/动机**：可红性是证明资格的地板。canary 迎合错误生产（历史 change（canary-
 unbend.md`）与「删掉回归没有任何测试变红」都是同一件事：门没有失败价值。
 
 **边界**：本命题管「可红」；每个具体断言的可红 fixture 归该断言 owner（每 assertion 恰
@@ -180,7 +180,7 @@ fail closed）。
 伪门禁，等同于没有检查。层序/ladder 中每个被声明的入口（check.mjs、build.mjs、各
 run.mjs、entry.test.mjs、wired gate）必须是真实存在的文件。
 
-**含义/动机**：`archive/changes/completed/fix.md` 教训：DSL 门禁只扫 136/245 个文件仍宣称全量
+**含义/动机**：历史 change（fix）教训：DSL 门禁只扫 136/245 个文件仍宣称全量
 清零——门没装在房间门口。proof-ladder 的「每个 wired 路径存在」断言把这条变成机器事实。
 
 **边界**：本命题管「门禁自身指向真实路径」；具体扫描范围（扫哪些源码）归各语义门禁的
@@ -196,7 +196,7 @@ owner。
 执行者不得自降 close 判据（Deferred 不阻塞 close 需用户 Amendment——过程面归
 `requirement-system` 的 blocker 协议）。
 
-**含义/动机**：`archive/changes/completed/fix.md` 审计的「验收口径事后缩水」：frozen scope 明说
+**含义/动机**：历史 change（fix）审计的「验收口径事后缩水」：frozen scope 明说
 是 close 条件，执行者自己宣布 Deferred 不阻塞 close。机器 ratchet 只降不升 + 过程
 Amendment 协议双保险。
 

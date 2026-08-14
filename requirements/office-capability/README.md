@@ -13,7 +13,7 @@ caller-facing tool）同 ID 命中、consequence 不漂移；offices 不可互�
 
 ## HOW 概览
 
-- 权威模型：`archive/docs/what/architecture.md` ARCH-017（Office Capability Model）。
+- 权威模型：历史 ARCH-017（Office Capability Model，2026-08-14 归档）；现行规范见 WHAT OFF-002/005。
 - 语义锚点目录：`scripts/checks/semantic-anchors.mjs` `OFFICE_CAPABILITY_ANCHORS`（5 id，本包拥有）
   与 `OFFICE_CAPABILITY_NEGATIVES`；Gate F 机制在 `scripts/checks/language-parity-gate.mjs`
   `scanOfficeCapabilityIntegrity`。

@@ -7,7 +7,7 @@
 
 | WHAT 命题 | 实现载体 | 说明 |
 |---|---|---|
-| 001 | `archive/docs/what/architecture.md` ARCH-014 decision filter（规范本体）；`scripts/checks/provider-leak-gate.mjs` 只做反向 enforcement | filter 六问目前是文档级律；正向可红性由 Gate B + 本包 admission-law 测试承接 |
+| 001 | 历史 ARCH-014 decision filter（规范本体）；`scripts/checks/provider-leak-gate.mjs` 只做反向 enforcement | filter 六问目前是文档级律；正向可红性由 Gate B + 本包 admission-law 测试承接 |
 | 002/003/004/005 | `scripts/checks/provider-leak-gate.mjs` → `FORBIDDEN_TOKENS` / `FORBIDDEN_DTO_PATTERNS` / `FAST_DEEP_BINDING_RE`，扫描 `PROVIDER_SCAN_ROOTS` 列出的 renderer（JoinResultRenderer、HorizonTool、JoinTool、ForkTool、PtyTool、ExecutorTool、InspectorTool、FetchTool、FinalityTool、BashHoneypotTool、FileMutationTools、ChronicleTool、CoderTool、JudgeTool、JsBookkeeperTool） | Gate B（ARCH-016）；baseline ratchet 见「历史与弃权」 |
 | 003/011 | `Infrastructure/OpenCode/Tools/HorizonTool.fs`、`JoinTool.fs`、`Infrastructure/OpenCode/Codec/JoinResultRenderer.fs` | 自然语言后果渲染；`requirements/delegation/tests/join-tool-family.test.mjs` 有真实 wire 断言 |
 | 006/007/010 | `Infrastructure/OpenCode/Tools/ForkTool.fs`、`ToolRegistry.fs`（role predicate）；`resources/provider/tool/{fork,commission}/description/*.md` | 可见集合的运行时执行面 + 文案面 |
