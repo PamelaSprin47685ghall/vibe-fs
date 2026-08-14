@@ -29,7 +29,7 @@ import {
   stream,
   toList,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import { applyTransform, reconcileAttempt } from '../../../dist/Application/Reconciliation/XWire.js'
 import {
   PluginRuntimeScope_$ctor_Z47771AD0 as makeScope,

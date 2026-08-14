@@ -35,7 +35,7 @@ import {
   stream,
   toolCallId,
   toList,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 
 const openLife = async (journal, session, life) => {
   const appended = await agentJournal.appendManagerLifecycle(

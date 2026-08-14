@@ -14,7 +14,7 @@ import {
   sessionId,
   idValue,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../verification-system/tests/support/domain.mjs'
 import {
   buildTurn,
   classifyOutcome,
