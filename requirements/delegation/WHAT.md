@@ -222,8 +222,10 @@ deep-ROLE 命中 `[NEEDHELP]` 时：claim 当前 assistance abort，等待 fresh
 「如何解决这个 agent 的当前困难？」开头。consultation 普通完成由 assistance 路由消费，物化
 `includeOpening=false` 的 WorkRecord，作为 typed `NeedHelpAdvice` continuation 返回原 binding。
 consultation 不继承 owner Persona、不得递归 NEEDHELP；owner single-flight（同 owner 至多一个 active
-consultation）；每 LogicalRun 次数有限、额度不向 provider 暴露；取消/终结后迟到 advice 不得复活 owner；
-sentinel 在 XTrace capture 前剥离，不写入 WorkRecord/Chronicle（AGENT-031、HOST-027）。
+consultation）；每 LogicalRun 次数有限、额度不向 provider 暴露；取消/终结时 physical child abort 立即发出，
+且 owner deletion 的返回 Task 必须等待 durable `HandleAbandoned` 落地后才能继续释放 Journal/store；不得把
+该 durable cleanup 作为 detached task 丢弃。取消/终结后迟到 advice 不得复活 owner；sentinel 在 XTrace
+capture 前剥离，不写入 WorkRecord/Chronicle（AGENT-031、HOST-027）。
 
 含义/动机：求助是真实依赖（请求方等待 advice 才继续），不是假 completion / hidden prose injection；
 owner 生命周期约束保证咨询不脱管。
