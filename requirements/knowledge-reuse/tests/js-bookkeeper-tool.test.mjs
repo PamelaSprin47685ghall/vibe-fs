@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { listItems, resultOf } from '../support/domain.mjs'
+import { listItems, resultOf } from '../../../tests/unit/support/domain.mjs'
 import {
   BookkeeperRuntime_bindSession as bindSession,
   BookkeeperRuntime_resetSessionPort as resetSessionPort,

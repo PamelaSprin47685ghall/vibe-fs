@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { reviewSeal } from '../support/domain.mjs'
+import { reviewSeal } from '../../../tests/unit/support/domain.mjs'
 
 /** Host-raw message shape SessionSnapshotPort.projectMessages accepts. */
 const msg = ({ id, role, parentID, completed, agent, summary, mode }) => {

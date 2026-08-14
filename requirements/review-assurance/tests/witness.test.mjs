@@ -38,7 +38,7 @@ import {
   verdictWitness,
   providerLanguage,
   providerResources,
-} from '../support/domain.mjs'
+} from '../../../tests/unit/support/domain.mjs'
 
 // A visible stand-in for sha256: the property under test is which text is
 // digested, not the hash function.

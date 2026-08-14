@@ -17,7 +17,7 @@ import {
   CasebookProjection_fold as fold,
   CasebookProjection_evict as evict,
 } from '../../../dist/Domain/Casebook.js'
-import { caseOf, listItems, mapEntries, toList } from '../support/domain.mjs'
+import { caseOf, listItems, mapEntries, toList } from '../../../tests/unit/support/domain.mjs'
 
 const caseIndex = (cls, name) => Object.create(cls.prototype).cases().indexOf(name)
 const observation = (name, payload) => new Observation(caseIndex(Observation, name), payload)

@@ -13,7 +13,7 @@ import { Observation } from '../../../dist/Domain/Casebook.js'
 import { loadEvents } from '../../../dist/Infrastructure/CasebookStore.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { caseOf, listItems, resultOf, toList } from '../support/domain.mjs'
+import { caseOf, listItems, resultOf, toList } from '../../../tests/unit/support/domain.mjs'
 import {
   CANONICAL_A,
   CANONICAL_Q,
