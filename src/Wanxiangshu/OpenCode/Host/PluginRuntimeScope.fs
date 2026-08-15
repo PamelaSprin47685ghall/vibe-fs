@@ -315,6 +315,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
             recovery.ClearAttemptPlansFor key
 
+    let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
+        task {
+            match owner with
+            | Some active -> do! active.DisposeAsync()
+            | None -> ()
+        }
+
     member this.DisposeAsync() : Task =
         lock disposeGate (fun () ->
             match disposeTask with
@@ -335,9 +342,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                                 toolRuntime <- None
                                 owner)
 
-                        match runtimeOwner with
-                        | Some owner -> do! owner.DisposeAsync()
-                        | None -> ()
+                        do! disposeRuntimeOwner runtimeOwner
 
                         sessions.Dispose()
                         syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())

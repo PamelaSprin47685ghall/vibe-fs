@@ -16,6 +16,7 @@ open Wanxiangshu.Strength.Replica
 open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
@@ -41,6 +42,35 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
+module private OrchestratorRuntimeDecisions =
+    /// Job progress evidence → continue eligibility (GLORY-068: terminal never revives).
+    let requireActiveJob (record: ManagerJobProjection) : Result<ManagerJobProjection, string> =
+        match record.Progress with
+        | JobProgress.Published _
+        | JobProgress.Failed _
+        | JobProgress.Abandoned ->
+            Error(sprintf "Manager job is no longer active: %s" (ManagerJobId.value record.ManagerJobId))
+        | JobProgress.ManagerStarted
+        | JobProgress.CandidateReady _
+        | JobProgress.ConflictPending _
+        | JobProgress.RebasedCandidateReady _
+        | JobProgress.PublishClaimed _ -> Ok record
+
+    let mapTaskError (mapper: 'error -> 'mapped) (operation: Task<Result<'value, 'error>>) =
+        task {
+            let! result = operation
+            return Result.mapError mapper result
+        }
+
+    let releaseWorktreeOnError (worktree: WorktreeResource) (operation: Task<Result<'value, 'error>>) =
+        task {
+            match! operation with
+            | Ok value -> return Ok value
+            | Error error ->
+                let! _ = worktree.Release()
+                return Error error
+        }
+
 /// Runtime owner for ManagerJob resources. Every job runs the sequential
 /// direct-CE OrchestratorProgram workflow; the mailbox contains only final post-FF verdicts.
 ///
@@ -65,13 +95,12 @@ type Orchestrator
         IntegrationGate.lockPath (defaultArg lockRepoPath repoPath) (TargetRef.value targetRef)
 
     let appendFact stream fact =
-        task {
+        taskResult {
             match journalPort with
-            | None -> return Ok()
+            | None -> return ()
             | Some port ->
-                match! port.AppendFact stream fact with
-                | Ok _ -> return Ok()
-                | Error error -> return Error error
+                let! _ = port.AppendFact stream fact
+                return ()
         }
 
     let snapshot () =
@@ -112,118 +141,84 @@ type Orchestrator
         (expectedToolCalls: int option)
         (worktreePath: WorktreePath option)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
-        task {
-            let! dirty = git.IsDirty(WorktreePath.create repoPath)
+        taskResult {
+            let! dirty = git.IsDirty(WorktreePath.create repoPath) |> TaskResultCE.ofTask
+            do! if dirty then Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty") else Ok()
 
-            if dirty then
-                return Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty")
-            else
-                let path = defaultArg worktreePath (defaultWorktreePath jobId)
-                // PERSIST-009: effect identity is deterministic before git runs.
-                let identity = WorktreeCommands.identityOf jobId
+            let path = defaultArg worktreePath (defaultWorktreePath jobId)
+            // PERSIST-009: effect identity is deterministic before git runs.
+            let identity = WorktreeCommands.identityOf jobId
 
-                let requestFact =
-                    OrchestratorFact.WorktreeCreateRequested
-                        {| ManagerJobId = jobId
-                           WorktreeIdentity = identity
-                           WorktreePath = path |}
+            let requestFact =
+                OrchestratorFact.WorktreeCreateRequested
+                    {| ManagerJobId = jobId
+                       WorktreeIdentity = identity
+                       WorktreePath = path |}
 
-                match! appendFact StreamId.Workspace requestFact with
-                | Error error ->
-                    return
-                        Error(
-                            OrchestratorVerdict.IntegrationFailed(
-                                jobId,
-                                sprintf "Failed to persist worktree request: %s" error
-                            )
-                        )
-                | Ok() ->
-                    match! WorktreeResource.Create(git, jobId, path) with
-                    | Error error ->
-                        return
-                            Error(
-                                OrchestratorVerdict.IntegrationFailed(
-                                    jobId,
-                                    sprintf "Failed to create worktree: %s" error
-                                )
-                            )
-                    | Ok worktree ->
-                        let createdFact =
-                            OrchestratorFact.WorktreeCreated
-                                {| ManagerJobId = jobId
-                                   WorktreeIdentity = worktree.Identity
-                                   WorktreePath = path |}
+            let integration failurePrefix error =
+                OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
 
-                        match! appendFact StreamId.Workspace createdFact with
-                        | Error error ->
-                            let! _ = worktree.Release()
+            do!
+                appendFact StreamId.Workspace requestFact
+                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree request")
 
-                            return
-                                Error(
-                                    OrchestratorVerdict.IntegrationFailed(
-                                        jobId,
-                                        sprintf "Failed to persist worktree created: %s" error
-                                    )
-                                )
-                        | Ok() ->
-                            // The Manager is forked BEFORE the job fact, because ORCH-006
-                            // requires the fact to carry its SessionId. A crash here leaves a
-                            // Manager with no job, which the next sweep cleans up; the reverse
-                            // order would leave a job whose Manager can never be addressed.
-                            match!
-                                manager.StartManager
-                                    { JobId = jobId
-                                      ManagerAgent = managerAgent
-                                      Worktree = path
-                                      Prompt = prompt
-                                      ExpectedToolCalls = expectedToolCalls }
-                            with
-                            | Error error ->
-                                let! _ = worktree.Release()
+            let! worktree =
+                WorktreeResource.Create(git, jobId, path)
+                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create worktree")
 
-                                return
-                                    Error(
-                                        OrchestratorVerdict.IntegrationFailed(
-                                            jobId,
-                                            sprintf "Failed to start manager: %s" error
-                                        )
-                                    )
-                            | Ok managerSessionId ->
-                                let fact =
-                                    OrchestratorFact.ManagerJobCreated
-                                        {| ManagerJobId = jobId
-                                           ManagerSessionId = managerSessionId
-                                           ManagerAgent = managerAgent
-                                           Byname = byname
-                                           WorktreeIdentity = worktree.Identity
-                                           WorktreePath = path
-                                           TargetRef = targetRef
-                                           TargetBranchFrozen = TargetRef.value targetRef |}
+            return!
+                taskResult {
+                    let createdFact =
+                        OrchestratorFact.WorktreeCreated
+                            {| ManagerJobId = jobId
+                               WorktreeIdentity = worktree.Identity
+                               WorktreePath = path |}
 
-                                match! appendFact StreamId.Workspace fact with
-                                | Error error ->
-                                    let! _ = worktree.Release()
+                    do!
+                        appendFact StreamId.Workspace createdFact
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree created")
 
-                                    return
-                                        Error(
-                                            OrchestratorVerdict.IntegrationFailed(
-                                                jobId,
-                                                sprintf "Failed to persist manager job: %s" error
-                                            )
-                                        )
-                                | Ok() ->
-                                    if journalPort.IsSome then
-                                        worktree.MarkDurable()
+                    // The Manager is forked BEFORE the job fact, because ORCH-006
+                    // requires the fact to carry its SessionId. A crash here leaves a
+                    // Manager with no job, which the next sweep cleans up; the reverse
+                    // order would leave a job whose Manager can never be addressed.
+                    let! managerSessionId =
+                        manager.StartManager
+                            { JobId = jobId
+                              ManagerAgent = managerAgent
+                              Worktree = path
+                              Prompt = prompt
+                              ExpectedToolCalls = expectedToolCalls }
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to start manager")
 
-                                    let job =
-                                        { JobId = jobId
-                                          ManagerSessionId = managerSessionId
-                                          ManagerAgent = managerAgent
-                                          TargetRef = targetRef
-                                          Worktree = worktree }
+                    let fact =
+                        OrchestratorFact.ManagerJobCreated
+                            {| ManagerJobId = jobId
+                               ManagerSessionId = managerSessionId
+                               ManagerAgent = managerAgent
+                               Byname = byname
+                               WorktreeIdentity = worktree.Identity
+                               WorktreePath = path
+                               TargetRef = targetRef
+                               TargetBranchFrozen = TargetRef.value targetRef |}
 
-                                    startPublication job
-                                    return Ok job.Handle
+                    do!
+                        appendFact StreamId.Workspace fact
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist manager job")
+
+                    if journalPort.IsSome then worktree.MarkDurable()
+
+                    let job =
+                        { JobId = jobId
+                          ManagerSessionId = managerSessionId
+                          ManagerAgent = managerAgent
+                          TargetRef = targetRef
+                          Worktree = worktree }
+
+                    startPublication job
+                    return job.Handle
+                }
+                |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
         }
 
     member _.ForkManager
@@ -259,25 +254,16 @@ type Orchestrator
     /// Manager session continue with an appended requirement ("十年修得同船渡").
     /// Refuses terminal jobs; a finished job never revives.
     member this.ContinueManager(jobId: ManagerJobId, prompt: string) : Task<Result<WorktreePath, string>> =
-        task {
+        taskResult {
             let projection = snapshot ()
 
-            match OrchestratorProjection.tryFind jobId projection.AgentProjections.Orchestrator with
-            | None -> return Error(sprintf "Unknown manager job: %s" (ManagerJobId.value jobId))
-            | Some record ->
-                match record.Progress with
-                | JobProgress.Published _
-                | JobProgress.Failed _
-                | JobProgress.Abandoned ->
-                    return Error(sprintf "Manager job is no longer active: %s" (ManagerJobId.value jobId))
-                | JobProgress.ManagerStarted
-                | JobProgress.CandidateReady _
-                | JobProgress.ConflictPending _
-                | JobProgress.RebasedCandidateReady _
-                | JobProgress.PublishClaimed _ ->
-                    match! manager.ResumeManager record.ManagerJobId record.WorktreePath prompt with
-                    | Error error -> return Error error
-                    | Ok() -> return Ok record.WorktreePath
+            let! record =
+                OrchestratorProjection.tryFind jobId projection.AgentProjections.Orchestrator
+                |> Result.requireSome (sprintf "Unknown manager job: %s" (ManagerJobId.value jobId))
+                |> Result.bind OrchestratorRuntimeDecisions.requireActiveJob
+
+            do! manager.ResumeManager record.ManagerJobId record.WorktreePath prompt
+            return record.WorktreePath
         }
 
     /// Compatibility single-result join (Empty when idle).

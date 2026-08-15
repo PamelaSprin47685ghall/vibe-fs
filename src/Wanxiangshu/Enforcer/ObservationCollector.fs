@@ -66,17 +66,19 @@ type ObservationCollector() =
 
     let buffers = Dictionary<string, ResizeArray<Observation>>()
 
+    let appendObservation sessionId observation =
+        match buffers.TryGetValue sessionId with
+        | true, buffer -> buffer.Add observation
+        | false, _ ->
+            let buffer = ResizeArray<Observation>()
+            buffer.Add observation
+            buffers.[sessionId] <- buffer
+
     /// Record one tool execution's observation for a session.
     member _.Collect(sessionId: string, toolName: string, args: obj, output: string) : unit =
         match CasebookCapture.capture toolName args output with
         | None -> ()
-        | Some observation ->
-            match buffers.TryGetValue sessionId with
-            | true, buffer -> buffer.Add observation
-            | false, _ ->
-                let buffer = ResizeArray<Observation>()
-                buffer.Add observation
-                buffers.[sessionId] <- buffer
+        | Some observation -> appendObservation sessionId observation
 
     /// Observations collected so far for a session (normalized).
     member _.Drain(sessionId: string) : Observation list =

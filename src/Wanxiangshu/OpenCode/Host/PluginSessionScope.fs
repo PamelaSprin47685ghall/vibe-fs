@@ -91,11 +91,13 @@ type PluginSessionScope() =
     /// cancelled too. Returns the keys to cancel (including sessionId itself
     /// when it is not a Main with a linked Blogger).
     member this.LinkedBloggerKeys(sessionId: string) : string list =
-        match this.Companions.TryGetValue sessionId with
-        | true, companion ->
+        let bloggerKeys (companion: CompanionHost) =
             match companion.BloggerSession with
             | Some bloggerId -> [ SessionId.value bloggerId ]
             | None -> []
+
+        match this.Companions.TryGetValue sessionId with
+        | true, companion -> bloggerKeys companion
         | false, _ ->
             // sessionId may itself be a Blogger child being deleted.
             [ sessionId ]

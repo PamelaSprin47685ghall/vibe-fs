@@ -2,6 +2,7 @@ namespace Wanxiangshu.Context.Trace
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -116,7 +117,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (run: ProviderRunIdentity option)
         (fact: AgentFact)
-        : Task =
+        : Task<unit> =
         task {
             match! AgentJournal.appendAgent (StreamId.Session sessionId) run fact journal with
             | Ok _ -> return ()
@@ -127,6 +128,31 @@ module XTraceCapture =
                             sprintf "XTrace append failed: %s" (JournalAppendFailure.describe failure)
                         )
                     )
+        }
+
+    let private requireBlobWritten (context: string) (result: Result<'a, string>) : 'a =
+        match result with
+        | Ok blob -> blob
+        | Error error -> raise (InvalidOperationException(sprintf "%s: %s" context error))
+
+    /// Evidence → Decision: opening absent and assignment non-blank → capture.
+    let private captureOpeningWhenAbsent
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (assignmentText: string)
+        (authoritativeRequirements: string list)
+        : Task =
+        task {
+            let existing = xTraceOf durable sessionId
+
+            if existing.Opening.IsNone && not (String.IsNullOrWhiteSpace assignmentText) then
+                do!
+                    CompanionFact.OpeningPromptCaptured
+                        {| SessionId = sessionId
+                           AssignmentText = assignmentText
+                           AuthoritativeRequirements = authoritativeRequirements
+                           ProviderRun = None |}
+                    |> appendFact durable sessionId None
         }
 
     /// COMPANION-003: capture the opening task verbatim. Idempotent — a session
@@ -142,18 +168,44 @@ module XTraceCapture =
             match journal with
             | None -> return ()
             | Some durable ->
-                let existing = xTraceOf durable sessionId
+                do! captureOpeningWhenAbsent durable sessionId assignmentText authoritativeRequirements
+        }
 
-                if existing.Opening.IsNone && not (String.IsNullOrWhiteSpace assignmentText) then
-                    do!
-                        CompanionFact.OpeningPromptCaptured
-                            {| SessionId = sessionId
-                               AssignmentText = assignmentText
-                               AuthoritativeRequirements = authoritativeRequirements
-                               ProviderRun = None |}
-                        |> appendFact durable sessionId None
+    let private isReplayTerminal (durable: AgentJournal) (sessionId: SessionId) (text: string) : bool =
+        xTraceOf durable sessionId
+        |> fun existing -> existing.Terminal
+        |> Option.exists (fun (_, digest) -> HostDigest.sha256Hex text = BlobDigest.value digest)
 
-                return ()
+    let private appendTerminalOutput
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (text: string)
+        (providerRun: ProviderRunIdentity)
+        : Task =
+        task {
+            let! writeResult = durable.WriteBlob text
+            let blob = requireBlobWritten "XTrace terminal blob write failed" writeResult
+
+            do!
+                CompanionFact.TerminalOutputCaptured
+                    {| SessionId = sessionId
+                       TextRef = blob.BlobRef
+                       TextDigest = blob.BlobDigest
+                       ProviderRun = providerRun |}
+                |> appendFact durable sessionId (Some providerRun)
+        }
+
+    /// Evidence → Decision: non-blank, non-replay terminal text → durable capture.
+    let private captureTerminalTextWhenFresh
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (text: string)
+        (providerRun: ProviderRunIdentity)
+        : Task =
+        task {
+            if String.IsNullOrWhiteSpace text then return ()
+            elif isReplayTerminal durable sessionId text then return ()
+            else do! appendTerminalOutput durable sessionId text providerRun
         }
 
     /// COMPANION-003 / EXEC-009: capture terminal text into XTrace.
@@ -169,28 +221,7 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return ()
-            | Some durable ->
-                if not (String.IsNullOrWhiteSpace text) then
-                    let existing = xTraceOf durable sessionId
-
-                    let isReplay =
-                        existing.Terminal
-                        |> Option.exists (fun (_, digest) -> HostDigest.sha256Hex text = BlobDigest.value digest)
-
-                    if not isReplay then
-                        match! durable.WriteBlob text with
-                        | Error error ->
-                            raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
-                        | Ok blob ->
-                            do!
-                                CompanionFact.TerminalOutputCaptured
-                                    {| SessionId = sessionId
-                                       TextRef = blob.BlobRef
-                                       TextDigest = blob.BlobDigest
-                                       ProviderRun = providerRun |}
-                                |> appendFact durable sessionId (Some providerRun)
-
-                return ()
+            | Some durable -> do! captureTerminalTextWhenFresh durable sessionId text providerRun
         }
 
     /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
@@ -241,6 +272,103 @@ module XTraceCapture =
         | WireToolResult(_, result) -> SemanticToolResult result
         | WireMedia(mediaType, digest) -> SemanticMedia(mediaType, digest)
 
+    type private PartCaptureWork =
+        { Message: TraceSourceMessage
+          TurnIndex: int
+          PartIndex: int
+          Source: TraceSourcePart
+          Provenance: string }
+
+    let private enumeratePositionalCaptureWork
+        (generation: int)
+        (messages: TraceSourceMessage list)
+        : PartCaptureWork list =
+        messages
+        |> List.mapi (fun turnIndex message ->
+            message.Parts
+            |> List.mapi (fun partIndex source ->
+                { Message = message
+                  TurnIndex = turnIndex
+                  PartIndex = partIndex
+                  Source = source
+                  Provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex }))
+        |> List.concat
+
+    let private enumerateStableCaptureWork
+        (generation: int)
+        (messageIds: string list)
+        (messages: TraceSourceMessage list)
+        : PartCaptureWork list =
+        List.zip messageIds messages
+        |> List.mapi (fun turnIndex (messageId, message) ->
+            message.Parts
+            |> List.mapi (fun partIndex source ->
+                { Message = message
+                  TurnIndex = turnIndex
+                  PartIndex = partIndex
+                  Source = source
+                  Provenance = sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex }))
+        |> List.concat
+
+    /// One positional part: skip if provenance known; else blob + append (raises on blob error).
+    let private appendPositionalPartIfAbsent
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (recorded: Set<string>)
+        (nextCursor: unit -> int64)
+        (work: PartCaptureWork)
+        : Task =
+        task {
+            if Set.contains work.Provenance recorded then
+                return ()
+            else
+                let cursor = nextCursor ()
+                let kind, toolName, body = partShape work.Source.Part
+                let! writeResult = durable.WriteBlob body
+                let blob = requireBlobWritten "XTrace part blob write failed" writeResult
+
+                do!
+                    CompanionFact.XTracePartAppended
+                        {| SessionId = sessionId
+                           CursorSequence = cursor
+                           Role = work.Message.Role
+                           Turn = work.TurnIndex
+                           PartIndex = work.PartIndex
+                           Kind = kind
+                           ToolName = toolName
+                           TextRef = blob.BlobRef
+                           TextDigest = blob.BlobDigest
+                           Provenance = work.Provenance
+                           ProviderRun = work.Message.ProviderRun
+                           ToolCallId = work.Source.ToolCallId
+                           HostToolPartId = work.Source.HostToolPartId |}
+                    |> appendFact durable sessionId work.Message.ProviderRun
+        }
+
+    let private captureSourcesWithJournal
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (messages: TraceSourceMessage list)
+        : Task<XTraceProjectionState option> =
+        task {
+            let existing = xTraceOf durable sessionId
+            let generation = captureGeneration durable sessionId
+            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+            // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
+            let mutable cursor = XTraceProjection.headSequence existing
+
+            let nextCursor () =
+                cursor <- cursor + 1L
+                cursor
+
+            let works = enumeratePositionalCaptureWork generation messages
+
+            for work in works do
+                do! appendPositionalPartIfAbsent durable sessionId recorded nextCursor work
+
+            return Some(xTraceOf durable sessionId)
+        }
+
     let private captureSources
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -249,55 +377,7 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return None
-            | Some durable ->
-                let existing = xTraceOf durable sessionId
-                let generation = captureGeneration durable sessionId
-
-                let recorded =
-                    existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
-
-                // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
-                let mutable cursor = XTraceProjection.headSequence existing
-                // DSL-MUTABLE: algorithm-scratch — semantic turn ordinal within this capture batch
-                let mutable turnIndex = 0
-
-                for message in messages do
-                    // DSL-MUTABLE: algorithm-scratch — semantic part ordinal within the current turn
-                    let mutable partIndex = 0
-
-                    for source in message.Parts do
-                        let provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex
-
-                        if not (Set.contains provenance recorded) then
-                            cursor <- cursor + 1L
-                            let kind, toolName, body = partShape source.Part
-
-                            match! durable.WriteBlob body with
-                            | Error error ->
-                                raise (InvalidOperationException(sprintf "XTrace part blob write failed: %s" error))
-                            | Ok blob ->
-                                do!
-                                    CompanionFact.XTracePartAppended
-                                        {| SessionId = sessionId
-                                           CursorSequence = cursor
-                                           Role = message.Role
-                                           Turn = turnIndex
-                                           PartIndex = partIndex
-                                           Kind = kind
-                                           ToolName = toolName
-                                           TextRef = blob.BlobRef
-                                           TextDigest = blob.BlobDigest
-                                           Provenance = provenance
-                                           ProviderRun = message.ProviderRun
-                                           ToolCallId = source.ToolCallId
-                                           HostToolPartId = source.HostToolPartId |}
-                                    |> appendFact durable sessionId message.ProviderRun
-
-                        partIndex <- partIndex + 1
-
-                    turnIndex <- turnIndex + 1
-
-                return Some(xTraceOf durable sessionId)
+            | Some durable -> return! captureSourcesWithJournal durable sessionId messages
         }
 
     /// STRENGTH-008: whether this XTrace can accept a historical insertion
@@ -313,6 +393,85 @@ module XTraceCapture =
             existing.Parts
             |> List.forall (fun part -> part.Provenance.Contains("/msg:", StringComparison.Ordinal))
 
+    /// Evidence → Decision: stable insertion prerequisites (capability + id contract).
+    let private validateStableCapturePrerequisites
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (messages: TraceSourceMessage list)
+        : Result<unit, string> =
+        if not (supportsStableInsertion journal sessionId) then
+            Error "legacy positional XTrace cannot accept stable historical insertion"
+        elif List.length messageIds <> List.length messages then
+            Error "stable XTrace message identity cardinality does not match semantic projection"
+        elif messageIds |> List.exists String.IsNullOrWhiteSpace then
+            Error "stable XTrace requires a non-empty Host id for every semantic message"
+        elif (messageIds |> Set.ofList |> Set.count) <> List.length messageIds then
+            Error "stable XTrace requires unique Host message ids"
+        else
+            Ok()
+
+    /// One stable part: skip if provenance known; else blob + append (Error on blob failure).
+    let private appendStablePartIfAbsent
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (recorded: Set<string>)
+        (nextCursor: unit -> int64)
+        (work: PartCaptureWork)
+        : Task<Result<unit, string>> =
+        taskResult {
+            if Set.contains work.Provenance recorded then
+                return ()
+            else
+                let cursor = nextCursor ()
+                let kind, toolName, body = partShape work.Source.Part
+                let! blob = durable.WriteBlob body
+
+                do!
+                    CompanionFact.XTracePartAppended
+                        {| SessionId = sessionId
+                           CursorSequence = cursor
+                           Role = work.Message.Role
+                           Turn = work.TurnIndex
+                           PartIndex = work.PartIndex
+                           Kind = kind
+                           ToolName = toolName
+                           TextRef = blob.BlobRef
+                           TextDigest = blob.BlobDigest
+                           Provenance = work.Provenance
+                           ProviderRun = work.Message.ProviderRun
+                           ToolCallId = work.Source.ToolCallId
+                           HostToolPartId = work.Source.HostToolPartId |}
+                    |> appendFact durable sessionId work.Message.ProviderRun
+                    |> TaskResultCE.ofTask
+        }
+
+    let private captureSourcesStableWithJournal
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (messages: TraceSourceMessage list)
+        : Task<Result<XTraceProjectionState option, string>> =
+        taskResult {
+            do! validateStableCapturePrerequisites (Some durable) sessionId messageIds messages
+            let existing = xTraceOf durable sessionId
+            let generation = captureGeneration durable sessionId
+            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+            // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
+            let mutable cursor = XTraceProjection.headSequence existing
+
+            let nextCursor () =
+                cursor <- cursor + 1L
+                cursor
+
+            let works = enumerateStableCaptureWork generation messageIds messages
+
+            for work in works do
+                do! appendStablePartIfAbsent durable sessionId recorded nextCursor work
+
+            return Some(xTraceOf durable sessionId)
+        }
+
     let private captureSourcesStable
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -322,71 +481,50 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return Ok None
-            | Some durable ->
-                let existing = xTraceOf durable sessionId
+            | Some durable -> return! captureSourcesStableWithJournal durable sessionId messageIds messages
+        }
 
-                if not (supportsStableInsertion journal sessionId) then
-                    return Error "legacy positional XTrace cannot accept stable historical insertion"
-                elif List.length messageIds <> List.length messages then
-                    return Error "stable XTrace message identity cardinality does not match semantic projection"
-                elif messageIds |> List.exists String.IsNullOrWhiteSpace then
-                    return Error "stable XTrace requires a non-empty Host id for every semantic message"
-                elif (messageIds |> Set.ofList |> Set.count) <> List.length messageIds then
-                    return Error "stable XTrace requires unique Host message ids"
-                else
-                    let generation = captureGeneration durable sessionId
+    /// Evidence → Decision: last-words turn/part from existing XTrace tip.
+    let private lastWordsPlacement (existing: XTraceProjectionState) : int * int =
+        match List.tryLast existing.Parts with
+        | Some last -> last.Turn + 1, 0
+        | None -> 0, 0
 
-                    let recorded =
-                        existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+    let private captureLastWordsWhenAbsent
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (textRef: BlobRef)
+        (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        : Task =
+        task {
+            let existing = xTraceOf durable sessionId
+            let generation = captureGeneration durable sessionId
+            let provenance = sprintf "g:%d/last_words" generation
+            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
-                    // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
-                    let mutable cursor = XTraceProjection.headSequence existing
-                    // DSL-MUTABLE: algorithm-scratch — first capture failure while preserving source order
-                    let mutable failure: string option = None
-                    // DSL-MUTABLE: algorithm-scratch — semantic turn ordinal within this stable capture batch
-                    let mutable turnIndex = 0
+            if Set.contains provenance recorded then
+                return ()
+            else
+                let cursor = XTraceProjection.headSequence existing + 1L
+                let turn, partIndex = lastWordsPlacement existing
 
-                    for messageId, message in List.zip messageIds messages do
-                        if Option.isNone failure then
-                            // DSL-MUTABLE: algorithm-scratch — semantic part ordinal within the current stable turn
-                            let mutable partIndex = 0
-
-                            for source in message.Parts do
-                                if Option.isNone failure then
-                                    let provenance = sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
-
-                                    if not (Set.contains provenance recorded) then
-                                        cursor <- cursor + 1L
-                                        let kind, toolName, body = partShape source.Part
-
-                                        match! durable.WriteBlob body with
-                                        | Error error ->
-                                            failure <- Some(sprintf "XTrace part blob write failed: %s" error)
-                                        | Ok blob ->
-                                            do!
-                                                CompanionFact.XTracePartAppended
-                                                    {| SessionId = sessionId
-                                                       CursorSequence = cursor
-                                                       Role = message.Role
-                                                       Turn = turnIndex
-                                                       PartIndex = partIndex
-                                                       Kind = kind
-                                                       ToolName = toolName
-                                                       TextRef = blob.BlobRef
-                                                       TextDigest = blob.BlobDigest
-                                                       Provenance = provenance
-                                                       ProviderRun = message.ProviderRun
-                                                       ToolCallId = source.ToolCallId
-                                                       HostToolPartId = source.HostToolPartId |}
-                                                |> appendFact durable sessionId message.ProviderRun
-
-                                partIndex <- partIndex + 1
-
-                        turnIndex <- turnIndex + 1
-
-                    match failure with
-                    | Some error -> return Error error
-                    | None -> return Ok(Some(xTraceOf durable sessionId))
+                do!
+                    CompanionFact.XTracePartAppended
+                        {| SessionId = sessionId
+                           CursorSequence = cursor
+                           Role = "assistant"
+                           Turn = turn
+                           PartIndex = partIndex
+                           Kind = "text"
+                           ToolName = None
+                           TextRef = textRef
+                           TextDigest = textDigest
+                           Provenance = provenance
+                           ProviderRun = Some providerRun
+                           ToolCallId = None
+                           HostToolPartId = None |}
+                    |> appendFact durable sessionId (Some providerRun)
         }
 
     /// Write last_words as a normal assistant text part so a completed Life's
@@ -402,40 +540,7 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return ()
-            | Some durable ->
-                let existing = xTraceOf durable sessionId
-                let generation = captureGeneration durable sessionId
-                let provenance = sprintf "g:%d/last_words" generation
-
-                let recorded =
-                    existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
-
-                if not (Set.contains provenance recorded) then
-                    let cursor = XTraceProjection.headSequence existing + 1L
-
-                    let turn, partIndex =
-                        match List.tryLast existing.Parts with
-                        | Some last -> last.Turn + 1, 0
-                        | None -> 0, 0
-
-                    do!
-                        CompanionFact.XTracePartAppended
-                            {| SessionId = sessionId
-                               CursorSequence = cursor
-                               Role = "assistant"
-                               Turn = turn
-                               PartIndex = partIndex
-                               Kind = "text"
-                               ToolName = None
-                               TextRef = textRef
-                               TextDigest = textDigest
-                               Provenance = provenance
-                               ProviderRun = Some providerRun
-                               ToolCallId = None
-                               HostToolPartId = None |}
-                        |> appendFact durable sessionId (Some providerRun)
-
-                return ()
+            | Some durable -> do! captureLastWordsWhenAbsent durable sessionId textRef textDigest providerRun
         }
 
     let captureProjection

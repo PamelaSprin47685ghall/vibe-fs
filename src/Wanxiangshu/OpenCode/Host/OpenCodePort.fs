@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
@@ -60,6 +61,74 @@ module OpenCodePort =
         match opts.Model with
         | Some model -> Some model
         | None -> opts.Agent |> Option.bind ManagedAgentConfig.tryBoundModel
+
+    let private responseBody (res: obj) =
+        if not (isNull res) && not (isNull res?data) then res?data else res
+
+    let private trySessionId (body: obj) =
+        if not (isNull body) && not (isNull body?id) then Some(SessionId.create (unbox<string> body?id))
+        else None
+
+    let private tryMessageId (data: obj) =
+        if not (isNull data) && not (isNull data?id) then Some(PhysicalUserMessageId.create (unbox<string> data?id))
+        else None
+
+    let private optionalParentId (item: obj) =
+        if isNull item?parentID then None else Some(SessionId.create (unbox<string> item?parentID))
+
+    let private optionalAgent (item: obj) =
+        if isNull item?agent then None else Some(unbox<string> item?agent)
+
+    let private optionalTitle (item: obj) =
+        if isNull item?title then None else Some(unbox<string> item?title)
+
+    let private tryChildInfo (item: obj) =
+        if isNull item || isNull item?id then
+            None
+        else
+            Some
+                { SessionId = SessionId.create (unbox<string> item?id)
+                  ParentSessionId = optionalParentId item
+                  Agent = optionalAgent item
+                  Title = optionalTitle item }
+
+    let private childrenFromResponse (data: obj) =
+        let items: obj array = if isNull data then [||] else unbox data
+        items |> Array.choose tryChildInfo |> Array.toList
+
+    let private readParentId (body: obj) : Result<SessionId option, string> =
+        if isNull body then
+            Error "Missing session response"
+        elif isNull body?parentID || String.IsNullOrWhiteSpace(string body?parentID) then
+            Ok None
+        else
+            Ok(Some(SessionId.create (string body?parentID)))
+
+    let private resolveCloseFn (sessObj: obj) =
+        if not (isNull sessObj?delete) then Some sessObj?delete
+        elif not (isNull sessObj?close) then Some sessObj?close
+        else None
+
+    let private parsePostSuccessBody (text: string) =
+        if String.IsNullOrWhiteSpace text then createObj [] else Fable.Core.JS.JSON.parse text
+
+    let private parseGetBody (body: string) =
+        if String.IsNullOrWhiteSpace body then box [||] else Fable.Core.JS.JSON.parse body
+
+    let private tryWorkDirectory (input: obj) =
+        if isNull input || isNull input?directory then
+            None
+        else
+            let directory = unbox<string> input?directory
+            if String.IsNullOrWhiteSpace directory then None else Some directory
+
+    let private readResponseTextSafe (response: obj) : Task<string> =
+        task {
+            try
+                return! unbox<Task<string>> (response?text ())
+            with _ ->
+                return ""
+        }
 
     [<Emit("fetch($0, $1)")>]
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
@@ -139,24 +208,23 @@ module OpenCodePort =
                 }
 
             member _.AbortSession(sessionId: SessionId) =
-                task {
-                    let sId = SessionId.value sessionId
-
+                taskResult {
                     try
+                        let sId = SessionId.value sessionId
                         let sessObj = client?session
                         let abortFn = sessObj?abort
 
                         let payload =
                             createObj [ "path", box (createObj [ "id", box sId ]); "headers", box (headersObj None) ]
 
-                        let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload))
-                        return Ok()
+                        let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return ()
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
             member _.CreateSession (parentId: SessionId option) opts =
-                task {
+                taskResult {
                     let parentFields =
                         parentId
                         |> Option.map (fun parent -> [ "parentID", box (SessionId.value parent) ])
@@ -181,27 +249,16 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let createFn = sessObj?create
-                        let! res = unbox<Task<obj>> (createFn?call (sessObj, payload))
-
-                        let body =
-                            if not (isNull res) && not (isNull res?data) then
-                                res?data
-                            else
-                                res
-
-                        if not (isNull body) && not (isNull body?id) then
-                            return Ok(SessionId.create (unbox<string> body?id))
-                        else
-                            return Error "Missing session id in response"
+                        let! res = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return! responseBody res |> trySessionId |> Result.requireSome "Missing session id in response"
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
             member _.GetSessionParent(sessionId: SessionId) =
-                task {
-                    let sId = SessionId.value sessionId
-
+                taskResult {
                     try
+                        let sId = SessionId.value sessionId
                         let sessObj = client?session
                         let getFn = sessObj?get
 
@@ -211,26 +268,14 @@ module OpenCodePort =
                                   "sessionID", box sId
                                   "headers", box (headersObj None) ]
 
-                        let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
-
-                        let body =
-                            if not (isNull res) && not (isNull res?data) then
-                                res?data
-                            else
-                                res
-
-                        if isNull body then
-                            return Error "Missing session response"
-                        elif isNull body?parentID || String.IsNullOrWhiteSpace(string body?parentID) then
-                            return Ok None
-                        else
-                            return Ok(Some(SessionId.create (string body?parentID)))
+                        let! res = unbox<Task<obj>> (getFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return! responseBody res |> readParentId
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
             member _.CreateChildSession (parentId: SessionId) opts =
-                task {
+                taskResult {
                     let pId = SessionId.value parentId
 
                     let payload =
@@ -248,92 +293,42 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let createFn = sessObj?create
-                        let! res = unbox<Task<obj>> (createFn?call (sessObj, payload))
-
-                        let body =
-                            if not (isNull res) && not (isNull res?data) then
-                                res?data
-                            else
-                                res
-
-                        if not (isNull body) && not (isNull body?id) then
-                            return Ok(SessionId.create (unbox<string> body?id))
-                        else
-                            return Error "Missing session id in response"
+                        let! res = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return! responseBody res |> trySessionId |> Result.requireSome "Missing session id in response"
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
             member _.ListChildren(parentId: SessionId) =
-                task {
-                    let pId = SessionId.value parentId
-
+                taskResult {
                     try
+                        let pId = SessionId.value parentId
                         let sessObj = client?session
                         let childrenFn = sessObj?children
 
                         let payload =
                             createObj [ "path", box (createObj [ "id", box pId ]); "headers", box (headersObj None) ]
 
-                        let! res = unbox<Task<obj>> (childrenFn?call (sessObj, payload))
-
-                        let body =
-                            if not (isNull res) && not (isNull res?data) then
-                                res?data
-                            else
-                                res
-
-                        let items: obj array = if isNull body then [||] else unbox body
-
-                        return
-                            Ok(
-                                items
-                                |> Array.choose (fun item ->
-                                    if isNull item || isNull item?id then
-                                        None
-                                    else
-                                        Some
-                                            { SessionId = SessionId.create (unbox<string> item?id)
-                                              ParentSessionId =
-                                                if isNull item?parentID then
-                                                    None
-                                                else
-                                                    Some(SessionId.create (unbox<string> item?parentID))
-                                              Agent =
-                                                if isNull item?agent then
-                                                    None
-                                                else
-                                                    Some(unbox<string> item?agent)
-                                              Title =
-                                                if isNull item?title then
-                                                    None
-                                                else
-                                                    Some(unbox<string> item?title) })
-                                |> Array.toList
-                            )
+                        let! res = unbox<Task<obj>> (childrenFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return responseBody res |> childrenFromResponse
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
             member _.CloseChildSession(childId: SessionId) =
-                task {
-                    let cId = SessionId.value childId
-
+                taskResult {
                     try
+                        let cId = SessionId.value childId
                         let sessObj = client?session
 
-                        let closeFn =
-                            if not (isNull sessObj?delete) then sessObj?delete
-                            elif not (isNull sessObj?close) then sessObj?close
-                            else null
+                        let! closeFn =
+                            resolveCloseFn sessObj
+                            |> Result.requireSome "No close/delete session method on SDK client"
 
-                        if not (isNull closeFn) then
-                            let! _ = unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = cId |}))
-                            return Ok()
-                        else
-                            return Error "No close/delete session method on SDK client"
+                        let! _ = unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = cId |})) |> TaskResultCE.ofTask
+                        return ()
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
     type HttpPort(baseUrl: string) =
@@ -344,54 +339,34 @@ module OpenCodePort =
                 baseUrl
 
         let postJson (endpoint: string) (body: obj) : Task<Result<obj, string>> =
-            task {
+            taskResult {
                 try
                     let init =
                         {| method = "POST"
                            headers = {| ``Content-Type`` = "application/json" |}
                            body = Fable.Core.JS.JSON.stringify body |}
 
-                    let! response = jsFetch (cleanBaseUrl + endpoint) init
+                    let! response = jsFetch (cleanBaseUrl + endpoint) init |> TaskResultCE.ofTask
                     let status = unbox<int> response?status
-
-                    if status >= 200 && status < 300 then
-                        // Some Host endpoints answer 2xx with an empty body. Never
-                        // treat a successful empty response as an error.
-                        try
-                            let! text = unbox<Task<string>> (response?text ())
-
-                            if String.IsNullOrWhiteSpace text then
-                                return Ok(createObj [])
-                            else
-                                return Ok(Fable.Core.JS.JSON.parse text)
-                        with _ ->
-                            return Ok(createObj [])
-                    else
-                        return Error $"HTTP {status}"
+                    do! Result.requireTrue $"HTTP {status}" (status >= 200 && status < 300)
+                    // Some Host endpoints answer 2xx with an empty body. Never
+                    // treat a successful empty response as an error.
+                    let! text = readResponseTextSafe response |> TaskResultCE.ofTask
+                    return parsePostSuccessBody text
                 with ex ->
-                    return Error ex.Message
+                    return! Error ex.Message
             }
 
         let getJson (endpoint: string) : Task<Result<obj, string>> =
-            task {
+            taskResult {
                 try
-                    let! response = jsFetch (cleanBaseUrl + endpoint) {| method = "GET" |}
+                    let! response = jsFetch (cleanBaseUrl + endpoint) {| method = "GET" |} |> TaskResultCE.ofTask
                     let status = unbox<int> response?status
-
-                    if status >= 200 && status < 300 then
-                        let! body = unbox<Task<string>> (response?text ())
-
-                        return
-                            Ok(
-                                if String.IsNullOrWhiteSpace body then
-                                    box [||]
-                                else
-                                    Fable.Core.JS.JSON.parse body
-                            )
-                    else
-                        return Error $"HTTP {status}"
+                    do! Result.requireTrue $"HTTP {status}" (status >= 200 && status < 300)
+                    let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+                    return parseGetBody body
                 with ex ->
-                    return Error ex.Message
+                    return! Error ex.Message
             }
 
         interface IOpenCodePort with
@@ -432,30 +407,24 @@ module OpenCodePort =
 
                     let! res = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)
 
-                    match res with
-                    | Ok data ->
-                        // Many Host versions answer 2xx with an empty body. That is
-                        // admission, not a message identity — PROMPT-005 keeps the two
-                        // apart, so an empty body cannot be reported as delivery.
-                        if not (isNull data) && not (isNull data?id) then
-                            return AdmittedWithPhysicalMessage(PhysicalUserMessageId.create (unbox<string> data?id))
-                        else
-                            return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
+                    // Many Host versions answer 2xx with an empty body. That is
+                    // admission, not a message identity — PROMPT-005 keeps the two
+                    // apart, so an empty body cannot be reported as delivery.
+                    match Result.map tryMessageId res with
+                    | Ok(Some id) -> return AdmittedWithPhysicalMessage id
+                    | Ok None -> return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                     | Error err -> return Retryable err
                 }
 
             member _.AbortSession(sessionId: SessionId) =
-                task {
+                taskResult {
                     let sId = SessionId.value sessionId
-                    let! res = postJson $"/session/{sId}/abort" {| |}
-
-                    match res with
-                    | Ok _ -> return Ok()
-                    | Error err -> return Error err
+                    let! _ = postJson $"/session/{sId}/abort" {| |}
+                    return ()
                 }
 
             member _.CreateSession (parentId: SessionId option) opts =
-                task {
+                taskResult {
                     let bodyFields =
                         (parentId
                          |> Option.map (fun parent -> [ "parentID", box (SessionId.value parent) ])
@@ -467,29 +436,18 @@ module OpenCodePort =
                            |> Option.map (fun agent -> [ "agent", box agent ])
                            |> Option.defaultValue [])
 
-                    let! res = postJson "/session" (createObj bodyFields)
-
-                    match res with
-                    | Ok data when not (isNull data) && not (isNull data?id) ->
-                        return Ok(SessionId.create (unbox<string> data?id))
-                    | Ok _ -> return Error "Missing session id in response"
-                    | Error err -> return Error err
+                    let! data = postJson "/session" (createObj bodyFields)
+                    return! trySessionId data |> Result.requireSome "Missing session id in response"
                 }
 
             member _.GetSessionParent(sessionId: SessionId) =
-                task {
-                    let! res = getJson $"/session/{SessionId.value sessionId}"
-
-                    match res with
-                    | Error err -> return Error err
-                    | Ok data when isNull data -> return Error "Missing session response"
-                    | Ok data when isNull data?parentID || String.IsNullOrWhiteSpace(string data?parentID) ->
-                        return Ok None
-                    | Ok data -> return Ok(Some(SessionId.create (string data?parentID)))
+                taskResult {
+                    let! data = getJson $"/session/{SessionId.value sessionId}"
+                    return! readParentId data
                 }
 
             member _.CreateChildSession (parentId: SessionId) opts =
-                task {
+                taskResult {
                     let pId = SessionId.value parentId
 
                     let bodyFields =
@@ -501,80 +459,29 @@ module OpenCodePort =
                            |> Option.map (fun agent -> [ "agent", box agent ])
                            |> Option.defaultValue [])
 
-                    let payload = createObj bodyFields
-
-                    let! res = postJson "/session" payload
-
-                    match res with
-                    | Ok data ->
-                        if not (isNull data) && not (isNull data?id) then
-                            return Ok(SessionId.create (unbox<string> data?id))
-                        else
-                            return Error "Missing session id in response"
-                    | Error err -> return Error err
+                    let! data = postJson "/session" (createObj bodyFields)
+                    return! trySessionId data |> Result.requireSome "Missing session id in response"
                 }
 
             member _.ListChildren(parentId: SessionId) =
-                task {
-                    let! res = getJson $"/session/{SessionId.value parentId}/children"
+                taskResult {
+                    let! data = getJson $"/session/{SessionId.value parentId}/children"
 
-                    match res with
-                    | Error err -> return Error err
-                    | Ok data ->
-                        try
-                            let items: obj array = if isNull data then [||] else unbox data
-
-                            return
-                                Ok(
-                                    items
-                                    |> Array.choose (fun item ->
-                                        if isNull item || isNull item?id then
-                                            None
-                                        else
-                                            Some
-                                                { SessionId = SessionId.create (unbox<string> item?id)
-                                                  ParentSessionId =
-                                                    if isNull item?parentID then
-                                                        None
-                                                    else
-                                                        Some(SessionId.create (unbox<string> item?parentID))
-                                                  Agent =
-                                                    if isNull item?agent then
-                                                        None
-                                                    else
-                                                        Some(unbox<string> item?agent)
-                                                  Title =
-                                                    if isNull item?title then
-                                                        None
-                                                    else
-                                                        Some(unbox<string> item?title) })
-                                    |> Array.toList
-                                )
-                        with ex ->
-                            return Error ex.Message
+                    try
+                        return childrenFromResponse data
+                    with ex ->
+                        return! Error ex.Message
                 }
 
             member _.CloseChildSession(childId: SessionId) =
-                task {
+                taskResult {
                     let cId = SessionId.value childId
-                    let! res = postJson $"/session/{cId}/abort" {| |}
-
-                    match res with
-                    | Ok _ -> return Ok()
-                    | Error err -> return Error err
+                    let! _ = postJson $"/session/{cId}/abort" {| |}
+                    return ()
                 }
 
     let create (input: obj) : IOpenCodePort option =
-        let workDir =
-            if not (isNull input) && not (isNull input?directory) then
-                let directory = unbox<string> input?directory
-
-                if String.IsNullOrWhiteSpace directory then
-                    None
-                else
-                    Some directory
-            else
-                None
+        let workDir = tryWorkDirectory input
 
         if isNull input then
             None

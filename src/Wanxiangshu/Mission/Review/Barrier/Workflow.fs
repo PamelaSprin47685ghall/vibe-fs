@@ -31,9 +31,9 @@ module ReviewBarrier =
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             match journal with
-            | None -> return Error "Review barrier requires an AgentJournal"
+            | None -> return! Error "Review barrier requires an AgentJournal"
             | Some durable ->
                 let fact =
                     ReviewFact.ReviewBarrierStarted
@@ -42,7 +42,9 @@ module ReviewBarrier =
                            BarrierId = barrierId
                            GitTreeHash = tree |}
 
-                match! AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
-                | Ok _ -> return Ok()
-                | Error failure -> return Error(JournalAppendFailure.describe failure)
+                let! _ =
+                    AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable
+                    |> Task.map (Result.mapError JournalAppendFailure.describe)
+
+                return ()
         }

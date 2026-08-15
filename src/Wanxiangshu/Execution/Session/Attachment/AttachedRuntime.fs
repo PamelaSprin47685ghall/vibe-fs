@@ -80,22 +80,19 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
             createChild: SessionId -> string -> string option -> Task<Result<SessionId, string>>,
             onReady: SessionId -> string -> unit
         ) : Task<Result<SessionId * string, string>> =
-        task {
+        taskResult {
             let scope = ReuseScope.ofSession ownerSessionId
             let key = bindingKey scope role
-
             let existing = lock gate (fun () -> tryGetLocked scope role)
 
             match existing with
-            | Some(sessionId, boundAgent) -> return Ok(sessionId, boundAgent)
+            | Some(sessionId, boundAgent) -> return sessionId, boundAgent
             | None ->
-                match! createChild ownerSessionId agentName directory with
-                | Error error -> return Error error
-                | Ok childId ->
-                    register ownerSessionId childId
-                    onReady childId agentName
-                    lock gate (fun () -> bindings.[key] <- (childId, agentName))
-                    return Ok(childId, agentName)
+                let! childId = createChild ownerSessionId agentName directory
+                register ownerSessionId childId
+                onReady childId agentName
+                lock gate (fun () -> bindings.[key] <- (childId, agentName))
+                return childId, agentName
         }
 
     member _.Clear() = lock gate (fun () -> bindings.Clear())

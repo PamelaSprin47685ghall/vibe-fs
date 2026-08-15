@@ -22,6 +22,7 @@ open Wanxiangshu.Strength
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
@@ -53,6 +54,34 @@ module JoinDrain =
          @ HandleProjection.joinable projection)
         |> List.sortBy stableJoinKey
 
+    let private abandonReasonText (reason: HandleAbandonReason) =
+        match reason with
+        | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
+        | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
+        | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
+
+    let private afterConsumeCas
+        (agentId: string)
+        (record: HandleRecord)
+        (reasonText: string)
+        (completedAt: DateTimeOffset)
+        (outcome: Result<HandleRecord, HandleConsumeRejection>)
+        : Result<RunCompletion, ForkError> option =
+        match outcome with
+        | Ok _ ->
+            Some(
+                Ok
+                    { RunId = "abandoned-" + agentId
+                      AgentId = agentId
+                      AgentName = record.TargetAgent
+                      Role = AgentRoleIdentity.ofRole record.CanonicalRole
+                      Outcome = AgentCompletion.abandoned agentId reasonText
+                      CompletedAt = completedAt }
+            )
+        | Error AlreadyRetired
+        | Error(NotJoinable _) -> None
+        | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+
     /// Materialise Abandoned as a batch item and CAS-retire (single report).
     /// `completedAt` is caller-minted (IClockPort at composition).
     let tryConsumeOneAbandoned
@@ -65,39 +94,36 @@ module JoinDrain =
             match record.Lifecycle, HandleId.tryAgent record.Handle with
             | HandleLifecycle.Abandoned reason, Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
-
-                let reasonText =
-                    match reason with
-                    | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
-                    | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
-                    | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
-
-                let role = AgentRoleIdentity.ofRole record.CanonicalRole
-
-                match! HandleController.consume durable parentId record.Handle with
-                | Ok _ ->
-                    return
-                        Some(
-                            Ok
-                                { RunId = "abandoned-" + agentId
-                                  AgentId = agentId
-                                  AgentName = record.TargetAgent
-                                  Role = role
-                                  Outcome = AgentCompletion.abandoned agentId reasonText
-                                  CompletedAt = completedAt }
-                        )
-                | Error AlreadyRetired -> return None
-                | Error(NotJoinable _) -> return None
-                | Error(AppendFailed err) -> return Some(Error(ForkError.NotFound err))
+                let! outcome = HandleController.consume durable parentId record.Handle
+                return afterConsumeCas agentId record (abandonReasonText reason) completedAt outcome
             | _ -> return None
         }
 
     let private appendFact (durable: AgentJournal) (parentId: SessionId) (fact: AgentFact) =
-        task {
-            match! AgentJournal.appendAgent (StreamId.Session parentId) None fact durable with
-            | Ok _ -> return Ok()
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
-        }
+        AgentJournal.appendAgent (StreamId.Session parentId) None fact durable
+        |> Task.map (Result.map ignore >> Result.mapError JournalAppendFailure.describe)
+
+    let private afterRejectAppendFailure
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (err: string)
+        : Result<RunCompletion, ForkError> option =
+        let after = AgentJournal.handleProjection durable parentId
+
+        match HandleProjection.tryFind record.Handle after with
+        | Some { Lifecycle = HandleLifecycle.Active } -> None
+        | _ -> Some(Error(ForkError.NotFound err))
+
+    let private rejectAppendOutcome
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (appendResult: Result<unit, string>)
+        : Result<RunCompletion, ForkError> option =
+        match appendResult with
+        | Ok() -> None
+        | Error err -> afterRejectAppendFailure durable parentId record err
 
     /// Unretired legacy false abort: append rejection, fold reverts to Active, no join item.
     /// Idempotent when already Active (fold rejects AlreadyCompleted / NotCompleted → treat as done).
@@ -111,7 +137,7 @@ module JoinDrain =
         task {
             match record.Lifecycle with
             | HandleLifecycle.CompletedAwaitingJoin _ ->
-                match!
+                let! appendResult =
                     appendFact
                         durable
                         parentId
@@ -121,16 +147,62 @@ module JoinDrain =
                                ExpectedCompletionRef = blobRef
                                ExpectedCompletionDigest = blobDigest
                                Reason = FalseCompletionReason.LegacyAbortWasObservation |})
-                with
-                | Ok() -> return None
-                | Error err ->
-                    let after = AgentJournal.handleProjection durable parentId
 
-                    match HandleProjection.tryFind record.Handle after with
-                    | Some { Lifecycle = HandleLifecycle.Active } -> return None
-                    | _ -> return Some(Error(ForkError.NotFound err))
+                return rejectAppendOutcome durable parentId record appendResult
             | _ -> return None
         }
+
+    let private appendMigrationFacts
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (replacement: HandleId)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        : Task<Result<unit, ForkError>> =
+        taskResult {
+            do!
+                appendFact
+                    durable
+                    parentId
+                    (ExecutionFact.HandleFalseTerminalReported
+                        {| ParentSessionId = parentId
+                           Handle = record.Handle
+                           BadCompletionRef = blobRef
+                           BadCompletionDigest = blobDigest
+                           Reason = FalseCompletionReason.LegacyAbortWasObservation |})
+                |> Task.map (Result.mapError ForkError.NotFound)
+
+            do!
+                appendFact
+                    durable
+                    parentId
+                    (ExecutionFact.HandleLinked
+                        {| ParentSessionId = parentId
+                           ChildSessionId = record.ChildSessionId
+                           Handle = replacement
+                           TargetAgent = record.TargetAgent
+                           Byname = record.Byname
+                           CanonicalRole = record.CanonicalRole
+                           Ownership = record.Ownership |})
+                |> Task.map (Result.mapError ForkError.NotFound)
+
+            do!
+                appendFact
+                    durable
+                    parentId
+                    (ExecutionFact.ParentJoinCorrectionRequested
+                        {| ParentSessionId = parentId
+                           OriginalHandle = record.Handle
+                           ReplacementHandle = replacement
+                           BadCompletionDigest = blobDigest |})
+                |> Task.map (Result.mapError ForkError.NotFound)
+        }
+
+    let private migrationJoinOutcome (result: Result<unit, ForkError>) : Result<RunCompletion, ForkError> option =
+        match result with
+        | Ok() -> None
+        | Error e -> Some(Error e)
 
     /// Retired legacy false abort: deterministic replacement + correction (idempotent).
     let private migrateRetiredFalseAbort
@@ -148,47 +220,82 @@ module JoinDrain =
             match HandleProjection.tryFind replacement projection with
             | Some _ -> return None
             | None ->
-                match!
-                    appendFact
-                        durable
-                        parentId
-                        (ExecutionFact.HandleFalseTerminalReported
-                            {| ParentSessionId = parentId
-                               Handle = record.Handle
-                               BadCompletionRef = blobRef
-                               BadCompletionDigest = blobDigest
-                               Reason = FalseCompletionReason.LegacyAbortWasObservation |})
-                with
-                | Error err -> return Some(Error(ForkError.NotFound err))
-                | Ok() ->
-                    match!
-                        appendFact
-                            durable
-                            parentId
-                            (ExecutionFact.HandleLinked
-                                {| ParentSessionId = parentId
-                                   ChildSessionId = record.ChildSessionId
-                                   Handle = replacement
-                                   TargetAgent = record.TargetAgent
-                                   Byname = record.Byname
-                                   CanonicalRole = record.CanonicalRole
-                                   Ownership = record.Ownership |})
-                    with
-                    | Error err -> return Some(Error(ForkError.NotFound err))
-                    | Ok() ->
-                        match!
-                            appendFact
-                                durable
-                                parentId
-                                (ExecutionFact.ParentJoinCorrectionRequested
-                                    {| ParentSessionId = parentId
-                                       OriginalHandle = record.Handle
-                                       ReplacementHandle = replacement
-                                       BadCompletionDigest = blobDigest |})
-                        with
-                        | Ok() -> return None
-                        | Error err -> return Some(Error(ForkError.NotFound err))
+                let! result = appendMigrationFacts durable parentId record replacement blobRef blobDigest
+                return migrationJoinOutcome result
         }
+
+    let private missingBodyOutcome (agentId: string) (lifecycle: HandleLifecycle) =
+        match lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Terminal }
+        | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.SendFailure } ->
+            Some(Error(ForkError.TerminalMaterializationFailed agentId))
+        | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled } -> None
+        | _ -> None
+
+    let private afterFinalityConsume
+        (completion: RunCompletion)
+        (outcome: Result<HandleRecord, HandleConsumeRejection>)
+        : Result<RunCompletion, ForkError> option =
+        match outcome with
+        | Ok _ -> Some(Ok completion)
+        | Error AlreadyRetired
+        | Error(NotJoinable _) -> None
+        | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+
+    let private joinCurrentDecoded
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (agentId: string)
+        (decoded: DurableAgentCompletionV2)
+        (body: string)
+        (completedAt: DateTimeOffset)
+        : Task<Result<RunCompletion, ForkError> option> =
+        task {
+            let proof =
+                JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
+
+            let completion =
+                HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded completedAt
+
+            match JoinableCompletion.finality proof with
+            | ChildFinality.Succeeded _
+            | ChildFinality.Failed _ ->
+                let! outcome = HandleController.consume durable parentId record.Handle
+                return afterFinalityConsume completion outcome
+            | ChildFinality.Abandoned _ -> return None
+        }
+
+    let private afterDecodeBody
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (agentId: string)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        (body: string)
+        (completedAt: DateTimeOffset)
+        : Task<Result<RunCompletion, ForkError> option> =
+        match HandleCompletionCodec.decodeBody body with
+        | Current decoded -> joinCurrentDecoded durable parentId record agentId decoded body completedAt
+        | LegacyFalseAbort _ -> rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
+        | Invalid _ -> Task.FromResult None
+
+    let private afterReadBody
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (agentId: string)
+        (readResult: Result<string option * BlobRef option * BlobDigest option, string>)
+        (completedAt: DateTimeOffset)
+        : Task<Result<RunCompletion, ForkError> option> =
+        match readResult with
+        | Error err -> Task.FromResult(Some(Error(ForkError.NotFound err)))
+        | Ok(None, _, _) -> Task.FromResult(missingBodyOutcome agentId record.Lifecycle)
+        | Ok(Some body, Some blobRef, Some blobDigest) ->
+            afterDecodeBody durable parentId record agentId blobRef blobDigest body completedAt
+        | Ok(Some _, _, _) ->
+            Task.FromResult(Some(Error(ForkError.NotFound "completion blob ref/digest pair is incomplete")))
 
     /// One durable completed handle: decode first, then prove, then CAS.
     /// `completedAt` is caller-minted (IClockPort at composition).
@@ -203,40 +310,8 @@ module JoinDrain =
             | None -> return None
             | Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
-
-                match! HandleCompletionCodec.tryReadBody durable record with
-                | Error err -> return Some(Error(ForkError.NotFound err))
-                | Ok(None, _, _) ->
-                    match record.Lifecycle with
-                    | HandleLifecycle.CompletedAwaitingJoin cell ->
-                        match cell.Kind with
-                        | HandleCompletionKind.Terminal
-                        | HandleCompletionKind.SendFailure ->
-                            return Some(Error(ForkError.TerminalMaterializationFailed agentId))
-                        | HandleCompletionKind.Cancelled -> return None
-                    | _ -> return None
-                | Ok(Some body, Some blobRef, Some blobDigest) ->
-                    match HandleCompletionCodec.decodeBody body with
-                    | Current decoded ->
-                        let proof =
-                            JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
-
-                        let completion =
-                            HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded completedAt
-
-                        match JoinableCompletion.finality proof with
-                        | ChildFinality.Succeeded _
-                        | ChildFinality.Failed _ ->
-                            match! HandleController.consume durable parentId record.Handle with
-                            | Ok _ -> return Some(Ok completion)
-                            | Error AlreadyRetired -> return None
-                            | Error(NotJoinable _) -> return None
-                            | Error(AppendFailed err) -> return Some(Error(ForkError.NotFound err))
-                        | ChildFinality.Abandoned _ -> return None
-                    | LegacyFalseAbort _ -> return! rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
-                    | Invalid _ -> return None
-                | Ok(Some _, _, _) ->
-                    return Some(Error(ForkError.NotFound "completion blob ref/digest pair is incomplete"))
+                let! readResult = HandleCompletionCodec.tryReadBody durable record
+                return! afterReadBody durable parentId record agentId readResult completedAt
         }
 
     /// Dispatch one record through the correct consume path.
@@ -251,6 +326,25 @@ module JoinDrain =
         | HandleLifecycle.CompletedAwaitingJoin _ -> tryConsumeOneDurable durable parentId record completedAt
         | _ -> Task.FromResult None
 
+    let private agentNotTaken (takenIds: Set<string>) (r: HandleRecord) =
+        match HandleId.tryAgent r.Handle with
+        | Some id -> not (Set.contains (AgentHandleId.value id) takenIds)
+        | None -> true
+
+    let private refreshCandidates
+        (acc: RunCompletion list)
+        (refresh: unit -> AgentLinkageProjection)
+        (records: HandleRecord list)
+        =
+        let takenIds = acc |> List.map (fun c -> c.AgentId) |> Set.ofList
+
+        orderedCandidates (refresh ())
+        |> List.filter (agentNotTaken takenIds)
+        |> fun refreshed ->
+            if List.isEmpty refreshed then Choice1Of3()
+            elif refreshed = records then Choice2Of3()
+            else Choice3Of3 refreshed
+
     /// Core drain loop: ordered candidates, CAS consume, refresh on race/skip.
     /// Returns Ok list (may be empty) or Error when the first item fails hard.
     let drainJoinableBatch
@@ -259,44 +353,70 @@ module JoinDrain =
         (consumeOne: HandleRecord -> Task<Result<RunCompletion, ForkError> option>)
         (refresh: unit -> AgentLinkageProjection)
         : Task<Result<RunCompletion list, ForkError>> =
-        task {
-            let cap = min maxCount JoinBatch.Max
+        let rec consumeSafe
+            (acc: RunCompletion list)
+            (remaining: int)
+            (records: HandleRecord list)
+            : Task<Result<RunCompletion list, ForkError>> =
+            task {
+                match remaining, records with
+                | 0, _
+                | _, [] -> return Ok(List.rev acc)
+                | n, record :: rest -> return! afterConsumeOne acc n record rest
+            }
 
-            if cap <= 0 then
-                return Ok []
-            else
-                let rec consumeSafe
-                    (acc: RunCompletion list)
-                    (remaining: int)
-                    (records: HandleRecord list)
-                    : Task<Result<RunCompletion list, ForkError>> =
-                    task {
-                        match remaining, records with
-                        | 0, _ -> return Ok(List.rev acc)
-                        | _, [] -> return Ok(List.rev acc)
-                        | n, record :: rest ->
-                            match! consumeOne record with
-                            | Some(Ok completion) -> return! consumeSafe (completion :: acc) (n - 1) rest
-                            | Some(Error e) when List.isEmpty acc -> return Error e
-                            | Some(Error _) -> return Ok(List.rev acc)
-                            | None ->
-                                let takenIds = acc |> List.map (fun c -> c.AgentId) |> Set.ofList
-                                let refreshedProj = refresh ()
+        and afterConsumeOne
+            (acc: RunCompletion list)
+            (n: int)
+            (record: HandleRecord)
+            (rest: HandleRecord list)
+            : Task<Result<RunCompletion list, ForkError>> =
+            task {
+                let! outcome = consumeOne record
+                return! decideConsumeOutcome acc n record rest outcome
+            }
 
-                                let refreshed =
-                                    orderedCandidates refreshedProj
-                                    |> List.filter (fun r ->
-                                        match HandleId.tryAgent r.Handle with
-                                        | Some id -> not (Set.contains (AgentHandleId.value id) takenIds)
-                                        | None -> true)
+        and refreshAfterMiss
+            (acc: RunCompletion list)
+            (n: int)
+            (record: HandleRecord)
+            (rest: HandleRecord list)
+            : Task<Result<RunCompletion list, ForkError>> =
+            match refreshCandidates acc refresh (record :: rest) with
+            | Choice1Of3() -> Task.FromResult(Ok(List.rev acc))
+            | Choice2Of3() -> consumeSafe acc n rest
+            | Choice3Of3 refreshed -> consumeSafe acc n refreshed
 
-                                if List.isEmpty refreshed then return Ok(List.rev acc)
-                                elif refreshed = records then return! consumeSafe acc n rest
-                                else return! consumeSafe acc n refreshed
-                    }
+        and decideConsumeOutcome
+            (acc: RunCompletion list)
+            (n: int)
+            (record: HandleRecord)
+            (rest: HandleRecord list)
+            (outcome: Result<RunCompletion, ForkError> option)
+            : Task<Result<RunCompletion list, ForkError>> =
+            match outcome with
+            | Some(Ok completion) -> consumeSafe (completion :: acc) (n - 1) rest
+            | Some(Error e) when List.isEmpty acc -> Task.FromResult(Error e)
+            | Some(Error _) -> Task.FromResult(Ok(List.rev acc))
+            | None -> refreshAfterMiss acc n record rest
 
-                return! consumeSafe [] cap (orderedCandidates projection)
-        }
+        let cap = min maxCount JoinBatch.Max
+
+        if cap <= 0 then
+            Task.FromResult(Ok [])
+        else
+            consumeSafe [] cap (orderedCandidates projection)
+
+    let private forkErrorMessage (e: ForkError) =
+        match e with
+        | ForkError.NotFound msg -> msg
+        | other -> sprintf "%A" other
+
+    let private migrateOutcomeToUnit (outcome: Result<RunCompletion, ForkError> option) =
+        match outcome with
+        | None
+        | Some(Ok _) -> Ok()
+        | Some(Error e) -> Error(forkErrorMessage e)
 
     /// Execute replacement migration when blob identity is known.
     let tryMigrateRetiredFalseAbort
@@ -311,14 +431,64 @@ module JoinDrain =
             | None -> return Error "not an agent handle"
             | Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
+                let! outcome = migrateRetiredFalseAbort durable parentId record agentId blobRef blobDigest
+                return migrateOutcomeToUnit outcome
+        }
 
-                match! migrateRetiredFalseAbort durable parentId record agentId blobRef blobDigest with
-                | None -> return Ok()
-                | Some(Error e) ->
-                    match e with
-                    | ForkError.NotFound msg -> return Error msg
-                    | other -> return Error(sprintf "%A" other)
-                | Some(Ok _) -> return Ok()
+    let private completionBlobPair (cell: HandleCompletion) =
+        match cell.CompletionRef, cell.CompletionDigest with
+        | Some blobRef, Some blobDigest -> Some(blobRef, blobDigest)
+        | _ -> None
+
+    /// Unretired awaiting-join → reject path; retired → migrate path.
+    let private tryFalseAbortCell (record: HandleRecord) =
+        match record.Lifecycle, HandleId.tryAgent record.Handle, record.LastCompletion with
+        | HandleLifecycle.CompletedAwaitingJoin cell, Some _, _ ->
+            completionBlobPair cell |> Option.map (fun pair -> pair, false)
+        | HandleLifecycle.Retired, Some _, Some cell -> completionBlobPair cell |> Option.map (fun pair -> pair, true)
+        | _ -> None
+
+    let private applyDecodedFalseAbort
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        (body: string)
+        (retired: bool)
+        : Task<unit> =
+        match HandleCompletionCodec.decodeBody body, retired with
+        | LegacyFalseAbort _, false ->
+            rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
+            |> Task.map ignore
+        | LegacyFalseAbort _, true ->
+            tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest
+            |> Task.map ignore
+        | _ -> Task.FromResult()
+
+    let private maybeApplyLegacyFalseAbort
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        (retired: bool)
+        : Task<unit> =
+        task {
+            let! readResult = durable.Writer.BlobWriter.Read blobRef
+
+            match readResult with
+            | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
+                return! applyDecodedFalseAbort durable parentId record blobRef blobDigest body retired
+            | _ -> return ()
+        }
+
+    let private reconcileOne (durable: AgentJournal) (parentId: SessionId) (record: HandleRecord) : Task<unit> =
+        task {
+            match tryFalseAbortCell record with
+            | None -> return ()
+            | Some((blobRef, blobDigest), retired) ->
+                return! maybeApplyLegacyFalseAbort durable parentId record blobRef blobDigest retired
         }
 
     /// Scan projection: reject unretired false aborts; migrate retired false aborts.
@@ -329,35 +499,7 @@ module JoinDrain =
             let projection = AgentJournal.handleProjection durable parentId
 
             for record in HandleProjection.linkedChildren projection do
-                match record.Lifecycle, HandleId.tryAgent record.Handle with
-                | HandleLifecycle.CompletedAwaitingJoin cell, Some _ ->
-                    match cell.CompletionRef, cell.CompletionDigest with
-                    | Some blobRef, Some blobDigest ->
-                        match! durable.Writer.BlobWriter.Read blobRef with
-                        | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
-                            match HandleCompletionCodec.decodeBody body with
-                            | LegacyFalseAbort _ ->
-                                let! _ = rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
-                                ()
-                            | _ -> ()
-                        | _ -> ()
-                    | _ -> ()
-                | HandleLifecycle.Retired, Some _ ->
-                    match record.LastCompletion with
-                    | Some cell ->
-                        match cell.CompletionRef, cell.CompletionDigest with
-                        | Some blobRef, Some blobDigest ->
-                            match! durable.Writer.BlobWriter.Read blobRef with
-                            | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
-                                match HandleCompletionCodec.decodeBody body with
-                                | LegacyFalseAbort _ ->
-                                    let! _ = tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest
-                                    ()
-                                | _ -> ()
-                            | _ -> ()
-                        | _ -> ()
-                    | None -> ()
-                | _ -> ()
+                do! reconcileOne durable parentId record
         }
 
     /// Production entry: reconcile false aborts, then drain joinable.

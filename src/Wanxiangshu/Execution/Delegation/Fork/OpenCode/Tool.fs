@@ -69,6 +69,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -345,17 +346,22 @@ module ForkTool =
         (scope: ToolRuntimeScope)
         (handles: AgentLinkageProjection option)
         (request: Request)
-        =
-        task {
-            match request.Attach with
-            | None -> return Ok None
-            | Some attach ->
-                match handles |> Option.bind (HandleProjection.tryFindByByname attach) with
-                | None -> return Error Path.Fork.AttachUnknown
-                | Some record ->
-                    let! workRecord = scope.ParentWorkRecordFor(SessionId.value record.ChildSessionId)
-                    return Ok workRecord
-        }
+        : Task<Result<string option, string>> =
+        match request.Attach with
+        | None -> Task.FromResult(Ok None)
+        | Some attach ->
+            taskResult {
+                let! record =
+                    handles
+                    |> Option.bind (HandleProjection.tryFindByByname attach)
+                    |> Result.requireSome Path.Fork.AttachUnknown
+
+                let! workRecord =
+                    scope.ParentWorkRecordFor(SessionId.value record.ChildSessionId)
+                    |> TaskResultCE.ofTask
+
+                return workRecord
+            }
 
     let private bynameOf (request: Request) (fallback: string) =
         if String.IsNullOrWhiteSpace request.Name then
@@ -363,14 +369,11 @@ module ForkTool =
         else
             request.Name.Trim()
 
-    let private recordFissionAffinity (scope: ToolRuntimeScope) (context: HostToolContext) handleId =
-        task {
-            if String.IsNullOrWhiteSpace context.SessionId then
-                return Ok()
-            else
-                match FissionRuntime.tryLane (SessionId.create context.SessionId), scope.Journal with
-                | Some lane, Some durable ->
-                    match!
+    let private appendFissionAffinity durable (context: HostToolContext) lane handleId =
+        taskResult {
+            let! _ =
+                task {
+                    let! result =
                         AgentJournal.appendAgent
                             (StreamId.Session lane.OwnerSessionId)
                             context.ProviderRunId
@@ -380,11 +383,349 @@ module ForkTool =
                                    ExternalId = FissionExternalId.agent handleId
                                    LaneIndex = lane.LaneIndex |})
                             durable
-                    with
-                    | Ok _ -> return Ok()
-                    | Error failure -> return Error(JournalAppendFailure.describe failure)
-                | _ -> return Ok()
+
+                    return Result.mapError JournalAppendFailure.describe result
+                }
+
+            return ()
         }
+
+    let private bindFissionAffinity (scope: ToolRuntimeScope) (context: HostToolContext) handleId =
+        match FissionRuntime.tryLane (SessionId.create context.SessionId), scope.Journal with
+        | Some lane, Some durable -> appendFissionAffinity durable context lane handleId
+        | _ -> Task.FromResult(Ok())
+
+    let private recordFissionAffinity (scope: ToolRuntimeScope) (context: HostToolContext) handleId =
+        if String.IsNullOrWhiteSpace context.SessionId then
+            Task.FromResult(Ok())
+        else
+            bindFissionAffinity scope context handleId
+
+    let private agentHandles (scope: ToolRuntimeScope) (context: HostToolContext) =
+        match scope.Journal with
+        | Some journal when not (String.IsNullOrWhiteSpace context.SessionId) ->
+            let owner = scope.LogicalOwnerFor(SessionId.create context.SessionId)
+            Some(AgentJournal.handleProjection journal owner)
+        | _ -> None
+
+    let private announceChild (runtime: HostForkRuntime) (context: HostToolContext) agentKey =
+        runtime.TryFindAgent agentKey
+        |> Option.bind (fun created -> created.ChildSessionId)
+        |> Option.iter (fun childId ->
+            FissionRuntime.notifyChildCreated (SessionId.create context.SessionId) agentKey childId)
+
+    let private runManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        role
+        (request: Request)
+        attachment
+        handleId
+        (managed: ManagedAgent)
+        =
+        task {
+            if hasKeywords request || request.Attach.IsSome then
+                let! rendered = prepareForkPrompt scope runtime role request attachment
+
+                return!
+                    runtime.Fork(
+                        handleId,
+                        role,
+                        managed.Name,
+                        request.Charge,
+                        None,
+                        renderedPrompt = rendered,
+                        byname = request.Name,
+                        ?expectedToolCalls = request.ExpectedToolCalls
+                    )
+            else
+                return!
+                    runtime.Fork(
+                        handleId,
+                        role,
+                        managed.Name,
+                        request.Charge,
+                        None,
+                        byname = request.Name,
+                        ?expectedToolCalls = request.ExpectedToolCalls
+                    )
+        }
+
+    let private runManagerReuse
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        role
+        (request: Request)
+        attachment
+        agentId
+        =
+        task {
+            if hasKeywords request || request.Attach.IsSome then
+                let! rendered = prepareForkPrompt scope runtime role request attachment
+
+                return!
+                    runtime.Reuse(
+                        agentId,
+                        request.Charge,
+                        renderedPrompt = rendered,
+                        ?expectedToolCalls = request.ExpectedToolCalls
+                    )
+            else
+                return!
+                    runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls)
+        }
+
+    let private sealManagerAffinity
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        agentKey
+        language
+        (request: Request)
+        denyPath
+        =
+        task {
+            match! recordFissionAffinity scope context agentKey with
+            | Error _ -> return consequence (prose language denyPath)
+            | Ok() ->
+                announceChild runtime context agentKey
+
+                return
+                    successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+        }
+
+    let private commitNewManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        (managed: ManagedAgent)
+        role
+        attachment
+        =
+        task {
+            let handleId = ToolHostCodec.newHandleId ()
+            let! forkResult = runManagerFork scope runtime role request attachment handleId managed
+
+            match forkResult with
+            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
+            | Ok _ ->
+                return!
+                    sealManagerAffinity
+                        scope
+                        runtime
+                        context
+                        handleId
+                        language
+                        request
+                        Path.Fork.ChargeNotPlaced
+        }
+
+    let private finishNewManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        role
+        =
+        task {
+            match! resolveAttachment scope handles request with
+            | Error path -> return consequence (prose language path)
+            | Ok attachment ->
+                return!
+                    commitNewManagerFork
+                        scope
+                        runtime
+                        context
+                        request
+                        language
+                        managed
+                        role
+                        attachment
+        }
+
+    let private placeNewManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        =
+        let role = AgentRoleIdentity.ofManaged managed.Role
+
+        if hasKeywords request && not (warmStartAllowed role) then
+            Task.FromResult(consequence (prose language Path.Fork.WarmStartUnavailable))
+        else
+            finishNewManagerFork scope runtime context request language handles managed role
+
+    let private reuseWhileActive (runtime: HostForkRuntime) agentId (request: Request) language =
+        task {
+            match!
+                runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls)
+            with
+            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+            | Ok _ when request.Attach.IsSome ->
+                return successInstruction (namedProse language Path.Fork.AttachBusy (request.Name.Trim()))
+            | Ok _ ->
+                return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+        }
+
+    let private commitIdleReuse
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        (record: AgentRecord)
+        agentId
+        attachment
+        =
+        task {
+            let! reuseResult = runManagerReuse scope runtime record.Role request attachment agentId
+
+            match reuseResult with
+            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+            | Ok _ ->
+                return!
+                    sealManagerAffinity
+                        scope
+                        runtime
+                        context
+                        agentId
+                        language
+                        request
+                        Path.Fork.PersonCannotTakeCharge
+        }
+
+    let private reuseWhileIdle
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (record: AgentRecord)
+        agentId
+        =
+        task {
+            match! resolveAttachment scope handles request with
+            | Error path -> return consequence (prose language path)
+            | Ok attachment ->
+                return!
+                    commitIdleReuse scope runtime context request language record agentId attachment
+        }
+
+    let private reuseFoundAgent
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (record: AgentRecord)
+        agentId
+        =
+        let activeRun = lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+
+        if activeRun then
+            reuseWhileActive runtime agentId request language
+        else
+            reuseWhileIdle scope runtime context request language handles record agentId
+
+    let private reuseResolvedAgent
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        agentId
+        =
+        match runtime.TryFindAgent agentId with
+        | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnavailable))
+        | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
+            Task.FromResult(consequence (prose language Path.Fork.WarmStartUnavailable))
+        | Some record -> reuseFoundAgent scope runtime context request language handles record agentId
+
+    let private executeManagerReusePerson
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        handle
+        =
+        match HandleId.tryAgent handle.Handle with
+        | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
+        | Some handleId ->
+            reuseResolvedAgent
+                scope
+                runtime
+                context
+                request
+                language
+                handles
+                (AgentHandleId.value handleId)
+
+    let private executeManagerNewCalling
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        existingByname
+        =
+        match existingByname, tryCalling managerCallingBindings request.Calling with
+        | Some _, _ -> Task.FromResult(consequence (prose language Path.Fork.NameAlreadyBelongs))
+        | None, None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
+        | None, Some managed -> placeNewManagerFork scope runtime context request language handles managed
+
+    let private executeManagerExistingPerson
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        existingByname
+        =
+        match existingByname with
+        | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
+        | Some handle ->
+            executeManagerReusePerson scope runtime context request language handles handle
+
+    let private executeManagerWithRuntime
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        =
+        let handles = agentHandles scope context
+        let existingByname = handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+        if hasCalling request then
+            executeManagerNewCalling scope runtime context request language handles existingByname
+        else
+            executeManagerExistingPerson scope runtime context request language handles existingByname
+
+    let private executeManagerAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        =
+        match scope.RuntimeFor context with
+        | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeContextUnavailable))
+        | Ok runtime -> executeManagerWithRuntime scope runtime request context language
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -397,177 +738,97 @@ module ForkTool =
             elif isSelfAttachment request then
                 return consequence (prose language Path.Fork.AttachSelf)
             else
-                match scope.RuntimeFor context with
-                | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
-                | Ok runtime ->
-                    let handles =
-                        match scope.Journal with
-                        | Some journal when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                            let owner = scope.LogicalOwnerFor(SessionId.create context.SessionId)
-                            Some(AgentJournal.handleProjection journal owner)
-                        | _ -> None
-
-                    let existingByname =
-                        handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
-
-                    if hasCalling request then
-                        match existingByname with
-                        | Some _ -> return consequence (prose language Path.Fork.NameAlreadyBelongs)
-                        | None ->
-                            match tryCalling managerCallingBindings request.Calling with
-                            | None -> return consequence (prose language Path.Fork.UnknownCalling)
-                            | Some managed ->
-                                let role = AgentRoleIdentity.ofManaged managed.Role
-
-                                if hasKeywords request && not (warmStartAllowed role) then
-                                    return consequence (prose language Path.Fork.WarmStartUnavailable)
-                                else
-                                    match! resolveAttachment scope handles request with
-                                    | Error path -> return consequence (prose language path)
-                                    | Ok attachment ->
-                                        let handleId = ToolHostCodec.newHandleId ()
-
-                                        let! forkResult =
-                                            if hasKeywords request || request.Attach.IsSome then
-                                                task {
-                                                    let! rendered =
-                                                        prepareForkPrompt scope runtime role request attachment
-
-                                                    return!
-                                                        runtime.Fork(
-                                                            handleId,
-                                                            role,
-                                                            managed.Name,
-                                                            request.Charge,
-                                                            None,
-                                                            renderedPrompt = rendered,
-                                                            byname = request.Name,
-                                                            ?expectedToolCalls = request.ExpectedToolCalls
-                                                        )
-                                                }
-                                            else
-                                                runtime.Fork(
-                                                    handleId,
-                                                    role,
-                                                    managed.Name,
-                                                    request.Charge,
-                                                    None,
-                                                    byname = request.Name,
-                                                    ?expectedToolCalls = request.ExpectedToolCalls
-                                                )
-
-                                        match forkResult with
-                                        | Ok _ ->
-                                            match! recordFissionAffinity scope context handleId with
-                                            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-                                            | Ok() ->
-                                                runtime.TryFindAgent handleId
-                                                |> Option.bind (fun created -> created.ChildSessionId)
-                                                |> Option.iter (fun childId ->
-                                                    FissionRuntime.notifyChildCreated
-                                                        (SessionId.create context.SessionId)
-                                                        handleId
-                                                        childId)
-
-                                                return
-                                                    successInstruction (
-                                                        namedProse
-                                                            language
-                                                            Path.Fork.ChargeCarried
-                                                            (request.Name.Trim())
-                                                    )
-                                        | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-                    else
-                        match existingByname with
-                        | None -> return consequence (prose language Path.Fork.PersonUnknown)
-                        | Some handle ->
-                            match HandleId.tryAgent handle.Handle with
-                            | None -> return consequence (prose language Path.Fork.PersonUnknown)
-                            | Some handleId ->
-                                let agentId = AgentHandleId.value handleId
-
-                                match runtime.TryFindAgent agentId with
-                                | None -> return consequence (prose language Path.Fork.PersonUnavailable)
-                                | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
-                                    return consequence (prose language Path.Fork.WarmStartUnavailable)
-                                | Some record ->
-                                    let activeRun =
-                                        lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
-
-                                    if activeRun then
-                                        match!
-                                            runtime.Reuse(
-                                                agentId,
-                                                request.Charge,
-                                                ?expectedToolCalls = request.ExpectedToolCalls
-                                            )
-                                        with
-                                        | Error _ ->
-                                            return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                                        | Ok _ when request.Attach.IsSome ->
-                                            return
-                                                successInstruction (
-                                                    namedProse language Path.Fork.AttachBusy (request.Name.Trim())
-                                                )
-                                        | Ok _ ->
-                                            return
-                                                successInstruction (
-                                                    namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
-                                                )
-                                    else
-                                        match! resolveAttachment scope handles request with
-                                        | Error path -> return consequence (prose language path)
-                                        | Ok attachment ->
-                                            let! reuseResult =
-                                                if hasKeywords request || request.Attach.IsSome then
-                                                    task {
-                                                        let! rendered =
-                                                            prepareForkPrompt
-                                                                scope
-                                                                runtime
-                                                                record.Role
-                                                                request
-                                                                attachment
-
-                                                        return!
-                                                            runtime.Reuse(
-                                                                agentId,
-                                                                request.Charge,
-                                                                renderedPrompt = rendered,
-                                                                ?expectedToolCalls = request.ExpectedToolCalls
-                                                            )
-                                                    }
-                                                else
-                                                    runtime.Reuse(
-                                                        agentId,
-                                                        request.Charge,
-                                                        ?expectedToolCalls = request.ExpectedToolCalls
-                                                    )
-
-                                            match reuseResult with
-                                            | Error _ ->
-                                                return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                                            | Ok _ ->
-                                                match! recordFissionAffinity scope context agentId with
-                                                | Error _ ->
-                                                    return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                                                | Ok() ->
-                                                    runtime.TryFindAgent agentId
-                                                    |> Option.bind (fun updated -> updated.ChildSessionId)
-                                                    |> Option.iter (fun childId ->
-                                                        FissionRuntime.notifyChildCreated
-                                                            (SessionId.create context.SessionId)
-                                                            agentId
-                                                            childId)
-
-                                                    return
-                                                        successInstruction (
-                                                            namedProse
-                                                                language
-                                                                Path.Fork.ChargeCarried
-                                                                (request.Name.Trim())
-                                                        )
+                return! executeManagerAfterGuards scope request context language
         }
+
+    let private orchestratorExistingByname (scope: ToolRuntimeScope) (request: Request) =
+        scope.Journal
+        |> Option.bind (fun journal ->
+            (AgentJournal.snapshot journal).AgentProjections.Orchestrator
+            |> OrchestratorProjection.tryFindByByname request.Name)
+
+    let private finishCommissionNew
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        (managed: ManagedAgent)
+        =
+        task {
+            let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
+            let host = scope.OrchestratorHostFor context.SessionId
+
+            match!
+                host.ForkManagerJob(
+                    managerId,
+                    managed.Name,
+                    request.Charge,
+                    byname = request.Name,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+            with
+            | Ok _ ->
+                return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+            | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
+        }
+
+    let private commissionNewCalling
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        existingByname
+        =
+        match existingByname, tryCalling orchestratorCallingBindings request.Calling with
+        | Some _, _ -> Task.FromResult(consequence (prose language Path.Commission.NameAlreadyBelongs))
+        | None, None -> Task.FromResult(consequence (prose language Path.Commission.UnknownCalling))
+        | None, Some managed -> finishCommissionNew scope context request language managed
+
+    let private continueExistingCommission
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        job
+        =
+        task {
+            let host = scope.OrchestratorHostFor context.SessionId
+
+            match!
+                host.ContinueManagerJob(
+                    job.ManagerJobId,
+                    request.Charge,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+            with
+            | Ok _ ->
+                return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+            | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+        }
+
+    let private commissionExistingByname
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        existingByname
+        =
+        match existingByname with
+        | None -> Task.FromResult(consequence (prose language Path.Commission.RoadUnknown))
+        | Some job -> continueExistingCommission scope context request language job
+
+    let private executeOrchestratorAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        =
+        let existingByname = orchestratorExistingByname scope request
+
+        if hasCalling request then
+            commissionNewCalling scope context request language existingByname
+        else
+            commissionExistingByname scope context request language existingByname
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -580,56 +841,7 @@ module ForkTool =
             elif String.IsNullOrWhiteSpace request.Charge then
                 return consequence (prose language Path.Commission.ChargeRequired)
             else
-                let existingByname =
-                    scope.Journal
-                    |> Option.bind (fun journal ->
-                        (AgentJournal.snapshot journal).AgentProjections.Orchestrator
-                        |> OrchestratorProjection.tryFindByByname request.Name)
-
-                if hasCalling request then
-                    match existingByname with
-                    | Some _ -> return consequence (prose language Path.Commission.NameAlreadyBelongs)
-                    | None ->
-                        match tryCalling orchestratorCallingBindings request.Calling with
-                        | None -> return consequence (prose language Path.Commission.UnknownCalling)
-                        | Some managed ->
-                            let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
-                            let host = scope.OrchestratorHostFor context.SessionId
-
-                            match!
-                                host.ForkManagerJob(
-                                    managerId,
-                                    managed.Name,
-                                    request.Charge,
-                                    byname = request.Name,
-                                    ?expectedToolCalls = request.ExpectedToolCalls
-                                )
-                            with
-                            | Ok _ ->
-                                return
-                                    successInstruction (
-                                        namedProse language Path.Commission.ChargeTaken (request.Name.Trim())
-                                    )
-                            | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
-                else
-                    match existingByname with
-                    | None -> return consequence (prose language Path.Commission.RoadUnknown)
-                    | Some job ->
-                        let host = scope.OrchestratorHostFor context.SessionId
-
-                        match!
-                            host.ContinueManagerJob(
-                                job.ManagerJobId,
-                                request.Charge,
-                                ?expectedToolCalls = request.ExpectedToolCalls
-                            )
-                        with
-                        | Ok _ ->
-                            return
-                                successInstruction (
-                                    namedProse language Path.Commission.ChargeTaken (request.Name.Trim())
-                                )
-                        | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+                return! executeOrchestratorAfterGuards scope request context language
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

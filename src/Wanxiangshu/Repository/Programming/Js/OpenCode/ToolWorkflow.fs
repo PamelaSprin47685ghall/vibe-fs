@@ -25,6 +25,7 @@ open Wanxiangshu.Strength.Persistence
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -124,52 +125,56 @@ module JsToolsData =
         else
             Error JsFailure.InvalidReturnValue
 
+    let private ofJsNumber (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+        if not (jsIsFinite value) then
+            Error JsFailure.InvalidReturnValue
+        elif not (jsIsInteger value) then
+            Ok(SyntheticToml.DataValue.Float(unbox value))
+        elif abs (unbox value: float) <= maxSafeInteger then
+            Ok(SyntheticToml.DataValue.Integer(int64 (unbox value: float)))
+        else
+            Ok(SyntheticToml.DataValue.Float(unbox value: float))
+
     let rec private ofJsValue (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+        let ty = jsType value
+
         if jsNull value then
             Ok SyntheticToml.DataValue.Null
+        elif ty = "boolean" then
+            Ok(SyntheticToml.DataValue.Bool(unbox value))
+        elif ty = "string" then
+            Ok(SyntheticToml.DataValue.String(unbox value))
+        elif ty = "number" then
+            ofJsNumber value
+        elif jsIsArray value then
+            ofJsArray value
+        elif ty = "object" then
+            ofJsObject value
         else
-            match jsType value with
-            | "boolean" -> Ok(SyntheticToml.DataValue.Bool(unbox value))
-            | "string" -> Ok(SyntheticToml.DataValue.String(unbox value))
-            | "number" ->
-                if not (jsIsFinite value) then
-                    Error JsFailure.InvalidReturnValue
-                elif jsIsInteger value then
-                    let n: float = unbox value
+            Error JsFailure.InvalidReturnValue
 
-                    if abs n <= maxSafeInteger then
-                        Ok(SyntheticToml.DataValue.Integer(int64 n))
-                    else
-                        Ok(SyntheticToml.DataValue.Float n)
-                else
-                    Ok(SyntheticToml.DataValue.Float(unbox value))
-            | "object" when jsIsArray value ->
-                let rec loop index acc =
-                    if index = jsLength value then
-                        let items = List.rev acc
+    and private ofJsArray (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+        result {
+            let! items =
+                [ 0 .. jsLength value - 1 ]
+                |> List.traverseResultM (fun index -> ofJsValue (jsGet value index))
 
-                        match validateArray items with
-                        | Error failure -> Error failure
-                        | Ok() -> Ok(SyntheticToml.DataValue.Array items)
-                    else
-                        match ofJsValue (jsGet value index) with
-                        | Error failure -> Error failure
-                        | Ok item -> loop (index + 1) (item :: acc)
+            do! validateArray items
+            return SyntheticToml.DataValue.Array items
+        }
 
-                loop 0 []
-            | "object" ->
-                let keys = jsKeys value
+    and private ofJsObject (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+        result {
+            let keys = jsKeys value
 
-                let rec loop index acc =
-                    if index = keys.Length then
-                        Ok(SyntheticToml.DataValue.Object(List.rev acc))
-                    else
-                        match ofJsValue (jsGet value keys.[index]) with
-                        | Error failure -> Error failure
-                        | Ok item -> loop (index + 1) ((keys.[index], item) :: acc)
+            let! fields =
+                [ 0 .. keys.Length - 1 ]
+                |> List.traverseResultM (fun index ->
+                    ofJsValue (jsGet value keys.[index])
+                    |> Result.map (fun item -> keys.[index], item))
 
-                loop 0 []
-            | _ -> Error JsFailure.InvalidReturnValue
+            return SyntheticToml.DataValue.Object fields
+        }
 
     let parse (json: string) : Result<SyntheticToml.DataValue, JsFailure> =
         try
