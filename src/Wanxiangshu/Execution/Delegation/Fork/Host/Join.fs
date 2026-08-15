@@ -71,8 +71,7 @@ module HostForkJoin =
     let private currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
         match HandleId.tryAgent record.Handle with
         | None -> false
-        | Some handleId ->
-            runtime.TryFindAgent(AgentHandleId.value handleId) |> Option.isSome
+        | Some handleId -> runtime.OwnsAgent(AgentHandleId.value handleId)
 
     /// EXEC-009 + EXEC-018 + GREEN-5: agent facts from Journal; PTY from mailbox as PtyJoinItem.
     /// journal=None: agent join fail-closed; pure PTY drain still allowed.

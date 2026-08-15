@@ -221,7 +221,8 @@ module PluginHooks =
                       box (fun (config: obj) ->
                           let inventory = ManagerConfig.configureManager config
                           scope.Strength.RecordManagedAgentInventory inventory
-                          scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config))
+                          scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                          ExplicitSessionResume.registerCommand config)
                       // HOST-006: this hook cannot refuse a compaction — its output
                       // has no cancel field (`plugin/index.ts:305`) and
                       // `plugin.trigger` discards the return value. Registered
@@ -305,6 +306,11 @@ module PluginHooks =
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                     hooks?tool <- toolRegistration.Tools
+                    let adoptExisting parent record =
+                        toolRegistration.Runtime.AdoptExistingChild(parent, record)
+
+                    hooks?``command.execute.before`` <-
+                        pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting))
                 with ex ->
                     raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 

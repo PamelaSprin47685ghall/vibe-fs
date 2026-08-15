@@ -434,13 +434,16 @@ module HostForkAgent =
                 let existing =
                     lock this.Gate (fun () ->
                         match this.Children.TryGetValue agentId with
-                        | true, childId -> Some childId
-                        | false, _ -> None)
+                        | true, childId -> Some(childId, false)
+                        | false, _ ->
+                            match this.DormantChildren.TryGetValue agentId with
+                            | true, childId -> Some(childId, true)
+                            | false, _ -> None)
 
                 match abandoned, existing with
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                | _, Some childId ->
+                | _, Some(childId, wasDormant) ->
                     match this.Journal, expectedToolCalls with
                     | Some journal, Some expected -> do! DelegatedToolEstimateLedger.replace journal childId expected
                     | _ -> ()
@@ -505,6 +508,9 @@ module HostForkAgent =
                                 with
                                 | Error linkError -> return Error linkError
                                 | Ok() ->
+                                    if wasDormant then
+                                        this.ActivateDormantChild(agentId, childId, role)
+
                                     let! enriched =
                                         match renderedPrompt with
                                         | Some rendered -> Task.FromResult(Some rendered)

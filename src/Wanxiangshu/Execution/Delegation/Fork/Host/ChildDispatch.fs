@@ -198,15 +198,29 @@ module HostForkChildDispatch =
         // callbacks) see cancellation immediately.
         runtime.Cancel()
 
+        // Teardown ownership is process-local. Durable Active handles from a
+        // previous process are broken historical tools, not resources this
+        // runtime may abandon/abort merely because the same parent runtime exists.
+        // Explicit /continue discoveries remain dormant outside `children` until
+        // a new reuse charge activates them.
+        let processOwned =
+            lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
         let owned =
             match durableHandles with
+            | None -> processOwned
             | Some handles ->
-                HandleProjection.activeHandles handles
-                |> List.choose (fun record ->
-                    match HandleId.tryAgent record.Handle with
-                    | Some handle -> Some(AgentHandleId.value handle, record.ChildSessionId)
-                    | None -> None)
-            | None -> lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+                processOwned
+                |> List.filter (fun (agentId, childId) ->
+                    match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
+                    | Some record ->
+                        record.ChildSessionId = childId
+                        && (match record.Lifecycle with
+                            | HandleLifecycle.Active -> true
+                            | HandleLifecycle.CompletedAwaitingJoin _
+                            | HandleLifecycle.Abandoned _
+                            | HandleLifecycle.Retired -> false)
+                    | None -> false)
 
         let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)

@@ -77,6 +77,12 @@ type HostForkRuntime
     let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
     let runtime = ForkRuntime(clock = clockPort, timerPort = timers)
     let children = Dictionary<string, SessionId>()
+    // Join visibility is process ownership, not liveness. A run may already have
+    // settled and left the live list while its completion is still waiting for join.
+    let processOwnedAgents = HashSet<string>()
+    // CRASH-018: explicit /continue discoveries are addressable for reuse but
+    // are not owned by this process until a new charge actually reopens them.
+    let dormantChildren = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
     /// Provider TerminalName → PtyId. Occupied until Join delivers closure.
@@ -158,11 +164,12 @@ type HostForkRuntime
                         observer item
                     with _ ->
                         ())
-    // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryWorkflow
-    // RestoreHandles → HostForkRestart.restoreLinkedChildren is the sole path.
+    // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
+    // HostForkRestart remains a detached algorithm library for explicit resume flows.
 
     member internal _.Runtime = runtime
     member internal _.Children = children
+    member internal _.DormantChildren = dormantChildren
     member internal _.PendingRuns = pendingRuns
     member internal _.PtyRuns = ptyRuns
 
@@ -197,7 +204,9 @@ type HostForkRuntime
     /// runtime before Fork, so Fork's existing-child path reuses the SAME Host
     /// session (X/Y context preserved) instead of creating a second one.
     member internal _.AdoptChild(agentId: string, childId: SessionId) : unit =
-        lock gate (fun () -> children.[agentId] <- childId)
+        lock gate (fun () ->
+            children.[agentId] <- childId
+            processOwnedAgents.Add agentId |> ignore)
 
     /// GLORY-040: deliver a first prompt that was deferred until its review
     /// barrier had durably opened. Idempotent per agent id: a second call with
@@ -302,6 +311,8 @@ type HostForkRuntime
         |> ignore
 
     member this.InstallRun(agentId: string, childId: SessionId, role: Role) =
+        lock gate (fun () -> processOwnedAgents.Add agentId |> ignore)
+
         let run =
             HostForkRunLifecycle.installRun
                 gate
@@ -360,6 +371,31 @@ type HostForkRuntime
 
     member _.TryFindAgent(agentId: string) =
         runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
+
+    member internal _.OwnsAgent(agentId: string) =
+        lock gate (fun () -> processOwnedAgents.Contains agentId)
+
+    /// CRASH-018: explicit /continue may discover a physically surviving child.
+    /// It stays dormant: addressable by a later explicit reuse, but excluded from
+    /// this process's cancellation/teardown ownership until that reuse begins.
+    member _.AdoptExisting(agentId: string, childId: SessionId, role: Role, agent: string) : unit =
+        lock gate (fun () -> dormantChildren.[agentId] <- childId)
+        runtime.Restore(agentId, role, agent)
+        runtime.BindChildSession(agentId, childId)
+
+    member internal _.TryDormantChild(agentId: string) : SessionId option =
+        lock gate (fun () ->
+            match dormantChildren.TryGetValue agentId with
+            | true, childId -> Some childId
+            | false, _ -> None)
+
+    member internal _.ActivateDormantChild(agentId: string, childId: SessionId, role: Role) : unit =
+        lock gate (fun () ->
+            dormantChildren.Remove agentId |> ignore
+            children.[agentId] <- childId
+            processOwnedAgents.Add agentId |> ignore)
+
+        childCreated agentId role childId
 
     /// The Host child session a forked agent id drives.
     ///

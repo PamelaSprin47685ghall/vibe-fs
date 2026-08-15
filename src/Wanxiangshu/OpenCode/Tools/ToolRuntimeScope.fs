@@ -17,6 +17,7 @@ open Wanxiangshu.Process
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Context.Companion
@@ -310,6 +311,37 @@ type ToolRuntimeScope
                         let runtime = createRuntime ownerKey
                         runtimes.[ownerKey] <- runtime
                         Ok runtime)
+
+    /// CRASH-018: process-local adoption for explicit /continue. The durable
+    /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
+    /// fork reuse is the first action allowed to reopen it durably.
+    member _.AdoptExistingChild(parentSessionId: SessionId, record: HandleRecord) : Result<unit, string> =
+        match record.Ownership, HandleId.tryAgent record.Handle with
+        | Fact.HandleOwnership.HostOwnedHidden, _ -> Error "host-owned hidden child is not resumable by the user session"
+        | Fact.HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
+        | Fact.HandleOwnership.DurableParentHandle, Some handleId ->
+            let ownerKey = SessionId.value parentSessionId
+
+            lock gate (fun () ->
+                if disposed then
+                    Error "Tool runtime scope is disposed"
+                else
+                    let runtime =
+                        match runtimes.TryGetValue ownerKey with
+                        | true, existing when not existing.IsCancelled -> existing
+                        | _ ->
+                            let created = createRuntime ownerKey
+                            runtimes.[ownerKey] <- created
+                            created
+
+                    runtime.AdoptExisting(
+                        AgentHandleId.value handleId,
+                        record.ChildSessionId,
+                        AgentRoleIdentity.ofRole record.CanonicalRole,
+                        record.TargetAgent
+                    )
+
+                    Ok())
 
     member _.ExecutorRuntimeFor(ctx: HostToolContext) =
         lock gate (fun () ->

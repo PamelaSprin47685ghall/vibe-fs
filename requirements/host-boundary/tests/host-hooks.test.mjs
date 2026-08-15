@@ -88,6 +88,18 @@ const HOOK_FIXTURES = {
     output: {},
   },
 
+  // CRASH-018: explicit command hook must consume both Host arguments. Empty
+  // session id avoids adopting anything while still forcing a visible output part.
+  'command.execute.before': {
+    input: { command: 'continue', sessionID: '', arguments: '' },
+    output: { parts: [] },
+    assert: (output) => {
+      assert.equal(output.parts.length, 1)
+      assert.match(output.parts[0].text, /explicitly invoked \/continue/i)
+      assert.match(output.parts[0].text, /previous interrupted tool remains failed/i)
+    },
+  },
+
   // HOST-013: every non-Companion session gets one completed auto-injected
   // Host row at transform time, empty history included. OpenCode expands that
   // completed tool part into provider tool-call + tool-result.

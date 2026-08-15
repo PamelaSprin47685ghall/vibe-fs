@@ -345,6 +345,7 @@ module CanonicalIntegrator =
         |> Result.bind (fun ordered -> integrate initialState ordered)
 
     let private fullReplayGate = obj ()
+    // DSL-MUTABLE: resource — one process-wide emergency full-history replay budget.
     let mutable private fullReplayUsed = false
 
     let private trySpendFullReplayBudget () =
