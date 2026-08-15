@@ -22,6 +22,7 @@
 | REQUIREMENT-SYSTEM-015 | `tests/change-lifecycle.test.mjs`（AGENTS.md「普通小型修复不要求创建 Change」；删句即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个包 README/WHY/WHAT 的 DEPENDS ON ⊆ INDEX 骨架断言） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（本测试自身即机器执行；删已存在包 PROOF 行必红） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
+| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs`（scanner 跳过字符串/注释/模板；skip/todo 非 proof；multi-primary 分类；`scripts/lib/requirement-trace.mjs` 图构建）；`scripts/checks/requirement-trace.mjs`（全仓 closure gate + `--report` / `--explain`） | NEW | node --test requirements/requirement-system/tests/requirement-trace.test.mjs / node scripts/checks/requirement-trace.mjs |
 
 ## 人工评审承接表（生命周期机制停用后仍有效的过程检查）
 

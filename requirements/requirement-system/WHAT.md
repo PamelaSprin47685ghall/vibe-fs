@@ -237,3 +237,24 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 cutover 设计期完成（历史见 git）。
 
 **证据指针**：→ PROOF.md L24。
+
+## REQUIREMENT-SYSTEM-018：可执行证明双向可追溯
+
+**规范陈述**：`requirements/**/tests/**/*.test.mjs` 中的每个可执行 test case 必须显式声明恰
+一个当前 WHAT proposition ID；该 ID 必须存在于唯一 owner package 的 WHAT.md。每个当前
+WHAT proposition 必须至少被一个非 skip、非 todo 的 test case 证明。test 与 WHAT 之间不
+存在无归属、悬空、多 primary 或仅依赖路径推断的关系。机器合同只认 test title 开头的
+`WHAT[<CURRENT-WHAT-ID>]`，不认历史 ID、文件路径隐式 ownership 或注释里的近似表述。
+
+**含义/动机**：WHAT → PROOF → test 的正向边已由 meta-verifier 检查；缺的是反向边
+test → WHAT。没有反向边，测试可以偷偷创造第二套需求体系，而文档漏测无人发现。双向闭环
+使每个 test 的存在理由机器可答（`requirement-trace --explain`），使每个 WHAT 的活性机器
+可验（零 active test = 命题失效）。「一个 test 只回答一个 WHAT」保证 failure meaning 唯一；
+两条命题若无法分别测试，优先回头合并命题而不是放宽本条。
+
+**边界**：helper、fixture、`beforeEach`、普通 `assert` 不是独立 proof case；粒度以
+`test()` / `t.test()` 为准。`test.skip` / `test.todo` 可携带标签但**不构成** WHAT 的
+proof。`requirements/**/tests/e2e/` 与 `tests/integration/` 拥有各自 entrypoint 与验收
+口径，由对应包自行声明归属，不在本命题扫描宇宙内。
+
+**证据指针**：→ PROOF.md L25。
