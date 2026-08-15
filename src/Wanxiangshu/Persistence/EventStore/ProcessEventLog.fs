@@ -224,6 +224,7 @@ module ProcessEventLog =
         // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with writer history length.
         let mutable acc: EventEnvelope list = []
         let mutable failure: StorageInvalid option = None
+        // DSL-MUTABLE: algorithm-scratch — writer-line cursor
         let mutable index = 0
 
         while index < lines.Length - 1 && failure.IsNone do

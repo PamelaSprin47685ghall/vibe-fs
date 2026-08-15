@@ -449,7 +449,7 @@ module DedicatedTodoReviewerRuntime =
             sendContinuationAssignment sessions journal enlisted.ReviewerSessionId assignmentDirectory assignmentText
 
     type private AssignmentDispatchDecision =
-        | AlreadyAcceptedOrPending
+        | AlreadyDispatched
         | NeedsDispatch of MagicTodoAfter.AssignmentDelivery
 
     let private assignmentDispatchDecision
@@ -464,7 +464,7 @@ module DedicatedTodoReviewerRuntime =
                 (AgentJournal.snapshot journal).AgentProjections
         with
         | PromptAuthorityLedger.DispatchStatus.Accepted _
-        | PromptAuthorityLedger.DispatchStatus.Pending -> AlreadyAcceptedOrPending
+        | PromptAuthorityLedger.DispatchStatus.Pending -> AlreadyDispatched
         | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
             let hasActiveProfile =
                 PromptAuthorityLedger.activeProfile reviewerSessionId (AgentJournal.snapshot journal).AgentProjections
@@ -487,7 +487,7 @@ module DedicatedTodoReviewerRuntime =
             let payloadDigest = HostDigest.sha256Hex assignmentText
 
             match assignmentDispatchDecision journal enlisted.ReviewerSessionId payloadDigest with
-            | AlreadyAcceptedOrPending -> return! concludeReview journal lifeId writeId
+            | AlreadyDispatched -> return! concludeReview journal lifeId writeId
             | NeedsDispatch delivery ->
                 do! sendAssignmentDelivery sessions journal runtime handleId enlisted agentName delivery assignmentText
 

@@ -149,7 +149,7 @@ module ModelRouting =
         }
 
     let private recommendedTemplate () =
-        PackageResources.readText "wanxiangshu.mjs"
+        ModelRoutingResource.recommendedTemplate ()
 
     let bootstrapDefault () =
         bootstrapAndLoadAt (configPath ()) (recommendedTemplate ())
@@ -197,6 +197,7 @@ module ModelRouting =
         let managedBySession = Dictionary<string, HashSet<string>>()
         let pending = ResizeArray<PendingDemand>()
         let pendingManaged = Dictionary<string, PendingDemand>()
+        // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None
 
         let running () = managed.Values |> Seq.toArray
@@ -216,7 +217,7 @@ module ModelRouting =
 
             keys.Add key |> ignore
 
-        let removePending demand =
+        let removeDemand demand =
             pending.Remove demand |> ignore
             pendingManaged.Remove demand.LeaseKey |> ignore
 
@@ -244,11 +245,12 @@ module ModelRouting =
 
         let commit demand target =
             rememberManaged demand.SessionId demand.LeaseKey target
-            removePending demand
+            removeDemand demand
             AsyncSupport.trySetResult demand.Completion target |> ignore
 
-        let rec drainPending () =
+        let rec drainDemands () =
             ensureHealthy ()
+            // DSL-MUTABLE: algorithm-scratch — drain-loop progress flag
             let mutable progress = true
 
             while progress && pending.Count > 0 do
@@ -277,7 +279,7 @@ module ModelRouting =
                         match scheduleOrPoison agent with
                         | Some target ->
                             rememberManaged sessionId key target
-                            drainPending ()
+                            drainDemands ()
                             Task.FromResult target
                         | None ->
                             let completion =
@@ -324,7 +326,7 @@ module ModelRouting =
                         | None -> None
                         | Some target ->
                             rememberManaged sessionId key target
-                            drainPending ()
+                            drainDemands ()
                             Some target)
 
         member _.TryLease(sessionId: string, agent: string) : ModelRoutingTarget option =
@@ -340,6 +342,7 @@ module ModelRouting =
             if not (String.IsNullOrWhiteSpace sessionId) then
                 lock gate (fun () ->
                     let sessionId = sessionId.Trim()
+                    // DSL-MUTABLE: algorithm-scratch — occupancy changed by this release
                     let mutable changed = false
 
                     match managedBySession.TryGetValue sessionId with
@@ -356,11 +359,11 @@ module ModelRouting =
                         |> Seq.toArray
 
                     for demand in cancelled do
-                        removePending demand
+                        removeDemand demand
                         AsyncSupport.trySetCanceled demand.Completion |> ignore
 
                     if changed && fatalError.IsNone then
-                        drainPending ())
+                        drainDemands ())
 
         member _.CancelPendingSession(sessionId: string) =
             if not (String.IsNullOrWhiteSpace sessionId) then
@@ -371,14 +374,16 @@ module ModelRouting =
                     |> Seq.filter (fun demand -> demand.SessionId = sessionId)
                     |> Seq.toArray
                     |> Array.iter (fun demand ->
-                        removePending demand
+                        removeDemand demand
                         AsyncSupport.trySetCanceled demand.Completion |> ignore))
 
-        member _.SnapshotRunning() = lock gate (fun () -> running ())
+        member _.SnapshotOccupied() = lock gate (fun () -> running ())
         member _.PendingCount = lock gate (fun () -> pending.Count)
 
     let private sharedGate = obj ()
+    // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
     let mutable private sharedRuntime: ModelRoutingRuntime option = None
+    // DSL-MUTABLE: single-flight — in-flight scheduler bootstrap
     let mutable private sharedLoad: Task<ModelRoutingRuntime> option = None
 
     let private ensureShared () : Task<ModelRoutingRuntime> =
@@ -422,5 +427,5 @@ module ModelRouting =
     let releaseSession (sessionId: SessionId) =
         current().ReleaseSession(SessionId.value sessionId)
 
-    let cancelPendingSession (sessionId: SessionId) =
+    let cancelUnacquiredSession (sessionId: SessionId) =
         current().CancelPendingSession(SessionId.value sessionId)

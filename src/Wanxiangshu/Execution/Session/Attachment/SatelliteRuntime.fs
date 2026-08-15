@@ -168,7 +168,7 @@ module private SatelliteLeaseFlow =
             return! linkLease sessions spec owner lease
         }
 
-    let retirePending
+    let retireInFlight
         (sessions: ISessionHostPort)
         (invalidate: unit -> unit)
         (spec: SatelliteSpec)
@@ -224,4 +224,4 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
 
         match flight with
         | None -> spec.Close owner
-        | Some pending -> SatelliteLeaseFlow.retirePending sessions invalidate spec owner pending
+        | Some pending -> SatelliteLeaseFlow.retireInFlight sessions invalidate spec owner pending

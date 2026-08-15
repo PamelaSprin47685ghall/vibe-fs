@@ -371,6 +371,7 @@ module CanonicalIntegrator =
             // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with history length.
             let mutable state = initialState
             let mutable remaining = ordered
+            // DSL-MUTABLE: algorithm-scratch — first integrateOne failure cuts this replay
             let mutable failure: string option = None
 
             while not (List.isEmpty remaining) && failure.IsNone do

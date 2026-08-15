@@ -183,16 +183,16 @@ module ProjectionMessageEdit =
         else
             Error "Strength tool results must originate from a logical tool message"
 
-    type private StrengthPending =
+    type private StrengthCallBatch =
         Map<string, ToolCallId * string * string> * obj list * int * WireMessage * string option
 
     let private startCallBatch
-        (pendingBatch: StrengthPending option)
+        (pendingBatch: StrengthCallBatch option)
         (message: WireMessage)
         (index: int)
         (hostId: string option)
         (calls: (ToolCallId * string * string) list)
-        : Result<StrengthPending option, string> =
+        : Result<StrengthCallBatch option, string> =
         if Option.isSome pendingBatch then
             Error "Strength Host adapter saw a new tool batch before the previous batch completed"
         else
@@ -246,7 +246,7 @@ module ProjectionMessageEdit =
         else
             Ok()
 
-    let private requirePendingBatch (pendingBatch: StrengthPending option) : Result<StrengthPending, string> =
+    let private requirePendingBatch (pendingBatch: StrengthCallBatch option) : Result<StrengthCallBatch, string> =
         match pendingBatch with
         | None -> Error "Strength Host adapter found tool results without a preceding call batch"
         | Some batch -> Ok batch
@@ -254,7 +254,7 @@ module ProjectionMessageEdit =
     let private finishResultBatch
         (sessionId: string)
         (sha256: string -> string)
-        (pendingBatch: StrengthPending option)
+        (pendingBatch: StrengthCallBatch option)
         (message: WireMessage)
         (results: (ToolCallId * string) list)
         : Result<obj, string> =
@@ -286,7 +286,7 @@ module ProjectionMessageEdit =
     let private emitRegularMessage
         (sessionId: string)
         (sha256: string -> string)
-        (pendingBatch: StrengthPending option)
+        (pendingBatch: StrengthCallBatch option)
         (index: int)
         (message: WireMessage)
         (hostId: string option)
@@ -304,11 +304,11 @@ module ProjectionMessageEdit =
         (sha256: string -> string)
         (loop:
             (int * (WireMessage * string option * bool)) list
-                -> StrengthPending option
+                -> StrengthCallBatch option
                 -> obj list
                 -> Result<obj list, string>)
         (tail: (int * (WireMessage * string option * bool)) list)
-        (pendingBatch: StrengthPending option)
+        (pendingBatch: StrengthCallBatch option)
         (acc: obj list)
         (index: int)
         (message: WireMessage)
@@ -321,7 +321,7 @@ module ProjectionMessageEdit =
         | false, false -> Error "Strength Host adapter refuses a message mixing tool calls and results"
         | false, true ->
             startCallBatch pendingBatch message index hostId calls
-            |> Result.bind (fun nextPending -> loop tail nextPending acc)
+            |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
         | true, false ->
             finishResultBatch sessionId sha256 pendingBatch message results
             |> Result.bind (fun raw -> loop tail None (raw :: acc))

@@ -190,8 +190,8 @@ module SessionExecutionBinding =
 
         ModelRouting.releaseSession sessionId
 
-    let cancelPending (sessionId: SessionId) =
-        ModelRouting.cancelPendingSession sessionId
+    let cancelUnacquired (sessionId: SessionId) =
+        ModelRouting.cancelUnacquiredSession sessionId
 
     let requiresProviderBindingProof (sessionId: SessionId) =
         lock gate (fun () ->

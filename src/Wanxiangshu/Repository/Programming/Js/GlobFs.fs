@@ -109,17 +109,17 @@ module JsGlobFs =
 
     type private BraceScan =
         | BraceDone of (string * string list * string) option
-        | BraceNext of i: int * depth: int * start: int
+        | BraceContinue of i: int * depth: int * start: int
 
     let private braceCharStep (s: string) (i: int) (depth: int) (start: int) : BraceScan =
         match s.[i] with
-        | '{' when depth = 0 -> BraceNext(i + 1, 1, i)
-        | '{' -> BraceNext(i + 1, depth + 1, start)
+        | '{' when depth = 0 -> BraceContinue(i + 1, 1, i)
+        | '{' -> BraceContinue(i + 1, depth + 1, start)
         | '}' when depth = 1 && start >= 0 ->
             let inner = s.Substring(start + 1, i - start - 1)
             BraceDone(Some(s.Substring(0, start), splitTopCommas inner, s.Substring(i + 1)))
-        | '}' when depth > 1 -> BraceNext(i + 1, depth - 1, start)
-        | _ -> BraceNext(i + 1, depth, start)
+        | '}' when depth > 1 -> BraceContinue(i + 1, depth - 1, start)
+        | _ -> BraceContinue(i + 1, depth, start)
 
     let private findBraceGroup (s: string) : (string * string list * string) option =
         let rec scan (i: int) (depth: int) (start: int) =
@@ -131,7 +131,7 @@ module JsGlobFs =
         and continueBraceScan (i: int) (depth: int) (start: int) =
             match braceCharStep s i depth start with
             | BraceDone result -> result
-            | BraceNext(i', depth', start') -> scan i' depth' start'
+            | BraceContinue(i', depth', start') -> scan i' depth' start'
 
         scan 0 0 -1
 

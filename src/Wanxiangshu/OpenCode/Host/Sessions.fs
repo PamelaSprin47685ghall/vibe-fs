@@ -269,7 +269,7 @@ type InjectedSessionPort
         member _.InterruptSessionOnly(sessionId) =
             task {
                 Diagnostic.emit "session-fission-interrupt" [ "session_id", SessionId.value sessionId ]
-                SessionExecutionBinding.cancelPending sessionId
+                SessionExecutionBinding.cancelUnacquired sessionId
 
                 match underlyingPort with
                 | Some port -> return! port.AbortSession sessionId
@@ -283,7 +283,7 @@ type InjectedSessionPort
                 // identical to a model that simply stopped. One record per abort, visible under
                 // WANXIANGSHU_DIAG=1.
                 Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
-                SessionExecutionBinding.cancelPending sessionId
+                SessionExecutionBinding.cancelUnacquired sessionId
                 detachChild sessionId
                 do! abortChildren sessionId
 

@@ -108,6 +108,7 @@ module EventKWayMerge =
         // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with total history length.
         let mutable remaining = streams |> Map.ofList
         let mutable seen: Map<string, EventEnvelope> = Map.empty
+        // DSL-MUTABLE: algorithm-scratch — merged envelopes and loop exit
         let mutable acc: EventEnvelope list = []
         let mutable outcome: Result<EventEnvelope list, StorageInvalid> option = None
 

@@ -8,7 +8,7 @@ const {
   ModelRouting_ModelRoutingRuntime__TryAcquireManaged_Z384F8060: tryAcquireManaged,
   ModelRouting_ModelRoutingRuntime__ReleaseSession_Z721C83C5: releaseSession,
   ModelRouting_ModelRoutingRuntime__CancelPendingSession_Z721C83C5: cancelPendingSession,
-  ModelRouting_ModelRoutingRuntime__SnapshotRunning: snapshotRunning,
+  ModelRouting_ModelRoutingRuntime__SnapshotOccupied: snapshotOccupied,
   ModelRouting_ModelRoutingRuntime__get_PendingCount: pendingCount,
 } = routing
 
@@ -29,7 +29,7 @@ test('EMR_003_each_session_agent_lease_contributes_one_running_occurrence', asyn
   assert.equal(key(first), 'provider/shared|none')
   assert.equal(key(same), 'provider/shared|none')
   assert.equal(key(peer), 'provider/shared|none')
-  assert.equal(snapshotRunning(runtime).length, 2, 'A and B are two leases even on the same target')
+  assert.equal(snapshotOccupied(runtime).length, 2, 'A and B are two leases even on the same target')
   assert.deepEqual(seen, [[], ['provider/shared|none']], 'reusing one lease must not re-run the scheduler')
 })
 
@@ -53,7 +53,7 @@ test('EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async ()
   releaseSession(runtime, 'holder')
   assert.equal(key(await waiting), 'provider/only|none')
   assert.equal(pendingCount(runtime), 0)
-  assert.equal(snapshotRunning(runtime).length, 1)
+  assert.equal(snapshotOccupied(runtime).length, 1)
 })
 
 test('EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
@@ -75,7 +75,7 @@ test('EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
   const runtime = new ModelRoutingRuntime(() => null)
   assert.equal(tryAcquireManaged(runtime, 'replica', 'fast-coder'), undefined)
   assert.equal(pendingCount(runtime), 0)
-  assert.deepEqual(snapshotRunning(runtime), [])
+  assert.deepEqual(snapshotOccupied(runtime), [])
 })
 
 test('EMR_006_lease_is_stable_even_when_scheduler_would_choose_differently_later', async () => {
@@ -98,10 +98,10 @@ test('EMR_007_release_is_idempotent_and_wakes_waiters_once', async () => {
   releaseSession(runtime, 'holder')
   const acquired = await waiting
   assert.equal(acquired.Model, 'provider/one')
-  assert.equal(snapshotRunning(runtime).length, 1)
+  assert.equal(snapshotOccupied(runtime).length, 1)
 
   releaseSession(runtime, 'holder')
-  assert.equal(snapshotRunning(runtime).length, 1, 'second release cannot remove somebody else\'s lease')
+  assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s lease')
 })
 
 test('EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {

@@ -144,7 +144,7 @@ module OrchestratorGit =
                 return! finalizeCommitOrRebase runner managerId worktree
         }
 
-    let private afterStage
+    let private afterGitAdd
         (runner: Command -> Task<int * string * string>)
         (managerId: string)
         (worktree: string)
@@ -172,5 +172,5 @@ module OrchestratorGit =
             if addCode <> 0 then
                 return Error(sprintf "git add failed: %s" addErr)
             else
-                return! afterStage runner managerId worktree
+                return! afterGitAdd runner managerId worktree
         }
