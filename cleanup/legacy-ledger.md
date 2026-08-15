@@ -83,8 +83,8 @@
 | Consumer evidence | durable sample：`requirements/durable-events/tests/fact-codec.test.mjs`（migration 测试） |
 | Writer alive? | 否（新 writer 写完整字段） |
 | Reader alive? | 是（`deserializeFact` 自动注入 `null`） |
-| Classification | **待 census**（有真实 durable sample 则 BOUNDED-COMPAT decode-only；无则 DELETE） |
-| Exit condition | 无真实旧数据 → DELETE；有真实旧数据 + 必须支持 → KEEP decode-only + retention horizon |
+| Classification | **BOUNDED-COMPAT decode-only**（census 2026：真实 journal 样本 `.git/wanxiang/events/` 11 files 6280 lines 全部现代形状，零缺字段行；fixture 有测试契约 MIGRATION_handle_completed_*） |
+| Exit condition | 真实旧数据为零 → DELETE |
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 
@@ -99,8 +99,8 @@
 | Consumer evidence | durable sample：fact-codec.test.mjs |
 | Writer alive? | 否 |
 | Reader alive? | 是 |
-| Classification | **待 census** |
-| Exit condition | 同上 |
+| Classification | **BOUNDED-COMPAT decode-only**（census 2026：真实样本零缺字段行；测试 MIGRATION_handle_linked_without_ownership 断言注入 `DurableParentHandle` 保持 pre-change 语义） |
+| Exit condition | 真实旧数据为零 → DELETE |
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 
@@ -115,8 +115,8 @@
 | Consumer evidence | durable sample：fact-codec.test.mjs |
 | Writer alive? | 否 |
 | Reader alive? | 是 |
-| Classification | **待 census** |
-| Exit condition | 同上 |
+| Classification | **BOUNDED-COMPAT decode-only**（census 2026：真实样本零缺字段行；测试 MIGRATION_handle_linked_without_byname 断言注入 `""` 回退 TargetAgent） |
+| Exit condition | 真实旧数据为零 → DELETE |
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 
@@ -131,8 +131,8 @@
 | Consumer evidence | durable sample：fact-codec.test.mjs |
 | Writer alive? | 否 |
 | Reader alive? | 是 |
-| Classification | **待 census** |
-| Exit condition | 同上 |
+| Classification | **DELETE**（census 2026：零测试覆盖 + 真实样本零缺字段行——无证据即 DELETE，TASK.md §六「无法知道 → 不允许直接 KEEP forever」） |
+| Exit condition | 已达成：无测试、无真实旧数据 |
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 
@@ -144,11 +144,11 @@
 | Current owner | `Persistence/Journal/FactCodec.fs` |
 | Old world | 旧 Observation tag 形状（tag rewrite） |
 | Current consumer | `deserializeFact` pipeline（:278）+ `Envelope.fs:93`（Decode 前 rewrite） |
-| Consumer evidence | durable sample：fact-codec.test.mjs |
+| Consumer evidence | durable sample：fact-codec.test.mjs + `behavior-diagnosis/tests/envelope-tip-v2-clean-break.test.mjs`（legacy tag 双解码断言） |
 | Writer alive? | 否 |
 | Reader alive? | 是（decode 前置步骤） |
-| Classification | **待 census** |
-| Exit condition | 同上 |
+| Classification | **BOUNDED-COMPAT decode-only**（census 2026：真实样本零 `BlogEntryCommitted` 命中；但 behavior-diagnosis 测试契约明确要求 legacy tag 双解码——tip-v2 clean break 的配套，非债务） |
+| Exit condition | tip-v2 clean break 完成 → 删除双解码 + 测试 |
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 

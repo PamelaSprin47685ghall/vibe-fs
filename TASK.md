@@ -788,8 +788,8 @@ HOW = 今天 + 前三朝考古现场
 | CLN-04    | 删除 deprecated `RunCompletion.AgentId`                     | ✅ 完成 |
 | CLN-05    | Join single-result compatibility caller migration         |  ✅ |
 | CLN-06    | 删除 `JoinItem → RunCompletion` internal compatibility path |  ✅ |
-| CLN-07    | FactCodec legacy migration inventory，只分类不删                |  低 |
-| CLN-08..N | 每种 durable decode 单独裁决                                    | 中高 |
+| CLN-07    | FactCodec legacy migration inventory，只分类不删                |  ✅ |
+| CLN-08..N | 每种 durable decode 单独裁决（census 完成：LEGACY-010..014 分类已定）   | 中高 |
 | CLN-X     | `false abort` runtime migration retirement                |  高 |
 | CLN-Y     | Host V1 compatibility sink 加 creditor + exit contract     |  低 |
 | CLN-Z     | retire historical absence ratchets                        |  低 |
