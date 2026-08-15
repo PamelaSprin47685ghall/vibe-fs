@@ -792,8 +792,8 @@ HOW = 今天 + 前三朝考古现场
 | CLN-08..N | 每种 durable decode 单独裁决（census 完成：LEGACY-010..014 分类已定）   | 中高 |
 | CLN-X     | `false abort` runtime migration retirement                |  高 |
 | CLN-Y     | Host V1 compatibility sink 加 creditor + exit contract     |  低 |
-| CLN-Z     | retire historical absence ratchets                        |  低 |
-| CLN-Z2    | active HOW/WHY historical tombstone cleanup               | 极低 |
+| CLN-Z     | retire historical absence ratchets                        |  ✅ |
+| CLN-Z2    | active HOW/WHY historical tombstone cleanup               |  ✅ |
 | FINAL     | 删除 legacy ledger 自身 + permanent architecture gates        |  低 |
 
 注意：
