@@ -157,3 +157,28 @@ test('JS_SURFACE_006_fable_representation_not_contract', () => {
   const gate = read('scripts/checks/js-boundary-gate.mjs')
   assert.match(gate, /test-surface-scan\.mjs/, 'gate must share the inventory scanner')
 })
+
+test('JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
+  // A registered surface is a legal entry point ONLY because a contract test
+  // pins it (JS-SEMANTIC-SURFACE-003: surface exists because a component owns
+  // a contract, never because a test wants access). Every entry in the scanner
+  // allowlist must be imported by at least one semantic test file.
+  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
+  const block = scannerSource.match(/SURFACE_MODULES = \[[\s\S]*?\]/)
+  assert.ok(block, 'scanner must declare SURFACE_MODULES')
+  const registered = [...block[0].matchAll(/'([^']+\.js)'/g)].map((m) => m[1])
+  assert.ok(registered.length >= 2, `expected the two pilots registered, found ${registered.length}`)
+
+  const testsRoot = join(ROOT, 'requirements')
+  const testFiles = walk(testsRoot, ['.test.mjs']).filter((f) => !f.includes('/e2e/') && !f.includes('/integration/'))
+  const allSources = testFiles.map((f) => readFileSync(f, 'utf8'))
+
+  for (const modulePath of registered) {
+    const imported = allSources.some((src) => src.includes(`dist/${modulePath}`))
+    assert.equal(
+      imported,
+      true,
+      `registered surface ${modulePath} has no contract test importing it — registration without a contract test is a test-convenience entry, not a surface`,
+    )
+  }
+})
