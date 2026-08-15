@@ -85,22 +85,44 @@ module WriterStreamSync =
             | None -> return Error(asStorage (sprintf "missing %s tree" label))
         }
 
+    let private requireBlobMode (entry: TreeEntry) =
+        if entry.Mode = blobMode then Ok()
+        else Error(asStorage (sprintf "sync leaf is not a blob: %s" entry.Name))
+
+    let private readBlobEntry (raw: IGitRawStore) (entry: TreeEntry) =
+        taskResult {
+            do! requireBlobMode entry
+
+            match! raw.ReadObject entry.Oid with
+            | None -> return! Error(asStorage (sprintf "missing sync blob: %s" entry.Name))
+            | Some bytes -> return entry.Name, bytes
+        }
+
     let private readBlobList
         (raw: IGitRawStore)
         (entries: TreeEntry list)
         : Task<Result<(string * byte[]) list, ConvergeError>> =
-        let rec loop remaining acc =
-            task {
-                match remaining with
-                | [] -> return Ok(List.rev acc)
-                | entry :: tail when entry.Mode = blobMode ->
-                    match! raw.ReadObject entry.Oid with
-                    | None -> return Error(asStorage (sprintf "missing sync blob: %s" entry.Name))
-                    | Some bytes -> return! loop tail ((entry.Name, bytes) :: acc)
-                | entry :: _ -> return Error(asStorage (sprintf "sync leaf is not a blob: %s" entry.Name))
-            }
+        entries |> List.traverseTaskResultM (readBlobEntry raw)
 
-        loop entries []
+    let private writerTextFromBlob (name: string, bytes: byte[]) =
+        if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
+            raise (InvalidOperationException(sprintf "invalid writer filename: %s" name))
+
+        let writerId = name.Substring(0, name.Length - ".ndjson".Length)
+        writerId, Encoding.UTF8.GetString bytes
+
+    let private readRemoteTrees
+        (raw: IGitRawStore)
+        (writerTree: TreeEntry)
+        (payloadTree: TreeEntry)
+        =
+        taskResult {
+            let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
+            let! writerBlobs = readBlobList raw writerEntries
+            let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
+            let! payloadBlobs = readBlobList raw payloadEntries
+            return List.map writerTextFromBlob writerBlobs, payloadBlobs
+        }
 
     let private readRemote
         (raw: IGitRawStore)
@@ -118,89 +140,95 @@ module WriterStreamSync =
                 |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
 
             match writers, payloads with
-            | Some writerTree, Some payloadTree ->
-                let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
-                let! writerBlobs = readBlobList raw writerEntries
-                let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
-                let! payloadBlobs = readBlobList raw payloadEntries
-
-                let writerTexts =
-                    writerBlobs
-                    |> List.map (fun (name, bytes) ->
-                        if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
-                            raise (InvalidOperationException(sprintf "invalid writer filename: %s" name))
-
-                        let writerId = name.Substring(0, name.Length - ".ndjson".Length)
-                        writerId, Encoding.UTF8.GetString bytes)
-
-                return writerTexts, payloadBlobs
+            | Some writerTree, Some payloadTree -> return! readRemoteTrees raw writerTree payloadTree
             | _ -> return! Error(asStorage "sync root must contain writers/ and payloads/")
         }
+
+    let private decodeOneRemoteWriter (writerId: string, text: string) =
+        ProcessEventLog.decodeWriterText ("remote:" + writerId) text
+        |> Result.mapError ConvergeError.StorageInvalid
+        |> Result.map (fun events -> "remote:" + writerId, events)
 
     let private decodeRemoteWriters
         (writers: (string * string) list)
         : Result<(string * Wanxiangshu.Persistence.EventStore.EventEnvelope list) list, ConvergeError> =
-        let rec loop remaining acc =
-            match remaining with
-            | [] -> Ok(List.rev acc)
-            | (writerId, text) :: tail ->
-                match ProcessEventLog.decodeWriterText ("remote:" + writerId) text with
-                | Error error -> Error(ConvergeError.StorageInvalid error)
-                | Ok events -> loop tail (("remote:" + writerId, events) :: acc)
+        writers |> List.traverseResultM decodeOneRemoteWriter
 
-        loop writers []
+    let private missingPayloadRef (commonDir: string) (ordered: EventEnvelope list) =
+        ordered
+        |> List.collect (fun event -> event.PayloadRefs)
+        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
+
+    let private validateMergedStreams
+        (commonDir: string)
+        (local: (string * EventEnvelope list) list)
+        (remote: (string * EventEnvelope list) list)
+        =
+        let taggedLocal =
+            local |> List.map (fun (writerId, events) -> "local:" + writerId, events)
+
+        result {
+            let! ordered =
+                EventKWayMerge.merge (taggedLocal @ remote)
+                |> Result.mapError ConvergeError.StorageInvalid
+
+            match missingPayloadRef commonDir ordered with
+            | Some payloadRef -> return! Error(ConvergeError.StorageInvalid(StorageInvalid.MissingPayload payloadRef))
+            | None -> return ()
+        }
 
     let private validateUnion
         (commonDir: string)
         (remoteWriters: (string * string) list)
         : Result<unit, ConvergeError> =
-        match ProcessEventLog.readStreams commonDir, decodeRemoteWriters remoteWriters with
-        | Error error, _ -> Error(ConvergeError.StorageInvalid error)
-        | _, Error error -> Error error
-        | Ok local, Ok remote ->
-            let taggedLocal =
-                local |> List.map (fun (writerId, events) -> "local:" + writerId, events)
+        result {
+            let! local =
+                ProcessEventLog.readStreams commonDir
+                |> Result.mapError ConvergeError.StorageInvalid
 
-            match EventKWayMerge.merge (taggedLocal @ remote) with
-            | Error error -> Error(ConvergeError.StorageInvalid error)
-            | Ok ordered ->
-                let missing =
-                    ordered
-                    |> List.collect (fun event -> event.PayloadRefs)
-                    |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
+            let! remote = decodeRemoteWriters remoteWriters
+            return! validateMergedStreams commonDir local remote
+        }
 
-                match missing with
-                | Some payloadRef -> Error(ConvergeError.StorageInvalid(StorageInvalid.MissingPayload payloadRef))
-                | None -> Ok()
+    let private mergeOnePayload commonDir (name, bytes) =
+        ProcessEventLog.mergePayloadFile commonDir name bytes
+        |> Result.mapError asStorage
+
+    let private mergeOneWriter commonDir (writerId, text) =
+        ProcessEventLog.mergeWriterText commonDir writerId text
+        |> Result.mapError asStorage
 
     let private importRemote
         (commonDir: string)
         (writers: (string * string) list)
         (payloads: (string * byte[]) list)
         : Result<unit, ConvergeError> =
-        let rec mergePayloads remaining =
-            match remaining with
-            | [] -> Ok()
-            | (name, bytes) :: tail ->
-                match ProcessEventLog.mergePayloadFile commonDir name bytes with
-                | Ok() -> mergePayloads tail
-                | Error error -> Error(asStorage error)
-
-        let rec mergeWriters remaining =
-            match remaining with
-            | [] -> Ok()
-            | (writerId, text) :: tail ->
-                match ProcessEventLog.mergeWriterText commonDir writerId text with
-                | Ok() -> mergeWriters tail
-                | Error error -> Error(asStorage error)
-
         // Payloads are content-addressed and may be safely imported before facts.
         // Validate the combined k-way history/closure before changing writer truth.
         result {
-            do! mergePayloads payloads
+            do! payloads |> List.traverseResultM (mergeOnePayload commonDir) |> Result.map ignore
             do! validateUnion commonDir writers
-            return! mergeWriters writers
+            do! writers |> List.traverseResultM (mergeOneWriter commonDir) |> Result.map ignore
+            return ()
         }
+
+    let private syncWithoutRemote (raw: IGitRawStore) (commonDir: string) =
+        taskResult {
+            do! validateUnion commonDir []
+            return! materializeLocal raw commonDir |> TaskResultCE.ofTask
+        }
+
+    let private syncWithRemote (raw: IGitRawStore) (commonDir: string) (snapshot: StoreSnapshot) =
+        taskResult {
+            let! writers, payloads = readRemote raw snapshot
+            do! importRemote commonDir writers payloads
+            return! materializeLocal raw commonDir |> TaskResultCE.ofTask
+        }
+
+    let private syncRemoteChoice (raw: IGitRawStore) (commonDir: string) (remote: StoreSnapshot option) =
+        match remote with
+        | None -> syncWithoutRemote raw commonDir
+        | Some snapshot -> syncWithRemote raw commonDir snapshot
 
     /// Merge remote physical truth into local writer files, then materialize the
     /// whole local truth as the candidate remote snapshot. Business integration
@@ -212,16 +240,7 @@ module WriterStreamSync =
         : Task<Result<StoreSnapshot, ConvergeError>> =
         taskResult {
             try
-                match remote with
-                | None ->
-                    do! validateUnion commonDir []
-                    let! local = materializeLocal raw commonDir |> TaskResultCE.ofTask
-                    return local
-                | Some snapshot ->
-                    let! writers, payloads = readRemote raw snapshot
-                    do! importRemote commonDir writers payloads
-                    let! local = materializeLocal raw commonDir |> TaskResultCE.ofTask
-                    return local
+                return! syncRemoteChoice raw commonDir remote
             with ex ->
                 return! Error(ConvergeError.Transport ex.Message)
         }

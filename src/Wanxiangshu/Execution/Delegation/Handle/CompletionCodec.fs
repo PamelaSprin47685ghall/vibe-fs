@@ -87,6 +87,14 @@ module HandleCompletionCodec =
 
         CanonicalJson.canonicalJson (createObj fields)
 
+    let private coerceFieldValue (value: obj) : string =
+        if isNull value then
+            ""
+        elif emitJsExpr value "typeof $0 === 'string'" then
+            unbox<string> value
+        else
+            string value
+
     let private field (raw: obj) (key: string) : string =
         let hasKey: bool =
             emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
@@ -94,14 +102,7 @@ module HandleCompletionCodec =
         if not hasKey then
             ""
         else
-            let value = raw?(key)
-
-            if isNull value then
-                ""
-            elif emitJsExpr value "typeof $0 === 'string'" then
-                unbox<string> value
-            else
-                string value
+            coerceFieldValue (raw?(key))
 
     let private fieldOpt (raw: obj) (key: string) : string option =
         let hasKey: bool =
@@ -115,82 +116,98 @@ module HandleCompletionCodec =
         else
             Some(create value)
 
+    let private runIdOrDefault (agentId: string) (runId: string) =
+        if String.IsNullOrWhiteSpace runId then
+            "run-" + agentId
+        else
+            runId
+
+    let private directoryOpt (directory: string) =
+        if String.IsNullOrWhiteSpace directory then
+            None
+        else
+            Some directory
+
+    let private legacyAbortPayload (runId: string) (json: string) (raw: obj) =
+        LegacyFalseAbort
+            { Status = "aborted"
+              RunId = runId
+              Code = field raw "code"
+              Message = field raw "message"
+              ChildSessionId = field raw "child_session_id"
+              RawBody = json }
+
+    let private completedV2 (runId: string) (raw: obj) =
+        Current(
+            CompletedV2
+                { RunId = runId
+                  WorkRecord = field raw "work_record"
+                  ChildSessionId = field raw "child_session_id"
+                  AuthorityRoot = field raw "authority_root"
+                  ProviderRun = field raw "provider_run"
+                  Directory = field raw "directory" }
+        )
+
+    let private failedV2 (runId: string) (raw: obj) =
+        Current(
+            FailedV2
+                { RunId = runId
+                  Code = field raw "code"
+                  Message = field raw "message"
+                  ChildSessionId = field raw "child_session_id" }
+        )
+
+    let private decodePreV2Status (status: string) (runId: string) (raw: obj) =
+        match status with
+        | "completed" -> completedV2 runId raw
+        | "failed" -> failedV2 runId raw
+        | _ -> Invalid(CompletionDecodeError.UnknownFinality status)
+
+    let private decodeV2Finality
+        (finalityField: string option)
+        (runId: string)
+        (raw: obj)
+        (json: string)
+        =
+        match finalityField with
+        | None -> Invalid CompletionDecodeError.MissingFinality
+        | Some "completed" -> completedV2 runId raw
+        | Some "failed" -> failedV2 runId raw
+        | Some "aborted" -> legacyAbortPayload runId json raw
+        | Some other -> Invalid(CompletionDecodeError.UnknownFinality other)
+
+    let private decodeBySchema
+        (schemaVersion: string option)
+        (status: string)
+        (finalityField: string option)
+        (runId: string)
+        (raw: obj)
+        (json: string)
+        =
+        match schemaVersion with
+        | None when status = "completed" || status = "failed" || status = "abandoned" ->
+            decodePreV2Status status runId raw
+        | None -> Invalid CompletionDecodeError.MissingSchemaVersion
+        | Some version when version <> "2" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
+        | Some _ -> decodeV2Finality finalityField runId raw json
+
+    let private decodeParsed (raw: obj) (json: string) =
+        let schemaVersion = fieldOpt raw "schemaVersion"
+        let status = field raw "status"
+        let finalityField = fieldOpt raw "finality"
+        let runId = field raw "run_id"
+
+        if status = "aborted" then
+            legacyAbortPayload runId json raw
+        else
+            decodeBySchema schemaVersion status finalityField runId raw json
+
     /// Decode blob → DurableCompletionDecode (v2 Current | LegacyFalseAbort | Invalid).
     /// Never constructs RunCompletion for legacy abort.
     let decodeBody (json: string) : DurableCompletionDecode =
         try
             let raw = JS.JSON.parse json
-            let schemaVersion = fieldOpt raw "schemaVersion"
-            let status = field raw "status"
-            let finalityField = fieldOpt raw "finality"
-            let runId = field raw "run_id"
-
-            // Legacy: status=aborted (with or without schemaVersion 1 / missing version).
-            if status = "aborted" then
-                LegacyFalseAbort
-                    { Status = "aborted"
-                      RunId = runId
-                      Code = field raw "code"
-                      Message = field raw "message"
-                      ChildSessionId = field raw "child_session_id"
-                      RawBody = json }
-            else
-                match schemaVersion with
-                | None when status = "completed" || status = "failed" || status = "abandoned" ->
-                    // Pre-v2 completed/failed still accepted as Current via status→finality map.
-                    // Abandoned blob is not a joinable terminal.
-                    match status with
-                    | "completed" ->
-                        Current(
-                            CompletedV2
-                                { RunId = runId
-                                  WorkRecord = field raw "work_record"
-                                  ChildSessionId = field raw "child_session_id"
-                                  AuthorityRoot = field raw "authority_root"
-                                  ProviderRun = field raw "provider_run"
-                                  Directory = field raw "directory" }
-                        )
-                    | "failed" ->
-                        Current(
-                            FailedV2
-                                { RunId = runId
-                                  Code = field raw "code"
-                                  Message = field raw "message"
-                                  ChildSessionId = field raw "child_session_id" }
-                        )
-                    | _ -> Invalid(CompletionDecodeError.UnknownFinality status)
-                | None -> Invalid CompletionDecodeError.MissingSchemaVersion
-                | Some version when version <> "2" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
-                | Some _ ->
-                    match finalityField with
-                    | None -> Invalid CompletionDecodeError.MissingFinality
-                    | Some "completed" ->
-                        Current(
-                            CompletedV2
-                                { RunId = runId
-                                  WorkRecord = field raw "work_record"
-                                  ChildSessionId = field raw "child_session_id"
-                                  AuthorityRoot = field raw "authority_root"
-                                  ProviderRun = field raw "provider_run"
-                                  Directory = field raw "directory" }
-                        )
-                    | Some "failed" ->
-                        Current(
-                            FailedV2
-                                { RunId = runId
-                                  Code = field raw "code"
-                                  Message = field raw "message"
-                                  ChildSessionId = field raw "child_session_id" }
-                        )
-                    | Some "aborted" ->
-                        LegacyFalseAbort
-                            { Status = "aborted"
-                              RunId = runId
-                              Code = field raw "code"
-                              Message = field raw "message"
-                              ChildSessionId = field raw "child_session_id"
-                              RawBody = json }
-                    | Some other -> Invalid(CompletionDecodeError.UnknownFinality other)
+            decodeParsed raw json
         with ex ->
             Invalid(CompletionDecodeError.InvalidJson ex.Message)
 
@@ -206,11 +223,7 @@ module HandleCompletionCodec =
 
         match decoded with
         | CompletedV2 payload ->
-            let runId =
-                if String.IsNullOrWhiteSpace payload.RunId then
-                    "run-" + agentId
-                else
-                    payload.RunId
+            let runId = runIdOrDefault agentId payload.RunId
 
             { RunId = runId
               AgentId = agentId
@@ -225,18 +238,10 @@ module HandleCompletionCodec =
                       AuthorityRoot = optId AuthorityRootUserMessageId.create payload.AuthorityRoot
                       ProviderRun = optId ProviderRunIdentity.create payload.ProviderRun
                       WorkRecord = payload.WorkRecord
-                      Directory =
-                        if String.IsNullOrWhiteSpace payload.Directory then
-                            None
-                        else
-                            Some payload.Directory }
+                      Directory = directoryOpt payload.Directory }
               CompletedAt = completedAt }
         | FailedV2 payload ->
-            let runId =
-                if String.IsNullOrWhiteSpace payload.RunId then
-                    "run-" + agentId
-                else
-                    payload.RunId
+            let runId = runIdOrDefault agentId payload.RunId
 
             { RunId = runId
               AgentId = agentId
@@ -252,6 +257,15 @@ module HandleCompletionCodec =
                       Message = payload.Message }
               CompletedAt = completedAt }
 
+    let private decodeErrorReason (err: CompletionDecodeError) =
+        match err with
+        | CompletionDecodeError.MissingSchemaVersion -> "missing schemaVersion"
+        | CompletionDecodeError.UnknownSchemaVersion v -> sprintf "unknown schemaVersion: %s" v
+        | CompletionDecodeError.UnknownFinality f -> sprintf "unknown finality: %s" f
+        | CompletionDecodeError.MissingFinality -> "missing finality"
+        | CompletionDecodeError.InvalidJson r -> sprintf "invalid json: %s" r
+        | CompletionDecodeError.IncompletePayload r -> r
+
     /// Rebuild a `RunCompletion` from durable handle identity + blob body.
     /// Legacy abort → Error (never agent aborted finality).
     /// `completedAt` is caller-minted — codec must not invent wall time.
@@ -264,17 +278,41 @@ module HandleCompletionCodec =
         match decodeBody json with
         | Current decoded -> Ok(tryMaterialiseRunCompletion record agentId decoded completedAt)
         | LegacyFalseAbort _ -> Error "legacy false abort is not a joinable completion"
-        | Invalid err ->
-            let reason =
-                match err with
-                | CompletionDecodeError.MissingSchemaVersion -> "missing schemaVersion"
-                | CompletionDecodeError.UnknownSchemaVersion v -> sprintf "unknown schemaVersion: %s" v
-                | CompletionDecodeError.UnknownFinality f -> sprintf "unknown finality: %s" f
-                | CompletionDecodeError.MissingFinality -> "missing finality"
-                | CompletionDecodeError.InvalidJson r -> sprintf "invalid json: %s" r
-                | CompletionDecodeError.IncompletePayload r -> r
+        | Invalid err -> Error(sprintf "completion blob decode failed: %s" (decodeErrorReason err))
 
-            Error(sprintf "completion blob decode failed: %s" reason)
+    let private assertBlobDigest (body: string) (expectedDigest: BlobDigest) =
+        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
+            Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
+        else
+            Ok body
+
+    let private readVerifiedBlob
+        (journal: AgentJournal)
+        (blobRef: BlobRef)
+        (expectedDigest: BlobDigest)
+        : System.Threading.Tasks.Task<Result<string, string>> =
+        taskResult {
+            let! body = journal.Writer.BlobWriter.Read blobRef
+            return! assertBlobDigest body expectedDigest
+        }
+
+    let private tryReadCompletedAwaiting
+        (journal: AgentJournal)
+        (record: HandleRecord)
+        (agentId: string)
+        (completedAt: DateTimeOffset)
+        (completion: HandleCompletion)
+        : System.Threading.Tasks.Task<Result<RunCompletion option, string>> =
+        taskResult {
+            match completion.CompletionRef, completion.CompletionDigest with
+            | None, None -> return None
+            | Some blobRef, Some expectedDigest ->
+                let! body = readVerifiedBlob journal blobRef expectedDigest
+                let! decoded = tryDecode record agentId body completedAt
+                return Some decoded
+            | Some _, None
+            | None, Some _ -> return! Error "completion blob ref/digest pair is incomplete"
+        }
 
     /// Read blob body from journal when the handle carries a completion ref.
     let tryRead
@@ -283,25 +321,25 @@ module HandleCompletionCodec =
         (agentId: string)
         (completedAt: DateTimeOffset)
         : System.Threading.Tasks.Task<Result<RunCompletion option, string>> =
-        task {
-            match record.Lifecycle with
-            | HandleLifecycle.CompletedAwaitingJoin completion ->
-                match completion.CompletionRef, completion.CompletionDigest with
-                | None, None -> return Ok None
-                | Some blobRef, Some expectedDigest ->
-                    match! journal.Writer.BlobWriter.Read blobRef with
-                    | Error err -> return Error err
-                    | Ok body ->
-                        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                            return
-                                Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
-                        else
-                            return tryDecode record agentId body completedAt |> Result.map Some
-                | Some _, None
-                | None, Some _ -> return Error "completion blob ref/digest pair is incomplete"
-            | HandleLifecycle.Active
-            | HandleLifecycle.Abandoned _
-            | HandleLifecycle.Retired -> return Ok None
+        match record.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin completion ->
+            tryReadCompletedAwaiting journal record agentId completedAt completion
+        | HandleLifecycle.Active
+        | HandleLifecycle.Abandoned _
+        | HandleLifecycle.Retired -> System.Threading.Tasks.Task.FromResult(Ok None)
+
+    let private tryReadBodyCompletedAwaiting
+        (journal: AgentJournal)
+        (completion: HandleCompletion)
+        : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
+        taskResult {
+            match completion.CompletionRef, completion.CompletionDigest with
+            | None, None -> return (None, None, None)
+            | Some blobRef, Some expectedDigest ->
+                let! body = readVerifiedBlob journal blobRef expectedDigest
+                return (Some body, Some blobRef, Some expectedDigest)
+            | Some _, None
+            | None, Some _ -> return! Error "completion blob ref/digest pair is incomplete"
         }
 
     /// Read raw blob body for decode-first JoinDrain path.
@@ -309,23 +347,9 @@ module HandleCompletionCodec =
         (journal: AgentJournal)
         (record: HandleRecord)
         : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
-        task {
-            match record.Lifecycle with
-            | HandleLifecycle.CompletedAwaitingJoin completion ->
-                match completion.CompletionRef, completion.CompletionDigest with
-                | None, None -> return Ok(None, None, None)
-                | Some blobRef, Some expectedDigest ->
-                    match! journal.Writer.BlobWriter.Read blobRef with
-                    | Error err -> return Error err
-                    | Ok body ->
-                        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
-                            return
-                                Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
-                        else
-                            return Ok(Some body, Some blobRef, Some expectedDigest)
-                | Some _, None
-                | None, Some _ -> return Error "completion blob ref/digest pair is incomplete"
-            | HandleLifecycle.Active
-            | HandleLifecycle.Abandoned _
-            | HandleLifecycle.Retired -> return Ok(None, None, None)
-        }
+        match record.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin completion ->
+            tryReadBodyCompletedAwaiting journal completion
+        | HandleLifecycle.Active
+        | HandleLifecycle.Abandoned _
+        | HandleLifecycle.Retired -> System.Threading.Tasks.Task.FromResult(Ok(None, None, None))

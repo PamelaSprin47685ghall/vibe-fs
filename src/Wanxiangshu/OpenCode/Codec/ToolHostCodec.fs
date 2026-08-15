@@ -44,6 +44,56 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+module private HostArgDecode =
+    let nonEmptyString (value: string) =
+        if String.IsNullOrWhiteSpace value then None else Some value
+
+    let nonNullText (item: obj) =
+        if isNull item then
+            None
+        else
+            string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+    // Fable erases unbox<obj array> to identity: a plain string would iterate its
+    // CHARACTERS as items. Array-test first — a non-array is absent, never a char sequence.
+    let textsFromArrayValue (value: obj) =
+        if emitJsExpr value "Array.isArray($0)" then
+            unbox<obj array> value
+            |> Array.choose nonNullText
+            |> Array.toList
+            |> Some
+        else
+            None
+
+    let tryTextsFromArrayValue (value: obj) =
+        try textsFromArrayValue value with _ -> None
+
+    // Fable erases unbox<float> to identity, so a string would pass through where
+    // .NET would throw. Type-test instead: a non-number is absent, never a wrong-typed Some.
+    let numberFromValue (value: obj) =
+        if emitJsExpr value "typeof $0 === 'number'" then
+            Some(unbox<float> value)
+        else
+            None
+
+    let tryNumberFromValue (value: obj) =
+        try numberFromValue value with _ -> None
+
+    let nonNegativeIntegerFromValue (value: obj) : Result<int option, unit> =
+        if emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0" then
+            Ok(Some(int (unbox<float> value)))
+        else
+            Error()
+
+    let boolFromValue (value: obj) =
+        if emitJsExpr value "typeof $0 === 'boolean'" then
+            Some(unbox<bool> value)
+        else
+            None
+
+    let tryBoolFromValue (value: obj) =
+        try boolFromValue value with _ -> None
+
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
 type HostToolArguments internal (raw: obj) =
     member _.Text(name: string) =
@@ -61,67 +111,25 @@ type HostToolArguments internal (raw: obj) =
         if isNull raw || isNull raw?(name) then
             None
         else
-            try
-                // Fable erases unbox<obj array> to identity: a plain string would
-                // iterate its CHARACTERS as items. Array-test first — a non-array
-                // is absent, never a char sequence.
-                let value = raw?(name)
-
-                if emitJsExpr value "Array.isArray($0)" then
-                    unbox<obj array> value
-                    |> Array.choose (fun item ->
-                        if isNull item then
-                            None
-                        else
-                            string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not))
-                    |> Array.toList
-                    |> Some
-                else
-                    None
-            with _ ->
-                None
+            HostArgDecode.tryTextsFromArrayValue (raw?(name))
 
     member _.OptionalNumber(name: string) =
         if isNull raw || isNull raw?(name) then
             None
         else
-            try
-                // Fable erases unbox<float> to identity, so a string would pass
-                // through where .NET would throw. Type-test instead: a non-number
-                // is absent, never a wrong-typed Some.
-                let value = raw?(name)
-
-                if emitJsExpr value "typeof $0 === 'number'" then
-                    Some(unbox<float> value)
-                else
-                    None
-            with _ ->
-                None
+            HostArgDecode.tryNumberFromValue (raw?(name))
 
     member _.OptionalNonNegativeInteger(name: string) : Result<int option, unit> =
         if isNull raw || isNull raw?(name) then
             Ok None
         else
-            let value = raw?(name)
-
-            if emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0" then
-                Ok(Some(int (unbox<float> value)))
-            else
-                Error()
+            HostArgDecode.nonNegativeIntegerFromValue (raw?(name))
 
     member _.OptionalBool(name: string) =
         if isNull raw || isNull raw?(name) then
             None
         else
-            try
-                let value = raw?(name)
-
-                if emitJsExpr value "typeof $0 === 'boolean'" then
-                    Some(unbox<bool> value)
-                else
-                    None
-            with _ ->
-                None
+            HostArgDecode.tryBoolFromValue (raw?(name))
 
 /// Typed subset of the OpenCode tool invocation context used by domain tools.
 ///
@@ -211,68 +219,73 @@ module ToolHostCodec =
     [<Emit("Math.random().toString(36).slice(2, 8)")>]
     let newHandleId () : string = jsNative
 
+    let private tryUnboxString (raw: obj) (name: string) =
+        try Some(unbox<string> raw?(name)) with _ -> None
+
     let private contextString (raw: obj) (name: string) =
         if isNull raw || isNull raw?(name) then
             None
         else
-            try
-                let value = unbox<string> raw?(name)
-                if String.IsNullOrWhiteSpace value then None else Some value
-            with _ ->
-                None
+            tryUnboxString raw name |> Option.bind HostArgDecode.nonEmptyString
+
+    let private abortSignalFromRaw (raw: obj) =
+        let abort = raw?("abort")
+
+        if not (isNull abort) then
+            abort
+        elif not (isNull (raw?("abortSignal"))) then
+            raw?("abortSignal")
+        else
+            raw?("signal")
+
+    let private abortSignalOf (raw: obj) =
+        if isNull raw then null else abortSignalFromRaw raw
+
+    let private listenAbort (signal: obj) (callback: unit -> unit) =
+        let aborted = signal?("aborted")
+
+        if not (isNull aborted) && unbox<bool> aborted then
+            callback ()
+            fun () -> ()
+        else
+            let listener = fun (_: obj) -> callback ()
+            signal?addEventListener ("abort", listener, createObj [ "once", box true ])
+            fun () -> signal?removeEventListener ("abort", listener)
 
     let private attachAbort (raw: obj) (callback: unit -> unit) =
-        let signal =
-            if isNull raw then
-                null
-            else
-                let abort = raw?("abort")
-
-                if not (isNull abort) then
-                    abort
-                else
-                    let abortSignal = raw?("abortSignal")
-
-                    if not (isNull abortSignal) then
-                        abortSignal
-                    else
-                        raw?("signal")
+        let signal = abortSignalOf raw
 
         if isNull signal || isNull (signal?("addEventListener")) then
             fun () -> ()
         else
-            let aborted = signal?("aborted")
+            listenAbort signal callback
 
-            if not (isNull aborted) && unbox<bool> aborted then
-                callback ()
-                fun () -> ()
-            else
-                let listener = fun (_: obj) -> callback ()
-                signal?addEventListener ("abort", listener, createObj [ "once", box true ])
-                fun () -> signal?removeEventListener ("abort", listener)
+    let private partText (part: obj) =
+        if isNull part || isNull part?text then
+            None
+        else
+            Some(unbox<string> part?text)
+
+    let private tryPartsPrompt (raw: obj) =
+        try
+            unbox<obj array> raw?message?parts
+            |> Array.choose partText
+            |> String.concat ""
+            |> Option.ofObj
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        with _ ->
+            None
 
     let private promptText (raw: obj) =
         let fromParts =
             if isNull raw || isNull raw?message || isNull raw?message?parts then
                 None
             else
-                try
-                    unbox<obj array> raw?message?parts
-                    |> Array.choose (fun part ->
-                        if isNull part || isNull part?text then
-                            None
-                        else
-                            Some(unbox<string> part?text))
-                    |> String.concat ""
-                    |> Option.ofObj
-                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
-                with _ ->
-                    None
+                tryPartsPrompt raw
 
         fromParts
         |> Option.orElse (contextString raw "prompt")
         |> Option.orElse (contextString raw "input")
-
     let decodeContext (raw: obj) =
         { SessionId = contextString raw "sessionID" |> Option.defaultValue ""
           Agent = contextString raw "agent"

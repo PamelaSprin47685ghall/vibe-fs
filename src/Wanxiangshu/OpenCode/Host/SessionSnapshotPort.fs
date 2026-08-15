@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch.OpenCode
@@ -80,14 +81,17 @@ module SessionSnapshotPort =
         elif not (isNull raw?info) then raw?info
         else raw
 
+    let private decodePartsOrEmpty (parts: obj array) : MessagePart array =
+        try
+            HostMessageCodec.decodeParts parts
+        with _ ->
+            [||]
+
     let private partsOf (raw: obj) : MessagePart array =
         if isNull raw || isNull raw?parts then
             [||]
         else
-            try
-                HostMessageCodec.decodeParts (unbox<obj array> raw?parts)
-            with _ ->
-                [||]
+            decodePartsOrEmpty (unbox<obj array> raw?parts)
 
     let private canonicalValue (value: obj) =
         if isNull value then
@@ -95,86 +99,98 @@ module SessionSnapshotPort =
         else
             CanonicalJson.canonicalJson value
 
+    let private isToolKind (kind: string) =
+        kind = "tool"
+        || kind = "tool-call"
+        || kind = "tool_call"
+        || kind.StartsWith "tool-"
+
+    /// Evidence → Decision: tool-part input wire fields.
+    let private toolInputOf (part: obj) (state: obj) =
+        if not (isNull state) && not (isNull state?input) then
+            state?input
+        elif not (isNull part?input) then
+            part?input
+        elif not (isNull part?args) then
+            part?args
+        else
+            part?arguments
+
+    let private completedOutputOf (state: obj) =
+        if isNull state then null
+        elif not (isNull state?output) then state?output
+        else state?result
+
+    let private failedErrorOf (state: obj) =
+        if isNull state then null
+        elif not (isNull state?error) then state?error
+        elif not (isNull state?errorText) then state?errorText
+        else state?output
+
+    /// Evidence → Decision: Host tool-part status string → SnapshotToolPartState.
+    let private toolStateOf (state: obj) (stateValue: string) =
+        match stateValue with
+        | "completed" -> SnapshotToolPartState.Completed(canonicalValue (completedOutputOf state))
+        | "error" -> SnapshotToolPartState.Failed(canonicalValue (failedErrorOf state))
+        | _ -> SnapshotToolPartState.Pending
+
+    let private sessionToolPartOf (partId: string) (call: string) (name: string) (part: obj) (state: obj) =
+        let stateValue =
+            readString (if isNull state then null else state?status)
+            |> Option.map (fun value -> value.ToLowerInvariant())
+            |> Option.defaultValue "pending"
+
+        { HostToolPartId = HostToolPartId.create partId
+          ToolCallId = ToolCallId.create call
+          ToolName = name
+          InputCanonical = canonicalValue (toolInputOf part state)
+          State = toolStateOf state stateValue }
+
+    /// Evidence → Decision: named tool identity present → SessionToolPart.
+    let private chooseNamedToolPart (part: obj) : SessionToolPart option =
+        let state = if isNull part?state then null else part?state
+
+        let callId =
+            readString part?toolCallId
+            |> Option.orElse (readString part?callID)
+            |> Option.orElse (readString part?callId)
+
+        let toolName = readString part?tool |> Option.orElse (readString part?name)
+        let hostToolPartId = readString part?id
+
+        match hostToolPartId, callId, toolName with
+        | Some partId, Some call, Some name -> Some(sessionToolPartOf partId call name part state)
+        | _ -> None
+
+    /// Evidence → Decision: part kind is a tool wire form.
+    let private chooseToolKindPart (part: obj) : SessionToolPart option =
+        let kind =
+            readString part?``type``
+            |> Option.defaultValue ""
+            |> fun value -> value.ToLowerInvariant()
+
+        if not (isToolKind kind) then
+            None
+        else
+            chooseNamedToolPart part
+
+    let private trySessionToolPart (part: obj) : SessionToolPart option =
+        if isNull part then
+            None
+        else
+            chooseToolKindPart part
+
+    let private decodeToolPartsOrEmpty (parts: obj array) : SessionToolPart array =
+        try
+            parts |> Array.choose trySessionToolPart
+        with _ ->
+            [||]
+
     let private toolPartsOf (raw: obj) : SessionToolPart array =
         if isNull raw || isNull raw?parts then
             [||]
         else
-            try
-                unbox<obj array> raw?parts
-                |> Array.choose (fun part ->
-                    if isNull part then
-                        None
-                    else
-                        let kind =
-                            readString part?``type``
-                            |> Option.defaultValue ""
-                            |> fun value -> value.ToLowerInvariant()
-
-                        let isTool =
-                            kind = "tool"
-                            || kind = "tool-call"
-                            || kind = "tool_call"
-                            || kind.StartsWith "tool-"
-
-                        if not isTool then
-                            None
-                        else
-                            let state = if isNull part?state then null else part?state
-
-                            let callId =
-                                readString part?toolCallId
-                                |> Option.orElse (readString part?callID)
-                                |> Option.orElse (readString part?callId)
-
-                            let toolName = readString part?tool |> Option.orElse (readString part?name)
-
-                            let hostToolPartId = readString part?id
-
-                            match hostToolPartId, callId, toolName with
-                            | Some partId, Some call, Some name ->
-                                let input =
-                                    if not (isNull state) && not (isNull state?input) then
-                                        state?input
-                                    elif not (isNull part?input) then
-                                        part?input
-                                    elif not (isNull part?args) then
-                                        part?args
-                                    else
-                                        part?arguments
-
-                                let stateValue =
-                                    readString (if isNull state then null else state?status)
-                                    |> Option.map (fun value -> value.ToLowerInvariant())
-                                    |> Option.defaultValue "pending"
-
-                                let toolState =
-                                    match stateValue with
-                                    | "completed" ->
-                                        let output =
-                                            if isNull state then null
-                                            elif not (isNull state?output) then state?output
-                                            else state?result
-
-                                        SnapshotToolPartState.Completed(canonicalValue output)
-                                    | "error" ->
-                                        let error =
-                                            if isNull state then null
-                                            elif not (isNull state?error) then state?error
-                                            elif not (isNull state?errorText) then state?errorText
-                                            else state?output
-
-                                        SnapshotToolPartState.Failed(canonicalValue error)
-                                    | _ -> SnapshotToolPartState.Pending
-
-                                Some
-                                    { HostToolPartId = HostToolPartId.create partId
-                                      ToolCallId = ToolCallId.create call
-                                      ToolName = name
-                                      InputCanonical = canonicalValue input
-                                      State = toolState }
-                            | _ -> None)
-            with _ ->
-                [||]
+            decodeToolPartsOrEmpty (unbox<obj array> raw?parts)
 
     let private modelOf (info: obj) : OpencodeModel option =
         if isNull info then
@@ -200,22 +216,13 @@ module SessionSnapshotPort =
         // `info.error.name = "APIError"` decoded as `ErrorName = None`, which
         // turned a settled provider failure into `TurnUnknown`.
         let readError (error: obj) =
-            match readString (if isNull error then null else error?name) with
-            | Some value -> Some value
-            | None -> readString (if isNull error then null else error?``type``)
+            readString (if isNull error then null else error?name)
+            |> Option.orElseWith (fun () -> readString (if isNull error then null else error?``type``))
 
-        let infoError = if isNull info then null else info?error
-        let rawError = if isNull raw then null else raw?error
-
-        match readError infoError with
-        | Some _ as result -> result
-        | None ->
-            match readError rawError with
-            | Some _ as result -> result
-            | None ->
-                match readString (if isNull info then null else info?errorName) with
-                | Some _ as result -> result
-                | None -> readString (if isNull raw then null else raw?errorName)
+        readError (if isNull info then null else info?error)
+        |> Option.orElseWith (fun () -> readError (if isNull raw then null else raw?error))
+        |> Option.orElseWith (fun () -> readString (if isNull info then null else info?errorName))
+        |> Option.orElseWith (fun () -> readString (if isNull raw then null else raw?errorName))
 
     /// `summary = true` in Host 1.18.9 is a boolean on assistant messages. User
     /// messages carry a summary OBJECT (`{ title?, body?, diffs }`), so a non-null
@@ -252,26 +259,34 @@ module SessionSnapshotPort =
     /// `OpenCodePort` writes it onto the text part because that survives the Host
     /// round-trip more reliably than `body.metadata`; both spellings are read here so
     /// the recovery does not depend on which one a given Host version preserved.
+    let private promptKeyFromMetadata (source: obj) =
+        if isNull source || isNull source?metadata then
+            None
+        else
+            readString source?metadata?(PromptMetadataCodec.PromptKeyField)
+
+    let private promptKeyFromPart (part: obj) =
+        if isNull part then
+            None
+        else
+            promptKeyFromMetadata part
+
+    let private tryPickPromptKeyFromParts (parts: obj array) =
+        try
+            parts |> Array.tryPick promptKeyFromPart
+        with _ ->
+            None
+
+    let private promptKeyFromParts (raw: obj) =
+        if isNull raw || isNull raw?parts then
+            None
+        else
+            tryPickPromptKeyFromParts (unbox<obj array> raw?parts)
+
     let private promptKeyOf (info: obj) (raw: obj) =
-        let fromMetadata (source: obj) =
-            if isNull source || isNull source?metadata then
-                None
-            else
-                readString source?metadata?(PromptMetadataCodec.PromptKeyField)
-
-        let fromParts () =
-            if isNull raw || isNull raw?parts then
-                None
-            else
-                try
-                    unbox<obj array> raw?parts
-                    |> Array.tryPick (fun part -> if isNull part then None else fromMetadata part)
-                with _ ->
-                    None
-
-        [ fromMetadata info; fromMetadata raw ]
-        |> List.tryPick id
-        |> Option.orElseWith fromParts
+        promptKeyFromMetadata info
+        |> Option.orElseWith (fun () -> promptKeyFromMetadata raw)
+        |> Option.orElseWith (fun () -> promptKeyFromParts raw)
 
     let projectMessage (raw: obj) : SessionMessage option =
         if isNull raw then
@@ -332,6 +347,31 @@ module SessionSnapshotPort =
         | Missing of toolCallId: ToolCallId
         | Ambiguous of toolCallId: ToolCallId
 
+    /// Evidence → Decision: tool part id matches the callback → location.
+    let private toolCallLocationOf
+        (toolCallId: ToolCallId)
+        (message: SessionMessage)
+        (part: SessionToolPart)
+        : ToolCallLocation option =
+        if part.ToolCallId <> toolCallId then
+            None
+        else
+            Some
+                { ProviderRun = ProviderRunIdentity.create message.Id
+                  HostToolPartId = part.HostToolPartId
+                  ToolCallId = part.ToolCallId
+                  ToolName = part.ToolName
+                  InputCanonical = part.InputCanonical
+                  State = part.State }
+
+    let private assistantToolLocations (toolCallId: ToolCallId) (message: SessionMessage) =
+        if message.Role <> "assistant" then
+            []
+        else
+            message.ToolParts
+            |> Array.toList
+            |> List.choose (toolCallLocationOf toolCallId message)
+
     /// Resolve one tool callback through the Host's persisted assistant message.
     /// `callID` alone is not a ProviderRun binding; the enclosing assistant
     /// message and persisted ToolPart are the only admissible evidence.
@@ -339,25 +379,7 @@ module SessionSnapshotPort =
         (toolCallId: ToolCallId)
         (messages: SessionMessage list)
         : Result<ToolCallLocation, ToolCallLocationError> =
-        let candidates =
-            messages
-            |> List.collect (fun message ->
-                if message.Role <> "assistant" then
-                    []
-                else
-                    message.ToolParts
-                    |> Array.toList
-                    |> List.choose (fun part ->
-                        if part.ToolCallId = toolCallId then
-                            Some
-                                { ProviderRun = ProviderRunIdentity.create message.Id
-                                  HostToolPartId = part.HostToolPartId
-                                  ToolCallId = part.ToolCallId
-                                  ToolName = part.ToolName
-                                  InputCanonical = part.InputCanonical
-                                  State = part.State }
-                        else
-                            None))
+        let candidates = messages |> List.collect (assistantToolLocations toolCallId)
 
         match candidates with
         | [ location ] -> Ok location
@@ -383,6 +405,31 @@ module SessionSnapshotPort =
         else
             [||]
 
+    /// HOST 1.18.9 `session.messages` defaults to `order = "desc"` unless pinned.
+    /// Evidence: `packages/core/src/session.ts:308` (`requestedOrder = input.order ?? "desc"`).
+    let private messagesQuery (workspaceDirectory: string option) =
+        match workspaceDirectory with
+        | Some dir -> createObj [ "directory", box dir; "order", box "asc" ]
+        | None -> createObj [ "order", box "asc" ]
+
+    let private messagesFromHttpText (text: string) =
+        if String.IsNullOrWhiteSpace text then
+            []
+        else
+            projectMessages (unwrapPayload (JS.JSON.parse text))
+
+    let private nonBlankDirectory (directory: string) =
+        if String.IsNullOrWhiteSpace directory then
+            None
+        else
+            Some directory
+
+    let private directoryOption (input: obj) =
+        if isNull input || isNull input?directory then
+            None
+        else
+            nonBlankDirectory (unbox<string> input?directory)
+
     type SdkSnapshotPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
             match workspaceDirectory with
@@ -391,40 +438,26 @@ module SessionSnapshotPort =
 
         interface ISessionSnapshotPort with
             member _.GetMessages(sessionId) =
-                task {
+                taskResult {
                     try
                         let sessObj = client?session
                         let messagesFn = sessObj?messages
+                        do! Result.requireFalse "session.messages unavailable on SDK client" (isNull messagesFn)
+                        let sid = SessionId.value sessionId
 
-                        if isNull messagesFn then
-                            return Error "session.messages unavailable on SDK client"
-                        else
-                            let sid = SessionId.value sessionId
+                        let payload =
+                            createObj
+                                [ "path", box (createObj [ "id", box sid ])
+                                  "query", box (messagesQuery workspaceDirectory)
+                                  "headers", box (headersObj ()) ]
 
-                            let payload =
-                                createObj
-                                    [ "path", box (createObj [ "id", box sid ])
-                                      "query",
-                                      box (
-                                          // HOST 1.18.9 `session.messages` defaults to
-                                          // `order = "desc"` (newest first) unless the
-                                          // caller asks otherwise. Every consumer of
-                                          // `ISessionSnapshotPort` (TurnReconcile,
-                                          // ReviewSeal, PromptRecovery, XWire) reads the
-                                          // list as chronological, so the port must
-                                          // pin the order it hands out. Evidence:
-                                          // `packages/core/src/session.ts:308`
-                                          // (`requestedOrder = input.order ?? "desc"`).
-                                          match workspaceDirectory with
-                                          | Some dir -> createObj [ "directory", box dir; "order", box "asc" ]
-                                          | None -> createObj [ "order", box "asc" ]
-                                      )
-                                      "headers", box (headersObj ()) ]
+                        let! response =
+                            unbox<Task<obj>> (messagesFn?call (sessObj, payload))
+                            |> TaskResultCE.ofTask
 
-                            let! response = unbox<Task<obj>> (messagesFn?call (sessObj, payload))
-                            return Ok(projectMessages (unwrapPayload response))
+                        return projectMessages (unwrapPayload response)
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
     type HttpSnapshotPort(baseUrl: string) =
@@ -439,39 +472,23 @@ module SessionSnapshotPort =
 
         interface ISessionSnapshotPort with
             member _.GetMessages(sessionId) =
-                task {
+                taskResult {
                     try
                         let url =
                             sprintf "%s/session/%s/message?order=asc" cleanBase (SessionId.value sessionId)
 
                         let init = createObj [ "method", box "GET" ]
-                        let! response = jsFetch url init
+                        let! response = jsFetch url init |> TaskResultCE.ofTask
                         let status = unbox<int> response?status
-
-                        if status < 200 || status >= 300 then
-                            return Error(sprintf "HTTP %d" status)
-                        else
-                            let! text = unbox<Task<string>> (response?text ())
-
-                            if String.IsNullOrWhiteSpace text then
-                                return Ok []
-                            else
-                                return Ok(projectMessages (unwrapPayload (JS.JSON.parse text)))
+                        do! Result.requireTrue (sprintf "HTTP %d" status) (status >= 200 && status < 300)
+                        let! text = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+                        return messagesFromHttpText text
                     with ex ->
-                        return Error ex.Message
+                        return! Error ex.Message
                 }
 
     let create (input: obj) : ISessionSnapshotPort option =
-        let workDir =
-            if not (isNull input) && not (isNull input?directory) then
-                let directory = unbox<string> input?directory
-
-                if String.IsNullOrWhiteSpace directory then
-                    None
-                else
-                    Some directory
-            else
-                None
+        let workDir = directoryOption input
 
         if isNull input then
             None

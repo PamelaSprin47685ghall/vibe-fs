@@ -103,6 +103,12 @@ module BloggerCoordinator =
             blog, xTrace, epoch
         | None -> host.Memory.Blog, host.Memory.XTrace, PrefixEpochId.initial
 
+    let private openingFloor (journal: AgentJournal option) (mainSessionId: SessionId) : int64 option =
+        match journal with
+        | None -> None
+        | Some durable ->
+            ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
+
     let private nextMainContext
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
@@ -135,6 +141,83 @@ module BloggerCoordinator =
             // Commit-path fatal remains only for contexts that somehow escaped this gate.
             EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection chunk
 
+    let private encodeContextPayload (ctx: BloggerRequestContext) =
+        match ctx with
+        | BloggerRequestContext.Main main ->
+            "main",
+            main.PreviousIngestedThroughSequence,
+            main.NextIngestedThroughSequence,
+            [],
+            createObj
+                [ "kind", box "main"
+                  "toml", box main.Toml
+                  "delta_digest", box (BlobDigest.value main.DeltaDigest)
+                  "prev_ingest", box main.PreviousIngestedThroughSequence
+                  "next_ingest", box main.NextIngestedThroughSequence
+                  "prev_cutoff", box main.PreviousCoverableTurnCutoffExclusive
+                  "next_cutoff", box main.NextCoverableTurnCutoffExclusive
+                  "next_prefix_digest", box main.NextCoveredPrefixDigest
+                  "frame_epoch", box (FrameEpochId.value main.FrameEpochId)
+                  "observed_prefix_epoch", box (PrefixEpochId.value main.ObservedPrefixEpochId) ]
+        | BloggerRequestContext.Squash squash ->
+            "squash",
+            0L,
+            0L,
+            squash.FrameDigests,
+            createObj
+                [ "kind", box "squash"
+                  "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
+                  "covered_frame_count", box squash.CoveredFrameCount
+                  "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
+                  "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
+
+    let private abandonStaleOpen
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        (staleOpen: OpenBloggerRequest option)
+        : Task<unit> =
+        task {
+            match staleOpen with
+            | Some openReq when openReq.RequestId <> requestId ->
+                do!
+                    BloggerAbandon.byRequestId
+                        journal
+                        openReq.RequestId
+                        mainSessionId
+                        bloggerSessionId
+                        "superseded-by-new-materialize"
+            | _ -> ()
+        }
+
+    let private resolveContextBlob
+        (journal: AgentJournal)
+        (existingOpen: OpenBloggerRequest option)
+        (promptKey: PromptKey option)
+        (contextPayload: obj)
+        : Task<Result<BlobRef * BlobDigest, string>> =
+        match existingOpen with
+        | Some openReq when openReq.PromptKey.IsNone && promptKey.IsSome ->
+            Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
+        | Some openReq when openReq.PromptKey = promptKey ->
+            Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
+        | _ ->
+            taskResult {
+                let! blob = journal.WriteBlob(CanonicalJson.canonicalJson contextPayload)
+                return blob.BlobRef, blob.BlobDigest
+            }
+
+    let private appendMaterialized
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (fact: AgentFact)
+        : Task<Result<unit, string>> =
+        task {
+            let! result = AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal
+            return result |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+        }
+
     /// C5: durable materialization. Context blob is the irrecomputable semantic
     /// input. Pre-send PromptKey=None; after physical send, re-append with the
     /// same ContextDigest + Some PromptKey so commit can prove ownership.
@@ -143,42 +226,13 @@ module BloggerCoordinator =
         (ctx: BloggerRequestContext)
         (promptKey: PromptKey option)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             let requestId = BloggerRequestContext.requestId ctx
             let mainSessionId = BloggerRequestContext.mainSessionId ctx
             let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
             let epoch = BloggerRequestContext.observedPrefixEpoch ctx
             let frameEpoch = BloggerRequestContext.frameEpochId ctx
-
-            let kind, prevSeq, nextSeq, selectedDigests, contextPayload =
-                match ctx with
-                | BloggerRequestContext.Main main ->
-                    "main",
-                    main.PreviousIngestedThroughSequence,
-                    main.NextIngestedThroughSequence,
-                    [],
-                    createObj
-                        [ "kind", box "main"
-                          "toml", box main.Toml
-                          "delta_digest", box (BlobDigest.value main.DeltaDigest)
-                          "prev_ingest", box main.PreviousIngestedThroughSequence
-                          "next_ingest", box main.NextIngestedThroughSequence
-                          "prev_cutoff", box main.PreviousCoverableTurnCutoffExclusive
-                          "next_cutoff", box main.NextCoverableTurnCutoffExclusive
-                          "next_prefix_digest", box main.NextCoveredPrefixDigest
-                          "frame_epoch", box (FrameEpochId.value main.FrameEpochId)
-                          "observed_prefix_epoch", box (PrefixEpochId.value main.ObservedPrefixEpochId) ]
-                | BloggerRequestContext.Squash squash ->
-                    "squash",
-                    0L,
-                    0L,
-                    squash.FrameDigests,
-                    createObj
-                        [ "kind", box "squash"
-                          "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
-                          "covered_frame_count", box squash.CoveredFrameCount
-                          "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
-                          "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
+            let kind, prevSeq, nextSeq, selectedDigests, contextPayload = encodeContextPayload ctx
 
             // One open request per Blogger. Restart / re-offer with a new RequestId
             // must supersede a stale open slot (fold rejects two opens on one session).
@@ -197,52 +251,26 @@ module BloggerCoordinator =
                 |> Option.bind (fun s -> s.BloggerCycles)
                 |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
-            match staleOpen with
-            | Some openReq when openReq.RequestId <> requestId ->
-                do!
-                    BloggerAbandon.byRequestId
-                        journal
-                        openReq.RequestId
-                        mainSessionId
-                        bloggerSessionId
-                        "superseded-by-new-materialize"
-            | _ -> ()
+            do! abandonStaleOpen journal mainSessionId bloggerSessionId requestId staleOpen |> TaskResultCE.ofTask
 
-            let! contextResult =
-                match existingOpen with
-                | Some openReq when openReq.PromptKey.IsNone && promptKey.IsSome ->
-                    // Fill-in: keep the frozen pre-send blob/digest.
-                    Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
-                | Some openReq when openReq.PromptKey = promptKey ->
-                    Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
-                | _ ->
-                    task {
-                        match! journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
-                        | Error error -> return Error error
-                        | Ok blob -> return Ok(blob.BlobRef, blob.BlobDigest)
-                    }
+            let! contextRef, contextDigest = resolveContextBlob journal existingOpen promptKey contextPayload
 
-            match contextResult with
-            | Error error -> return Error error
-            | Ok(contextRef, contextDigest) ->
-                let fact =
-                    ContextFact.BloggerRequestMaterialized
-                        {| RequestId = requestId
-                           MainSessionId = mainSessionId
-                           BloggerSessionId = bloggerSessionId
-                           RequestKind = kind
-                           ContextRef = contextRef
-                           ContextDigest = contextDigest
-                           ObservedPrefixEpochId = epoch
-                           PreviousIngestedThroughSequence = prevSeq
-                           NextIngestedThroughSequence = nextSeq
-                           FrameEpochId = frameEpoch
-                           SelectedFrameDigests = selectedDigests
-                           PromptKey = promptKey |}
+            let fact =
+                ContextFact.BloggerRequestMaterialized
+                    {| RequestId = requestId
+                       MainSessionId = mainSessionId
+                       BloggerSessionId = bloggerSessionId
+                       RequestKind = kind
+                       ContextRef = contextRef
+                       ContextDigest = contextDigest
+                       ObservedPrefixEpochId = epoch
+                       PreviousIngestedThroughSequence = prevSeq
+                       NextIngestedThroughSequence = nextSeq
+                       FrameEpochId = frameEpoch
+                       SelectedFrameDigests = selectedDigests
+                       PromptKey = promptKey |}
 
-                match! AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
-                | Error failure -> return Error(JournalAppendFailure.describe failure)
-                | Ok _ -> return Ok()
+            do! appendMaterialized journal mainSessionId fact
         }
 
     let private abandonRequest (journal: AgentJournal option) (ctx: BloggerRequestContext) (reason: string) : Task =
@@ -262,6 +290,105 @@ module BloggerCoordinator =
     /// New Authority Root on main after join/return: allow Blogger again.
     let reactivateAfterNewRoot = BloggerRuntimeHost.reactivateAfterNewRoot
 
+    let private startedEffect (ctx: BloggerRequestContext) =
+        match ctx with
+        | BloggerRequestContext.Squash _ -> DecisionEffect.StartedSquash
+        | BloggerRequestContext.Main _ -> DecisionEffect.Started
+
+    let private failAfterSend
+        (journal: AgentJournal option)
+        (host: CompanionHost)
+        (scope: IParkedTransformHost)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        (reason: string)
+        : Task<DecisionEffect> =
+        task {
+            do! abandonRequest journal ctx reason
+            scope.ClearCurrentRequest key
+            host.InvalidateBloggerCache()
+            return DecisionEffect.StartFailed reason
+        }
+
+    let private bindSendAndPostMaterialize
+        (host: CompanionHost)
+        (j: AgentJournal)
+        (ctx: BloggerRequestContext)
+        : Task<Result<DecisionEffect, string>> =
+        taskResult {
+            let! promptKey = host.StartFromContext(ctx)
+            do! materializeRequest j ctx (Some promptKey)
+            return startedEffect ctx
+        }
+
+    let private proceedAfterPreSend
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (j: AgentJournal)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        task {
+            scope.SetCurrentRequest(key, ctx)
+            let! outcome = bindSendAndPostMaterialize host j ctx
+
+            match outcome with
+            | Ok effect -> return effect
+            | Error reason -> return! failAfterSend journal host scope key ctx reason
+        }
+
+    let private afterPreSendMaterialize
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (j: AgentJournal)
+        (mainId: SessionId)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        if blocksNew (Some j) mainId scope key then
+            task {
+                do! abandonRequest journal ctx "main-sealed-before-send"
+                forceSealRuntime scope key
+                return DecisionEffect.Sealed
+            }
+        else
+            proceedAfterPreSend scope host journal j key ctx
+
+    let private materializeThenSend
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (j: AgentJournal)
+        (mainId: SessionId)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        task {
+            match! materializeRequest j ctx None with
+            | Error reason -> return DecisionEffect.MaterializeFailed reason
+            | Ok() -> return! afterPreSendMaterialize scope host journal j mainId key ctx
+        }
+
+    let private startWithJournal
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (j: AgentJournal)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest) → send.
+        // No cell.State write: physical flight registry is the busy authority.
+        let mainId = BloggerRequestContext.mainSessionId ctx
+
+        if blocksNew (Some j) mainId scope key then
+            forceSealRuntime scope key
+            Task.FromResult DecisionEffect.Sealed
+        else
+            materializeThenSend scope host journal j mainId key ctx
+
     let private startFrozen
         (scope: IParkedTransformHost)
         (host: CompanionHost)
@@ -269,55 +396,43 @@ module BloggerCoordinator =
         (key: string)
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
-        task {
-            // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest) → send.
-            // No cell.State write: physical flight registry is the busy authority.
-            let mainId = BloggerRequestContext.mainSessionId ctx
+        match journal with
+        | None -> Task.FromResult(DecisionEffect.MaterializeFailed "no journal")
+        | Some j -> startWithJournal scope host journal j key ctx
 
-            match journal with
-            | None -> return DecisionEffect.MaterializeFailed "no journal"
-            | Some j ->
-                if blocksNew (Some j) mainId scope key then
-                    forceSealRuntime scope key
-                    return DecisionEffect.Sealed
-                else
-                    // Pre-send: freeze semantic context with PromptKey=None.
-                    match! materializeRequest j ctx None with
-                    | Error reason -> return DecisionEffect.MaterializeFailed reason
-                    | Ok() ->
-                        // Re-check after materialize: main may complete during blob write.
-                        // DrainWindow.Open still allows send until next seal cycle ends.
-                        if blocksNew (Some j) mainId scope key then
-                            do! abandonRequest journal ctx "main-sealed-before-send"
-                            forceSealRuntime scope key
-                            return DecisionEffect.Sealed
-                        else
-                            scope.SetCurrentRequest(key, ctx)
+    let private effectFromMaterialDecision
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (key: string)
+        (decision: BloggerRuntime.Decision)
+        : Task<DecisionEffect option> =
+        match decision with
+        | BloggerRuntime.Decision.Start startCtx
+        | BloggerRuntime.Decision.Offer startCtx ->
+            task {
+                let! effect = startFrozen scope host journal key startCtx
+                return Some effect
+            }
+        | BloggerRuntime.Decision.Skip -> Task.FromResult(Some DecisionEffect.SkippedInFlight)
 
-                            let! sent = host.StartFromContext(ctx)
-
-                            match sent with
-                            | Ok promptKey ->
-                                // Post-send: bind PromptKey on the open request so commit
-                                // can prove this RequestId owns the assistant parent.
-                                // Detached accept may still leave parent unresolved until
-                                // PhysicalAccepted; binding the key itself is durable now.
-                                match! materializeRequest j ctx (Some promptKey) with
-                                | Error reason ->
-                                    do! abandonRequest journal ctx reason
-                                    scope.ClearCurrentRequest key
-                                    host.InvalidateBloggerCache()
-                                    return DecisionEffect.StartFailed reason
-                                | Ok() ->
-                                    match ctx with
-                                    | BloggerRequestContext.Squash _ -> return DecisionEffect.StartedSquash
-                                    | BloggerRequestContext.Main _ -> return DecisionEffect.Started
-                            | Error reason ->
-                                do! abandonRequest journal ctx reason
-                                scope.ClearCurrentRequest key
-                                host.InvalidateBloggerCache()
-                                return DecisionEffect.StartFailed reason
-        }
+    let private tryStartBuiltSquash
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (key: string)
+        (squashCtxOpt: BloggerRequestContext option)
+        : Task<DecisionEffect option> =
+        match squashCtxOpt with
+        | None -> Task.FromResult None
+        | Some squashCtx ->
+            // Physical facts only: parked waiter + flight ownership (decideMaterial).
+            effectFromMaterialDecision
+                scope
+                host
+                journal
+                key
+                (BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) squashCtx)
 
     let private tryStartSquash
         (scope: IParkedTransformHost)
@@ -329,34 +444,108 @@ module BloggerCoordinator =
         (key: string)
         (blog: BlogProjectionState)
         : Task<DecisionEffect option> =
-        task {
-            // Material wakes the recovery waiter first. Presence of the waiter is the
-            // opportunity (physical possession), not a cross-call Armed flag.
-            if not (host.OfferRecoveryMaterial()) then
-                return None
-            else
-                let maySquash =
-                    RecoverySlot.mayRecover
-                        SlotArming.ArmedByAdvance
-                        (host.BloggerCursorOffset())
-                        (List.length blog.Frames > 0)
+        // Material wakes the recovery waiter first. Presence of the waiter is the
+        // opportunity (physical possession), not a cross-call Armed flag.
+        if not (host.OfferRecoveryMaterial()) then
+            Task.FromResult None
+        elif
+            not (
+                RecoverySlot.mayRecover
+                    SlotArming.ArmedByAdvance
+                    (host.BloggerCursorOffset())
+                    (List.length blog.Frames > 0)
+            )
+        then
+            Task.FromResult None
+        else
+            tryStartBuiltSquash
+                scope
+                host
+                journal
+                key
+                (CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog)
 
-                if not maySquash then
-                    return None
-                else
-                    match
-                        CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog
-                    with
-                    | None -> return None
-                    | Some squashCtx ->
-                        // Physical facts only: parked waiter + flight ownership (decideMaterial).
-                        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) squashCtx with
-                        | BloggerRuntime.Decision.Start startCtx
-                        | BloggerRuntime.Decision.Offer startCtx ->
-                            let! effect = startFrozen scope host journal key startCtx
-                            return Some effect
-                        | BloggerRuntime.Decision.Skip -> return Some DecisionEffect.SkippedInFlight
-        }
+    let private applyMainDecision
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) ctx with
+        | BloggerRuntime.Decision.Start startCtx -> startFrozen scope host journal key startCtx
+        | BloggerRuntime.Decision.Offer offerCtx ->
+            let resumed = scope.SetPendingOffer(key, offerCtx)
+            Task.FromResult(DecisionEffect.OfferedParked resumed)
+        | BloggerRuntime.Decision.Skip -> Task.FromResult DecisionEffect.SkippedInFlight
+
+    let private startMainOrNone
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (key: string)
+        (ctxOpt: BloggerRequestContext option)
+        : Task<DecisionEffect> =
+        match ctxOpt with
+        | None -> Task.FromResult DecisionEffect.NoMaterial
+        | Some ctx -> applyMainDecision scope host journal key ctx
+
+    let private continueAfterSquashMiss
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (observedEpoch: PrefixEpochId)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (floorSequence: int64 option)
+        (projection: ProviderSemanticProjection)
+        (key: string)
+        : Task<DecisionEffect> =
+        startMainOrNone
+            scope
+            host
+            journal
+            key
+            (nextMainContext
+                mainSessionId
+                bloggerSessionId
+                observedEpoch
+                blog
+                xTrace
+                floorSequence
+                projection)
+
+    let private continueAfterSquashAttempt
+        (scope: IParkedTransformHost)
+        (host: CompanionHost)
+        (journal: AgentJournal option)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (observedEpoch: PrefixEpochId)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (floorSequence: int64 option)
+        (projection: ProviderSemanticProjection)
+        (key: string)
+        (squashEffect: DecisionEffect option)
+        : Task<DecisionEffect> =
+        match squashEffect with
+        | Some effect -> Task.FromResult effect
+        | None ->
+            continueAfterSquashMiss
+                scope
+                host
+                journal
+                mainSessionId
+                bloggerSessionId
+                observedEpoch
+                blog
+                xTrace
+                floorSequence
+                projection
+                key
 
     /// Unique production entry for main-session material → Blogger lifecycle.
     let onMainMaterial
@@ -367,55 +556,44 @@ module BloggerCoordinator =
         (bloggerSessionId: SessionId)
         (projection: ProviderSemanticProjection)
         : Task<DecisionEffect> =
-        task {
-            let key = SessionId.value bloggerSessionId
+        let key = SessionId.value bloggerSessionId
 
-            // GLORY-023 / TODO-001: Manager Opening floor from effectiveOpeningFloor
-            // (BlindPlan Pre-T1 dynamic head / Post-T1 WorkRecordStart). Never
-            // legacy activation prefix end.
-            let floorSequence =
-                match journal with
-                | None -> None
-                | Some durable ->
-                    ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
+        // GLORY-023 / TODO-001: Manager Opening floor from effectiveOpeningFloor
+        // (BlindPlan Pre-T1 dynamic head / Post-T1 WorkRecordStart). Never
+        // legacy activation prefix end.
+        let floorSequence = openingFloor journal mainSessionId
 
-            if blocksNew journal mainSessionId scope key then
-                forceSealRuntime scope key
-                return DecisionEffect.Sealed
-            elif scope.HasFlight key then
-                // Busy = physical flight ownership, not cell.State match.
-                return DecisionEffect.SkippedInFlight
-            else
-                // No sealed mirror: blocksNew above already applied the durable
-                // seal (DecisionEffect.Sealed) before this point.
-                // No cell: decideMaterial routes from HasParked + HasFlight only.
+        if blocksNew journal mainSessionId scope key then
+            forceSealRuntime scope key
+            Task.FromResult DecisionEffect.Sealed
+        elif scope.HasFlight key then
+            // Busy = physical flight ownership, not cell.State match.
+            Task.FromResult DecisionEffect.SkippedInFlight
+        else
+            // No sealed mirror: blocksNew above already applied the durable
+            // seal (DecisionEffect.Sealed) before this point.
+            // No cell: decideMaterial routes from HasParked + HasFlight only.
+            task {
                 let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
 
                 let! squashEffect =
                     tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key blog
 
-                match squashEffect with
-                | Some effect -> return effect
-                | None ->
-                    match
-                        nextMainContext
-                            mainSessionId
-                            bloggerSessionId
-                            observedEpoch
-                            blog
-                            xTrace
-                            floorSequence
-                            projection
-                    with
-                    | None -> return DecisionEffect.NoMaterial
-                    | Some ctx ->
-                        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) ctx with
-                        | BloggerRuntime.Decision.Start startCtx -> return! startFrozen scope host journal key startCtx
-                        | BloggerRuntime.Decision.Offer offerCtx ->
-                            let resumed = scope.SetPendingOffer(key, offerCtx)
-                            return DecisionEffect.OfferedParked resumed
-                        | BloggerRuntime.Decision.Skip -> return DecisionEffect.SkippedInFlight
-        }
+                return!
+                    continueAfterSquashAttempt
+                        scope
+                        host
+                        journal
+                        mainSessionId
+                        bloggerSessionId
+                        observedEpoch
+                        blog
+                        xTrace
+                        floorSequence
+                        projection
+                        key
+                        squashEffect
+            }
 
     /// AABB: rebuild Main context from latest projection at the same prev ingest.
     /// Does not advance coverage; replaces frozen Toml/RequestId/next_* for retry.
@@ -433,11 +611,6 @@ module BloggerCoordinator =
             None
         else
             // GLORY-023 / TODO-001: same Opening floor as onMainMaterial.
-            let floorSequence =
-                match journal with
-                | None -> None
-                | Some durable ->
-                    ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
-
+            let floorSequence = openingFloor journal mainSessionId
             let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
             nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection

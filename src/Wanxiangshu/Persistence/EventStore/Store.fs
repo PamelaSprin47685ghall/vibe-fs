@@ -5,6 +5,7 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -61,16 +62,10 @@ module EventStore =
     let private asAppendStorage (error: StorageInvalid) = AppendError.StorageInvalid error
 
     let private validateVocabulary (events: EventEnvelope list) : Result<unit, StorageInvalid> =
-        let rec loop remaining =
-            match remaining with
-            | [] -> Ok()
-            | head :: tail ->
-                if AuthoritativeEventTypes.isKnown head.EventType then
-                    loop tail
-                else
-                    Error(StorageInvalid.UnknownEventType head.EventType)
-
-        loop events
+        events
+        |> List.tryFind (fun head -> not (AuthoritativeEventTypes.isKnown head.EventType))
+        |> Option.map (fun head -> Error(StorageInvalid.UnknownEventType head.EventType))
+        |> Option.defaultValue (Ok())
 
     let private validateBatchDag (events: EventEnvelope list) : Result<unit, StorageInvalid> =
         let keys =
@@ -91,28 +86,71 @@ module EventStore =
             elif Set.contains key visiting then
                 Error StorageInvalid.CyclicParents
             else
-                let nextVisiting = Set.add key visiting
-                let parents = Map.tryFind key parentsById |> Option.defaultValue []
+                walkChildren key visiting visited
 
-                let rec visitParents remaining currentVisited =
-                    match remaining with
-                    | [] -> Ok(Set.add key currentVisited)
-                    | parent :: tail ->
-                        match visit parent nextVisiting currentVisited with
-                        | Error error -> Error error
-                        | Ok nextVisited -> visitParents tail nextVisited
+        and walkChildren key visiting visited =
+            let nextVisiting = Set.add key visiting
+            let parents = Map.tryFind key parentsById |> Option.defaultValue []
 
-                visitParents parents visited
+            let rec visitParents remaining currentVisited =
+                match remaining with
+                | [] -> Ok(Set.add key currentVisited)
+                | parent :: tail ->
+                    result {
+                        let! nextVisited = visit parent nextVisiting currentVisited
+                        return! visitParents tail nextVisited
+                    }
+
+            visitParents parents visited
 
         let rec all remaining visited =
             match remaining with
             | [] -> Ok()
             | key :: tail ->
-                match visit key Set.empty visited with
-                | Error error -> Error error
-                | Ok nextVisited -> all tail nextVisited
+                result {
+                    let! nextVisited = visit key Set.empty visited
+                    return! all tail nextVisited
+                }
 
         all (Set.toList keys) Set.empty
+
+    let private reuseSeenIdentity
+        (normalized: EventEnvelope)
+        (existing: EventEnvelope)
+        (seen: Map<string, EventEnvelope>)
+        (acc: EventEnvelope list)
+        : Result<Map<string, EventEnvelope> * EventEnvelope list, StorageInvalid> =
+        result {
+            do! CanonicalEventCodec.checkIdentity normalized existing
+            return seen, acc
+        }
+
+    let private observeStoreOrFresh
+        (integrator: ICanonicalIntegrator)
+        (key: string)
+        (normalized: EventEnvelope)
+        (seen: Map<string, EventEnvelope>)
+        (acc: EventEnvelope list)
+        : Result<Map<string, EventEnvelope> * EventEnvelope list, StorageInvalid> =
+        match integrator.TryEvent normalized.EventId with
+        | Some existing ->
+            result {
+                do! CanonicalEventCodec.checkIdentity normalized existing
+                return Map.add key normalized seen, acc
+            }
+        | None -> Ok(Map.add key normalized seen, normalized :: acc)
+
+    let private stepAgainstCurrent
+        (integrator: ICanonicalIntegrator)
+        (normalized: EventEnvelope)
+        (seen: Map<string, EventEnvelope>)
+        (acc: EventEnvelope list)
+        : Result<Map<string, EventEnvelope> * EventEnvelope list, StorageInvalid> =
+        let key = EventId.value normalized.EventId
+
+        match Map.tryFind key seen with
+        | Some existing -> reuseSeenIdentity normalized existing seen acc
+        | None -> observeStoreOrFresh integrator key normalized seen acc
 
     let private newEventsAgainstCurrent
         (integrator: ICanonicalIntegrator)
@@ -122,23 +160,35 @@ module EventStore =
             match remaining with
             | [] -> Ok(List.rev acc)
             | head :: tail ->
-                let normalized = EventEnvelope.normalize head
-                let key = EventId.value normalized.EventId
+                result {
+                    let! nextSeen, nextAcc =
+                        stepAgainstCurrent integrator (EventEnvelope.normalize head) seen acc
 
-                match Map.tryFind key seen with
-                | Some existing ->
-                    match CanonicalEventCodec.checkIdentity normalized existing with
-                    | Error error -> Error error
-                    | Ok() -> loop tail seen acc
-                | None ->
-                    match integrator.TryEvent normalized.EventId with
-                    | Some existing ->
-                        match CanonicalEventCodec.checkIdentity normalized existing with
-                        | Error error -> Error error
-                        | Ok() -> loop tail (Map.add key normalized seen) acc
-                    | None -> loop tail (Map.add key normalized seen) (normalized :: acc)
+                    return! loop tail nextSeen nextAcc
+                }
 
         loop events Map.empty []
+
+    let private parentKnown
+        (integrator: ICanonicalIntegrator)
+        (batchIds: Set<string>)
+        (parent: EventId)
+        =
+        Set.contains (EventId.value parent) batchIds
+        || Option.isSome (integrator.TryEvent parent)
+
+    let private validateParentList
+        (integrator: ICanonicalIntegrator)
+        (batchIds: Set<string>)
+        (parents: EventId list)
+        : Result<unit, StorageInvalid> =
+        let rec loop remaining =
+            match remaining with
+            | [] -> Ok()
+            | parent :: tail when parentKnown integrator batchIds parent -> loop tail
+            | parent :: _ -> Error(StorageInvalid.MissingParent parent)
+
+        loop parents
 
     let private validateParents
         (integrator: ICanonicalIntegrator)
@@ -149,27 +199,9 @@ module EventStore =
             |> List.map (fun envelope -> EventId.value envelope.EventId)
             |> Set.ofList
 
-        let rec parents remaining =
-            match remaining with
-            | [] -> Ok()
-            | parent :: tail ->
-                if
-                    Set.contains (EventId.value parent) batchIds
-                    || Option.isSome (integrator.TryEvent parent)
-                then
-                    parents tail
-                else
-                    Error(StorageInvalid.MissingParent parent)
-
-        let rec eventsLeft remaining =
-            match remaining with
-            | [] -> Ok()
-            | head :: tail ->
-                match parents head.Parents with
-                | Error error -> Error error
-                | Ok() -> eventsLeft tail
-
-        eventsLeft events
+        events
+        |> List.traverseResultM (fun head -> validateParentList integrator batchIds head.Parents)
+        |> Result.map ignore
 
     let private validatePayloadClosure (commonDir: string) (events: EventEnvelope list) : Result<unit, StorageInvalid> =
         let refs =
@@ -181,27 +213,71 @@ module EventStore =
         | Some missing -> Error(StorageInvalid.MissingPayload missing)
         | None -> Ok()
 
+    let private validateFreshBatch
+        (commonDir: string)
+        (integrator: ICanonicalIntegrator)
+        (fresh: EventEnvelope list)
+        : Result<EventEnvelope list, StorageInvalid> =
+        result {
+            do! validateParents integrator fresh
+            do! validateBatchDag fresh
+            do! validatePayloadClosure commonDir fresh
+            return fresh
+        }
+
     let private validateForAppend
         (commonDir: string)
         (integrator: ICanonicalIntegrator)
         (events: EventEnvelope list)
         : Result<EventEnvelope list, StorageInvalid> =
-        match validateVocabulary events with
-        | Error error -> Error error
-        | Ok() ->
-            match newEventsAgainstCurrent integrator events with
-            | Error error -> Error error
-            | Ok [] -> Ok []
-            | Ok fresh ->
-                match validateParents integrator fresh with
-                | Error error -> Error error
-                | Ok() ->
-                    match validateBatchDag fresh with
-                    | Error error -> Error error
-                    | Ok() ->
-                        match validatePayloadClosure commonDir fresh with
-                        | Error error -> Error error
-                        | Ok() -> Ok fresh
+        result {
+            do! validateVocabulary events
+            let! fresh = newEventsAgainstCurrent integrator events
+
+            if List.isEmpty fresh then
+                return []
+            else
+                return! validateFreshBatch commonDir integrator fresh
+        }
+
+    let private commitPrepared
+        (log: ProcessEventLog)
+        (prepared: PreparedIntegration)
+        : AppendReceipt =
+        ProcessEventLog.append log prepared.DurableEvents
+        prepared.Commit()
+        { Cuts = prepared.Cuts }
+
+    let private appendFresh
+        (integrator: ICanonicalIntegrator)
+        (log: ProcessEventLog)
+        (fresh: EventEnvelope list)
+        : Result<AppendReceipt, AppendError> =
+        result {
+            let! prepared =
+                integrator.PrepareLive fresh
+                |> Result.mapError (fun reason ->
+                    AppendError.AppendFailed("integration preparation failed: " + reason))
+
+            return commitPrepared log prepared
+        }
+
+    let private appendValidated
+        (commonDir: string)
+        (integrator: ICanonicalIntegrator)
+        (log: ProcessEventLog)
+        (events: EventEnvelope list)
+        : Result<AppendReceipt, AppendError> =
+        result {
+            let! fresh =
+                validateForAppend commonDir integrator events
+                |> Result.mapError asAppendStorage
+
+            if List.isEmpty fresh then
+                return AppendReceipt.empty
+            else
+                return! appendFresh integrator log fresh
+        }
 
     let createLocal (commonDir: string) (writerId: string) (integrator: ICanonicalIntegrator) : IEventStore =
         let log = ProcessEventLog.create commonDir writerId
@@ -220,20 +296,7 @@ module EventStore =
                         return
                             lock gate (fun () ->
                                 try
-                                    match validateForAppend commonDir integrator events with
-                                    | Error error -> Error(asAppendStorage error)
-                                    | Ok [] -> Ok AppendReceipt.empty
-                                    | Ok fresh ->
-                                        match integrator.PrepareLive fresh with
-                                        | Error reason ->
-                                            Error(AppendError.AppendFailed("integration preparation failed: " + reason))
-                                        | Ok prepared ->
-                                            // Semantic cut/reset facts are part of the same physical append.
-                                            // The caller receives which input events were cut so only that
-                                            // invocation fails; the writer/runtime remains usable.
-                                            ProcessEventLog.append log prepared.DurableEvents
-                                            prepared.Commit ()
-                                            Ok { Cuts = prepared.Cuts }
+                                    appendValidated commonDir integrator log events
                                 with ex ->
                                     Error(AppendError.AppendFailed ex.Message))
                     })

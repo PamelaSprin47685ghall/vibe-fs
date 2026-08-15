@@ -23,6 +23,7 @@ open Wanxiangshu.Strength.Persistence
 
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -102,98 +103,119 @@ module JsMutationFs =
         with _ ->
             false
 
+    let private tryExists (path: string) : bool =
+        try
+            existsSync path
+        with _ ->
+            false
+
+    let private readExistingSnapshot (path: string) (full: string) : Result<string * string option, JsFailure> =
+        try
+            Ok(path, Some(decodeUtf8 (readFileBuffer full)))
+        with _ ->
+            Error(JsFailure.FileReadFailed path)
+
+    let private snapshotOne (resolvePath: string -> string) (path: string) : Result<string * string option, JsFailure> =
+        let full = resolvePath path
+
+        if tryExists full then
+            readExistingSnapshot path full
+        else
+            Ok(path, None)
+
+    let private removeIfPresent (full: string) : unit =
+        if existsSync full then
+            unlinkSync full
+
+    let private writeOrRemove (full: string) (original: string option) : unit =
+        match original with
+        | Some text -> writeFileSync full text
+        | None -> removeIfPresent full
+
+    let private restoreOneQuietly (resolvePath: string -> string) (path: string) (original: string option) : unit =
+        try
+            writeOrRemove (resolvePath path) original
+        with _ ->
+            ()
+
+    let private rollbackApplied (resolvePath: string -> string) (doneList: (string * string option) list) : unit =
+        for (appliedPath, appliedOriginal) in doneList do
+            restoreOneQuietly resolvePath appliedPath appliedOriginal
+
+    let private writeOne
+        (resolvePath: string -> string)
+        (snapshotList: (string * string option) list)
+        (path: string)
+        (newText: string)
+        : Result<string * string option, JsFailure> =
+        let full = resolvePath path
+
+        try
+            writeFileSync full newText
+            Ok(path, snd (List.find (fun (p, _) -> p = path) snapshotList))
+        with _ ->
+            Error JsFailure.TransactionCommitFailed
+
+    let private afterWrite
+        (resolvePath: string -> string)
+        (attempt: Result<string * string option, JsFailure>)
+        (rest: (string * string) list)
+        (doneList: (string * string option) list)
+        (continueApply: (string * string) list -> (string * string option) list -> Result<unit, JsFailure>)
+        : Result<unit, JsFailure> =
+        match attempt with
+        | Ok doneItem -> continueApply rest (doneItem :: doneList)
+        | Error failure ->
+            rollbackApplied resolvePath doneList
+            Error failure
+
+    let private applyWrites
+        (resolvePath: string -> string)
+        (snapshotList: (string * string option) list)
+        (plan: (string * string) list)
+        : Result<unit, JsFailure> =
+        let rec apply (remaining: (string * string) list) (doneList: (string * string option) list) =
+            match remaining with
+            | [] -> Ok()
+            | (path, newText) :: rest ->
+                afterWrite resolvePath (writeOne resolvePath snapshotList path newText) rest doneList apply
+
+        apply plan []
+
     /// JS-013: apply a commit plan under root — two phases. Phase 1 reads every
     /// original snapshot; any read failure aborts BEFORE any write (a target
     /// that cannot be snapshotted cannot be rolled back). Phase 2 writes all
     /// files; a write failure rolls back every already-written path
     /// (rewrites restored, creates removed) — all-or-nothing.
     let commitPlan (root: string) (plan: (string * string) list) : Result<unit, JsFailure> =
-        let resolvePath (path: string) =
-            if pathIsAbsolute path then
-                pathResolve path
-            else
-                pathResolve (pathJoin root path)
+        let resolvePath path = resolveToolPath root path
 
-        // Phase 1 — snapshot every target before touching anything.
-        let snapshots =
-            plan
-            |> List.map (fun (path, _) ->
-                let full = resolvePath path
+        result {
+            let! snapshotList =
+                plan
+                |> List.traverseResultM (fun (path, _) -> snapshotOne resolvePath path)
 
-                let existed =
-                    try
-                        existsSync full
-                    with _ ->
-                        false
+            return! applyWrites resolvePath snapshotList plan
+        }
 
-                if existed then
-                    try
-                        Ok(path, Some(decodeUtf8 (readFileBuffer full)))
-                    with _ ->
-                        Error(JsFailure.FileReadFailed path)
-                else
-                    Ok(path, None))
-
-        match
-            List.tryPick
-                (function
-                | Error failure -> Some failure
-                | Ok _ -> None)
-                snapshots
-        with
-        | Some failure -> Error failure
-        | None ->
-            let snapshotList =
-                snapshots
-                |> List.choose (function
-                    | Ok(path, original) -> Some(path, original)
-                    | Error _ -> None)
-
-            // Phase 2 — write all; roll back on the first failure.
-            let rec apply (remaining: (string * string) list) (doneList: (string * string option) list) =
-                match remaining with
-                | [] -> Ok()
-                | (path, newText) :: rest ->
-                    let full = resolvePath path
-
-                    try
-                        writeFileSync full newText
-                        apply rest ((path, snd (List.find (fun (p, _) -> p = path) snapshotList)) :: doneList)
-                    with _ ->
-                        // roll back everything applied so far
-                        for (appliedPath, appliedOriginal) in doneList do
-                            try
-                                let appliedFull = resolvePath appliedPath
-
-                                match appliedOriginal with
-                                | Some text -> writeFileSync appliedFull text
-                                | None ->
-                                    if existsSync appliedFull then
-                                        unlinkSync appliedFull
-                            with _ ->
-                                ()
-
-                        Error JsFailure.TransactionCommitFailed
-
-            apply plan []
+    let private restorePlanItem (root: string) (path: string) (original: string option) : unit =
+        restoreOneQuietly (resolveToolPath root) path original
 
     /// JS-015: rollback — restore originals / remove creates, reversed order.
     let rollbackPlan (root: string) (plan: (string * string option) list) : unit =
         for (path, original) in plan do
-            try
-                let full =
-                    if pathIsAbsolute path then
-                        pathResolve path
-                    else
-                        pathResolve (pathJoin root path)
+            restorePlanItem root path original
 
-                match original with
-                | Some text -> writeFileSync full text
-                | None ->
-                    if existsSync full then
-                        unlinkSync full
-            with _ ->
-                ()
+    let private applyRestore (full: string) (restoreTo: string option) : unit =
+        match restoreTo with
+        | Some text -> writeFileSync full text
+        | None -> removeIfPresent full
+
+    let private undoMatchingFile (full: string) (restoreTo: string option) : unit =
+        try
+            applyRestore full restoreTo
+        with _ ->
+            ()
 
     /// JS-015: undo one mutation only when the disk still holds the text we
     /// wrote (expectedCurrent). If the file was changed by someone else, or we
@@ -203,13 +225,5 @@ module JsMutationFs =
         let full = resolveToolPath root path
 
         match JsUtf8Fs.readUtf8Classified full with
-        | Ok current when current = expectedCurrent ->
-            try
-                match restoreTo with
-                | Some text -> writeFileSync full text
-                | None ->
-                    if existsSync full then
-                        unlinkSync full
-            with _ ->
-                ()
+        | Ok current when current = expectedCurrent -> undoMatchingFile full restoreTo
         | _ -> ()

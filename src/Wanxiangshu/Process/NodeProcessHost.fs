@@ -108,34 +108,123 @@ module NodeProcessHost =
 
     let notifyExited (child: ChildProcess) = notifyExitedList child.OnExited
 
+    let private assignEnvMap (jsEnv: obj) (envMap: Map<string, string>) =
+        for KeyValue(k, v) in envMap do
+            emitJsExpr (jsEnv, k, v) "$0[$1] = $2" |> ignore
+
     let private buildEnv (envOpt: Map<string, string> option) : obj =
         let jsEnv = processEnv ()
 
         match envOpt with
-        | Some envMap ->
-            for KeyValue(k, v) in envMap do
-                emitJsExpr (jsEnv, k, v) "$0[$1] = $2" |> ignore
+        | Some envMap -> assignEnvMap jsEnv envMap
         | None -> ()
 
         jsEnv
 
     let private cwdValue (cmd: Command) (ctx: ProcessContext) : obj =
-        match cmd.WorkingDirectory with
+        match cmd.WorkingDirectory |> Option.orElse ctx.WorkingDirectory with
         | Some wd -> box wd
-        | None ->
-            match ctx.WorkingDirectory with
-            | Some wd -> box wd
-            | None -> emitJsExpr () "process.cwd()"
+        | None -> emitJsExpr () "process.cwd()"
+
+    let private tryChunkBytes (chunk: obj) : byte[] option =
+        let bytes = if isNull chunk then [||] else toBytes chunk
+
+        if bytes.Length = 0 then
+            None
+        else
+            Some bytes
 
     let private recordChunk (handler: byte[] -> unit) (chunk: obj) =
         try
-            if not (isNull chunk) then
-                let bytes = toBytes chunk
-
-                if bytes.Length > 0 then
-                    handler bytes
+            tryChunkBytes chunk |> Option.iter handler
         with _ ->
             ()
+
+    let private trySpawnChild (cmd: Command) (options: obj) =
+        try
+            spawnChild cmd.FileName (cmd.Arguments |> List.toArray) options
+        with _ ->
+            null
+
+    let private attachStream (stream: obj) (handler: byte[] -> unit) =
+        if not (isNull stream) then
+            emitJsExpr (stream, recordChunk handler) "$0.on('data', $1)" |> ignore
+
+    let private applyStdin (child: obj) (stdin: string option) =
+        match stdin with
+        | Some text -> writeStdinText child text
+        | None -> closeStdin child
+
+    let private killIfStillRunning (exitedRef: bool ref) (child: obj) =
+        if not exitedRef.Value then
+            killProcessGroup child
+
+    let private makeKill (child: obj) =
+        fun () ->
+            try
+                killProcessGroup child
+            with _ ->
+                ()
+
+    let private wireExitHandlers (child: obj) (exitTcs: TaskCompletionSource<int>) (exitedRef: bool ref) (onExited: (unit -> unit) ResizeArray) =
+        emitJsExpr
+            (child,
+             (fun (code: obj) ->
+                 let c = if isNull code then 0 else unbox<int> code
+                 exitedRef.Value <- true
+                 trySetResult exitTcs c |> ignore
+                 notifyExitedList onExited),
+             (fun _err ->
+                 exitedRef.Value <- true
+                 trySetResult exitTcs -1 |> ignore
+                 notifyExitedList onExited))
+            "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
+        |> ignore
+
+    let private assembleChild (child: obj) (onStdout: byte[] -> unit) (onStderr: byte[] -> unit) (cmd: Command) (ct: CancellationToken) =
+        let exitTcs = TaskCompletionSource<int>()
+        let onExited = ResizeArray<unit -> unit>()
+        let exitedRef = ref false
+
+        attachStream (stdoutOf child) onStdout
+        attachStream (stderrOf child) onStderr
+        wireExitHandlers child exitTcs exitedRef onExited
+        applyStdin child cmd.Stdin
+
+        use _ = ct.Register(fun () -> killIfStillRunning exitedRef child)
+
+        { Process = child
+          Exit = exitTcs
+          // EXEC-011: SIGKILL the whole process group, then let
+          // the close handler report the real exit. Marking the
+          // child exited here would let a waiter return before
+          // the process actually died.
+          Kill = makeKill child
+          Exited = exitedRef
+          OnExited = onExited }
+
+    let private spawnOrReject
+        (cmd: Command)
+        (ctx: ProcessContext)
+        (onStdout: byte[] -> unit)
+        (onStderr: byte[] -> unit)
+        (ct: CancellationToken)
+        =
+        task {
+            let options =
+                createObj
+                    [ "env" ==> buildEnv cmd.Environment
+                      "cwd" ==> cwdValue cmd ctx
+                      "detached" ==> true
+                      "stdio" ==> [| "pipe"; "pipe"; "pipe" |] ]
+
+            let child = trySpawnChild cmd options
+
+            if isNull child then
+                return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
+            else
+                return Ok(assembleChild child onStdout onStderr cmd ct)
+        }
 
     let spawn
         (cmd: Command)
@@ -148,75 +237,7 @@ module NodeProcessHost =
             if ct.IsCancellationRequested then
                 return Error "Cancelled before spawn"
             else
-                let options =
-                    createObj
-                        [ "env" ==> buildEnv cmd.Environment
-                          "cwd" ==> cwdValue cmd ctx
-                          "detached" ==> true
-                          "stdio" ==> [| "pipe"; "pipe"; "pipe" |] ]
-
-                let child =
-                    try
-                        spawnChild cmd.FileName (cmd.Arguments |> List.toArray) options
-                    with _ ->
-                        null
-
-                if isNull child then
-                    return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
-                else
-                    let exitTcs = TaskCompletionSource<int>()
-                    let onExited = ResizeArray<unit -> unit>()
-
-                    let stdout = stdoutOf child
-                    let stderr = stderrOf child
-
-                    if not (isNull stdout) then
-                        emitJsExpr (stdout, recordChunk onStdout) "$0.on('data', $1)" |> ignore
-
-                    if not (isNull stderr) then
-                        emitJsExpr (stderr, recordChunk onStderr) "$0.on('data', $1)" |> ignore
-
-                    let exitedRef = ref false
-
-                    emitJsExpr
-                        (child,
-                         (fun (code: obj) ->
-                             let c = if isNull code then 0 else unbox<int> code
-                             exitedRef.Value <- true
-                             trySetResult exitTcs c |> ignore
-                             notifyExitedList onExited),
-                         (fun _err ->
-                             exitedRef.Value <- true
-                             trySetResult exitTcs -1 |> ignore
-                             notifyExitedList onExited))
-                        "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
-                    |> ignore
-
-                    match cmd.Stdin with
-                    | Some text -> writeStdinText child text
-                    | None -> closeStdin child
-
-                    use _ =
-                        ct.Register(fun () ->
-                            if not exitedRef.Value then
-                                killProcessGroup child)
-
-                    return
-                        Ok
-                            { Process = child
-                              Exit = exitTcs
-                              // EXEC-011: SIGKILL the whole process group, then let
-                              // the close handler report the real exit. Marking the
-                              // child exited here would let a waiter return before
-                              // the process actually died.
-                              Kill =
-                                fun () ->
-                                    try
-                                        killProcessGroup child
-                                    with _ ->
-                                        ()
-                              Exited = exitedRef
-                              OnExited = onExited }
+                return! spawnOrReject cmd ctx onStdout onStderr ct
         }
 
     let tempPath () : string =
@@ -230,32 +251,44 @@ module NodeProcessHost =
         if not (isNull data) && data.Length > 0 then
             appendFileSync path data
 
+    let private unlinkIfPresent (path: string) =
+        if not (String.IsNullOrWhiteSpace path) && existsSync path then
+            unlinkSync path
+
     let deleteFile (path: string) : unit =
         try
-            if not (String.IsNullOrWhiteSpace path) && existsSync path then
-                unlinkSync path
+            unlinkIfPresent path
         with _ ->
             ()
 
-    let readFileSyncChunks (path: string) (chunkSize: int) (consume: byte[] -> unit) : unit =
-        let fd = openSync path "r"
+    let private applyReadStep (fd: int) (buffer: byte[]) (chunkSize: int) (position: int) (consume: byte[] -> unit) =
+        let count = readSync fd buffer 0 chunkSize position
+
+        if count <= 0 then
+            struct (position, true)
+        else
+            let chunk = Array.zeroCreate<byte> count
+            Array.blit buffer 0 chunk 0 count
+            consume chunk
+            struct (position + count, false)
+
+    let private drainAllChunks (fd: int) (chunkSize: int) (consume: byte[] -> unit) =
         let buffer = Array.zeroCreate<byte> chunkSize
         // DSL-MUTABLE: buffer — read loop file offset
         let mutable position = 0
         // DSL-MUTABLE: buffer — read loop done flag
         let mutable done' = false
 
-        try
-            while not done' do
-                let count = readSync fd buffer 0 chunkSize position
+        while not done' do
+            let struct (next, finished) = applyReadStep fd buffer chunkSize position consume
+            position <- next
+            done' <- finished
 
-                if count <= 0 then
-                    done' <- true
-                else
-                    let chunk = Array.zeroCreate<byte> count
-                    Array.blit buffer 0 chunk 0 count
-                    consume chunk
-                    position <- position + count
+    let readFileSyncChunks (path: string) (chunkSize: int) (consume: byte[] -> unit) : unit =
+        let fd = openSync path "r"
+
+        try
+            drainAllChunks fd chunkSize consume
         finally
             closeSync fd
 

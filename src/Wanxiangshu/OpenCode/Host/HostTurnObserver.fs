@@ -75,16 +75,167 @@ open Wanxiangshu.Strength
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
 
+    let private notifyBloggerRecovery (sessionId: SessionId) (companion: CompanionHost) =
+        match companion.BloggerSession with
+        | Some bloggerId when bloggerId = sessionId -> companion.StartRecoveryOpportunity() |> ignore
+        | _ -> ()
+
+    let private notifyCompanionsOfRecovery (scope: PluginRuntimeScope) (sessionId: SessionId) =
+        for KeyValue(_, companion) in scope.Sessions.Companions do
+            notifyBloggerRecovery sessionId companion
+
     let private armRecoveryIfEligible (scope: PluginRuntimeScope) isFissionOwner (turn: ReconciledTurn) =
         match isFissionOwner, turn.Outcome with
         | false, (ReconcileProgram.TurnFailed _ | ReconcileProgram.TurnAborted _) ->
             scope.ArmRecovery turn.SessionId
-
-            for KeyValue(_, companion) in scope.Sessions.Companions do
-                match companion.BloggerSession with
-                | Some bloggerId when bloggerId = turn.SessionId -> companion.StartRecoveryOpportunity() |> ignore
-                | _ -> ()
+            notifyCompanionsOfRecovery scope turn.SessionId
         | _ -> ()
+
+    let private dropNeedHelpIfTerminal (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
+        match turn.Outcome with
+        | ReconcileProgram.TurnCompleted
+        | ReconcileProgram.TurnFailed _
+        | ReconcileProgram.TurnAborted _ -> scope.NeedHelpSensor.DropAttempt(turn.SessionId, turn.ProviderRun)
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnInProgress -> ()
+
+    let private failStrengthProjection (scope: PluginRuntimeScope) (error: string) =
+        let reason = "Strength promotion projection failed: " + error
+        scope.Strength.TripStrengthFuse reason
+        raise (InvalidOperationException reason)
+
+    let private failStrengthStorage (scope: PluginRuntimeScope) (error: string) =
+        let reason = "Strength promotion commit storage failure: " + error
+        scope.Strength.TripStrengthFuse reason
+        raise (InvalidOperationException reason)
+
+    let private applyStrengthAppend (scope: PluginRuntimeScope) (result: StrengthDurableAppend) =
+        match result with
+        | StrengthDurableAppend.Applied -> ()
+        | StrengthDurableAppend.SemanticRejected error ->
+            // Durable cut-tail already isolated this one event. Do not
+            // fuse Strength or poison future attempts.
+            Diagnostic.emit "strength-semantic-cut" [ "result", error ]
+        | StrengthDurableAppend.StorageFailed error -> failStrengthStorage scope error
+
+    let private commitStrengthEvent
+        (durability: StrengthDurabilityPort)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        (projection: StrengthProjection)
+        : Task =
+        task {
+            match StrengthLifecycle.reconcileEvent projection turn with
+            | None -> return ()
+            | Some event ->
+                let! appendResult = durability.Append event
+                return applyStrengthAppend scope appendResult
+        }
+
+    let private loadAndCommitStrength
+        (durability: StrengthDurabilityPort)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        : Task =
+        task {
+            match! durability.LoadProjection() with
+            | Error error -> return failStrengthProjection scope error
+            | Ok projection -> return! commitStrengthEvent durability scope turn projection
+        }
+
+    let private observeStrengthDurability
+        (strengthDurability: StrengthDurabilityPort option)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        : Task =
+        task {
+            match strengthDurability with
+            | None -> return ()
+            | Some durability -> return! loadAndCommitStrength durability scope turn
+        }
+
+    let private isDurableFissionOwner (journal: AgentJournal option) (sessionId: SessionId) =
+        journal
+        |> Option.exists (fun durable ->
+            FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
+            |> Option.isSome)
+
+    let private isFissionOwnerSession (journal: AgentJournal option) (sessionId: SessionId) =
+        FissionRuntime.isSilentInterrupt sessionId
+        || isDurableFissionOwner journal sessionId
+
+    let private observeFamilyReady
+        (recoveryTimerPort: ITimerPort)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (reviewerContinuationPort: ReviewerContinuationPort)
+        (context: ReconciledTurnContext)
+        : Task =
+        task {
+            let turn = context.Turn
+            let isFissionOwner = isFissionOwnerSession journal turn.SessionId
+            armRecoveryIfEligible scope isFissionOwner turn
+            do! XWire.reconcileAttempt journal scope turn
+            TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
+
+            let! fissionHandled =
+                FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn
+
+            if not isFissionOwner && not fissionHandled then
+                // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+                // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                do!
+                    TurnWorkflow.observe
+                        recoveryTimerPort
+                        Pty.abortParent
+                        sessionPort
+                        eventPort
+                        journal
+                        scope.SyncDelegateRuntime
+                        reviewerContinuationPort
+                        scope.Sessions.NudgeSent
+                        scope.Sessions.JoinGuardNudges
+                        scope.HasLivePty
+                        scope.Sessions.AbortedSessions
+                        (Some scope.LoopSensor)
+                        scope.Sessions.Quiescence
+                        context
+        }
+
+    let private observeAfterStrength
+        (recoveryTimerPort: ITimerPort)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (reviewerContinuationPort: ReviewerContinuationPort)
+        (context: ReconciledTurnContext)
+        : Task =
+        task {
+            let turn = context.Turn
+            // RECOVERY-FAMILY: family recovery before business effects of a turn.
+            let! recovery = scope.EnsureRecoveryDone turn.SessionId
+
+            match recovery with
+            | FamilyRecovery.FamilyBlocked _ ->
+                // Fail closed: definitive block → no business effects.
+                return ()
+            | FamilyRecovery.FamilyWaiting _
+            | FamilyRecovery.FamilyReady _ ->
+                // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
+                // block. Bounded-context workflows still observe the terminal.
+                return!
+                    observeFamilyReady
+                        recoveryTimerPort
+                        sessionPort
+                        eventPort
+                        journal
+                        scope
+                        reviewerContinuationPort
+                        context
+        }
 
     let observe
         (recoveryTimerPort: ITimerPort)
@@ -121,13 +272,7 @@ module HostTurnObserver =
                 |> ignore
 
                 return ()
-            | AssistanceTurnDisposition.NotAssistance ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnCompleted
-                | ReconcileProgram.TurnFailed _
-                | ReconcileProgram.TurnAborted _ -> scope.NeedHelpSensor.DropAttempt(turn.SessionId, turn.ProviderRun)
-                | ReconcileProgram.TurnNeedsContinuation _
-                | ReconcileProgram.TurnInProgress -> ()
+            | AssistanceTurnDisposition.NotAssistance -> dropNeedHelpIfTerminal scope turn
 
             let strengthHandled =
                 scope.Strength.StrengthReplicaRuntime
@@ -154,76 +299,15 @@ module HostTurnObserver =
                 // continuation can be admitted. This writer is independent
                 // of rollout/fuse state because a provider may already have
                 // consumed a durable Candidate.
-                match strengthDurability with
-                | None -> ()
-                | Some durability ->
-                    match! durability.LoadProjection() with
-                    | Error error ->
-                        let reason = "Strength promotion projection failed: " + error
-                        scope.Strength.TripStrengthFuse reason
-                        raise (InvalidOperationException reason)
-                    | Ok projection ->
-                        match StrengthLifecycle.reconcileEvent projection turn with
-                        | None -> ()
-                        | Some event ->
-                            match! durability.Append event with
-                            | StrengthDurableAppend.Applied -> ()
-                            | StrengthDurableAppend.SemanticRejected error ->
-                                // Durable cut-tail already isolated this one event. Do not
-                                // fuse Strength or poison future attempts.
-                                Diagnostic.emit "strength-semantic-cut" [ "result", error ]
-                            | StrengthDurableAppend.StorageFailed error ->
-                                let reason = "Strength promotion commit storage failure: " + error
-                                scope.Strength.TripStrengthFuse reason
-                                raise (InvalidOperationException reason)
+                do! observeStrengthDurability strengthDurability scope turn
 
-                // RECOVERY-FAMILY: family recovery before business effects of a turn.
-                let! recovery = scope.EnsureRecoveryDone turn.SessionId
-
-                match recovery with
-                | FamilyRecovery.FamilyBlocked _ ->
-                    // Fail closed: definitive block → no business effects.
-                    ()
-                | FamilyRecovery.FamilyWaiting _
-                | FamilyRecovery.FamilyReady _ ->
-                    // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
-                    // block. Bounded-context workflows still observe the terminal.
-
-                    let durableFissionReplacement =
+                return!
+                    observeAfterStrength
+                        recoveryTimerPort
+                        sessionPort
+                        eventPort
                         journal
-                        |> Option.exists (fun durable ->
-                            FissionProjection.tryActiveForOwner
-                                turn.SessionId
-                                (AgentJournal.snapshot durable).AgentProjections.Fission
-                            |> Option.isSome)
-
-                    let isFissionOwner =
-                        FissionRuntime.isSilentInterrupt turn.SessionId || durableFissionReplacement
-
-                    armRecoveryIfEligible scope isFissionOwner turn
-                    do! XWire.reconcileAttempt journal scope turn
-                    TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
-
-                    let! fissionHandled =
-                        FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn
-
-                    if not isFissionOwner && not fissionHandled then
-                        // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                        // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
-                        do!
-                            TurnWorkflow.observe
-                                recoveryTimerPort
-                                Pty.abortParent
-                                sessionPort
-                                eventPort
-                                journal
-                                scope.SyncDelegateRuntime
-                                reviewerContinuationPort
-                                scope.Sessions.NudgeSent
-                                scope.Sessions.JoinGuardNudges
-                                scope.HasLivePty
-                                scope.Sessions.AbortedSessions
-                                (Some scope.LoopSensor)
-                                scope.Sessions.Quiescence
-                                context
+                        scope
+                        reviewerContinuationPort
+                        context
         }

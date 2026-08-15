@@ -8,6 +8,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -83,54 +84,77 @@ module StrengthReplicaTransform =
             | _ -> None)
         |> Map.ofList
 
+    let private isPendingToolPart (part: SessionToolPart) =
+        match part.State with
+        | SnapshotToolPartState.Pending -> true
+        | _ -> false
+
+    let private hasPendingTool (toolParts: SessionToolPart list) =
+        toolParts |> List.exists isPendingToolPart
+
+    let private exchangeOfPart (results: Map<string, string>) (part: SessionToolPart) =
+        Map.tryFind (ToolCallId.value part.ToolCallId) results
+        |> Option.map (fun result ->
+            { ToolName = part.ToolName.Trim().ToLowerInvariant()
+              CanonicalArguments = part.InputCanonical
+              CanonicalResult = result })
+
+    [<RequireQualifiedAccess>]
+    type private HostBatchStep =
+        | Skip
+        | Stop
+        | Take of StrengthRequestBatch
+
+    let private classifyAssistantBatch
+        (requestOrdinal: int)
+        (rawMessage: obj)
+        (message: SessionMessage)
+        : HostBatchStep =
+        let toolParts = message.ToolParts |> Array.toList
+        let results = providerResultsByCallId rawMessage
+        let exchanges = toolParts |> List.choose (exchangeOfPart results)
+
+        if List.isEmpty toolParts then
+            HostBatchStep.Stop
+        elif hasPendingTool toolParts then
+            HostBatchStep.Stop
+        elif Map.count results <> List.length toolParts then
+            HostBatchStep.Stop
+        elif List.length exchanges <> List.length toolParts then
+            HostBatchStep.Stop
+        else
+            HostBatchStep.Take
+                { RequestOrdinal = requestOrdinal + 1
+                  Exchanges = exchanges }
+
+    let private classifyHostMessage (requestOrdinal: int) (rawMessage: obj) : HostBatchStep =
+        match SessionSnapshotPort.projectMessage rawMessage with
+        | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
+            classifyAssistantBatch requestOrdinal rawMessage message
+        | _ -> HostBatchStep.Skip
+
+    let rec private continueHostBatch
+        (remaining: obj list)
+        (requestOrdinal: int)
+        (collected: StrengthRequestBatch list)
+        : StrengthRequestBatch list =
+        match remaining with
+        | [] -> List.rev collected
+        | rawMessage :: tail -> stepHostBatch tail requestOrdinal collected rawMessage
+
+    and private stepHostBatch
+        (tail: obj list)
+        (requestOrdinal: int)
+        (collected: StrengthRequestBatch list)
+        (rawMessage: obj)
+        : StrengthRequestBatch list =
+        match classifyHostMessage requestOrdinal rawMessage with
+        | HostBatchStep.Skip -> continueHostBatch tail requestOrdinal collected
+        | HostBatchStep.Stop -> List.rev collected
+        | HostBatchStep.Take batch -> continueHostBatch tail batch.RequestOrdinal (batch :: collected)
+
     let private collectHostCompleteBatches (rawMessages: obj list) : StrengthRequestBatch list =
-        let rec loop remaining requestOrdinal collected =
-            match remaining with
-            | [] -> List.rev collected
-            | rawMessage :: tail ->
-                match SessionSnapshotPort.projectMessage rawMessage with
-                | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
-                    let toolParts = message.ToolParts |> Array.toList
-
-                    if List.isEmpty toolParts then
-                        List.rev collected
-                    elif
-                        toolParts
-                        |> List.exists (fun part ->
-                            match part.State with
-                            | SnapshotToolPartState.Pending -> true
-                            | _ -> false)
-                    then
-                        List.rev collected
-                    else
-                        let results = providerResultsByCallId rawMessage
-
-                        if Map.count results <> List.length toolParts then
-                            List.rev collected
-                        else
-                            let exchanges =
-                                toolParts
-                                |> List.choose (fun part ->
-                                    Map.tryFind (ToolCallId.value part.ToolCallId) results
-                                    |> Option.map (fun result ->
-                                        { ToolName = part.ToolName.Trim().ToLowerInvariant()
-                                          CanonicalArguments = part.InputCanonical
-                                          CanonicalResult = result }))
-
-                            if List.length exchanges <> List.length toolParts then
-                                List.rev collected
-                            else
-                                let nextOrdinal = requestOrdinal + 1
-
-                                loop
-                                    tail
-                                    nextOrdinal
-                                    ({ RequestOrdinal = nextOrdinal
-                                       Exchanges = exchanges }
-                                     :: collected)
-                | _ -> loop tail requestOrdinal collected
-
-        loop rawMessages 0 []
+        continueHostBatch rawMessages 0 []
 
     let private snapshotOf wire =
         { CurrentProjection = ProviderProjection.toSemantic wire
@@ -138,6 +162,211 @@ module StrengthReplicaTransform =
           BlogFrames = []
           TransportMessages = Set.empty
           HostReanchor = None }
+
+    let private batchesForReplica (rawMessages: obj list) (currentWire: ProviderProjection.ProviderWireProjection) =
+        let hostBatches = collectHostCompleteBatches rawMessages
+
+        if List.isEmpty hostBatches then
+            StrengthBatchCollector.collectCompleteBatches currentWire.Messages
+        else
+            hostBatches
+
+    let private localFrameOf
+        (sha256: string -> string)
+        (binding: StrengthReplicaBinding)
+        (batches: StrengthRequestBatch list)
+        : Result<StrengthFrameBundle option, StrengthFrameError> =
+        match batches with
+        | [] -> Ok None
+        | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
+
+    let private replicaIntents
+        (binding: StrengthReplicaBinding)
+        (frame: StrengthFrameBundle option)
+        : ProjectionIntent list =
+        [ yield
+              ProjectionIntent.useStrengthMirror
+                  binding.DecisionId
+                  binding.TargetProviderRun
+                  binding.SemanticDigest
+                  binding.LocalizedMirrorMessages
+          match frame with
+          | Some bundle ->
+              yield
+                  ProjectionIntent.strengthReplicaLocal
+                      binding.OwnerSessionId
+                      binding.DecisionId
+                      bundle
+          | None -> () ]
+
+    let private retireWith
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replicaSessionId: SessionId)
+        (reason: string)
+        (batches: StrengthRequestBatch list)
+        : Task<StrengthReplicaTransformOutcome> =
+        task {
+            runtime.Retire replicaSessionId |> ignore
+            let! _ = sessions.AbortSession replicaSessionId
+            return StrengthReplicaTransformOutcome.Retired(reason, batches)
+        }
+
+    let private applyPlanned
+        (sha256: string -> string)
+        (sessionIdText: string)
+        (output: obj)
+        (currentWire: ProviderProjection.ProviderWireProjection)
+        (ordered: ProjectionIntent list)
+        (batches: StrengthRequestBatch list)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replicaSessionId: SessionId)
+        : Task<StrengthReplicaTransformOutcome> =
+        let rendered =
+            ProjectionRenderer.renderMessagesWithHostIds
+                sha256
+                (snapshotOf currentWire)
+                currentWire.Messages
+                ordered
+
+        match ProjectionMessageEdit.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered with
+        | Error error -> retireWith runtime sessions replicaSessionId error batches
+        | Ok replacement ->
+            task {
+                HostMessageProjection.replaceMessagesInPlace output replacement
+                return StrengthReplicaTransformOutcome.Ready batches
+            }
+
+    let private applyWithFrame
+        (sha256: string -> string)
+        (binding: StrengthReplicaBinding)
+        (sessionIdText: string)
+        (output: obj)
+        (currentWire: ProviderProjection.ProviderWireProjection)
+        (frame: StrengthFrameBundle option)
+        (batches: StrengthRequestBatch list)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replicaSessionId: SessionId)
+        : Task<StrengthReplicaTransformOutcome> =
+        match ProjectionPlanner.plan (replicaIntents binding frame) with
+        | Error conflict ->
+            retireWith
+                runtime
+                sessions
+                replicaSessionId
+                (sprintf "projection-conflict:%A" conflict)
+                batches
+        | Ok ordered ->
+            applyPlanned
+                sha256
+                sessionIdText
+                output
+                currentWire
+                ordered
+                batches
+                runtime
+                sessions
+                replicaSessionId
+
+    let private applyUnderBudget
+        (sha256: string -> string)
+        (binding: StrengthReplicaBinding)
+        (sessionIdText: string)
+        (output: obj)
+        (currentWire: ProviderProjection.ProviderWireProjection)
+        (batches: StrengthRequestBatch list)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replicaSessionId: SessionId)
+        : Task<StrengthReplicaTransformOutcome> =
+        match localFrameOf sha256 binding batches with
+        | Error error ->
+            retireWith
+                runtime
+                sessions
+                replicaSessionId
+                (sprintf "invalid-replica-frame:%A" error)
+                batches
+        | Ok frame ->
+            applyWithFrame
+                sha256
+                binding
+                sessionIdText
+                output
+                currentWire
+                frame
+                batches
+                runtime
+                sessions
+                replicaSessionId
+
+    let private applyBatches
+        (sha256: string -> string)
+        (binding: StrengthReplicaBinding)
+        (sessionIdText: string)
+        (output: obj)
+        (currentWire: ProviderProjection.ProviderWireProjection)
+        (batches: StrengthRequestBatch list)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replicaSessionId: SessionId)
+        : Task<StrengthReplicaTransformOutcome> =
+        if List.length batches >= StrengthBudget.requestLimit binding.Budget then
+            retireWith runtime sessions replicaSessionId "provider-request-budget-reached" batches
+        else
+            applyUnderBudget
+                sha256
+                binding
+                sessionIdText
+                output
+                currentWire
+                batches
+                runtime
+                sessions
+                replicaSessionId
+
+    let private applyWithBinding
+        (sha256: string -> string)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (output: obj)
+        (binding: StrengthReplicaBinding)
+        (sessionIdText: string)
+        (replicaSessionId: SessionId)
+        : Task<StrengthReplicaTransformOutcome> =
+        task {
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+            let currentWire = ProviderWireCapture.decodeMessageView rawMessages
+            let batches = batchesForReplica rawMessages currentWire
+
+            return!
+                applyBatches
+                    sha256
+                    binding
+                    sessionIdText
+                    output
+                    currentWire
+                    batches
+                    runtime
+                    sessions
+                    replicaSessionId
+        }
+
+    let private applyWithSessionId
+        (sha256: string -> string)
+        (runtime: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (output: obj)
+        (sessionIdText: string)
+        : Task<StrengthReplicaTransformOutcome> =
+        let replicaSessionId = SessionId.create sessionIdText
+
+        match runtime.TryFindByReplica replicaSessionId with
+        | None -> task { return StrengthReplicaTransformOutcome.NotReplica }
+        | Some binding ->
+            applyWithBinding sha256 runtime sessions output binding sessionIdText replicaSessionId
 
     let apply
         (sha256: string -> string)
@@ -148,87 +377,5 @@ module StrengthReplicaTransform =
         task {
             match ProviderWireDecode.projectionSessionIdFromMessages output with
             | None -> return StrengthReplicaTransformOutcome.NotReplica
-            | Some sessionIdText ->
-                let replicaSessionId = SessionId.create sessionIdText
-
-                match runtime.TryFindByReplica replicaSessionId with
-                | None -> return StrengthReplicaTransformOutcome.NotReplica
-                | Some binding ->
-                    let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
-                    let currentWire = ProviderWireCapture.decodeMessageView rawMessages
-                    let hostBatches = collectHostCompleteBatches rawMessages
-
-                    let batches =
-                        if List.isEmpty hostBatches then
-                            StrengthBatchCollector.collectCompleteBatches currentWire.Messages
-                        else
-                            hostBatches
-
-                    let completed = List.length batches
-
-                    if completed >= StrengthBudget.requestLimit binding.Budget then
-                        runtime.Retire replicaSessionId |> ignore
-                        let! _ = sessions.AbortSession replicaSessionId
-                        return StrengthReplicaTransformOutcome.Retired("provider-request-budget-reached", batches)
-                    else
-                        let localFrame =
-                            match batches with
-                            | [] -> Ok None
-                            | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
-
-                        match localFrame with
-                        | Error error ->
-                            runtime.Retire replicaSessionId |> ignore
-                            let! _ = sessions.AbortSession replicaSessionId
-
-                            return
-                                StrengthReplicaTransformOutcome.Retired(
-                                    sprintf "invalid-replica-frame:%A" error,
-                                    batches
-                                )
-                        | Ok frame ->
-                            let intents =
-                                [ yield
-                                      ProjectionIntent.useStrengthMirror
-                                          binding.DecisionId
-                                          binding.TargetProviderRun
-                                          binding.SemanticDigest
-                                          binding.LocalizedMirrorMessages
-                                  match frame with
-                                  | Some bundle ->
-                                      yield
-                                          ProjectionIntent.strengthReplicaLocal
-                                              binding.OwnerSessionId
-                                              binding.DecisionId
-                                              bundle
-                                  | None -> () ]
-
-                            match ProjectionPlanner.plan intents with
-                            | Error conflict ->
-                                runtime.Retire replicaSessionId |> ignore
-                                let! _ = sessions.AbortSession replicaSessionId
-
-                                return
-                                    StrengthReplicaTransformOutcome.Retired(
-                                        sprintf "projection-conflict:%A" conflict,
-                                        batches
-                                    )
-                            | Ok ordered ->
-                                let rendered =
-                                    ProjectionRenderer.renderMessagesWithHostIds
-                                        sha256
-                                        (snapshotOf currentWire)
-                                        currentWire.Messages
-                                        ordered
-
-                                match
-                                    ProjectionMessageEdit.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered
-                                with
-                                | Error error ->
-                                    runtime.Retire replicaSessionId |> ignore
-                                    let! _ = sessions.AbortSession replicaSessionId
-                                    return StrengthReplicaTransformOutcome.Retired(error, batches)
-                                | Ok replacement ->
-                                    HostMessageProjection.replaceMessagesInPlace output replacement
-                                    return StrengthReplicaTransformOutcome.Ready batches
+            | Some sessionIdText -> return! applyWithSessionId sha256 runtime sessions output sessionIdText
         }

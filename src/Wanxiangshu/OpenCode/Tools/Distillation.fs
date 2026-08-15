@@ -121,6 +121,41 @@ module Distillation =
             (changed, PtyTiming.timerTask remainingMs)
             "Promise.race([$0.then(function(){return!0}),$1.then(function(){return!1})])"
 
+    type private AwaitStep =
+        | Completed of RunCompletion
+        | Retry
+        | GiveUp
+
+    let private raiseAwaitTimeout () =
+        raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
+
+    let private remainingMs (deadline: DateTimeOffset) =
+        int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
+
+    let private onTimedOut (runtime: IDistillationRuntime) fromRevision (deadline: DateTimeOffset) =
+        task {
+            let remaining = remainingMs deadline
+
+            if remaining <= 0 then
+                return GiveUp
+            else
+                let changed = runtime.AwaitJournalChangeFrom fromRevision
+                let! journalAdvanced = awaitJournalAdvanceOrDeadline changed remaining
+                return (if journalAdvanced then Retry else GiveUp)
+        }
+
+    let private stepJoin (runtime: IDistillationRuntime) fromRevision deadline joined =
+        match joined with
+        | Ok completion -> Task.FromResult(Completed completion)
+        | Error ForkError.TimedOut -> onTimedOut runtime fromRevision deadline
+        | Error error -> raise (InvalidOperationException(error.ToString()))
+
+    let private applyAwaitStep (step: AwaitStep) (retry: unit -> Task<RunCompletion>) =
+        match step with
+        | Completed completion -> Task.FromResult completion
+        | Retry -> retry ()
+        | GiveUp -> raiseAwaitTimeout ()
+
     /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
     /// FamilyWaiting → ForkError.TimedOut: wait for a journal advance within one deadline.
     /// FamilyBlocked / real join timeout → ForkError.NotFound: hard fail, no retry.
@@ -129,30 +164,15 @@ module Distillation =
 
         let rec loop () : Task<RunCompletion> =
             task {
-                let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
+                let remaining = remainingMs deadline
 
-                if remainingMs <= 0 then
-                    return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
+                if remaining <= 0 then
+                    return raiseAwaitTimeout ()
                 else
                     let fromRevision = runtime.CurrentJournalRevision()
-                    let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
-
-                    match joined with
-                    | Ok completion -> return completion
-                    | Error ForkError.TimedOut ->
-                        let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
-
-                        if remainingMs <= 0 then
-                            return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
-                        else
-                            let changed = runtime.AwaitJournalChangeFrom fromRevision
-                            let! journalAdvanced = awaitJournalAdvanceOrDeadline changed remainingMs
-
-                            if journalAdvanced then
-                                return! loop ()
-                            else
-                                return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
-                    | Error error -> return raise (InvalidOperationException(error.ToString()))
+                    let! joined = runtime.AwaitAgentWithPermit(agentId, Some remaining)
+                    let! step = stepJoin runtime fromRevision deadline joined
+                    return! applyAwaitStep step loop
             }
 
         loop ()
@@ -215,15 +235,21 @@ module Distillation =
             (mergeDistillationsPrompt lang)
             (Some combined)
 
+    let private ensureRoot (levels: ResizeArray<ResizeArray<string>>) =
+        if levels.Count = 0 then
+            levels.Add(ResizeArray())
+
+    let private ensureLevel (levels: ResizeArray<ResizeArray<string>>) index =
+        if levels.Count <= index then
+            levels.Add(ResizeArray())
+
     let private rippleInsert
         (mergeDistillations: int -> string list -> Task<string>)
         (levels: ResizeArray<ResizeArray<string>>)
         (summary: string)
         =
         task {
-            if levels.Count = 0 then
-                levels.Add(ResizeArray())
-
+            ensureRoot levels
             levels.[0].Add summary
             // DSL-MUTABLE: algorithm-scratch — online reduce level index
             let mutable lvl = 0
@@ -232,12 +258,54 @@ module Distillation =
                 let batch = levels.[lvl] |> Seq.toList
                 levels.[lvl].Clear()
                 let! reduced = mergeDistillations (lvl + 1) batch
-
-                if levels.Count <= lvl + 1 then
-                    levels.Add(ResizeArray())
-
+                ensureLevel levels (lvl + 1)
                 levels.[lvl + 1].Add reduced
                 lvl <- lvl + 1
+        }
+
+    let private reduceBatch
+        (mergeDistillations: int -> string list -> Task<string>)
+        (levelIndex: int)
+        (isLast: bool)
+        (batch: string list)
+        (carry: string list)
+        =
+        task {
+            match batch with
+            | [] -> return carry
+            | [ single ] when isLast -> return [ single ]
+            | _ ->
+                let! reduced = mergeDistillations (levelIndex + 1) batch
+                return [ reduced ]
+        }
+
+    let private foldLevel
+        (mergeDistillations: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        (index: int)
+        (carry: string list)
+        =
+        let batch = carry @ (levels.[index] |> Seq.toList)
+        reduceBatch mergeDistillations index (index = levels.Count - 1) batch carry
+
+    let private foldCarry (carry: string list) =
+        match carry with
+        | [ single ] -> single
+        | _ -> ""
+
+    let private foldNonEmpty
+        (mergeDistillations: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        =
+        task {
+            // DSL-MUTABLE: algorithm-scratch — online reduce carry list
+            let mutable carry: string list = []
+
+            for i in 0 .. levels.Count - 1 do
+                let! next = foldLevel mergeDistillations levels i carry
+                carry <- next
+
+            return foldCarry carry
         }
 
     let private foldLevels
@@ -248,22 +316,7 @@ module Distillation =
             if levels.Count = 0 then
                 return ""
             else
-                // DSL-MUTABLE: algorithm-scratch — online reduce carry list
-                let mutable carry: string list = []
-
-                for i in 0 .. levels.Count - 1 do
-                    let batch = carry @ (levels.[i] |> Seq.toList)
-
-                    match batch with
-                    | [] -> ()
-                    | [ single ] when i = levels.Count - 1 -> carry <- [ single ]
-                    | _ ->
-                        let! reduced = mergeDistillations (i + 1) batch
-                        carry <- [ reduced ]
-
-                match carry with
-                | [ single ] -> return single
-                | _ -> return ""
+                return! foldNonEmpty mergeDistillations levels
         }
 
     let reduceOnline (mergeDistillations: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
@@ -287,6 +340,80 @@ module Distillation =
             ProviderProse.render lang Path.CondensationUnavailable (Map [ "raw_tail", rawTail ])
         else
             ProviderProse.render lang Path.CondensationIncomplete (Map [ "account", account; "raw_tail", rawTail ])
+
+    let private noteMapResult
+        (cancelOwned: unit -> unit)
+        (mapped: Choice<int * string, int * byte[] * string>[])
+        (index: int)
+        (result: Choice<int * string, int * byte[] * string>)
+        =
+        mapped.[index] <- result
+
+        match result with
+        | Choice2Of2 _ -> cancelOwned ()
+        | Choice1Of2 _ -> ()
+
+    let private awaitMapTasks
+        (cancelOwned: unit -> unit)
+        (mapTasks: Task<Choice<int * string, int * byte[] * string>>[])
+        =
+        task {
+            let mapped = Array.zeroCreate mapTasks.Length
+
+            for i in 0 .. mapTasks.Length - 1 do
+                let! result = mapTasks.[i]
+                noteMapResult cancelOwned mapped i result
+
+            return mapped
+        }
+
+    let private reduceMapped
+        (merge: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        (successes: (int * string)[])
+        =
+        task {
+            for _, summary in successes do
+                do! rippleInsert merge levels summary
+
+            return! foldLevels merge levels
+        }
+
+    let private finishDistill
+        (cancelOwned: unit -> unit)
+        (lang: ProviderLanguage)
+        (reduced: string)
+        (rawTail: string)
+        (failureCount: int)
+        =
+        if failureCount = 0 then
+            reduced
+        else
+            cancelOwned ()
+            partialWithTail lang reduced rawTail
+
+    let private reduceOrPartial
+        (cancelOwned: unit -> unit)
+        (merge: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        (successes: (int * string)[])
+        (failures: (int * byte[] * string)[])
+        (lang: ProviderLanguage)
+        (chunks: ResizeArray<int * byte[]>)
+        =
+        task {
+            try
+                let! reduced = reduceMapped merge levels successes
+                return finishDistill cancelOwned lang reduced (rawTailText chunks) failures.Length
+            with ex ->
+                cancelOwned ()
+
+                return
+                    ProviderProse.render
+                        lang
+                        Path.CondensationFailed
+                        (Map [ "error", ex.Message; "raw_tail", rawTailText chunks ])
+        }
 
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial account plus the
@@ -322,15 +449,7 @@ module Distillation =
                                return Choice2Of2(chunkIndex, chunk, ex.Message)
                        } |]
 
-            let mapped = Array.zeroCreate mapTasks.Length
-
-            for i in 0 .. mapTasks.Length - 1 do
-                let! result = mapTasks.[i]
-                mapped.[i] <- result
-
-                match result with
-                | Choice2Of2 _ -> cancelOwned ()
-                | Choice1Of2 _ -> ()
+            let! mapped = awaitMapTasks cancelOwned mapTasks
 
             let successes =
                 mapped
@@ -347,25 +466,5 @@ module Distillation =
 
             let levels = ResizeArray<ResizeArray<string>>()
             let merge = mergeDistillations runtime forkedIds lang
-
-            try
-                for _, summary in successes do
-                    do! rippleInsert merge levels summary
-
-                let! reduced = foldLevels merge levels
-                let rawTail = rawTailText chunks
-
-                if failures.Length = 0 then
-                    return reduced
-                else
-                    cancelOwned ()
-                    return partialWithTail lang reduced rawTail
-            with ex ->
-                cancelOwned ()
-
-                return
-                    ProviderProse.render
-                        lang
-                        Path.CondensationFailed
-                        (Map [ "error", ex.Message; "raw_tail", rawTailText chunks ])
+            return! reduceOrPartial cancelOwned merge levels successes failures lang chunks
         }

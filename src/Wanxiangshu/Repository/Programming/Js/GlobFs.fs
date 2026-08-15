@@ -23,6 +23,7 @@ open Wanxiangshu.Strength.Persistence
 
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -106,19 +107,28 @@ module JsGlobFs =
 
         go (List.ofSeq inner) 0 "" []
 
+    type private BraceScan =
+        | BraceDone of (string * string list * string) option
+        | BraceNext of i: int * depth: int * start: int
+
+    let private braceCharStep (s: string) (i: int) (depth: int) (start: int) : BraceScan =
+        match s.[i] with
+        | '{' when depth = 0 -> BraceNext(i + 1, 1, i)
+        | '{' -> BraceNext(i + 1, depth + 1, start)
+        | '}' when depth = 1 && start >= 0 ->
+            let inner = s.Substring(start + 1, i - start - 1)
+            BraceDone(Some(s.Substring(0, start), splitTopCommas inner, s.Substring(i + 1)))
+        | '}' when depth > 1 -> BraceNext(i + 1, depth - 1, start)
+        | _ -> BraceNext(i + 1, depth, start)
+
     let private findBraceGroup (s: string) : (string * string list * string) option =
         let rec scan (i: int) (depth: int) (start: int) =
-            if i >= s.Length then
-                None
-            else
-                match s.[i] with
-                | '{' when depth = 0 -> scan (i + 1) 1 i
-                | '{' -> scan (i + 1) (depth + 1) start
-                | '}' when depth = 1 && start >= 0 ->
-                    let inner = s.Substring(start + 1, i - start - 1)
-                    Some(s.Substring(0, start), splitTopCommas inner, s.Substring(i + 1))
-                | '}' when depth > 1 -> scan (i + 1) (depth - 1) start
-                | _ -> scan (i + 1) depth start
+            if i >= s.Length then None else continueBraceScan i depth start
+
+        and continueBraceScan (i: int) (depth: int) (start: int) =
+            match braceCharStep s i depth start with
+            | BraceDone result -> result
+            | BraceNext(i', depth', start') -> scan i' depth' start'
 
         scan 0 0 -1
 
@@ -135,19 +145,17 @@ module JsGlobFs =
             | '*' :: '*' :: rest -> convert rest (acc + ".*")
             | '*' :: rest -> convert rest (acc + "[^/]*")
             | '?' :: rest -> convert rest (acc + "[^/]")
-            | '[' :: rest ->
-                let rec takeClass (xs: char list) (buf: string) (count: int) : Result<string, JsFailure> =
-                    match xs with
-                    | [] -> Error JsFailure.AnchorInvalidPattern
-                    | ']' :: more when count > 0 -> convert more (acc + "[" + buf + "]")
-                    | '!' :: more when count = 0 -> takeClass more "^" 1
-                    | c :: more ->
-                        let piece = if c = '\\' then "\\\\" else string c
-
-                        takeClass more (buf + piece) (count + 1)
-
-                takeClass rest "" 0
+            | '[' :: rest -> takeClass rest "" 0 acc
             | c :: rest -> convert rest (acc + System.Text.RegularExpressions.Regex.Escape(string c))
+
+        and takeClass (xs: char list) (buf: string) (count: int) (acc: string) : Result<string, JsFailure> =
+            match xs with
+            | [] -> Error JsFailure.AnchorInvalidPattern
+            | ']' :: more when count > 0 -> convert more (acc + "[" + buf + "]")
+            | '!' :: more when count = 0 -> takeClass more "^" 1 acc
+            | c :: more ->
+                let piece = if c = '\\' then "\\\\" else string c
+                takeClass more (buf + piece) (count + 1) acc
 
         if System.String.IsNullOrEmpty pattern then
             Error JsFailure.AnchorInvalidPattern
@@ -173,23 +181,24 @@ module JsGlobFs =
         if System.String.IsNullOrEmpty pattern then
             Error JsFailure.AnchorInvalidPattern
         else
-            let rec go remaining acc =
-                match remaining with
-                | [] -> Ok(List.rev acc |> List.toArray)
-                | piece :: rest ->
-                    match compilePathPattern piece with
-                    | Error failure -> Error failure
-                    | Ok re -> go rest (re :: acc)
+            expandBraces pattern
+            |> List.traverseResultM compilePathPattern
+            |> Result.map Array.ofList
 
-            go (expandBraces pattern) []
+    let private parseIgnoreBody (baseRel: string) (negated: bool) (body: string) : IgnoreRule option =
+        let directoryOnly = body.EndsWith("/")
+        let spec = if directoryOnly then body.Substring(0, body.Length - 1) else body
+
+        compilePathPattern spec
+        |> Result.toOption
+        |> Option.map (fun re ->
+            { Base = baseRel
+              Regex = re
+              Negated = negated
+              DirectoryOnly = directoryOnly })
 
     let private parseIgnoreLine (baseRel: string) (raw: string) : IgnoreRule option =
-        let line =
-            if raw.EndsWith("\r") then
-                raw.Substring(0, raw.Length - 1)
-            else
-                raw
-
+        let line = if raw.EndsWith("\r") then raw.Substring(0, raw.Length - 1) else raw
         let trimmed = line.Trim()
 
         if trimmed = "" || trimmed.StartsWith("#") then
@@ -198,58 +207,113 @@ module JsGlobFs =
             let negated = trimmed.StartsWith("!")
             let body = if negated then trimmed.Substring(1) else trimmed
 
-            if body = "" then
-                None
-            else
-                let directoryOnly = body.EndsWith("/")
-
-                let spec =
-                    if directoryOnly then
-                        body.Substring(0, body.Length - 1)
-                    else
-                        body
-
-                match compilePathPattern spec with
-                | Error _ -> None
-                | Ok re ->
-                    Some
-                        { Base = baseRel
-                          Regex = re
-                          Negated = negated
-                          DirectoryOnly = directoryOnly }
+            if body = "" then None else parseIgnoreBody baseRel negated body
 
     let private loadIgnoreFile (filePath: string) (baseRel: string) : IgnoreRule list =
         match JsUtf8Fs.readUtf8 filePath with
         | Error _ -> []
         | Ok text -> text.Split([| '\n' |]) |> Array.toList |> List.choose (parseIgnoreLine baseRel)
 
+    let private localIgnorePath (ruleBase: string) (rel: string) : string option =
+        if ruleBase = "" then Some rel
+        elif rel = ruleBase then Some ""
+        elif rel.StartsWith(ruleBase + "/") then Some(rel.Substring(ruleBase.Length + 1))
+        else None
+
     let private isIgnored (rules: ResizeArray<IgnoreRule>) (rel: string) (isDir: bool) : bool =
         let rec go i ignored =
-            if i >= rules.Count then
-                ignored
-            else
-                let rule = rules.[i]
+            if i >= rules.Count then ignored else applyRule i ignored
 
-                if rule.DirectoryOnly && not isDir then
-                    go (i + 1) ignored
-                else
-                    let local =
-                        if rule.Base = "" then
-                            Some rel
-                        elif rel = rule.Base then
-                            Some ""
-                        elif rel.StartsWith(rule.Base + "/") then
-                            Some(rel.Substring(rule.Base.Length + 1))
-                        else
-                            None
+        and applyRule i ignored =
+            let rule = rules.[i]
 
-                    match local with
-                    | None
-                    | Some "" -> go (i + 1) ignored
-                    | Some path when regexTest rule.Regex path -> go (i + 1) (not rule.Negated)
-                    | Some _ -> go (i + 1) ignored
+            match rule.DirectoryOnly && not isDir, localIgnorePath rule.Base rel with
+            | true, _ -> go (i + 1) ignored
+            | _, None
+            | _, Some "" -> go (i + 1) ignored
+            | _, Some path when regexTest rule.Regex path -> go (i + 1) (not rule.Negated)
+            | _, Some _ -> go (i + 1) ignored
 
         go 0 false
+
+    type private VisibleEntry =
+        | SkipEntry
+        | RecurseDirectory of full: string * childRel: string
+        | EmitFile of childRel: string
+
+    let private tryListDirectory (dir: string) : string list =
+        try
+            readdirSync dir |> Array.toList |> List.sort
+        with _ ->
+            []
+
+    let private tryLstat (full: string) : obj option =
+        try
+            Some(lstatSync full)
+        with _ ->
+            None
+
+    let private classifyStatKind
+        (rules: ResizeArray<IgnoreRule>)
+        (childRel: string)
+        (full: string)
+        (st: obj)
+        : VisibleEntry =
+        if isSymbolicLink st then
+            SkipEntry
+        elif isDirectory st && isIgnored rules childRel true then
+            SkipEntry
+        elif isDirectory st then
+            RecurseDirectory(full, childRel)
+        elif isFile st && isIgnored rules childRel false then
+            SkipEntry
+        elif isFile st then
+            EmitFile childRel
+        else
+            SkipEntry
+
+    let private classifyNonGitEntry
+        (rules: ResizeArray<IgnoreRule>)
+        (rel: string)
+        (dir: string)
+        (entry: string)
+        : VisibleEntry =
+        let full = pathJoin dir entry
+        let childRel = if rel = "" then entry else rel + "/" + entry
+
+        match tryLstat full with
+        | None -> SkipEntry
+        | Some st -> classifyStatKind rules childRel full st
+
+    let private classifyVisibleEntry
+        (rules: ResizeArray<IgnoreRule>)
+        (rel: string)
+        (dir: string)
+        (entry: string)
+        : VisibleEntry =
+        if entry = ".git" then SkipEntry else classifyNonGitEntry rules rel dir entry
+
+    let private applyVisibleEntry
+        (files: ResizeArray<string>)
+        (walk: string -> string -> unit)
+        (action: VisibleEntry)
+        =
+        match action with
+        | SkipEntry -> ()
+        | RecurseDirectory(full, childRel) -> walk full childRel
+        | EmitFile childRel -> files.Add(childRel.Replace('\\', '/'))
+
+    let private processDirectoryEntries
+        (rules: ResizeArray<IgnoreRule>)
+        (files: ResizeArray<string>)
+        (walk: string -> string -> unit)
+        (dir: string)
+        (rel: string)
+        (entries: string list)
+        =
+        for entry in entries do
+            classifyVisibleEntry rules rel dir entry
+            |> applyVisibleEntry files walk
 
     let private collectVisibleFiles (root: string) : string list =
         let files = ResizeArray<string>()
@@ -259,37 +323,20 @@ module JsGlobFs =
             let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
             let mark = rules.Count
 
-            if rel = "" then
-                for rule in loadIgnoreFile (pathJoin root ".git/info/exclude") "" do
-                    rules.Add(rule)
+            let rootExcludes =
+                if rel = "" then
+                    loadIgnoreFile (pathJoin root ".git/info/exclude") ""
+                else
+                    []
+
+            for rule in rootExcludes do
+                rules.Add(rule)
 
             for rule in nested do
                 rules.Add(rule)
 
             try
-                try
-                    let entries = readdirSync dir |> Array.toList |> List.sort
-
-                    for entry in entries do
-                        if entry <> ".git" then
-                            let full = pathJoin dir entry
-                            let childRel = if rel = "" then entry else rel + "/" + entry
-
-                            try
-                                let st = lstatSync full
-
-                                if isSymbolicLink st then
-                                    ()
-                                elif isDirectory st then
-                                    if not (isIgnored rules childRel true) then
-                                        walk full childRel
-                                elif isFile st then
-                                    if not (isIgnored rules childRel false) then
-                                        files.Add(childRel.Replace('\\', '/'))
-                            with _ ->
-                                ()
-                with _ ->
-                    ()
+                processDirectoryEntries rules files walk dir rel (tryListDirectory dir)
             finally
                 rules.RemoveRange(mark, rules.Count - mark)
 
@@ -300,14 +347,13 @@ module JsGlobFs =
     /// internal bound. An oversized result is tail-kept once, by the Host
     /// tool-result bound at the final boundary.
     let glob (root: string) (pattern: string) : Result<JsGlobListing, JsFailure> =
-        match compileUserPatterns pattern with
-        | Error failure -> Error failure
-        | Ok matchers ->
-            let files = collectVisibleFiles root
-            let matched = ResizeArray<string>()
+        result {
+            let! matchers = compileUserPatterns pattern
 
-            for rel in files do
-                if Array.exists (fun re -> regexTest re rel) matchers then
-                    matched.Add(rel)
+            let paths =
+                collectVisibleFiles root
+                |> List.filter (fun rel -> Array.exists (fun re -> regexTest re rel) matchers)
+                |> List.sort
 
-            Ok { Paths = matched |> Seq.toList |> List.sort }
+            return { Paths = paths }
+        }

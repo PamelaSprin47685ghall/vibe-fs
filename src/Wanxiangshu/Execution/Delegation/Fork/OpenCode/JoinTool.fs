@@ -122,6 +122,240 @@ module JoinTool =
     let private recoveryBlocked language (_blocks: NonEmpty<RecoveryBlock>) =
         consequence (ProviderProse.instructionLines language Path.RecoveryBlocked Map.empty)
 
+    let private renderOrchestratorOutcome language outcome =
+        match outcome with
+        | Error _ -> consequence (ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty)
+        | Ok(Interrupted reason) -> JoinResultRenderer.renderInterrupted language reason
+        | Ok(ResultsAvailable batch) -> JoinResultRenderer.renderOrchestratorBatch language batch
+
+    let private executeOrchestratorJoin
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        language
+        (sessionId: SessionId)
+        (attempt: JoinAttemptLease)
+        =
+        task {
+            let joinDescriptor =
+                DiagnosticWait.create
+                    "orchestrator-join"
+                    (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value sessionId ])
+                    [ "session", SessionId.value sessionId; "tool", "join" ]
+                    (WorkflowProducer(CausalOwner.create "ManagerWorkflow" []))
+                    [ WaitEscape.CancelledBy(CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ])
+                      WaitEscape.SessionLifetime ]
+                    "JoinTool.Orchestrator.JoinPublishedAvailable"
+
+            let! outcome =
+                CausalAwait.awaitTask
+                    CausalWaitHub.observer
+                    joinDescriptor
+                    (scope
+                        .OrchestratorHostFor(context.SessionId)
+                        .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait))
+
+            return renderOrchestratorOutcome language outcome
+        }
+
+    let private devopsOrPlainWait (isDevOps: bool) (attemptWait: Task<JoinInterruptReason>) =
+        if isDevOps then
+            let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
+
+            emitJsExpr
+                (attemptWait, emitJsExpr timerTask "$0.then(function(){return'DeadlineExpired';})")
+                "Promise.race([$0,$1])"
+        else
+            attemptWait
+
+    let private joinTaskForMembership
+        (runtime: HostForkRuntime)
+        (permit: FamilyRecoveryPermit)
+        (waitTask: Task<JoinInterruptReason>)
+        (fissionMembership: (string * int) option)
+        =
+        match fissionMembership with
+        | Some(groupId, laneIndex) ->
+            HostForkJoin.joinAvailableForFissionLane runtime groupId laneIndex JoinBatch.Max waitTask
+        | None -> Join.joinAvailable runtime permit JoinBatch.Max waitTask
+
+    let private liveAgentName (runtime: HostForkRuntime) (agentId: string) =
+        match runtime.TryFindAgent agentId with
+        | Some record -> record.Agent
+        | None -> ""
+
+    let private resolveAgentName
+        (scope: ToolRuntimeScope)
+        (root: SessionId)
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        =
+        let durableByname =
+            scope.Journal
+            |> Option.bind (fun journal ->
+                AgentJournal.handleProjection journal root
+                |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+            |> Option.map (fun handle -> handle.Byname)
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+        match durableByname with
+        | Some byname -> byname.Trim()
+        | None -> liveAgentName runtime agentId
+
+    let private terminalNameFromMap (runtime: HostForkRuntime) (ptyId: string) =
+        lock runtime.Gate (fun () ->
+            runtime.TerminalByName
+            |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
+        |> Option.defaultValue ""
+
+    let private resolveTerminalLabel (runtime: HostForkRuntime) (ptyId: string) =
+        let _, ptys = runtime.List()
+
+        match ptys |> List.tryFind (fun record -> record.PtyId = ptyId) with
+        | Some record when not (String.IsNullOrWhiteSpace record.Command) -> record.Command.Trim()
+        | _ -> terminalNameFromMap runtime ptyId
+
+    let private renderInterruptedReason language (reason: JoinInterruptReason) =
+        match reason with
+        | JoinInterruptReason.OperatorAbort
+        | JoinInterruptReason.UserMessageArrived -> JoinResultRenderer.renderInterrupted language reason
+        | JoinInterruptReason.DeadlineExpired ->
+            JoinResultRenderer.renderInterrupted language JoinInterruptReason.DeadlineExpired
+
+    let private untrackJoinItem (runtime: HostForkRuntime) (item: JoinItem) =
+        match item with
+        | JoinItem.PtyItem ptyItem -> runtime.UntrackPtyRun(PtyJoinItem.ptyId ptyItem)
+        | JoinItem.AgentItem _ -> ()
+
+    let private releasePtyTracks (runtime: HostForkRuntime) (batch: NonEmptyBatch<JoinItem>) =
+        NonEmptyBatch.toList batch |> List.iter (untrackJoinItem runtime)
+
+    let private renderJoined
+        language
+        (runtime: HostForkRuntime)
+        (resolveName: string -> string)
+        (resolveLabel: string -> string)
+        (joined: Result<JoinWaitOutcome<JoinItem>, ForkError>)
+        =
+        match joined with
+        | Ok(Interrupted reason) -> renderInterruptedReason language reason
+        | Ok(ResultsAvailable batch) ->
+            // Render before releasing names: this Join result is the moment the
+            // old terminal ending becomes heard.
+            let rendered =
+                JoinResultRenderer.renderJoinItemBatch language resolveName batch resolveLabel
+
+            releasePtyTracks runtime batch
+            rendered
+        | Error joinError -> JoinResultRenderer.renderForkError language joinError resolveName
+
+    let private executeAgentWithRuntime
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        language
+        (sessionId: SessionId)
+        (attempt: JoinAttemptLease)
+        (permit: FamilyRecoveryPermit)
+        (runtime: HostForkRuntime)
+        =
+        task {
+            let isDevOps = scope.IsRole(context, Role.DevOps)
+            let waitTask = devopsOrPlainWait isDevOps attempt.Wait
+
+            let joinDescriptor =
+                DiagnosticWait.create
+                    "agent-join"
+                    (CausalOwner.create "JoinTool" [ "session", SessionId.value sessionId ])
+                    [ "session", SessionId.value sessionId; "tool", "join" ]
+                    (ExternalProducer("child-completion", [ "session", SessionId.value sessionId ]))
+                    [ WaitEscape.CancelledBy(CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ])
+                      WaitEscape.SessionLifetime ]
+                    "JoinTool.joinAvailable"
+
+            // Only process-local Fission bindings are active. A durable Open
+            // group from a previous process is a broken tool record, not an
+            // implicit lane to resume.
+            let fissionMembership =
+                FissionRuntime.tryLane sessionId
+                |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
+
+            let joinTask = joinTaskForMembership runtime permit waitTask fissionMembership
+            let! joined = CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
+            let root = scope.LogicalOwnerFor sessionId
+
+            return
+                renderJoined
+                    language
+                    runtime
+                    (resolveAgentName scope root runtime)
+                    (resolveTerminalLabel runtime)
+                    joined
+        }
+
+    let private executeAgentJoin
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        language
+        (sessionId: SessionId)
+        (attempt: JoinAttemptLease)
+        (permit: FamilyRecoveryPermit)
+        =
+        task {
+            match scope.RuntimeFor context with
+            | Error _ ->
+                return consequence (ProviderProse.instructionLines language Path.UnavailableFromContext Map.empty)
+            | Ok runtime -> return! executeAgentWithRuntime scope context language sessionId attempt permit runtime
+        }
+
+    let private executeWhenReady
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        language
+        (sessionId: SessionId)
+        (attempt: JoinAttemptLease)
+        (permit: FamilyRecoveryPermit)
+        =
+        // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
+        // Wait is the only interrupt channel. Completion still beats interrupt.
+        if scope.IsRole(context, Role.Orchestrator) then
+            executeOrchestratorJoin scope context language sessionId attempt
+        else
+            executeAgentJoin scope context language sessionId attempt permit
+
+    let private executeAfterSession
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        language
+        (sessionId: SessionId)
+        =
+        task {
+            // EXEC-017: Begin the attempt first — before RequireFamilyRecovery and
+            // before the mailbox wait — so a user-message signal that lands while
+            // recovery or setup is still running is recorded on THIS attempt's own
+            // TCS. There is no session-level future latch; Dispose unregisters.
+            let attempt = scope.JoinAttempts.Begin(sessionId, context.ToolCallId)
+            let detachAbort = context.AttachAbort attempt.SignalOperatorAbort
+
+            use _attempt = attempt
+
+            use _cleanup =
+                { new IDisposable with
+                    member _.Dispose() = detachAbort () }
+
+            let root = scope.LogicalOwnerFor sessionId
+            let! recovery = scope.RequireFamilyRecovery root
+
+            match recovery with
+            | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked language blocks
+            | FamilyRecovery.FamilyWaiting _ ->
+                // EXEC-023: no permit while waiting — must not drain durable agent
+                // finals via bare JoinAvailable. Surface retryable RECOVERY_WAITING
+                // so Manager re-invokes join after RestoreHandles advances to Ready
+                // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
+                return consequence (ProviderProse.instructionLines language Path.RecoveryWaiting Map.empty)
+            | FamilyRecovery.FamilyReady permit ->
+                return! executeWhenReady scope context language sessionId attempt permit
+        }
+
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) (context: HostToolContext) =
         task {
             let language = lang context
@@ -129,175 +363,7 @@ module JoinTool =
             if String.IsNullOrWhiteSpace context.SessionId then
                 return consequence (ProviderProse.instructionLines language Path.UnavailableUntilAuthority Map.empty)
             else
-                let sessionId = SessionId.create context.SessionId
-
-                // EXEC-017: Begin the attempt first — before RequireFamilyRecovery and
-                // before the mailbox wait — so a user-message signal that lands while
-                // recovery or setup is still running is recorded on THIS attempt's own
-                // TCS. There is no session-level future latch; Dispose unregisters.
-                let attempt = scope.JoinAttempts.Begin(sessionId, context.ToolCallId)
-                let detachAbort = context.AttachAbort attempt.SignalOperatorAbort
-
-                use _attempt = attempt
-
-                use _cleanup =
-                    { new IDisposable with
-                        member _.Dispose() = detachAbort () }
-
-                let root = scope.LogicalOwnerFor sessionId
-                let! recovery = scope.RequireFamilyRecovery root
-
-                match recovery with
-                | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked language blocks
-                | FamilyRecovery.FamilyWaiting _ ->
-                    // EXEC-023: no permit while waiting — must not drain durable agent
-                    // finals via bare JoinAvailable. Surface retryable RECOVERY_WAITING
-                    // so Manager re-invokes join after RestoreHandles advances to Ready
-                    // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
-                    return consequence (ProviderProse.instructionLines language Path.RecoveryWaiting Map.empty)
-                | FamilyRecovery.FamilyReady permit ->
-                    // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
-                    // Wait is the only interrupt channel. Completion still beats interrupt.
-                    if scope.IsRole(context, Role.Orchestrator) then
-                        let joinDescriptor =
-                            DiagnosticWait.create
-                                "orchestrator-join"
-                                (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value sessionId ])
-                                [ "session", SessionId.value sessionId; "tool", "join" ]
-                                (WorkflowProducer(CausalOwner.create "ManagerWorkflow" []))
-                                [ WaitEscape.CancelledBy(
-                                      CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ]
-                                  )
-                                  WaitEscape.SessionLifetime ]
-                                "JoinTool.Orchestrator.JoinPublishedAvailable"
-
-                        let! outcome =
-                            CausalAwait.awaitTask
-                                CausalWaitHub.observer
-                                joinDescriptor
-                                (scope
-                                    .OrchestratorHostFor(context.SessionId)
-                                    .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait))
-
-                        match outcome with
-                        | Error _ ->
-                            return
-                                consequence (
-                                    ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty
-                                )
-                        | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted language reason
-                        | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch language batch
-                    else
-                        match scope.RuntimeFor context with
-                        | Error _ ->
-                            return
-                                consequence (
-                                    ProviderProse.instructionLines language Path.UnavailableFromContext Map.empty
-                                )
-                        | Ok runtime ->
-                            let isDevOps = scope.IsRole(context, Role.DevOps)
-
-                            let waitTask: Task<JoinInterruptReason> =
-                                if isDevOps then
-                                    let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
-
-                                    emitJsExpr
-                                        (attempt.Wait,
-                                         emitJsExpr timerTask "$0.then(function(){return'DeadlineExpired';})")
-                                        "Promise.race([$0,$1])"
-                                else
-                                    attempt.Wait
-
-                            let joinDescriptor =
-                                DiagnosticWait.create
-                                    "agent-join"
-                                    (CausalOwner.create "JoinTool" [ "session", SessionId.value sessionId ])
-                                    [ "session", SessionId.value sessionId; "tool", "join" ]
-                                    (ExternalProducer("child-completion", [ "session", SessionId.value sessionId ]))
-                                    [ WaitEscape.CancelledBy(
-                                          CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ]
-                                      )
-                                      WaitEscape.SessionLifetime ]
-                                    "JoinTool.joinAvailable"
-
-                            // Only process-local Fission bindings are active. A durable
-                            // Open group from a previous process is a broken tool record,
-                            // not an implicit lane to resume.
-                            let fissionMembership =
-                                FissionRuntime.tryLane sessionId
-                                |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
-
-                            let joinTask =
-                                match fissionMembership with
-                                | Some(groupId, laneIndex) ->
-                                    HostForkJoin.joinAvailableForFissionLane
-                                        runtime
-                                        groupId
-                                        laneIndex
-                                        JoinBatch.Max
-                                        waitTask
-                                | None -> Join.joinAvailable runtime permit JoinBatch.Max waitTask
-
-                            let! joined = CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
-
-                            let resolveAgentName agentId =
-                                let durableByname =
-                                    scope.Journal
-                                    |> Option.bind (fun journal ->
-                                        AgentJournal.handleProjection journal root
-                                        |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-                                    |> Option.map (fun handle -> handle.Byname)
-                                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
-
-                                match durableByname with
-                                | Some byname -> byname.Trim()
-                                | None ->
-                                    match runtime.TryFindAgent agentId with
-                                    | Some record -> record.Agent
-                                    | None -> ""
-
-                            let resolveTerminalLabel ptyId =
-                                let _, ptys = runtime.List()
-
-                                match ptys |> List.tryFind (fun record -> record.PtyId = ptyId) with
-                                | Some record when not (String.IsNullOrWhiteSpace record.Command) ->
-                                    record.Command.Trim()
-                                | _ ->
-                                    lock runtime.Gate (fun () ->
-                                        runtime.TerminalByName
-                                        |> Seq.tryPick (fun (KeyValue(name, id)) ->
-                                            if id = ptyId then Some name else None))
-                                    |> Option.defaultValue ""
-
-                            match joined with
-                            | Ok(Interrupted reason) ->
-                                match reason with
-                                | JoinInterruptReason.OperatorAbort
-                                | JoinInterruptReason.UserMessageArrived ->
-                                    return JoinResultRenderer.renderInterrupted language reason
-                                | JoinInterruptReason.DeadlineExpired ->
-                                    return
-                                        JoinResultRenderer.renderInterrupted
-                                            language
-                                            JoinInterruptReason.DeadlineExpired
-                            | Ok(ResultsAvailable batch) ->
-                                // Render before releasing names: this Join result is the
-                                // moment the old terminal ending becomes heard.
-                                let rendered =
-                                    JoinResultRenderer.renderJoinItemBatch
-                                        language
-                                        resolveAgentName
-                                        batch
-                                        resolveTerminalLabel
-
-                                NonEmptyBatch.toList batch
-                                |> List.iter (function
-                                    | JoinItem.PtyItem item -> runtime.UntrackPtyRun(PtyJoinItem.ptyId item)
-                                    | JoinItem.AgentItem _ -> ())
-
-                                return rendered
-                            | Error joinError ->
-                                return JoinResultRenderer.renderForkError language joinError resolveAgentName
+                return! executeAfterSession scope context language (SessionId.create context.SessionId)
         }
 
     let spec scope =

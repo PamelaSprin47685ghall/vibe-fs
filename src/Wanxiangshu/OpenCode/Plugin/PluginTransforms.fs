@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
@@ -105,6 +106,534 @@ open PluginHostInterop
 
 module PluginTransforms =
 
+    let private raiseStrengthFailClosed (fuse: string -> unit) (reason: string) : 'a =
+        fuse reason
+        raise (InvalidOperationException reason)
+
+    /// HOST-013: bind session start or abort + fail-closed.
+    let private bindSessionStartedAtOrAbort
+        (durable: AgentJournal)
+        (sessionId: string)
+        (candidate: DateTimeOffset)
+        (sessionPort: ISessionHostPort)
+        : Task<DateTimeOffset option> =
+        task {
+            match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
+            | Ok startedAt -> return Some startedAt
+            | Error reason ->
+                Diagnostic.emit
+                    "host-013-session-start-bind-failed"
+                    [ "session_id", sessionId; "result", reason ]
+
+                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+
+                return
+                    raise (
+                        InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason)
+                    )
+        }
+
+    let private tryBindSessionStartedAt
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartCandidate: DateTimeOffset option)
+        (sessionPort: ISessionHostPort)
+        : Task<DateTimeOffset option> =
+        match journal, projectionSessionIdOpt, sessionStartCandidate with
+        | Some durable, Some sessionId, Some candidate ->
+            bindSessionStartedAtOrAbort durable sessionId candidate sessionPort
+        | _ -> Task.FromResult None
+
+    let private strengthReplayPlansFor
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (strengthFailFuse: string -> unit)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        : Task<StrengthReplayPlan list> =
+        match projectionSessionIdOpt with
+        | Some sessionId ->
+            StrengthReplay.applyBeforeXTrace
+                journal
+                strengthDurability
+                (raiseStrengthFailClosed strengthFailFuse)
+                sessionId
+                outObj
+        | None -> Task.FromResult []
+
+    /// Strip AssistancePrompt sentinel from reasoning wire parts only.
+    let private stripReasoningSentinel (part: ProviderWireCapture.CapturedWirePart) =
+        match part.WirePart with
+        | WireReasoning text ->
+            { part with
+                WirePart = WireReasoning(AssistancePrompt.stripSentinel text) }
+        | WireText _
+        | WireToolCall _
+        | WireToolResult _
+        | WireMedia _ -> part
+
+    let private capturedMessagesStripped (rawMessages: obj list) =
+        ProviderWireCapture.decodeCapturedMessageView rawMessages
+        |> List.map (fun message ->
+            { message with
+                Parts = message.Parts |> List.map stripReasoningSentinel })
+
+    /// Evidence → Decision: all Host message ids present → stable id list.
+    let private tryStableHostMessageIds (rawMessages: obj list) : string list option =
+        let ids = rawMessages |> List.map ProviderWireDecode.hostMessageId
+
+        if ids |> List.forall Option.isSome then
+            Some(ids |> List.map Option.get)
+        else
+            None
+
+    let private captureStableOrFailClosed
+        (journal: AgentJournal option)
+        (sessionIdentity: SessionId)
+        (ids: string list)
+        (capturedMessages: ProviderWireCapture.CapturedWireMessage list)
+        (strengthFailFuse: string -> unit)
+        : Task<XTraceProjectionState option> =
+        task {
+            match!
+                XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages
+            with
+            | Ok state -> return state
+            | Error error -> return raiseStrengthFailClosed strengthFailFuse error
+        }
+
+    let private captureTraceState
+        (journal: AgentJournal option)
+        (sessionIdentity: SessionId)
+        (stableMessageIds: string list option)
+        (capturedMessages: ProviderWireCapture.CapturedWireMessage list)
+        (strengthFailFuse: string -> unit)
+        : Task<XTraceProjectionState option> =
+        match stableMessageIds with
+        | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
+            captureStableOrFailClosed journal sessionIdentity ids capturedMessages strengthFailFuse
+        | _ -> XTraceCapture.captureMessageView journal sessionIdentity capturedMessages
+
+    let private refreshCompanionXTrace
+        (companions: Dictionary<string, CompanionHost>)
+        (sessionId: string)
+        (updated: XTraceProjectionState)
+        =
+        match companions.TryGetValue sessionId with
+        | true, host -> host.RefreshXTrace updated
+        | false, _ -> ()
+
+    let private applyManagerNarrativeRewrite
+        (journal: AgentJournal option)
+        (sessionIdOpt: string option)
+        (traceState: XTraceProjectionState option)
+        (rawMessages: obj list)
+        (outObj: obj)
+        : Task =
+        task {
+            match! ManagerNarrativeTransform.tryTransform journal sessionIdOpt traceState rawMessages with
+            | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
+            | None -> ()
+        }
+
+    let private applySessionXTraceAndNarrative
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (strengthFailFuse: string -> unit)
+        (scope: PluginRuntimeScope)
+        (sessionId: string)
+        (outObj: obj)
+        (strengthReplayPlans: StrengthReplayPlan list)
+        : Task =
+        task {
+            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+            let capturedMessages = capturedMessagesStripped rawMessages
+
+            let _semantic =
+                ProviderWireCapture.wireMessageView capturedMessages
+                |> ProviderProjection.toSemantic
+
+            let sessionIdentity = SessionId.create sessionId
+            let stableMessageIds = tryStableHostMessageIds rawMessages
+
+            let! traceState =
+                captureTraceState
+                    journal
+                    sessionIdentity
+                    stableMessageIds
+                    capturedMessages
+                    strengthFailFuse
+
+            do!
+                StrengthReplay.commitTracedAfterCapture
+                    journal
+                    strengthDurability
+                    (raiseStrengthFailClosed strengthFailFuse)
+                    traceState
+                    strengthReplayPlans
+
+            traceState
+            |> Option.iter (refreshCompanionXTrace scope.Sessions.Companions sessionId)
+
+            do! applyManagerNarrativeRewrite journal (Some sessionId) traceState rawMessages outObj
+
+            do!
+                ManagerNarrativeTransform.applyAcceptedActivation
+                    journal
+                    (Some sessionId)
+                    traceState
+                    rawMessages
+        }
+
+    let private applySessionXTracePipeline
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (strengthFailFuse: string -> unit)
+        (scope: PluginRuntimeScope)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        (strengthReplayPlans: StrengthReplayPlan list)
+        : Task =
+        match projectionSessionIdOpt with
+        | Some sessionId ->
+            applySessionXTraceAndNarrative
+                journal
+                strengthDurability
+                strengthFailFuse
+                scope
+                sessionId
+                outObj
+                strengthReplayPlans
+        | None -> Task.FromResult()
+
+    let private projectOrKeepRaw
+        (sessionId: string)
+        (bloggerMessages: obj list)
+        (messages: obj list)
+        : obj list =
+        if List.isEmpty messages then
+            Diagnostic.emit
+                "enforcer-empty-project"
+                [ "session_id", sessionId
+                  "result", "ProjectMessages empty; keep raw transcript" ]
+
+            bloggerMessages
+        else
+            messages
+
+    let private messagesOrRaw (bloggerMessages: obj list) (messages: obj list) : obj list =
+        if List.isEmpty messages then
+            bloggerMessages
+        else
+            messages
+
+    let private terminalRunFromMessages (rawMessages: obj list) : ProviderRunIdentity =
+        match EnforcerCycleDecode.lastAssistantStep rawMessages with
+        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
+            ProviderRunIdentity.create messageId
+        | _ -> ProviderRunIdentity.create "unknown-prose-run"
+
+    let private makeRecoveryProbe
+        (durable: AgentJournal)
+        (sid: SessionId)
+        (rawMessages: obj list)
+        : EnforcerContinuation.RecoveryStageProbe =
+        fun ctx ->
+            let terminalRun = terminalRunFromMessages rawMessages
+            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+            BloggerRecoveryProbe.repairState durable sid requestKey terminalRun rawMessages
+
+    let private applyContinuationOutcome
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (bloggerMessages: obj list)
+        (outObj: obj)
+        (outcome: EnforcerContinuation.ContinuationOutcome)
+        : Task =
+        task {
+            match outcome with
+            | EnforcerContinuation.ContinuationOutcome.ProjectMessages messages ->
+                HostMessageProjection.replaceMessagesInPlace
+                    outObj
+                    (projectOrKeepRaw sessionId bloggerMessages messages)
+            | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
+                HostMessageProjection.replaceMessagesInPlace
+                    outObj
+                    (messagesOrRaw bloggerMessages messages)
+
+                Diagnostic.emit
+                    "enforcer-stop-physical-run"
+                    [ "session_id", sessionId; "result", reason ]
+
+                let! _ = sessionPort.AbortSession sid
+                ()
+        }
+
+    let private runEnforcerWhenFamilyReady
+        (scope: PluginRuntimeScope)
+        (journal: AgentJournal option)
+        (durable: AgentJournal)
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (outObj: obj)
+        : Task =
+        task {
+            let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
+
+            let repairNudge: InteractionRepairNudge =
+                HostSessionNudge.trySendInteractionRepair sessionPort
+
+            let confirmedFailure: ConfirmedFailurePort =
+                fun targetSessionId providerRun reason ->
+                    task {
+                        let! outcome =
+                            FallbackLedger.admitConfirmedFailure
+                                durable
+                                AgentPairCursor.DefaultAutoRecoveryBudget
+                                targetSessionId
+                                providerRun
+                                reason
+
+                        return outcome
+                    }
+
+            let! outcome =
+                EnforcerHost.handleContinuation
+                    scope.ParkedTransformHost
+                    journal
+                    (Some repairNudge)
+                    (Some confirmedFailure)
+                    makeRecoveryProbe
+                    sid
+                    bloggerMessages
+
+            do! applyContinuationOutcome sessionPort sid sessionId bloggerMessages outObj outcome
+        }
+
+    let private runEnforcerAfterRecovery
+        (scope: PluginRuntimeScope)
+        (journal: AgentJournal option)
+        (durable: AgentJournal)
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (outObj: obj)
+        (recovery: FamilyRecovery)
+        : Task =
+        match recovery with
+        | FamilyRecovery.FamilyBlocked _ -> Task.FromResult()
+        | FamilyRecovery.FamilyWaiting _
+        | FamilyRecovery.FamilyReady _ ->
+            runEnforcerWhenFamilyReady scope journal durable sessionPort sid sessionId outObj
+
+    let private runEnforcerForMainSession
+        (scope: PluginRuntimeScope)
+        (journal: AgentJournal option)
+        (durable: AgentJournal)
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (outObj: obj)
+        : Task =
+        task {
+            let! recovery = scope.EnsureRecoveryDone sid
+            do! runEnforcerAfterRecovery scope journal durable sessionPort sid sessionId outObj recovery
+        }
+
+    let private runEnforcerIfMainAssociated
+        (scope: PluginRuntimeScope)
+        (journal: AgentJournal option)
+        (durable: AgentJournal)
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (outObj: obj)
+        : Task =
+        let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
+
+        match SessionAssociationProjection.tryMainSessionOf sid associations with
+        | Some _ -> runEnforcerForMainSession scope journal durable sessionPort sid sessionId outObj
+        | None -> Task.FromResult()
+
+    let private applyBloggerEnforcerContinuation
+        (scope: PluginRuntimeScope)
+        (journal: AgentJournal option)
+        (sessionPort: ISessionHostPort)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        : Task =
+        match projectionSessionIdOpt, journal with
+        | Some sessionId, Some durable ->
+            let sid = SessionId.create sessionId
+            runEnforcerIfMainAssociated scope journal durable sessionPort sid sessionId outObj
+        | _ -> Task.FromResult()
+
+    let private skipPairGuideline
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        : bool =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            SessionAssociationProjection.isCompanion
+                (SessionId.create sessionId)
+                (AgentJournal.snapshot durable).AgentProjections.Associations
+        | _ -> false
+
+    let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
+        match projectionSessionIdOpt with
+        | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
+        | None -> ProviderLanguage.English
+
+    let private toolEstimateText
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (language: ProviderLanguage)
+        : string option =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
+            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
+        | _ -> None
+
+    let private composeMarkerText
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (elapsed: string option)
+        (toolEstimate: string option)
+        (guideline: string)
+        : Task<string> =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            task {
+                let! guidance =
+                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+
+                return
+                    PairProgrammingCalibration.composeWithElapsed
+                        guidance
+                        elapsed
+                        toolEstimate
+                        guideline
+            }
+        | _ ->
+            Task.FromResult(
+                PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline
+            )
+
+    let private abortSessionIfPresent
+        (sessionPort: ISessionHostPort)
+        (projectionSessionIdOpt: string option)
+        : Task =
+        match projectionSessionIdOpt with
+        | Some sessionId ->
+            task {
+                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                ()
+            }
+        | None -> Task.FromResult()
+
+    let private applyPairInjectResult
+        (sessionPort: ISessionHostPort)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        (injectResult: Result<obj list, string>)
+        : Task =
+        match injectResult with
+        | Ok newMessages ->
+            HostMessageProjection.replaceMessagesInPlace outObj newMessages
+            Task.FromResult()
+        | Error reason ->
+            Diagnostic.emit
+                "host-013-fail-closed"
+                [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
+
+            abortSessionIfPresent sessionPort projectionSessionIdOpt
+
+    let private injectPairProgrammingGuideline
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartedAt: DateTimeOffset option)
+        (clock: IClockPort)
+        (sessionPort: ISessionHostPort)
+        (outObj: obj)
+        : Task =
+        task {
+            let messages = unbox<obj array> outObj?messages |> Array.toList
+            let language = languageFor projectionSessionIdOpt
+
+            let guideline =
+                ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+
+            let elapsed =
+                sessionStartedAt
+                |> Option.map (fun startedAt ->
+                    let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
+                    PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
+
+            let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
+
+            let! markerText =
+                composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
+
+            let! injectResult =
+                PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
+
+            do! applyPairInjectResult sessionPort projectionSessionIdOpt outObj injectResult
+        }
+
+    let private maybeInjectPairGuideline
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartedAt: DateTimeOffset option)
+        (clock: IClockPort)
+        (sessionPort: ISessionHostPort)
+        (outObj: obj)
+        : Task =
+        if skipPairGuideline journal projectionSessionIdOpt then
+            Task.FromResult()
+        else
+            injectPairProgrammingGuideline
+                journal
+                projectionSessionIdOpt
+                sessionStartedAt
+                clock
+                sessionPort
+                outObj
+
+    let private sealTaskFor
+        (snapshotOpt: ISessionSnapshotPort option)
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (wired: HostSignalBootstrap.WiredSignals)
+        (outObj: obj)
+        : Task =
+        match projectionSessionIdOpt with
+        | None -> Task.FromResult()
+        | Some projectionSessionId ->
+            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+            ReviewSeal.sealTransform
+                snapshotOpt
+                journal
+                (SessionId.create projectionSessionId)
+                (ProviderWireCapture.decodeMessageView rawMessages)
+                (ProviderWireCapture.lastUserMessageId rawMessages)
+                wired.PendingReviewSeals
+
+    let private strengthReplicaRuntime
+        (projectionSessionIdOpt: string option)
+        (scope: PluginRuntimeScope)
+        : StrengthReplicaRuntime option =
+        match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
+        | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
+        | _ -> None
+
+    let private requireReplicaHandled (handled: bool) =
+        if not handled then
+            raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
+
     /// Provider-facing transform composition: order only.
     /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
     /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
@@ -116,13 +645,8 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
-        let workspaceDirectory = boot.WorkspaceDirectory
-        // Boot carries the fuse as `string -> unit`; re-open it as 'a so the
-        // fail-closed branches can type as whatever the enclosing match needs
-        // (the raise never returns).
-        let strengthFailClosed (reason: string) : 'a =
-            boot.StrengthFailClosed reason
-            raise (InvalidOperationException reason)
+        let _workspaceDirectory = boot.WorkspaceDirectory
+        let strengthFailFuse = boot.StrengthFailClosed
 
         let normalTransform (projectionSessionIdOpt: string option) (inObj: obj) (outObj: obj) : Task<unit> =
             task {
@@ -140,30 +664,15 @@ module PluginTransforms =
                     projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
 
                 let! sessionStartedAt =
-                    match journal, projectionSessionIdOpt, sessionStartCandidate with
-                    | Some durable, Some sessionId, Some candidate ->
-                        task {
-                            match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
-                            | Ok startedAt -> return Some startedAt
-                            | Error reason ->
-                                Diagnostic.emit
-                                    "host-013-session-start-bind-failed"
-                                    [ "session_id", sessionId; "result", reason ]
-
-                                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
-
-                                return
-                                    raise (
-                                        InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason)
-                                    )
-                        }
-                    | _ -> Task.FromResult None
+                    tryBindSessionStartedAt journal projectionSessionIdOpt sessionStartCandidate sessionPort
 
                 let! strengthReplayPlans =
-                    match projectionSessionIdOpt with
-                    | Some sessionId ->
-                        StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailClosed sessionId outObj
-                    | None -> Task.FromResult []
+                    strengthReplayPlansFor
+                        journal
+                        strengthDurability
+                        strengthFailFuse
+                        projectionSessionIdOpt
+                        outObj
 
                 // COMPANION-003/007: keep the XTrace in step with the
                 // provider-visible semantic projection at the transform
@@ -174,89 +683,15 @@ module PluginTransforms =
                 // replacement) as raw parts.
                 // Idempotent by (turn, part) provenance; a lagging trace
                 // would stall BlogObservationCommitted.
-                match projectionSessionIdOpt with
-                | Some sessionId ->
-                    let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                    let capturedMessages =
-                        ProviderWireCapture.decodeCapturedMessageView rawMessages
-                        |> List.map (fun message ->
-                            { message with
-                                Parts =
-                                    message.Parts
-                                    |> List.map (fun part ->
-                                        match part.WirePart with
-                                        | WireReasoning text ->
-                                            { part with
-                                                WirePart = WireReasoning(AssistancePrompt.stripSentinel text) }
-                                        | WireText _
-                                        | WireToolCall _
-                                        | WireToolResult _
-                                        | WireMedia _ -> part) })
-
-                    let semantic =
-                        ProviderWireCapture.wireMessageView capturedMessages
-                        |> ProviderProjection.toSemantic
-
-                    // COMPANION-003/007 + STRENGTH-008: new Host-runtime
-                    // traces use stable Host-message identity so a promoted
-                    // frame may be inserted before its not-yet-captured target
-                    // output without renumbering already-captured history.
-                    let sessionIdentity = SessionId.create sessionId
-
-                    let stableMessageIds =
-                        let ids = rawMessages |> List.map ProviderWireDecode.hostMessageId
-
-                        if ids |> List.forall Option.isSome then
-                            Some(ids |> List.map Option.get)
-                        else
-                            None
-
-                    let! traceState =
-                        match stableMessageIds with
-                        | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
-                            task {
-                                match!
-                                    XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages
-                                with
-                                | Ok state -> return state
-                                | Error error -> return strengthFailClosed error
-                            }
-                        | _ -> XTraceCapture.captureMessageView journal sessionIdentity capturedMessages
-
-                    do!
-                        StrengthReplay.commitTracedAfterCapture
-                            journal
-                            strengthDurability
-                            strengthFailClosed
-                            traceState
-                            strengthReplayPlans
-
-                    traceState
-                    |> Option.iter (fun updated ->
-                        match scope.Sessions.Companions.TryGetValue sessionId with
-                        | true, host -> host.RefreshXTrace updated
-                        | false, _ -> ())
-
-                    // GLORY-013: after durable X capture, before any further
-                    // rewrite: open a Manager Life and rewrite the Birth /
-                    // Reawakening narrative on the provider-facing transcript.
-                    // Idempotent by (session, message, source) and by the Life
-                    // projection itself; durable Opening stays the raw text.
-                    match! ManagerNarrativeTransform.tryTransform journal (Some sessionId) traceState rawMessages with
-                    | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
-                    | None -> ()
-
-                    // GLORY-021: once the Activation continuation has been
-                    // physically accepted, fix the compression floor at the
-                    // XTrace head (just after the Activation prompt).
-                    do!
-                        ManagerNarrativeTransform.applyAcceptedActivation
-                            journal
-                            (Some sessionId)
-                            traceState
-                            rawMessages
-                | None -> ()
+                do!
+                    applySessionXTracePipeline
+                        journal
+                        strengthDurability
+                        strengthFailFuse
+                        scope
+                        projectionSessionIdOpt
+                        outObj
+                        strengthReplayPlans
 
                 do!
                     CompanionTransform.handleCompanionTransform
@@ -279,106 +714,13 @@ module PluginTransforms =
                 // docs/what/enforcer.md ENFORCER-044/047/050: Blogger continuation only.
                 // Main-session material is decided once in
                 // CompanionTransform → BloggerCoordinator.onMainMaterial.
-                match projectionSessionIdOpt with
-                | Some sessionId ->
-                    let sid = SessionId.create sessionId
-
-                    match journal with
-                    | Some durable ->
-                        let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
-
-                        match SessionAssociationProjection.tryMainSessionOf sid associations with
-                        | Some _ ->
-                            // RECOVERY-FAMILY: family recovery before blogger continuation effects.
-                            let! recovery = scope.EnsureRecoveryDone sid
-
-                            match recovery with
-                            | FamilyRecovery.FamilyBlocked _ -> ()
-                            | FamilyRecovery.FamilyWaiting _
-                            | FamilyRecovery.FamilyReady _ ->
-                                let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                                // InteractionRepair port: HostSessionNudge is compile-later;
-                                // EnforcerHost only sees InteractionRepairNudge (Session layer).
-                                let repairNudge: InteractionRepairNudge =
-                                    HostSessionNudge.trySendInteractionRepair sessionPort
-
-                                // rabbit §13: Infrastructure closes Application fallback
-                                // ledger + budget into the Session-facing admission capability.
-                                let confirmedFailure: ConfirmedFailurePort =
-                                    fun targetSessionId providerRun reason ->
-                                        task {
-                                            let! outcome =
-                                                FallbackLedger.admitConfirmedFailure
-                                                    durable
-                                                    AgentPairCursor.DefaultAutoRecoveryBudget
-                                                    targetSessionId
-                                                    providerRun
-                                                    reason
-
-                                            return outcome
-                                        }
-
-                                // ENFORCER-153: the recovery stage probe derives
-                                // nudge/AABB state from durable claim + transcript.
-                                let recoveryProbe
-                                    (durable: AgentJournal)
-                                    (sid: SessionId)
-                                    (rawMessages: obj list)
-                                    : EnforcerContinuation.RecoveryStageProbe =
-                                    fun ctx ->
-                                        let terminalRun =
-                                            match EnforcerCycleDecode.lastAssistantStep rawMessages with
-                                            | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
-                                                ProviderRunIdentity.create messageId
-                                            | _ -> ProviderRunIdentity.create "unknown-prose-run"
-
-                                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-
-                                        BloggerRecoveryProbe.repairState durable sid requestKey terminalRun rawMessages
-
-                                let! outcome =
-                                    EnforcerHost.handleContinuation
-                                        scope.ParkedTransformHost
-                                        journal
-                                        (Some repairNudge)
-                                        (Some confirmedFailure)
-                                        recoveryProbe
-                                        sid
-                                        bloggerMessages
-
-                                match outcome with
-                                | EnforcerContinuation.ContinuationOutcome.ProjectMessages messages ->
-                                    let projected =
-                                        if List.isEmpty messages then
-                                            Diagnostic.emit
-                                                "enforcer-empty-project"
-                                                [ "session_id", sessionId
-                                                  "result", "ProjectMessages empty; keep raw transcript" ]
-
-                                            bloggerMessages
-                                        else
-                                            messages
-
-                                    HostMessageProjection.replaceMessagesInPlace outObj projected
-                                | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
-                                    let projected = if List.isEmpty messages then bloggerMessages else messages
-
-                                    HostMessageProjection.replaceMessagesInPlace outObj projected
-
-                                    Diagnostic.emit
-                                        "enforcer-stop-physical-run"
-                                        [ "session_id", sessionId; "result", reason ]
-
-                                    // Await abort so Host fiber interrupt is pending before
-                                    // transform returns → handle.process / provider skipped.
-                                    // Transform-initiated abort is not LoopSensor-armed → no
-                                    // ProviderRetryAttempt (TurnAborted only).
-                                    let! _ = sessionPort.AbortSession sid
-                                    ()
-                        | None -> ()
-                    | None -> ()
-                | None -> ()
+                do!
+                    applyBloggerEnforcerContinuation
+                        scope
+                        journal
+                        sessionPort
+                        projectionSessionIdOpt
+                        outObj
 
                 // STRENGTH-009: freeze the post-Enforcer semantic view and
                 // complete any eligible speculation before the Pair marker.
@@ -389,74 +731,14 @@ module PluginTransforms =
                 // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                 // 再在 ResultGap 写入本次 completed auto-injected Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
-                let skipGuideline =
-                    match journal, projectionSessionIdOpt with
-                    | Some durable, Some sessionId ->
-                        SessionAssociationProjection.isCompanion
-                            (SessionId.create sessionId)
-                            (AgentJournal.snapshot durable).AgentProjections.Associations
-                    | _ -> false
-
-                if not skipGuideline then
-                    let messages = unbox<obj array> outObj?messages |> Array.toList
-
-                    let language =
-                        match projectionSessionIdOpt with
-                        | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-                        | None -> ProviderLanguage.English
-
-                    let guideline =
-                        ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
-
-                    let elapsed =
+                do!
+                    maybeInjectPairGuideline
+                        journal
+                        projectionSessionIdOpt
                         sessionStartedAt
-                        |> Option.map (fun startedAt ->
-                            let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
-                            PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
-
-                    let toolEstimate =
-                        match journal, projectionSessionIdOpt with
-                        | Some durable, Some sessionId ->
-                            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
-                            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
-                        | _ -> None
-
-                    let! markerText =
-                        match journal, projectionSessionIdOpt with
-                        | Some durable, Some sessionId ->
-                            task {
-                                let! guidance =
-                                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
-
-                                return
-                                    PairProgrammingCalibration.composeWithElapsed
-                                        guidance
-                                        elapsed
-                                        toolEstimate
-                                        guideline
-                            }
-                        | _ ->
-                            Task.FromResult(
-                                PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline
-                            )
-
-                    match!
-                        PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
-                    with
-                    | Ok newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
-                    | Error reason ->
-                        // HOST-013 fail closed：synthetic 历史无法按 durable anchor
-                        // 字节级重建时，禁止把 raw transcript 原样发给 provider
-                        // （那会静默破坏 append-only prefix）。中止本次物理 run。
-                        Diagnostic.emit
-                            "host-013-fail-closed"
-                            [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
-
-                        match projectionSessionIdOpt with
-                        | Some sessionId ->
-                            let! _ = sessionPort.AbortSession(SessionId.create sessionId)
-                            ()
-                        | None -> ()
+                        clock
+                        sessionPort
+                        outObj
 
                 // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                 // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。
@@ -472,21 +754,7 @@ module PluginTransforms =
                 // Host source awaits every hook in turn (`plugin/index.ts:280-292`),
                 // so returning a Task here makes the SDK read complete before the
                 // provider request is built.
-                let sealTask =
-                    match projectionSessionIdOpt with
-                    | None -> Task.FromResult()
-                    | Some projectionSessionId ->
-                        let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                        ReviewSeal.sealTransform
-                            snapshotOpt
-                            journal
-                            (SessionId.create projectionSessionId)
-                            (ProviderWireCapture.decodeMessageView rawMessages)
-                            (ProviderWireCapture.lastUserMessageId rawMessages)
-                            wired.PendingReviewSeals
-
-                do! sealTask
+                do! sealTaskFor snapshotOpt journal projectionSessionIdOpt wired outObj
                 ()
             }
 
@@ -496,21 +764,14 @@ module PluginTransforms =
 
                 projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
-                let strengthReplica =
-                    match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
-                    | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
-                    | _ -> None
-
-                match strengthReplica with
+                match strengthReplicaRuntime projectionSessionIdOpt scope with
                 | Some runtime ->
                     // STRENGTH-004/009: Replica uses exactly one request-plan
                     // writer plus its mirror/K gate. XTrace, Manager narrative,
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! XWire.applyTransform snapshotOpt journal scope outObj
                     let! handled = runtime.HandleTransform outObj
-
-                    if not handled then
-                        raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
+                    requireReplicaHandled handled
 
                     let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                     let sanitized = HostMessageProjection.sanitizeMessages currentMessages

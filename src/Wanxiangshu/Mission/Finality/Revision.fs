@@ -7,6 +7,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -94,13 +95,10 @@ module RevisionWorkflow =
         (rejectingReviewer: SessionId)
         (barrierId: ReviewBarrierId)
         : Task<Result<string * BlobWriteReceipt, string>> =
-        task {
-            match! RecordWorkflow.awaitCanonicalWorkRecord journal rejectingReviewer barrierId with
-            | Error reason -> return Error reason
-            | Ok workRecord ->
-                match! journal.WriteBlob workRecord with
-                | Error reason -> return Error reason
-                | Ok blob -> return Ok(workRecord, blob)
+        taskResult {
+            let! workRecord = RecordWorkflow.awaitCanonicalWorkRecord journal rejectingReviewer barrierId
+            let! blob = journal.WriteBlob workRecord
+            return workRecord, blob
         }
 
     let private sealRejected
@@ -131,54 +129,90 @@ module RevisionWorkflow =
             return FinalityOutcome.Rejected(rejectedPrompt managerSessionId workRecord)
         }
 
+    [<RequireQualifiedAccess>]
+    type private SiblingPollOutcome =
+        | Complete of (SessionId * ReviewBarrierId * string) list
+        | AwaitJournal
+        | Failed of string
+
+    let private collectSiblingStates
+        (journal: AgentJournal)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        : Task<JournalRevision * (SessionId * ReviewBarrierId * RecordReadiness) list> =
+        task {
+            let snapshot, revision = AgentJournal.snapshotWithRevision journal
+            let states = ResizeArray<SessionId * ReviewBarrierId * RecordReadiness>()
+
+            for sid, barrierId in siblings do
+                let! state = RecordWorkflow.readiness journal snapshot sid barrierId true
+                states.Add(sid, barrierId, state)
+
+            return revision, states |> Seq.toList
+        }
+
+    let private unavailableSiblingReason
+        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
+        =
+        states
+        |> List.tryPick (fun (_, _, state) ->
+            match state with
+            | RecordReadiness.Unavailable reason -> Some reason
+            | _ -> None)
+
+    let private readySiblingRecords
+        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
+        =
+        states
+        |> List.choose (fun (sid, barrierId, state) ->
+            match state with
+            | RecordReadiness.Ready record -> Some(sid, barrierId, record)
+            | _ -> None)
+
+    let private completeOrIncompleteSiblingRecords
+        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        =
+        let records = readySiblingRecords states
+
+        if List.length records = List.length siblings then
+            SiblingPollOutcome.Complete records
+        else
+            SiblingPollOutcome.Failed "durable sibling record readiness is incomplete"
+
+    let private decideSiblingPoll
+        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        =
+        let awaitingJournal =
+            states |> List.exists (fun (_, _, state) -> state = RecordReadiness.AwaitJournal)
+
+        match unavailableSiblingReason states, awaitingJournal with
+        | Some reason, _ -> SiblingPollOutcome.Failed reason
+        | None, true -> SiblingPollOutcome.AwaitJournal
+        | None, false -> completeOrIncompleteSiblingRecords states siblings
+
     let private awaitDurableSiblingRecords
         (journal: AgentJournal)
         (siblings: (SessionId * ReviewBarrierId) list)
         : Task<Result<(SessionId * ReviewBarrierId * string) list, string>> =
         let rec loop () =
             task {
-                if List.isEmpty siblings then
-                    return Ok []
-                else
-                    let snapshot, revision = AgentJournal.snapshotWithRevision journal
+                let! revision, states = collectSiblingStates journal siblings
 
-                    let states = ResizeArray<SessionId * ReviewBarrierId * RecordReadiness>()
-
-                    for sid, barrierId in siblings do
-                        let! state = RecordWorkflow.readiness journal snapshot sid barrierId true
-                        states.Add(sid, barrierId, state)
-
-                    let states = states |> Seq.toList
-
-                    match
-                        states
-                        |> List.tryPick (fun (_, _, state) ->
-                            match state with
-                            | RecordReadiness.Unavailable reason -> Some reason
-                            | _ -> None)
-                    with
-                    | Some reason -> return Error reason
-                    | None when
-                        states
-                        |> List.exists (fun (_, _, state) -> state = RecordReadiness.AwaitJournal)
-                        ->
-                        let! _ = AgentJournal.awaitChangeFrom revision journal
-                        return! loop ()
-                    | None ->
-                        let records =
-                            states
-                            |> List.choose (fun (sid, barrierId, state) ->
-                                match state with
-                                | RecordReadiness.Ready record -> Some(sid, barrierId, record)
-                                | _ -> None)
-
-                        if List.length records = List.length siblings then
-                            return Ok records
-                        else
-                            return Error "durable sibling record readiness is incomplete"
+                match decideSiblingPoll states siblings with
+                | SiblingPollOutcome.Failed reason -> return Error reason
+                | SiblingPollOutcome.AwaitJournal ->
+                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    return! loop ()
+                | SiblingPollOutcome.Complete records -> return Ok records
             }
 
-        loop ()
+        task {
+            if List.isEmpty siblings then
+                return Ok []
+            else
+                return! loop ()
+        }
 
     let tryActiveFinality (snapshot: ProjectionSet) (managerSessionId: SessionId) (requestId: FinalityRequestId) =
         AgentProjection.tryFind managerSessionId snapshot.AgentProjections
@@ -186,6 +220,48 @@ module RevisionWorkflow =
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
         |> Option.bind (fun life -> life.ActiveFinality)
         |> Option.filter (fun active -> active.RequestId = requestId)
+
+    let private prepareSiblingSteer
+        (journal: AgentJournal)
+        (existingSteers: Map<SessionId, SiblingSteerEvidence>)
+        (reviewerSessionId: SessionId, barrierId: ReviewBarrierId, workRecord: string)
+        : Task<Result<SessionId * ReviewBarrierId * string * BlobWriteReceipt option, string>> =
+        match Map.tryFind reviewerSessionId existingSteers with
+        | Some evidence ->
+            taskResult {
+                let! text = journal.Writer.BlobWriter.Read evidence.WorkRecordRef
+                return reviewerSessionId, barrierId, text, None
+            }
+        | None ->
+            taskResult {
+                let! blob = journal.WriteBlob workRecord
+                return reviewerSessionId, barrierId, workRecord, Some blob
+            }
+
+    let private appendNewSiblingSteerFact
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (blob: BlobWriteReceipt)
+        : Task<unit> =
+        task {
+            do!
+                FinalityJournal.appendLifecycle
+                    journal
+                    (ManagerLifecycleFact.FinalitySiblingSteered
+                        {| SessionId = managerSessionId
+                           LifeId = lifeId
+                           RequestId = requestId
+                           ReviewerSessionId = reviewerSessionId
+                           BarrierId = barrierId
+                           GitTreeHash = requestTree
+                           WorkRecordRef = blob.BlobRef
+                           WorkRecordDigest = blob.BlobDigest |})
+        }
 
     let private commitSiblingSteerFacts
         (journal: AgentJournal)
@@ -195,50 +271,36 @@ module RevisionWorkflow =
         (requestTree: GitTreeHash)
         (records: (SessionId * ReviewBarrierId * string) list)
         : Task<Result<(SessionId * string) list, string>> =
-        task {
+        taskResult {
             let existingSteers =
                 tryActiveFinality (AgentJournal.snapshot journal) managerSessionId requestId
                 |> Option.map (fun active -> active.SiblingSteers)
                 |> Option.defaultValue Map.empty
 
-            let prepared =
-                ResizeArray<SessionId * ReviewBarrierId * string * BlobWriteReceipt option>()
-            // DSL-MUTABLE: algorithm-scratch — first preparation failure while preserving input order
-            let mutable failure: string option = None
+            let! prepared =
+                records
+                |> List.traverseTaskResultM (prepareSiblingSteer journal existingSteers)
 
-            for reviewerSessionId, barrierId, workRecord in records do
-                if failure.IsNone then
-                    match Map.tryFind reviewerSessionId existingSteers with
-                    | Some evidence ->
-                        match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
-                        | Ok text -> prepared.Add(reviewerSessionId, barrierId, text, None)
-                        | Error reason -> failure <- Some reason
-                    | None ->
-                        match! journal.WriteBlob workRecord with
-                        | Error reason -> failure <- Some reason
-                        | Ok blob -> prepared.Add(reviewerSessionId, barrierId, workRecord, Some blob)
+            let newFacts =
+                prepared
+                |> List.choose (fun (sid, barrierId, _, blobOpt) ->
+                    blobOpt |> Option.map (fun blob -> sid, barrierId, blob))
 
-            match failure with
-            | Some reason -> return Error reason
-            | None ->
-                for reviewerSessionId, barrierId, _, blobOpt in prepared do
-                    match blobOpt with
-                    | None -> ()
-                    | Some blob ->
-                        do!
-                            FinalityJournal.appendLifecycle
-                                journal
-                                (ManagerLifecycleFact.FinalitySiblingSteered
-                                    {| SessionId = managerSessionId
-                                       LifeId = lifeId
-                                       RequestId = requestId
-                                       ReviewerSessionId = reviewerSessionId
-                                       BarrierId = barrierId
-                                       GitTreeHash = requestTree
-                                       WorkRecordRef = blob.BlobRef
-                                       WorkRecordDigest = blob.BlobDigest |})
+            let! _ =
+                newFacts
+                |> List.traverseTaskResultM (fun (sid, barrierId, blob) ->
+                    appendNewSiblingSteerFact
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        sid
+                        barrierId
+                        blob
+                    |> TaskResultCE.ofTask)
 
-                return Ok(prepared |> Seq.map (fun (sid, _, text, _) -> sid, text) |> Seq.toList)
+            return prepared |> List.map (fun (sid, _, text, _) -> sid, text)
         }
 
     let private sendSiblingSteers
@@ -252,6 +314,87 @@ module RevisionWorkflow =
                 ()
         }
         :> Task
+
+    let private rejectAfterPrimary
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (rejectingReviewer: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requestTree: GitTreeHash)
+        (records: (SessionId * ReviewBarrierId * string) list)
+        (workRecord: string)
+        (primaryBlob: BlobWriteReceipt)
+        : Task<FinalityOutcome> =
+        task {
+            match! commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
+            | Error _ ->
+                return!
+                    concludeUndecided
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        rejectingReviewer
+                        barrierId
+            | Ok prepared ->
+                let! outcome =
+                    sealRejected
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        rejectingReviewer
+                        barrierId
+                        requestTree
+                        workRecord
+                        primaryBlob
+
+                do! sendSiblingSteers reviewerPort managerSessionId prepared
+                return outcome
+        }
+
+    let private rejectAfterRecords
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (rejectingReviewer: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requestTree: GitTreeHash)
+        (records: (SessionId * ReviewBarrierId * string) list)
+        : Task<FinalityOutcome> =
+        task {
+            match! stagePrimaryRejectionRecord journal rejectingReviewer barrierId with
+            | Error _ ->
+                return!
+                    concludeUndecided
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        rejectingReviewer
+                        barrierId
+            | Ok(workRecord, primaryBlob) ->
+                return!
+                    rejectAfterPrimary
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        rejectingReviewer
+                        barrierId
+                        requestTree
+                        records
+                        workRecord
+                        primaryBlob
+        }
 
     let rejectAndSteer
         (reviewerPort: FinalityReviewerPort)
@@ -270,45 +413,47 @@ module RevisionWorkflow =
                 return!
                     concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
             | Ok records ->
-                match! stagePrimaryRejectionRecord journal rejectingReviewer barrierId with
-                | Error _ ->
-                    return!
-                        concludeUndecided
-                            journal
-                            managerSessionId
-                            lifeId
-                            requestId
-                            requestTree
-                            rejectingReviewer
-                            barrierId
-                | Ok(workRecord, primaryBlob) ->
-                    match! commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
-                    | Error _ ->
-                        return!
-                            concludeUndecided
-                                journal
-                                managerSessionId
-                                lifeId
-                                requestId
-                                requestTree
-                                rejectingReviewer
-                                barrierId
-                    | Ok prepared ->
-                        let! outcome =
-                            sealRejected
-                                journal
-                                managerSessionId
-                                lifeId
-                                requestId
-                                rejectingReviewer
-                                barrierId
-                                requestTree
-                                workRecord
-                                primaryBlob
-
-                        do! sendSiblingSteers reviewerPort managerSessionId prepared
-                        return outcome
+                return!
+                    rejectAfterRecords
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        rejectingReviewer
+                        barrierId
+                        requestTree
+                        records
         }
+
+    let private readReadySteerRecord
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        : Task<string option> =
+        task {
+            match! RecordWorkflow.readiness journal snapshot reviewerSessionId barrierId true with
+            | RecordReadiness.Ready record -> return Some record
+            | _ -> return None
+        }
+
+    let private readSteerWorkRecord
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (evidence: SiblingSteerEvidence)
+        : Task<string option> =
+        task {
+            match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
+            | Ok workRecord -> return Some workRecord
+            | Error _ -> return! readReadySteerRecord journal snapshot reviewerSessionId evidence.BarrierId
+        }
+
+    let private steerPromptOrUnavailable (managerSessionId: SessionId) (workRecordOpt: string option) =
+        match workRecordOpt with
+        | Some workRecord -> steerPrompt managerSessionId workRecord
+        | None -> steerUnavailablePrompt managerSessionId
 
     let private replaySiblingSteer
         (reviewerPort: FinalityReviewerPort)
@@ -326,23 +471,8 @@ module RevisionWorkflow =
             with
             | None -> ()
             | Some evidence ->
-                let! workRecordOpt =
-                    task {
-                        match! journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
-                        | Ok workRecord -> return Some workRecord
-                        | Error _ ->
-                            match!
-                                RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true
-                            with
-                            | RecordReadiness.Ready record -> return Some record
-                            | _ -> return None
-                    }
-
-                let prompt =
-                    match workRecordOpt with
-                    | Some workRecord -> steerPrompt managerSessionId workRecord
-                    | None -> steerUnavailablePrompt managerSessionId
-
+                let! workRecordOpt = readSteerWorkRecord journal snapshot reviewerSessionId evidence
+                let prompt = steerPromptOrUnavailable managerSessionId workRecordOpt
                 let! _ = reviewerPort.SendRevisionSteer managerSessionId prompt
                 ()
         }
@@ -361,17 +491,27 @@ module RevisionWorkflow =
         }
         :> Task
 
+    let private tryRevisionBarrierId (memberRef: ReviewMemberRef) (guard: ReviewGuardProjection) =
+        match guard.CurrentBarrierId, guard.Witness with
+        | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
+            Some barrierId
+        | _ -> None
+
+    let private tryRevisionSibling
+        (snapshot: ProjectionSet)
+        (memberRef: ReviewMemberRef)
+        (reviewerSessionId: SessionId)
+        =
+        AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.ReviewGuard)
+        |> Option.bind (tryRevisionBarrierId memberRef)
+        |> Option.map (fun barrierId -> reviewerSessionId, barrierId)
+
     let pendingRevision (snapshot: ProjectionSet) (request: FinalityRequestProjection) =
         request.Members
         |> Map.toList
         |> List.tryPick (fun (reviewerSessionId, memberRef) ->
-            AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.ReviewGuard)
-            |> Option.bind (fun guard ->
-                match guard.CurrentBarrierId, guard.Witness with
-                | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
-                    Some(reviewerSessionId, barrierId)
-                | _ -> None))
+            tryRevisionSibling snapshot memberRef reviewerSessionId)
 
     let durableRevisionSiblings
         (snapshot: ProjectionSet)
@@ -384,13 +524,102 @@ module RevisionWorkflow =
             if reviewerSessionId = rejectingReviewer then
                 None
             else
-                AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ReviewGuard)
-                |> Option.bind (fun guard ->
-                    match guard.CurrentBarrierId, guard.Witness with
-                    | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
-                        Some(reviewerSessionId, barrierId)
-                    | _ -> None))
+                tryRevisionSibling snapshot memberRef reviewerSessionId)
+
+    let private resumeOpenRejectedRequest
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (snapshot: ProjectionSet)
+        (activeRequest: FinalityRequestProjection)
+        : Task<FinalityOutcome option> =
+        task {
+            match pendingRevision snapshot activeRequest with
+            | None -> return None
+            | Some(reviewerSessionId, barrierId) ->
+                let siblings =
+                    durableRevisionSiblings snapshot activeRequest reviewerSessionId
+                    @ (activeRequest.SiblingSteers
+                       |> Map.toList
+                       |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
+                       |> List.filter (fun (sid, _) -> sid <> reviewerSessionId))
+                    |> List.distinctBy fst
+
+                let! outcome =
+                    rejectAndSteer
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        reviewerSessionId
+                        barrierId
+                        activeRequest.GitTreeHash
+                        siblings
+
+                return Some outcome
+        }
+
+    let private resumeClosedRejectedRequest
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (requestId: FinalityRequestId)
+        (activeRequest: FinalityRequestProjection)
+        : Task<FinalityOutcome option> =
+        task {
+            let siblings =
+                activeRequest.SiblingSteers
+                |> Map.toList
+                |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
+
+            if not (List.isEmpty siblings) then
+                do! steerRevisionSiblings reviewerPort journal managerSessionId requestId siblings
+
+            return None
+        }
+
+    let private resumeRejectedRequestBody
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        : Task<FinalityOutcome option> =
+        task {
+            let snapshot = AgentJournal.snapshot journal
+
+            let requestOpt =
+                AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.ManagerLife)
+                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                |> Option.filter (fun life -> life.LifeId = lifeId)
+                |> Option.bind (fun life -> life.ActiveFinality)
+                |> Option.filter (fun active -> active.RequestId = requestId)
+
+            match requestOpt with
+            | None -> return None
+            | Some activeRequest when ManagerLifecycleProjection.isOpen activeRequest ->
+                return!
+                    resumeOpenRejectedRequest
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        snapshot
+                        activeRequest
+            | Some activeRequest ->
+                return!
+                    resumeClosedRejectedRequest
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        requestId
+                        activeRequest
+        }
 
     let resumeRejectedRequest
         (reviewerPort: FinalityReviewerPort)
@@ -401,53 +630,13 @@ module RevisionWorkflow =
         : Task<FinalityOutcome option> =
         task {
             try
-                let snapshot = AgentJournal.snapshot journal
-
-                let requestOpt =
-                    AgentProjection.tryFind managerSessionId snapshot.AgentProjections
-                    |> Option.bind (fun session -> session.ManagerLife)
-                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                    |> Option.filter (fun life -> life.LifeId = lifeId)
-                    |> Option.bind (fun life -> life.ActiveFinality)
-                    |> Option.filter (fun active -> active.RequestId = requestId)
-
-                match requestOpt with
-                | None -> return None
-                | Some activeRequest when ManagerLifecycleProjection.isOpen activeRequest ->
-                    match pendingRevision snapshot activeRequest with
-                    | None -> return None
-                    | Some(reviewerSessionId, barrierId) ->
-                        let siblings =
-                            durableRevisionSiblings snapshot activeRequest reviewerSessionId
-                            @ (activeRequest.SiblingSteers
-                               |> Map.toList
-                               |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
-                               |> List.filter (fun (sid, _) -> sid <> reviewerSessionId))
-                            |> List.distinctBy fst
-
-                        let! outcome =
-                            rejectAndSteer
-                                reviewerPort
-                                journal
-                                managerSessionId
-                                lifeId
-                                requestId
-                                reviewerSessionId
-                                barrierId
-                                activeRequest.GitTreeHash
-                                siblings
-
-                        return Some outcome
-                | Some activeRequest ->
-                    let siblings =
-                        activeRequest.SiblingSteers
-                        |> Map.toList
-                        |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
-
-                    if not (List.isEmpty siblings) then
-                        do! steerRevisionSiblings reviewerPort journal managerSessionId requestId siblings
-
-                    return None
+                return!
+                    resumeRejectedRequestBody
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
             with _ ->
                 return Some(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
         }

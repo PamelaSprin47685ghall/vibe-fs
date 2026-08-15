@@ -26,6 +26,69 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 
+module private ForkRuntimeControl =
+    let runChildWork
+        (workOpt: (unit -> Task<AgentCompletionOutcome>) option)
+        (childRunner: string -> Role -> string option -> Task<AgentCompletionOutcome>)
+        (agentId: string)
+        (role: Role)
+        (promptOpt: string option)
+        =
+        match workOpt with
+        | Some work -> work ()
+        | None -> childRunner agentId role promptOpt
+
+    let publishAgentCompletion
+        (mailbox: CompletionMailbox)
+        (terminalListener: RunCompletion -> unit)
+        (childRun: ChildRun)
+        (agentId: string)
+        (completion: RunCompletion)
+        =
+        childRun.Completion.TrySet(completion) |> ignore
+        mailbox.PulseAgentHandle(AgentHandleId.create agentId)
+
+        try
+            terminalListener completion
+        with _ ->
+            ()
+
+    let forkCreatedOrNudged (isNew: bool) (agentId: string) =
+        if isNew then ForkResult.Created agentId else ForkResult.Nudged agentId
+
+    let awaitPendingNoTimeout (pending: Task<RunCompletion>) =
+        task {
+            let! value = pending
+            return Ok value
+        }
+
+    let awaitPendingWithTimeout (agentId: string) (pending: Task<RunCompletion>) (ms: int) =
+        task {
+            let! completedFirst = PtyTiming.raceExit (pending :> Task) ms
+
+            if completedFirst then
+                let! value = pending
+                return Ok value
+            else
+                return Error(sprintf "await agent timed out: %s" agentId)
+        }
+
+    let awaitKnownAgent (agentId: string) (pending: Task<RunCompletion>) (timeoutMs: int option) =
+        match timeoutMs with
+        | None -> awaitPendingNoTimeout pending
+        | Some ms when ms <= 0 -> Task.FromResult(Error(sprintf "await agent timed out: %s" agentId))
+        | Some ms -> awaitPendingWithTimeout agentId pending ms
+
+    let tryCleanupAgent (cleanupPort: string -> unit) (id: string) =
+        try
+            cleanupPort id
+        with _ ->
+            ()
+
+    let cleanupAgentIds (cleanupPort: string -> unit) (ids: string list) =
+        for id in ids do
+            tryCleanupAgent cleanupPort id
+
 /// Runtime for managing child agent runs and PTY sessions.
 ///
 /// Uses a Map<AgentId, ChildRun> for agent tracking (replacing the previous
@@ -69,6 +132,14 @@ type ForkRuntime
             clockPort = clockPort
         )
 
+    let cancelAllAgentsAndClearPtys () =
+        lock lockObj (fun () ->
+            for run in agents |> Map.toSeq |> Seq.map snd do
+                ChildRun.cancel run
+
+            ptys <- Map.empty
+            agents |> Map.toSeq |> Seq.map fst |> Seq.toList)
+
     /// Start a new child run: create the ChildRun and return a thunk that
     /// executes the work. Agent completion settles the cell + pulses wake only;
     /// durable projection (Host path) is the join fact source.
@@ -87,12 +158,11 @@ type ForkRuntime
 
         let runTask () =
             task {
-                let work (ct: CancellationToken) =
+                let work (_ct: CancellationToken) =
                     task {
                         try
-                            match workOpt with
-                            | Some w -> return! w ()
-                            | None -> return! childRunner agentId role promptOpt
+                            return!
+                                ForkRuntimeControl.runChildWork workOpt childRunner agentId role promptOpt
                         with ex ->
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
@@ -114,17 +184,23 @@ type ForkRuntime
                 match completionOpt with
                 | None -> ()
                 | Some completion ->
-                    childRun.Completion.TrySet(completion) |> ignore
-                    // GREEN-5: agent mailbox is wake-only; no payload publish.
-                    mailbox.PulseAgentHandle(AgentHandleId.create agentId)
-
-                    try
-                        terminalListener completion
-                    with _ ->
-                        ()
+                    ForkRuntimeControl.publishAgentCompletion mailbox terminalListener childRun agentId completion
             }
 
         childRun, runTask
+
+    let startReplacementRun
+        (agentId: string)
+        (agentName: string)
+        (role: Role)
+        (prompt: string option)
+        (runWork: (unit -> Task<AgentCompletionOutcome>) option)
+        =
+        let isNew = not (agents |> Map.containsKey agentId)
+        let childRun, runTask = startRun agentId agentName role prompt runWork
+        agents <- agents |> Map.add agentId childRun
+        runTask () |> ignore
+        ForkRuntimeControl.forkCreatedOrNudged isNew agentId
 
     // -----------------------------------------------------------------------
     // Public API — Fork
@@ -144,26 +220,17 @@ type ForkRuntime
         let agentName = agent.Trim()
 
         lock lockObj (fun () ->
+            let existing = agents |> Map.tryFind agentId
+
             if mailbox.IsCancelled then
                 ForkResult.NotFound agentId
+            elif existing |> Option.exists ChildRun.isActive then
+                // Busy agent: nudge only, no new run created.
+                ForkResult.Nudged agentId
             else
-                match agents |> Map.tryFind agentId with
-                | Some run when ChildRun.isActive run ->
-                    // Busy agent: nudge only, no new run created.
-                    ForkResult.Nudged agentId
-
-                | _ ->
-                    // New agent OR idle existing agent with completed run:
-                    // replace the old ChildRun and start a fresh run.
-                    let isNew = not (agents |> Map.containsKey agentId)
-                    let childRun, runTask = startRun agentId agentName role prompt runWork
-                    agents <- agents |> Map.add agentId childRun
-                    runTask () |> ignore
-
-                    if isNew then
-                        ForkResult.Created agentId
-                    else
-                        ForkResult.Nudged agentId)
+                // New agent OR idle existing agent with completed run:
+                // replace the old ChildRun and start a fresh run.
+                startReplacementRun agentId agentName role prompt runWork)
 
     // -----------------------------------------------------------------------
     // Public API — Join / signal / drain (EXEC-017 / EXEC-018 / GREEN-5)
@@ -240,24 +307,7 @@ type ForkRuntime
 
         match completion with
         | None -> Task.FromResult(Error(sprintf "Unknown agent id: %s" agentId))
-        | Some pending ->
-            match timeoutMs with
-            | None ->
-                task {
-                    let! value = pending
-                    return Ok value
-                }
-            | Some ms when ms <= 0 -> Task.FromResult(Error(sprintf "await agent timed out: %s" agentId))
-            | Some ms ->
-                task {
-                    let! completedFirst = PtyTiming.raceExit (pending :> Task) ms
-
-                    if completedFirst then
-                        let! value = pending
-                        return Ok value
-                    else
-                        return Error(sprintf "await agent timed out: %s" agentId)
-                }
+        | Some pending -> ForkRuntimeControl.awaitKnownAgent agentId pending timeoutMs
 
     /// Cancel one agent run without tearing down the whole runtime mailbox.
     member _.CancelAgent(agentId: string) : unit =
@@ -300,18 +350,7 @@ type ForkRuntime
     /// Cancel all active runs and PTYs, drain pending waiters.
     member _.Cancel() : unit =
         if mailbox.Cancel() then
-            let ids =
-                lock lockObj (fun () ->
-                    for run in agents |> Map.toSeq |> Seq.map snd do
-                        ChildRun.cancel run
-
-                    ptys <- Map.empty
-                    agents |> Map.toSeq |> Seq.map fst |> Seq.toList)
-
-            for id in ids do
-                try
-                    cleanupPort id
-                with _ ->
-                    ()
+            cancelAllAgentsAndClearPtys ()
+            |> ForkRuntimeControl.cleanupAgentIds cleanupPort
 
     member this.Close() : unit = this.Cancel()

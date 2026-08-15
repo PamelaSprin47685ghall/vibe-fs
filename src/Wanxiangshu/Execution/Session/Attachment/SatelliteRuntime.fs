@@ -19,7 +19,9 @@ open Wanxiangshu.Strength
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 
@@ -44,118 +46,157 @@ type SatelliteSpec =
       Link: SessionId -> SessionId -> string -> Task<Result<unit, string>>
       Close: SessionId -> Task<Result<unit, string>> }
 
-type SatelliteRuntime(sessions: ISessionHostPort) =
-    let gate = obj ()
-    let flights = Dictionary<string, Task<Result<SatelliteLease, string>>>()
-
+module private SatelliteLeaseFlow =
     let kindLabel =
         function
         | SatelliteKind.Companion -> "companion"
 
-    let key owner kind =
-        SessionId.value owner + "\u001f" + kindLabel kind
+    let recoverError kind error =
+        sprintf "Cannot recover %s satellite: %s" (kindLabel kind) error
 
     let exactCandidate (spec: SatelliteSpec) (child: OpenCodeChildInfo) =
         child.Agent = Some spec.Agent && child.Title = Some spec.Title
 
-    let start (owner: SessionId) (spec: SatelliteSpec) =
-        task {
+    let listOwnerChildren (sessions: ISessionHostPort) rootId owner =
+        if rootId = owner then
+            Task.FromResult(Ok [])
+        else
+            sessions.ListChildren owner
+
+    let createChild (sessions: ISessionHostPort) owner (spec: SatelliteSpec) origin =
+        taskResult {
+            let! child =
+                sessions.CreateChildSession(
+                    owner,
+                    { Title = Some spec.Title
+                      Agent = Some spec.Agent
+                      Directory = spec.Directory }
+                )
+
+            return
+                { SessionId = child
+                  Origin = origin }
+        }
+
+    let replacementOrConflict
+        (sessions: ISessionHostPort)
+        owner
+        (spec: SatelliteSpec)
+        (merged: OpenCodeChildInfo list)
+        restored
+        =
+        match merged |> List.filter (fun child -> child.SessionId = restored) with
+        | [] -> createChild sessions owner spec Replacement
+        | _ ->
+            Task.FromResult(
+                Error(
+                    sprintf
+                        "Conflicting %s satellite recovery for %s: journal-linked Host child has different agent/title"
+                        (kindLabel spec.Kind)
+                        (SessionId.value owner)
+                )
+            )
+
+    let resolveRestored
+        (sessions: ISessionHostPort)
+        owner
+        (spec: SatelliteSpec)
+        (merged: OpenCodeChildInfo list)
+        (candidates: OpenCodeChildInfo list)
+        restored
+        =
+        match candidates |> List.filter (fun child -> child.SessionId = restored) with
+        | [ child ] ->
+            Task.FromResult(
+                Ok
+                    { SessionId = child.SessionId
+                      Origin = Reused }
+            )
+        | [] -> replacementOrConflict sessions owner spec merged restored
+        | many ->
+            Task.FromResult(
+                Error(
+                    sprintf
+                        "Ambiguous %s satellite recovery for %s: %d journal-linked Host children"
+                        (kindLabel spec.Kind)
+                        (SessionId.value owner)
+                        many.Length
+                )
+            )
+
+    let resolveLease
+        (sessions: ISessionHostPort)
+        owner
+        (spec: SatelliteSpec)
+        (merged: OpenCodeChildInfo list)
+        (candidates: OpenCodeChildInfo list)
+        =
+        match spec.RestoredSessionId with
+        | Some restored -> resolveRestored sessions owner spec merged candidates restored
+        | None -> createChild sessions owner spec Created
+
+    let linkLease (sessions: ISessionHostPort) (spec: SatelliteSpec) owner (lease: SatelliteLease) =
+        taskResult {
+            let! linkOutcome = spec.Link owner lease.SessionId spec.Agent |> TaskResultCE.ofTask
+
+            match linkOutcome with
+            | Ok() -> return lease
+            | Error error ->
+                let! _ = sessions.AbortSession lease.SessionId |> TaskResultCE.ofTask
+                return! Error error
+        }
+
+    let start (sessions: ISessionHostPort) (owner: SessionId) (spec: SatelliteSpec) =
+        taskResult {
             // HOST-015: physical parent is always the family root; ownership is
             // proven by the journal link (RestoredSessionId), never by Host
             // parentID. Root children are the flat location; owner children are
             // queried too so satellites created before flattening stay reusable.
             let rootId = sessions.FamilyRootOf owner
 
-            match! sessions.ListChildren rootId with
-            | Error error -> return Error(sprintf "Cannot recover %s satellite: %s" (kindLabel spec.Kind) error)
-            | Ok rootChildren ->
-                let! ownerChildren =
-                    if rootId = owner then
-                        Task.FromResult(Ok [])
-                    else
-                        sessions.ListChildren owner
+            let! rootChildren =
+                sessions.ListChildren rootId
+                |> Task.map (Result.mapError (recoverError spec.Kind))
 
-                match ownerChildren with
-                | Error error -> return Error(sprintf "Cannot recover %s satellite: %s" (kindLabel spec.Kind) error)
-                | Ok ownerChildren ->
-                    let merged =
-                        (rootChildren @ ownerChildren) |> List.distinctBy (fun child -> child.SessionId)
+            let! ownerChildren =
+                listOwnerChildren sessions rootId owner
+                |> Task.map (Result.mapError (recoverError spec.Kind))
 
-                    let candidates = merged |> List.filter (exactCandidate spec)
+            let merged =
+                (rootChildren @ ownerChildren) |> List.distinctBy (fun child -> child.SessionId)
 
-                    let! resolved =
-                        task {
-                            match spec.RestoredSessionId with
-                            | Some restored ->
-                                match candidates |> List.filter (fun child -> child.SessionId = restored) with
-                                | [ child ] ->
-                                    return
-                                        Ok
-                                            { SessionId = child.SessionId
-                                              Origin = Reused }
-                                | [] ->
-                                    match merged |> List.filter (fun child -> child.SessionId = restored) with
-                                    | [] ->
-                                        // The journal-linked child is permanently
-                                        // gone from the Host → Replacement.
-                                        match!
-                                            sessions.CreateChildSession(
-                                                owner,
-                                                { Title = Some spec.Title
-                                                  Agent = Some spec.Agent
-                                                  Directory = spec.Directory }
-                                            )
-                                        with
-                                        | Error error -> return Error error
-                                        | Ok child ->
-                                            return
-                                                Ok
-                                                    { SessionId = child
-                                                      Origin = Replacement }
-                                    | _ ->
-                                        return
-                                            Error(
-                                                sprintf
-                                                    "Conflicting %s satellite recovery for %s: journal-linked Host child has different agent/title"
-                                                    (kindLabel spec.Kind)
-                                                    (SessionId.value owner)
-                                            )
-                                | many ->
-                                    return
-                                        Error(
-                                            sprintf
-                                                "Ambiguous %s satellite recovery for %s: %d journal-linked Host children"
-                                                (kindLabel spec.Kind)
-                                                (SessionId.value owner)
-                                                many.Length
-                                        )
-                            | None ->
-                                // No journal link proves ownership of any existing
-                                // child: never adopt a same-agent/title sibling
-                                // under the shared flat root — always create.
-                                match!
-                                    sessions.CreateChildSession(
-                                        owner,
-                                        { Title = Some spec.Title
-                                          Agent = Some spec.Agent
-                                          Directory = spec.Directory }
-                                    )
-                                with
-                                | Error error -> return Error error
-                                | Ok child -> return Ok { SessionId = child; Origin = Created }
-                        }
-
-                    match resolved with
-                    | Error error -> return Error error
-                    | Ok lease ->
-                        // The reverse association must exist before the first prompt so
-                        // transforms can prove that this child is a leaf satellite.
-                        match! spec.Link owner lease.SessionId spec.Agent with
-                        | Ok() -> return Ok lease
-                        | Error error ->
-                            let! _ = sessions.AbortSession lease.SessionId
-                            return Error error
+            let candidates = merged |> List.filter (exactCandidate spec)
+            let! lease = resolveLease sessions owner spec merged candidates
+            return! linkLease sessions spec owner lease
         }
+
+    let retirePending
+        (sessions: ISessionHostPort)
+        (invalidate: unit -> unit)
+        (spec: SatelliteSpec)
+        owner
+        (pending: Task<Result<SatelliteLease, string>>)
+        =
+        taskResult {
+            let! outcome = pending |> TaskResultCE.ofTask
+
+            match outcome with
+            | Error error ->
+                invalidate ()
+                return! Error error
+            | Ok lease ->
+                do! sessions.AbortSession lease.SessionId
+                do! spec.Close owner
+                invalidate ()
+                return ()
+        }
+
+type SatelliteRuntime(sessions: ISessionHostPort) =
+    let gate = obj ()
+    let flights = Dictionary<string, Task<Result<SatelliteLease, string>>>()
+
+    let key owner kind =
+        SessionId.value owner + "\u001f" + SatelliteLeaseFlow.kindLabel kind
 
     member _.Ensure(owner: SessionId, spec: SatelliteSpec) : Task<Result<SatelliteLease, string>> =
         lock gate (fun () ->
@@ -164,7 +205,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
             match flights.TryGetValue cacheKey with
             | true, flight -> flight
             | false, _ ->
-                let flight = start owner spec
+                let flight = SatelliteLeaseFlow.start sessions owner spec
                 flights.[cacheKey] <- flight
                 flight)
 
@@ -172,33 +213,17 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
         lock gate (fun () -> flights.Remove(key owner kind) |> ignore)
 
     member this.Retire(owner: SessionId, spec: SatelliteSpec) : Task<Result<unit, string>> =
-        task {
-            let cacheKey = key owner spec.Kind
+        let cacheKey = key owner spec.Kind
 
-            let flight =
-                lock gate (fun () ->
-                    if flights.ContainsKey cacheKey then
-                        Some flights.[cacheKey]
-                    else
-                        None)
+        let flight =
+            lock gate (fun () ->
+                if flights.ContainsKey cacheKey then
+                    Some flights.[cacheKey]
+                else
+                    None)
 
-            match flight with
-            | None ->
-                match! spec.Close owner with
-                | Ok() -> return Ok()
-                | Error error -> return Error error
-            | Some pending ->
-                match! pending with
-                | Error error ->
-                    this.Invalidate(owner, spec.Kind)
-                    return Error error
-                | Ok lease ->
-                    match! sessions.AbortSession lease.SessionId with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        match! spec.Close owner with
-                        | Error error -> return Error error
-                        | Ok() ->
-                            this.Invalidate(owner, spec.Kind)
-                            return Ok()
-        }
+        let invalidate () = this.Invalidate(owner, spec.Kind)
+
+        match flight with
+        | None -> spec.Close owner
+        | Some pending -> SatelliteLeaseFlow.retirePending sessions invalidate spec owner pending

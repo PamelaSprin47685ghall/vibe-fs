@@ -1,6 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -159,108 +161,157 @@ module PtyTool =
         else
             Ok language
 
+    let private finishToolOutcome (outcome: Result<string, string>) =
+        match outcome with
+        | Ok body -> body
+        | Error msg -> error msg
+
+    /// Evidence → Decision: open-terminal name+command prerequisites.
+    let private requireOpenArgs (language: ProviderLanguage) (args: HostToolArguments) =
+        let name = args.Text "name"
+        let command = args.Text "command"
+
+        if String.IsNullOrWhiteSpace name then
+            Error(prose language Path.OpenTerminal.NameRequired)
+        elif String.IsNullOrWhiteSpace command then
+            Error(prose language Path.OpenTerminal.CommandRequired)
+        else
+            Ok(name, command)
+
+    /// Evidence → Decision: ManagedAgent required for ForkPty authority.
+    let private requireManagedAgent (language: ProviderLanguage) (scope: ToolRuntimeScope) (context: HostToolContext) =
+        scope.ManagedAgentFor context
+        |> Result.requireSome (prose language Path.OpenTerminal.AuthorityRequired)
+
+    /// Evidence → Decision: terminal name must be free before ForkPty.
+    let private requirePtyNameAvailable
+        (language: ProviderLanguage)
+        (runtime: HostForkRuntime)
+        (name: string)
+        =
+        runtime.TryPtyByName name
+        |> Result.requireNone (namedProse language Path.OpenTerminal.AlreadyInUse (name.Trim()))
+
+    /// Evidence → Decision: bind name or untrack the freshly forked PTY.
+    let private bindOpenedTerminal
+        (language: ProviderLanguage)
+        (runtime: HostForkRuntime)
+        (name: string)
+        (id: PtyId)
+        =
+        match runtime.TryBindTerminalName(name, id) with
+        | Ok() -> Ok(instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim())))
+        | Error bindError ->
+            runtime.UntrackPtyRun id.Value
+            Error bindError
+
+    /// Evidence → Decision: named PTY must already exist for send/read/signal.
+    let private requirePtyByName
+        (language: ProviderLanguage)
+        (unknownPath: string)
+        (runtime: HostForkRuntime)
+        (name: string)
+        =
+        runtime.TryPtyByName name
+        |> Result.requireSome (namedProse language unknownPath (name.Trim()))
+
+    /// Evidence → Decision: empty read output vs payload.
+    let private readTerminalBody (language: ProviderLanguage) (name: string) (read: PtyRead) =
+        if String.IsNullOrWhiteSpace read.Output then
+            instruction (namedProse language Path.ReadTerminal.NothingNew (name.Trim()))
+        else
+            ToolHostCodec.tomlObject [ "output", tString read.Output ]
+
+    let private openTerminalOutcome
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! language = requireDevOps scope context Path.OpenTerminal.DevOpsOnly
+            let! name, command = requireOpenArgs language args
+            let! runtime = scope.RuntimeFor context
+            let! agent = requireManagedAgent language scope context
+            do! requirePtyNameAvailable language runtime name
+            let directory = scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
+            let! id = runtime.ForkPty(command, agent, ?cwd = directory)
+            return! bindOpenedTerminal language runtime name id
+        }
+
+    let private sendTerminalOutcome
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! language = requireDevOps scope context Path.SendTerminal.DevOpsOnly
+            let name = args.Text "name"
+            let input = args.Text "input"
+            let! runtime = scope.RuntimeFor context
+            let! ptyId = requirePtyByName language Path.SendTerminal.UnknownTerminal runtime name
+            let! _ = runtime.SendPty(ptyId, input, None)
+            return instruction (prose language Path.SendTerminal.InputSent)
+        }
+
+    let private readTerminalOutcome
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! language = requireDevOps scope context Path.ReadTerminal.DevOpsOnly
+            let name = args.Text "name"
+            let! runtime = scope.RuntimeFor context
+            let! ptyId = requirePtyByName language Path.ReadTerminal.UnknownTerminal runtime name
+            let! read = runtime.SendPty(ptyId, "", None)
+            return readTerminalBody language name read
+        }
+
+    let private signalTerminalOutcome
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! language = requireDevOps scope context Path.SignalTerminal.DevOpsOnly
+            let name = args.Text "name"
+            let signalRaw = args.Text "signal"
+            let! signalValue = PtySignal.tryParse signalRaw
+            let! runtime = scope.RuntimeFor context
+            let! ptyId = requirePtyByName language Path.SignalTerminal.UnknownTerminal runtime name
+            let! _ = runtime.SendPty(ptyId, "", Some signalValue)
+
+            return
+                instruction (
+                    ProviderProse.render
+                        language
+                        Path.SignalTerminal.SignalSent
+                        (Map [ "signal", signalRaw.Trim().ToUpperInvariant(); "name", name.Trim() ])
+                )
+        }
+
     let private openExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            match requireDevOps scope context Path.OpenTerminal.DevOpsOnly with
-            | Error msg -> return error msg
-            | Ok language ->
-                let name = args.Text "name"
-                let command = args.Text "command"
-
-                if String.IsNullOrWhiteSpace name then
-                    return error (prose language Path.OpenTerminal.NameRequired)
-                elif String.IsNullOrWhiteSpace command then
-                    return error (prose language Path.OpenTerminal.CommandRequired)
-                else
-                    match scope.RuntimeFor context with
-                    | Error runtimeError -> return error runtimeError
-                    | Ok runtime ->
-                        match scope.ManagedAgentFor context with
-                        | None -> return error (prose language Path.OpenTerminal.AuthorityRequired)
-                        | Some agent ->
-                            match runtime.TryPtyByName name with
-                            | Some _ -> return error (namedProse language Path.OpenTerminal.AlreadyInUse (name.Trim()))
-                            | None ->
-                                let directory =
-                                    scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
-
-                                match! runtime.ForkPty(command, agent, ?cwd = directory) with
-                                | Error forkError -> return error forkError
-                                | Ok id ->
-                                    match runtime.TryBindTerminalName(name, id) with
-                                    | Error bindError ->
-                                        runtime.UntrackPtyRun id.Value
-                                        return error bindError
-                                    | Ok() ->
-                                        return instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim()))
+            let! outcome = openTerminalOutcome scope args context
+            return finishToolOutcome outcome
         }
 
     let private sendExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            match requireDevOps scope context Path.SendTerminal.DevOpsOnly with
-            | Error msg -> return error msg
-            | Ok language ->
-                let name = args.Text "name"
-                let input = args.Text "input"
-
-                match scope.RuntimeFor context with
-                | Error runtimeError -> return error runtimeError
-                | Ok runtime ->
-                    match runtime.TryPtyByName name with
-                    | None -> return error (namedProse language Path.SendTerminal.UnknownTerminal (name.Trim()))
-                    | Some ptyId ->
-                        match! runtime.SendPty(ptyId, input, None) with
-                        | Ok _ -> return instruction (prose language Path.SendTerminal.InputSent)
-                        | Error sendError -> return error sendError
+            let! outcome = sendTerminalOutcome scope args context
+            return finishToolOutcome outcome
         }
 
     let private readExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            match requireDevOps scope context Path.ReadTerminal.DevOpsOnly with
-            | Error msg -> return error msg
-            | Ok language ->
-                let name = args.Text "name"
-
-                match scope.RuntimeFor context with
-                | Error runtimeError -> return error runtimeError
-                | Ok runtime ->
-                    match runtime.TryPtyByName name with
-                    | None -> return error (namedProse language Path.ReadTerminal.UnknownTerminal (name.Trim()))
-                    | Some ptyId ->
-                        match! runtime.SendPty(ptyId, "", None) with
-                        | Error readError -> return error readError
-                        | Ok read when String.IsNullOrWhiteSpace read.Output ->
-                            return instruction (namedProse language Path.ReadTerminal.NothingNew (name.Trim()))
-                        | Ok read -> return ToolHostCodec.tomlObject [ "output", tString read.Output ]
+            let! outcome = readTerminalOutcome scope args context
+            return finishToolOutcome outcome
         }
 
     let private signalExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            match requireDevOps scope context Path.SignalTerminal.DevOpsOnly with
-            | Error msg -> return error msg
-            | Ok language ->
-                let name = args.Text "name"
-                let signalRaw = args.Text "signal"
-
-                match PtySignal.tryParse signalRaw with
-                | Error signalError -> return error signalError
-                | Ok signalValue ->
-                    match scope.RuntimeFor context with
-                    | Error runtimeError -> return error runtimeError
-                    | Ok runtime ->
-                        match runtime.TryPtyByName name with
-                        | None -> return error (namedProse language Path.SignalTerminal.UnknownTerminal (name.Trim()))
-                        | Some ptyId ->
-                            match! runtime.SendPty(ptyId, "", Some signalValue) with
-                            | Ok _ ->
-                                return
-                                    instruction (
-                                        ProviderProse.render
-                                            language
-                                            Path.SignalTerminal.SignalSent
-                                            (Map [ "signal", signalRaw.Trim().ToUpperInvariant(); "name", name.Trim() ])
-                                    )
-                            | Error sendError -> return error sendError
+            let! outcome = signalTerminalOutcome scope args context
+            return finishToolOutcome outcome
         }
 
     let private signalValues =

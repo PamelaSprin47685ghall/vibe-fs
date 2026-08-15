@@ -16,6 +16,14 @@ module ProcessRunner =
     open Wanxiangshu.Process.Deadline
     open Wanxiangshu.Process.Spool
 
+    type private HostSpawn =
+        Command
+            -> ProcessContext
+            -> (byte[] -> unit)
+            -> (byte[] -> unit)
+            -> CancellationToken
+            -> Task<Result<ChildProcess, string>>
+
     /// EXEC-011: the effective deadline is `min(3 × estimate, administrator ceiling)`.
     /// Read from the context so the ceiling is the one the caller configured, not a
     /// second copy of the rule here.
@@ -33,14 +41,37 @@ module ProcessRunner =
         else
             Ok()
 
+    let private releaseGateIfHeld (gateHeld: bool) =
+        if gateHeld then
+            LargeGate.release ()
+
+    let private maybeAcquireGate (estimate: ProcessEstimate) (ct: CancellationToken) : Task<bool> =
+        if estimate.EstimatedMemory = EstimatedMemory.Large then
+            task {
+                do! LargeGate.acquire ct
+                return true
+            }
+        else
+            Task.FromResult false
+
+    let private killQuietly (child: ChildProcess) =
+        try
+            child.Kill()
+        with _ ->
+            ()
+
+    let private outcomeAfterWait
+        (collector: OutputCollector)
+        (budget: TimeSpan)
+        (waited: WaitOutcome)
+        : Result<ProcessOutcome, ProcessError> =
+        if waited.TimedOut then
+            Error(ProcessError.TimeoutExceeded budget)
+        else
+            Ok(buildResult collector waited.ExitCode)
+
     let private spawnHost
-        (hostSpawn:
-            Command
-                -> ProcessContext
-                -> (byte[] -> unit)
-                -> (byte[] -> unit)
-                -> CancellationToken
-                -> Task<Result<ChildProcess, string>>)
+        (hostSpawn: HostSpawn)
         (cmd: Command)
         (estimate: ProcessEstimate)
         (ctx: ProcessContext)
@@ -51,9 +82,10 @@ module ProcessRunner =
                 let collector = create estimate
                 let! spawnResult = hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct
 
-                match spawnResult with
-                | Ok child -> return Ok(child, collector)
-                | Error reason -> return Error(ProcessError.SpawnFailed reason)
+                return
+                    spawnResult
+                    |> Result.map (fun child -> child, collector)
+                    |> Result.mapError ProcessError.SpawnFailed
             with
             | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
             | :? OperationCanceledException when ct.IsCancellationRequested ->
@@ -61,66 +93,59 @@ module ProcessRunner =
             | ex -> return Error(ProcessError.ExecutionFailed ex.Message)
         }
 
-    let private runProgram
-        (hostSpawn:
-            Command
-                -> ProcessContext
-                -> (byte[] -> unit)
-                -> (byte[] -> unit)
-                -> CancellationToken
-                -> Task<Result<ChildProcess, string>>)
+    let private runSpawned
+        (child: ChildProcess)
+        (collector: OutputCollector)
+        (estimate: ProcessEstimate)
+        (ctx: ProcessContext)
+        (ct: CancellationToken)
+        : Task<Result<ProcessOutcome, ProcessError>> =
+        task {
+            let clock = fun () -> DateTimeOffset.UtcNow
+
+            // The applied budget is returned alongside the outcome so the
+            // reported timeout is the one that actually fired. Recomputing it
+            // for the error would be a second read of the ceiling, and a
+            // TimeoutExceeded carrying a different duration than the deadline
+            // that expired is a lie the operator cannot detect.
+            let budget = budgetSpan estimate ctx
+            let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
+            killQuietly child
+            return outcomeAfterWait collector budget waited
+        }
+
+    let private runAfterGate
+        (hostSpawn: HostSpawn)
         (cmd: Command)
         (estimate: ProcessEstimate)
         (ctx: ProcessContext)
         (ct: CancellationToken)
         : Task<Result<ProcessOutcome, ProcessError>> =
         task {
-            match validateEstimate estimate with
+            match! spawnHost hostSpawn cmd estimate ctx ct with
             | Error e -> return Error e
-            | Ok() ->
-                // DSL-MUTABLE: resource — LargeGate permit ownership flag (release-on-exit)
-                let mutable gateHeld = false
+            | Ok(child, collector) -> return! runSpawned child collector estimate ctx ct
+        }
 
-                try
-                    if estimate.EstimatedMemory = EstimatedMemory.Large then
-                        do! LargeGate.acquire ct
-                        gateHeld <- true
+    let private runProgram
+        (hostSpawn: HostSpawn)
+        (cmd: Command)
+        (estimate: ProcessEstimate)
+        (ctx: ProcessContext)
+        (ct: CancellationToken)
+        : Task<Result<ProcessOutcome, ProcessError>> =
+        taskResult {
+            do! validateEstimate estimate
+            let! gateHeld = TaskResultCE.ofTask (maybeAcquireGate estimate ct)
 
-                    match! spawnHost hostSpawn cmd estimate ctx ct with
-                    | Error e -> return Error e
-                    | Ok(child, collector) ->
-                        let clock = fun () -> DateTimeOffset.UtcNow
-
-                        // The applied budget is returned alongside the outcome so the
-                        // reported timeout is the one that actually fired. Recomputing it
-                        // for the error would be a second read of the ceiling, and a
-                        // TimeoutExceeded carrying a different duration than the deadline
-                        // that expired is a lie the operator cannot detect.
-                        let budget = budgetSpan estimate ctx
-                        let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
-
-                        try
-                            child.Kill()
-                        with _ ->
-                            ()
-
-                        if waited.TimedOut then
-                            return Error(ProcessError.TimeoutExceeded budget)
-                        else
-                            return Ok(buildResult collector waited.ExitCode)
-                finally
-                    if gateHeld then
-                        LargeGate.release ()
+            try
+                return! runAfterGate hostSpawn cmd estimate ctx ct
+            finally
+                releaseGateIfHeld gateHeld
         }
 
     let runWithHost
-        (hostSpawn:
-            Command
-                -> ProcessContext
-                -> (byte[] -> unit)
-                -> (byte[] -> unit)
-                -> CancellationToken
-                -> Task<Result<ChildProcess, string>>)
+        (hostSpawn: HostSpawn)
         (cmd: Command)
         (estimate: ProcessEstimate)
         (ctx: ProcessContext)
@@ -135,6 +160,36 @@ module ProcessRunner =
         (ct: CancellationToken)
         : Task<Result<ProcessOutcome, ProcessError>> =
         runWithHost NodeProcessHost.spawn cmd estimate ctx ct
+
+    let private emitOutputChunks
+        (onStdout: byte[] -> unit)
+        (onStderr: byte[] -> unit)
+        (outBytes: byte[])
+        (errBytes: byte[])
+        =
+        for chunk in chunkBytes 8192 outBytes do
+            onStdout chunk
+
+        for chunk in chunkBytes 8192 errBytes do
+            onStderr chunk
+
+    let private completeLauncherChild
+        (parentCt: CancellationToken)
+        (exited: bool ref)
+        (exitTcs: TaskCompletionSource<int>)
+        (onStdout: byte[] -> unit)
+        (onStderr: byte[] -> unit)
+        (finish: int -> unit)
+        (exitCode: int)
+        (outBytes: byte[])
+        (errBytes: byte[])
+        =
+        if parentCt.IsCancellationRequested then
+            exited.Value <- true
+            trySetCanceled exitTcs |> ignore
+        else
+            emitOutputChunks onStdout onStderr outBytes errBytes
+            finish exitCode
 
     /// Test seam that turns a pure launcher (cmd -> (exitCode, stdout, stderr))
     /// into a host so the full process lifecycle can be exercised.
@@ -183,17 +238,16 @@ module ProcessRunner =
                     try
                         let! (exitCode, outBytes, errBytes) = launcher cmd cts.Token
 
-                        if parentCt.IsCancellationRequested then
-                            exited.Value <- true
-                            trySetCanceled exitTcs |> ignore
-                        else
-                            for chunk in chunkBytes 8192 outBytes do
-                                onStdout chunk
-
-                            for chunk in chunkBytes 8192 errBytes do
-                                onStderr chunk
-
-                            finish exitCode
+                        completeLauncherChild
+                            parentCt
+                            exited
+                            exitTcs
+                            onStdout
+                            onStderr
+                            finish
+                            exitCode
+                            outBytes
+                            errBytes
                     with
                     // A killed process still reports an exit. Leaving the cell unset
                     // here would hang every waiter, since only the real exit completes

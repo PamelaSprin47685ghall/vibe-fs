@@ -122,21 +122,55 @@ module FissionHost =
         else
             None
 
+    let private handleStillOutstanding handles agentId =
+        match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
+        | Some { Lifecycle = HandleLifecycle.Retired } -> false
+        | Some _
+        | None -> true
+
+    let private externalStillOutstanding handles externalId =
+        match agentIdOfExternal externalId with
+        | None -> true
+        | Some agentId -> handleStillOutstanding handles agentId
+
+    let private affinityOutstanding handles laneIndex externalId affinity =
+        affinity = laneIndex && externalStillOutstanding handles externalId
+
     let private laneHasOutstandingExternal durable laneIndex (group: FissionGroupProjection) =
         let handles = AgentJournal.handleProjection durable group.OwnerSessionId
 
         group.ExternalAffinities
-        |> Map.exists (fun externalId affinity ->
-            if affinity <> laneIndex then
-                false
-            else
-                match agentIdOfExternal externalId with
-                | None -> true
-                | Some agentId ->
-                    match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
-                    | Some { Lifecycle = HandleLifecycle.Retired } -> false
-                    | Some _ -> true
-                    | None -> true)
+        |> Map.exists (fun externalId affinity -> affinityOutstanding handles laneIndex externalId affinity)
+
+    let private isHandleRetired durable ownerSessionId handle =
+        match HandleProjection.tryFind handle (AgentJournal.handleProjection durable ownerSessionId) with
+        | Some { Lifecycle = HandleLifecycle.Retired } -> true
+        | _ -> false
+
+    let private ensureRetiredAfterConsume durable ownerSessionId handle =
+        task {
+            match! HandleController.consume durable ownerSessionId handle with
+            | Ok _ -> return true
+            | Error _ -> return isHandleRetired durable ownerSessionId handle
+        }
+
+    let private tryConsumeCompletedHandle durable ownerSessionId handle =
+        match HandleProjection.tryFind handle (AgentJournal.handleProjection durable ownerSessionId) with
+        | Some { Lifecycle = HandleLifecycle.Retired } -> task { return true }
+        | Some { Lifecycle = HandleLifecycle.CompletedAwaitingJoin _ }
+        | Some { Lifecycle = HandleLifecycle.Abandoned _ } ->
+            ensureRetiredAfterConsume durable ownerSessionId handle
+        | Some { Lifecycle = HandleLifecycle.Active }
+        | None -> task { return false }
+
+    let private consumeOnePreFission durable (group: FissionGroupProjection) completionId =
+        match agentIdOfExternal completionId with
+        | None -> task { return true }
+        | Some agentId ->
+            tryConsumeCompletedHandle durable group.OwnerSessionId (HandleController.agentHandle agentId)
+
+    let private continuePreFissionConsume ok rest consume =
+        if ok then consume rest else task { return false }
 
     let private consumePreFissionAgents durable (group: FissionGroupProjection) =
         let rec consume completionIds =
@@ -144,87 +178,147 @@ module FissionHost =
                 match completionIds with
                 | [] -> return true
                 | completionId :: rest ->
-                    match agentIdOfExternal completionId with
-                    | None -> return! consume rest
-                    | Some agentId ->
-                        let handle = HandleController.agentHandle agentId
-                        let projection = AgentJournal.handleProjection durable group.OwnerSessionId
-
-                        match HandleProjection.tryFind handle projection with
-                        | Some { Lifecycle = HandleLifecycle.Retired } -> return! consume rest
-                        | Some { Lifecycle = HandleLifecycle.CompletedAwaitingJoin _ }
-                        | Some { Lifecycle = HandleLifecycle.Abandoned _ } ->
-                            match! HandleController.consume durable group.OwnerSessionId handle with
-                            | Ok _ -> return! consume rest
-                            | Error _ ->
-                                let after = AgentJournal.handleProjection durable group.OwnerSessionId
-
-                                match HandleProjection.tryFind handle after with
-                                | Some { Lifecycle = HandleLifecycle.Retired } -> return! consume rest
-                                | _ -> return false
-                        | Some { Lifecycle = HandleLifecycle.Active }
-                        | None -> return false
+                    let! ok = consumeOnePreFission durable group completionId
+                    return! continuePreFissionConsume ok rest consume
             }
 
         group.PreFissionCompletionIds |> Set.toList |> List.sort |> consume
 
-    let private aggregateWorkRecord durable (group: FissionGroupProjection) =
-        task {
-            match! readVerified durable group.OwnerWorkRecordRef group.OwnerWorkRecordDigest with
-            | Error error -> return Error error
-            | Ok ownerRecord ->
-                let blocks = ResizeArray<string>()
-                blocks.Add "[[fission_convergence]]"
-                blocks.Add(sprintf "lane_count = %d" group.LaneCount)
+    let private appendOneLaneWork
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (blocks: ResizeArray<string>)
+        laneIndex
+        =
+        taskResult {
+            match Map.tryFind laneIndex group.LaneWork with
+            | None -> return! Error(sprintf "missing lane work %d" laneIndex)
+            | Some(workRef, workDigest) ->
+                let! record = readVerified durable workRef workDigest
                 blocks.Add ""
-                blocks.Add "[owner_before_fission]"
-                blocks.Add ownerRecord
+                blocks.Add(sprintf "[lane.%d]" laneIndex)
+                blocks.Add record
+                return ()
+        }
 
-                let rec appendLaneWork laneIndex =
-                    task {
-                        if laneIndex >= group.LaneCount then
-                            return Ok()
-                        else
-                            match Map.tryFind laneIndex group.LaneWork with
-                            | None -> return Error(sprintf "missing lane work %d" laneIndex)
-                            | Some(workRef, workDigest) ->
-                                match! readVerified durable workRef workDigest with
-                                | Error readError -> return Error readError
-                                | Ok record ->
-                                    blocks.Add ""
-                                    blocks.Add(sprintf "[lane.%d]" laneIndex)
-                                    blocks.Add record
-                                    return! appendLaneWork (laneIndex + 1)
-                    }
+    let rec private appendLaneWorkBlocks
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (blocks: ResizeArray<string>)
+        laneIndex
+        =
+        taskResult {
+            if laneIndex >= group.LaneCount then
+                return ()
+            else
+                do! appendOneLaneWork durable group blocks laneIndex
+                return! appendLaneWorkBlocks durable group blocks (laneIndex + 1)
+        }
 
-                let rec appendSharedCompletions completionIds =
-                    task {
-                        match completionIds with
-                        | [] -> return Ok()
-                        | completionId :: rest ->
-                            match Map.tryFind completionId group.CapturedCompletions with
-                            | None -> return Error("missing captured shared completion: " + completionId)
-                            | Some(payloadRef, payloadDigest) ->
-                                match! readVerified durable payloadRef payloadDigest with
-                                | Error readError -> return Error readError
-                                | Ok payload ->
-                                    blocks.Add ""
-                                    blocks.Add("[shared_completion.\"" + completionId.Replace("\"", "\\\"") + "\"]")
-                                    blocks.Add payload
-                                    return! appendSharedCompletions rest
-                    }
+    let private appendOneSharedCompletion
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (blocks: ResizeArray<string>)
+        completionId
+        =
+        taskResult {
+            match Map.tryFind completionId group.CapturedCompletions with
+            | None -> return! Error("missing captured shared completion: " + completionId)
+            | Some(payloadRef, payloadDigest) ->
+                let! payload = readVerified durable payloadRef payloadDigest
+                blocks.Add ""
+                blocks.Add("[shared_completion.\"" + completionId.Replace("\"", "\\\"") + "\"]")
+                blocks.Add payload
+                return ()
+        }
 
-                match! appendLaneWork 0 with
-                | Error reason -> return Error reason
-                | Ok() ->
-                    match!
-                        group.PreFissionCompletionIds
-                        |> Set.toList
-                        |> List.sort
-                        |> appendSharedCompletions
-                    with
-                    | Error reason -> return Error reason
-                    | Ok() -> return Ok(String.concat "\n" (blocks |> Seq.toList))
+    let rec private appendSharedCompletionBlocks
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (blocks: ResizeArray<string>)
+        completionIds
+        =
+        taskResult {
+            match completionIds with
+            | [] -> return ()
+            | completionId :: rest ->
+                do! appendOneSharedCompletion durable group blocks completionId
+                return! appendSharedCompletionBlocks durable group blocks rest
+        }
+
+    let private aggregateWorkRecord (durable: AgentJournal) (group: FissionGroupProjection) =
+        taskResult {
+            let! ownerRecord = readVerified durable group.OwnerWorkRecordRef group.OwnerWorkRecordDigest
+            let blocks = ResizeArray<string>()
+            blocks.Add "[[fission_convergence]]"
+            blocks.Add(sprintf "lane_count = %d" group.LaneCount)
+            blocks.Add ""
+            blocks.Add "[owner_before_fission]"
+            blocks.Add ownerRecord
+            do! appendLaneWorkBlocks durable group blocks 0
+
+            do!
+                group.PreFissionCompletionIds
+                |> Set.toList
+                |> List.sort
+                |> appendSharedCompletionBlocks durable group blocks
+
+            return String.concat "\n" (blocks |> Seq.toList)
+        }
+
+    let private ownerAuthority projections ownerSessionId =
+        PromptAuthorityLedger.activeProfile ownerSessionId projections
+        |> Option.orElseWith (fun () ->
+            PromptAuthorityLedger.lastAuthorityProfile ownerSessionId projections)
+
+    let private notifyOwnerConverged
+        (eventPort: IEventObservationPort)
+        (group: FissionGroupProjection)
+        providerRun
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (aggregate: string)
+        =
+        eventPort.NotifyTerminal
+            group.OwnerSessionId
+            (TerminalOutcome.Completed
+                { SessionId = group.OwnerSessionId
+                  AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
+                  ProviderRun = providerRun
+                  Role = authority.CanonicalRole
+                  Directory = None
+                  TerminalText = aggregate
+                  TurnFormalText = aggregate })
+        |> ignore
+
+        FissionAdmission.releaseOwner group.OwnerSessionId
+        FissionRuntime.clearOwner group.OwnerSessionId
+        true
+
+    let private publishVerifiedAggregate
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        providerRun
+        (aggregate: string)
+        =
+        let projections = (AgentJournal.snapshot durable).AgentProjections
+
+        match ownerAuthority projections group.OwnerSessionId with
+        | None -> false
+        | Some authority -> notifyOwnerConverged eventPort group providerRun authority aggregate
+
+    let private publishAggregate
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        providerRun
+        aggregateRef
+        aggregateDigest
+        =
+        task {
+            match! readVerified durable aggregateRef aggregateDigest with
+            | Error _ -> return false
+            | Ok aggregate -> return publishVerifiedAggregate eventPort durable group providerRun aggregate
         }
 
     let private publishConverged
@@ -235,36 +329,148 @@ module FissionHost =
         task {
             match group.Terminal with
             | FissionGroupTerminal.Converged(_, providerRun, aggregateRef, aggregateDigest) ->
-                match! readVerified durable aggregateRef aggregateDigest with
-                | Error _ -> return false
-                | Ok aggregate ->
-                    let projections = (AgentJournal.snapshot durable).AgentProjections
-
-                    let profile =
-                        PromptAuthorityLedger.activeProfile group.OwnerSessionId projections
-                        |> Option.orElseWith (fun () ->
-                            PromptAuthorityLedger.lastAuthorityProfile group.OwnerSessionId projections)
-
-                    match profile with
-                    | None -> return false
-                    | Some authority ->
-                        eventPort.NotifyTerminal
-                            group.OwnerSessionId
-                            (TerminalOutcome.Completed
-                                { SessionId = group.OwnerSessionId
-                                  AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
-                                  ProviderRun = providerRun
-                                  Role = authority.CanonicalRole
-                                  Directory = None
-                                  TerminalText = aggregate
-                                  TurnFormalText = aggregate })
-                        |> ignore
-
-                        FissionAdmission.releaseOwner group.OwnerSessionId
-                        FissionRuntime.clearOwner group.OwnerSessionId
-                        return true
+                return! publishAggregate eventPort durable group providerRun aggregateRef aggregateDigest
             | _ -> return false
         }
+
+    let private allLaneWorkPresent (group: FissionGroupProjection) =
+        group.LaneWork.Count = group.LaneCount
+        && group.LaneProviderRuns.Count = group.LaneCount
+
+    let private allSharedCompletionsDelivered (group: FissionGroupProjection) =
+        group.PreFissionCompletionIds
+        |> Set.forall (fun completionId ->
+            let delivered =
+                group.CompletionDeliveries
+                |> Map.tryFind completionId
+                |> Option.defaultValue Set.empty
+
+            Map.containsKey completionId group.CapturedCompletions
+            && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+
+    let private appendConvergedFact
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        (aggregateBlob: BlobWriteReceipt)
+        terminalLane
+        terminalRun
+        =
+        appendFission
+            durable
+            owner
+            (Some terminalRun)
+            (FissionFact.FissionConverged
+                {| GroupId = group.GroupId
+                   OwnerSessionId = owner
+                   TerminalLaneSessionId = terminalLane
+                   TerminalProviderRun = terminalRun
+                   AggregateWorkRecordRef = aggregateBlob.BlobRef
+                   AggregateWorkRecordDigest = aggregateBlob.BlobDigest |})
+
+    let private publishAfterConverge
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        groupId
+        =
+        match
+            FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
+        with
+        | Some converged -> publishConverged eventPort durable converged
+        | None -> task { return false }
+
+    let private commitConvergenceWithTerminal
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        (aggregateBlob: BlobWriteReceipt)
+        terminalLane
+        terminalRun
+        =
+        task {
+            match! appendConvergedFact durable owner group aggregateBlob terminalLane terminalRun with
+            | Error _ -> return false
+            | Ok() -> return! publishAfterConverge eventPort durable group.GroupId
+        }
+
+    let private commitWithAggregateBlob
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        (aggregateBlob: BlobWriteReceipt)
+        =
+        let terminalIndex = group.LaneCount - 1
+
+        match
+            Map.tryFind terminalIndex group.LaneSessions, Map.tryFind terminalIndex group.LaneProviderRuns
+        with
+        | Some terminalLane, Some terminalRun ->
+            commitConvergenceWithTerminal eventPort durable owner group aggregateBlob terminalLane terminalRun
+        | _ -> task { return false }
+
+    let private writeAggregateAndCommit
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        (aggregate: string)
+        =
+        task {
+            match! durable.WriteBlob aggregate with
+            | Error _ -> return false
+            | Ok aggregateBlob -> return! commitWithAggregateBlob eventPort durable owner group aggregateBlob
+        }
+
+    let private commitConvergence
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        =
+        task {
+            match! aggregateWorkRecord durable group with
+            | Error _ -> return false
+            | Ok aggregate -> return! writeAggregateAndCommit eventPort durable owner group aggregate
+        }
+
+    let private afterPreConsumed
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        preConsumed
+        =
+        if not preConsumed then
+            task { return false }
+        else
+            commitConvergence eventPort durable owner group
+
+    let private tryConvergeOpen
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        =
+        task {
+            if not (allLaneWorkPresent group) || not (allSharedCompletionsDelivered group) then
+                return false
+            else
+                let! preConsumed = consumePreFissionAgents durable group
+                return! afterPreConsumed eventPort durable owner group preConsumed
+        }
+
+    let private tryConvergeGroup
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        owner
+        (group: FissionGroupProjection)
+        =
+        match group.Terminal with
+        | FissionGroupTerminal.Failed _ -> task { return false }
+        | FissionGroupTerminal.Converged _ -> publishConverged eventPort durable group
+        | FissionGroupTerminal.Open -> tryConvergeOpen eventPort durable owner group
 
     /// Attempt the single logical convergence. Safe to call from lane terminal,
     /// shared-completion delivery, or crash recovery. Completed publication is
@@ -275,70 +481,31 @@ module FissionHost =
                 FissionProjection.tryLatestForOwner owner (AgentJournal.snapshot durable).AgentProjections.Fission
             with
             | None -> return false
-            | Some group ->
-                match group.Terminal with
-                | FissionGroupTerminal.Failed _ -> return false
-                | FissionGroupTerminal.Converged _ -> return! publishConverged eventPort durable group
-                | FissionGroupTerminal.Open ->
-                    let allLaneWork =
-                        group.LaneWork.Count = group.LaneCount
-                        && group.LaneProviderRuns.Count = group.LaneCount
+            | Some group -> return! tryConvergeGroup eventPort durable owner group
+        }
 
-                    let allShared =
-                        group.PreFissionCompletionIds
-                        |> Set.forall (fun completionId ->
-                            let delivered =
-                                group.CompletionDeliveries
-                                |> Map.tryFind completionId
-                                |> Option.defaultValue Set.empty
+    let private captureNewPayload
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        completionId
+        (payload: string)
+        =
+        taskResult {
+            let! blob = durable.WriteBlob payload
 
-                            Map.containsKey completionId group.CapturedCompletions
-                            && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+            do!
+                appendFission
+                    durable
+                    group.OwnerSessionId
+                    None
+                    (FissionFact.FissionCompletionCaptured
+                        {| GroupId = group.GroupId
+                           OwnerSessionId = group.OwnerSessionId
+                           CompletionId = completionId
+                           PayloadRef = blob.BlobRef
+                           PayloadDigest = blob.BlobDigest |})
 
-                    if not allLaneWork || not allShared then
-                        return false
-                    else
-                        let! preConsumed = consumePreFissionAgents durable group
-
-                        if not preConsumed then
-                            return false
-                        else
-                            match! aggregateWorkRecord durable group with
-                            | Error _ -> return false
-                            | Ok aggregate ->
-                                match! durable.WriteBlob aggregate with
-                                | Error _ -> return false
-                                | Ok aggregateBlob ->
-                                    let terminalIndex = group.LaneCount - 1
-
-                                    match
-                                        Map.tryFind terminalIndex group.LaneSessions,
-                                        Map.tryFind terminalIndex group.LaneProviderRuns
-                                    with
-                                    | Some terminalLane, Some terminalRun ->
-                                        match!
-                                            appendFission
-                                                durable
-                                                owner
-                                                (Some terminalRun)
-                                                (FissionFact.FissionConverged
-                                                    {| GroupId = group.GroupId
-                                                       OwnerSessionId = owner
-                                                       TerminalLaneSessionId = terminalLane
-                                                       TerminalProviderRun = terminalRun
-                                                       AggregateWorkRecordRef = aggregateBlob.BlobRef
-                                                       AggregateWorkRecordDigest = aggregateBlob.BlobDigest |})
-                                        with
-                                        | Error _ -> return false
-                                        | Ok() ->
-                                            match
-                                                FissionProjection.tryGroup
-                                                    group.GroupId
-                                                    (AgentJournal.snapshot durable).AgentProjections.Fission
-                                            with
-                                            | Some converged -> return! publishConverged eventPort durable converged
-                                            | None -> return false
-                                    | _ -> return false
+            return (blob.BlobRef, blob.BlobDigest)
         }
 
     let private capturePayload
@@ -350,24 +517,278 @@ module FissionHost =
         task {
             match Map.tryFind completionId group.CapturedCompletions with
             | Some existing -> return Ok existing
-            | None ->
-                match! durable.WriteBlob payload with
-                | Error error -> return Error error
-                | Ok blob ->
-                    match!
-                        appendFission
-                            durable
-                            group.OwnerSessionId
-                            None
-                            (FissionFact.FissionCompletionCaptured
-                                {| GroupId = group.GroupId
-                                   OwnerSessionId = group.OwnerSessionId
-                                   CompletionId = completionId
-                                   PayloadRef = blob.BlobRef
-                                   PayloadDigest = blob.BlobDigest |})
-                    with
-                    | Error error -> return Error error
-                    | Ok() -> return Ok(blob.BlobRef, blob.BlobDigest)
+            | None -> return! captureNewPayload durable group completionId payload
+        }
+
+    let private appendDeliveryFact
+        (durable: AgentJournal)
+        groupId
+        ownerSessionId
+        completionId
+        laneIndex
+        =
+        appendFission
+            durable
+            ownerSessionId
+            None
+            (FissionFact.FissionCompletionDelivered
+                {| GroupId = groupId
+                   OwnerSessionId = ownerSessionId
+                   CompletionId = completionId
+                   LaneIndex = laneIndex |})
+
+    let private sendSharedCompletionContinuation
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        laneSessionId
+        completionId
+        (payload: string)
+        =
+        let effectiveAgent = authority.SelectedAgent
+
+        let prompt =
+            String.concat
+                "\n"
+                [ "A completion that was already outstanding before Fission now belongs to every present of this same participant."
+                  "Treat it as one shared completion fact, not as newly delegated work."
+                  "completion_id = " + completionId
+                  ""
+                  payload ]
+
+        let dispatcher = PromptDispatcher.forJournal durable
+
+        dispatcher.SendContinuation
+            sessionPort
+            laneSessionId
+            prompt
+            PromptAuthority.ContinuationKind.FissionHandoff
+            authority
+            effectiveAgent
+            (directoryFor laneSessionId)
+            PromptDispatcher.AwaitMode.Detached
+            None
+
+    let private sendThenMarkDelivery
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (now: FissionGroupProjection)
+        laneIndex
+        laneSessionId
+        (payload: string)
+        =
+        task {
+            match!
+                sendSharedCompletionContinuation
+                    sessionPort
+                    durable
+                    directoryFor
+                    authority
+                    laneSessionId
+                    completionId
+                    payload
+            with
+            | Error _ -> return ()
+            | Ok _ ->
+                let! _ = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+                return ()
+        }
+
+    let private deliverOrMarkLane
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (now: FissionGroupProjection)
+        laneIndex
+        laneSessionId
+        (payload: string)
+        =
+        if Map.containsKey laneIndex now.LaneWork then
+            task {
+                let! _ = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+                return ()
+            }
+        else
+            sendThenMarkDelivery
+                sessionPort
+                durable
+                directoryFor
+                groupId
+                completionId
+                authority
+                now
+                laneIndex
+                laneSessionId
+                payload
+
+    let private deliverOneLaneSession
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (now: FissionGroupProjection)
+        laneIndex
+        (payload: string)
+        =
+        match Map.tryFind laneIndex now.LaneSessions with
+        | None -> task { return () }
+        | Some laneSessionId ->
+            deliverOrMarkLane
+                sessionPort
+                durable
+                directoryFor
+                groupId
+                completionId
+                authority
+                now
+                laneIndex
+                laneSessionId
+                payload
+
+    let private deliverOneLane
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        laneIndex
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (payload: string)
+        =
+        let current =
+            FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
+
+        match current with
+        | None -> task { return () }
+        | Some now when completionDeliveredTo laneIndex completionId now -> task { return () }
+        | Some now ->
+            deliverOneLaneSession
+                sessionPort
+                durable
+                directoryFor
+                groupId
+                completionId
+                authority
+                now
+                laneIndex
+                payload
+
+    let private deliverAllLanes
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (group: FissionGroupProjection)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (payload: string)
+        =
+        task {
+            for laneIndex in [ 0 .. group.LaneCount - 1 ] do
+                do!
+                    deliverOneLane
+                        sessionPort
+                        durable
+                        directoryFor
+                        groupId
+                        completionId
+                        laneIndex
+                        authority
+                        payload
+        }
+
+    let private deliverPayloadWithAuthority
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (group: FissionGroupProjection)
+        (payload: string)
+        =
+        let projections = (AgentJournal.snapshot durable).AgentProjections
+
+        match ownerAuthority projections group.OwnerSessionId with
+        | None -> task { return () }
+        | Some authority ->
+            task {
+                do!
+                    deliverAllLanes
+                        sessionPort
+                        durable
+                        directoryFor
+                        groupId
+                        completionId
+                        group
+                        authority
+                        payload
+
+                let! _ = tryConverge eventPort durable group.OwnerSessionId
+                return ()
+            }
+
+    let private deliverVerifiedPayload
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        completionId
+        (group: FissionGroupProjection)
+        payloadRef
+        payloadDigest
+        =
+        task {
+            match! readVerified durable payloadRef payloadDigest with
+            | Error _ -> return ()
+            | Ok payload ->
+                return!
+                    deliverPayloadWithAuthority
+                        sessionPort
+                        eventPort
+                        durable
+                        directoryFor
+                        groupId
+                        completionId
+                        group
+                        payload
+        }
+
+    let private deliverCapturedInGroup
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        groupId
+        (group: FissionGroupProjection)
+        completionId
+        =
+        task {
+            match Map.tryFind completionId group.CapturedCompletions with
+            | None -> return ()
+            | Some(payloadRef, payloadDigest) ->
+                return!
+                    deliverVerifiedPayload
+                        sessionPort
+                        eventPort
+                        durable
+                        directoryFor
+                        groupId
+                        completionId
+                        group
+                        payloadRef
+                        payloadDigest
         }
 
     let private deliverCaptured
@@ -382,91 +803,50 @@ module FissionHost =
             match FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission with
             | None -> return ()
             | Some group ->
-                match Map.tryFind completionId group.CapturedCompletions with
-                | None -> return ()
-                | Some(payloadRef, payloadDigest) ->
-                    match! readVerified durable payloadRef payloadDigest with
-                    | Error _ -> return ()
-                    | Ok payload ->
-                        let projections = (AgentJournal.snapshot durable).AgentProjections
+                return!
+                    deliverCapturedInGroup
+                        sessionPort
+                        eventPort
+                        durable
+                        directoryFor
+                        groupId
+                        group
+                        completionId
+        }
 
-                        let profile =
-                            PromptAuthorityLedger.activeProfile group.OwnerSessionId projections
-                            |> Option.orElseWith (fun () ->
-                                PromptAuthorityLedger.lastAuthorityProfile group.OwnerSessionId projections)
+    let private abortAllLaneSessions (sessionPort: ISessionHostPort) (group: FissionGroupProjection) =
+        task {
+            for KeyValue(_, laneSessionId) in group.LaneSessions do
+                let! _ = sessionPort.AbortSession laneSessionId
+                ()
+        }
 
-                        match profile with
-                        | None -> return ()
-                        | Some authority ->
-                            for laneIndex in [ 0 .. group.LaneCount - 1 ] do
-                                let current =
-                                    FissionProjection.tryGroup
-                                        groupId
-                                        (AgentJournal.snapshot durable).AgentProjections.Fission
+    let private failOpenGroup
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        reason
+        =
+        task {
+            match!
+                appendFission
+                    durable
+                    group.OwnerSessionId
+                    None
+                    (FissionFact.FissionFailed
+                        {| GroupId = group.GroupId
+                           OwnerSessionId = group.OwnerSessionId
+                           Reason = reason |})
+            with
+            | Error _ -> return ()
+            | Ok() ->
+                do! abortAllLaneSessions sessionPort group
+                eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed reason)
+                |> ignore
 
-                                match current with
-                                | None -> ()
-                                | Some now when completionDeliveredTo laneIndex completionId now -> ()
-                                | Some now ->
-                                    match Map.tryFind laneIndex now.LaneSessions with
-                                    | None -> ()
-                                    | Some laneSessionId ->
-                                        if Map.containsKey laneIndex now.LaneWork then
-                                            let! _ =
-                                                appendFission
-                                                    durable
-                                                    now.OwnerSessionId
-                                                    None
-                                                    (FissionFact.FissionCompletionDelivered
-                                                        {| GroupId = groupId
-                                                           OwnerSessionId = now.OwnerSessionId
-                                                           CompletionId = completionId
-                                                           LaneIndex = laneIndex |})
-
-                                            ()
-                                        else
-                                            let effectiveAgent = authority.SelectedAgent
-
-                                            let prompt =
-                                                String.concat
-                                                    "\n"
-                                                    [ "A completion that was already outstanding before Fission now belongs to every present of this same participant."
-                                                      "Treat it as one shared completion fact, not as newly delegated work."
-                                                      "completion_id = " + completionId
-                                                      ""
-                                                      payload ]
-
-                                            let dispatcher = PromptDispatcher.forJournal durable
-
-                                            match!
-                                                dispatcher.SendContinuation
-                                                    sessionPort
-                                                    laneSessionId
-                                                    prompt
-                                                    PromptAuthority.ContinuationKind.FissionHandoff
-                                                    authority
-                                                    effectiveAgent
-                                                    (directoryFor laneSessionId)
-                                                    PromptDispatcher.AwaitMode.Detached
-                                                    None
-                                            with
-                                            | Error _ -> ()
-                                            | Ok _ ->
-                                                let! _ =
-                                                    appendFission
-                                                        durable
-                                                        now.OwnerSessionId
-                                                        None
-                                                        (FissionFact.FissionCompletionDelivered
-                                                            {| GroupId = groupId
-                                                               OwnerSessionId = now.OwnerSessionId
-                                                               CompletionId = completionId
-                                                               LaneIndex = laneIndex |})
-
-                                                ()
-
-                            let! _ = tryConverge eventPort durable group.OwnerSessionId
-                            return ()
+                FissionAdmission.releaseOwner group.OwnerSessionId
+                FissionRuntime.clearOwner group.OwnerSessionId
         }
 
     let private failGroup
@@ -478,30 +858,201 @@ module FissionHost =
         =
         task {
             match group.Terminal with
-            | FissionGroupTerminal.Open ->
-                match!
-                    appendFission
-                        durable
-                        group.OwnerSessionId
-                        None
-                        (FissionFact.FissionFailed
-                            {| GroupId = group.GroupId
-                               OwnerSessionId = group.OwnerSessionId
-                               Reason = reason |})
-                with
-                | Error _ -> return ()
-                | Ok() ->
-                    for KeyValue(_, laneSessionId) in group.LaneSessions do
-                        let! _ = sessionPort.AbortSession laneSessionId
-                        ()
-
-                    eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed reason)
-                    |> ignore
-
-                    FissionAdmission.releaseOwner group.OwnerSessionId
-                    FissionRuntime.clearOwner group.OwnerSessionId
+            | FissionGroupTerminal.Open -> do! failOpenGroup sessionPort eventPort durable group reason
             | _ -> ()
         }
+
+    let private appendLaneMaterialized
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        (workBlob: BlobWriteReceipt)
+        =
+        appendFission
+            durable
+            group.OwnerSessionId
+            (Some turn.ProviderRun)
+            (FissionFact.FissionLaneMaterialized
+                {| GroupId = group.GroupId
+                   OwnerSessionId = group.OwnerSessionId
+                   LaneIndex = laneIndex
+                   LaneSessionId = turn.SessionId
+                   ProviderRun = turn.ProviderRun
+                   WorkRecordRef = workBlob.BlobRef
+                   WorkRecordDigest = workBlob.BlobDigest |})
+
+    let private afterLaneMaterializedAppend
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (outcome: Result<unit, string>)
+        =
+        task {
+            match outcome with
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
+            | Ok() ->
+                let! _ = tryConverge eventPort durable group.OwnerSessionId
+                return true
+        }
+
+    let private writeLaneWorkAndMaterialize
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        (workRecord: string)
+        =
+        task {
+            match! durable.WriteBlob workRecord with
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
+            | Ok workBlob ->
+                let! outcome = appendLaneMaterialized durable group laneIndex turn workBlob
+                return! afterLaneMaterializedAppend sessionPort eventPort durable group outcome
+        }
+
+    let private materializeCompletedLane
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        task {
+            match! LifecycleWorkRecordProjection.lifecycleWorkRecord (Some durable) turn.SessionId true with
+            | None ->
+                do!
+                    failGroup
+                        sessionPort
+                        eventPort
+                        durable
+                        group
+                        "Fission lane completed without canonical Lifecycle Work Record"
+
+                return true
+            | Some workRecord ->
+                return! writeLaneWorkAndMaterialize sessionPort eventPort durable group laneIndex turn workRecord
+        }
+
+    let private observeOpenLaneCompletion
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        task {
+            if laneHasOutstandingExternal durable laneIndex group then
+                let! _ =
+                    HostJoinGuard.nudge
+                        sessionPort
+                        journal
+                        joinGuardNudges
+                        turn.SessionId
+                        turn.Directory
+
+                return true
+            elif not (sharedInputsAccounted laneIndex group) then
+                // The shared completion broadcaster will send a same-run
+                // continuation when the missing fact arrives.
+                return true
+            else
+                return! materializeCompletedLane sessionPort eventPort durable group laneIndex turn
+        }
+
+    let private observeCompletedLane
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        match group.Terminal with
+        | FissionGroupTerminal.Converged _
+        | FissionGroupTerminal.Failed _ -> task { return true }
+        | FissionGroupTerminal.Open ->
+            observeOpenLaneCompletion
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                durable
+                group
+                laneIndex
+                turn
+
+    let private observeLaneOutcome
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        match turn.Outcome with
+        | ReconcileProgram.TurnInProgress
+        | ReconcileProgram.TurnNeedsContinuation _ -> task { return false }
+        | ReconcileProgram.TurnFailed _ ->
+            // Provider-attempt failure remains lane-local and follows the
+            // ordinary A/A/B/B recovery path. Fission does not turn one
+            // failed attempt into group failure.
+            task { return false }
+        | ReconcileProgram.TurnAborted reason ->
+            task {
+                do! failGroup sessionPort eventPort durable group reason
+                return true
+            }
+        | ReconcileProgram.TurnCompleted ->
+            observeCompletedLane
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                durable
+                group
+                laneIndex
+                turn
+
+    let private observeDurableLaneTurn
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (durable: AgentJournal)
+        (turn: ReconciledTurn)
+        =
+        match
+            FissionProjection.tryMembershipOfLane
+                turn.SessionId
+                (AgentJournal.snapshot durable).AgentProjections.Fission
+        with
+        | None -> task { return false }
+        | Some(group, laneIndex) ->
+            observeLaneOutcome
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                durable
+                group
+                laneIndex
+                turn
 
     /// Returns true when this turn belongs to Fission and its terminal semantics
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
@@ -530,81 +1081,12 @@ module FissionHost =
                 return true
             | false, None -> return false
             | false, Some durable ->
-                match
-                    FissionProjection.tryMembershipOfLane
-                        turn.SessionId
-                        (AgentJournal.snapshot durable).AgentProjections.Fission
-                with
-                | None -> return false
-                | Some(group, laneIndex) ->
-                    match turn.Outcome with
-                    | ReconcileProgram.TurnInProgress
-                    | ReconcileProgram.TurnNeedsContinuation _ -> return false
-                    | ReconcileProgram.TurnFailed _ ->
-                        // Provider-attempt failure remains lane-local and follows the
-                        // ordinary A/A/B/B recovery path. Fission does not turn one
-                        // failed attempt into group failure.
-                        return false
-                    | ReconcileProgram.TurnAborted reason ->
-                        do! failGroup sessionPort eventPort durable group reason
-                        return true
-                    | ReconcileProgram.TurnCompleted ->
-                        match group.Terminal with
-                        | FissionGroupTerminal.Converged _
-                        | FissionGroupTerminal.Failed _ -> return true
-                        | FissionGroupTerminal.Open ->
-                            if laneHasOutstandingExternal durable laneIndex group then
-                                let! _ =
-                                    HostJoinGuard.nudge
-                                        sessionPort
-                                        journal
-                                        joinGuardNudges
-                                        turn.SessionId
-                                        turn.Directory
-
-                                return true
-                            elif not (sharedInputsAccounted laneIndex group) then
-                                // The shared completion broadcaster will send a same-run
-                                // continuation when the missing fact arrives.
-                                return true
-                            else
-                                match!
-                                    LifecycleWorkRecordProjection.lifecycleWorkRecord (Some durable) turn.SessionId true
-                                with
-                                | None ->
-                                    do!
-                                        failGroup
-                                            sessionPort
-                                            eventPort
-                                            durable
-                                            group
-                                            "Fission lane completed without canonical Lifecycle Work Record"
-
-                                    return true
-                                | Some workRecord ->
-                                    match! durable.WriteBlob workRecord with
-                                    | Error error ->
-                                        do! failGroup sessionPort eventPort durable group error
-                                        return true
-                                    | Ok workBlob ->
-                                        match!
-                                            appendFission
-                                                durable
-                                                group.OwnerSessionId
-                                                (Some turn.ProviderRun)
-                                                (FissionFact.FissionLaneMaterialized
-                                                    {| GroupId = group.GroupId
-                                                       OwnerSessionId = group.OwnerSessionId
-                                                       LaneIndex = laneIndex
-                                                       LaneSessionId = turn.SessionId
-                                                       ProviderRun = turn.ProviderRun
-                                                       WorkRecordRef = workBlob.BlobRef
-                                                       WorkRecordDigest = workBlob.BlobDigest |})
-                                        with
-                                        | Error error ->
-                                            do! failGroup sessionPort eventPort durable group error
-                                            return true
-                                        | Ok() ->
-                                            let! _ = tryConverge eventPort durable group.OwnerSessionId
-                                            return true
+                return!
+                    observeDurableLaneTurn
+                        sessionPort
+                        eventPort
+                        journal
+                        joinGuardNudges
+                        durable
+                        turn
         }

@@ -58,6 +58,246 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.OpenCode
 
+module private CompanionHostDecisions =
+
+    type EnsureSource =
+        | Restore of string
+        | CreateFresh
+
+    let linkBlogger
+        (durable: ICompanionDurablePort option)
+        (recordLinked: SessionId -> unit)
+        : SessionId -> SessionId -> string -> Task<Result<unit, string>> =
+        fun owner id agent ->
+            taskResult {
+                match durable with
+                | None ->
+                    recordLinked id
+                    return ()
+                | Some port ->
+                    do! port.LinkBlogger(owner, id, agent)
+                    recordLinked id
+            }
+
+    let closeBlogger (durable: ICompanionDurablePort option) : SessionId -> Task<Result<unit, string>> =
+        fun owner ->
+            match durable with
+            | None -> Task.FromResult(Ok())
+            | Some port -> port.CloseBlogger owner
+
+    let bloggerCursorOffset (primaryId: SessionId) (journal: AgentJournal option) : AgentPairCursor.FallbackOffset =
+        journal
+        |> Option.bind (fun j -> FallbackEvidence.tryCurrentState primaryId (AgentJournal.snapshot j))
+        |> Option.map (fun current -> current.Cursor.Offset)
+        |> Option.defaultValue AgentPairCursor.FallbackOffset.Fork0
+
+    let decideEnsureSource (restoredOpt: string option) (bloggerIdOpt: SessionId option) : EnsureSource =
+        match restoredOpt, bloggerIdOpt with
+        | Some id, None -> Restore id
+        | _ -> CreateFresh
+
+    let executeEnsureSource
+        (sessions: ISessionHostPort)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (source: EnsureSource)
+        : Task<Result<SessionId, string>> =
+        taskResult {
+            match source with
+            | Restore id -> return SessionId.create id
+            | CreateFresh ->
+                return!
+                    sessions.CreateChildSession(
+                        primaryId,
+                        { Title = Some agent
+                          Agent = Some agent
+                          Directory = directory }
+                    )
+        }
+
+    let finishCreateLink
+        (durable: ICompanionDurablePort option)
+        (recordLinked: SessionId -> unit)
+        (primaryId: SessionId)
+        (agent: string)
+        (sid: SessionId)
+        (onFailed: unit -> unit)
+        : Task<SessionId> =
+        task {
+            let! outcome =
+                task {
+                    try
+                        let! linked = linkBlogger durable recordLinked primaryId sid agent
+                        return Result.mapError (fun msg -> InvalidOperationException msg :> exn) linked
+                    with ex ->
+                        return Error ex
+                }
+
+            match outcome with
+            | Ok() -> return sid
+            | Error ex ->
+                onFailed ()
+                return raise ex
+        }
+
+    let runEnsureSource
+        (sessions: ISessionHostPort)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (source: EnsureSource)
+        : Task<Result<SessionId, exn>> =
+        task {
+            try
+                let! result = executeEnsureSource sessions primaryId agent directory source
+                return Result.mapError (fun msg -> InvalidOperationException msg :> exn) result
+            with ex ->
+                return Error ex
+        }
+
+    let ensureViaSatellite
+        (runtime: SatelliteRuntime)
+        (durable: ICompanionDurablePort option)
+        (recordLinked: SessionId -> unit)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (readRestored: unit -> string option)
+        (onEnsured: SessionId -> unit)
+        (clearRestoredId: unit -> unit)
+        (onFailed: unit -> unit)
+        : Task<SessionId> =
+        task {
+            let! outcome =
+                taskResult {
+                    let spec =
+                        { Kind = SatelliteKind.Companion
+                          Agent = agent
+                          Title = agent
+                          Directory = directory
+                          RestoredSessionId = readRestored () |> Option.map SessionId.create
+                          Link = linkBlogger durable recordLinked
+                          Close = closeBlogger durable }
+
+                    return! runtime.Ensure(primaryId, spec)
+                }
+
+            match outcome with
+            | Error error ->
+                onFailed ()
+                return raise (InvalidOperationException error)
+            | Ok lease ->
+                onEnsured lease.SessionId
+                clearRestoredId ()
+                return lease.SessionId
+        }
+
+    let ensureViaSessions
+        (sessions: ISessionHostPort)
+        (durable: ICompanionDurablePort option)
+        (recordLinked: SessionId -> unit)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (readRestored: unit -> string option)
+        (readBloggerId: unit -> SessionId option)
+        (onEnsured: SessionId -> unit)
+        (clearRestoredId: unit -> unit)
+        (onFailed: unit -> unit)
+        : Task<SessionId> =
+        task {
+            let source = decideEnsureSource (readRestored ()) (readBloggerId ())
+            let! outcome = runEnsureSource sessions primaryId agent directory source
+
+            match source, outcome with
+            | Restore _, Ok sid ->
+                onEnsured sid
+                clearRestoredId ()
+                return sid
+            | CreateFresh, Ok sid ->
+                onEnsured sid
+                return! finishCreateLink durable recordLinked primaryId agent sid onFailed
+            | _, Error ex ->
+                onFailed ()
+                return raise ex
+        }
+
+    let startEnsureBlogger
+        (satelliteRuntime: SatelliteRuntime option)
+        (sessions: ISessionHostPort)
+        (durable: ICompanionDurablePort option)
+        (recordLinked: SessionId -> unit)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (readRestored: unit -> string option)
+        (readBloggerId: unit -> SessionId option)
+        (onEnsured: SessionId -> unit)
+        (clearRestoredId: unit -> unit)
+        (onFailed: unit -> unit)
+        : Task<SessionId> =
+        match satelliteRuntime with
+        | Some runtime ->
+            ensureViaSatellite
+                runtime
+                durable
+                recordLinked
+                primaryId
+                agent
+                directory
+                readRestored
+                onEnsured
+                clearRestoredId
+                onFailed
+        | None ->
+            ensureViaSessions
+                sessions
+                durable
+                recordLinked
+                primaryId
+                agent
+                directory
+                readRestored
+                readBloggerId
+                onEnsured
+                clearRestoredId
+                onFailed
+
+    let retireBlogger
+        (satelliteRuntime: SatelliteRuntime option)
+        (sessions: ISessionHostPort)
+        (durable: ICompanionDurablePort option)
+        (primaryId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (childId: SessionId)
+        : Task<Result<unit, string>> =
+        match satelliteRuntime with
+        | Some runtime ->
+            taskResult {
+                let spec =
+                    { Kind = SatelliteKind.Companion
+                      Agent = agent
+                      Title = agent
+                      Directory = directory
+                      RestoredSessionId = Some childId
+                      Link = fun _ _ _ -> Task.FromResult(Ok())
+                      Close = closeBlogger durable }
+
+                do! runtime.Retire(primaryId, spec)
+            }
+        | None ->
+            taskResult {
+                do! sessions.AbortSession(childId)
+                do! closeBlogger durable primaryId
+            }
+
+    let applyCloseResult (recordClosed: unit -> unit) (closed: Result<unit, string>) : unit =
+        match closed with
+        | Ok() -> recordClosed ()
+        | Error error -> raise (InvalidOperationException error)
+
 type CompanionHost
     (
         primaryId: SessionId,
@@ -97,87 +337,24 @@ type CompanionHost
             | Some task -> task
             | None ->
                 let task =
-                    match satelliteRuntime with
-                    | Some runtime ->
-                        task {
-                            let spec =
-                                { Kind = SatelliteKind.Companion
-                                  Agent = bloggerEffectiveAgent
-                                  Title = bloggerEffectiveAgent
-                                  Directory = bloggerDirectory
-                                  RestoredSessionId = restoredBloggerIdOpt |> Option.map SessionId.create
-                                  Link =
-                                    fun owner id agent ->
-                                        task {
-                                            match durable with
-                                            | None ->
-                                                companion.RecordBloggerLinked id
-                                                return Ok()
-                                            | Some port ->
-                                                match! port.LinkBlogger(owner, id, agent) with
-                                                | Ok() ->
-                                                    companion.RecordBloggerLinked id
-                                                    return Ok()
-                                                | Error error -> return Error error
-                                        }
-                                  Close =
-                                    fun owner ->
-                                        match durable with
-                                        | None -> Task.FromResult(Ok())
-                                        | Some port -> port.CloseBlogger owner }
-
-                            match! runtime.Ensure(primaryId, spec) with
-                            | Error error ->
-                                bloggerCreateFailed <- true
-                                bloggerId <- None
-                                return raise (InvalidOperationException error)
-                            | Ok lease ->
-                                bloggerId <- Some lease.SessionId
-                                bloggerCreateFailed <- false
-                                restoredBloggerIdOpt <- None
-                                bloggerCreated lease.SessionId
-                                return lease.SessionId
-                        }
-                    | None ->
-                        task {
-                            try
-                                match restoredBloggerIdOpt, bloggerId with
-                                | Some id, None ->
-                                    let sid = SessionId.create id
-                                    bloggerId <- Some sid
-                                    bloggerCreateFailed <- false
-                                    bloggerCreated sid
-                                    restoredBloggerIdOpt <- None
-                                    return sid
-                                | _ ->
-                                    let! created =
-                                        sessions.CreateChildSession(
-                                            primaryId,
-                                            { Title = Some bloggerEffectiveAgent
-                                              Agent = Some bloggerEffectiveAgent
-                                              Directory = bloggerDirectory }
-                                        )
-
-                                    match created with
-                                    | Ok id ->
-                                        bloggerId <- Some id
-                                        bloggerCreateFailed <- false
-                                        bloggerCreated id
-
-                                        match durable with
-                                        | None -> companion.RecordBloggerLinked id
-                                        | Some port ->
-                                            match! port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) with
-                                            | Ok() -> companion.RecordBloggerLinked id
-                                            | Error error -> raise (InvalidOperationException error)
-
-                                        return id
-                                    | Error error -> return raise (InvalidOperationException error)
-                            with ex ->
-                                bloggerCreateFailed <- true
-                                bloggerId <- None
-                                return raise ex
-                        }
+                    CompanionHostDecisions.startEnsureBlogger
+                        satelliteRuntime
+                        sessions
+                        durable
+                        companion.RecordBloggerLinked
+                        primaryId
+                        bloggerEffectiveAgent
+                        bloggerDirectory
+                        (fun () -> restoredBloggerIdOpt)
+                        (fun () -> bloggerId)
+                        (fun sid ->
+                            bloggerId <- Some sid
+                            bloggerCreateFailed <- false
+                            bloggerCreated sid)
+                        (fun () -> restoredBloggerIdOpt <- None)
+                        (fun () ->
+                            bloggerCreateFailed <- true
+                            bloggerId <- None)
 
                 bloggerCreateTask <- Some task
                 task)
@@ -235,12 +412,7 @@ type CompanionHost
     /// CTX-006: primary session fallback cursor Offset (durable, not cached).
     /// FALLBACK-002: the offset leaves this boundary as the closed DU.
     member this.BloggerCursorOffset() : AgentPairCursor.FallbackOffset =
-        match journal with
-        | Some j ->
-            match FallbackEvidence.tryCurrentState primaryId (AgentJournal.snapshot j) with
-            | Some current -> current.Cursor.Offset
-            | None -> AgentPairCursor.FallbackOffset.Fork0
-        | None -> AgentPairCursor.FallbackOffset.Fork0
+        CompanionHostDecisions.bloggerCursorOffset primaryId journal
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =
@@ -280,43 +452,21 @@ type CompanionHost
             let taskOpt = lock gate (fun () -> bloggerCreateTask)
 
             match taskOpt with
-            | Some task ->
-                let! childId = task
-
-                match satelliteRuntime with
-                | Some runtime ->
-                    let spec =
-                        { Kind = SatelliteKind.Companion
-                          Agent = bloggerEffectiveAgent
-                          Title = bloggerEffectiveAgent
-                          Directory = bloggerDirectory
-                          RestoredSessionId = Some childId
-                          Link = fun _ _ _ -> Task.FromResult(Ok())
-                          Close =
-                            fun owner ->
-                                match durable with
-                                | None -> Task.FromResult(Ok())
-                                | Some port -> port.CloseBlogger owner }
-
-                    match! runtime.Retire(primaryId, spec) with
-                    | Ok() -> ()
-                    | Error error -> raise (InvalidOperationException error)
-                | None ->
-                    let! aborted = sessions.AbortSession(childId)
-
-                    match aborted with
-                    | Ok() -> ()
-                    | Error error -> raise (InvalidOperationException error)
-
-                    match durable with
-                    | None -> ()
-                    | Some port ->
-                        match! port.CloseBlogger primaryId with
-                        | Ok() -> ()
-                        | Error error -> raise (InvalidOperationException error)
-
-                companion.RecordBloggerClosed()
             | None -> ()
+            | Some pending ->
+                let! childId = pending
+
+                let! closed =
+                    CompanionHostDecisions.retireBlogger
+                        satelliteRuntime
+                        sessions
+                        durable
+                        primaryId
+                        bloggerEffectiveAgent
+                        bloggerDirectory
+                        childId
+
+                CompanionHostDecisions.applyCloseResult companion.RecordBloggerClosed closed
         }
 
     interface IDisposable with

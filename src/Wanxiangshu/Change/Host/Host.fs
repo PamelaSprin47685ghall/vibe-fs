@@ -49,6 +49,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Barrier
+open FsToolkit.ErrorHandling
 
 /// Host wiring for the Orchestrator: forks Managers and reviewers under one
 /// runtime, and supplies `ManagerPort` to the pure publish program.
@@ -60,11 +61,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
+    let registerReviewerTreeIfPresent (agentId: string) (childId: SessionId) =
+        match worktrees.TryGetValue agentId with
+        | true, path -> deps.RegisterReviewerTree (SessionId.value childId) (GitTree.create path)
+        | false, _ -> ()
+
     let onChildCreated (agentId: string) (role: Role) (childId: SessionId) =
         if role = Role.Reviewer then
-            match worktrees.TryGetValue agentId with
-            | true, path -> deps.RegisterReviewerTree (SessionId.value childId) (GitTree.create path)
-            | false, _ -> ()
+            registerReviewerTreeIfPresent agentId childId
 
         deps.OnChildCreated agentId role childId
 
@@ -101,11 +105,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         |> Option.bind (fun journal ->
             OrchestratorProjection.tryFind jobId (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
 
-    let outcomeOf (run: RunCompletion) =
-        match run.Outcome with
+    let outcomeResult (outcome: AgentCompletionOutcome) =
+        match outcome with
         | AgentCompleted _ -> Ok()
         | AgentFailed payload -> Error payload.Message
         | AgentAbandoned(_, reason) -> Error reason
+
+    let outcomeOf (run: RunCompletion) = outcomeResult run.Outcome
+
+    let childSessionOrError (agentId: string) =
+        match runtime.TryChildSession agentId with
+        | Some childId -> Ok childId
+        | None -> Error(sprintf "Fork of '%s' produced no child session" agentId)
 
     /// Fork a child and hand back the Host session it created.
     ///
@@ -120,10 +131,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (deferSend: bool)
         (expectedToolCalls: int option)
         =
-        task {
+        taskResult {
             worktrees.[agentId] <- WorktreePath.value worktree
 
-            match!
+            let! _fork =
                 runtime.Fork(
                     agentId,
                     role,
@@ -133,12 +144,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     deferSend = deferSend,
                     ?expectedToolCalls = expectedToolCalls
                 )
-            with
-            | Error error -> return Error error
-            | Ok _ ->
-                match runtime.TryChildSession agentId with
-                | Some childId -> return Ok childId
-                | None -> return Error(sprintf "Fork of '%s' produced no child session" agentId)
+
+            return! childSessionOrError agentId
         }
 
     // Await one HostPendingRun.Source for this agent. Prefer Host pending over
@@ -153,27 +160,26 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 return Error(sprintf "await agent timed out: %s" agentId)
             else
                 let! outcome = source
-
-                match outcome with
-                | AgentCompleted _ -> return Ok()
-                | AgentFailed payload -> return Error payload.Message
-                | AgentAbandoned(_, reason) -> return Error reason
+                return outcomeResult outcome
         }
+
+    let awaitPendingOrJoin (agentId: string) (sourceOpt: Task<AgentCompletionOutcome> option) =
+        match sourceOpt with
+        | Some source -> awaitPendingSource agentId source
+        | None ->
+            taskResult {
+                let! run = HostForkJoin.awaitAgent runtime agentId (Some Distillation.AwaitAgentTimeoutMs)
+                return! outcomeOf run
+            }
 
     let awaitChild (agentId: string) =
-        task {
-            match
-                lock runtime.Gate (fun () ->
-                    match runtime.PendingRuns.TryGetValue agentId with
-                    | true, run when not run.Finished -> Some run.Source.Task
-                    | _ -> None)
-            with
-            | Some source -> return! awaitPendingSource agentId source
-            | None ->
-                match! HostForkJoin.awaitAgent runtime agentId (Some Distillation.AwaitAgentTimeoutMs) with
-                | Error error -> return Error error
-                | Ok run -> return outcomeOf run
-        }
+        let sourceOpt =
+            lock runtime.Gate (fun () ->
+                match runtime.PendingRuns.TryGetValue agentId with
+                | true, run when not run.Finished -> Some run.Source.Task
+                | _ -> None)
+
+        awaitPendingOrJoin agentId sourceOpt
 
     // ── ManagerPort ─────────────────────────────────────────────────────────
 
@@ -187,33 +193,34 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             false
             start.ExpectedToolCalls
 
+    let finalizeRegisteredWorktree (agentId: string) =
+        match worktrees.TryGetValue agentId with
+        | true, path -> OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+        | false, _ -> Task.FromResult(Error(sprintf "No worktree registered for manager job '%s'" agentId))
+
     /// Await the Manager, then stage its work into a candidate commit.
     ///
     /// `finalizeWorktree` runs only on a completed Manager: a failed or aborted run
     /// has nothing to commit, and committing anyway would produce a candidate the
     /// Manager never claimed was done.
     let awaitManager (jobId: ManagerJobId) : Task<Result<unit, string>> =
-        task {
-            let agentId = managerAgentId jobId
+        let agentId = managerAgentId jobId
 
-            let descriptor =
-                DiagnosticWait.create
-                    "manager-job-completion"
-                    (CausalOwner.create "OrchestratorJob" [ "job", ManagerJobId.value jobId ])
-                    [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
-                    (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
-                    [ WaitEscape.DeadlineAt(
-                          DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
-                      )
-                      WaitEscape.ProcessLifetime ]
-                    "OrchestratorHost.awaitManager"
+        let descriptor =
+            DiagnosticWait.create
+                "manager-job-completion"
+                (CausalOwner.create "OrchestratorJob" [ "job", ManagerJobId.value jobId ])
+                [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
+                (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
+                [ WaitEscape.DeadlineAt(
+                      DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
+                  )
+                  WaitEscape.ProcessLifetime ]
+                "OrchestratorHost.awaitManager"
 
-            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId) with
-            | Error error -> return Error error
-            | Ok() ->
-                match worktrees.TryGetValue agentId with
-                | true, path -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
-                | false, _ -> return Error(sprintf "No worktree registered for manager job '%s'" agentId)
+        taskResult {
+            do! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId)
+            return! finalizeRegisteredWorktree agentId
         }
 
     /// Drop a leftover Host pending for this agent so Resume can install a fresh
@@ -242,6 +249,49 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | true, _ -> runtime.PendingRuns.Remove agentId |> ignore
             | false, _ -> ())
 
+    let adoptChildIfMissing (agentId: string) (sessionId: SessionId) =
+        match runtime.Children.TryGetValue agentId with
+        | true, _ -> ()
+        | false, _ -> runtime.AdoptChild(agentId, sessionId)
+
+    let conflictTimeoutBody (grepOut: string) =
+        if String.IsNullOrWhiteSpace grepOut then "(no grep body)" else grepOut.Trim()
+
+    let waitConflictResolved (path: string) (deadline: DateTimeOffset) : Task<Result<unit, string>> =
+        let rec loop () =
+            taskResult {
+                let! grepCode, grepOut, _ =
+                    OrchestratorGit.run (
+                        OrchestratorGit.command
+                            path
+                            [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
+                    )
+                    |> TaskResultCE.ofTask
+
+                // git grep: 0 = markers present, 1 = clean, >1 = error
+                if grepCode = 1 then
+                    return ()
+                elif grepCode > 1 then
+                    return! Error "conflict-marker scan failed"
+                elif DateTimeOffset.UtcNow >= deadline then
+                    return!
+                        Error(
+                            sprintf
+                                "conflict resolution timed out (markers still present):\n%s"
+                                (conflictTimeoutBody grepOut)
+                        )
+                else
+                    do! Wanxiangshu.Process.PtyTiming.timerTask 50 |> TaskResultCE.ofTask
+                    return! loop ()
+            }
+
+        loop ()
+
+    let requireJobRecord (jobId: ManagerJobId) =
+        match jobRecord jobId with
+        | Some record -> Ok record
+        | None -> Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
+
     /// ORCH-003/ORCH-007: hand work back to the SAME Manager in the SAME worktree.
     ///
     /// Fork the conflict-resume prompt, then wait until the worktree has no
@@ -251,64 +301,28 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     /// NotifyTerminal (measured: conflict-resume.2 + coder resolved, REBASE_HEAD
     /// stuck, no manager HandleCompleted for the resume unit).
     let resumeManager (jobId: ManagerJobId) (worktree: WorktreePath) (prompt: string) =
-        task {
-            match jobRecord jobId with
-            | None -> return Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
-            | Some record ->
-                let agentId = managerAgentId jobId
-                let path = WorktreePath.value worktree
-                worktrees.[agentId] <- path
-                clearStaleHostRun agentId
+        taskResult {
+            let! record = requireJobRecord jobId
+            let agentId = managerAgentId jobId
+            let path = WorktreePath.value worktree
+            worktrees.[agentId] <- path
+            clearStaleHostRun agentId
+            adoptChildIfMissing agentId record.ManagerSessionId
+            // The Host pending is advanced by the existing session callbacks.
+            // Do not spawn a second detached waiter: it owns no state transition
+            // and would retain timeout/polling handles after Continue returns.
+            let! _fork =
+                runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
 
-                match runtime.Children.TryGetValue agentId with
-                | true, _ -> ()
-                | false, _ -> runtime.AdoptChild(agentId, record.ManagerSessionId)
+            let resolutionDeadline =
+                DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
 
-                match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
-                | Error error -> return Error error
-                | Ok _ ->
-                    // The Host pending is advanced by the existing session callbacks.
-                    // Do not spawn a second detached waiter: it owns no state transition
-                    // and would retain timeout/polling handles after Continue returns.
-                    let resolutionDeadline =
-                        DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
-
-                    // Gate on disk content only. Unmerged index entries clear only
-                    // after `git add`; that belongs to finalizeWorktree. Waiting for
-                    // empty `--diff-filter=U` before add is a deadlock (Coder can
-                    // rewrite the file while paths stay AA until staged).
-                    let rec waitResolved () =
-                        task {
-                            let! grepCode, grepOut, _ =
-                                OrchestratorGit.run (
-                                    OrchestratorGit.command
-                                        path
-                                        [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
-                                )
-
-                            // git grep: 0 = markers present, 1 = clean, >1 = error
-                            if grepCode = 1 then
-                                return Ok()
-                            elif grepCode > 1 then
-                                return Error "conflict-marker scan failed"
-                            elif DateTimeOffset.UtcNow >= resolutionDeadline then
-                                return
-                                    Error(
-                                        sprintf
-                                            "conflict resolution timed out (markers still present):\n%s"
-                                            (if String.IsNullOrWhiteSpace grepOut then
-                                                 "(no grep body)"
-                                             else
-                                                 grepOut.Trim())
-                                    )
-                            else
-                                do! Wanxiangshu.Process.PtyTiming.timerTask 50
-                                return! waitResolved ()
-                        }
-
-                    match! waitResolved () with
-                    | Error error -> return Error error
-                    | Ok() -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+            // Gate on disk content only. Unmerged index entries clear only
+            // after `git add`; that belongs to finalizeWorktree. Waiting for
+            // empty `--diff-filter=U` before add is a deadlock (Coder can
+            // rewrite the file while paths stay AA until staged).
+            do! waitConflictResolved path resolutionDeadline
+            return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
         }
 
     /// ORCH-006: abort the manager and every reviewer child session for a job
@@ -338,6 +352,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     runtime.Children.Remove id |> ignore)
         }
 
+    let sendDeferredThenAwait (reviewerAgentId: string) =
+        taskResult {
+            do! runtime.SendDeferredFirstPrompt reviewerAgentId
+            return! awaitChild reviewerAgentId
+        }
+
     /// One review barrier. A fresh reviewer agent id per barrier, so REVIEW-008's
     /// "fresh dual PERFECT" is structural: a new session's guard starts empty.
     let reverify
@@ -353,12 +373,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             deps.Journal
             (fun _ path prompt ->
                 forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
-            (fun _ ->
-                task {
-                    match! runtime.SendDeferredFirstPrompt reviewerAgentId with
-                    | Error error -> return Error error
-                    | Ok() -> return! awaitChild reviewerAgentId
-                })
+            (fun _ -> sendDeferredThenAwait reviewerAgentId)
             jobId
             managerSessionId
             worktree
@@ -392,139 +407,173 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | Error error -> return Error error
         }
 
-    let initializeEngine () : Task<Result<Orchestrator, string>> =
+    let recoverJobsIfPresent (value: Orchestrator) =
+        match deps.Journal with
+        | Some journal ->
+            OrchestratorManagerJob.recoverJobs
+                journal
+                orchestratorId
+                worktrees
+                deps.RegisterChildDirectory
+                deps.RegisterReviewerTree
+                value
+        | None -> task { return () }
+
+    let mapSweepError (pending: Task<Result<unit, string>>) : Task<Result<unit, string>> =
         task {
-            match engineInstance with
-            | Some value -> return Ok value
-            | None ->
-                match! frozenTarget () with
-                | Error reason -> return Error reason
-                | Ok target ->
-                    // Canonicalize the repo path via git common-dir so symlinked
-                    // spellings share one cross-process publish lock.
-                    let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
-                    let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
-
-                    let activeJobs =
-                        deps.Journal
-                        |> Option.map (fun journal ->
-                            OrchestratorProjection.activeJobs
-                                (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
-                        |> Option.defaultValue []
-
-                    // Sweep orphaned manager artifacts before resuming jobs, so a
-                    // resumed job never adopts a worktree the sweep is about to remove.
-                    let sweepDescriptor =
-                        DiagnosticWait.create
-                            "orchestrator-engine-sweep"
-                            (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
-                            [ "lock", sweepLockPath; "target", TargetRef.value target ]
-                            (ExternalProducer("integration-gate", [ "lock", sweepLockPath ]))
-                            [ WaitEscape.ProcessLifetime ]
-                            "OrchestratorHost.initializeEngine.sweepLocked"
-
-                    match!
-                        CausalAwait.awaitTask
-                            CausalWaitHub.observer
-                            sweepDescriptor
-                            (OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs)
-                    with
-                    | Error error -> return Error(sprintf "orchestrator cleanup failed: %s" error)
-                    | Ok() ->
-                        let value =
-                            Orchestrator(
-                                gitPort,
-                                managerPort,
-                                deps.RepoPath,
-                                target,
-                                ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
-                                ?lockRepoPath = Some lockRepoPath
-                            )
-
-                        match deps.Journal with
-                        | Some journal ->
-                            do!
-                                OrchestratorManagerJob.recoverJobs
-                                    journal
-                                    orchestratorId
-                                    worktrees
-                                    deps.RegisterChildDirectory
-                                    deps.RegisterReviewerTree
-                                    value
-                        | None -> ()
-
-                        lock engineGate (fun () -> engineInstance <- Some value)
-                        return Ok value
+            match! pending with
+            | Ok() -> return Ok()
+            | Error error -> return Error(sprintf "orchestrator cleanup failed: %s" error)
         }
+
+    let createEngine (target: TargetRef) : Task<Result<Orchestrator, string>> =
+        taskResult {
+            // Canonicalize the repo path via git common-dir so symlinked
+            // spellings share one cross-process publish lock.
+            let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
+            let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
+
+            let activeJobs =
+                deps.Journal
+                |> Option.map (fun journal ->
+                    OrchestratorProjection.activeJobs
+                        (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+                |> Option.defaultValue []
+
+            // Sweep orphaned manager artifacts before resuming jobs, so a
+            // resumed job never adopts a worktree the sweep is about to remove.
+            let sweepDescriptor =
+                DiagnosticWait.create
+                    "orchestrator-engine-sweep"
+                    (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
+                    [ "lock", sweepLockPath; "target", TargetRef.value target ]
+                    (ExternalProducer("integration-gate", [ "lock", sweepLockPath ]))
+                    [ WaitEscape.ProcessLifetime ]
+                    "OrchestratorHost.initializeEngine.sweepLocked"
+
+            do!
+                CausalAwait.awaitTask
+                    CausalWaitHub.observer
+                    sweepDescriptor
+                    (OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs)
+                |> mapSweepError
+
+            let value =
+                Orchestrator(
+                    gitPort,
+                    managerPort,
+                    deps.RepoPath,
+                    target,
+                    ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
+                    ?lockRepoPath = Some lockRepoPath
+                )
+
+            do! recoverJobsIfPresent value |> TaskResultCE.ofTask
+            lock engineGate (fun () -> engineInstance <- Some value)
+            return value
+        }
+
+    let initializeEngine () : Task<Result<Orchestrator, string>> =
+        match engineInstance with
+        | Some value -> Task.FromResult(Ok value)
+        | None ->
+            taskResult {
+                let! target = frozenTarget ()
+                return! createEngine target
+            }
 
     let engine () : Task<Result<Orchestrator, string>> =
         lock engineGate (fun () ->
-            match engineInstance with
-            | Some value -> Task.FromResult(Ok value)
-            | None ->
-                match engineTask with
-                | Some task -> task
-                | None ->
-                    let task = initializeEngine ()
-                    engineTask <- Some task
-                    task)
+            match engineInstance, engineTask with
+            | Some value, _ -> Task.FromResult(Ok value)
+            | None, Some task -> task
+            | None, None ->
+                let task = initializeEngine ()
+                engineTask <- Some task
+                task)
+
+    let mapForkManagerError
+        (pending: Task<Result<OrchestratorHandle, OrchestratorVerdict>>)
+        : Task<Result<OrchestratorHandle, string>> =
+        task {
+            match! pending with
+            | Ok handle -> return Ok handle
+            | Error verdict -> return Error(sprintf "%A" verdict)
+        }
+
+    let providerBynameOrAgent (byname: string option) (managerAgent: string) =
+        match byname with
+        | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
+        | _ -> managerAgent
+
+    let replaceEstimateIfPresent (jobId: ManagerJobId) (expectedToolCalls: int option) =
+        match expectedToolCalls, jobRecord jobId, deps.Journal with
+        | Some expected, Some record, Some journal ->
+            DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
+        | _ -> task { return () }
+
+    let joinPublishedString (engine: Orchestrator) =
+        task {
+            let! verdict = engine.JoinPublished()
+            return sprintf "%A" verdict
+        }
+
+    let joinPublishedBatchOnce
+        (maxCount: int)
+        (interrupt: Task<JoinInterruptReason>)
+        : Task<Result<JoinWaitOutcome<OrchestratorVerdict>, string>> =
+        taskResult {
+            try
+                let! engine = engine ()
+                let! outcome = engine.JoinPublishedBatch(maxCount, interrupt) |> TaskResultCE.ofTask
+                return outcome
+            finally
+                lock joinGate (fun () -> joinInFlight <- false)
+        }
 
     member _.ForkManagerJob
         (jobId: ManagerJobId, managerAgent: string, prompt: string, ?byname: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
-        task {
-            let providerByname =
-                match byname with
-                | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
-                | _ -> managerAgent
+        let providerByname = providerBynameOrAgent byname managerAgent
 
-            let descriptor =
-                DiagnosticWait.create
-                    "commission-manager-job"
-                    (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
-                    [ "job", ManagerJobId.value jobId; "manager_agent", managerAgent ]
-                    (ExternalProducer("orchestrator-engine", [ "job", ManagerJobId.value jobId ]))
-                    [ WaitEscape.ProcessLifetime; WaitEscape.SessionLifetime ]
-                    "OrchestratorHost.CommissionManagerJob"
+        let descriptor =
+            DiagnosticWait.create
+                "commission-manager-job"
+                (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
+                [ "job", ManagerJobId.value jobId; "manager_agent", managerAgent ]
+                (ExternalProducer("orchestrator-engine", [ "job", ManagerJobId.value jobId ]))
+                [ WaitEscape.ProcessLifetime; WaitEscape.SessionLifetime ]
+                "OrchestratorHost.CommissionManagerJob"
 
-            let pending =
-                task {
-                    match! engine () with
-                    | Error reason -> return Error reason
-                    | Ok engine ->
-                        match!
-                            engine.ForkManager(
-                                jobId,
-                                managerAgent,
-                                prompt,
-                                byname = providerByname,
-                                ?expectedToolCalls = expectedToolCalls
-                            )
-                        with
-                        | Error verdict -> return Error(sprintf "%A" verdict)
-                        | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
-                }
+        let pending =
+            taskResult {
+                let! engine = engine ()
 
-            return! CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
-        }
+                let! handle =
+                    engine.ForkManager(
+                        jobId,
+                        managerAgent,
+                        prompt,
+                        byname = providerByname,
+                        ?expectedToolCalls = expectedToolCalls
+                    )
+                    |> mapForkManagerError
+
+                return WorktreePath.value handle.WorktreePath
+            }
+
+        CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
 
     /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
     /// Manager job (same worktree, same session) with an appended requirement.
     member _.ContinueManagerJob
         (jobId: ManagerJobId, prompt: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
-        task {
-            match expectedToolCalls, jobRecord jobId, deps.Journal with
-            | Some expected, Some record, Some journal ->
-                do! DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
-            | _ -> ()
-
-            match! engine () with
-            | Error reason -> return Error reason
-            | Ok engine ->
-                match! engine.ContinueManager(jobId, prompt) with
-                | Error error -> return Error error
-                | Ok path -> return Ok(WorktreePath.value path)
+        taskResult {
+            do! replaceEstimateIfPresent jobId expectedToolCalls |> TaskResultCE.ofTask
+            let! engine = engine ()
+            let! path = engine.ContinueManager(jobId, prompt)
+            return WorktreePath.value path
         }
 
     /// Compatibility single-result join (stringified Empty/verdict). Prefer JoinPublishedAvailable.
@@ -532,9 +581,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         task {
             match! engine () with
             | Error reason -> return sprintf "Orchestrator init failed: %s" reason
-            | Ok engine ->
-                let! verdict = engine.JoinPublished()
-                return sprintf "%A" verdict
+            | Ok engine -> return! joinPublishedString engine
         }
 
     /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
@@ -552,16 +599,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         if not acquired then
             Task.FromResult(Error "JOIN_IN_PROGRESS: another join call is already waiting for this session")
         else
-            task {
-                try
-                    match! engine () with
-                    | Error reason -> return Error reason
-                    | Ok engine ->
-                        let! outcome = engine.JoinPublishedBatch(maxCount, interrupt)
-                        return Ok outcome
-                finally
-                    lock joinGate (fun () -> joinInFlight <- false)
-            }
+            joinPublishedBatchOnce maxCount interrupt
 
     member _.CancelAndDrain() : Task = runtime.CancelAndDrain()
 

@@ -32,9 +32,207 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
+open FsToolkit.ErrorHandling
 
 /// Existing-child dispatch + parent teardown helpers.
 module HostForkChildDispatch =
+    let private mergeAbortError (errOpt: string option) (abortResult: Result<unit, string>) =
+        match errOpt, abortResult with
+        | None, Error err -> Some err
+        | _ -> errOpt
+
+    let private abortSessionResult (sessions: ISessionHostPort) (childId: SessionId) =
+        task {
+            try
+                return! sessions.AbortSession childId
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private abortOne (sessions: ISessionHostPort) (childId: SessionId) (errOpt: string option) =
+        task {
+            let! abortResult = abortSessionResult sessions childId
+            return mergeAbortError errOpt abortResult
+        }
+
+    let private isActiveOwnedHandle (childId: SessionId) (record: HandleRecord) =
+        record.ChildSessionId = childId
+        && match record.Lifecycle with
+           | HandleLifecycle.Active -> true
+           | HandleLifecycle.CompletedAwaitingJoin _
+           | HandleLifecycle.Abandoned _
+           | HandleLifecycle.Retired -> false
+
+    let private isProcessOwnedActiveHandle
+        (handles: AgentLinkageProjection)
+        (agentId: string, childId: SessionId)
+        =
+        match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
+        | Some record -> isActiveOwnedHandle childId record
+        | None -> false
+
+    let private requireOk (context: string) (result: Result<unit, string>) =
+        match result with
+        | Ok() -> ()
+        | Error err -> raise (InvalidOperationException(sprintf "%s: %s" context err))
+
+    let private awaitUnit (work: Task) : Task<unit> =
+        task {
+            do! work
+            return ()
+        }
+
+    let private settlePendingAbandoned
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (settleAbandoned: PendingHostRun -> unit)
+        =
+        let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+
+        for run in pending do
+            settleAbandoned run
+
+    let private clearChildrenAndRuns
+        (gate: obj)
+        (children: Dictionary<string, SessionId>)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        =
+        lock gate (fun () ->
+            children.Clear()
+            pendingRuns.Clear())
+
+    let private decideExistingSendAcceptance (sent: Result<unit, string>) (result: ForkResult) =
+        match sent, result with
+        | Ok(), (ForkResult.Nudged _ | ForkResult.Created _) -> Ok result
+        | Ok(), _ -> Error "Existing agent did not accept a new run"
+        | Error err, _ -> Error err
+
+    let private nudgeBusyChild
+        (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (agent: string)
+        (prompt: string)
+        : Task<Result<ForkResult, string>> =
+        taskResult {
+            do! sendBusyNudge agentId childId role agent prompt
+            return ForkResult.Nudged agentId
+        }
+
+    let private completeIdleExistingSend
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (sessions: ISessionHostPort)
+        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (agent: string)
+        (prompt: string)
+        (enrichedPrompt: string option)
+        (run: PendingHostRun)
+        (result: ForkResult)
+        : Task<Result<ForkResult, string>> =
+        taskResult {
+            HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
+            let payload = Option.defaultValue prompt enrichedPrompt
+            // ofTask keeps Result intact so Error still settles failRun (not bare bind).
+            let! sent =
+                sendChildPrompt agentId childId role agent payload
+                |> TaskResultCE.ofTask
+
+            match decideExistingSendAcceptance sent result with
+            | Ok accepted -> return accepted
+            | Error err ->
+                do!
+                    HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
+                    |> awaitUnit
+                    |> TaskResultCE.ofTask
+
+                return! Error err
+        }
+
+    let private dispatchIdleExistingChild
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (sessions: ISessionHostPort)
+        (childWorkRecordFor: SessionId -> Task<string option>)
+        (runtime: ForkRuntime)
+        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (onRunStarted: SessionId -> Role -> unit)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (prompt: string)
+        (agent: string)
+        (enrichedPrompt: string option)
+        : Task<Result<ForkResult, string>> =
+        taskResult {
+            // Idle existing child: new AgentOwnerRoot work via ordinary send.
+            //
+            // A first-prompt fork (the `enrichedPrompt` Some case) carries the
+            // same ARCH-010 payload a brand-new child would receive. The fork
+            // boundary must produce one shape for "the child's round
+            // assignment" whether the session is fresh or restored from the
+            // journal — measured: a post-restart review fork that sent the raw
+            // opening prompt broke every canary declaration anchored on the
+            // envelope, while a busy nudge (a continuation) must stay raw.
+            let run =
+                HostForkRunLifecycle.installRun
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    sessions
+                    childWorkRecordFor
+                    agentId
+                    childId
+                    role
+
+            onRunStarted childId role
+
+            let result =
+                runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task))
+
+            match result with
+            | ForkResult.NotFound _ ->
+                do!
+                    HostForkRunLifecycle.failRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        run
+                        "Fork runtime is cancelled"
+                    |> awaitUnit
+                    |> TaskResultCE.ofTask
+
+                return! Error "Fork runtime is cancelled"
+            | _ ->
+                return!
+                    completeIdleExistingSend
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        sendChildPrompt
+                        agentId
+                        childId
+                        role
+                        agent
+                        prompt
+                        enrichedPrompt
+                        run
+                        result
+        }
+
     /// Sends a prompt to an already-linked child: if a run is active for this
     /// agent, nudge (fire-and-forget send, carrying role explicitly — after a
     /// host restart OpenCode would otherwise resolve an agent-less child prompt
@@ -60,111 +258,52 @@ module HostForkChildDispatch =
         (agent: string)
         (enrichedPrompt: string option)
         : Task<Result<ForkResult, string>> =
-        task {
+        taskResult {
             let activeRun =
                 lock gate (fun () ->
                     match pendingRuns.TryGetValue agentId with
                     | true, run -> Some run
                     | false, _ -> None)
 
-            match activeRun with
-            | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
-            | Some _ ->
+            match activeRun, runtime.IsCancelled with
+            | Some _, true -> return! Error "Fork runtime is cancelled"
+            | Some _, false ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
-                let! sent = sendBusyNudge agentId childId role agent prompt
-
-                match sent with
-                | Ok() -> return Ok(ForkResult.Nudged agentId)
-                | Error err -> return Error err
-            | None ->
-                // Idle existing child: new AgentOwnerRoot work via ordinary send.
-                //
-                // A first-prompt fork (the `enrichedPrompt` Some case) carries the
-                // same ARCH-010 payload a brand-new child would receive. The fork
-                // boundary must produce one shape for "the child's round
-                // assignment" whether the session is fresh or restored from the
-                // journal — measured: a post-restart review fork that sent the raw
-                // opening prompt broke every canary declaration anchored on the
-                // envelope, while a busy nudge (a continuation) must stay raw.
-                let run =
-                    HostForkRunLifecycle.installRun
+                return! nudgeBusyChild sendBusyNudge agentId childId role agent prompt
+            | None, _ ->
+                return!
+                    dispatchIdleExistingChild
                         gate
                         pendingRuns
                         journal
                         parentId
                         sessions
                         childWorkRecordFor
+                        runtime
+                        sendChildPrompt
+                        onRunStarted
                         agentId
                         childId
                         role
-
-                onRunStarted childId role
-
-                let result =
-                    runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task))
-
-                match result with
-                | ForkResult.NotFound _ ->
-                    do!
-                        HostForkRunLifecycle.failRun
-                            gate
-                            pendingRuns
-                            journal
-                            parentId
-                            sessions
-                            run
-                            "Fork runtime is cancelled"
-
-                    return Error "Fork runtime is cancelled"
-                | _ ->
-                    HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
-
-                    let payload = Option.defaultValue prompt enrichedPrompt
-                    let! sent = sendChildPrompt agentId childId role agent payload
-
-                    match sent, result with
-                    | Ok(), (ForkResult.Nudged _ | ForkResult.Created _) -> return Ok result
-                    | Ok(), _ ->
-                        do!
-                            HostForkRunLifecycle.failRun
-                                gate
-                                pendingRuns
-                                journal
-                                parentId
-                                sessions
-                                run
-                                "Existing agent did not accept a new run"
-
-                        return Error "Existing agent did not accept a new run"
-                    | Error err, _ ->
-                        do! HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
-                        return Error err
+                        prompt
+                        agent
+                        enrichedPrompt
         }
 
     /// Abort linked child sessions. Handle retirement has already been written
     /// synchronously by the caller before the async cleanup begins.
     let teardownChildren (sessions: ISessionHostPort) (childIds: SessionId list) : Task<Result<unit, string>> =
-        task {
-            let rec loop remaining firstError =
-                task {
-                    match remaining, firstError with
-                    | [], Some err -> return Error err
-                    | [], None -> return Ok()
-                    | childId :: rest, errOpt ->
-                        try
-                            let! abortResult = sessions.AbortSession childId
+        let rec loop remaining firstError =
+            task {
+                match remaining, firstError with
+                | [], Some err -> return Error err
+                | [], None -> return Ok()
+                | childId :: rest, errOpt ->
+                    let! next = abortOne sessions childId errOpt
+                    return! loop rest next
+            }
 
-                            match abortResult, errOpt with
-                            | Error err, None -> return! loop rest (Some err)
-                            | _ -> return! loop rest errOpt
-                        with ex ->
-                            match errOpt with
-                            | None -> return! loop rest (Some ex.Message)
-                            | Some _ -> return! loop rest errOpt
-                }
-
-            return! loop childIds None
-        }
+        loop childIds None
 
     /// Cancel parent: fail pending runs, abandon child handles, clear maps.
     ///
@@ -209,18 +348,7 @@ module HostForkChildDispatch =
         let owned =
             match durableHandles with
             | None -> processOwned
-            | Some handles ->
-                processOwned
-                |> List.filter (fun (agentId, childId) ->
-                    match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
-                    | Some record ->
-                        record.ChildSessionId = childId
-                        && (match record.Lifecycle with
-                            | HandleLifecycle.Active -> true
-                            | HandleLifecycle.CompletedAwaitingJoin _
-                            | HandleLifecycle.Abandoned _
-                            | HandleLifecycle.Retired -> false)
-                    | None -> false)
+            | Some handles -> processOwned |> List.filter (isProcessOwnedActiveHandle handles)
 
         let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)
@@ -229,29 +357,17 @@ module HostForkChildDispatch =
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
         task {
-            match! HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt with
-            | Error err ->
-                // Journal failure during abandon is a durable-state bug; surface it.
-                return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err))
-            | Ok() ->
-                do! ptyPort.CloseAll()
-                Pty.unregisterParentAbort parentKey parentAbortToken
+            let! cancelResult =
+                HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
 
-                let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+            requireOk "Parent handle abandon failed" cancelResult
 
-                for run in pending do
-                    settleAbandoned run
+            do! ptyPort.CloseAll()
+            Pty.unregisterParentAbort parentKey parentAbortToken
+            settlePendingAbandoned gate pendingRuns settleAbandoned
+            do! awaitRecovery ()
 
-                do! awaitRecovery ()
-
-                let! teardown = teardownChildren sessions (childIds |> List.distinct)
-
-                match teardown with
-                | Ok() ->
-                    lock gate (fun () ->
-                        children.Clear()
-                        pendingRuns.Clear())
-
-                    return ()
-                | Error err -> return raise (InvalidOperationException(sprintf "Parent teardown failed: %s" err))
+            let! teardown = teardownChildren sessions (childIds |> List.distinct)
+            requireOk "Parent teardown failed" teardown
+            clearChildrenAndRuns gate children pendingRuns
         }

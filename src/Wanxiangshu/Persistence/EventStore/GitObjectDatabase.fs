@@ -164,6 +164,21 @@ module GitObjectDatabase =
         let header = latin1Buffer (sprintf "%s %d\u0000" objectType body.Length)
         bufferConcat [| header; asBuffer body |]
 
+    let private parseLooseHeader (header: string) (body: byte[]) : (string * byte[]) option =
+        match header.Split(' ') with
+        | [| objectType; _ |] -> Some(objectType, body)
+        | _ -> None
+
+    let private parseFramedLoose (framed: byte[]) : (string * byte[]) option =
+        let separator = Array.IndexOf(framed, 0uy)
+
+        if separator < 0 then
+            None
+        else
+            let header = Encoding.UTF8.GetString(framed, 0, separator)
+            let body = framed.[separator + 1 ..]
+            parseLooseHeader header body
+
     /// Object body plus its Git type, or None when the loose object is absent.
     let private tryReadLoose (objectsDir: string) (oid: string) : Task<(string * byte[]) option> =
         task {
@@ -174,20 +189,8 @@ module GitObjectDatabase =
                 return None
             else
                 let! fileBytes = readBytes file
-
                 let framed: byte[] = emitJsExpr (inflateSync (asBuffer fileBytes)) "Buffer.from($0)"
-
-                let separator = Array.IndexOf(framed, 0uy)
-
-                if separator < 0 then
-                    return None
-                else
-                    let header = Encoding.UTF8.GetString(framed, 0, separator)
-                    let body = framed.[separator + 1 ..]
-
-                    match header.Split(' ') with
-                    | [| objectType; _ |] -> return Some(objectType, body)
-                    | _ -> return None
+                return parseFramedLoose framed
         }
 
     /// Write the framed object unless the oid already exists. Returns the oid either way.
@@ -232,32 +235,41 @@ module GitObjectDatabase =
     let writeTree (objectsDir: string) (entries: TreeEntry list) : Task<string> =
         writeLoose objectsDir "tree" (treeBody entries)
 
+    let private decodeTreeMeta (meta: string) (oidHex: string) : TreeEntry option =
+        let space = meta.IndexOf(' ')
+
+        if space < 0 then
+            None
+        else
+            Some
+                { Mode = GitTree.normalizeMode (meta.Substring(0, space))
+                  Name = meta.Substring(space + 1)
+                  Oid = GitObjectId.create oidHex }
+
+    /// None = end of tree; Some(entryOpt, next) = continue at next.
+    let private treeRecordAfterOffset (body: byte[]) (offset: int) : (TreeEntry option * int) option =
+        let separator = Array.IndexOf(body, 0uy, offset)
+
+        if separator < 0 || separator + 20 >= body.Length then
+            None
+        else
+            let meta = Encoding.UTF8.GetString(body, offset, separator - offset)
+            let oidHex = toHex body.[separator + 1 .. separator + 20]
+            Some(decodeTreeMeta meta oidHex, separator + 21)
+
+    let private treeRecordAt (body: byte[]) (offset: int) : (TreeEntry option * int) option =
+        if offset >= body.Length then
+            None
+        else
+            treeRecordAfterOffset body offset
+
     /// Parse a tree body back into entries. Modes are normalized by the caller's store rules.
     let private parseTree (body: byte[]) : TreeEntry list =
         let rec loop (offset: int) (acc: TreeEntry list) =
-            if offset >= body.Length then
-                List.rev acc
-            else
-                let separator = Array.IndexOf(body, 0uy, offset)
-
-                if separator < 0 || separator + 20 >= body.Length then
-                    List.rev acc
-                else
-                    let meta = Encoding.UTF8.GetString(body, offset, separator - offset)
-                    let space = meta.IndexOf(' ')
-                    let oidBytes = body.[separator + 1 .. separator + 20]
-
-                    let oidHex = toHex oidBytes
-
-                    if space < 0 then
-                        loop (separator + 21) acc
-                    else
-                        let entry =
-                            { Mode = GitTree.normalizeMode (meta.Substring(0, space))
-                              Name = meta.Substring(space + 1)
-                              Oid = GitObjectId.create oidHex }
-
-                        loop (separator + 21) (entry :: acc)
+            match treeRecordAt body offset with
+            | None -> List.rev acc
+            | Some(None, next) -> loop next acc
+            | Some(Some entry, next) -> loop next (entry :: acc)
 
         loop 0 []
 
@@ -288,45 +300,58 @@ module GitObjectDatabase =
         text.Length = 40
         && text |> Seq.forall (fun c -> Char.IsDigit c || (c >= 'a' && c <= 'f'))
 
+    let private oidFromRefText (text: string) : string option =
+        let trimmed = text.Trim()
+        if isOid trimmed then Some trimmed else None
+
+    let private tryReadLooseRefOid (loose: string) : Task<string option> =
+        task {
+            let! loosePresent = exists loose
+
+            if not loosePresent then
+                return None
+            else
+                let! text = readFileText loose "utf8"
+                return oidFromRefText text
+        }
+
+    let private oidFromPackedRefRow (refName: string) (row: string) : string option =
+        match row.Split(' ') with
+        | [| oid; name |] when name = refName && isOid oid -> Some oid
+        | _ -> None
+
+    let private oidFromPackedRefLine (refName: string) (line: string) : string option =
+        let row = line.Trim()
+
+        if row = "" || row.StartsWith "#" || row.StartsWith "^" then
+            None
+        else
+            oidFromPackedRefRow refName row
+
+    let private tryReadPackedRefOid (gitDir: string) (refName: string) : Task<string option> =
+        task {
+            let packed = gitDir + "/packed-refs"
+            let! packedPresent = exists packed
+
+            if not packedPresent then
+                return None
+            else
+                let! packedText = readFileText packed "utf8"
+
+                return
+                    packedText.Split('\n')
+                    |> Array.tryPick (oidFromPackedRefLine refName)
+        }
+
     /// The ref's value: the loose ref file first, then `packed-refs` (a `gc`/`pack-refs` may have
     /// moved it there). Symrefs are not a store shape and are not followed.
     let tryReadRef (gitDir: string) (refName: string) : Task<string option> =
         task {
-            let loose = gitDir + "/" + refName
-            let! loosePresent = exists loose
-
-            let! fromLoose =
-                task {
-                    if not loosePresent then
-                        return None
-                    else
-                        let! text = readFileText loose "utf8"
-                        let trimmed = text.Trim()
-                        if isOid trimmed then return Some trimmed else return None
-                }
+            let! fromLoose = tryReadLooseRefOid (gitDir + "/" + refName)
 
             match fromLoose with
             | Some oid -> return Some oid
-            | None ->
-                let packed = gitDir + "/packed-refs"
-                let! packedPresent = exists packed
-
-                if not packedPresent then
-                    return None
-                else
-                    let! packedText = readFileText packed "utf8"
-
-                    return
-                        packedText.Split('\n')
-                        |> Array.tryPick (fun line ->
-                            let row = line.Trim()
-
-                            if row = "" || row.StartsWith "#" || row.StartsWith "^" then
-                                None
-                            else
-                                match row.Split(' ') with
-                                | [| oid; name |] when name = refName && isOid oid -> Some oid
-                                | _ -> None)
+            | None -> return! tryReadPackedRefOid gitDir refName
         }
 
     let private closeQuietly (handle: obj) : Task<unit> =
@@ -345,6 +370,96 @@ module GitObjectDatabase =
                 ()
         }
 
+    let private tryAcquireLock (lockPath: string) : Task<obj option> =
+        task {
+            try
+                let! handle = fsOpen lockPath "wx"
+                return Some handle
+            with _ ->
+                return None
+        }
+
+    let private readRefTextQuietly (refPath: string) : Task<string option> =
+        task {
+            try
+                let! text = readFileText refPath "utf8"
+                return Some(text.Trim())
+            with _ ->
+                return None
+        }
+
+    /// DURABLE-EVENTS-004/006：CAS 未见证 newOid 不得假装提交。
+    let private confirmInstalledOid (lockPath: string) (refPath: string) (newOid: string) : Task<bool> =
+        task {
+            let! current = readRefTextQuietly refPath
+
+            if current = Some newOid then
+                return true
+            else
+                do! unlinkQuietly lockPath
+                return false
+        }
+
+    let private settleRenameFailure (lockPath: string) (refPath: string) (newOid: string) : Task<bool> =
+        task {
+            let! present = exists refPath
+
+            if not present then
+                do! unlinkQuietly lockPath
+                return false
+            else
+                // rename 失败但 ref 已存在时，只有确认 ref 现在持有 newOid 才可报成功。
+                return! confirmInstalledOid lockPath refPath newOid
+        }
+
+    let private commitLockedRef (handle: obj) (lockPath: string) (refPath: string) (newOid: string) : Task<bool> =
+        task {
+            let! _ = handleWrite handle (latin1Buffer (newOid + "\n"))
+            do! handleClose handle
+
+            try
+                do! rename lockPath refPath
+                return true
+            with _ ->
+                return! settleRenameFailure lockPath refPath newOid
+        }
+
+    let private decideCasAfterRead
+        (handle: obj)
+        (lockPath: string)
+        (refPath: string)
+        (expectedOld: string option)
+        (newOid: string)
+        (current: string option)
+        : Task<bool> =
+        if current <> expectedOld then
+            task {
+                do! closeQuietly handle
+                do! unlinkQuietly lockPath
+                return false
+            }
+        else
+            commitLockedRef handle lockPath refPath newOid
+
+    let private swapWithLock
+        (gitDir: string)
+        (refName: string)
+        (expectedOld: string option)
+        (newOid: string)
+        (handle: obj)
+        (lockPath: string)
+        (refPath: string)
+        : Task<bool> =
+        task {
+            try
+                let! current = tryReadRef gitDir refName
+                return! decideCasAfterRead handle lockPath refPath expectedOld newOid current
+            with error ->
+                do! closeQuietly handle
+                do! unlinkQuietly lockPath
+                return raise error
+        }
+
     /// Git's own lockfile protocol: create `<ref>.lock` exclusively, verify the current value is
     /// still what the caller expected, write the new value into the lock, rename it over the ref.
     /// A lost race — lock taken, or the ref moved — returns false, which is the CAS answer.
@@ -358,59 +473,10 @@ module GitObjectDatabase =
             let refPath = gitDir + "/" + refName
             let lockPath = refPath + ".lock"
             do! ensureDirectory (refPath.Substring(0, refPath.LastIndexOf '/'))
-
-            let! handleOpt =
-                task {
-                    try
-                        let! handle = fsOpen lockPath "wx"
-                        return Some handle
-                    with _ ->
-                        return None
-                }
+            let! handleOpt = tryAcquireLock lockPath
 
             match handleOpt with
             | None -> return false
             | Some handle ->
-                try
-                    let! current = tryReadRef gitDir refName
-
-                    if current <> expectedOld then
-                        do! closeQuietly handle
-                        do! unlinkQuietly lockPath
-                        return false
-                    else
-                        let! _ = handleWrite handle (latin1Buffer (newOid + "\n"))
-                        do! handleClose handle
-
-                        try
-                            do! rename lockPath refPath
-                            return true
-                        with _ ->
-                            let! present = exists refPath
-
-                            if not present then
-                                do! unlinkQuietly lockPath
-                                return false
-                            else
-                                // rename 失败但 ref 已存在时，CAS 只有确认 ref 现在持有的正是 newOid
-                                // 才可报成功（DURABLE-EVENTS-004/006：CAS 未见证 newOid 不得假装提交）。
-                                // ref 内容是 40 位 hex + "\n"，Trim 后即为 oid。
-                                let! current =
-                                    task {
-                                        try
-                                            let! text = readFileText refPath "utf8"
-                                            return Some(text.Trim())
-                                        with _ ->
-                                            return None
-                                    }
-
-                                if current = Some newOid then
-                                    return true
-                                else
-                                    do! unlinkQuietly lockPath
-                                    return false
-                with error ->
-                    do! closeQuietly handle
-                    do! unlinkQuietly lockPath
-                    return raise error
+                return! swapWithLock gitDir refName expectedOld newOid handle lockPath refPath
         }

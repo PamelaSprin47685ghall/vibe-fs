@@ -93,6 +93,28 @@ module ToolResultBound =
             // BMP non-ASCII, unpaired surrogate → 3 (matches SyntheticToml.byteCount)
             1, 3
 
+    let private scalarStepBack (text: string) (start: int) : int =
+        if
+            start >= 2
+            && isLowSurrogate text.[start - 1]
+            && isHighSurrogate text.[start - 2]
+        then
+            start - 2
+        else
+            start - 1
+
+    let rec private walkUtf8Tail (text: string) (maxBytes: int) (acc: int) (start: int) : int =
+        let atEnd = start <= 0
+        let prev = if atEnd then 0 else scalarStepBack text start
+        let bytes = if atEnd then 0 else snd (scalarAt text prev)
+
+        if atEnd then start
+        elif acc + bytes > maxBytes then start
+        else walkUtf8Tail text maxBytes (acc + bytes) prev
+
+    let private sliceFrom (text: string) (start: int) : string =
+        if start >= text.Length then "" else text.Substring(start)
+
     /// UTF-8-safe suffix with byte length ≤ `maxBytes`. Single reverse walk.
     let private utf8Tail (text: string) (maxBytes: int) : string =
         if maxBytes <= 0 then
@@ -100,84 +122,70 @@ module ToolResultBound =
         elif SyntheticToml.byteCount text <= maxBytes then
             text
         else
-            // DSL-MUTABLE: algorithm-scratch — backward scalar walk end exclusive
-            let mutable endExclusive = text.Length
-            // DSL-MUTABLE: algorithm-scratch — backward scalar walk start
-            let mutable start = text.Length
-            // DSL-MUTABLE: algorithm-scratch — accumulated bytes so far
-            let mutable acc = 0
-            // DSL-MUTABLE: algorithm-scratch — running flag for the backward walk
-            let mutable running = true
+            sliceFrom text (walkUtf8Tail text maxBytes 0 text.Length)
 
-            while start > 0 && running do
-                // Step one scalar backward.
-                let prev =
-                    if
-                        start >= 2
-                        && isLowSurrogate text.[start - 1]
-                        && isHighSurrogate text.[start - 2]
-                    then
-                        start - 2
-                    else
-                        start - 1
+    /// Locate segment start (one past previous `\n`) and the newline index (`-1` if none).
+    let private findLineBounds (text: string) (segEnd: int) : int * int =
+        // DSL-MUTABLE: algorithm-scratch — backward newline-scan cursor
+        let mutable p = segEnd - 1
 
-                let _, bytes = scalarAt text prev
+        while p >= 0 && text.[p] <> '\n' do
+            p <- p - 1
 
-                if acc + bytes > maxBytes then
-                    running <- false
-                else
-                    acc <- acc + bytes
-                    start <- prev
+        p + 1, p
 
-            if start >= endExclusive then
-                ""
-            else
-                text.Substring(start, endExclusive - start)
+    let private overflowTail (text: string) (segStart: int) (segEnd: int) : string list =
+        let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) ContentMaxBytes
+        if tail = "" then [] else [ tail ]
+
+    let rec private collectTail
+        (text: string)
+        (segments: string list)
+        (accBytes: int)
+        (count: int)
+        (segEnd: int)
+        : string list =
+        let segStart, newlineAt = findLineBounds text segEnd
+        let line = text.Substring(segStart, segEnd - segStart)
+        let lineBytes = SyntheticToml.byteCount line
+        let size = lineBytes + (if count = 0 then 0 else 1)
+        let overBudget = count >= ContentMaxLines || accBytes + size > ContentMaxBytes
+
+        if overBudget && count = 0 then
+            overflowTail text segStart segEnd
+        elif overBudget then
+            segments
+        elif newlineAt < 0 then
+            line :: segments
+        else
+            collectTail text (line :: segments) (accBytes + size) (count + 1) newlineAt
 
     /// Tail under ContentMaxLines / ContentMaxBytes. Host-compatible accounting:
     /// `split('\n')` keeps empties; inter-line newline costs 1 byte.
     /// Single backward walk from the end — never allocates a full line array.
     let private takeTail (text: string) : string =
-        // DSL-MUTABLE: algorithm-scratch — tail lines in forward text order
-        let mutable segments = []
-        // DSL-MUTABLE: algorithm-scratch — accumulated bytes of the joined tail
-        let mutable accBytes = 0
-        // DSL-MUTABLE: algorithm-scratch — count of lines collected so far
-        let mutable count = 0
-        // DSL-MUTABLE: algorithm-scratch — end-exclusive of the segment being read
-        let mutable segEnd = text.Length
-        // DSL-MUTABLE: algorithm-scratch — stop flag for the backward walk
-        let mutable stop = false
+        String.concat "\n" (collectTail text [] 0 0 text.Length)
 
-        while not stop do
-            // Locate this segment's start: one past the previous '\n'.
-            // DSL-MUTABLE: algorithm-scratch — backward newline-scan cursor
-            let mutable p = segEnd - 1
+    let private newlineBump (n: int) (c: char) = if c = '\n' then n + 1 else n
 
-            while p >= 0 && text.[p] <> '\n' do
-                p <- p - 1
+    let private countLines (text: string) : int =
+        // DSL-MUTABLE: algorithm-scratch — newline-derived line counter
+        let mutable n = 1
 
-            let segStart = p + 1
+        for c in text do
+            n <- newlineBump n c
 
-            let lineBytes =
-                SyntheticToml.byteCount (text.Substring(segStart, segEnd - segStart))
+        n
 
-            let size = lineBytes + (if count = 0 then 0 else 1)
+    let private boundNonEmpty (text: string) : string =
+        let totalBytes = SyntheticToml.byteCount text
+        // split('\n').length == newline count + 1 (trailing empty counts).
+        let totalLines = countLines text
 
-            if count >= ContentMaxLines || accBytes + size > ContentMaxBytes then
-                if count = 0 then
-                    // The single line overflows bytes on its own: UTF-8-safe tail.
-                    let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) ContentMaxBytes
-                    if tail = "" then segments <- [] else segments <- [ tail ]
-
-                stop <- true
-            else
-                accBytes <- accBytes + size
-                segments <- text.Substring(segStart, segEnd - segStart) :: segments
-                count <- count + 1
-                if p < 0 then stop <- true else segEnd <- p
-
-        String.concat "\n" segments
+        if totalLines <= HostMaxLines && totalBytes <= HostMaxBytes then
+            text
+        else
+            Marker + takeTail text
 
     /// Bound a custom tool result. Under Host limits → identity.
     /// Over → `Marker + tail`, sized so Host does not re-truncate.
@@ -185,19 +193,4 @@ module ToolResultBound =
         if isNull text || text = "" then
             text
         else
-            let totalBytes = SyntheticToml.byteCount text
-            // split('\n').length == newline count + 1 (trailing empty counts).
-            let totalLines =
-                // DSL-MUTABLE: algorithm-scratch — newline-derived line counter
-                let mutable n = 1
-
-                for c in text do
-                    if c = '\n' then
-                        n <- n + 1
-
-                n
-
-            if totalLines <= HostMaxLines && totalBytes <= HostMaxBytes then
-                text
-            else
-                Marker + takeTail text
+            boundNonEmpty text

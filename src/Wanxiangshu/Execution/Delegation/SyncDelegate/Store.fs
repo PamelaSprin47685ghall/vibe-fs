@@ -67,6 +67,242 @@ type internal SyncDelegateAdmission =
     | Ready of SyncDelegateInvocation list
     | Rejected of string
 
+module private SyncDelegateStoreOps =
+    let sessionKey (sessionId: SessionId) = SessionId.value sessionId
+    let scopeKey (scope: ReuseScopeId) = ReuseScopeId.value scope
+    let keyOf (scope: ReuseScopeId) role = scopeKey scope, role
+    let callKey (callId: ToolCallId) = ToolCallId.value callId
+    let providerRunKey (providerRun: ProviderRunIdentity) = ProviderRunIdentity.value providerRun
+
+    let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) =
+        sessionKey owner, providerRunKey providerRun
+
+    let sameCallOrder left right =
+        List.map callKey left = List.map callKey right
+
+    let failInvocation (invocation: SyncDelegateInvocation) error =
+        AsyncSupport.trySetResult invocation.Completion (Error error) |> ignore
+
+    let failInvocations (invocations: seq<SyncDelegateInvocation>) error =
+        for invocation in invocations do
+            failInvocation invocation error
+
+    let failCalls (failCall: SyncDelegateCall -> string -> unit) (calls: SyncDelegateCall list) error =
+        for call in calls do
+            failCall call error
+
+    let removeOwnerListIfEmpty
+        (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>)
+        ownerKey
+        (list: ResizeArray<SyncDelegateCall>)
+        =
+        if list.Count = 0 then
+            callsByOwnerScope.Remove ownerKey |> ignore
+
+    let removeOwnerCall
+        (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>)
+        ownerKey
+        (call: SyncDelegateCall)
+        =
+        match callsByOwnerScope.TryGetValue ownerKey with
+        | true, list ->
+            list.Remove call |> ignore
+            removeOwnerListIfEmpty callsByOwnerScope ownerKey list
+        | false, _ -> ()
+
+    let tryRemoveOwnerCall
+        (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>)
+        ownerKey
+        (call: SyncDelegateCall)
+        =
+        match callsByOwnerScope.TryGetValue ownerKey with
+        | true, list ->
+            let wasRemoved = list.Remove call
+            removeOwnerListIfEmpty callsByOwnerScope ownerKey list
+            wasRemoved
+        | false, _ -> false
+
+    let removeDelegateIfCurrent
+        (callsByDelegate: Dictionary<string, SyncDelegateCall>)
+        delegateKey
+        (call: SyncDelegateCall)
+        =
+        match callsByDelegate.TryGetValue delegateKey with
+        | true, current when Object.ReferenceEquals(current.Answer, call.Answer) ->
+            callsByDelegate.Remove delegateKey |> ignore
+        | _ -> ()
+
+    let ownerCallsOf (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>) ownerKey =
+        match callsByOwnerScope.TryGetValue ownerKey with
+        | true, list -> list
+        | false, _ ->
+            let list = ResizeArray<SyncDelegateCall>()
+            callsByOwnerScope.[ownerKey] <- list
+            list
+
+    let cancelPendingBatch
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        key
+        error
+        =
+        failInvocations pendingBatches.[key].Items.Values error
+        pendingBatches.Remove key |> ignore
+
+    let cancelActiveBatch
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        key
+        error
+        =
+        failInvocations activeBatches.[key] error
+        activeBatches.Remove key |> ignore
+
+    let detachDelegates
+        (callsByDelegate: Dictionary<string, SyncDelegateCall>)
+        (calls: SyncDelegateCall list)
+        =
+        for call in calls do
+            callsByDelegate.Remove(sessionKey call.Delegate) |> ignore
+
+    let failOwnerScopeCalls
+        (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>)
+        (callsByDelegate: Dictionary<string, SyncDelegateCall>)
+        (failCall: SyncDelegateCall -> string -> unit)
+        sKey
+        error
+        =
+        match callsByOwnerScope.TryGetValue sKey with
+        | true, list ->
+            let calls = list |> Seq.toList
+            callsByOwnerScope.Remove sKey |> ignore
+            detachDelegates callsByDelegate calls
+            failCalls failCall calls error
+        | false, _ -> ()
+
+    let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
+        let callOrder =
+            observed.Calls
+            |> Seq.choose (fun (observedRole, callId) -> if observedRole = role then Some callId else None)
+            |> Seq.toList
+
+        if List.contains currentCall callOrder then
+            Some
+                { ProviderRun = providerRun
+                  CallOrder = callOrder
+                  CurrentCall = currentCall }
+        else
+            None
+
+    let admitSingle
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        key
+        (invocation: SyncDelegateInvocation)
+        =
+        if pendingBatches.ContainsKey key then
+            SyncDelegateAdmission.Rejected "sync delegate rejected: semantic batch already pending"
+        else
+            activeBatches.[key] <- [ invocation ]
+            SyncDelegateAdmission.Ready [ invocation ]
+
+    let resolvePendingBatch
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        key
+        (batch: SyncDelegateBatch)
+        =
+        match pendingBatches.TryGetValue key with
+        | true, existing when
+            ProviderRunIdentity.value existing.ProviderRun = ProviderRunIdentity.value batch.ProviderRun
+            && sameCallOrder existing.CallOrder batch.CallOrder
+            ->
+            Ok existing
+        | true, _ -> Error "sync delegate rejected: another ProviderRun batch is pending"
+        | false, _ ->
+            let created =
+                { ProviderRun = batch.ProviderRun
+                  CallOrder = batch.CallOrder
+                  Items = Dictionary<string, SyncDelegateInvocation>() }
+
+            pendingBatches.[key] <- created
+            Ok created
+
+    let completeOrWaitBatch
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        key
+        (batchState: PendingBatch)
+        currentKey
+        (invocation: SyncDelegateInvocation)
+        =
+        batchState.Items.[currentKey] <- invocation
+
+        if batchState.Items.Count <> batchState.CallOrder.Length then
+            SyncDelegateAdmission.Waiting
+        else
+            let ordered =
+                batchState.CallOrder
+                |> List.map (fun callId -> batchState.Items.[callKey callId])
+
+            pendingBatches.Remove key |> ignore
+            activeBatches.[key] <- ordered
+            SyncDelegateAdmission.Ready ordered
+
+    let admitBatched
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        key
+        (invocation: SyncDelegateInvocation)
+        (batch: SyncDelegateBatch)
+        =
+        let orderedKeys = batch.CallOrder |> List.map callKey
+        let currentKey = callKey batch.CurrentCall
+
+        if
+            List.isEmpty orderedKeys
+            || Set.count (Set.ofList orderedKeys) <> List.length orderedKeys
+            || not (List.contains currentKey orderedKeys)
+        then
+            SyncDelegateAdmission.Rejected "sync delegate rejected: invalid ProviderRun batch"
+        else
+            match resolvePendingBatch pendingBatches key batch with
+            | Error error -> SyncDelegateAdmission.Rejected error
+            | Ok batchState when batchState.Items.ContainsKey currentKey ->
+                SyncDelegateAdmission.Rejected "sync delegate rejected: duplicate ToolCallId in batch"
+            | Ok batchState ->
+                completeOrWaitBatch pendingBatches activeBatches key batchState currentKey invocation
+
+    let admitByBatch
+        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        key
+        (invocation: SyncDelegateInvocation)
+        =
+        match invocation.Batch with
+        | None -> admitSingle pendingBatches activeBatches key invocation
+        | Some batch -> admitBatched pendingBatches activeBatches key invocation batch
+
+    let disposeCallRegistration
+        gate
+        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
+        activeKey
+        (callsByOwnerScope: Dictionary<string, ResizeArray<SyncDelegateCall>>)
+        ownerKey
+        (call: SyncDelegateCall)
+        (callsByDelegate: Dictionary<string, SyncDelegateCall>)
+        delegateKey
+        (failIfOwned: unit -> unit)
+        =
+        let stillOwned =
+            lock gate (fun () ->
+                activeBatches.Remove activeKey |> ignore
+                let removed = tryRemoveOwnerCall callsByOwnerScope ownerKey call
+                removeDelegateIfCurrent callsByDelegate delegateKey call
+                removed)
+
+        if stillOwned then
+            failIfOwned ()
+
+open SyncDelegateStoreOps
+
 /// EXEC-026/031: process-local SyncDelegateRuntime state. Semantic batches are
 /// defined by ProviderRun + provider tool-call order, never scheduler timing.
 type internal SyncDelegateCallStore() as this =
@@ -85,35 +321,6 @@ type internal SyncDelegateCallStore() as this =
     // DSL-MUTABLE: reservation — complete/admitted batch through ordinary completion
     let activeBatches =
         Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>()
-
-    let sessionKey (sessionId: SessionId) = SessionId.value sessionId
-    let scopeKey (scope: ReuseScopeId) = ReuseScopeId.value scope
-    let keyOf (scope: ReuseScopeId) role = scopeKey scope, role
-    let callKey (callId: ToolCallId) = ToolCallId.value callId
-    let providerRunKey (providerRun: ProviderRunIdentity) = ProviderRunIdentity.value providerRun
-
-    let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) =
-        sessionKey owner, providerRunKey providerRun
-
-    let sameCallOrder left right =
-        List.map callKey left = List.map callKey right
-
-    let failInvocation (invocation: SyncDelegateInvocation) error =
-        AsyncSupport.trySetResult invocation.Completion (Error error) |> ignore
-
-    let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
-        let callOrder =
-            observed.Calls
-            |> Seq.choose (fun (observedRole, callId) -> if observedRole = role then Some callId else None)
-            |> Seq.toList
-
-        if List.contains currentCall callOrder then
-            Some
-                { ProviderRun = providerRun
-                  CallOrder = callOrder
-                  CurrentCall = currentCall }
-        else
-            None
 
     member _.ObserveProviderToolCall
         (owner: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, callId: ToolCallId)
@@ -156,16 +363,7 @@ type internal SyncDelegateCallStore() as this =
             match callsByDelegate.TryGetValue delegateKey with
             | true, call ->
                 callsByDelegate.Remove delegateKey |> ignore
-                let ownerKey = scopeKey call.OwnerScope
-
-                match callsByOwnerScope.TryGetValue ownerKey with
-                | true, list ->
-                    list.Remove call |> ignore
-
-                    if list.Count = 0 then
-                        callsByOwnerScope.Remove ownerKey |> ignore
-                | false, _ -> ()
-
+                removeOwnerCall callsByOwnerScope (scopeKey call.OwnerScope) call
                 Some call
             | false, _ -> None)
 
@@ -179,59 +377,7 @@ type internal SyncDelegateCallStore() as this =
             if activeBatches.ContainsKey key then
                 SyncDelegateAdmission.Rejected "sync delegate rejected: dedicated delegate already has an active batch"
             else
-                match invocation.Batch with
-                | None ->
-                    if pendingBatches.ContainsKey key then
-                        SyncDelegateAdmission.Rejected "sync delegate rejected: semantic batch already pending"
-                    else
-                        activeBatches.[key] <- [ invocation ]
-                        SyncDelegateAdmission.Ready [ invocation ]
-                | Some batch ->
-                    let orderedKeys = batch.CallOrder |> List.map callKey
-                    let currentKey = callKey batch.CurrentCall
-
-                    if
-                        List.isEmpty orderedKeys
-                        || Set.count (Set.ofList orderedKeys) <> List.length orderedKeys
-                        || not (List.contains currentKey orderedKeys)
-                    then
-                        SyncDelegateAdmission.Rejected "sync delegate rejected: invalid ProviderRun batch"
-                    else
-                        let pending =
-                            match pendingBatches.TryGetValue key with
-                            | true, existing when
-                                ProviderRunIdentity.value existing.ProviderRun = ProviderRunIdentity.value
-                                                                                     batch.ProviderRun
-                                && sameCallOrder existing.CallOrder batch.CallOrder
-                                ->
-                                Ok existing
-                            | true, _ -> Error "sync delegate rejected: another ProviderRun batch is pending"
-                            | false, _ ->
-                                let created =
-                                    { ProviderRun = batch.ProviderRun
-                                      CallOrder = batch.CallOrder
-                                      Items = Dictionary<string, SyncDelegateInvocation>() }
-
-                                pendingBatches.[key] <- created
-                                Ok created
-
-                        match pending with
-                        | Error error -> SyncDelegateAdmission.Rejected error
-                        | Ok batchState when batchState.Items.ContainsKey currentKey ->
-                            SyncDelegateAdmission.Rejected "sync delegate rejected: duplicate ToolCallId in batch"
-                        | Ok batchState ->
-                            batchState.Items.[currentKey] <- invocation
-
-                            if batchState.Items.Count <> batchState.CallOrder.Length then
-                                SyncDelegateAdmission.Waiting
-                            else
-                                let ordered =
-                                    batchState.CallOrder
-                                    |> List.map (fun callId -> batchState.Items.[callKey callId])
-
-                                pendingBatches.Remove key |> ignore
-                                activeBatches.[key] <- ordered
-                                SyncDelegateAdmission.Ready ordered)
+                admitByBatch pendingBatches activeBatches key invocation)
 
     member _.ReleaseAdmission(ownerScope: ReuseScopeId, role: SyncDelegateRole) =
         lock gate (fun () -> activeBatches.Remove(keyOf ownerScope role) |> ignore)
@@ -239,26 +385,19 @@ type internal SyncDelegateCallStore() as this =
     member _.CancelScope(scope: ReuseScopeId) =
         lock gate (fun () ->
             let sKey = scopeKey scope
+            let cancelError = "Sync delegate call was cancelled"
 
             let pendingKeys =
                 pendingBatches.Keys |> Seq.filter (fun (scope, _) -> scope = sKey) |> Seq.toList
 
             for key in pendingKeys do
-                let pending = pendingBatches.[key]
-
-                for invocation in pending.Items.Values do
-                    failInvocation invocation "Sync delegate call was cancelled"
-
-                pendingBatches.Remove key |> ignore
+                cancelPendingBatch pendingBatches key cancelError
 
             let activeKeys =
                 activeBatches.Keys |> Seq.filter (fun (scope, _) -> scope = sKey) |> Seq.toList
 
             for key in activeKeys do
-                for invocation in activeBatches.[key] do
-                    failInvocation invocation "Sync delegate call was cancelled"
-
-                activeBatches.Remove key |> ignore
+                cancelActiveBatch activeBatches key cancelError
 
             let observedKeys =
                 observedProviderRuns.Keys
@@ -268,15 +407,12 @@ type internal SyncDelegateCallStore() as this =
             for key in observedKeys do
                 observedProviderRuns.Remove key |> ignore
 
-            match callsByOwnerScope.TryGetValue sKey with
-            | true, list ->
-                let calls = list |> Seq.toList
-                callsByOwnerScope.Remove sKey |> ignore
-
-                for call in calls do
-                    callsByDelegate.Remove(sessionKey call.Delegate) |> ignore
-                    this.FailCall(call, "Sync delegate call was cancelled")
-            | false, _ -> ())
+            failOwnerScopeCalls
+                callsByOwnerScope
+                callsByDelegate
+                (fun call error -> this.FailCall(call, error))
+                sKey
+                cancelError)
 
     member _.BeginCall
         (
@@ -309,44 +445,22 @@ type internal SyncDelegateCallStore() as this =
                       Invocations = invocations
                       Answer = answer }
 
-                let ownerCalls =
-                    match callsByOwnerScope.TryGetValue ownerKey with
-                    | true, list -> list
-                    | false, _ ->
-                        let list = ResizeArray<SyncDelegateCall>()
-                        callsByOwnerScope.[ownerKey] <- list
-                        list
-
-                ownerCalls.Add call
+                (ownerCallsOf callsByOwnerScope ownerKey).Add call
                 callsByDelegate.[delegateKey] <- call
 
                 let registration =
                     { new IDisposable with
                         member _.Dispose() =
-                            let stillOwned =
-                                lock gate (fun () ->
-                                    activeBatches.Remove activeKey |> ignore
-
-                                    let removed =
-                                        match callsByOwnerScope.TryGetValue ownerKey with
-                                        | true, list ->
-                                            let wasRemoved = list.Remove call
-
-                                            if list.Count = 0 then
-                                                callsByOwnerScope.Remove ownerKey |> ignore
-
-                                            wasRemoved
-                                        | false, _ -> false
-
-                                    match callsByDelegate.TryGetValue delegateKey with
-                                    | true, current when Object.ReferenceEquals(current.Answer, call.Answer) ->
-                                        callsByDelegate.Remove delegateKey |> ignore
-                                    | _ -> ()
-
-                                    removed)
-
-                            if stillOwned then
-                                this.FailCall(call, "Sync delegate call scope disposed") }
+                            disposeCallRegistration
+                                gate
+                                activeBatches
+                                activeKey
+                                callsByOwnerScope
+                                ownerKey
+                                call
+                                callsByDelegate
+                                delegateKey
+                                (fun () -> this.FailCall(call, "Sync delegate call scope disposed")) }
 
                 Ok(call, registration))
 
@@ -391,17 +505,16 @@ type internal SyncDelegateCallStore() as this =
     /// Dispose path: fail every live/pending invocation and clear all indexes.
     member _.ClearAll() : SessionId list =
         lock gate (fun () ->
+            let disposedError = "SyncDelegate runtime disposed"
+
             for pending in pendingBatches.Values do
-                for invocation in pending.Items.Values do
-                    failInvocation invocation "SyncDelegate runtime disposed"
+                failInvocations pending.Items.Values disposedError
 
             for invocations in activeBatches.Values do
-                for invocation in invocations do
-                    failInvocation invocation "SyncDelegate runtime disposed"
+                failInvocations invocations disposedError
 
             for list in callsByOwnerScope.Values do
-                for call in list do
-                    this.FailCall(call, "SyncDelegate runtime disposed")
+                failCalls (fun call error -> this.FailCall(call, error)) (list |> Seq.toList) disposedError
 
             let retiredInspectors = deletedInspectorsByOwnerScope.Values |> Seq.toList
 

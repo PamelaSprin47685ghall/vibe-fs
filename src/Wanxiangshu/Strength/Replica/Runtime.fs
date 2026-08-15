@@ -11,6 +11,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -94,6 +95,225 @@ type private StrengthReplicaDecisionState =
       Completion: TaskCompletionSource<StrengthReplicaOutcome>
       RequestsAdmitted: int
       Batches: StrengthRequestBatch list }
+
+module private StrengthReplicaRuntimeLogic =
+
+    let requireNonEmptyBudget (budget: StrengthBudget) =
+        if StrengthBudget.requestLimit budget = 0 then
+            Error "StrengthReplica cannot start with K0"
+        else
+            Ok()
+
+    let parseEligibleFastAgent (fastAgent: string) =
+        match ManagedAgent.tryParse fastAgent with
+        | None -> Error(sprintf "StrengthReplica fast agent is unmanaged: %s" fastAgent)
+        | Some managed when not (Set.contains managed.Role StrengthPolicy.eligibleRoles) ->
+            Error(sprintf "StrengthReplica role is ineligible: %A" managed.Role)
+        | Some managed when managed.Tier <> AgentTier.Fast ->
+            Error(sprintf "StrengthReplica agent is not fast tier: %s" fastAgent)
+        | Some managed -> Ok managed
+
+    let requireOwnerIdle (liveRegistry: StrengthRuntime) (owner: SessionId) =
+        match liveRegistry.TryFindByOwner owner with
+        | Some _ -> Error "StrengthReplica owner already has an active decision"
+        | None -> Ok()
+
+    let registerLiveOrAbort
+        (sessions: ISessionHostPort)
+        (liveRegistry: StrengthRuntime)
+        (binding: StrengthReplicaBinding)
+        (replica: SessionId)
+        : Task<Result<unit, string>> =
+        task {
+            match liveRegistry.Register binding with
+            | Error error ->
+                let! _ = sessions.AbortSession replica
+                return Error(sprintf "StrengthReplica live registration failed: %A" error)
+            | Ok() -> return Ok()
+        }
+
+    let tryClaimCollector
+        (gate: obj)
+        (byReplica: Dictionary<string, StrengthReplicaDecisionState>)
+        (sessionKey: SessionId -> string)
+        (replica: SessionId)
+        (state: StrengthReplicaDecisionState)
+        =
+        lock gate (fun () ->
+            if byReplica.ContainsKey(sessionKey replica) then
+                false
+            else
+                byReplica.[sessionKey replica] <- state
+                true)
+
+    let claimCollectorOrFail
+        (gate: obj)
+        (byReplica: Dictionary<string, StrengthReplicaDecisionState>)
+        (sessionKey: SessionId -> string)
+        (liveRegistry: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (registerReplica: SessionId -> SessionId -> string -> unit)
+        (owner: SessionId)
+        (replica: SessionId)
+        (fastAgent: string)
+        (state: StrengthReplicaDecisionState)
+        : Task<Result<unit, string>> =
+        task {
+            if tryClaimCollector gate byReplica sessionKey replica state then
+                registerReplica owner replica fastAgent
+                return Ok()
+            else
+                liveRegistry.Retire replica |> ignore
+                let! _ = sessions.AbortSession replica
+                return Error "StrengthReplica in-flight state collided after live registration"
+        }
+
+    let applyBootstrapSendResult
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (state: StrengthReplicaDecisionState)
+        (sent: Result<'ignored, string>)
+        =
+        match sent with
+        | Error error -> complete (StrengthReplicaTerminal.Failed error) state
+        | Ok _ -> ()
+
+    let bootstrapDetachedSend
+        (dispatcher: PromptDispatcher.Runtime)
+        (sessions: ISessionHostPort)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
+        (promptModelFor: (string -> OpencodeModel option) option)
+        (directory: string option)
+        (replica: SessionId)
+        (fastAgent: string)
+        (state: StrengthReplicaDecisionState)
+        : Task<unit> =
+        task {
+            try
+                let! sent =
+                    dispatcher.SendAgentOwnerRootWithTools
+                        sessions
+                        replica
+                        "Continue."
+                        fastAgent
+                        directory
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                        StrengthReplicaTools.exactReadonlyHostToolMap
+                        (promptModelFor |> Option.bind (fun lookup -> lookup fastAgent))
+
+                applyBootstrapSendResult complete state sent
+            with ex ->
+                complete (StrengthReplicaTerminal.Failed ex.Message) state
+                do! abortReplica state
+        }
+
+    let terminalForRetiredReason (reason: string) =
+        if reason = "provider-request-budget-reached" then
+            StrengthReplicaTerminal.BudgetReached
+        elif
+            reason.StartsWith("invalid-replica-frame", StringComparison.Ordinal)
+            || reason.StartsWith("projection-conflict", StringComparison.Ordinal)
+        then
+            StrengthReplicaTerminal.InvalidFrame reason
+        else
+            StrengthReplicaTerminal.Failed reason
+
+    let applyTransformOutcome
+        (liveRegistry: StrengthRuntime)
+        (replaceState: StrengthReplicaDecisionState -> StrengthReplicaDecisionState -> bool)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (replica: SessionId)
+        (state: StrengthReplicaDecisionState)
+        (transformed: StrengthReplicaTransformOutcome)
+        : bool =
+        match transformed with
+        | StrengthReplicaTransformOutcome.NotReplica -> false
+        | StrengthReplicaTransformOutcome.Ready batches ->
+            let limit =
+                liveRegistry.TryFindByReplica replica
+                |> Option.map (fun binding -> StrengthBudget.requestLimit binding.Budget)
+                |> Option.defaultValue 0
+
+            let next =
+                { state with
+                    RequestsAdmitted = min limit (List.length batches + 1)
+                    Batches = batches }
+
+            replaceState state next |> ignore
+            true
+        | StrengthReplicaTransformOutcome.Retired(reason, batches) ->
+            let next =
+                { state with
+                    RequestsAdmitted = List.length batches
+                    Batches = batches }
+
+            replaceState state next |> ignore
+            complete (terminalForRetiredReason reason) next
+            true
+
+    let handleTransformSession
+        (tryState: SessionId -> StrengthReplicaDecisionState option)
+        (replaceState: StrengthReplicaDecisionState -> StrengthReplicaDecisionState -> bool)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (liveRegistry: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (sessionIdText: string)
+        (output: obj)
+        : Task<bool> =
+        task {
+            let replica = SessionId.create sessionIdText
+
+            match tryState replica with
+            | None -> return false
+            | Some state ->
+                let! transformed =
+                    StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
+
+                return applyTransformOutcome liveRegistry replaceState complete replica state transformed
+        }
+
+    let completeFromTurnOutcome
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (state: StrengthReplicaDecisionState)
+        (outcome: ReconcileProgram.TurnOutcome)
+        =
+        match outcome with
+        | ReconcileProgram.TurnCompleted -> complete StrengthReplicaTerminal.TextCompleted state
+        | ReconcileProgram.TurnFailed reason
+        | ReconcileProgram.TurnAborted reason -> complete (StrengthReplicaTerminal.Failed reason) state
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnInProgress -> ()
+
+    let cancelReplicaBinding
+        (tryState: SessionId -> StrengthReplicaDecisionState option)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
+        (liveRegistry: StrengthRuntime)
+        (binding: StrengthReplicaBinding)
+        : Task<unit> =
+        task {
+            match tryState binding.ReplicaSessionId with
+            | None -> liveRegistry.Retire binding.ReplicaSessionId |> ignore
+            | Some state ->
+                complete StrengthReplicaTerminal.Cancelled state
+                do! abortReplica state
+        }
+
+    let settleCompletionRace
+        (completed: bool)
+        (deadline: IDeadlineHandle)
+        (current: StrengthReplicaDecisionState)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
+        : Task<unit> =
+        task {
+            if completed then
+                deadline.Cancel()
+            else
+                complete StrengthReplicaTerminal.TimedOut current
+                do! abortReplica current
+        }
 
 /// STRENGTH-003/004/009/011: physical coordinator for one decision-local leaf.
 ///
@@ -204,47 +424,15 @@ type StrengthReplicaRuntime
             match ProviderWireDecode.projectionSessionIdFromMessages output with
             | None -> return false
             | Some sessionIdText ->
-                let replica = SessionId.create sessionIdText
-
-                match tryState replica with
-                | None -> return false
-                | Some state ->
-                    let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
-
-                    match transformed with
-                    | StrengthReplicaTransformOutcome.NotReplica -> return false
-                    | StrengthReplicaTransformOutcome.Ready batches ->
-                        let limit =
-                            liveRegistry.TryFindByReplica replica
-                            |> Option.map (fun binding -> StrengthBudget.requestLimit binding.Budget)
-                            |> Option.defaultValue 0
-
-                        let next =
-                            { state with
-                                RequestsAdmitted = min limit (List.length batches + 1)
-                                Batches = batches }
-
-                        replaceState state next |> ignore
-                        return true
-                    | StrengthReplicaTransformOutcome.Retired(reason, batches) ->
-                        let next =
-                            { state with
-                                RequestsAdmitted = List.length batches
-                                Batches = batches }
-
-                        replaceState state next |> ignore
-
-                        if reason = "provider-request-budget-reached" then
-                            complete StrengthReplicaTerminal.BudgetReached next
-                        elif
-                            reason.StartsWith("invalid-replica-frame", StringComparison.Ordinal)
-                            || reason.StartsWith("projection-conflict", StringComparison.Ordinal)
-                        then
-                            complete (StrengthReplicaTerminal.InvalidFrame reason) next
-                        else
-                            complete (StrengthReplicaTerminal.Failed reason) next
-
-                        return true
+                return!
+                    StrengthReplicaRuntimeLogic.handleTransformSession
+                        tryState
+                        replaceState
+                        complete
+                        liveRegistry
+                        sessions
+                        sessionIdText
+                        output
         }
 
     /// Replica terminal observations are consumed before ordinary Work reconcile.
@@ -253,13 +441,7 @@ type StrengthReplicaRuntime
         match tryState turn.SessionId with
         | None -> false
         | Some state ->
-            match turn.Outcome with
-            | ReconcileProgram.TurnCompleted -> complete StrengthReplicaTerminal.TextCompleted state
-            | ReconcileProgram.TurnFailed reason
-            | ReconcileProgram.TurnAborted reason -> complete (StrengthReplicaTerminal.Failed reason) state
-            | ReconcileProgram.TurnNeedsContinuation _
-            | ReconcileProgram.TurnInProgress -> ()
-
+            StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state turn.Outcome
             true
 
     member _.CancelOwner(owner: SessionId) : Task =
@@ -267,11 +449,13 @@ type StrengthReplicaRuntime
             match liveRegistry.TryFindByOwner owner with
             | None -> ()
             | Some binding ->
-                match tryState binding.ReplicaSessionId with
-                | None -> liveRegistry.Retire binding.ReplicaSessionId |> ignore
-                | Some state ->
-                    complete StrengthReplicaTerminal.Cancelled state
-                    do! abortReplica state
+                do!
+                    StrengthReplicaRuntimeLogic.cancelReplicaBinding
+                        tryState
+                        complete
+                        abortReplica
+                        liveRegistry
+                        binding
         }
 
     member private _.ObserveDryRun(state: StrengthReplicaDecisionState) =
@@ -281,12 +465,13 @@ type StrengthReplicaRuntime
                 let completionTask = state.Completion.Task
                 let! completed = completionWins completionTask deadline
 
-                if completed then
-                    deadline.Cancel()
-                else
-                    let current = tryState state.Replica |> Option.defaultValue state
-                    complete StrengthReplicaTerminal.TimedOut current
-                    do! abortReplica current
+                do!
+                    StrengthReplicaRuntimeLogic.settleCompletionRace
+                        completed
+                        deadline
+                        (tryState state.Replica |> Option.defaultValue state)
+                        complete
+                        abortReplica
 
                 let! _ = completionTask
                 removeState state
@@ -339,102 +524,75 @@ type StrengthReplicaRuntime
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaDecisionState, string>> =
-        task {
-            if StrengthBudget.requestLimit budget = 0 then
-                return Error "StrengthReplica cannot start with K0"
-            else
-                match ManagedAgent.tryParse fastAgent with
-                | None -> return Error(sprintf "StrengthReplica fast agent is unmanaged: %s" fastAgent)
-                | Some managed when not (Set.contains managed.Role StrengthPolicy.eligibleRoles) ->
-                    return Error(sprintf "StrengthReplica role is ineligible: %A" managed.Role)
-                | Some managed when managed.Tier <> AgentTier.Fast ->
-                    return Error(sprintf "StrengthReplica agent is not fast tier: %s" fastAgent)
-                | Some managed ->
-                    match liveRegistry.TryFindByOwner owner with
-                    | Some _ -> return Error "StrengthReplica owner already has an active decision"
-                    | None ->
-                        let! created =
-                            sessions.CreateChildSession(
-                                owner,
-                                { Title = Some fastAgent
-                                  Agent = Some fastAgent
-                                  Directory = directory }
-                            )
+        taskResult {
+            do! StrengthReplicaRuntimeLogic.requireNonEmptyBudget budget
+            let! managed = StrengthReplicaRuntimeLogic.parseEligibleFastAgent fastAgent
+            do! StrengthReplicaRuntimeLogic.requireOwnerIdle liveRegistry owner
 
-                        match created with
-                        | Error error -> return Error error
-                        | Ok replica ->
-                            // AGENT-028/029 / STRENGTH-004: inherit owner Persona + language;
-                            // ExecutionBinding alone switches to fast-<role>.
-                            PersonaBinding.ensureInherited owner replica |> ignore
+            let! replica =
+                sessions.CreateChildSession(
+                    owner,
+                    { Title = Some fastAgent
+                      Agent = Some fastAgent
+                      Directory = directory }
+                )
 
-                            let capabilities =
-                                PromptAuthority.toolCapabilitiesFor managed.Role ProviderRequestKind.StrengthReplica
+            // AGENT-028/029 / STRENGTH-004: inherit owner Persona + language;
+            // ExecutionBinding alone switches to fast-<role>.
+            PersonaBinding.ensureInherited owner replica |> ignore
 
-                            let binding: StrengthReplicaBinding =
-                                { OwnerSessionId = owner
-                                  ReplicaSessionId = replica
-                                  DecisionId = decisionId
-                                  TargetProviderRun = targetProviderRun
-                                  CanonicalRole = managed.Role
-                                  Budget = budget
-                                  MaxFrameBytes = frameByteLimit
-                                  SemanticDigest = mirrorSemanticDigest
-                                  LocalizedMirrorMessages = localizedMirror
-                                  ToolCapabilitySet = capabilities }
+            let capabilities =
+                PromptAuthority.toolCapabilitiesFor managed.Role ProviderRequestKind.StrengthReplica
 
-                            match liveRegistry.Register binding with
-                            | Error error ->
-                                let! _ = sessions.AbortSession replica
-                                return Error(sprintf "StrengthReplica live registration failed: %A" error)
-                            | Ok() ->
-                                let state =
-                                    { Owner = owner
-                                      Replica = replica
-                                      DecisionId = decisionId
-                                      Completion = TaskCompletionSource<StrengthReplicaOutcome>()
-                                      RequestsAdmitted = 0
-                                      Batches = [] }
+            let binding: StrengthReplicaBinding =
+                { OwnerSessionId = owner
+                  ReplicaSessionId = replica
+                  DecisionId = decisionId
+                  TargetProviderRun = targetProviderRun
+                  CanonicalRole = managed.Role
+                  Budget = budget
+                  MaxFrameBytes = frameByteLimit
+                  SemanticDigest = mirrorSemanticDigest
+                  LocalizedMirrorMessages = localizedMirror
+                  ToolCapabilitySet = capabilities }
 
-                                let collectorClaimed =
-                                    lock gate (fun () ->
-                                        if byReplica.ContainsKey(key replica) then
-                                            false
-                                        else
-                                            byReplica.[key replica] <- state
-                                            true)
+            do! StrengthReplicaRuntimeLogic.registerLiveOrAbort sessions liveRegistry binding replica
 
-                                if not collectorClaimed then
-                                    liveRegistry.Retire replica |> ignore
-                                    let! _ = sessions.AbortSession replica
-                                    return Error "StrengthReplica in-flight state collided after live registration"
-                                else
-                                    registerReplica owner replica fastAgent
+            let state =
+                { Owner = owner
+                  Replica = replica
+                  DecisionId = decisionId
+                  Completion = TaskCompletionSource<StrengthReplicaOutcome>()
+                  RequestsAdmitted = 0
+                  Batches = [] }
 
-                                    try
-                                        // The physical bootstrap is never provider-visible: the
-                                        // Replica transform replaces it with FrozenMirror before
-                                        // request #1 is admitted.
-                                        match!
-                                            dispatcher.SendAgentOwnerRootWithTools
-                                                sessions
-                                                replica
-                                                "Continue."
-                                                fastAgent
-                                                directory
-                                                PromptDispatcher.AwaitMode.Detached
-                                                None
-                                                StrengthReplicaTools.exactReadonlyHostToolMap
-                                                (promptModelFor |> Option.bind (fun lookup -> lookup fastAgent))
-                                        with
-                                        | Error error -> complete (StrengthReplicaTerminal.Failed error) state
-                                        | Ok _ -> ()
+            do!
+                StrengthReplicaRuntimeLogic.claimCollectorOrFail
+                    gate
+                    byReplica
+                    key
+                    liveRegistry
+                    sessions
+                    registerReplica
+                    owner
+                    replica
+                    fastAgent
+                    state
 
-                                        return Ok state
-                                    with ex ->
-                                        complete (StrengthReplicaTerminal.Failed ex.Message) state
-                                        do! abortReplica state
-                                        return Ok state
+            do!
+                StrengthReplicaRuntimeLogic.bootstrapDetachedSend
+                    dispatcher
+                    sessions
+                    complete
+                    abortReplica
+                    promptModelFor
+                    directory
+                    replica
+                    fastAgent
+                    state
+                |> TaskResultCE.ofTask
+
+            return state
         }
 
     member this.StartDecision
@@ -466,12 +624,13 @@ type StrengthReplicaRuntime
                     let completionTask = state.Completion.Task
                     let! completed = completionWins completionTask deadline
 
-                    if completed then
-                        deadline.Cancel()
-                    else
-                        let current = tryState state.Replica |> Option.defaultValue state
-                        complete StrengthReplicaTerminal.TimedOut current
-                        do! abortReplica current
+                    do!
+                        StrengthReplicaRuntimeLogic.settleCompletionRace
+                            completed
+                            deadline
+                            (tryState state.Replica |> Option.defaultValue state)
+                            complete
+                            abortReplica
 
                     let! result = completionTask
                     removeState state

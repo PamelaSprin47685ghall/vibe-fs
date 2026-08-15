@@ -111,44 +111,46 @@ module PtySupervisor =
     [<Emit("$0.then((spawn) => $1(spawn)).catch((err) => $2(String(err && err.message || err)))")>]
     let private runLoader (loader: JS.Promise<obj>) (onOk: obj -> unit) (onErr: string -> unit) : unit = jsNative
 
+    let private startSpawnLoad (supervisor: PtySupervisor) : Task<unit> =
+        match supervisor.LoadTask with
+        | Some t -> t
+        | None ->
+            let tcs = TaskCompletionSource<unit>()
+            supervisor.LoadTask <- Some tcs.Task
+
+            runLoader
+                (loadSpawn ())
+                (fun spawn ->
+                    supervisor.SpawnFn <- Some(unbox spawn)
+                    tcs.SetResult(()))
+                (fun err -> tcs.SetException(Exception err))
+
+            tcs.Task
+
     let ensureSpawn (supervisor: PtySupervisor) : Task<unit> =
         match supervisor.SpawnFn with
         | Some _ -> Task.FromResult(())
-        | None ->
-            match supervisor.LoadTask with
-            | Some t -> t
-            | None ->
-                let tcs = TaskCompletionSource<unit>()
-                supervisor.LoadTask <- Some tcs.Task
-
-                runLoader
-                    (loadSpawn ())
-                    (fun spawn ->
-                        supervisor.SpawnFn <- Some(unbox spawn)
-                        tcs.SetResult(()))
-                    (fun err -> tcs.SetException(Exception err))
-
-                tcs.Task
+        | None -> startSpawnLoad supervisor
 
     [<Emit("$0('sh', ['-lc', $1], $2)")>]
     let private invokeSpawn (spawn: obj) (command: string) (options: obj) : obj = jsNative
+
+    let private resolveCwd (cwd: string) : obj =
+        if String.IsNullOrEmpty cwd then
+            emitJsExpr () "process.cwd()"
+        else
+            box cwd
 
     let spawnSync (supervisor: PtySupervisor) (command: string) (cwd: string) : obj =
         match supervisor.SpawnFn with
         | None -> failwith "bun-pty is not loaded"
         | Some spawn ->
-            let cwdValue =
-                if String.IsNullOrEmpty cwd then
-                    emitJsExpr () "process.cwd()"
-                else
-                    box cwd
-
             let options =
                 createObj
                     [ "name", box "xterm-256color"
                       "cols", box 80
                       "rows", box 24
-                      "cwd", cwdValue ]
+                      "cwd", resolveCwd cwd ]
 
             invokeSpawn spawn command options
 
@@ -185,6 +187,118 @@ module PtySupervisor =
             else
                 [])
 
+    let private writeBackend (session: PtySession) (bytes: byte[]) =
+        task {
+            try
+                let text = Encoding.UTF8.GetString bytes
+                session.Backend?write text
+                return Ok()
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private resolveSilentRead (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) =
+        match tryGet supervisor id with
+        | Some s when s.AwaitingFirstByte ->
+            s.AwaitingFirstByte <- false
+            let text = s.OutputBuffer.ToString()
+            s.OutputBuffer.Clear() |> ignore
+            port.ReadResult(id, text, s.Closed)
+        | _ -> ()
+
+    let private armFirstByteWait (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) (session: PtySession) =
+        session.AwaitingFirstByte <- true
+
+        task {
+            do! PtyTiming.timerTask PtyReadFirstByteMs
+            resolveSilentRead supervisor port id
+        }
+        |> ignore
+
+    let private readBackend (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) (session: PtySession) =
+        task {
+            let buffered = session.OutputBuffer.ToString()
+
+            if buffered <> "" || session.Closed then
+                session.OutputBuffer.Clear() |> ignore
+                port.ReadResult(id, buffered, session.Closed)
+            else
+                // PTY-READ-FIRST-BYTE: an open terminal with nothing buffered has not
+                // answered yet, and answering "" instantly makes the obvious agent
+                // sequence — write a command, read its output — return nothing whenever
+                // the shell has not echoed within the same tick. Measured: `pty-stress`
+                // reads eleven times and every read came back empty under suite load,
+                // while the echo turned up later in the join outcome.
+                //
+                // So the read waits for the next byte instead of guessing. Event-driven:
+                // `onData` resolves the parked reader as soon as the terminal speaks. The
+                // timer is only the answer for a genuinely silent terminal, which must
+                // still get "" rather than hang.
+                armFirstByteWait supervisor port id session
+
+            return Ok()
+        }
+
+    let private signalBackend (session: PtySession) (signal: PtySignal) =
+        task {
+            try
+                killProcessTree session.Backend (signalName signal)
+                return Ok()
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private resizeBackend (session: PtySession) (width: int) (height: int) =
+        task {
+            try
+                session.Backend?resize(width, height)
+                return Ok()
+            with _ ->
+                return Ok()
+        }
+
+    let private applyBackendCommand
+        (supervisor: PtySupervisor)
+        (port: PtyPort)
+        (id: PtyId)
+        (session: PtySession)
+        (command: PtyCommand)
+        =
+        match command with
+        | PtyCommand.Write bytes -> writeBackend session bytes
+        | PtyCommand.Read -> readBackend supervisor port id session
+        | PtyCommand.Signal signal -> signalBackend session signal
+        | PtyCommand.Resize(width, height) -> resizeBackend session width height
+        | PtyCommand.Spawn _ -> Task.FromResult(Ok())
+
+    let private pendingWriteTcs (command: PtyCommand) =
+        match command with
+        | PtyCommand.Write _ ->
+            let tcs = TaskCompletionSource<Result<unit, string>>()
+            Some tcs
+        | _ -> None
+
+    let private awaitPending (tcsOpt: TaskCompletionSource<Result<unit, string>> option) =
+        task {
+            match tcsOpt with
+            | Some tcs -> return! tcs.Task
+            | None -> return Ok()
+        }
+
+    let private enqueuePending (supervisor: PtySupervisor) (session: PtySession) (command: PtyCommand) =
+        let tcsOpt = pendingWriteTcs command
+        lock supervisor.Gate (fun () -> session.Pending.Add(command, tcsOpt))
+        awaitPending tcsOpt
+
+    let private sessionOrCreate (supervisor: PtySupervisor) (id: PtyId) =
+        lock supervisor.Gate (fun () ->
+            match tryGetUnlocked supervisor id with
+            | Some s -> s
+            | None ->
+                let s = PtySession.create id.Value null
+                supervisor.Sessions.[id] <- s
+                s)
+
     let applyLive
         (supervisor: PtySupervisor)
         (port: PtyPort)
@@ -192,90 +306,65 @@ module PtySupervisor =
         (command: PtyCommand)
         : Task<Result<unit, string>> =
         task {
-            let session =
-                lock supervisor.Gate (fun () ->
-                    match tryGetUnlocked supervisor id with
-                    | Some s -> s
-                    | None ->
-                        let s = PtySession.create id.Value null
-                        supervisor.Sessions.[id] <- s
-                        s)
+            let session = sessionOrCreate supervisor id
 
             if session.Closed then
                 return Ok()
-            elif not (isNull session.Backend) then
-                match command with
-                | PtyCommand.Write bytes ->
-                    try
-                        let text = Encoding.UTF8.GetString bytes
-                        session.Backend?write text
-                        return Ok()
-                    with ex ->
-                        return Error ex.Message
-                | PtyCommand.Read ->
-                    let buffered = session.OutputBuffer.ToString()
-
-                    if buffered <> "" || session.Closed then
-                        session.OutputBuffer.Clear() |> ignore
-                        port.ReadResult(id, buffered, session.Closed)
-                        return Ok()
-                    else
-                        // PTY-READ-FIRST-BYTE: an open terminal with nothing buffered has not
-                        // answered yet, and answering "" instantly makes the obvious agent
-                        // sequence — write a command, read its output — return nothing whenever
-                        // the shell has not echoed within the same tick. Measured: `pty-stress`
-                        // reads eleven times and every read came back empty under suite load,
-                        // while the echo turned up later in the join outcome.
-                        //
-                        // So the read waits for the next byte instead of guessing. Event-driven:
-                        // `onData` resolves the parked reader as soon as the terminal speaks. The
-                        // timer is only the answer for a genuinely silent terminal, which must
-                        // still get "" rather than hang.
-                        session.AwaitingFirstByte <- true
-
-                        // Answer on silence, in a task rather than a continuation so the shape is
-                        // the same `task { }` the rest of this file uses.
-                        task {
-                            do! PtyTiming.timerTask PtyReadFirstByteMs
-
-                            match tryGet supervisor id with
-                            | Some s when s.AwaitingFirstByte ->
-                                s.AwaitingFirstByte <- false
-                                let text = s.OutputBuffer.ToString()
-                                s.OutputBuffer.Clear() |> ignore
-                                port.ReadResult(id, text, s.Closed)
-                            | _ -> ()
-                        }
-                        |> ignore
-
-                        return Ok()
-                | PtyCommand.Signal signal ->
-                    try
-                        killProcessTree session.Backend (signalName signal)
-                        return Ok()
-                    with ex ->
-                        return Error ex.Message
-                | PtyCommand.Resize(width, height) ->
-                    try
-                        session.Backend?resize(width, height)
-                        return Ok()
-                    with _ ->
-                        return Ok()
-                | PtyCommand.Spawn _ -> return Ok()
+            elif isNull session.Backend then
+                return! enqueuePending supervisor session command
             else
-                let tcsOpt =
-                    match command with
-                    | PtyCommand.Write _ ->
-                        let tcs = TaskCompletionSource<Result<unit, string>>()
-                        Some tcs
-                    | _ -> None
-
-                lock supervisor.Gate (fun () -> session.Pending.Add(command, tcsOpt))
-
-                match tcsOpt with
-                | Some tcs -> return! tcs.Task
-                | None -> return Ok()
+                return! applyBackendCommand supervisor port id session command
         }
+
+    let private drainAwaitingFirstByte (port: PtyPort) (id: PtyId) (s: PtySession) =
+        if s.AwaitingFirstByte then
+            s.AwaitingFirstByte <- false
+            let text = s.OutputBuffer.ToString()
+            s.OutputBuffer.Clear() |> ignore
+            port.ReadResult(id, text, s.Closed)
+
+    let private appendLiveData (port: PtyPort) (id: PtyId) (data: string) (s: PtySession) =
+        s.OutputBuffer.Append data |> ignore
+        // PTY-READ-FIRST-BYTE: a read parked on an empty buffer is answered by the
+        // terminal speaking, not by a timer expiring. Draining here is what makes
+        // write-then-read deterministic instead of a race against the shell's echo.
+        drainAwaitingFirstByte port id s
+
+    let private onSessionData (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) (data: string) =
+        match tryGet supervisor id with
+        | None -> ()
+        | Some s when s.Closed -> ()
+        | Some s -> appendLiveData port id data s
+
+    let private residualOrClosed (residual: string) =
+        if String.IsNullOrEmpty residual then
+            PtyOutcome.Closed
+        else
+            residual
+
+    let private onSessionExit (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) =
+        match tryGet supervisor id with
+        | None -> ()
+        | Some s when s.Closed -> ()
+        | Some s ->
+            s.Closed <- true
+            let residual = s.OutputBuffer.ToString()
+            s.OutputBuffer.Clear() |> ignore
+            s.ExitCompletion.SetResult(())
+            let pending = drop supervisor id
+            failPending pending "PTY exited before command was applied"
+            port.FailRead(id, "PTY exited before read completed")
+            port.Complete(id, Ok(residualOrClosed residual))
+
+    let private killOrphanTerm (term: obj) =
+        try
+            killProcessTree term (signalName PtySignal.Kill)
+        with _ ->
+            ()
+
+    let private killUnlessClosed (session: PtySession) =
+        if not session.Closed then
+            killOrphanTerm session.Backend
 
     let attach
         (supervisor: PtySupervisor)
@@ -299,52 +388,11 @@ module PtySupervisor =
                 supervisor.Sessions.[id] <- live
                 placeholder.Pending |> Seq.toList)
 
-        term?onData (fun (data: string) ->
-            match tryGet supervisor id with
-            | None -> ()
-            | Some s when s.Closed -> ()
-            | Some s ->
-                s.OutputBuffer.Append data |> ignore
-
-                // PTY-READ-FIRST-BYTE: a read parked on an empty buffer is answered by the
-                // terminal speaking, not by a timer expiring. Draining here is what makes
-                // write-then-read deterministic instead of a race against the shell's echo.
-                if s.AwaitingFirstByte then
-                    s.AwaitingFirstByte <- false
-                    let text = s.OutputBuffer.ToString()
-                    s.OutputBuffer.Clear() |> ignore
-                    port.ReadResult(id, text, s.Closed))
-        |> ignore
-
-        term?onExit (fun (_event: obj) ->
-            match tryGet supervisor id with
-            | None -> ()
-            | Some s when s.Closed -> ()
-            | Some s ->
-                s.Closed <- true
-                let residual = s.OutputBuffer.ToString()
-                s.OutputBuffer.Clear() |> ignore
-                s.ExitCompletion.SetResult(())
-                let pending = drop supervisor id
-                failPending pending "PTY exited before command was applied"
-                port.FailRead(id, "PTY exited before read completed")
-
-                port.Complete(
-                    id,
-                    Ok(
-                        if String.IsNullOrEmpty residual then
-                            PtyOutcome.Closed
-                        else
-                            residual
-                    )
-                ))
-        |> ignore
+        term?onData (fun (data: string) -> onSessionData supervisor port id data) |> ignore
+        term?onExit (fun (_event: obj) -> onSessionExit supervisor port id) |> ignore
 
         if not (port.Exists id) then
-            try
-                killProcessTree term (signalName PtySignal.Kill)
-            with _ ->
-                ()
+            killOrphanTerm term
 
         for (command, tcsOpt) in pending do
             task {
@@ -358,8 +406,4 @@ module PtySupervisor =
             lock supervisor.Gate (fun () -> supervisor.Sessions.Values |> Seq.toList)
 
         for session in sessions do
-            if not session.Closed then
-                try
-                    killProcessTree session.Backend (signalName PtySignal.Kill)
-                with _ ->
-                    ()
+            killUnlessClosed session

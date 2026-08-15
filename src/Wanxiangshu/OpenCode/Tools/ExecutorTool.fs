@@ -220,103 +220,161 @@ module ExecutorTool =
         | ProcessError.ProcessCancelled _ -> consequence (prose language Path.Run.Cancelled)
         | ProcessError.ExecutionFailed _ -> consequence (prose language Path.Run.ExecutionFailed)
 
+    let private directoryFor (scope: ToolRuntimeScope) (context: HostToolContext) =
+        if String.IsNullOrWhiteSpace context.SessionId then
+            scope.WorkspaceDirectory
+        else
+            scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+    let private estimatedMemory (worldLock: bool) =
+        if worldLock then
+            EstimatedMemory.Large
+        else
+            EstimatedMemory.Medium
+
+    let private completedToml (exitCode: int) (stdout: string) (stderr: string) =
+        let fields =
+            [ yield "exit_code", TInt exitCode
+              if not (String.IsNullOrWhiteSpace stdout) then
+                  yield "stdout", TString stdout
+              if not (String.IsNullOrWhiteSpace stderr) then
+                  yield "stderr", TString stderr ]
+
+        tomlObject fields
+
+    let private familyPermit (scope: ToolRuntimeScope) (root: SessionId) : Task<Result<FamilyRecoveryPermit, string>> =
+        task {
+            let! recovery = scope.RequireFamilyRecovery root
+
+            match recovery with
+            | FamilyRecovery.FamilyBlocked _ -> return Error "RECOVERY_BLOCKED:"
+            | FamilyRecovery.FamilyWaiting _ -> return Error "RECOVERY_WAITING:"
+            | FamilyRecovery.FamilyReady permit -> return Ok permit
+        }
+
+    let private distillationRuntime
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (requirePermit: DistillationRuntime.RequirePermit)
+        =
+        match scope.Journal with
+        | Some journal ->
+            Distillation.asDistillationRuntime (scope.ExecutorRuntimeFor context) journal requirePermit
+        | None -> Distillation.ofForkRuntime (ForkRuntime())
+
+    let private spooledInstructions (summary: string) =
+        if System.String.IsNullOrWhiteSpace summary then
+            []
+        else
+            [ summary ]
+
+    let private condenseWithAuthority
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (context: HostToolContext)
+        (exitCode: int)
+        (spoolPath: string)
+        =
+        task {
+            let root = SessionId.create context.SessionId
+            let requirePermit () = familyPermit scope root
+            let! permitResult = requirePermit ()
+
+            match permitResult with
+            | Error msg when msg.StartsWith("RECOVERY_BLOCKED", System.StringComparison.Ordinal) ->
+                return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
+            | Error _
+            | Ok _ ->
+                let runtime = distillationRuntime scope context requirePermit
+                let! summary = Distillation.distillSpool runtime spoolPath language
+                return tomlObjectWithInstructions (spooledInstructions summary) [ "exit_code", TInt exitCode ]
+        }
+
+    let private condenseOrBlock
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (context: HostToolContext)
+        (exitCode: int)
+        (spoolPath: string)
+        =
+        if String.IsNullOrWhiteSpace context.SessionId then
+            task { return consequence (prose language Path.Run.CannotCondenseUntilAuthority) }
+        else
+            condenseWithAuthority scope language context exitCode spoolPath
+
+    let private finalizeSpooled
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (context: HostToolContext)
+        (exitCode: int)
+        (spoolPath: string)
+        =
+        task {
+            try
+                return! condenseOrBlock scope language context exitCode spoolPath
+            finally
+                Spool.delete spoolPath
+        }
+
+    let private interpretOutcome
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (context: HostToolContext)
+        (result: Result<ProcessOutcome, ProcessError>)
+        =
+        match result with
+        | Error processError -> task { return processConsequence language processError }
+        | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
+            task { return completedToml exitCode stdout stderr }
+        | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
+            finalizeSpooled scope language context exitCode spoolPath
+
+    let private runPrepared
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        (language: ProviderLanguage)
+        =
+        task {
+            let directory = directoryFor scope context
+
+            let estimate =
+                { EstimatedRuntime = RuntimeSeconds request.DeadlineSeconds
+                  EstimatedOutput = OutputBytes request.OutputBudgetBytes
+                  EstimatedMemory = estimatedMemory request.WorldLock }
+
+            let command =
+                { FileName = "sh"
+                  Arguments = [ "-lc"; request.Command ]
+                  WorkingDirectory = directory
+                  Environment = None
+                  Stdin = None
+                  Deadline = None
+                  PtyOptions = None }
+
+            use cancellation = new CancellationTokenSource()
+            let detachAbort = context.AttachAbort cancellation.Cancel
+
+            let processContext: ProcessContext =
+                { WorkingDirectory = directory
+                  HardLimit = scope.ProcessHardLimit }
+
+            let! result =
+                try
+                    ProcessRunner.run command estimate processContext cancellation.Token
+                finally
+                    detachAbort ()
+
+            return! interpretOutcome scope language context result
+        }
+
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             let language = lang context
 
             match scope.RuntimeFor context with
             | Error _ -> return consequence (prose language Path.Run.CannotRunFromContext)
-            | Ok _ ->
-                let directory =
-                    if String.IsNullOrWhiteSpace context.SessionId then
-                        scope.WorkspaceDirectory
-                    else
-                        scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
-
-                let estimate =
-                    { EstimatedRuntime = RuntimeSeconds request.DeadlineSeconds
-                      EstimatedOutput = OutputBytes request.OutputBudgetBytes
-                      EstimatedMemory =
-                        if request.WorldLock then
-                            EstimatedMemory.Large
-                        else
-                            EstimatedMemory.Medium }
-
-                let command =
-                    { FileName = "sh"
-                      Arguments = [ "-lc"; request.Command ]
-                      WorkingDirectory = directory
-                      Environment = None
-                      Stdin = None
-                      Deadline = None
-                      PtyOptions = None }
-
-                use cancellation = new CancellationTokenSource()
-                let detachAbort = context.AttachAbort cancellation.Cancel
-
-                let processContext: ProcessContext =
-                    { WorkingDirectory = directory
-                      HardLimit = scope.ProcessHardLimit }
-
-                let! result =
-                    try
-                        ProcessRunner.run command estimate processContext cancellation.Token
-                    finally
-                        detachAbort ()
-
-                match result with
-                | Error processError -> return processConsequence language processError
-                | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
-                    let fields =
-                        [ yield "exit_code", TInt exitCode
-                          if not (String.IsNullOrWhiteSpace stdout) then
-                              yield "stdout", TString stdout
-                          if not (String.IsNullOrWhiteSpace stderr) then
-                              yield "stderr", TString stderr ]
-
-                    return tomlObject fields
-                | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
-                    try
-                        if String.IsNullOrWhiteSpace context.SessionId then
-                            return consequence (prose language Path.Run.CannotCondenseUntilAuthority)
-                        else
-                            let root = SessionId.create context.SessionId
-
-                            let requirePermit () : Task<Result<FamilyRecoveryPermit, string>> =
-                                task {
-                                    let! recovery = scope.RequireFamilyRecovery root
-
-                                    match recovery with
-                                    | FamilyRecovery.FamilyBlocked _ -> return Error "RECOVERY_BLOCKED:"
-                                    | FamilyRecovery.FamilyWaiting _ -> return Error "RECOVERY_WAITING:"
-                                    | FamilyRecovery.FamilyReady permit -> return Ok permit
-                                }
-
-                            match! requirePermit () with
-                            | Error msg when msg.StartsWith("RECOVERY_BLOCKED", System.StringComparison.Ordinal) ->
-                                return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
-                            | Error _
-                            | Ok _ ->
-                                let runtime =
-                                    match scope.Journal with
-                                    | Some journal ->
-                                        Distillation.asDistillationRuntime
-                                            (scope.ExecutorRuntimeFor context)
-                                            journal
-                                            requirePermit
-                                    | None -> Distillation.ofForkRuntime (ForkRuntime())
-
-                                let! summary = Distillation.distillSpool runtime spoolPath language
-
-                                let instructions =
-                                    if System.String.IsNullOrWhiteSpace summary then
-                                        []
-                                    else
-                                        [ summary ]
-
-                                return tomlObjectWithInstructions instructions [ "exit_code", TInt exitCode ]
-                    finally
-                        Spool.delete spoolPath
+            | Ok _ -> return! runPrepared scope request context language
         }
 
     let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

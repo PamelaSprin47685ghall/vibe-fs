@@ -6,6 +6,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -81,13 +82,9 @@ module VerdictWorkflow =
         (providerRun: ProviderRunIdentity)
         (guard: ReviewGuardProjection)
         =
-        match Map.tryFind providerRun guard.Seals with
-        | None -> None
-        | Some seal ->
-            if Set.contains (SealDigest.value challenge.ChallengeContentDigest) seal.IncludedToolResultDigests then
-                Some seal
-            else
-                None
+        Map.tryFind providerRun guard.Seals
+        |> Option.filter (fun seal ->
+            Set.contains (SealDigest.value challenge.ChallengeContentDigest) seal.IncludedToolResultDigests)
 
     let private append (sessionId: SessionId) (providerRun: ProviderRunIdentity) fact journal =
         task {
@@ -105,6 +102,122 @@ module VerdictWorkflow =
                ProviderRun = submission.ProviderRun
                ToolCallId = submission.ToolCallId
                Verdict = submission.Verdict |}
+
+    let private recordProcessTerminal
+        (journal: AgentJournal)
+        (submission: VerdictSubmission)
+        : Task<Result<VerdictDecision, string>> =
+        taskResult {
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+            return VerdictDecision.ProcessTerminal
+        }
+
+    let private recordRevised
+        (journal: AgentJournal)
+        (submission: VerdictSubmission)
+        : Task<Result<VerdictDecision, string>> =
+        taskResult {
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+            return VerdictDecision.Revised
+        }
+
+    let private issueChallenge
+        (journal: AgentJournal)
+        (sha256: string -> string)
+        (submission: VerdictSubmission)
+        : Task<Result<VerdictDecision, string>> =
+        taskResult {
+            let lang = ProviderProse.languageOf submission.ReviewerSessionId
+            let challengeText = ProviderProse.render lang ReviewChallenge.Path Map.empty
+            let challengePrompt = ProviderProse.document lang ReviewChallenge.Path Map.empty
+            let challengeDigest = ReviewChallenge.contentDigest sha256 challengePrompt
+
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+
+            let issued =
+                ReviewFact.PerfectChallengeIssued
+                    {| BarrierId = submission.BarrierId
+                       GitTreeHash = submission.GitTreeHash
+                       ReviewerSessionId = submission.ReviewerSessionId
+                       FirstProviderRun = submission.ProviderRun
+                       FirstToolCallId = submission.ToolCallId
+                       ChallengeTextVersion = ReviewChallenge.TextVersion
+                       ChallengeContentDigest = challengeDigest |}
+
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun issued journal
+            return VerdictDecision.ChallengeIssued challengeText
+        }
+
+    let private issueOrSkipChallenge
+        (journal: AgentJournal)
+        (sha256: string -> string)
+        (submission: VerdictSubmission)
+        (guard: ReviewGuardProjection)
+        : Task<Result<VerdictDecision, string>> =
+        if ReviewProjection.satisfiesGuard submission.GitTreeHash guard then
+            Task.FromResult(Ok VerdictDecision.AlreadyCounted)
+        else
+            issueChallenge journal sha256 submission
+
+    let private confirmWitness
+        (journal: AgentJournal)
+        (submission: VerdictSubmission)
+        (challenge: PerfectChallenge)
+        (seal: ProviderInputSeal)
+        : Task<Result<VerdictDecision, string>> =
+        taskResult {
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+
+            let witness =
+                ReviewFact.ConfirmedReviewWitness
+                    {| ManagerJobId = submission.ManagerJobId
+                       ManagerSessionId = submission.ManagerSessionId
+                       ReviewerSessionId = submission.ReviewerSessionId
+                       WorktreeIdentity = submission.WorktreeIdentity
+                       BarrierId = submission.BarrierId
+                       GitTreeHash = submission.GitTreeHash
+                       FirstProviderRun = challenge.FirstProviderRun
+                       FirstToolCallId = challenge.FirstToolCallId
+                       ChallengeResultDigest = challenge.ChallengeContentDigest
+                       SecondProviderRun = submission.ProviderRun
+                       SecondProviderInputDigest = seal.SealDigest
+                       SecondToolCallId = submission.ToolCallId |}
+
+            let! _ = append submission.ReviewerSessionId submission.ProviderRun witness journal
+            return VerdictDecision.Confirmed
+        }
+
+    let private confirmOrUnproven
+        (journal: AgentJournal)
+        (submission: VerdictSubmission)
+        (guard: ReviewGuardProjection)
+        (challenge: PerfectChallenge)
+        : Task<Result<VerdictDecision, string>> =
+        match provenSeal challenge submission.ProviderRun guard with
+        | None -> Task.FromResult(Ok VerdictDecision.ChallengeUnproven)
+        | Some seal -> confirmWitness journal submission challenge seal
+
+    let private recordPerfect
+        (journal: AgentJournal)
+        (sha256: string -> string)
+        (submission: VerdictSubmission)
+        (guard: ReviewGuardProjection)
+        : Task<Result<VerdictDecision, string>> =
+        match guard.PendingChallenge with
+        | Some challenge when challenge.FirstProviderRun = submission.ProviderRun ->
+            Task.FromResult(Ok VerdictDecision.AlreadyCounted)
+        | None -> issueOrSkipChallenge journal sha256 submission guard
+        | Some challenge -> confirmOrUnproven journal submission guard challenge
+
+    let private recordOrdinaryVerdict
+        (journal: AgentJournal)
+        (sha256: string -> string)
+        (submission: VerdictSubmission)
+        (guard: ReviewGuardProjection)
+        : Task<Result<VerdictDecision, string>> =
+        match submission.Verdict with
+        | ReviewGuardVerdict.Revise -> recordRevised journal submission
+        | ReviewGuardVerdict.Perfect -> recordPerfect journal sha256 submission guard
 
     let submit
         (journal: AgentJournal)
@@ -135,84 +248,7 @@ module VerdictWorkflow =
             if ReviewProjection.hasObservedAttempt attempt guard then
                 return Ok VerdictDecision.AlreadyCounted
             elif processReview then
-                match! append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal with
-                | Error error -> return Error error
-                | Ok _ -> return Ok VerdictDecision.ProcessTerminal
+                return! recordProcessTerminal journal submission
             else
-                match submission.Verdict with
-                | ReviewGuardVerdict.Revise ->
-                    match!
-                        append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
-                    with
-                    | Error error -> return Error error
-                    | Ok _ -> return Ok VerdictDecision.Revised
-
-                | ReviewGuardVerdict.Perfect ->
-                    match guard.PendingChallenge with
-                    | Some challenge when challenge.FirstProviderRun = submission.ProviderRun ->
-                        return Ok VerdictDecision.AlreadyCounted
-
-                    | None ->
-                        if ReviewProjection.satisfiesGuard submission.GitTreeHash guard then
-                            return Ok VerdictDecision.AlreadyCounted
-                        else
-                            let lang = ProviderProse.languageOf submission.ReviewerSessionId
-                            let challengeText = ProviderProse.render lang ReviewChallenge.Path Map.empty
-                            let challengePrompt = ProviderProse.document lang ReviewChallenge.Path Map.empty
-                            let challengeDigest = ReviewChallenge.contentDigest sha256 challengePrompt
-
-                            match!
-                                append
-                                    submission.ReviewerSessionId
-                                    submission.ProviderRun
-                                    (verdictFact submission)
-                                    journal
-                            with
-                            | Error error -> return Error error
-                            | Ok _ ->
-                                let issued =
-                                    ReviewFact.PerfectChallengeIssued
-                                        {| BarrierId = submission.BarrierId
-                                           GitTreeHash = submission.GitTreeHash
-                                           ReviewerSessionId = submission.ReviewerSessionId
-                                           FirstProviderRun = submission.ProviderRun
-                                           FirstToolCallId = submission.ToolCallId
-                                           ChallengeTextVersion = ReviewChallenge.TextVersion
-                                           ChallengeContentDigest = challengeDigest |}
-
-                                match! append submission.ReviewerSessionId submission.ProviderRun issued journal with
-                                | Error error -> return Error error
-                                | Ok _ -> return Ok(VerdictDecision.ChallengeIssued challengeText)
-
-                    | Some challenge ->
-                        match provenSeal challenge submission.ProviderRun guard with
-                        | None -> return Ok VerdictDecision.ChallengeUnproven
-                        | Some seal ->
-                            match!
-                                append
-                                    submission.ReviewerSessionId
-                                    submission.ProviderRun
-                                    (verdictFact submission)
-                                    journal
-                            with
-                            | Error error -> return Error error
-                            | Ok _ ->
-                                let witness =
-                                    ReviewFact.ConfirmedReviewWitness
-                                        {| ManagerJobId = submission.ManagerJobId
-                                           ManagerSessionId = submission.ManagerSessionId
-                                           ReviewerSessionId = submission.ReviewerSessionId
-                                           WorktreeIdentity = submission.WorktreeIdentity
-                                           BarrierId = submission.BarrierId
-                                           GitTreeHash = submission.GitTreeHash
-                                           FirstProviderRun = challenge.FirstProviderRun
-                                           FirstToolCallId = challenge.FirstToolCallId
-                                           ChallengeResultDigest = challenge.ChallengeContentDigest
-                                           SecondProviderRun = submission.ProviderRun
-                                           SecondProviderInputDigest = seal.SealDigest
-                                           SecondToolCallId = submission.ToolCallId |}
-
-                                match! append submission.ReviewerSessionId submission.ProviderRun witness journal with
-                                | Error error -> return Error error
-                                | Ok _ -> return Ok VerdictDecision.Confirmed
+                return! recordOrdinaryVerdict journal sha256 submission guard
         }

@@ -16,6 +16,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -183,47 +184,41 @@ type AssistanceHost
             runText
             requestingAgent
 
+    let requireFlag (cond: bool) = if cond then Some () else None
+
+    let tryParseNonNeg (text: string) =
+        match Int32.TryParse text with
+        | true, value when value >= 0 -> Some value
+        | _ -> None
+
+    let readLength (text: string) (start: int) =
+        option {
+            let separator = text.IndexOf('-', start)
+            do! requireFlag (separator >= 0)
+            let! value = tryParseNonNeg (text.Substring(start, separator - start))
+            return value, separator + 1
+        }
+
     let tryDecodeHandleId (agentId: string) =
-        if
-            String.IsNullOrWhiteSpace agentId
-            || not (agentId.StartsWith(HandlePrefix, StringComparison.Ordinal))
-        then
-            None
-        else
+        option {
+            do!
+                requireFlag (
+                    not (String.IsNullOrWhiteSpace agentId)
+                    && agentId.StartsWith(HandlePrefix, StringComparison.Ordinal)
+                )
+
             let rest = agentId.Substring(HandlePrefix.Length)
-
-            let readLength (text: string) (start: int) =
-                let separator = text.IndexOf('-', start)
-
-                if separator < 0 then
-                    None
-                else
-                    match Int32.TryParse(text.Substring(start, separator - start)) with
-                    | true, value when value >= 0 -> Some(value, separator + 1)
-                    | _ -> None
-
-            match readLength rest 0 with
-            | None -> None
-            | Some(ownerLength, p1) ->
-                match readLength rest p1 with
-                | None -> None
-                | Some(runLength, p2) ->
-                    match readLength rest p2 with
-                    | None -> None
-                    | Some(agentLength, payloadStart) ->
-                        let expected = ownerLength + runLength + agentLength
-
-                        if payloadStart + expected <> rest.Length then
-                            None
-                        else
-                            let ownerText = rest.Substring(payloadStart, ownerLength)
-                            let runText = rest.Substring(payloadStart + ownerLength, runLength)
-                            let requester = rest.Substring(payloadStart + ownerLength + runLength, agentLength)
-
-                            if String.IsNullOrWhiteSpace ownerText || String.IsNullOrWhiteSpace runText then
-                                None
-                            else
-                                Some(SessionId.create ownerText, LogicalRunId.create runText, requester)
+            let! ownerLength, p1 = readLength rest 0
+            let! runLength, p2 = readLength rest p1
+            let! agentLength, payloadStart = readLength rest p2
+            let expected = ownerLength + runLength + agentLength
+            do! requireFlag (payloadStart + expected = rest.Length)
+            let ownerText = rest.Substring(payloadStart, ownerLength)
+            let runText = rest.Substring(payloadStart + ownerLength, runLength)
+            let requester = rest.Substring(payloadStart + ownerLength + runLength, agentLength)
+            do! requireFlag (not (String.IsNullOrWhiteSpace ownerText || String.IsNullOrWhiteSpace runText))
+            return SessionId.create ownerText, LogicalRunId.create runText, requester
+        }
 
     let tryDecodeRecord (record: HandleRecord) =
         match record.Ownership, record.Handle with
@@ -313,150 +308,163 @@ type AssistanceHost
         }
 
     let consumeCompleted owner (record: HandleRecord) : Task =
-        task {
-            match journal with
-            | None -> ()
-            | Some durable ->
-                match! HandleController.consume durable owner record.Handle with
-                | Ok _
-                | Error HandleConsumeRejection.AlreadyRetired -> ()
-                | Error _ -> ()
-        }
+        match journal with
+        | None -> AsyncSupport.completedTask ()
+        | Some durable ->
+            task {
+                let! _ = HandleController.consume durable owner record.Handle
+                ()
+            }
+            :> Task
+
+    let terminalEvidence succeeded agentId handle childId body =
+        if succeeded then TerminalEvidence.completed agentId handle childId body
+        else TerminalEvidence.failed agentId handle childId body
+
+    let commitActiveTerminal owner evidence =
+        match JoinableCompletion.tryFromProvenTerminal evidence with
+        | Error error -> Task.FromResult(Error error)
+        | Ok proof -> ChildRecoveryWorkflow.commitJoinable journal owner proof
 
     let recordTerminal owner agentId childId (record: HandleRecord) succeeded body : Task<Result<unit, string>> =
         match record.Lifecycle with
         | HandleLifecycle.Active ->
-            let evidence =
-                if succeeded then
-                    TerminalEvidence.completed agentId record.Handle childId body
-                else
-                    TerminalEvidence.failed agentId record.Handle childId body
-
-            match JoinableCompletion.tryFromProvenTerminal evidence with
-            | Error error -> Task.FromResult(Error error)
-            | Ok proof -> ChildRecoveryWorkflow.commitJoinable journal owner proof
+            commitActiveTerminal owner (terminalEvidence succeeded agentId record.Handle childId body)
         | HandleLifecycle.CompletedAwaitingJoin _ -> Task.FromResult(Ok())
         | HandleLifecycle.Retired -> Task.FromResult(Ok())
         | HandleLifecycle.Abandoned _ -> Task.FromResult(Error "consultation handle is abandoned")
 
+    let consumeIfAwaitingJoin owner (record: HandleRecord) =
+        match record.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin _ -> consumeCompleted owner record
+        | _ -> AsyncSupport.completedTask ()
+
+    let deliverAdviceAfterSend
+        owner
+        logicalRun
+        requester
+        childId
+        (record: HandleRecord)
+        providerPrompt
+        directory
+        =
+        task {
+            match!
+                sendContinuation
+                    owner
+                    logicalRun
+                    requester
+                    PromptAuthority.ContinuationKind.NeedHelpAdvice
+                    providerPrompt
+                    directory
+            with
+            | Ok _ ->
+                do! consumeIfAwaitingJoin owner record
+                return AssistanceTurnDisposition.Handled
+            | Error error ->
+                Diagnostic.emit
+                    "needhelp"
+                    [ "session_id", SessionId.value owner
+                      "result", "advice-send-failed"
+                      "provider_error", error ]
+
+                return AssistanceTurnDisposition.ClaimedButUnresolved
+        }
+
     let deliverAdvice owner logicalRun requester childId (record: HandleRecord) providerPrompt directory =
         task {
             if hasAdviceClaim owner logicalRun then
-                match record.Lifecycle with
-                | HandleLifecycle.CompletedAwaitingJoin _ -> do! consumeCompleted owner record
-                | _ -> ()
-
+                do! consumeIfAwaitingJoin owner record
                 return AssistanceTurnDisposition.Handled
             else
-                match!
-                    sendContinuation
+                return!
+                    deliverAdviceAfterSend
                         owner
                         logicalRun
                         requester
-                        PromptAuthority.ContinuationKind.NeedHelpAdvice
+                        childId
+                        record
                         providerPrompt
                         directory
-                with
-                | Ok _ ->
-                    match record.Lifecycle with
-                    | HandleLifecycle.CompletedAwaitingJoin _ -> do! consumeCompleted owner record
-                    | _ -> ()
-
-                    return AssistanceTurnDisposition.Handled
-                | Error error ->
-                    Diagnostic.emit
-                        "needhelp"
-                        [ "session_id", SessionId.value owner
-                          "result", "advice-send-failed"
-                          "provider_error", error ]
-
-                    return AssistanceTurnDisposition.ClaimedButUnresolved
         }
+
+    let settleFailedConsultation owner logicalRun agentId childId record requester error =
+        let failure = consultationFailedPrompt owner error
+
+        task {
+            match! recordTerminal owner agentId childId record false failure with
+            | Ok() ->
+                let refreshed = childRecord childId |> Option.map fst |> Option.defaultValue record
+                let! _ = deliverAdvice owner logicalRun requester childId refreshed failure None
+                ()
+            | Error _ -> ()
+        }
+        |> ignore
+
+    let onFailedConsultationTerminal childId error =
+        match
+            childRecord childId
+            |> Option.bind (fun (record, (agentId, owner, logicalRun, requester)) ->
+                ownerStillOnRun owner logicalRun
+                |> Option.map (fun _ -> record, agentId, owner, logicalRun, requester))
+        with
+        | None -> ()
+        | Some(record, agentId, owner, logicalRun, requester) ->
+            settleFailedConsultation owner logicalRun agentId childId record requester error
+
+    let observeChildTerminal childId _session outcome =
+        match outcome with
+        | TerminalOutcome.Failed error -> onFailedConsultationTerminal childId error
+        | _ -> ()
 
     let registerChildSubscription (childId: SessionId) =
         let key = SessionId.value childId
 
         lock claimGate (fun () ->
             if not (terminalSubscriptions.ContainsKey key) then
-                let sub =
-                    sessions.SubscribeTerminal(
-                        childId,
-                        fun _ outcome ->
-                            match outcome with
-                            | TerminalOutcome.Failed error ->
-                                match childRecord childId with
-                                | Some(record, (agentId, owner, logicalRun, requester)) ->
-                                    match ownerStillOnRun owner logicalRun with
-                                    | None -> ()
-                                    | Some _ ->
-                                        let failure = consultationFailedPrompt owner error
-
-                                        task {
-                                            match! recordTerminal owner agentId childId record false failure with
-                                            | Ok() ->
-                                                let refreshed =
-                                                    childRecord childId |> Option.map fst |> Option.defaultValue record
-
-                                                let! _ =
-                                                    deliverAdvice
-                                                        owner
-                                                        logicalRun
-                                                        requester
-                                                        childId
-                                                        refreshed
-                                                        failure
-                                                        None
-
-                                                ()
-                                            | Error _ -> ()
-                                        }
-                                        |> ignore
-                                | None -> ()
-                            | _ -> ()
-                    )
-
-                terminalSubscriptions.[key] <- sub)
+                terminalSubscriptions.[key] <- sessions.SubscribeTerminal(childId, observeChildTerminal childId))
 
     let trackChildOwned (childId: SessionId) =
         registerChildSubscription childId
         onChildOwned childId
 
     let sendConsultationRoot owner logicalRun requester childId directory =
-        task {
-            match! parentRecord owner with
-            | None -> return Error "canonical parent LifecycleWorkRecord unavailable"
-            | Some commissionerRecord ->
-                let assignment = consultationAssignment owner
+        taskResult {
+            let! parentOpt = parentRecord owner |> TaskResultCE.ofTask
 
-                let lang = ProviderProse.languageOf owner
+            let! commissionerRecord =
+                parentOpt |> Result.requireSome "canonical parent LifecycleWorkRecord unavailable"
 
-                let forkProse: ForkChildInstructions =
-                    { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
-                      CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
-                      Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
-                      Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
+            let assignment = consultationAssignment owner
+            let lang = ProviderProse.languageOf owner
 
-                let providerPrompt =
-                    ForkChildPayload.relay forkProse assignment (Some commissionerRecord) None [] None
+            let forkProse: ForkChildInstructions =
+                { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+                  CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+                  Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
+                  Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
-                do! XTraceCapture.captureOpening journal childId assignment []
+            let providerPrompt =
+                ForkChildPayload.relay forkProse assignment (Some commissionerRecord) None [] None
 
-                let dispatcher = journal |> Option.map PromptDispatcher.forJournal
+            do! XTraceCapture.captureOpening journal childId assignment [] |> TaskResultCE.ofTask
 
-                match dispatcher with
-                | None -> return Error "No journal: consultation Authority Root cannot be claimed"
-                | Some runtime ->
-                    return!
-                        runtime.SendAgentOwnerRootWithTools
-                            sessions
-                            childId
-                            providerPrompt
-                            consultationAgent
-                            directory
-                            PromptDispatcher.AwaitMode.Detached
-                            None
-                            (toolMap Role.Inquiry)
-                            None
+            let! runtime =
+                journal
+                |> Option.map PromptDispatcher.forJournal
+                |> Result.requireSome "No journal: consultation Authority Root cannot be claimed"
+
+            return!
+                runtime.SendAgentOwnerRootWithTools
+                    sessions
+                    childId
+                    providerPrompt
+                    consultationAgent
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+                    (toolMap Role.Inquiry)
+                    None
         }
 
     let existingConsultation owner logicalRun requester =
@@ -469,315 +477,471 @@ type AssistanceHost
             HandleProjection.tryFind handle (AgentJournal.handleProjection durable owner)
             |> Option.map (fun record -> agentId, record)
 
+    let isActiveConsultationFor owner record =
+        match tryDecodeRecord record, record.Lifecycle with
+        | Some(_, decodedOwner, _, _), (HandleLifecycle.Active | HandleLifecycle.CompletedAwaitingJoin _) when
+            decodedOwner = owner
+            ->
+            true
+        | _ -> false
+
     let ownerHasActiveConsultation owner =
         match currentProjection () with
         | None -> false
         | Some snapshot ->
             snapshot.AgentProjections.HandleByChildSession
-            |> Map.exists (fun _ record ->
-                match tryDecodeRecord record with
-                | Some(_, decodedOwner, _, _) when decodedOwner = owner ->
-                    match record.Lifecycle with
-                    | HandleLifecycle.Active
-                    | HandleLifecycle.CompletedAwaitingJoin _ -> true
-                    | HandleLifecycle.Abandoned _
-                    | HandleLifecycle.Retired -> false
-                | _ -> false)
+            |> Map.exists (fun _ record -> isActiveConsultationFor owner record)
+
+    let adviceFromCompletedChild owner logicalRun requester directory (record: HandleRecord) =
+        task {
+            match! childRecordText record.ChildSessionId with
+            | Some childWorkRecord when not (String.IsNullOrWhiteSpace childWorkRecord) ->
+                return!
+                    deliverAdvice
+                        owner
+                        logicalRun
+                        requester
+                        record.ChildSessionId
+                        record
+                        (advicePrompt owner childWorkRecord)
+                        directory
+            | _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+        }
+
+    let sendExhaustedAdvice owner logicalRun requester directory =
+        let exhausted =
+            consultationFailedPrompt
+                owner
+                "another consultation is unavailable for this run; continue the original charge with the evidence you have"
+
+        task {
+            match!
+                sendContinuation
+                    owner
+                    logicalRun
+                    requester
+                    PromptAuthority.ContinuationKind.NeedHelpAdvice
+                    exhausted
+                    directory
+            with
+            | Ok _ -> return AssistanceTurnDisposition.Handled
+            | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+        }
+
+    let recoverExistingConsultation owner logicalRun requester directory (_agentId: string) (record: HandleRecord) =
+        // Finite per-LogicalRun guard. Reuse/recover the one consultation
+        // resource; once it is spent, the owner still receives a bounded
+        // continuation rather than being left aborted with no successor.
+        trackChildOwned record.ChildSessionId
+
+        match record.Lifecycle with
+        | HandleLifecycle.Active -> Task.FromResult AssistanceTurnDisposition.Handled
+        | HandleLifecycle.CompletedAwaitingJoin _ ->
+            adviceFromCompletedChild owner logicalRun requester directory record
+        | HandleLifecycle.Retired
+        | HandleLifecycle.Abandoned _ -> sendExhaustedAdvice owner logicalRun requester directory
+
+    let afterConsultationLinked owner logicalRun requester directory childId =
+        trackChildOwned childId
+
+        task {
+            match! sendConsultationRoot owner logicalRun requester childId directory with
+            | Ok _ -> return AssistanceTurnDisposition.Handled
+            | Error error ->
+                Diagnostic.emit
+                    "needhelp"
+                    [ "session_id", SessionId.value owner
+                      "result", "consultation-send-failed"
+                      "provider_error", error ]
+
+                return AssistanceTurnDisposition.ClaimedButUnresolved
+        }
+
+    let linkConsultationHandle owner agentId childId =
+        task {
+            match!
+                HandleController.link
+                    journal
+                    owner
+                    agentId
+                    childId
+                    consultationAgent
+                    Role.Inquiry
+                    HandleOwnership.HostOwnedHidden
+            with
+            | Ok() -> return Ok()
+            | Error error ->
+                sessions.AbortSession childId |> ignore
+                return Error error
+        }
+
+    let afterConsultationChildCreated owner logicalRun requester directory agentId childId =
+        task {
+            match! linkConsultationHandle owner agentId childId with
+            | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Ok() -> return! afterConsultationLinked owner logicalRun requester directory childId
+        }
+
+    let startFreshConsultationWithParent owner logicalRun requester directory =
+        let agentId = encodeHandleId owner logicalRun requester
+
+        task {
+            match!
+                sessions.CreateChildSession(
+                    owner,
+                    { Title = Some "needhelp-consultation"
+                      Agent = Some consultationAgent
+                      Directory = directory }
+                )
+            with
+            | Error error ->
+                Diagnostic.emit
+                    "needhelp"
+                    [ "session_id", SessionId.value owner
+                      "result", "consultation-create-failed"
+                      "provider_error", error ]
+
+                return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Ok childId ->
+                return! afterConsultationChildCreated owner logicalRun requester directory agentId childId
+        }
+
+    let startFreshConsultation owner logicalRun requester directory =
+        task {
+            match! parentRecord owner with
+            | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Some _ -> return! startFreshConsultationWithParent owner logicalRun requester directory
+        }
 
     let beginConsultation owner logicalRun requester directory =
         task {
             match existingConsultation owner logicalRun requester with
-            | Some(_, record) ->
-                // Finite per-LogicalRun guard. Reuse/recover the one consultation
-                // resource; once it is spent, the owner still receives a bounded
-                // continuation rather than being left aborted with no successor.
-                trackChildOwned record.ChildSessionId
-
-                match record.Lifecycle with
-                | HandleLifecycle.Active -> return AssistanceTurnDisposition.Handled
-                | HandleLifecycle.CompletedAwaitingJoin _ ->
-                    match! childRecordText record.ChildSessionId with
-                    | Some childWorkRecord when not (String.IsNullOrWhiteSpace childWorkRecord) ->
-                        return!
-                            deliverAdvice
-                                owner
-                                logicalRun
-                                requester
-                                record.ChildSessionId
-                                record
-                                (advicePrompt owner childWorkRecord)
-                                directory
-                    | _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                | HandleLifecycle.Retired
-                | HandleLifecycle.Abandoned _ ->
-                    let exhausted =
-                        consultationFailedPrompt
-                            owner
-                            "another consultation is unavailable for this run; continue the original charge with the evidence you have"
-
-                    match!
-                        sendContinuation
-                            owner
-                            logicalRun
-                            requester
-                            PromptAuthority.ContinuationKind.NeedHelpAdvice
-                            exhausted
-                            directory
-                    with
-                    | Ok _ -> return AssistanceTurnDisposition.Handled
-                    | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Some(agentId, record) ->
+                return! recoverExistingConsultation owner logicalRun requester directory agentId record
             | None when ownerHasActiveConsultation owner -> return AssistanceTurnDisposition.ClaimedButUnresolved
-            | None ->
-                match! parentRecord owner with
-                | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                | Some _ ->
-                    let agentId = encodeHandleId owner logicalRun requester
-
-                    match!
-                        sessions.CreateChildSession(
-                            owner,
-                            { Title = Some "needhelp-consultation"
-                              Agent = Some consultationAgent
-                              Directory = directory }
-                        )
-                    with
-                    | Error error ->
-                        Diagnostic.emit
-                            "needhelp"
-                            [ "session_id", SessionId.value owner
-                              "result", "consultation-create-failed"
-                              "provider_error", error ]
-
-                        return AssistanceTurnDisposition.ClaimedButUnresolved
-                    | Ok childId ->
-                        match!
-                            HandleController.link
-                                journal
-                                owner
-                                agentId
-                                childId
-                                consultationAgent
-                                Role.Inquiry
-                                HandleOwnership.HostOwnedHidden
-                        with
-                        | Error error ->
-                            sessions.AbortSession childId |> ignore
-                            return AssistanceTurnDisposition.ClaimedButUnresolved
-                        | Ok() ->
-                            trackChildOwned childId
-
-                            match! sendConsultationRoot owner logicalRun requester childId directory with
-                            | Ok _ -> return AssistanceTurnDisposition.Handled
-                            | Error error ->
-                                Diagnostic.emit
-                                    "needhelp"
-                                    [ "session_id", SessionId.value owner
-                                      "result", "consultation-send-failed"
-                                      "provider_error", error ]
-
-                                return AssistanceTurnDisposition.ClaimedButUnresolved
+            | None -> return! startFreshConsultation owner logicalRun requester directory
         }
 
-    let requestingAgentFor (turn: ReconciledTurn) =
-        task {
-            match! snapshotPort.GetMessages turn.SessionId with
-            | Error error -> return Error error
-            | Ok messages ->
-                let run = ProviderRunIdentity.value turn.ProviderRun
+    let agentFromMessage (message: SessionMessage) =
+        match message.Agent with
+        | Some agent when not (String.IsNullOrWhiteSpace agent) -> Ok(agent.Trim())
+        | _ -> Error "requesting provider run has no managed agent binding"
 
-                match
-                    messages
-                    |> List.tryFind (fun message ->
-                        String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
-                        && message.Id = run)
-                with
-                | Some message ->
-                    match message.Agent with
-                    | Some agent when not (String.IsNullOrWhiteSpace agent) -> return Ok(agent.Trim())
-                    | _ -> return Error "requesting provider run has no managed agent binding"
-                | None -> return Error "requesting provider run is absent from reconciled Host snapshot"
+    let requestingAgentFor (turn: ReconciledTurn) =
+        taskResult {
+            let! messages = snapshotPort.GetMessages turn.SessionId
+            let run = ProviderRunIdentity.value turn.ProviderRun
+
+            let! message =
+                messages
+                |> List.tryFind (fun message ->
+                    String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+                    && message.Id = run)
+                |> Result.requireSome "requesting provider run is absent from reconciled Host snapshot"
+
+            return! agentFromMessage message
+        }
+
+    let sendEscalationContinuation (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) role =
+        let deep = ManagedAgentCatalog.nameOf AgentTier.Deep role
+
+        task {
+            match!
+                sendContinuation
+                    turn.SessionId
+                    profile.LogicalRunId
+                    deep
+                    PromptAuthority.ContinuationKind.NeedHelpEscalation
+                    (escalationPrompt turn.SessionId)
+                    turn.Directory
+            with
+            | Ok _ -> return AssistanceTurnDisposition.Handled
+            | Error error ->
+                Diagnostic.emit
+                    "needhelp"
+                    [ "session_id", SessionId.value turn.SessionId
+                      "result", "escalation-send-failed"
+                      "provider_error", error ]
+
+                return AssistanceTurnDisposition.ClaimedButUnresolved
+        }
+
+    let escalateFastOwnerRequest (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) role =
+        markOwnerClaim turn
+
+        task {
+            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
+                return AssistanceTurnDisposition.Handled
+            else
+                return! sendEscalationContinuation turn profile role
+        }
+
+    let takeSensorAndConsult (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) requester =
+        task {
+            // The permit itself remains revoked by HOST-004 after an
+            // operator abort and is intentionally not consumed here.
+            // Its presence proves this delivery came from a fresh
+            // SessionIdle wake, which is the transport fence needed
+            // before parenting a new physical child under the aborted
+            // owner session.
+            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
+                return AssistanceTurnDisposition.Handled
+            else
+                return! beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
+        }
+
+    let beginDeepOwnerConsultation
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        requester
+        =
+        // OpenCode may still be completing the physical parent-abort
+        // descendant sweep when AbortWake reconciles. Claim ownership
+        // now, but do not parent a fresh consultation under that session
+        // until a fresh SessionIdle permit proves the abort is quiescent.
+        markOwnerClaim turn
+
+        match context.Quiescence with
+        | None -> Task.FromResult AssistanceTurnDisposition.Handled
+        | Some _ -> takeSensorAndConsult turn profile requester
+
+    let handleParsedOwnerRequest
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        requestingAgent
+        =
+        match PromptAuthority.parseAgentName requestingAgent with
+        | Error _ -> Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
+        | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
+            Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
+        | Ok(_, role, AgentTier.Fast, _) -> escalateFastOwnerRequest turn profile role
+        | Ok(requester, _, AgentTier.Deep, _) -> beginDeepOwnerConsultation context turn profile requester
+
+    let handleOwnerRequestForProfile
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        =
+        task {
+            match! requestingAgentFor turn with
+            | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Ok requestingAgent -> return! handleParsedOwnerRequest context turn profile requestingAgent
         }
 
     let handleOwnerRequest (context: ReconciledTurnContext) =
-        task {
-            let turn = context.Turn
+        let turn = context.Turn
 
+        task {
             match activeProfile turn.SessionId with
             | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | Some profile when profile.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId ->
                 return AssistanceTurnDisposition.ClaimedButUnresolved
-            | Some profile ->
-                match! requestingAgentFor turn with
-                | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                | Ok requestingAgent ->
-                    match PromptAuthority.parseAgentName requestingAgent with
-                    | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                    | Ok(requester, role, _, _) when role <> profile.CanonicalRole ->
-                        return AssistanceTurnDisposition.ClaimedButUnresolved
-                    | Ok(_, role, AgentTier.Fast, _) ->
-                        markOwnerClaim turn
-
-                        if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                            return AssistanceTurnDisposition.Handled
-                        else
-                            let deep = ManagedAgentCatalog.nameOf AgentTier.Deep role
-
-                            match!
-                                sendContinuation
-                                    turn.SessionId
-                                    profile.LogicalRunId
-                                    deep
-                                    PromptAuthority.ContinuationKind.NeedHelpEscalation
-                                    (escalationPrompt turn.SessionId)
-                                    turn.Directory
-                            with
-                            | Ok _ -> return AssistanceTurnDisposition.Handled
-                            | Error error ->
-                                Diagnostic.emit
-                                    "needhelp"
-                                    [ "session_id", SessionId.value turn.SessionId
-                                      "result", "escalation-send-failed"
-                                      "provider_error", error ]
-
-                                return AssistanceTurnDisposition.ClaimedButUnresolved
-                    | Ok(requester, _, AgentTier.Deep, _) ->
-                        // OpenCode may still be completing the physical parent-abort
-                        // descendant sweep when AbortWake reconciles. Claim ownership
-                        // now, but do not parent a fresh consultation under that session
-                        // until a fresh SessionIdle permit proves the abort is quiescent.
-                        markOwnerClaim turn
-
-                        match context.Quiescence with
-                        | None -> return AssistanceTurnDisposition.Handled
-                        | Some _ ->
-                            // The permit itself remains revoked by HOST-004 after an
-                            // operator abort and is intentionally not consumed here.
-                            // Its presence proves this delivery came from a fresh
-                            // SessionIdle wake, which is the transport fence needed
-                            // before parenting a new physical child under the aborted
-                            // owner session.
-                            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                                return AssistanceTurnDisposition.Handled
-                            else
-                                return! beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
+            | Some profile -> return! handleOwnerRequestForProfile context turn profile
         }
+
+    let finalizeConsultationAdvice
+        owner
+        logicalRun
+        requester
+        childId
+        (record: HandleRecord)
+        providerPrompt
+        directory
+        =
+        let refreshed = childRecord childId |> Option.map fst |> Option.defaultValue record
+        deliverAdvice owner logicalRun requester childId refreshed providerPrompt directory
+
+    let finalizeConsultationFailure
+        owner
+        agentId
+        childId
+        (record: HandleRecord)
+        logicalRun
+        requester
+        directory
+        failure
+        =
+        task {
+            match! recordTerminal owner agentId childId record false failure with
+            | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Ok() ->
+                return! finalizeConsultationAdvice owner logicalRun requester childId record failure directory
+        }
+
+    let finalizeConsultationSuccess
+        owner
+        agentId
+        childId
+        (record: HandleRecord)
+        logicalRun
+        requester
+        directory
+        childWorkRecord
+        =
+        task {
+            match! recordTerminal owner agentId childId record true childWorkRecord with
+            | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
+            | Ok() ->
+                return!
+                    finalizeConsultationAdvice
+                        owner
+                        logicalRun
+                        requester
+                        childId
+                        record
+                        (advicePrompt owner childWorkRecord)
+                        directory
+        }
+
+    let completeConsultationTurn
+        (turn: ReconciledTurn)
+        (record: HandleRecord)
+        agentId
+        owner
+        logicalRun
+        requester
+        =
+        task {
+            // Assistance consumes this hidden child before ordinary
+            // TurnWorkflow reaches TerminalReporter; HostTurnObserver
+            // returns immediately after Handled, so the reconciled
+            // terminal must be materialized here. Persist the exact
+            // terminal segment first so the child LWR includes this
+            // completed turn's advice, not only its opening Chronicle
+            // or older XTrace material.
+            do! XTraceCapture.captureTerminal journal turn
+            let! body = childRecordText turn.SessionId
+            let body = body |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+            match body with
+            | None ->
+                let failure =
+                    consultationFailedPrompt owner "canonical child LifecycleWorkRecord unavailable"
+
+                return!
+                    finalizeConsultationFailure
+                        owner
+                        agentId
+                        turn.SessionId
+                        record
+                        logicalRun
+                        requester
+                        turn.Directory
+                        failure
+            | Some childWorkRecord ->
+                return!
+                    finalizeConsultationSuccess
+                        owner
+                        agentId
+                        turn.SessionId
+                        record
+                        logicalRun
+                        requester
+                        turn.Directory
+                        childWorkRecord
+        }
+
+    let recordRecursiveAbortFailure owner agentId childId record failure =
+        task {
+            let! _ = recordTerminal owner agentId childId record false failure
+            ()
+        }
+
+    let abortConsultationTurn
+        (turn: ReconciledTurn)
+        (record: HandleRecord)
+        agentId
+        owner
+        logicalRun
+        requester
+        reason
+        =
+        // If the consultation itself asks for help, consume that arm but
+        // never recurse into another consultation. The typed control
+        // cause proves this consultation attempt is unusable; ordinary
+        // external abort remains a bounded failure advice without being
+        // written as provider-failure evidence.
+        let recursive = sensor.TryTake(turn.SessionId, turn.ProviderRun)
+
+        let failureReason =
+            if recursive then "recursive NEEDHELP from consultation is not allowed"
+            else "consultation aborted: " + reason
+
+        let failure = consultationFailedPrompt owner failureReason
+
+        task {
+            if recursive then
+                do! recordRecursiveAbortFailure owner agentId turn.SessionId record failure
+
+            return!
+                finalizeConsultationAdvice
+                    owner
+                    logicalRun
+                    requester
+                    turn.SessionId
+                    record
+                    failure
+                    turn.Directory
+        }
+
+    let handleConsultationWhileOwnerActive
+        (turn: ReconciledTurn)
+        (record: HandleRecord)
+        agentId
+        owner
+        logicalRun
+        requester
+        =
+        match turn.Outcome with
+        | ReconcileProgram.TurnCompleted ->
+            completeConsultationTurn turn record agentId owner logicalRun requester
+        | ReconcileProgram.TurnFailed _ ->
+            // Provider-attempt failure remains child-local and follows the
+            // ordinary A/A/B/B recovery path. Assistance does not turn one
+            // failed attempt into consultation failure while retries can continue.
+            Task.FromResult AssistanceTurnDisposition.NotAssistance
+        | ReconcileProgram.TurnAborted reason ->
+            abortConsultationTurn turn record agentId owner logicalRun requester reason
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnInProgress -> Task.FromResult AssistanceTurnDisposition.NotAssistance
 
     let handleConsultationTurn
         (turn: ReconciledTurn)
         (record: HandleRecord)
         (decoded: string * SessionId * LogicalRunId * string)
         =
-        task {
-            let agentId, owner, logicalRun, requester = decoded
+        let agentId, owner, logicalRun, requester = decoded
 
+        task {
             match ownerStillOnRun owner logicalRun with
             | None ->
                 // Owner was cancelled/retired or accepted a newer Authority Root.
                 // A late child terminal may not resurrect it.
                 return AssistanceTurnDisposition.Handled
             | Some _ ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnCompleted ->
-                    // Assistance consumes this hidden child before ordinary
-                    // TurnWorkflow reaches TerminalReporter; HostTurnObserver
-                    // returns immediately after Handled, so the reconciled
-                    // terminal must be materialized here. Persist the exact
-                    // terminal segment first so the child LWR includes this
-                    // completed turn's advice, not only its opening Chronicle
-                    // or older XTrace material.
-                    do! XTraceCapture.captureTerminal journal turn
-
-                    let! body = childRecordText turn.SessionId
-                    let body = body |> Option.filter (String.IsNullOrWhiteSpace >> not)
-
-                    match body with
-                    | None ->
-                        let failure =
-                            consultationFailedPrompt owner "canonical child LifecycleWorkRecord unavailable"
-
-                        match! recordTerminal owner agentId turn.SessionId record false failure with
-                        | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                        | Ok() ->
-                            let refreshed =
-                                childRecord turn.SessionId |> Option.map fst |> Option.defaultValue record
-
-                            return!
-                                deliverAdvice owner logicalRun requester turn.SessionId refreshed failure turn.Directory
-                    | Some childWorkRecord ->
-                        match! recordTerminal owner agentId turn.SessionId record true childWorkRecord with
-                        | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                        | Ok() ->
-                            let refreshed =
-                                childRecord turn.SessionId |> Option.map fst |> Option.defaultValue record
-
-                            return!
-                                deliverAdvice
-                                    owner
-                                    logicalRun
-                                    requester
-                                    turn.SessionId
-                                    refreshed
-                                    (advicePrompt owner childWorkRecord)
-                                    turn.Directory
-
-                | ReconcileProgram.TurnFailed _ ->
-                    // Provider-attempt failure remains child-local and follows the
-                    // ordinary A/A/B/B recovery path. Assistance does not turn one
-                    // failed attempt into consultation failure while retries can continue.
-                    return AssistanceTurnDisposition.NotAssistance
-
-                | ReconcileProgram.TurnAborted reason ->
-                    // If the consultation itself asks for help, consume that arm but
-                    // never recurse into another consultation. The typed control
-                    // cause proves this consultation attempt is unusable; ordinary
-                    // external abort remains a bounded failure advice without being
-                    // written as provider-failure evidence.
-                    let recursive = sensor.TryTake(turn.SessionId, turn.ProviderRun)
-
-                    let failureReason =
-                        if recursive then
-                            "recursive NEEDHELP from consultation is not allowed"
-                        else
-                            "consultation aborted: " + reason
-
-                    let failure = consultationFailedPrompt owner failureReason
-
-                    if recursive then
-                        match! recordTerminal owner agentId turn.SessionId record false failure with
-                        | Ok() -> ()
-                        | Error _ -> ()
-
-                    let refreshed =
-                        childRecord turn.SessionId |> Option.map fst |> Option.defaultValue record
-
-                    return! deliverAdvice owner logicalRun requester turn.SessionId refreshed failure turn.Directory
-
-                | ReconcileProgram.TurnNeedsContinuation _
-                | ReconcileProgram.TurnInProgress -> return AssistanceTurnDisposition.NotAssistance
+                return! handleConsultationWhileOwnerActive turn record agentId owner logicalRun requester
         }
 
-    /// Reconcile one stable turn before fallback/recovery ownership.
-    member _.HandleTurn(context: ReconciledTurnContext) : Task<AssistanceTurnDisposition> =
-        task {
-            let turn = context.Turn
+    let handleOwnerSideTurn (context: ReconciledTurnContext) (turn: ReconciledTurn) =
+        match turn.Outcome with
+        | ReconcileProgram.TurnAborted _ when sensor.IsArmed(turn.SessionId, turn.ProviderRun) ->
+            handleOwnerRequest context
+        | ReconcileProgram.TurnAborted _ when isClaimedOwnerAttempt turn ->
+            Task.FromResult AssistanceTurnDisposition.Handled
+        | _ -> Task.FromResult AssistanceTurnDisposition.NotAssistance
 
-            match childRecord turn.SessionId with
-            | Some(record, decoded) -> return! handleConsultationTurn turn record decoded
-            | None ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnAborted _ when sensor.IsArmed(turn.SessionId, turn.ProviderRun) ->
-                    return! handleOwnerRequest context
-                | ReconcileProgram.TurnAborted _ when isClaimedOwnerAttempt turn ->
-                    return AssistanceTurnDisposition.Handled
-                | _ -> return AssistanceTurnDisposition.NotAssistance
-        }
+    let activeConsultationAbort (sessionId: SessionId) (childId: SessionId) (record: HandleRecord) =
+        match tryDecodeRecord record, record.Lifecycle with
+        | Some(agentId, owner, _, _), (HandleLifecycle.Active | HandleLifecycle.CompletedAwaitingJoin _) when
+            owner = sessionId
+            ->
+            sessions.AbortSession childId |> ignore
+            Some(agentId, owner)
+        | _ -> None
 
-    /// Synchronous signal-plane teardown. Parent cancellation uses this before its
-    /// own durable handle cancellation CE; no durable work is started here.
-    member _.DropSignals(sessionId: SessionId) =
-        sensor.DropSession sessionId
-        dropOwnerClaims sessionId
-
+    let dropSignalSubscriptions (sessionId: SessionId) =
         lock claimGate (fun () ->
             let key = SessionId.value sessionId
 
@@ -786,6 +950,23 @@ type AssistanceHost
                 sub.Dispose()
                 terminalSubscriptions.Remove key |> ignore
             | false, _ -> ())
+
+    /// Reconcile one stable turn before fallback/recovery ownership.
+    member _.HandleTurn(context: ReconciledTurnContext) : Task<AssistanceTurnDisposition> =
+        let turn = context.Turn
+
+        task {
+            match childRecord turn.SessionId with
+            | Some(record, decoded) -> return! handleConsultationTurn turn record decoded
+            | None -> return! handleOwnerSideTurn context turn
+        }
+
+    /// Synchronous signal-plane teardown. Parent cancellation uses this before its
+    /// own durable handle cancellation CE; no durable work is started here.
+    member _.DropSignals(sessionId: SessionId) =
+        sensor.DropSession sessionId
+        dropOwnerClaims sessionId
+        dropSignalSubscriptions sessionId
 
     /// Owner deletion closes its active consultation resource. Child deletion
     /// alone only removes stream state; the durable handle remains the recovery truth.
@@ -798,17 +979,9 @@ type AssistanceHost
             match currentProjection () with
             | None -> []
             | Some snapshot ->
-                [ for KeyValue(childId, record) in snapshot.AgentProjections.HandleByChildSession do
-                      match tryDecodeRecord record with
-                      | Some(agentId, owner, _, _) when owner = sessionId ->
-                          match record.Lifecycle with
-                          | HandleLifecycle.Active
-                          | HandleLifecycle.CompletedAwaitingJoin _ ->
-                              sessions.AbortSession childId |> ignore
-                              yield agentId, owner
-                          | HandleLifecycle.Abandoned _
-                          | HandleLifecycle.Retired -> ()
-                      | _ -> () ]
+                snapshot.AgentProjections.HandleByChildSession
+                |> Map.toList
+                |> List.choose (fun (childId, record) -> activeConsultationAbort sessionId childId record)
 
         task {
             for agentId, owner in active do

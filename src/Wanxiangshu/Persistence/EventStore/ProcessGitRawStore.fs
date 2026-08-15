@@ -47,6 +47,62 @@ module private ProcessGitLayout =
             answers.[key] <- answer
             answer
 
+module private ProcessGitOid =
+    let ofStdout (code: int) (stdout: string) : GitObjectId option =
+        let trimmed = stdout.Trim()
+
+        if code <> 0 || String.IsNullOrWhiteSpace trimmed || trimmed.Length <> 40 then
+            None
+        else
+            Some(GitObjectId.create trimmed)
+
+module private ProcessGitLsTree =
+    let private entryFromMeta (name: string) (parts: string[]) : TreeEntry option =
+        match parts with
+        | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
+            Some
+                { Mode = GitTree.normalizeMode mode
+                  Name = name
+                  Oid = GitObjectId.create oidText }
+        | _ -> None
+
+    let parseRow (row: string) : TreeEntry option =
+        match row.IndexOf('\t') with
+        | tab when tab < 0 -> None
+        | tab ->
+            let meta = row.Substring(0, tab)
+            let name = row.Substring(tab + 1)
+            entryFromMeta name (meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries))
+
+module private ProcessGitExec =
+    let complete
+        (tcs: TaskCompletionSource<int * byte[] * string>)
+        (error: obj)
+        (stdout: obj)
+        (_stderr: obj)
+        : unit =
+        if isNull error then
+            let outBytes: byte[] = emitJsExpr stdout "Buffer.from($0)"
+            AsyncSupport.trySetResult tcs (0, outBytes, "") |> ignore
+        else
+            let status: int =
+                emitJsExpr error "($0 && typeof $0.status === 'number') ? $0.status : 1"
+
+            let outBytes: byte[] =
+                emitJsExpr error "($0 && $0.stdout) ? Buffer.from($0.stdout) : Buffer.alloc(0)"
+
+            let errText: string =
+                emitJsExpr
+                    error
+                    """
+                    (function (e) {
+                      if (!e || e.stderr == null) return (e && e.message) || String(e);
+                      return Buffer.from(e.stderr).toString('utf8');
+                    })($0)
+                    """
+
+            AsyncSupport.trySetResult tcs (status, outBytes, errText) |> ignore
+
 /// Production `IGitRawStore` over a real Git object database + refs (§2.3 / §9).
 /// Plumbing only (`hash-object` / `mktree` / `cat-file` / `ls-tree` / `update-ref`).
 /// Never touches HEAD, index, commits, branches, or tags as store history.
@@ -92,17 +148,6 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
 
             failwith (sprintf "git %s failed (%d): %s" label code (detail.Trim()))
 
-    let oidOrNone (code: int) (stdout: string) : GitObjectId option =
-        if code <> 0 then
-            None
-        else
-            let trimmed = stdout.Trim()
-
-            if String.IsNullOrWhiteSpace trimmed || trimmed.Length <> 40 then
-                None
-            else
-                Some(GitObjectId.create trimmed)
-
     /// The ODB directory, resolved once. `--git-path objects` answers correctly for a worktree,
     /// a bare repo and an alternates-free submodule alike, which is why it is asked rather than
     /// assembled from `_repoPath`.
@@ -135,6 +180,137 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                         return Some trimmed
                 }))
 
+    let writeBlobViaCli (content: byte[]) =
+        task {
+            let! code, stdout, stderr = runWithStdin [ "hash-object"; "-w"; "--stdin" ] content
+            ensureOk "hash-object" code stdout stderr
+
+            match ProcessGitOid.ofStdout code stdout with
+            | Some oid -> return oid
+            | None -> return failwith (sprintf "hash-object returned invalid oid: %s" (stdout.Trim()))
+        }
+
+    let writeTreeViaCli (sorted: TreeEntry list) (lines: string) =
+        task {
+            let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
+            let! code, stdout, stderr = runWithStdin [ "mktree" ] payload
+            ensureOk "mktree" code stdout stderr
+            return ProcessGitOid.ofStdout code stdout
+        }
+
+    let writeTreeUncached (sorted: TreeEntry list) (lines: string) =
+        task {
+            match! objectsDirectory.Force() with
+            | Some objects ->
+                let! oid = GitObjectDatabase.writeTree objects sorted
+                return Some(GitObjectId.create oid)
+            | None -> return! writeTreeViaCli sorted lines
+        }
+
+    let rememberWrittenTree (cacheKey: string) (sorted: TreeEntry list) (written: GitObjectId option) =
+        match written with
+        | Some oid ->
+            writtenTreeCache.[cacheKey] <- oid
+            treeCache.[GitObjectId.value oid] <- sorted
+            oid
+        | None -> failwith "tree write returned an invalid oid"
+
+    let tryReadLooseObject (tip: string) (objects: string option) =
+        match objects with
+        | Some dir -> GitObjectDatabase.tryReadObject dir tip
+        | None -> Task.FromResult None
+
+    let cacheObjectBytes (tip: string) (bytes: byte[]) =
+        objectCache.[tip] <- bytes
+        Some bytes
+
+    let cacheCatFileBytes (tip: string) (code: int) (stdoutBytes: byte[]) =
+        if code <> 0 then
+            None
+        else
+            objectCache.[tip] <- stdoutBytes
+            Some stdoutBytes
+
+    let readAndCacheTypedObject (tip: string) (objectType: string) =
+        match objectType with
+        | "blob"
+        | "tree" as typed ->
+            task {
+                let! code, stdoutBytes, _ = run ([ "cat-file"; typed; tip ], None)
+                return cacheCatFileBytes tip code stdoutBytes
+            }
+        | _ -> Task.FromResult None
+
+    let readObjectFromPack (tip: string) =
+        task {
+            let! typeCode, typeOut, _ = runText [ "cat-file"; "-t"; tip ]
+
+            if typeCode <> 0 then
+                return None
+            else
+                return! readAndCacheTypedObject tip (typeOut.Trim())
+        }
+
+    let rememberLooseOrPack (tip: string) (loose: byte[] option) =
+        match loose with
+        | Some bytes -> Task.FromResult(cacheObjectBytes tip bytes)
+        | None -> readObjectFromPack tip
+
+    let readObjectUncached (tip: string) =
+        task {
+            let! objects = objectsDirectory.Force()
+            let! loose = tryReadLooseObject tip objects
+            return! rememberLooseOrPack tip loose
+        }
+
+    let tryReadLooseTree (tip: string) (objects: string option) =
+        match objects with
+        | Some dir -> GitObjectDatabase.tryReadTree dir tip
+        | None -> Task.FromResult None
+
+    let rememberTreeEntries (tip: string) (entries: TreeEntry list) =
+        let sorted = ProcessGitTree.sortEntries entries
+        treeCache.[tip] <- sorted
+        Some sorted
+
+    let readTreeFromLsTree (tip: string) =
+        task {
+            let! code, stdout, _ = runText [ "ls-tree"; "--full-tree"; "-z"; tip ]
+
+            if code <> 0 then
+                return None
+            else
+                let entries =
+                    stdout.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
+                    |> Array.choose ProcessGitLsTree.parseRow
+                    |> Array.toList
+
+                return rememberTreeEntries tip entries
+        }
+
+    let rememberLooseTreeOrCli (tip: string) (loose: TreeEntry list option) =
+        match loose with
+        | Some entries -> Task.FromResult(rememberTreeEntries tip entries)
+        | None -> readTreeFromLsTree tip
+
+    let readTreeUncached (tip: string) =
+        task {
+            let! objects = objectsDirectory.Force()
+            let! loose = tryReadLooseTree tip objects
+            return! rememberLooseTreeOrCli tip loose
+        }
+
+    let expectedOidText (expectedOld: GitObjectId option) =
+        match expectedOld with
+        | None -> zeroOid
+        | Some oid -> GitObjectId.value oid
+
+    let compareAndSwapViaCli (refName: string) (expectedOld: GitObjectId option) (next: string) =
+        task {
+            let! code, _, _ = runText [ "update-ref"; refName; next; expectedOidText expectedOld ]
+            return code = 0
+        }
+
     interface IGitRawStore with
         member _.WriteBlob(content: byte[]) =
             task {
@@ -142,13 +318,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                 | Some objects ->
                     let! oid = GitObjectDatabase.writeBlob objects content
                     return GitObjectId.create oid
-                | None ->
-                    let! code, stdout, stderr = runWithStdin [ "hash-object"; "-w"; "--stdin" ] content
-                    ensureOk "hash-object" code stdout stderr
-
-                    match oidOrNone code stdout with
-                    | Some oid -> return oid
-                    | None -> return failwith (sprintf "hash-object returned invalid oid: %s" (stdout.Trim()))
+                | None -> return! writeBlobViaCli content
             }
 
         member _.WriteTree(entries: TreeEntry list) =
@@ -174,25 +344,8 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                 match writtenTreeCache.TryGetValue cacheKey with
                 | true, oid -> return oid
                 | _ ->
-                    let! written =
-                        task {
-                            match! objectsDirectory.Force() with
-                            | Some objects ->
-                                let! oid = GitObjectDatabase.writeTree objects sorted
-                                return Some(GitObjectId.create oid)
-                            | None ->
-                                let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
-                                let! code, stdout, stderr = runWithStdin [ "mktree" ] payload
-                                ensureOk "mktree" code stdout stderr
-                                return oidOrNone code stdout
-                        }
-
-                    match written with
-                    | Some oid ->
-                        writtenTreeCache.[cacheKey] <- oid
-                        treeCache.[GitObjectId.value oid] <- sorted
-                        return oid
-                    | None -> return failwith "tree write returned an invalid oid"
+                    let! written = writeTreeUncached sorted lines
+                    return rememberWrittenTree cacheKey sorted written
             }
 
         member _.ReadObject(oid: GitObjectId) =
@@ -201,36 +354,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
 
                 match objectCache.TryGetValue tip with
                 | true, bytes -> return Some bytes
-                | _ ->
-                    let! objects = objectsDirectory.Force()
-
-                    let! loose =
-                        match objects with
-                        | Some dir -> GitObjectDatabase.tryReadObject dir tip
-                        | None -> Task.FromResult None
-
-                    match loose with
-                    | Some bytes ->
-                        objectCache.[tip] <- bytes
-                        return Some bytes
-                    | None ->
-                        // Packed (post-`gc`) or genuinely absent: the CLI is the only pack reader.
-                        let! typeCode, typeOut, _ = runText [ "cat-file"; "-t"; tip ]
-
-                        if typeCode <> 0 then
-                            return None
-                        else
-                            match typeOut.Trim() with
-                            | "blob"
-                            | "tree" as objectType ->
-                                let! code, stdoutBytes, _ = run ([ "cat-file"; objectType; tip ], None)
-
-                                if code <> 0 then
-                                    return None
-                                else
-                                    objectCache.[tip] <- stdoutBytes
-                                    return Some stdoutBytes
-                            | _ -> return None
+                | _ -> return! readObjectUncached tip
             }
 
         member _.ReadTree(oid: GitObjectId) =
@@ -239,49 +363,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
 
                 match treeCache.TryGetValue tip with
                 | true, entries -> return Some entries
-                | _ ->
-                    let! objects = objectsDirectory.Force()
-
-                    let! loose =
-                        match objects with
-                        | Some dir -> GitObjectDatabase.tryReadTree dir tip
-                        | None -> Task.FromResult None
-
-                    match loose with
-                    | Some entries ->
-                        let sorted = ProcessGitTree.sortEntries entries
-                        treeCache.[tip] <- sorted
-                        return Some sorted
-                    | None ->
-                        let! code, stdout, _ = runText [ "ls-tree"; "--full-tree"; "-z"; tip ]
-
-                        if code <> 0 then
-                            return None
-                        else
-                            let entries =
-                                stdout.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
-                                |> Array.choose (fun row ->
-                                    let tab = row.IndexOf('\t')
-
-                                    if tab < 0 then
-                                        None
-                                    else
-                                        let meta = row.Substring(0, tab)
-                                        let name = row.Substring(tab + 1)
-                                        let parts = meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
-
-                                        match parts with
-                                        | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
-                                            Some
-                                                { Mode = GitTree.normalizeMode mode
-                                                  Name = name
-                                                  Oid = GitObjectId.create oidText }
-                                        | _ -> None)
-                                |> Array.toList
-
-                            let sorted = ProcessGitTree.sortEntries entries
-                            treeCache.[tip] <- sorted
-                            return Some sorted
+                | _ -> return! readTreeUncached tip
             }
 
         member _.ReadRef(refName: string) =
@@ -292,7 +374,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                     return oid |> Option.map GitObjectId.create
                 | None ->
                     let! code, stdout, _ = runText [ "rev-parse"; "--verify"; "--quiet"; refName ]
-                    return oidOrNone code stdout
+                    return ProcessGitOid.ofStdout code stdout
             }
 
         member _.CompareAndSwapRef(refName, expectedOld, newOid) =
@@ -307,14 +389,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
                             refName
                             (expectedOld |> Option.map GitObjectId.value)
                             next
-                | None ->
-                    let expected =
-                        match expectedOld with
-                        | None -> zeroOid
-                        | Some oid -> GitObjectId.value oid
-
-                    let! code, _, _ = runText [ "update-ref"; refName; next; expected ]
-                    return code = 0
+                | None -> return! compareAndSwapViaCli refName expectedOld next
             }
 
 [<RequireQualifiedAccess>]
@@ -346,27 +421,7 @@ module ProcessGitRawStore =
 
             try
                 execFile "git" argv options (fun error stdout stderr ->
-                    if isNull error then
-                        let outBytes: byte[] = emitJsExpr stdout "Buffer.from($0)"
-                        AsyncSupport.trySetResult tcs (0, outBytes, "") |> ignore
-                    else
-                        let status: int =
-                            emitJsExpr error "($0 && typeof $0.status === 'number') ? $0.status : 1"
-
-                        let outBytes: byte[] =
-                            emitJsExpr error "($0 && $0.stdout) ? Buffer.from($0.stdout) : Buffer.alloc(0)"
-
-                        let errText: string =
-                            emitJsExpr
-                                error
-                                """
-                                (function (e) {
-                                  if (!e || e.stderr == null) return (e && e.message) || String(e);
-                                  return Buffer.from(e.stderr).toString('utf8');
-                                })($0)
-                                """
-
-                        AsyncSupport.trySetResult tcs (status, outBytes, errText) |> ignore)
+                    ProcessGitExec.complete tcs error stdout stderr)
             with ex ->
                 AsyncSupport.trySetResult tcs (1, Array.empty, ex.Message) |> ignore
 

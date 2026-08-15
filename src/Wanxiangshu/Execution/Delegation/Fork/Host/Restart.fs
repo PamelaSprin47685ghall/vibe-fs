@@ -67,6 +67,48 @@ module HostForkRestart =
           Pulse = Some(fun () -> runtime.PulseAgentHandle(AgentHandleId.create agentId))
           Clock = PtyTiming.nodeClockPort () }
 
+    let private blockReasons
+        (blocks: Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty<ChildRecoveryBlock>)
+        =
+        Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.toList blocks
+        |> List.map (function
+            | ChildRecoveryBlock.Reason r -> r
+            | ChildRecoveryBlock.SnapshotUnreadable(_, r) -> r)
+        |> String.concat "; "
+
+    let private recoveryDependencyReason (dep: RecoveryDependency) =
+        match dep with
+        | RecoveryDependency.AwaitingTerminalEvidence _ -> "awaiting terminal evidence"
+        | RecoveryDependency.HostRestoreInFlight _ -> "host restore in flight"
+
+    let private applyOkRecovery (runtime: ForkRuntime) (agentId: string) (result: ChildRecoveryResult) =
+        match result with
+        | ChildRecoveryResult.RecoveredTerminal _
+        | ChildRecoveryResult.RecoveredAbandoned _
+        | ChildRecoveryResult.RecoveredActive _ -> result
+        | ChildRecoveryResult.RecoveryIncomplete _ ->
+            runtime.MarkInterrupted(agentId, "host restart: awaiting terminal evidence")
+            result
+        | ChildRecoveryResult.RecoveryBlocked blocks ->
+            runtime.MarkInterrupted(agentId, sprintf "host restart: %s" (blockReasons blocks))
+            result
+
+    let private applyResolvedRecovery
+        (runtime: ForkRuntime)
+        (agentId: string)
+        (resolved: Result<ChildRecoveryResult, string>)
+        =
+        match resolved with
+        | Ok result -> applyOkRecovery runtime agentId result
+        | Error reason ->
+            runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
+
+            ChildRecoveryResult.RecoveryBlocked(
+                Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (
+                    ChildRecoveryBlock.Reason reason
+                )
+            )
+
     /// Active handle: Domain recoverChild via production interpreter.
     let recoverChild
         (runtime: ForkRuntime)
@@ -83,35 +125,44 @@ module HostForkRestart =
             runtime.BindChildSession(agentId, childSessionId)
 
             let p = ports runtime snapshot journal parentId agentId childSessionId role agent
+            let! resolved = ChildRecoveryWorkflow.resolveAndCommit p
+            return applyResolvedRecovery runtime agentId resolved
+        }
 
-            match! ChildRecoveryWorkflow.resolveAndCommit p with
-            | Ok result ->
-                match result with
-                | ChildRecoveryResult.RecoveredTerminal _
-                | ChildRecoveryResult.RecoveredAbandoned _
-                | ChildRecoveryResult.RecoveredActive _ -> return result
-                | ChildRecoveryResult.RecoveryIncomplete _ ->
-                    runtime.MarkInterrupted(agentId, "host restart: awaiting terminal evidence")
-                    return result
-                | ChildRecoveryResult.RecoveryBlocked blocks ->
-                    let reason =
-                        Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.toList blocks
-                        |> List.map (function
-                            | ChildRecoveryBlock.Reason r -> r
-                            | ChildRecoveryBlock.SnapshotUnreadable(_, r) -> r)
-                        |> String.concat "; "
+    let private completionBlobPair (cell: HandleCompletion) =
+        match cell.CompletionRef, cell.CompletionDigest with
+        | Some blobRef, Some blobDigest -> Some(blobRef, blobDigest)
+        | _ -> None
 
-                    runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
-                    return result
-            | Error reason ->
-                runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
+    let private migrateIfLegacyAbort
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        (body: string)
+        =
+        match HandleCompletionCodec.decodeBody body with
+        | LegacyFalseAbort _ ->
+            task {
+                let! _ = JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
+                return ()
+            }
+        | Current _
+        | Invalid _ -> task { return () }
 
-                return
-                    ChildRecoveryResult.RecoveryBlocked(
-                        Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (
-                            ChildRecoveryBlock.Reason reason
-                        )
-                    )
+    let private migrateFromBlob
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        =
+        task {
+            match! journal.Writer.BlobWriter.Read blobRef with
+            | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
+                do! migrateIfLegacyAbort journal parentId record blobRef blobDigest body
+            | _ -> ()
         }
 
     /// Clean-break: retired handle whose last cell was a legacy abort → replacement once.
@@ -120,22 +171,9 @@ module HostForkRestart =
         (parentId: SessionId)
         (record: HandleRecord)
         : Task<unit> =
-        task {
-            match record.LastCompletion with
-            | None -> ()
-            | Some cell ->
-                match cell.CompletionRef, cell.CompletionDigest with
-                | Some blobRef, Some blobDigest ->
-                    match! journal.Writer.BlobWriter.Read blobRef with
-                    | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
-                        match HandleCompletionCodec.decodeBody body with
-                        | LegacyFalseAbort _ ->
-                            let! _ = JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
-                            ()
-                        | _ -> ()
-                    | _ -> ()
-                | _ -> ()
-        }
+        match record.LastCompletion |> Option.bind completionBlobPair with
+        | None -> task { return () }
+        | Some(blobRef, blobDigest) -> migrateFromBlob journal parentId record blobRef blobDigest
 
     let private recoveredHandle (agentHandle: AgentHandleId) (child: SessionId) (kind: string) : RecoveredHandle =
         { Handle = agentHandle
@@ -152,27 +190,408 @@ module HostForkRestart =
         | ChildRecoveryResult.RecoveredAbandoned _ -> Choice1Of3(recoveredHandle agentHandle child "abandoned")
         | ChildRecoveryResult.RecoveredActive _ -> Choice1Of3(recoveredHandle agentHandle child "active")
         | ChildRecoveryResult.RecoveryIncomplete dep ->
-            let reason =
-                match dep with
-                | RecoveryDependency.AwaitingTerminalEvidence _ -> "awaiting terminal evidence"
-                | RecoveryDependency.HostRestoreInFlight _ -> "host restore in flight"
-
             Choice2Of3
                 { Handle = agentHandle
                   ChildSession = child
-                  Reason = reason }
+                  Reason = recoveryDependencyReason dep }
         | ChildRecoveryResult.RecoveryBlocked blocks ->
-            let reason =
-                Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.toList blocks
-                |> List.map (function
-                    | ChildRecoveryBlock.Reason r -> r
-                    | ChildRecoveryBlock.SnapshotUnreadable(_, r) -> r)
-                |> String.concat "; "
-
             Choice3Of3
                 { Handle = agentHandle
                   ChildSession = child
-                  Reason = reason }
+                  Reason = blockReasons blocks }
+
+    let private accumulateChoice
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (choice: Choice<RecoveredHandle, HandleRecoveryWait, HandleRecoveryBlock>)
+        =
+        match choice with
+        | Choice1Of3 h -> recovered.Add h
+        | Choice2Of3 w -> waiting.Add w
+        | Choice3Of3 b -> blocked.Add b
+
+    let private addBlocked
+        (runtime: ForkRuntime)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (child: SessionId)
+        (reason: string)
+        =
+        runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
+
+        blocked.Add
+            { Handle = agentHandle
+              ChildSession = child
+              Reason = reason }
+
+    let private addWaiting
+        (runtime: ForkRuntime)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (child: SessionId)
+        (message: string)
+        (reason: string)
+        =
+        runtime.MarkInterrupted(agentId, message)
+
+        waiting.Add
+            { Handle = agentHandle
+              ChildSession = child
+              Reason = reason }
+
+    let private bindChildIntoRuntime
+        (runtime: ForkRuntime)
+        (children: Dictionary<string, SessionId>)
+        (childCreatedDir: string -> SessionId -> string option -> unit)
+        (directoryOf: string -> string option)
+        (agentId: string)
+        (record: HandleRecord)
+        (role: Role)
+        =
+        children.[agentId] <- record.ChildSessionId
+        childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
+        runtime.Restore(agentId, role, record.TargetAgent)
+        runtime.BindChildSession(agentId, record.ChildSessionId)
+
+    let private publishCurrentCompletion
+        (runtime: ForkRuntime)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        (body: string)
+        (decoded: DurableAgentCompletionV2)
+        =
+        ignore (
+            JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
+        )
+
+        // GREEN-5: wake only; JoinDrain re-reads Journal for payload.
+        runtime.PulseAgentHandle agentHandle
+        recovered.Add(recoveredHandle agentHandle record.ChildSessionId "terminal")
+
+    let private rejectLegacyFalseAbort
+        (runtime: ForkRuntime)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        =
+        task {
+            match!
+                AgentJournal.appendAgent
+                    (StreamId.Session parentId)
+                    None
+                    (ExecutionFact.HandleFalseCompletionRejected
+                        {| ParentSessionId = parentId
+                           Handle = record.Handle
+                           ExpectedCompletionRef = blobRef
+                           ExpectedCompletionDigest = blobDigest
+                           Reason = FalseCompletionReason.LegacyAbortWasObservation |})
+                    journal
+            with
+            | Ok _ ->
+                addWaiting
+                    runtime
+                    waiting
+                    agentId
+                    agentHandle
+                    record.ChildSessionId
+                    "host restart: legacy false abort rejected"
+                    "legacy false abort rejected"
+            | Error failure ->
+                addBlocked
+                    runtime
+                    blocked
+                    agentId
+                    agentHandle
+                    record.ChildSessionId
+                    (JournalAppendFailure.describe failure)
+        }
+
+    let private restoreDecodedCompletion
+        (runtime: ForkRuntime)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        (body: string)
+        (blobRef: BlobRef)
+        (blobDigest: BlobDigest)
+        =
+        match HandleCompletionCodec.decodeBody body with
+        | Current decoded ->
+            publishCurrentCompletion runtime recovered agentId agentHandle record body decoded
+            task { return () }
+        | LegacyFalseAbort _ ->
+            rejectLegacyFalseAbort
+                runtime
+                journal
+                parentId
+                waiting
+                blocked
+                agentId
+                agentHandle
+                record
+                blobRef
+                blobDigest
+        | Invalid _ ->
+            // EXEC-022: Invalid blob = wait (not hard block). Align JoinDrain
+            // (Invalid → None / no consume) and ChildRecovery Incomplete.
+            addWaiting
+                runtime
+                waiting
+                agentId
+                agentHandle
+                record.ChildSessionId
+                "host restart: invalid completion blob; waiting"
+                "invalid completion blob"
+
+            task { return () }
+
+    let private restoreFromRecoverChild
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        (role: Role)
+        =
+        task {
+            let! result =
+                recoverChild
+                    runtime
+                    snapshot
+                    (Some journal)
+                    parentId
+                    agentId
+                    record.ChildSessionId
+                    role
+                    record.TargetAgent
+
+            accumulateChoice recovered waiting blocked (fromChildResult agentHandle record.ChildSessionId result)
+        }
+
+    let private restoreCompletedBody
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentId: string)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        (role: Role)
+        (read: Result<string option * BlobRef option * BlobDigest option, string>)
+        =
+        match read with
+        | Ok(Some body, Some blobRef, Some blobDigest) ->
+            restoreDecodedCompletion
+                runtime
+                journal
+                parentId
+                recovered
+                waiting
+                blocked
+                agentId
+                agentHandle
+                record
+                body
+                blobRef
+                blobDigest
+        | Ok(Some _, _, _) ->
+            addBlocked
+                runtime
+                blocked
+                agentId
+                agentHandle
+                record.ChildSessionId
+                "completion blob ref/digest pair is incomplete"
+
+            task { return () }
+        | Ok(None, _, _) ->
+            restoreFromRecoverChild
+                runtime
+                snapshot
+                journal
+                parentId
+                recovered
+                waiting
+                blocked
+                agentId
+                agentHandle
+                record
+                role
+        | Error reason ->
+            addBlocked runtime blocked agentId agentHandle record.ChildSessionId reason
+            task { return () }
+
+    let private restoreCompletedAwaitingJoin
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (children: Dictionary<string, SessionId>)
+        (childCreatedDir: string -> SessionId -> string option -> unit)
+        (directoryOf: string -> string option)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        =
+        task {
+            let agentId = AgentHandleId.value agentHandle
+            let role = AgentRoleIdentity.ofRole record.CanonicalRole
+
+            bindChildIntoRuntime runtime children childCreatedDir directoryOf agentId record role
+
+            let! read = HandleCompletionCodec.tryReadBody journal record
+
+            do!
+                restoreCompletedBody
+                    runtime
+                    snapshot
+                    journal
+                    parentId
+                    recovered
+                    waiting
+                    blocked
+                    agentId
+                    agentHandle
+                    record
+                    role
+                    read
+        }
+
+    let private restoreActiveHandle
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (children: Dictionary<string, SessionId>)
+        (childCreatedDir: string -> SessionId -> string option -> unit)
+        (directoryOf: string -> string option)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (agentHandle: AgentHandleId)
+        (record: HandleRecord)
+        =
+        let agentId = AgentHandleId.value agentHandle
+        let role = AgentRoleIdentity.ofRole record.CanonicalRole
+
+        children.[agentId] <- record.ChildSessionId
+        childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
+
+        restoreFromRecoverChild
+            runtime
+            snapshot
+            journal
+            parentId
+            recovered
+            waiting
+            blocked
+            agentId
+            agentHandle
+            record
+            role
+
+    let private restoreOneRecord
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (children: Dictionary<string, SessionId>)
+        (childCreatedDir: string -> SessionId -> string option -> unit)
+        (directoryOf: string -> string option)
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        (record: HandleRecord)
+        =
+        match record.Lifecycle, HandleId.tryAgent record.Handle with
+        | HandleLifecycle.Abandoned _, Some agentHandle ->
+            recovered.Add(recoveredHandle agentHandle record.ChildSessionId "abandoned")
+            task { return () }
+        | HandleLifecycle.Abandoned _, None
+        | _, None -> task { return () }
+        | HandleLifecycle.Retired, Some agentHandle ->
+            task {
+                do! migrateRetiredIfFalseAbort journal parentId record
+                recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
+            }
+        | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
+            restoreCompletedAwaitingJoin
+                runtime
+                snapshot
+                journal
+                parentId
+                children
+                childCreatedDir
+                directoryOf
+                recovered
+                waiting
+                blocked
+                agentHandle
+                record
+        | HandleLifecycle.Active, Some agentHandle ->
+            restoreActiveHandle
+                runtime
+                snapshot
+                journal
+                parentId
+                children
+                childCreatedDir
+                directoryOf
+                recovered
+                waiting
+                blocked
+                agentHandle
+                record
+
+    let private familyFromNonEmpty
+        (someCase: Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty<'a> -> HandleFamilyRecovery)
+        (items: ResizeArray<'a>)
+        =
+        match
+            Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq items)
+        with
+        | Some ne -> someCase ne
+        | None -> HandleFamilyRecovery.NoLinkedHandles
+
+    let private concludeFamilyRecovery
+        (recovered: ResizeArray<RecoveredHandle>)
+        (waiting: ResizeArray<HandleRecoveryWait>)
+        (blocked: ResizeArray<HandleRecoveryBlock>)
+        =
+        if recovered.Count = 0 && waiting.Count = 0 && blocked.Count = 0 then
+            HandleFamilyRecovery.NoLinkedHandles
+        elif blocked.Count > 0 then
+            familyFromNonEmpty HandleFamilyRecovery.HandlesBlocked blocked
+        elif waiting.Count > 0 then
+            familyFromNonEmpty HandleFamilyRecovery.HandlesWaiting waiting
+        else
+            familyFromNonEmpty HandleFamilyRecovery.HandlesRecovered recovered
 
     /// EXEC-009 restart recovery: rebuild parent join mailbox from durable handles.
     /// Returns HandleFamilyRecovery for SessionRecovery RestoreHandles (GREEN-4).
@@ -208,143 +627,22 @@ module HostForkRestart =
             let blocked = ResizeArray<HandleRecoveryBlock>()
 
             for record in records do
-                match record.Lifecycle, HandleId.tryAgent record.Handle with
-                | HandleLifecycle.Abandoned _, Some agentHandle ->
-                    recovered.Add(recoveredHandle agentHandle record.ChildSessionId "abandoned")
-                | HandleLifecycle.Abandoned _, None
-                | _, None -> ()
-                | HandleLifecycle.Retired, Some agentHandle ->
-                    do! migrateRetiredIfFalseAbort journal parentId record
-                    recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
-                | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
-                    let agentId = AgentHandleId.value agentHandle
-                    let role = AgentRoleIdentity.ofRole record.CanonicalRole
-
-                    children.[agentId] <- record.ChildSessionId
-                    childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
-                    runtime.Restore(agentId, role, record.TargetAgent)
-                    runtime.BindChildSession(agentId, record.ChildSessionId)
-
-                    match! HandleCompletionCodec.tryReadBody journal record with
-                    | Ok(Some body, Some blobRef, Some blobDigest) ->
-                        match HandleCompletionCodec.decodeBody body with
-                        | Current decoded ->
-                            ignore (
-                                JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
-                            )
-
-                            // GREEN-5: wake only; JoinDrain re-reads Journal for payload.
-                            runtime.PulseAgentHandle agentHandle
-                            recovered.Add(recoveredHandle agentHandle record.ChildSessionId "terminal")
-                        | LegacyFalseAbort _ ->
-                            match!
-                                AgentJournal.appendAgent
-                                    (StreamId.Session parentId)
-                                    None
-                                    (ExecutionFact.HandleFalseCompletionRejected
-                                        {| ParentSessionId = parentId
-                                           Handle = record.Handle
-                                           ExpectedCompletionRef = blobRef
-                                           ExpectedCompletionDigest = blobDigest
-                                           Reason = FalseCompletionReason.LegacyAbortWasObservation |})
-                                    journal
-                            with
-                            | Ok _ ->
-                                runtime.MarkInterrupted(agentId, "host restart: legacy false abort rejected")
-
-                                waiting.Add
-                                    { Handle = agentHandle
-                                      ChildSession = record.ChildSessionId
-                                      Reason = "legacy false abort rejected" }
-                            | Error failure ->
-                                runtime.MarkInterrupted(
-                                    agentId,
-                                    sprintf
-                                        "host restart: false abort reject failed: %s"
-                                        (JournalAppendFailure.describe failure)
-                                )
-
-                                blocked.Add
-                                    { Handle = agentHandle
-                                      ChildSession = record.ChildSessionId
-                                      Reason = JournalAppendFailure.describe failure }
-                        | Invalid _ ->
-                            // EXEC-022: Invalid blob = wait (not hard block). Align JoinDrain
-                            // (Invalid → None / no consume) and ChildRecovery Incomplete.
-                            runtime.MarkInterrupted(agentId, "host restart: invalid completion blob; waiting")
-
-                            waiting.Add
-                                { Handle = agentHandle
-                                  ChildSession = record.ChildSessionId
-                                  Reason = "invalid completion blob" }
-                    | Ok(Some _, _, _) ->
-                        runtime.MarkInterrupted(agentId, "host restart: completion blob ref/digest pair is incomplete")
-
-                        blocked.Add
-                            { Handle = agentHandle
-                              ChildSession = record.ChildSessionId
-                              Reason = "completion blob ref/digest pair is incomplete" }
-                    | Ok(None, _, _) ->
-                        let! result =
-                            recoverChild
-                                runtime
-                                snapshot
-                                (Some journal)
-                                parentId
-                                agentId
-                                record.ChildSessionId
-                                role
-                                record.TargetAgent
-
-                        match fromChildResult agentHandle record.ChildSessionId result with
-                        | Choice1Of3 h -> recovered.Add h
-                        | Choice2Of3 w -> waiting.Add w
-                        | Choice3Of3 b -> blocked.Add b
-                    | Error reason ->
-                        runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
-
-                        blocked.Add
-                            { Handle = agentHandle
-                              ChildSession = record.ChildSessionId
-                              Reason = reason }
-                | HandleLifecycle.Active, Some agentHandle ->
-                    let agentId = AgentHandleId.value agentHandle
-                    let role = AgentRoleIdentity.ofRole record.CanonicalRole
-
-                    children.[agentId] <- record.ChildSessionId
-                    childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
-
-                    let! result =
-                        recoverChild
-                            runtime
-                            snapshot
-                            (Some journal)
-                            parentId
-                            agentId
-                            record.ChildSessionId
-                            role
-                            record.TargetAgent
-
-                    match fromChildResult agentHandle record.ChildSessionId result with
-                    | Choice1Of3 h -> recovered.Add h
-                    | Choice2Of3 w -> waiting.Add w
-                    | Choice3Of3 b -> blocked.Add b
+                do!
+                    restoreOneRecord
+                        runtime
+                        snapshot
+                        journal
+                        parentId
+                        children
+                        childCreatedDir
+                        directoryOf
+                        recovered
+                        waiting
+                        blocked
+                        record
 
             // HandleFamilyRecovery carries Domain.SessionRecovery.NonEmpty.
-            if recovered.Count = 0 && waiting.Count = 0 && blocked.Count = 0 then
-                return HandleFamilyRecovery.NoLinkedHandles
-            elif blocked.Count > 0 then
-                match Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq blocked) with
-                | Some ne -> return HandleFamilyRecovery.HandlesBlocked ne
-                | None -> return HandleFamilyRecovery.NoLinkedHandles
-            elif waiting.Count > 0 then
-                match Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq waiting) with
-                | Some ne -> return HandleFamilyRecovery.HandlesWaiting ne
-                | None -> return HandleFamilyRecovery.NoLinkedHandles
-            else
-                match Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq recovered) with
-                | Some ne -> return HandleFamilyRecovery.HandlesRecovered ne
-                | None -> return HandleFamilyRecovery.NoLinkedHandles
+            return concludeFamilyRecovery recovered waiting blocked
         }
 
     /// Restore without a live ForkRuntime (journal-only parent, no in-process mailbox).

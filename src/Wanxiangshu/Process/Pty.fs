@@ -24,6 +24,127 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
+module private PtyPortSupport =
+    let invokeTerminate (handler: PtyBackendHandler) (id: PtyId) =
+        try
+            handler id (PtyCommand.Signal PtySignal.Terminate) |> ignore
+        with _ ->
+            ()
+
+    let claimClosedFlag (closed: bool ref) =
+        lock closed (fun () ->
+            if closed.Value then
+                true
+            else
+                closed.Value <- true
+                false)
+
+    let tryDeliverJoin (sender: PtyJoinItem -> unit) (item: PtyJoinItem) =
+        try
+            sender item
+        with _ ->
+            ()
+
+    let deliverJoinItem (senders: (PtyJoinItem -> unit) list) (item: PtyJoinItem) =
+        for sender in senders do
+            tryDeliverJoin sender item
+
+    let isAbortSignal (command: PtyCommand) =
+        match command with
+        | PtyCommand.Signal(PtySignal.Terminate | PtySignal.Kill | PtySignal.Interrupt) -> true
+        | _ -> false
+
+    let markAbortIfNeeded (gate: obj) (abortPending: HashSet<PtyId>) (id: PtyId) (command: PtyCommand) =
+        if isAbortSignal command then
+            lock gate (fun () -> abortPending.Add id |> ignore)
+
+    let runHandler (handler: PtyBackendHandler) (id: PtyId) (command: PtyCommand) =
+        task {
+            try
+                return! handler id command
+            with ex ->
+                return Error ex.Message
+        }
+
+    let parkOrReject
+        (readWaiters: Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>)
+        (id: PtyId)
+        =
+        if readWaiters.ContainsKey id then
+            AlreadyInProgress
+        else
+            let tcs = TaskCompletionSource<Result<string * bool, string>>()
+            readWaiters.[id] <- tcs
+            Park tcs
+
+    let outcomeText (outcome: Result<string, string> option) =
+        match defaultArg outcome (Ok PtyOutcome.Closed) with
+        | Ok t -> t
+        | Error e -> e
+
+    let abortMessage (text: string) =
+        if String.IsNullOrWhiteSpace text || text = PtyOutcome.Closed then
+            "PTY aborted"
+        else
+            text
+
+    let abortedJoinItem (id: PtyId) (outcome: Result<string, string> option) =
+        let msg = outcomeText outcome |> abortMessage
+
+        PtyAborted
+            { PtyId = id.Value
+              Outcome = msg
+              Closed = true
+              Code = "PTY_ABORTED"
+              Message = msg }
+
+    let naturalJoinItem (id: PtyId) (outcome: Result<string, string> option) =
+        match defaultArg outcome (Ok PtyOutcome.Closed) with
+        | Ok text ->
+            PtyExited
+                { PtyId = id.Value
+                  Outcome = text
+                  Closed = true }
+        | Error err ->
+            PtyFailed
+                { PtyId = id.Value
+                  Outcome = err
+                  Closed = true
+                  Code = "ERROR"
+                  Message = err }
+
+    let findExitTask (exitTasks: Dictionary<PtyId, Task>) (id: PtyId) =
+        match exitTasks.TryGetValue id with
+        | true, t -> Some t
+        | false, _ -> None
+
+    let applyKill (handler: PtyBackendHandler) (exitTask: Task) (id: PtyId) =
+        task {
+            let! killResult = handler id (PtyCommand.Signal PtySignal.Kill)
+
+            match killResult with
+            | Error err ->
+                return raise (InvalidOperationException(sprintf "PTY kill failed for %s: %s" id.Value err))
+            | Ok() -> do! exitTask
+        }
+
+    let continueAfterExitFound (handler: PtyBackendHandler) (exitTask: Task) (grace: int) (id: PtyId) =
+        task {
+            let! exited = PtyTiming.raceExit exitTask grace
+
+            if exited then
+                ()
+            else
+                do! applyKill handler exitTask id
+        }
+
+    let awaitRegisteredExit (handler: PtyBackendHandler) (exitTaskOpt: Task option) (grace: int) (id: PtyId) =
+        task {
+            match exitTaskOpt with
+            | None -> ()
+            | Some exitTask -> do! continueAfterExitFound handler exitTask grace id
+        }
+
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
 /// are supplied by Complete and share every registered mailbox sender.
 /// GREEN-5: sender carries PtyJoinItem (physical PTY fact), not agent RunCompletion.
@@ -44,6 +165,18 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
     let exitTasks = Dictionary<PtyId, Task>()
     do mailboxSender |> Option.iter mailboxSenders.Add
 
+    let publishFirstClose (id: PtyId) (closed: bool ref) (item: PtyJoinItem) =
+        let alreadyClosed = PtyPortSupport.claimClosedFlag closed
+
+        if not alreadyClosed then
+            lock gate (fun () ->
+                active.Remove id |> ignore
+                closedIds.Add id |> ignore)
+
+            this.FailRead(id, "PTY closed before read completed")
+            let senders = lock gate (fun () -> mailboxSenders |> Seq.toList)
+            PtyPortSupport.deliverJoinItem senders item
+
     /// Owner-initiated terminate: marks abort-pending + sends TERM. Does NOT
     /// remove from active, does NOT mark closed, does NOT FailRead, does NOT
     /// publish completion. Completion belongs exclusively to the backend's
@@ -58,10 +191,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
                 | _ -> false)
 
         if live then
-            try
-                handler id (PtyCommand.Signal PtySignal.Terminate) |> ignore
-            with _ ->
-                ()
+            PtyPortSupport.invokeTerminate handler id
 
     /// Complete from a backend exit (onExit). This is the ONLY path that
     /// publishes completion to mailbox senders. Removes from active, marks
@@ -77,32 +207,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
 
         match target with
         | None -> ()
-        | Some(_handle, closed) ->
-            let alreadyClosed =
-                lock closed (fun () ->
-                    if closed.Value then
-                        true
-                    else
-                        closed.Value <- true
-                        false)
-
-            if not alreadyClosed then
-                lock gate (fun () ->
-                    active.Remove id |> ignore
-                    closedIds.Add id |> ignore)
-
-                // Any in-flight read must resolve with an error; the completion
-                // below is the authoritative exit outcome delivered to Join.
-                this.FailRead(id, "PTY closed before read completed")
-
-                // AGENT-013: PTY DevOps-exclusive. GREEN-5: physical PtyJoinItem only.
-                let senders = lock gate (fun () -> mailboxSenders |> Seq.toList)
-
-                for sender in senders do
-                    try
-                        sender item
-                    with _ ->
-                        ()
+        | Some(_handle, closed) -> publishFirstClose id closed item
 
     member _.AddMailboxSender(sender: PtyJoinItem -> unit) =
         lock gate (fun () -> mailboxSenders.Add sender)
@@ -151,23 +256,13 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
                 | true, (_, c) -> (not c.Value, c.Value)
                 | false, _ -> (false, closedIds.Contains id))
 
-        if not live then
-            if closed then
-                Task.FromResult(Error "PTY closed")
-            else
-                Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
+        if not live && closed then
+            Task.FromResult(Error "PTY closed")
+        elif not live then
+            Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
         else
-            match command with
-            | PtyCommand.Signal(PtySignal.Terminate | PtySignal.Kill | PtySignal.Interrupt) ->
-                lock gate (fun () -> abortPending.Add id |> ignore)
-            | _ -> ()
-
-            task {
-                try
-                    return! handler id command
-                with ex ->
-                    return Error ex.Message
-            }
+            PtyPortSupport.markAbortIfNeeded gate abortPending id command
+            PtyPortSupport.runHandler handler id command
 
     /// Reads the currently buffered PTY output without completing the join.
     /// At most one read may be in flight per id; a second concurrent Read
@@ -177,13 +272,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
         let plan =
             lock gate (fun () ->
                 match active.TryGetValue id with
-                | true, (_, closed) when not closed.Value ->
-                    if readWaiters.ContainsKey id then
-                        AlreadyInProgress
-                    else
-                        let tcs = TaskCompletionSource<Result<string * bool, string>>()
-                        readWaiters.[id] <- tcs
-                        Park tcs
+                | true, (_, closed) when not closed.Value -> PtyPortSupport.parkOrReject readWaiters id
                 | true, _ -> ClosedImmediate
                 | false, _ when closedIds.Contains id -> ClosedImmediate
                 | false, _ -> Unknown(sprintf "Unknown PTY id: %s" id.Value))
@@ -249,37 +338,9 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
 
         let item =
             if wasAbort then
-                let text =
-                    match defaultArg outcome (Ok PtyOutcome.Closed) with
-                    | Ok t -> t
-                    | Error e -> e
-
-                let msg =
-                    if String.IsNullOrWhiteSpace text || text = PtyOutcome.Closed then
-                        "PTY aborted"
-                    else
-                        text
-
-                PtyAborted
-                    { PtyId = id.Value
-                      Outcome = msg
-                      Closed = true
-                      Code = "PTY_ABORTED"
-                      Message = msg }
+                PtyPortSupport.abortedJoinItem id outcome
             else
-                match defaultArg outcome (Ok PtyOutcome.Closed) with
-                | Ok text ->
-                    PtyExited
-                        { PtyId = id.Value
-                          Outcome = text
-                          Closed = true }
-                | Error err ->
-                    PtyFailed
-                        { PtyId = id.Value
-                          Outcome = err
-                          Closed = true
-                          Code = "ERROR"
-                          Message = err }
+                PtyPortSupport.naturalJoinItem id outcome
 
         completeFromExit id item
 
@@ -319,31 +380,10 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
                 requestTerminate id
 
                 let exitTaskOpt =
-                    lock gate (fun () ->
-                        match exitTasks.TryGetValue id with
-                        | true, t -> Some t
-                        | false, _ -> None)
+                    lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
 
-                match exitTaskOpt with
-                | None -> ()
-                | Some exitTask ->
-                    let! exited = PtyTiming.raceExit exitTask grace
-
-                    if not exited then
-                        // Grace elapsed without exit: escalate to KILL.
-                        let! killResult = handler id (PtyCommand.Signal PtySignal.Kill)
-
-                        match killResult with
-                        | Error err ->
-                            // KILL failed: do NOT wait forever for an exit that
-                            // will never come. Propagate the kill error.
-                            return raise (InvalidOperationException(sprintf "PTY kill failed for %s: %s" id.Value err))
-                        | Ok() ->
-                            // KILL sent; await the real onExit which calls
-                            // Complete (publishes completion).
-                            do! exitTask
-
-                    lock gate (fun () -> exitTasks.Remove id |> ignore)
+                do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
+                lock gate (fun () -> exitTasks.Remove id |> ignore)
         }
 
     member _.List() : AgentRecord list * PtyHandle list =

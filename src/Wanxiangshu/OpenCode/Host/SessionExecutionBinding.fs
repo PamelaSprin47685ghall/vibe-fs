@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -48,26 +49,28 @@ module SessionExecutionBinding =
     let private models = Dictionary<string, OpencodeModel>()
     let private internalBindings = Dictionary<string, ExpectedBinding list>()
 
+    let private rememberParent (childKey: string) (parentKey: string) =
+        match parents.TryGetValue childKey with
+        | true, existing when existing <> parentKey ->
+            invalidOp (sprintf "PROMPT-006: parented session '%s' changed parent" childKey)
+        | _ -> parents.[childKey] <- parentKey
+
+    let private rememberAgent (childKey: string) (proposed: string) =
+        match agents.TryGetValue childKey with
+        | true, existing when existing <> proposed ->
+            invalidOp (
+                sprintf "PROMPT-006: parented session '%s' agent changed (%s -> %s)" childKey existing proposed
+            )
+        | _ -> agents.[childKey] <- proposed
+
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         lock gate (fun () ->
             let childKey = SessionId.value childId
             let parentKey = SessionId.value parentId
-
-            match parents.TryGetValue childKey with
-            | true, existing when existing <> parentKey ->
-                invalidOp (sprintf "PROMPT-006: parented session '%s' changed parent" childKey)
-            | _ -> parents.[childKey] <- parentKey
+            rememberParent childKey parentKey
 
             match agent with
-            | Some value when not (String.IsNullOrWhiteSpace value) ->
-                let proposed = value.Trim()
-
-                match agents.TryGetValue childKey with
-                | true, existing when existing <> proposed ->
-                    invalidOp (
-                        sprintf "PROMPT-006: parented session '%s' agent changed (%s -> %s)" childKey existing proposed
-                    )
-                | _ -> agents.[childKey] <- proposed
+            | Some value when not (String.IsNullOrWhiteSpace value) -> rememberAgent childKey (value.Trim())
             | _ -> ())
 
     let restore (parentId: SessionId) (childId: SessionId) (agent: string option) = bind parentId childId agent
@@ -115,18 +118,20 @@ module SessionExecutionBinding =
             if not (models.ContainsKey key) then
                 models.[key] <- model)
 
+    let private pushInternalBinding (key: string) (agent: string) (model: OpencodeModel) =
+        let previous =
+            match internalBindings.TryGetValue key with
+            | true, value -> value
+            | false, _ -> []
+
+        internalBindings.[key] <- { Agent = agent.Trim(); Model = model } :: previous
+
     let beginInternalSend (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match opts.Agent, opts.Model with
         | Some agent, Some model when not (String.IsNullOrWhiteSpace agent) ->
             lock gate (fun () ->
                 let key = SessionId.value sessionId
-
-                let previous =
-                    match internalBindings.TryGetValue key with
-                    | true, value -> value
-                    | false, _ -> []
-
-                internalBindings.[key] <- { Agent = agent.Trim(); Model = model } :: previous)
+                pushInternalBinding key agent model)
         | _ -> invalidOp "PROMPT-006: internal send has no concrete agent/model binding"
 
     let endInternalSend (sessionId: SessionId) =
@@ -166,21 +171,22 @@ module SessionExecutionBinding =
 
     let private configuredModel agent = ManagedAgentConfig.tryBoundModel agent
 
+    let private tryPeerFromTierRole (tierText: string) (roleText: string) : string option =
+        match ManagedAgentCatalog.tryParseTier tierText, ManagedAgentCatalog.tryParseRole roleText with
+        | Some tier, Some role -> Some(ManagedAgentCatalog.peerNameOf tier role)
+        | _ -> None
+
+    let private tryPeerFromDashName (trimmed: string) : string option =
+        match trimmed.IndexOf '-' with
+        | index when index > 0 && index < trimmed.Length - 1 ->
+            tryPeerFromTierRole (trimmed.Substring(0, index)) (trimmed.Substring(index + 1))
+        | _ -> None
+
     let private tryPeerName (agentName: string) : string option =
         if ManagedAgentCatalog.isBookkeeperName agentName then
             ManagedAgentCatalog.bookkeeperPeerName agentName
         else
-            let trimmed = agentName.Trim()
-
-            match trimmed.IndexOf '-' with
-            | index when index > 0 && index < trimmed.Length - 1 ->
-                let tierText = trimmed.Substring(0, index)
-                let roleText = trimmed.Substring(index + 1)
-
-                match ManagedAgentCatalog.tryParseTier tierText, ManagedAgentCatalog.tryParseRole roleText with
-                | Some tier, Some role -> Some(ManagedAgentCatalog.peerNameOf tier role)
-                | _ -> None
-            | _ -> None
+            tryPeerFromDashName (agentName.Trim())
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID
@@ -195,67 +201,95 @@ module SessionExecutionBinding =
             let key = SessionId.value sessionId
             internalBindings.ContainsKey key || parents.ContainsKey key)
 
+    let private providerModelDriftError (expected: OpencodeModel) (actual: OpencodeModel) =
+        Error(
+            sprintf
+                "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
+                expected.providerID
+                expected.modelID
+                actual.providerID
+                actual.modelID
+        )
+
+    let private validatePeerModel (peer: string) (model: OpencodeModel) : Result<bool, string> =
+        match configuredModel peer with
+        | Some peerModel when sameModel peerModel model -> Ok true
+        | Some peerModel -> providerModelDriftError peerModel model
+        | None -> Error(sprintf "PROMPT-006: peer agent '%s' has no configured model binding" peer)
+
+    let private validatePeerAgent (baseAgent: string) (agent: string) (model: OpencodeModel) : Result<bool, string> =
+        match tryPeerName baseAgent with
+        | Some peer when peer = agent.Trim() -> validatePeerModel peer model
+        | _ -> Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent agent)
+
+    let private validateFrozenBinding
+        (baseAgent: string)
+        (baseModel: OpencodeModel)
+        (agent: string)
+        (model: OpencodeModel)
+        : Result<bool, string> =
+        if baseAgent <> agent.Trim() then
+            validatePeerAgent baseAgent agent model
+        elif sameModel baseModel model then
+            Ok true
+        else
+            providerModelDriftError baseModel model
+
+    let private validateParentedProvider
+        (key: string)
+        (agent: string)
+        (model: OpencodeModel)
+        : Result<bool, string> =
+        match agents.TryGetValue key, models.TryGetValue key with
+        | (true, baseAgent), (true, baseModel) -> validateFrozenBinding baseAgent baseModel agent model
+        | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
+
     let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         lock gate (fun () ->
             let key = SessionId.value sessionId
 
             match internalBindings.TryGetValue key with
             | true, current :: _ when current.Agent = agent.Trim() && sameModel current.Model model -> Ok true
-            | _ when parents.ContainsKey key ->
-                match agents.TryGetValue key, models.TryGetValue key with
-                | (true, baseAgent), (true, baseModel) ->
-                    if baseAgent = agent.Trim() then
-                        if sameModel baseModel model then
-                            Ok true
-                        else
-                            Error(
-                                sprintf
-                                    "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
-                                    baseModel.providerID
-                                    baseModel.modelID
-                                    model.providerID
-                                    model.modelID
-                            )
-                    else
-                        match tryPeerName baseAgent with
-                        | Some peer when peer = agent.Trim() ->
-                            match configuredModel peer with
-                            | Some peerModel when sameModel peerModel model -> Ok true
-                            | Some peerModel ->
-                                Error(
-                                    sprintf
-                                        "PROMPT-006: provider model drift (%s/%s -> %s/%s)"
-                                        peerModel.providerID
-                                        peerModel.modelID
-                                        model.providerID
-                                        model.modelID
-                                )
-                            | None -> Error(sprintf "PROMPT-006: peer agent '%s' has no configured model binding" peer)
-                        | _ -> Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent agent)
-                | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
+            | _ when parents.ContainsKey key -> validateParentedProvider key agent model
             | _ -> Ok false)
 
+    let private rejectOverrideModelMismatch
+        (agent: string)
+        (configured: OpencodeModel option)
+        (opts: OpenCodePromptOptions)
+        : Result<unit, string> =
+        match configured, opts.Model with
+        | Some bound, Some requested when not (sameModel bound requested) ->
+            Error(sprintf "PROMPT-006: execution override model does not match agent '%s' binding" agent)
+        | _ -> Ok()
+
+    let private resolveOverrideModel
+        (agent: string)
+        (configured: OpencodeModel option)
+        (opts: OpenCodePromptOptions)
+        : Result<OpencodeModel, string> =
+        configured
+        |> Option.orElse opts.Model
+        |> Result.requireSome (sprintf "PROMPT-006: execution override for '%s' has no provable model" agent)
+
     let private normalizeOverride (opts: OpenCodePromptOptions) =
-        match opts.Agent |> Option.bind nonEmpty with
-        | None -> Error "PROMPT-006: execution override requires an explicit managed agent"
-        | Some agent ->
+        result {
+            let! agent =
+                opts.Agent
+                |> Option.bind nonEmpty
+                |> Result.requireSome "PROMPT-006: execution override requires an explicit managed agent"
+
             let configured = configuredModel agent
+            do! rejectOverrideModelMismatch agent configured opts
+            let! model = resolveOverrideModel agent configured opts
 
-            match configured, opts.Model with
-            | Some bound, Some requested when not (sameModel bound requested) ->
-                Error(sprintf "PROMPT-006: execution override model does not match agent '%s' binding" agent)
-            | _ ->
-                match configured |> Option.orElse opts.Model with
-                | None -> Error(sprintf "PROMPT-006: execution override for '%s' has no provable model" agent)
-                | Some model ->
-                    Ok
-                        { opts with
-                            Agent = Some agent
-                            Model = Some model }
+            return
+                { opts with
+                    Agent = Some agent
+                    Model = Some model }
+        }
 
-    let private preserveBinding label baseAgent baseModel (opts: OpenCodePromptOptions) =
-        let requestedAgent = opts.Agent |> Option.bind nonEmpty
-
+    let private requireRequestedAgent (label: string) (baseAgent: string) (requestedAgent: string option) =
         if requestedAgent <> Some baseAgent then
             Error(
                 sprintf
@@ -265,60 +299,89 @@ module SessionExecutionBinding =
                     (requestedAgent |> Option.defaultValue "<missing>")
             )
         else
-            match baseModel with
-            | None -> Error(sprintf "PROMPT-006: %s '%s' has no provable model binding" label baseAgent)
-            | Some model ->
-                match opts.Model with
-                | Some requested when not (sameModel requested model) ->
-                    Error(
-                        sprintf
-                            "PROMPT-006: %s model drift (%s/%s -> %s/%s)"
-                            label
-                            model.providerID
-                            model.modelID
-                            requested.providerID
-                            requested.modelID
-                    )
-                | _ ->
-                    Ok
-                        { opts with
-                            Agent = Some baseAgent
-                            Model = Some model }
+            Ok()
+
+    let private requireBindingModel (label: string) (baseAgent: string) (baseModel: OpencodeModel option) =
+        match baseModel with
+        | None -> Error(sprintf "PROMPT-006: %s '%s' has no provable model binding" label baseAgent)
+        | Some model -> Ok model
+
+    let private requireModelCompatible (label: string) (model: OpencodeModel) (opts: OpenCodePromptOptions) =
+        match opts.Model with
+        | Some requested when not (sameModel requested model) ->
+            Error(
+                sprintf
+                    "PROMPT-006: %s model drift (%s/%s -> %s/%s)"
+                    label
+                    model.providerID
+                    model.modelID
+                    requested.providerID
+                    requested.modelID
+            )
+        | _ -> Ok()
+
+    let private preserveBinding label baseAgent baseModel (opts: OpenCodePromptOptions) =
+        result {
+            let requestedAgent = opts.Agent |> Option.bind nonEmpty
+            do! requireRequestedAgent label baseAgent requestedAgent
+            let! model = requireBindingModel label baseAgent baseModel
+            do! requireModelCompatible label model opts
+
+            return
+                { opts with
+                    Agent = Some baseAgent
+                    Model = Some model }
+        }
+
+    let private normalizeManagedPreserve (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
+        let model =
+            tryModel sessionId
+            |> Option.orElseWith (fun () -> configuredModel baseAgent)
+            |> Option.orElse opts.Model
+
+        preserveBinding "parented session" baseAgent model opts
+        |> Result.map (fun normalized ->
+            model |> Option.iter (rememberModel sessionId)
+            normalized)
+
+    let private normalizeManagedOverride (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
+        match tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent) with
+        | None -> Error "PROMPT-006: parented session has no provable base model binding"
+        | Some baseModel ->
+            rememberModel sessionId baseModel
+            normalizeOverride opts
+
+    let private normalizeManagedByIntent (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
+        match opts.BindingIntent with
+        | SessionBindingIntent.Preserve -> normalizeManagedPreserve sessionId baseAgent opts
+        | SessionBindingIntent.ExplicitExecutionOverride -> normalizeManagedOverride sessionId baseAgent opts
 
     let normalizeManagedPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match tryAgent sessionId |> Option.bind nonEmpty with
         | None -> Error "PROMPT-006: parented session has no frozen agent binding"
-        | Some baseAgent ->
-            match opts.BindingIntent with
-            | SessionBindingIntent.Preserve ->
-                let model =
-                    tryModel sessionId
-                    |> Option.orElseWith (fun () -> configuredModel baseAgent)
-                    |> Option.orElse opts.Model
+        | Some baseAgent -> normalizeManagedByIntent sessionId baseAgent opts
 
-                preserveBinding "parented session" baseAgent model opts
-                |> Result.map (fun normalized ->
-                    model |> Option.iter (rememberModel sessionId)
-                    normalized)
-            | SessionBindingIntent.ExplicitExecutionOverride ->
-                match tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent) with
-                | None -> Error "PROMPT-006: parented session has no provable base model binding"
-                | Some baseModel ->
-                    rememberModel sessionId baseModel
-                    normalizeOverride opts
+    let private normalizeUserFacingByIntent
+        (baseAgent: string)
+        (model: OpencodeModel)
+        (opts: OpenCodePromptOptions)
+        =
+        match opts.BindingIntent with
+        | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some model) opts
+        | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
+
+    let private normalizeUserFacingWithAgent
+        (sessionId: SessionId)
+        (baseAgent: string)
+        (opts: OpenCodePromptOptions)
+        =
+        match tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent) with
+        | None -> Error "PROMPT-006: user-facing session has no provable model binding"
+        | Some model ->
+            rememberModel sessionId model
+            normalizeUserFacingByIntent baseAgent model opts
 
     let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         match tryAgent sessionId with
-        | Some baseAgent ->
-            let baseModel =
-                tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent)
-
-            match baseModel with
-            | None -> Error "PROMPT-006: user-facing session has no provable model binding"
-            | Some model ->
-                rememberModel sessionId model
-
-                match opts.BindingIntent with
-                | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some model) opts
-                | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
+        | Some baseAgent -> normalizeUserFacingWithAgent sessionId baseAgent opts
         | None -> Error "PROMPT-006: user-facing session has no observed user binding"

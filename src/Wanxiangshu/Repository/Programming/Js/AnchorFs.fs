@@ -23,6 +23,7 @@ open Wanxiangshu.Strength.Persistence
 
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -116,6 +117,10 @@ module JsAnchorFs =
 
     type JsGrepListing = { Matches: JsGrepHit list }
 
+    let private appendLineStartIfNewline (offsets: ResizeArray<int>) (text: string) (i: int) =
+        if text.[i] = '\n' then
+            offsets.Add(i + 1)
+
     /// 每行起始偏移索引。lineOffsets[0]=0；每个 '\n' 之后紧跟下一行起始。
     /// 只认 '\n'（不做 CRLF 修正），与历史 lineColumn 计法一致。
     let private lineOffsets (text: string) : int array =
@@ -123,8 +128,7 @@ module JsAnchorFs =
         offsets.Add 0
 
         for i in 0 .. text.Length - 1 do
-            if text.[i] = '\n' then
-                offsets.Add(i + 1)
+            appendLineStartIfNewline offsets text i
 
         offsets.ToArray()
 
@@ -163,6 +167,29 @@ module JsAnchorFs =
         with _ ->
             []
 
+    let private locateHits (text: string) (spec: AnchorSpec) : (int * string) list =
+        match spec with
+        | AnchorSpec.Exact needle -> exactHits text needle
+        | AnchorSpec.Regex source -> regexHits text source
+
+    let private grepHitAt (rel: string) (offsets: int array) (index: int) (matched: string) : JsGrepHit =
+        let line, column = lineColumn offsets index
+
+        { Path = rel
+          Line = line
+          Column = column
+          Text = matched }
+
+    let private grepHitsOnText (rel: string) (text: string) (spec: AnchorSpec) : JsGrepHit list =
+        let offsets = lineOffsets text
+        locateHits text spec
+        |> List.map (fun (index, matched) -> grepHitAt rel offsets index matched)
+
+    let private grepHitsOnPath (root: string) (spec: AnchorSpec) (rel: string) : JsGrepHit list =
+        match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
+        | Error _ -> []
+        | Ok text -> grepHitsOnText rel text spec
+
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
     let grep (root: string) (spec: AnchorSpec) (pattern: string) : Result<JsGrepListing, JsFailure> =
@@ -172,83 +199,90 @@ module JsAnchorFs =
             else
                 pattern
 
-        match JsGlobFs.glob root globPattern with
-        | Error failure -> Error failure
-        | Ok listing ->
-            let acc = ResizeArray<JsGrepHit>()
+        result {
+            let! listing = JsGlobFs.glob root globPattern
+            let matches = listing.Paths |> List.collect (grepHitsOnPath root spec)
+            return { Matches = matches }
+        }
 
-            for rel in listing.Paths do
-                match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
-                | Error _ -> ()
-                | Ok text ->
-                    let offsets = lineOffsets text
+    /// Index of the nth occurrence of an exact needle, scanning forward
+    /// from fromIndex (ordinal). -1 when absent.
+    let rec private nthIndex (text: string) (needle: string) (fromIndex: int) (n: int) : int =
+        if n <= 0 then
+            -1
+        else
+            let idx = text.IndexOf(needle, fromIndex, System.StringComparison.Ordinal)
 
-                    let hits =
-                        match spec with
-                        | AnchorSpec.Exact needle -> exactHits text needle
-                        | AnchorSpec.Regex source -> regexHits text source
+            if idx < 0 then -1
+            elif n = 1 then idx
+            else nthIndex text needle (idx + needle.Length) (n - 1)
 
-                    for (index, matched) in hits do
-                        let line, column = lineColumn offsets index
+    let private findExactAnchor (text: string) (needle: string) (occurrence: int) : Result<int * int, JsFailure> =
+        result {
+            do!
+                if System.String.IsNullOrEmpty needle then
+                    Error JsFailure.AnchorEmptyContent
+                else
+                    Ok()
 
-                        acc.Add
-                            { Path = rel
-                              Line = line
-                              Column = column
-                              Text = matched }
+            let start = nthIndex text needle 0 occurrence
 
-            Ok { Matches = List.ofSeq acc }
+            if start < 0 then
+                return!
+                    Error(
+                        JsFailure.AnchorNotFound(
+                            "anchor did not match at occurrence " + string occurrence
+                        )
+                    )
+            else
+                return start, start + needle.Length
+        }
+
+    let private regexOccurrenceOrMissing (text: string) (pattern: string) (occurrence: int) : Result<int * int, JsFailure> =
+        let re = regexGlobal pattern
+        let m = findRegexOccurrence text re occurrence
+
+        if matchFound m then
+            Ok(matchStart m, matchEnd m)
+        else
+            Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
+
+    let private findRegexAnchor (text: string) (pattern: string) (occurrence: int) : Result<int * int, JsFailure> =
+        result {
+            do!
+                if System.String.IsNullOrEmpty pattern then
+                    Error JsFailure.AnchorEmptyContent
+                else
+                    Ok()
+
+            try
+                return! regexOccurrenceOrMissing text pattern occurrence
+            with _ ->
+                return! Error JsFailure.AnchorInvalidPattern
+        }
+
+    let private findAnchorBySpec (text: string) (spec: AnchorSpec) (occurrence: int) : Result<int * int, JsFailure> =
+        match spec with
+        | AnchorSpec.Exact needle -> findExactAnchor text needle occurrence
+        | AnchorSpec.Regex pattern -> findRegexAnchor text pattern occurrence
 
     /// JS-006: ordered string/RegExp anchor matching. `occurrence` is 1-based.
     /// Returns (start, end); zero-width matches yield start = end.
     let findAnchor (text: string) (spec: AnchorSpec) (occurrence: int) : Result<int * int, JsFailure> =
-        /// Index of the nth occurrence of an exact needle, scanning forward
-        /// from fromIndex (ordinal). -1 when absent.
-        let rec nthIndex (needle: string) (fromIndex: int) (n: int) : int =
-            if n <= 0 then
-                -1
-            else
-                let idx = text.IndexOf(needle, fromIndex, System.StringComparison.Ordinal)
-
-                if idx < 0 then -1
-                elif n = 1 then idx
-                else nthIndex needle (idx + needle.Length) (n - 1)
-
         if occurrence < 1 then
             Error JsFailure.AnchorInvalidPattern
         else
-            match spec with
-            | AnchorSpec.Exact needle ->
-                if System.String.IsNullOrEmpty needle then
-                    Error JsFailure.AnchorEmptyContent
-                else
-                    let start = nthIndex needle 0 occurrence
+            findAnchorBySpec text spec occurrence
 
-                    if start >= 0 then
-                        Ok(start, start + needle.Length)
-                    else
-                        Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
-            | AnchorSpec.Regex pattern ->
-                if System.String.IsNullOrEmpty pattern then
-                    Error JsFailure.AnchorEmptyContent
-                else
-                    try
-                        let re = regexGlobal pattern
-                        let m = findRegexOccurrence text re occurrence
-
-                        if matchFound m then
-                            Ok(matchStart m, matchEnd m)
-                        else
-                            Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
-                    with _ ->
-                        Error JsFailure.AnchorInvalidPattern
+    let private uniqueAfterFirst (text: string) (spec: AnchorSpec) (first: int * int) : Result<int * int, JsFailure> =
+        match findAnchor text spec 2 with
+        | Ok _ -> Error JsFailure.AnchorNotUnique
+        | Error _ -> Ok first
 
     /// JS-006: uniqueness refusal — when no occurrence is declared, the anchor
     /// must match exactly once.
     let requireUnique (text: string) (spec: AnchorSpec) : Result<int * int, JsFailure> =
-        match findAnchor text spec 1 with
-        | Error failure -> Error failure
-        | Ok first ->
-            match findAnchor text spec 2 with
-            | Ok _ -> Error JsFailure.AnchorNotUnique
-            | Error _ -> Ok first
+        result {
+            let! first = findAnchor text spec 1
+            return! uniqueAfterFirst text spec first
+        }
