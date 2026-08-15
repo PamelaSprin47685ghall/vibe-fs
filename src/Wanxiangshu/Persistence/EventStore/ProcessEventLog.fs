@@ -221,16 +221,21 @@ module ProcessEventLog =
             CanonicalEventCodec.tryDecode (line + "\n")
 
     let private decodeWriterLines (label: string) (lines: string[]) : Result<EventEnvelope list, StorageInvalid> =
-        let rec decode index acc =
-            result {
-                if index >= lines.Length - 1 then
-                    return List.rev acc
-                else
-                    let! envelope = decodeWriterLine label lines.[index]
-                    return! decode (index + 1) (envelope :: acc)
-            }
+        // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with writer history length.
+        let mutable acc: EventEnvelope list = []
+        let mutable failure: StorageInvalid option = None
+        let mutable index = 0
 
-        decode 0 []
+        while index < lines.Length - 1 && failure.IsNone do
+            match decodeWriterLine label lines.[index] with
+            | Ok envelope ->
+                acc <- envelope :: acc
+                index <- index + 1
+            | Error invalid -> failure <- Some invalid
+
+        match failure with
+        | Some invalid -> Error invalid
+        | None -> Ok(List.rev acc)
 
     let decodeWriterText (label: string) (text: string) : Result<EventEnvelope list, StorageInvalid> =
         if String.IsNullOrEmpty text then

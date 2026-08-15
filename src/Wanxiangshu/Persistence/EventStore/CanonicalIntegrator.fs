@@ -365,14 +365,24 @@ module CanonicalIntegrator =
     /// Business semantic failures never abort replay; they cut only that rule's
     /// tail until an in-order ProjectionCutTail reset fact is encountered.
     let private replay (streams: (string * EventEnvelope list) list) : Result<IntegratorState, string> =
-        let rec integrate (state: IntegratorState) (remaining: EventEnvelope list) =
-            match remaining with
-            | [] -> Ok state
-            | head :: tail -> integrateOne state head |> Result.bind (fun step -> integrate step.State tail)
-
         EventKWayMerge.merge streams
         |> Result.mapError (sprintf "writer-stream replay invalid: %A")
-        |> Result.bind (fun ordered -> integrate initialState ordered)
+        |> Result.bind (fun ordered ->
+            // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with history length.
+            let mutable state = initialState
+            let mutable remaining = ordered
+            let mutable failure: string option = None
+
+            while not (List.isEmpty remaining) && failure.IsNone do
+                match integrateOne state (List.head remaining) with
+                | Ok step ->
+                    state <- step.State
+                    remaining <- List.tail remaining
+                | Error reason -> failure <- Some reason
+
+            match failure with
+            | Some reason -> Error reason
+            | None -> Ok state)
 
     let private fullReplayGate = obj ()
     // DSL-MUTABLE: resource — one process-wide emergency full-history replay budget.

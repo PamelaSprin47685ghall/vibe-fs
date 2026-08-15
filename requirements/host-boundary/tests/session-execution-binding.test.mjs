@@ -51,6 +51,35 @@ after(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
+test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_stack_returns', async () => {
+  const sid = sessionId('ses_binding_async_override')
+  const promptKey = { fields: ['prompt-deep-continuation'] }
+  const deepModel = { providerID: 'provider', modelID: 'deep-coder-leased', variant: 'none' }
+
+  binding.observeUserFacingAgent(sid, 'fast-coder')
+
+  // Physical chat.message acceptance hands the typed continuation binding to the
+  // provider-attempt boundary. The SendPrompt call stack is already gone when
+  // chat.params eventually validates the provider request.
+  binding.acceptPromptExecution(sid, promptKey, 'deep-coder', deepModel)
+  const began = binding.beginProviderAttempt(sid, promptKey)
+  assert.equal(began.tag, 0, 'accepted PromptKey must bind the concrete provider attempt')
+
+  const allowed = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
+  assert.equal(allowed.tag, 0, allowed.tag === 0 ? '' : allowed.fields?.[0])
+  assert.equal(allowed.fields[0], true)
+
+  // The override is not session authority. A later provider attempt with no
+  // matching PromptKey falls back to the root/base binding and must reject deep.
+  const next = binding.beginProviderAttempt(sid, undefined)
+  assert.equal(next.tag, 0)
+  const stale = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
+  assert.equal(stale.tag, 1)
+  assert.match(stale.fields[0], /provider agent drift \(fast-coder -> deep-coder\)/)
+
+  binding.drop(sid)
+})
+
 test('PROMPT_006_parented_send_overrides_model_but_rejects_agent_drift_before_host', async () => {
   const child = sessionId('ses_binding_child')
   const sends = []

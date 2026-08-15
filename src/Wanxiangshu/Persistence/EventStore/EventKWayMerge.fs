@@ -2,8 +2,6 @@ namespace Wanxiangshu.Persistence.EventStore
 
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
-
-open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -98,23 +96,6 @@ module EventKWayMerge =
         | Some parent -> Error(StorageInvalid.MissingParent parent)
         | None -> Error(StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier")
 
-    let private advance
-        (remaining: Map<string, EventEnvelope list>)
-        (seen: Map<string, EventEnvelope>)
-        (acc: EventEnvelope list)
-        (writerId: string)
-        (head: EventEnvelope)
-        =
-        result {
-            let! duplicate = collisionOrDuplicate seen head
-            let nextQueues = Map.add writerId (List.tail remaining.[writerId]) remaining
-
-            if duplicate then
-                return nextQueues, seen, acc
-            else
-                return nextQueues, Map.add (eventKey head.EventId) head seen, head :: acc
-        }
-
     let private nonEmptyQueues (remaining: Map<string, EventEnvelope list>) =
         remaining
         |> Map.toList
@@ -124,24 +105,16 @@ module EventKWayMerge =
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
     let merge (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
-        let queues = streams |> Map.ofList
+        // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with total history length.
+        let mutable remaining = streams |> Map.ofList
+        let mutable seen: Map<string, EventEnvelope> = Map.empty
+        let mutable acc: EventEnvelope list = []
+        let mutable outcome: Result<EventEnvelope list, StorageInvalid> option = None
 
-        let rec loop
-            (remaining: Map<string, EventEnvelope list>)
-            (seen: Map<string, EventEnvelope>)
-            (acc: EventEnvelope list)
-            =
+        while outcome.IsNone do
             match nonEmptyQueues remaining with
-            | [] -> Ok(List.rev acc)
-            | nonEmpty -> stepReady remaining seen acc nonEmpty
-
-        and stepReady
-            (remaining: Map<string, EventEnvelope list>)
-            (seen: Map<string, EventEnvelope>)
-            (acc: EventEnvelope list)
-            (nonEmpty: (string * EventEnvelope list) list)
-            =
-            result {
+            | [] -> outcome <- Some(Ok(List.rev acc))
+            | nonEmpty ->
                 let ready =
                     nonEmpty
                     |> List.choose (fun (writerId, events) -> readyHead seen writerId events)
@@ -149,9 +122,14 @@ module EventKWayMerge =
 
                 match ready with
                 | (writerId, head) :: _ ->
-                    let! nextQueues, nextSeen, nextAcc = advance remaining seen acc writerId head
-                    return! loop nextQueues nextSeen nextAcc
-                | [] -> return! frontierError seen remaining nonEmpty
-            }
+                    match collisionOrDuplicate seen head with
+                    | Error invalid -> outcome <- Some(Error invalid)
+                    | Ok duplicate ->
+                        remaining <- Map.add writerId (List.tail remaining.[writerId]) remaining
 
-        loop queues Map.empty []
+                        if not duplicate then
+                            seen <- Map.add (eventKey head.EventId) head seen
+                            acc <- head :: acc
+                | [] -> outcome <- Some(frontierError seen remaining nonEmpty)
+
+        outcome.Value

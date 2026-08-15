@@ -15,9 +15,20 @@ module SessionExecutionBinding =
     let private parents = Dictionary<string, string>()
     let private agents = Dictionary<string, string>()
     let private internalBindings = Dictionary<string, ExpectedBinding list>()
+    // DSL-MUTABLE: resource — accepted plugin prompt execution identity awaiting
+    // the provider transform that answers that exact PromptKey. Process-local only;
+    // restart intentionally forgets it and therefore cannot resume old sends.
+    let private acceptedPromptBindings = Dictionary<string, ExpectedBinding>()
+    // DSL-MUTABLE: resource — binding frozen for the provider attempt currently
+    // being built by experimental.chat.messages.transform. Replaced at every
+    // provider-attempt boundary; never session authority.
+    let private providerAttemptBindings = Dictionary<string, ExpectedBinding>()
 
     let private nonEmpty (value: string) =
         if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+
+    let private promptBindingKey (sessionId: SessionId) (promptKey: PromptKey) =
+        SessionId.value sessionId + "\u001f" + PromptKey.value promptKey
 
     let private rememberParent (childKey: string) (parentKey: string) =
         match parents.TryGetValue childKey with
@@ -120,12 +131,59 @@ module SessionExecutionBinding =
             | true, _ -> internalBindings.Remove key |> ignore
             | false, _ -> ())
 
+    /// PROMPT-006: chat.message has physically accepted one plugin-owned prompt.
+    /// The caller supplies EffectiveAgent from the still-pending PromptClaim, not
+    /// from the Host message. This survives SendPrompt returning, but is addressed
+    /// by PromptKey and therefore cannot bless an unrelated later request.
+    let acceptPromptExecution
+        (sessionId: SessionId)
+        (promptKey: PromptKey)
+        (effectiveAgent: string)
+        (model: OpencodeModel)
+        : unit =
+        match nonEmpty effectiveAgent with
+        | None -> invalidOp "PROMPT-006: accepted plugin prompt has no EffectiveAgent"
+        | Some agent ->
+            lock gate (fun () ->
+                acceptedPromptBindings.[promptBindingKey sessionId promptKey] <- { Agent = agent; Model = model })
+
+    /// Provider-attempt boundary. A plugin-owned user message must consume the
+    /// execution binding registered for its exact PromptKey. External user roots
+    /// have no PromptKey and intentionally fall back to the session base binding.
+    let beginProviderAttempt (sessionId: SessionId) (promptKey: PromptKey option) : Result<unit, string> =
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+            providerAttemptBindings.Remove sessionKey |> ignore
+
+            match promptKey with
+            | None -> Ok()
+            | Some key ->
+                let bindingKey = promptBindingKey sessionId key
+
+                match acceptedPromptBindings.TryGetValue bindingKey with
+                | true, expected ->
+                    acceptedPromptBindings.Remove bindingKey |> ignore
+                    providerAttemptBindings.[sessionKey] <- expected
+                    Ok()
+                | false, _ ->
+                    Error(
+                        sprintf
+                            "PROMPT-006: provider attempt for PromptKey %s has no accepted execution binding"
+                            (PromptKey.value key)
+                    ))
+
     let drop (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
             parents.Remove key |> ignore
             agents.Remove key |> ignore
-            internalBindings.Remove key |> ignore)
+            internalBindings.Remove key |> ignore
+            providerAttemptBindings.Remove key |> ignore
+
+            acceptedPromptBindings.Keys
+            |> Seq.filter (fun bindingKey -> bindingKey.StartsWith(key + "\u001f", StringComparison.Ordinal))
+            |> Seq.toArray
+            |> Array.iter (fun bindingKey -> acceptedPromptBindings.Remove bindingKey |> ignore))
 
         ModelRouting.releaseSession sessionId
 
