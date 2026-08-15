@@ -88,7 +88,10 @@ test('long-stroke.toml declares theoretical exact event ceilings', () => {
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
   // REVIEW-013/017 cutover: reviewer judge bind now appends ProviderInputSealed
   // and each reviewer turn closes with ReviewAttemptClosed — legitimate topology
-  // change, re-measured at 761 envelopes; pinned at 768 (+7, pre-cutover headroom).
-  assert.equal(result.scenario.setup.maxJournalEvents, 768);
-  assert.equal(result.scenario.setup.maxSseEvents, 3650);
+  // change, re-measured at 751-777 durable envelopes and 3527-3651 SSE frames
+  // (post-cutover Host nondeterminism is wider on both); journal pinned at 785
+  // and SSE at 3750, above the highest observed but an order of magnitude below
+  // any runaway storm.
+  assert.equal(result.scenario.setup.maxJournalEvents, 785);
+  assert.equal(result.scenario.setup.maxSseEvents, 3750);
 });

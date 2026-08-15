@@ -283,6 +283,13 @@ module DedicatedTodoReviewerRuntime =
             | Ok _ -> return Ok()
         }
 
+    /// Assignment + delivery for one unresolved checkpoint (HOST-021).
+    ///
+    /// Everything happens in one direct CE: the barrier opens once per
+    /// assignment; the assignment is appended durable BEFORE the physical send,
+    /// freezing the pre-dispatch reviewer frontier; resend admission comes from
+    /// PromptAuthority's durable dispatch evidence, never an XTrace head
+    /// watermark (REVIEW-018).
     let private ensureAssignedAndDeliver
         (sessions: ISessionHostPort)
         (snapshot: ISessionSnapshotPort option)
@@ -320,9 +327,11 @@ module DedicatedTodoReviewerRuntime =
             match barrierResult with
             | Error reason -> return Error reason
             | Ok() ->
-                let! oldItemsResult = readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
+                let! oldItemsResult =
+                    readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
 
-                let! proposedResult = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+                let! proposedResult =
+                    readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
 
                 match oldItemsResult, proposedResult with
                 | Error reason, _
@@ -334,7 +343,11 @@ module DedicatedTodoReviewerRuntime =
                         let! opening = openingRaw journal managerLife
 
                         let! checkpointLwr =
-                            managerCheckpointLwr journal managerSessionId managerLife checkpoint.ReviewFrontier
+                            managerCheckpointLwr
+                                journal
+                                managerSessionId
+                                managerLife
+                                checkpoint.ReviewFrontier
 
                         let request: ProcessReviewRequest =
                             { TodoReviewId = reviewId
@@ -388,7 +401,9 @@ module DedicatedTodoReviewerRuntime =
                             with
                             | PromptAuthorityLedger.DispatchStatus.Accepted _
                             | PromptAuthorityLedger.DispatchStatus.Pending ->
-                                match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
+                                match!
+                                    TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                                with
                                 | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
                                 | _ -> return Ok()
                             | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
@@ -442,7 +457,9 @@ module DedicatedTodoReviewerRuntime =
                                 match sent with
                                 | Error reason -> return Error reason
                                 | Ok() ->
-                                    match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
+                                    match!
+                                        TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                                    with
                                     | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
                                     | _ -> return Ok()
         }
@@ -575,13 +592,6 @@ module DedicatedTodoReviewerRuntime =
                                         runtime
         }
 
-    /// Assignment + delivery for one unresolved checkpoint (HOST-021).
-    ///
-    /// Everything happens in one direct CE: the barrier opens once per
-    /// assignment; the assignment is appended durable BEFORE the physical send,
-    /// freezing the pre-dispatch reviewer frontier; resend admission comes from
-    /// PromptAuthority's durable dispatch evidence, never an XTrace head
-    /// watermark (REVIEW-018).
     let awaitConsumableReview
         (timerPort: ITimerPort)
         (sessions: ISessionHostPort)
