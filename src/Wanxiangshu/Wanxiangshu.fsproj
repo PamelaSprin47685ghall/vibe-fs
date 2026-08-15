@@ -17,6 +17,7 @@
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
+    <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
     <Compile Include="Foundation/FsToolkitFableCompat.fs"/>

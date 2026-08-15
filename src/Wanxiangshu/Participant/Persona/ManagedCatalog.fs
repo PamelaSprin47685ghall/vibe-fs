@@ -35,32 +35,9 @@ open Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 module ManagedAgentCatalog =
 
-    let roleLabel (role: Role) : string =
-        match role with
-        | Role.Manager -> "manager"
-        | Role.Orchestrator -> "orchestrator"
-        | Role.Coder -> "coder"
-        | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
-        | Role.Browser -> "browser"
-        | Role.Inquiry -> "inquiry"
-        | Role.Reviewer -> "reviewer"
-        | Role.Distiller -> "distiller"
-        | Role.Blogger -> "blogger"
+    let roleLabel (role: Role) : string = Roles.roleLabel role
 
-    let tryParseRole (value: string) : Role option =
-        match value.ToLowerInvariant() with
-        | "manager" -> Some Role.Manager
-        | "orchestrator" -> Some Role.Orchestrator
-        | "coder" -> Some Role.Coder
-        | "inspector" -> Some Role.Inspector
-        | "devops" -> Some Role.DevOps
-        | "browser" -> Some Role.Browser
-        | "inquiry" -> Some Role.Inquiry
-        | "reviewer" -> Some Role.Reviewer
-        | "distiller" -> Some Role.Distiller
-        | "blogger" -> Some Role.Blogger
-        | _ -> None
+    let tryParseRole (value: string) : Role option = Roles.tryParseRole value
 
     /// Journal / durable capitalised form (Fast / Deep).
     let tierLabel (tier: AgentTier) : string =

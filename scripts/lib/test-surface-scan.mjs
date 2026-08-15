@@ -49,6 +49,7 @@ export const SURFACE_MODULES = [
   'Context/Companion/Blogger/TomlSurface.js',
   'Execution/Delegation/DelegatedToolEstimateSurface.js',
   'Execution/Delegation/Fork/Surface.js',
+  'Foundation/RolesSurface.js',
   'Foundation/SyntheticTomlSurface.js',
   'Host/Contract/ToolResultBound.js',
   'OpenCode/Host/QuiescenceSurface.js',

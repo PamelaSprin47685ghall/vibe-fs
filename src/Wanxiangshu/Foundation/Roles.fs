@@ -119,6 +119,34 @@ module Roles =
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         permissions role |> Set.contains permission
 
+    /// Canonical wire label for a role (lowercase, AGENT-001 vocabulary).
+    let roleLabel (role: Role) : string =
+        match role with
+        | Role.Manager -> "manager"
+        | Role.Orchestrator -> "orchestrator"
+        | Role.Coder -> "coder"
+        | Role.Inspector -> "inspector"
+        | Role.DevOps -> "devops"
+        | Role.Browser -> "browser"
+        | Role.Inquiry -> "inquiry"
+        | Role.Reviewer -> "reviewer"
+        | Role.Distiller -> "distiller"
+        | Role.Blogger -> "blogger"
+
+    let tryParseRole (value: string) : Role option =
+        match value.ToLowerInvariant() with
+        | "manager" -> Some Role.Manager
+        | "orchestrator" -> Some Role.Orchestrator
+        | "coder" -> Some Role.Coder
+        | "inspector" -> Some Role.Inspector
+        | "devops" -> Some Role.DevOps
+        | "browser" -> Some Role.Browser
+        | "inquiry" -> Some Role.Inquiry
+        | "reviewer" -> Some Role.Reviewer
+        | "distiller" -> Some Role.Distiller
+        | "blogger" -> Some Role.Blogger
+        | _ -> None
+
 /// Permissions catalog keyed by Role. Role Law / system prompt SSOT =
 /// PromptCatalog via PromptResources — not this module. No Companion flag;
 /// COMPANION-001 is answered from durable Session kind (HOST-008).
