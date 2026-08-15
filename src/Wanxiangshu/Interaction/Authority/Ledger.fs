@@ -105,6 +105,16 @@ module PromptAuthorityLedger =
 
             PromptAuthorityRun.registerAuthority profile projection
 
+    /// The named Logical Run reached a durable terminal boundary.
+    let foldAuthorityLogicalRunClosed
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        (fact:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId |})
+        =
+        PromptAuthorityRun.closeAuthority fact.LogicalRunId fact.AuthorityRootUserMessageId projection
+
     /// PROMPT-005 `Claimed`.
     let foldPromptClaimed
         (runtimeStartCount: int)

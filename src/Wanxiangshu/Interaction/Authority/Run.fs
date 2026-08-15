@@ -144,6 +144,36 @@ module PromptAuthorityRun =
             // with session lifetime.
             ClaimSequences = Map.empty }
 
+    /// Close exactly the active Logical Run named by durable terminal evidence.
+    /// Run-scoped continuation resources are discarded; LastAuthorityProfile is
+    /// intentionally retained as history but may never substitute for ActiveLogicalRun.
+    let closeAuthority
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.PromptAuthorityProjection, string> =
+        let sameRun (profile: PromptAuthority.AuthorityExecutionProfile) =
+            profile.LogicalRunId = logicalRunId
+            && profile.AuthorityRootUserMessageId = authorityRoot
+
+        match projection.ActiveLogicalRun with
+        | Some active when sameRun active ->
+            Ok
+                { projection with
+                    ActiveLogicalRun = None
+                    PendingClaims = Map.empty
+                    AcceptedContinuationIds = Map.empty
+                    ClaimSequences = Map.empty }
+        | None when projection.LastAuthorityProfile |> Option.exists sameRun -> Ok projection
+        | Some active ->
+            Error(
+                sprintf
+                    "logical-run close mismatch: active=%s requested=%s"
+                    (LogicalRunId.value active.LogicalRunId)
+                    (LogicalRunId.value logicalRunId)
+            )
+        | None -> Error(sprintf "logical-run close has no matching authority: %s" (LogicalRunId.value logicalRunId))
+
     /// Register a claim and consume its ClaimSequence.
     ///
     /// PROMPT-011: the sequence must advance whether or not the claim later

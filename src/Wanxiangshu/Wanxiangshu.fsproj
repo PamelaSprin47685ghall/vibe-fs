@@ -146,6 +146,7 @@
     <Compile Include="Context/Companion/Projection.fs"/>
     <Compile Include="Context/Trace/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Projection.fs"/>
+    <Compile Include="Mission/Manager/Life/Admission.fs"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>

@@ -161,66 +161,71 @@ module ManagerLifeWorkflow =
             | Error failure -> return Error(sprintf "WorkActivated append failed: %s" failure)
         }
 
-    /// GLORY-068/069: AgentOwnerRoot Managers have no HumanRoot-created Life.
-    /// On first ending, materialize the migration Life from durable XTrace.
-    /// Idempotent: an existing current Life is returned unchanged.
-    let ensureMigrationLife
+    let private materializeInitialAgentOwnerLife
         (journal: AgentJournal)
         (sessionId: SessionId)
-        : Task<Result<ManagerLifeId option, string>> =
-        task {
-            let snapshot = AgentJournal.snapshot journal
+        (evidence: InitialAgentOwnerMigrationEvidence)
+        : Task<Result<LifeProjection option, string>> =
+        taskResult {
+            let xTrace = InitialAgentOwnerMigrationEvidence.xTrace evidence
+            let opening =
+                match xTrace.Opening with
+                | Some value -> Ok value
+                | None -> Error "AgentOwnerRoot migration requires OpeningMaterial"
 
-            let openLife (xTrace: XTraceProjectionState option) =
-                task {
-                    match xTrace with
-                    | None -> return Ok None
-                    | Some xTrace ->
-                        match xTrace.Opening with
-                        | None -> return Ok None
-                        | Some opening ->
-                            match! journal.WriteBlob opening.AssignmentText with
-                            | Error error -> return Error error
-                            | Ok blob ->
-                                let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
+            let! opening = opening
+            let! blob = journal.WriteBlob opening.AssignmentText
+            let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
-                                match!
-                                    appendLifecycle
-                                        journal
-                                        sessionId
-                                        (ManagerLifecycleFact.LifeOpened
-                                            {| SessionId = sessionId
-                                               LifeId = lifeId
-                                               OpeningUserMessageId =
-                                                PhysicalUserMessageId.create (SessionId.value sessionId)
-                                               OpeningTextRef = blob.BlobRef
-                                               OpeningTextDigest = blob.BlobDigest
-                                               OpeningCursorSequence = 0L |})
-                                with
-                                | Error error -> return Error error
-                                | Ok() ->
-                                    match!
-                                        appendLifecycle
-                                            journal
-                                            sessionId
-                                            (ManagerLifecycleFact.WorkActivated
-                                                {| SessionId = sessionId
-                                                   LifeId = lifeId
-                                                   ActivationPromptKey = PromptKey.create ""
-                                                   ProtectedPrefixEndSequence =
-                                                    XTraceProjection.headSequence xTrace + 1L |})
-                                    with
-                                    | Error error -> return Error error
-                                    | Ok() -> return Ok(Some lifeId)
-                }
+            do!
+                appendLifecycle
+                    journal
+                    sessionId
+                    (ManagerLifecycleFact.LifeOpened
+                        {| SessionId = sessionId
+                           LifeId = lifeId
+                           OpeningUserMessageId = PhysicalUserMessageId.create (SessionId.value sessionId)
+                           OpeningTextRef = blob.BlobRef
+                           OpeningTextDigest = blob.BlobDigest
+                           OpeningCursorSequence = 0L |})
 
-            match AgentProjection.tryFind sessionId snapshot.AgentProjections with
-            | None -> return Ok None
-            | Some session ->
-                match session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife) with
-                | Some life -> return Ok(Some life.LifeId)
-                | None -> return! openLife session.XTrace
+            do!
+                appendLifecycle
+                    journal
+                    sessionId
+                    (ManagerLifecycleFact.WorkActivated
+                        {| SessionId = sessionId
+                           LifeId = lifeId
+                           ActivationPromptKey = PromptKey.create ""
+                           ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
+
+            return
+                AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+                |> Option.bind (fun session -> session.ManagerLife)
+                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
         }
+
+    /// FINALITY-022 admission owner for ending-time Life lookup.
+    /// Existing Life wins; an AgentOwnerRoot may materialize exactly one migration
+    /// Life before any completed-Life history exists; otherwise no Life is admitted.
+    let ensureEndingLife
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        : Task<Result<LifeProjection option, string>> =
+        let snapshot = AgentJournal.snapshot journal
+        let session = AgentProjection.tryFind sessionId snapshot.AgentProjections
+        let lifecycle =
+            session
+            |> Option.bind (fun value -> value.ManagerLife)
+            |> Option.defaultValue ManagerLifecycleProjection.empty
+        let profile = PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+        let xTrace = session |> Option.bind (fun value -> value.XTrace)
+
+        match ManagerLifeAdmission.ending lifecycle profile xTrace with
+        | EndingLifeAdmission.ExistingLife life -> Task.FromResult(Ok(Some life))
+        | EndingLifeAdmission.NoLife -> Task.FromResult(Ok None)
+        | EndingLifeAdmission.InitialAgentOwnerMigration evidence ->
+            materializeInitialAgentOwnerLife journal sessionId evidence
 
     /// GLORY-062 durable half of the second suicide. Physical terminal publish is
     /// deliberately returned to Infrastructure as a capability effect.

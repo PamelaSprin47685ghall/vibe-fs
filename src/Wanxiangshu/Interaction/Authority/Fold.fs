@@ -122,3 +122,18 @@ module PromptFactFold =
                 )
             else
                 Ok withAuthority
+
+        | PromptFactCases.AuthorityLogicalRunClosed payload ->
+            let authority =
+                PromptAuthorityLedger.projectionFor payload.SessionId projection
+                |> Option.defaultValue PromptAuthorityLedger.empty
+
+            match PromptAuthorityLedger.foldAuthorityLogicalRunClosed authority payload with
+            | Error reason -> reject "AuthorityLogicalRunClosed" reason
+            | Ok closed ->
+                Ok(
+                    updateSession
+                        payload.SessionId
+                        (fun session -> { session with PromptAuthority = Some closed })
+                        projection
+                )

@@ -258,34 +258,6 @@ module FinalityTool =
         | FinalityOutcome.Blessed prompt
         | FinalityOutcome.Undecided prompt -> prompt
 
-    let private currentLifeOf (journal: AgentJournal) (sid: SessionId) =
-        AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.ManagerLife)
-        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-
-    let private authorityKindOf (journal: AgentJournal) (sid: SessionId) =
-        AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.PromptAuthority)
-        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-        |> Option.map (fun profile -> profile.AuthorityKind)
-
-    let private needsMigrationLife (journal: AgentJournal) (sid: SessionId) =
-        match authorityKindOf journal sid with
-        | Some kind when kind <> PromptAuthority.RootAuthorityKind.HumanRoot -> true
-        | _ -> false
-
-    /// GLORY-039: AgentOwnerRoot Manager (Orchestrator ManagerJob, GLORY-068)
-    /// has no Life; migrate on first ending. HumanRoot without Life keeps planning.
-    let private ensureEffectiveLife (journal: AgentJournal) (sid: SessionId) (life: LifeProjection option) =
-        match life with
-        | Some existing -> Task.FromResult(Some existing)
-        | None when needsMigrationLife journal sid ->
-            task {
-                let! _ = ManagerLifeWorkflow.ensureMigrationLife journal sid
-                return currentLifeOf journal sid
-            }
-        | None -> Task.FromResult None
-
     let private endingPrerequisiteRefusal (scope: ToolRuntimeScope) (context: HostToolContext) (lastWords: string) =
         if String.IsNullOrWhiteSpace lastWords then
             Some(refuse context Path.CallAgainWithLastWords)
@@ -449,18 +421,12 @@ module FinalityTool =
         (lastWords: string)
         =
         task {
-            let snapshot = AgentJournal.snapshot journal
-
-            let lifecycle =
-                AgentProjection.tryFind sid snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ManagerLife)
-                |> Option.defaultValue ManagerLifecycleProjection.empty
-
-            let! effectiveLife = ensureEffectiveLife journal sid lifecycle.CurrentLife
-
-            match effectiveLife with
-            | None -> return refuse context Path.ContinueWorking
-            | Some life -> return! acceptSuicide scope journal context sid sessionId life lastWords snapshot
+            match! ManagerLifeWorkflow.ensureEndingLife journal sid with
+            | Error _ -> return refuse context Path.TryAgainLater
+            | Ok None -> return refuse context Path.ContinueWorking
+            | Ok(Some life) ->
+                let snapshot = AgentJournal.snapshot journal
+                return! acceptSuicide scope journal context sid sessionId life lastWords snapshot
         }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
