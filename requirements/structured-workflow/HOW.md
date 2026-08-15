@@ -100,6 +100,48 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
   `Date.now` / `setTimeout` / `timerTask` 等——**raw-time 禁止语义归
   `time-capability`**，本门只是共享 scanner（MECHANISM 交叉）。
 
+### 3.3.1 `scripts/checks/fsharp-control-pyramid.mjs`（lexical decision ratchet）
+
+STRUCTURED-WORKFLOW-016 的 shape gate。scanner 以 F# offside/缩进结构识别
+`match` / `match!` / `function` / 多行 `if` / `try` / `while` / `for`；同级顺序 decision
+不算 nesting，`if/elif/else` 算同一层。扫描前会屏蔽行注释、可嵌套 block comment、普通
+字符串与 triple-quoted string，避免教程/示例文本制造命中。
+
+当前生产树 bootstrap：301 个文件、2166 个 depth≥2 decision。直接 hard-zero 会把任何
+小改动淹没在历史噪音里，因此 `scripts/check.mjs` 使用
+`fsharp-control-pyramid-baseline.json` 做 **per-file ratchet**：历史计数只冻结，新文件从
+0 开始；任一文件新增一个 nested decision 立即 RED。`--show-all` 显示全部债务；
+`--snapshot` 只打印当前 JSON，不写 baseline；baseline review 只允许数字下降。
+
+失败输出契约：先打印每个命中的 `file:line + depth + chain + source`，随后只打印一次
+`CONTROL_PYRAMID_GUIDE`。教程由测试硬钉最低 512 行 / 9302 字符，禁止以后以“精简”名义
+删掉修复路径。
+
+门禁先修已经落地：
+
+- `FsToolkit.ErrorHandling 5.2.0`：全仓 `result` / `option` 与 List traverse/sequence
+  vocabulary；Sphinx 不再私造 `ResultBuilder`。
+- `Wanxiangshu.Foundation.TaskResultBuilder`：Fable-compatible `Task<Result<_,_>>` CE；
+  `Task<Result<_,_>>` / `Result<_,_>` 直接 bind，普通 `Task<'T>` 显式
+  `TaskResultCE.ofTask`，避免 `Task<'T>` 与 `Task<Result<_,_>>` overload 推断歧义。
+- `WriterStreamSync.readRemote` / `syncWriterStreams` 是 `taskResult` 参考调用点；
+  `importRemote` 是 `result` 参考调用点。
+
+工程师命令：
+
+```text
+node scripts/checks/fsharp-control-pyramid.mjs --explain
+node scripts/checks/fsharp-control-pyramid.mjs --root=src/Wanxiangshu --show-all
+node scripts/checks/fsharp-control-pyramid.mjs --root=src/Wanxiangshu --snapshot
+node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs
+node --test requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs
+node scripts/check.mjs
+```
+
+`--show-all` 是清债视图；正式 CI 只报告相对 baseline 的新增文件/新增计数，避免 2166 个
+历史 todo 每次刷屏。没有 suppression / allowlist；若某命中不是机械 bind，也必须人工
+重审并命名 control-flow boundary。
+
 ### 3.4 高阶 Vocabulary 证明义务（DSL-014）
 
 每个改变 trace 的压缩 Vocabulary 必须有 temporal/behavioral proof。当前义务表：

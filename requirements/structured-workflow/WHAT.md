@@ -341,6 +341,37 @@ durable facts，禁止 Stage/布尔/时间猜）。
 
 ---
 
+## STRUCTURED-WORKFLOW-016：控制决策不得形成 lexical pyramid
+
+**规范陈述**：`match` / `match!` / `function` / 多行 `if` / `try` / `while` / `for`
+等控制 decision 可以存在，但其 branch/body 内不得继续无界长出第二层、第三层 decision
+树。第二层及更深 lexical decision 统一视为 control-pyramid 债务。新代码不得新增；
+历史债务按 **per-file 计数 ratchet** 冻结且只能下降。
+
+**修复优先级**：
+1. `Error/Ok`、`None/Some` 只做原样传播 → `result` / `option` / `taskResult` bind；
+2. 多个独立值共同决定状态 → 一次 tuple match；
+3. prerequisite → 扁平 `if/elif` 或先形成小型真实 `Decision`；
+4. 真正领域 decision → 保留穷尽 match，但内层 decision 必须获得具名
+   `Evidence → Decision` 责任，不能只把 pyramid 搬进 helper；
+5. collection short-circuit → traverse / sequence / fold CE；异常与循环边界同理应缩到
+   单一责任。
+
+**门禁语义**：scanner **故意激进**，允许 false positive；false positive 触发人工边界
+审查，不产生 suppression、文件 allowlist 或“合理嵌套”豁免。baseline 是迁移债务账本，
+不是许可证；任何 baseline 增长都违反本命题。
+
+**边界**：
+- 本命题不要求“零 match”；局部、扁平、一次可看完的领域 pattern match 是首选结构之一。
+- 同级顺序 decision 不构成 pyramid；`if/elif/else` 视作同一 decision level。
+- 门禁识别 lexical shape，不证明自动改写等价；命中后允许人工重切 workflow boundary。
+- `taskResult` / `result` 等具体实现词汇见 HOW.md §3.3.1；规范只要求 plumbing 不重复
+  手写成 nested decision。
+
+**证据**：PROOF.md §1 第 16 行。
+
+---
+
 ## 反向覆盖清单（COVERAGE.md 归属核对）
 
 | 源 Clause | 落点 |

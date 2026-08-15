@@ -19,6 +19,7 @@
 | STRUCTURED-WORKFLOW-013（Decorator 边界：transparent vs semantic） | `tests/semantic-vocabulary.test.mjs`：`SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary` | NEW | `node --test requirements/structured-workflow/tests/semantic-vocabulary.test.mjs` |
 | STRUCTURED-WORKFLOW-014（流程正确性由可观察效果证明） | REUSE `requirements/verification-system/tests/guide-contract.test.mjs`：`VERIFY_008_every_emitted_module_actually_loads`（导出面即契约）；REUSE `tests/unit/temporal/**`（finality-cohort-law / fallback-aabb-confluence / manager-unhappy-exactly-once / join-guard-wakeup / orchestrator-conflict-confluence / until-signal-or-deadline：可观察效果轨迹证明，无解释器节点指针）；REUSE `requirements/structured-workflow/tests/dsl-ownership.test.mjs`：`DSL_OWNERSHIP_threshold_freeze_semantics` | REUSE | `node --test requirements/verification-system/tests/guide-contract.test.mjs` |
 | STRUCTURED-WORKFLOW-015（取消是控制面，不是业务数据） | REUSE `requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs`：`P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal`、`P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export`（effect-accounting 拥有 outcome 代数；本命题钉控制面/数据面分离） | REUSE | `node --test requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs` |
+| STRUCTURED-WORKFLOW-016（控制决策不得形成 lexical pyramid） | `tests/fsharp-control-pyramid.test.mjs`：nested match RED、match→if→try RED、flat/tuple/if-elif GREEN、comment/string lexical shielding、per-file ratchet、production baseline exact、单次 repair manual + 教程篇幅下限；`tests/error-handling-vocabulary.test.mjs`：FsToolkit Result vocabulary、Fable-compatible TaskResult CE、WriterStreamSync 代表性糖化 | NEW | `node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs` |
 
 ## 2. 本包拥有的测试文件（全部单跑绿）
 
@@ -30,6 +31,8 @@
 | `tests/workflow-surface.test.mjs` | NEW | 已跑绿（3 pass） |
 | `tests/recovery-reentry.test.mjs` | NEW | 已跑绿（2 pass） |
 | `tests/semantic-vocabulary.test.mjs` | NEW | 已跑绿（3 pass） |
+| `tests/fsharp-control-pyramid.test.mjs` | NEW | 已跑绿（11 pass；production baseline=2166） |
+| `tests/error-handling-vocabulary.test.mjs` | NEW | 已跑绿（3 pass；Fable build 同步通过） |
 
 ## 3. 单跑命令
 
@@ -40,6 +43,8 @@ node --test requirements/structured-workflow/tests/reconcile-program.test.mjs
 node --test requirements/structured-workflow/tests/workflow-surface.test.mjs
 node --test requirements/structured-workflow/tests/recovery-reentry.test.mjs
 node --test requirements/structured-workflow/tests/semantic-vocabulary.test.mjs
+node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs
+node --test requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs
 ```
 
 ## 4. REUSE 落点（留在原处，SPLIT@cutover）

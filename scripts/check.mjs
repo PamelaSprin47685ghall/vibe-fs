@@ -12,6 +12,7 @@ const checks = [
   join(root, 'checks/architecture.mjs'),
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/dsl-ownership-ratchet.mjs'),
+  join(root, 'checks/fsharp-control-pyramid.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
@@ -39,6 +40,13 @@ for (const script of checks) {
   if (script.endsWith('dsl-ownership-ratchet.mjs')) {
     args.push(
       `--baseline=${join(root, 'checks/dsl-ownership-ratchet-baseline.json')}`,
+      '--root=src/Wanxiangshu',
+    )
+  }
+  // STRUCTURED-WORKFLOW-016: nested lexical decisions are frozen per file; new debt fails.
+  if (script.endsWith('fsharp-control-pyramid.mjs')) {
+    args.push(
+      `--baseline=${join(root, 'checks/fsharp-control-pyramid-baseline.json')}`,
       '--root=src/Wanxiangshu',
     )
   }

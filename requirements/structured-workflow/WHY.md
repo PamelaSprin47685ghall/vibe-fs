@@ -84,6 +84,27 @@ single-flight registry（`IParkedTransformHost.HasFlight` / `bloggerFlights`）�
 回答「调用者在等待什么语义」，压缩变成黑箱，审查失去锚点。对策 = DSL-013/014/015：
 任何聪明都必须有名字；任何名字都必须有 law。
 
+### 2.6 缩进也会变成隐形程序栈
+
+即使没有 `Stage`、mutable PC 或 AST，业务流程仍可能退化成 lexical tree：
+
+```text
+match A
+  success -> match B
+    success -> if C
+      true -> match D
+```
+
+这种代码没有第二个**数据结构运行时**，却把主要因果顺序藏进缩进深度。读者必须同时
+记住多层 branch context 才能知道当前操作为什么执行。最常见来源不是复杂业务，而是
+重复手写 `Result` / `Option` / `Task<Result<_,_>>` 的 short-circuit plumbing；另一类是
+把多个本可独立命名的领域 decision 塞进同一函数。
+
+因此 STRUCTURED-WORKFLOW-016 把第二层及更深 lexical decision 视为债务：机械形状门
+负责叫停，人工审查负责判断该用 bind、tuple match、guard、traverse 还是重切
+`Evidence → Decision` 边界。门禁故意允许 false positive，因为一次人工边界审查比永久
+容忍控制树更便宜。
+
 ## 3. 备选与被拒（考古）
 
 | 备选 | 被拒理由 | 来源 |
@@ -107,6 +128,7 @@ single-flight registry（`IParkedTransformHost.HasFlight` / `bloggerFlights`）�
 3. 依赖可变 stage / bool 乘积才知道下一步做什么；
 4. 恢复恢复执行位置而不是重入普通流程；
 5. Semantic Vocabulary 名字不声明完整业务承诺，或被压缩的时序没有 proof；
-6. 可变存储承载跨调用业务流程位置而不是物理资源。
+6. 可变存储承载跨调用业务流程位置而不是物理资源；
+7. branch/body 内继续长出第二层及更深 lexical decision，且新增债务超过 per-file baseline。
 
 每条对应 WHAT.md 的命题；可执行证据见 PROOF.md。
