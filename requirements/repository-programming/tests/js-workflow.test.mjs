@@ -218,7 +218,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
     const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
-    return { paths: ['a.txt'], truncated: false }
+    return { paths: ['a.txt'] }
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
@@ -226,7 +226,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
     const toml = render(outcome)
     const doc = parseToml(toml)
     assert.deepEqual(doc.data.paths, ['a.txt'])
-    assert.equal(doc.data.truncated, false)
+    assert.equal('truncated' in doc.data, false)
     assert.equal(doc.fs, undefined)
     assert.equal(toml.includes('[fs]'), false)
   } finally {

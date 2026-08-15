@@ -74,11 +74,11 @@ module CasebookReplay =
         | Observation.FileRead(path, _) ->
             readHash root path |> Option.map (fun hash -> Observation.FileRead(path, hash))
         | Observation.GlobResult(pattern, _) ->
-            match JsGlobFs.glob root pattern 256 with
+            match JsGlobFs.glob root pattern with
             | Ok listing -> Some(Observation.GlobResult(pattern, listing.Paths))
             | Error _ -> None
         | Observation.GrepResult(pattern, _) ->
-            match JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*" 256 with
+            match JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*" with
             | Ok listing ->
                 let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
 

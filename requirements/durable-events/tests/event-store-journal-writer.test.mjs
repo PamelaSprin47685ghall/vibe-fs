@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { agentFact, blobDigest, blobRef, caseOf, fact, idValue, payloadOf, providerRun, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
+import { agentFact, blobDigest, blobRef, caseOf, idValue, managerLifecycle, managerLifeId, payloadOf, physicalUser, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
 const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
@@ -75,22 +75,16 @@ test('appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async (
     const receipt = mustOk(await writer.BlobWriter.Write('part-body\n'))
     const handle = idValue.blobRef(receipt.BlobRef).slice('blobs/'.length)
 
-    const factValue = fact('XTracePartAppended', {
+    const factValue = managerLifecycle('LifeOpened', {
       SessionId: sessionId('ses_closure'),
-      CursorSequence: 1n,
-      Role: 'user',
-      Turn: 0,
-      PartIndex: 0,
-      Kind: 'text',
-      ToolName: undefined,
-      TextRef: receipt.BlobRef,
-      TextDigest: receipt.BlobDigest,
-      Provenance: 'turn:0/part:0',
-      ProviderRun: providerRun('msg_1'),
+      LifeId: managerLifeId('life_closure'),
+      OpeningUserMessageId: physicalUser('msg_1'),
+      OpeningTextRef: receipt.BlobRef,
+      OpeningTextDigest: receipt.BlobDigest,
+      OpeningCursorSequence: 1n,
     })
-    const appended = await AgentJournal.AgentJournalModule_appendAgent(
+    const appended = await AgentJournal.AgentJournalModule_appendManagerLifecycle(
       stream.session(sessionId('ses_closure')),
-      undefined,
       factValue,
       journal,
     )
@@ -111,20 +105,16 @@ test('closure_fails_closed_when_a_real_content_address_is_missing', async () => 
     const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
     const missingDigest = 'f'.repeat(64)
 
-    const factValue = fact('XTracePartAppended', {
+    const factValue = managerLifecycle('LifeOpened', {
       SessionId: sessionId('ses_missing'),
-      CursorSequence: 1n,
-      Role: 'user',
-      Turn: 0,
-      PartIndex: 0,
-      Kind: 'text',
-      TextRef: blobRef(`blobs/${missingDigest}`),
-      TextDigest: blobDigest(missingDigest),
-      Provenance: 'turn:0/part:0',
+      LifeId: managerLifeId('life_missing'),
+      OpeningUserMessageId: physicalUser('msg_missing'),
+      OpeningTextRef: blobRef(`blobs/${missingDigest}`),
+      OpeningTextDigest: blobDigest(missingDigest),
+      OpeningCursorSequence: 1n,
     })
-    const result = await AgentJournal.AgentJournalModule_appendAgent(
+    const result = await AgentJournal.AgentJournalModule_appendManagerLifecycle(
       stream.session(sessionId('ses_missing')),
-      undefined,
       factValue,
       journal,
     )

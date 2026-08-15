@@ -76,7 +76,7 @@ test('JS007_bindings_glob_lists_matching_paths', () => {
     const result = api.js.glob('src/*.fs')
     assert.equal(result.ok, true)
     assert.deepEqual(result.paths, ['src/a.fs'])
-    assert.equal(result.truncated, false)
+    assert.equal('truncated' in result, false)
   } finally {
     cleanup()
   }
@@ -92,7 +92,7 @@ test('JS010_bindings_grep_returns_matches', () => {
     assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
     assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])
     assert.deepEqual(result.matches.map((m) => m.line), [1, 1])
-    assert.equal(result.truncated, false)
+    assert.equal('truncated' in result, false)
   } finally {
     cleanup()
   }
