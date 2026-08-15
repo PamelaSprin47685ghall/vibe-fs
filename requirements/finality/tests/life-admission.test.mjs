@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ofArray as listOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import { Role } from '../../../dist/Foundation/Roles.js'
 import { RootAuthorityKind } from '../../../dist/Interaction/Authority/Model.js'
 import {
@@ -11,6 +10,7 @@ import {
   PhysicalUserMessageIdModule_create as physicalUser,
   PhysicalUserMessageIdModule_promoteToAuthorityRoot as promoteRoot,
 } from '../../../dist/Foundation/Identity.js'
+import { toList } from '../../verification-system/tests/support/domain/interop.mjs'
 
 const profile = (kind, root = 'root-1') => ({
   CanonicalRole: Role.Manager,
@@ -20,7 +20,7 @@ const profile = (kind, root = 'root-1') => ({
 
 const lifecycle = ({ current, completed = [] } = {}) => ({
   CurrentLife: current,
-  CompletedLives: listOfArray(completed),
+  CompletedLives: toList(completed),
 })
 
 test('FINALITY_022_AgentOwner_migration_is_admitted_only_before_any_Life_history', () => {

@@ -234,6 +234,7 @@
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Change/Types.fs"/>
     <Compile Include="Resources/PackageResources.fs"/>
+    <Compile Include="Resources/ModelRoutingResource.fs"/>
     <Compile Include="Resources/ProviderResources.fs"/>
     <Compile Include="Resources/ProviderProse.fs"/>
     <Compile Include="Resources/PromptResources.fs"/>

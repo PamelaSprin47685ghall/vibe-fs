@@ -347,5 +347,9 @@ module internal SyncDelegateWorkflow =
             | SyncDelegateAdmission.Waiting -> ()
             | SyncDelegateAdmission.Ready invocations -> do! runReadyBatch store deps ownerScope role invocations
 
-            return! completion.Task
+            return!
+                CausalAwait.awaitTask
+                    CausalWaitHub.observer
+                    (deps.DescribeWait(InvocationJoin(owner, role)))
+                    completion.Task
         }

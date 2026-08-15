@@ -6,7 +6,9 @@ open Wanxiangshu.Execution.Session.Wait
 
 /// EXEC-026 / EXEC-031: wait descriptors for SyncDelegate CE
 /// (Acquire → GetOrCreate → Send → await ordinary Completion / WorkRecord).
-type SyncDelegateWait = DelegateCompletion of owner: SessionId * delegateSession: SessionId * role: SyncDelegateRole
+type SyncDelegateWait =
+    | DelegateCompletion of owner: SessionId * delegateSession: SessionId * role: SyncDelegateRole
+    | InvocationJoin of owner: SessionId * role: SyncDelegateRole
 
 module SyncDelegateWait =
 
@@ -36,3 +38,11 @@ module SyncDelegateWait =
                 (delegateProducer delegateSession)
                 [ cancelEscape owner; WaitEscape.SessionLifetime ]
                 "SyncDelegateRuntime.Invoke"
+        | InvocationJoin(owner, role) ->
+            DiagnosticWait.create
+                "sync-delegate-invocation"
+                (toolOwner owner)
+                [ "owner", SessionId.value owner; "role", roleLabel role ]
+                (WorkflowProducer(CausalOwner.create "sync-delegate-invoke" [ "session", SessionId.value owner ]))
+                [ cancelEscape owner; WaitEscape.SessionLifetime ]
+                "SyncDelegateWorkflow.invoke"
