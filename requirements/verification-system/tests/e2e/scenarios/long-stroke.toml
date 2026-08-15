@@ -64,14 +64,18 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
 #   maxJournalEvents — EventStore envelope ceiling for the complete 66-step legal stroke. With the
 #                      three-call Inspector batch regression in G2, full strict traversals observed
-#                      730–733 durable envelopes; 740 is the pinned legal upper bound.
+#                      730–733 durable envelopes; 740 was the pinned legal upper bound. The
+#                      REVIEW-013/017 cutover appends ProviderInputSealed on every judge bind and
+#                      ReviewAttemptClosed on every reviewer turn (a legitimate topology change), so
+#                      the complete stroke was re-measured at 761 durable envelopes; 768 is the
+#                      pinned upper bound (+7, the same headroom as the pre-cutover pin).
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversal. Full strict
 #                      traversals observed 3553–3614 frames because Host may legally emit duplicate
 #                      update/status frames; 3650 keeps a narrow (<1.1% over observed max) allowance.
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-batch-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 740, maxSseEvents = 3650, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-batch-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 768, maxSseEvents = 3650, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -182,7 +186,7 @@ flow = [
   { wait = "manager-idle.3" },
   { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
   { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
-  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
+  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
   { wait = "manager-idle.4", timeoutMs = 30000 },
   { wait = "manager-idle.5", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },

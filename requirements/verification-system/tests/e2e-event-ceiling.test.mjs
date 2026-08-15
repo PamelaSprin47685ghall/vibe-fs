@@ -86,6 +86,9 @@ test('long-stroke.toml declares theoretical exact event ceilings', () => {
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  assert.equal(result.scenario.setup.maxJournalEvents, 740);
+  // REVIEW-013/017 cutover: reviewer judge bind now appends ProviderInputSealed
+  // and each reviewer turn closes with ReviewAttemptClosed — legitimate topology
+  // change, re-measured at 761 envelopes; pinned at 768 (+7, pre-cutover headroom).
+  assert.equal(result.scenario.setup.maxJournalEvents, 768);
   assert.equal(result.scenario.setup.maxSseEvents, 3650);
 });

@@ -234,3 +234,35 @@ module PromptAuthorityLedger =
         =
         projectionFor sessionId agentProjections
         |> Option.bind (fun authority -> Map.tryFind physicalMessageId authority.AcceptedContinuationIds)
+
+    /// The durable outcome of one logical dispatch, for resend admission.
+    ///
+    /// REVIEW-013/018 (process-review assignment reentry): `Accepted` means the
+    /// payload physically landed and must not be sent again; `Pending` means a
+    /// claim exists whose outcome is undetermined — recovery owns it, never a
+    /// blind resend; `Dispatchable` means no logical dispatch (or an explicitly
+    /// Abandoned one), so a new claim is allowed. Read from projection evidence;
+    /// the caller never scans the Journal.
+    [<RequireQualifiedAccess>]
+    type DispatchStatus =
+        | Accepted of evidence: PromptAuthority.AcceptedDispatch
+        | Pending
+        | Dispatchable
+
+    let dispatchStatusFor
+        (sessionId: SessionId)
+        (payloadDigest: string)
+        (agentProjections: AgentProjectionSet)
+        : DispatchStatus =
+        let key = PromptAuthority.acceptedDispatchKey sessionId payloadDigest
+
+        match projectionFor sessionId agentProjections with
+        | Some authority when Map.containsKey key authority.AcceptedDispatches ->
+            DispatchStatus.Accepted(Map.find key authority.AcceptedDispatches)
+        | Some authority when
+            authority.PendingClaims
+            |> Seq.exists (fun (KeyValue(_, claim)) ->
+                claim.SessionId = sessionId && claim.PayloadDigest = payloadDigest)
+            ->
+            DispatchStatus.Pending
+        | _ -> DispatchStatus.Dispatchable

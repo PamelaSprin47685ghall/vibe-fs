@@ -10,7 +10,7 @@
 - **challenge**：第一次 PERFECT 作为工具结果发出的 skeptical 句（`resources/provider/review/challenge/`），其 `contentDigest` 必须出现在第二次输入 seal 中才构成因果消费。
 - **ProviderInputSeal**：`messages.transform` 时刻对 canonical provider input 的摘要，绑定到即将消费它的 ProviderRunIdentity（HOST-010）。
 - **witness**：`ReviewWitness` 代数状态（NoReview / RevisionWitness / PerfectPending / Confirmed）；confirmed 只能从证据派生，不是存储标志。
-- **ConsumableReview**：`TodoReviewConcluded(k)` —— VerdictKnown ∧ 同 snapshot 的 canonical ProcessReviewLWR record-ready ∧ 已 append Concluded；下一 TodoWrite / suicide drain 才能消费。
+- **ConsumableReview**：`TodoReviewConcluded(k)` —— VerdictKnown ∧ matching `ReviewAttemptClosed`（冻结 record frontier）∧ 同 snapshot 的 canonical ProcessReviewLWR record-ready ∧ 已 append Concluded；下一 TodoWrite / suicide drain 才能消费。
 - **record-ready**：同一 Journal snapshot 下，以全量 origin coverage 物化含 `Chronicle`（及必要 Recent work）的 canonical LWR（request-range bounded，`includeOpening=false`）；frontier 为排他（lastPart+1）。
 
 ---

@@ -110,6 +110,18 @@ module ReviewFactFold =
                 projection
             |> verdictOutcome "ReviewVerdictRecorded" projection
 
+        | ReviewFactCases.ReviewAttemptClosed payload ->
+            let closed =
+                { Attempt =
+                    { ReviewBarrierId = payload.BarrierId
+                      GitTreeHash = payload.GitTreeHash
+                      ReviewerSessionId = payload.ReviewerSessionId
+                      ProviderRun = payload.ProviderRun
+                      ToolCallId = payload.ToolCallId }
+                  FrozenFrontier = { Sequence = payload.FrozenFrontierSequence } }
+
+            Ok(updateReviewGuard payload.ReviewerSessionId (ReviewProjection.applyAttemptClosed closed) projection)
+
         | ReviewFactCases.ConfirmedReviewWitness payload ->
             // The witness lands on the reviewer session, where the rest of the
             // review facts live; the requirement clearance lands on the Manager,

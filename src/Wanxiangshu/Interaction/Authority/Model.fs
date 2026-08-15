@@ -191,11 +191,28 @@ module PromptAuthority =
             ClaimedAtRuntimeStartCount: int
         }
 
+    /// PROMPT-005 typed evidence that one logical dispatch physically landed.
+    ///
+    /// Folded by the single integrator when `PhysicalAccepted` resolves a claim,
+    /// so business layers (process-review assignment reentry) decide resend
+    /// from projection evidence instead of scanning the Journal.
+    type AcceptedDispatch =
+        { PromptKey: PromptKey
+          SessionId: SessionId
+          Origin: PromptOrigin
+          PayloadDigest: string
+          PhysicalUserMessageId: PhysicalUserMessageId }
+
     type PromptAuthorityProjection =
         {
             LastAuthorityProfile: AuthorityExecutionProfile option
             ActiveLogicalRun: AuthorityExecutionProfile option
             PendingClaims: Map<PromptKey, PromptClaim>
+            /// PROMPT-005 accepted dispatch evidence, keyed by
+            /// session + payload digest. `Pending` on a claim means the outcome
+            /// is undetermined; an entry here means the payload physically
+            /// landed. Keyed — never a session scan (PERSIST-008).
+            AcceptedDispatches: Map<string, AcceptedDispatch>
             /// Physical message id -> the continuation kind it was accepted as.
             ///
             /// PROMPT-003 and PROMPT-009 only: this answers "was this message a
@@ -220,8 +237,14 @@ module PromptAuthority =
         { LastAuthorityProfile = None
           ActiveLogicalRun = None
           PendingClaims = Map.empty
+          AcceptedDispatches = Map.empty
           AcceptedContinuationIds = Map.empty
           ClaimSequences = Map.empty }
+
+    /// Key of one logical dispatch's landing evidence: the session plus the
+    /// payload digest both send paths derive identically (`sha256 text`).
+    let acceptedDispatchKey (sessionId: SessionId) (payloadDigest: string) =
+        SessionId.value sessionId + "\x1f" + payloadDigest
 
     let originLabel (origin: PromptOrigin) =
         match origin with

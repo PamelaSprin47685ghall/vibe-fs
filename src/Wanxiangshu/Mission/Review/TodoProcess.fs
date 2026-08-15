@@ -70,24 +70,28 @@ module TodoProcessReviewProgram =
     let private writeBlob (journal: AgentJournal) (body: string) : Task<Result<BlobWriteReceipt, string>> =
         journal.WriteBlob body
 
-    let private reviewerTrace (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
-        AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
-        |> Option.bind (fun session -> session.XTrace)
-        |> Option.defaultValue XTraceProjection.empty
+    /// REVIEW-013/017: the verdict AND its matching closure, bound together so
+    /// tryConclude stays a single flat decision. An attempt whose reconciled
+    /// turn has not closed has no consumable frontier — consuming the session
+    /// head instead would let a finished attempt's late-landing tail widen the
+    /// record.
+    let private verdictClosure
+        (guard: ReviewGuardProjection)
+        : (ProcessReviewVerdict * ReviewAttemptIdentity * ClosedAttempt) option =
+        let verdict =
+            if ReviewWitness.isRevision guard.Witness then
+                ProcessReviewVerdict.Revise
+            else
+                ProcessReviewVerdict.Perfect
 
-    let private processVerdict (guard: ReviewGuardProjection) : (ProcessReviewVerdict * ReviewAttemptIdentity) option =
         ReviewProjection.latestObservedAttempt guard
-        |> Option.map (fun attempt ->
-            let verdict =
-                if ReviewWitness.isRevision guard.Witness then
-                    ProcessReviewVerdict.Revise
-                else
-                    ProcessReviewVerdict.Perfect
+        |> Option.bind (fun attempt ->
+            ReviewProjection.closedAttemptOf attempt guard
+            |> Option.map (fun closure -> verdict, attempt, closure))
 
-            verdict, attempt)
-
-    /// Append TodoReviewConcluded when VerdictKnown ∧ ProcessReviewLWR record-ready
-    /// share this snapshot. Pending is a wait signal, not a provider-visible reject.
+    /// Append TodoReviewConcluded when VerdictKnown ∧ matching ReviewAttemptClosed
+    /// ∧ ProcessReviewLWR record-ready share this snapshot. Pending is a wait
+    /// signal, not a provider-visible reject.
     let tryConclude (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : Task<ConcludeOutcome> =
         task {
             let snapshot = AgentJournal.snapshot journal
@@ -104,11 +108,10 @@ module TodoProcessReviewProgram =
                         AgentProjection.tryFind assignment.ReviewerSessionId snapshot.AgentProjections
                         |> Option.bind (fun session -> session.ReviewGuard)
 
-                    match guard |> Option.bind processVerdict with
-                    | None -> return ConcludeOutcome.Pending "verdict unknown"
-                    | Some(verdict, attempt) ->
-                        let trace = reviewerTrace snapshot assignment.ReviewerSessionId
-                        let endExclusive = { Sequence = XTraceProjection.head trace }
+                    match guard |> Option.bind verdictClosure with
+                    | None -> return ConcludeOutcome.Pending "process verdict not closed"
+                    | Some(verdict, attempt, closure) ->
+                        let endExclusive = closure.FrozenFrontier
 
                         if endExclusive.Sequence <= assignment.ReviewWorkStartCursor.Sequence then
                             return ConcludeOutcome.Pending "process-review LWR range empty"
@@ -181,7 +184,7 @@ module TodoProcessReviewProgram =
                 | None -> ProducerPresence.Absent "reviewer session missing"
                 | Some reviewer ->
                     let verdictKnown =
-                        reviewer.ReviewGuard |> Option.bind processVerdict |> Option.isSome
+                        reviewer.ReviewGuard |> Option.bind verdictClosure |> Option.isSome
 
                     match Map.tryFind assignment.ReviewerSessionId snapshot.AgentProjections.HandleByChildSession with
                     | Some record ->

@@ -117,7 +117,8 @@ module ReviewSeal =
         // one exists, and more than one means the premise no longer holds.
         | many -> Error(AmbiguousRun(List.length many))
 
-    /// REVIEW-010: bind a parked seal to the provider run that will consume it.
+    /// REVIEW-010/013: bind a parked seal — with its frozen attempt scope — to
+    /// the provider run that will consume it.
     ///
     /// This is the ONLY binding point. The previous design also bound at the
     /// reconcile `onTurn` path, but on Host 1.18.10 the reconcile run and the
@@ -127,6 +128,10 @@ module ReviewSeal =
     /// The tool executing under the run is the only party that holds the run id
     /// `provenSeal` will ask for, so binding happens here, immediately before
     /// the verdict submit that consumes it.
+    ///
+    /// REVIEW-013: the returned seal carries the manager/barrier/tree frozen at
+    /// transform time; the judge builds its submission from that scope instead
+    /// of asking the current barrier or current tree.
     ///
     /// The parked candidate is removed by the caller once the submit succeeds.
     /// A stale candidate is harmless: the next transform of the same reviewer
@@ -142,7 +147,7 @@ module ReviewSeal =
         (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        : Task<Result<unit, SealBindFailure>> =
+        : Task<Result<SharedState.PendingSeal, SealBindFailure>> =
         task {
             let key = SessionId.value sessionId
 
@@ -161,7 +166,7 @@ module ReviewSeal =
                 match!
                     AgentJournal.appendAgent (StreamId.Session pending.SessionId) (Some providerRun) fact journal
                 with
-                | Ok _ -> return Ok()
+                | Ok _ -> return Ok pending
                 | Error failure -> return Error(AppendFailed(JournalAppendFailure.describe failure))
         }
 
@@ -209,21 +214,44 @@ module ReviewSeal =
                 | None -> false
             | None -> false
 
+    /// REVIEW-013: the attempt scope frozen at transform time.
+    ///
+    /// The manager/barrier/tree read here is what the request STARTED under.
+    /// A judge that read the current barrier instead could re-identify an old
+    /// attempt under a barrier opened while the previous reviewer turn was
+    /// still finishing. No open barrier means no scope to freeze — nothing is
+    /// parked and the judge fails closed.
+    let private frozenScope (journal: AgentJournal option) (sessionId: SessionId) =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.ReviewGuard)
+        |> Option.bind (fun guard ->
+            match guard.CurrentManagerSessionId, guard.CurrentBarrierId, guard.LastGitTreeHash with
+            | Some managerSessionId, Some barrierId, Some gitTreeHash -> Some(managerSessionId, barrierId, gitTreeHash)
+            | None, _, _
+            | _, None, _
+            | _, _, None -> None)
+
     let private parkSeal
+        (journal: AgentJournal option)
         (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
         (sessionId: SessionId)
         (physicalUserAddress: PhysicalUserMessageId option)
         (transformed: ProviderProjection.ProviderWireProjection)
         : unit =
-        match physicalUserAddress with
-        | None -> ()
-        | Some physical ->
+        match physicalUserAddress, frozenScope journal sessionId with
+        | Some physical, Some(managerSessionId, barrierId, gitTreeHash) ->
             pendingSeals.[SessionId.value sessionId] <-
                 { SessionId = sessionId
+                  ManagerSessionId = managerSessionId
+                  BarrierId = barrierId
+                  GitTreeHash = gitTreeHash
                   PhysicalUserMessageId = physical
                   SealDigest = ProviderProjection.sealDigest HostDigest.sha256Hex transformed
                   CanonicalVersion = ProviderProjection.CanonicalVersion
                   IncludedToolResultDigests = ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed }
+        | _ -> ()
 
     /// which rejection occurred.
     let sealTransform
@@ -258,7 +286,7 @@ module ReviewSeal =
                 // stage bit). First-PERFECT submissions never query a
                 // seal (there is no pending challenge yet), so the deferred
                 // binding is safe for them too.
-                parkSeal pendingSeals sessionId physicalUserAddress transformed
+                parkSeal journal pendingSeals sessionId physicalUserAddress transformed
                 return ()
             else
                 return ()

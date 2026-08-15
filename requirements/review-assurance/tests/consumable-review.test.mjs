@@ -52,6 +52,10 @@ import {
 const { tryConclude, producerPresence, awaitConsumableReview } = await import(
   '../../../dist/Mission/Review/TodoProcess.js'
 )
+const { XTraceProjection_head } = await import('../../../dist/Context/Trace/Projection.js')
+
+const xTraceHeadOf = (snapshot, session) =>
+  BigInt(XTraceProjection_head(fold.sessions(snapshot)[idValue.session(session)].XTrace))
 
 const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('life-consumable')
@@ -344,6 +348,39 @@ test('REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_n
       journal,
     )
 
+    // REVIEW-013/017: the verdict alone must not conclude — the reviewer's
+    // reconciled turn has to close first, freezing the record frontier.
+    const beforeClosure = await tryConclude(journal, life, write)
+    assert.equal(caseOf(beforeClosure), 'Pending', 'verdict without a closed reviewer turn must stay Pending')
+
+    const headAtClosure = xTraceHeadOf(agentJournal.snapshot(journal), reviewerSession)
+
+    await agentJournal.appendAgent(
+      stream.session(reviewerSession),
+      providerRun('reviewer-provider-run'),
+      agentFact('ReviewAttemptClosed', {
+        ReviewerSessionId: reviewerSession,
+        BarrierId: barrier,
+        GitTreeHash: gitTreeHash('tree_projection_verdict'),
+        ProviderRun: providerRun('reviewer-provider-run'),
+        ToolCallId: toolCallId('reviewer-call'),
+        FrozenFrontierSequence: headAtClosure,
+      }),
+      journal,
+    )
+
+    // The finished turn's late-landing XTrace tail: appended AFTER the closure.
+    // It must never widen the frozen frontier (cross-checkpoint pollution).
+    await xTraceCapture.captureProjection(
+      journal,
+      reviewerSession,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'assistant', parts: [xTraceCapture.text('A late tail landing after closure.')] },
+        ],
+      }),
+    )
+
     const before = agentJournal.snapshot(journal)
     const reviewerTrace = fold.sessions(before)[idValue.session(reviewerSession)].XTrace
     assert.equal(
@@ -360,6 +397,13 @@ test('REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_n
     const cp = mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
     assert.equal(cp.Concluded.ProviderRunId.fields[0], providerRun('reviewer-provider-run').fields[0])
     assert.equal(cp.Concluded.ToolCallId.fields[0], toolCallId('reviewer-call').fields[0])
+
+    // The record frontier is the closure's frozen value, not the post-closure head.
+    assert.equal(
+      cp.Concluded.ReviewerRecordFrontier.Sequence,
+      headAtClosure,
+      'the late-landing tail must not leak into the frozen record frontier',
+    )
   } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })
@@ -618,6 +662,18 @@ test('REVIEW_017 durable verdict keeps record-ready producer present after the r
       ProviderRun: providerRun('run-retired-verdict'),
       ToolCallId: toolCallId('judge-retired-verdict'),
       Verdict: verdict.perfect,
+    }))
+    // REVIEW-013/017: the reviewer's turn completed and closed the attempt. The
+    // frozen closure frontier (12) lies beyond any captured XTrace, so the LWR
+    // is intentionally not record-ready and the review keeps waiting — but the
+    // closure proves the review is not lost, so the producer stays Present.
+    await appendAgent(retiredReviewerSession, agentFact('ReviewAttemptClosed', {
+      ReviewerSessionId: retiredReviewerSession,
+      BarrierId: barrier,
+      GitTreeHash: gitTreeHash('tree-retired-verdict'),
+      ProviderRun: providerRun('run-retired-verdict'),
+      ToolCallId: toolCallId('judge-retired-verdict'),
+      FrozenFrontierSequence: 12n,
     }))
     await appendAgent(managerSession, agentFact('HandleCompleted', {
       ParentSessionId: managerSession,

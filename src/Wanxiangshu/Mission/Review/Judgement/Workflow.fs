@@ -47,6 +47,8 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion
@@ -78,8 +80,63 @@ open Wanxiangshu.Host
 /// injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
 
+    /// REVIEW-013/017: the latest verdict attempt this turn carried plus the
+    /// XTrace head at closure time. `None` when the turn produced no verdict.
+    let private closedAttemptEvidence (journal: AgentJournal option) (turn: ReconciledTurn) =
+        journal
+        |> Option.bind (fun durable ->
+            let snapshot = AgentJournal.snapshot durable
+
+            let frontier =
+                AgentProjection.tryFind turn.SessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.XTrace)
+                |> Option.map XTraceProjection.head
+                |> Option.defaultValue 0L
+
+            AgentProjection.tryFind turn.SessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.ReviewGuard)
+            |> Option.bind ReviewProjection.latestObservedAttempt
+            |> Option.map (fun attempt -> attempt, frontier))
+
+    /// One closure append, one flat result match.
+    let private writeAttemptClosed
+        (journal: AgentJournal)
+        (turn: ReconciledTurn)
+        (attempt: ReviewAttemptIdentity)
+        (frontier: int64)
+        : Task =
+        task {
+            let closed =
+                ReviewFact.ReviewAttemptClosed
+                    {| ReviewerSessionId = turn.SessionId
+                       BarrierId = attempt.ReviewBarrierId
+                       GitTreeHash = attempt.GitTreeHash
+                       ProviderRun = attempt.ProviderRun
+                       ToolCallId = attempt.ToolCallId
+                       FrozenFrontierSequence = frontier |}
+
+            // REVIEW-013/017: `ReviewVerdictRecorded` only proves the judge
+            // executed; the attempt closes only once this reconciled turn has
+            // fully completed and its XTrace converged. Append failures leave
+            // it unclosed — the conclusion stays Pending and an idle revisit
+            // re-runs this path, with the fold deduping by attempt identity.
+            let! appended =
+                AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some attempt.ProviderRun) closed journal
+
+            match appended with
+            | Ok _ -> ()
+            | Error _ -> ()
+        }
+
+    /// REVIEW-013/017: append the closure fact at turn completion. Flat by
+    /// construction — each decision is a single top-level match.
+    let private appendAttemptClosed (journal: AgentJournal option) (turn: ReconciledTurn) : Task =
+        match closedAttemptEvidence journal turn with
+        | None -> AsyncSupport.completedTask ()
+        | Some(attempt, frontier) -> writeAttemptClosed (Option.get journal) turn attempt frontier
+
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
-    /// XTrace terminal segment, and report Completed / Failed.
+    /// XTrace terminal segment, close the carried attempt, and report.
     /// `confirmedReviewerEmptyTextFallback` covers the confirmed double-PERFECT
     /// that ends tool-only with empty terminal text.
     let private completeReviewer
@@ -130,9 +187,18 @@ module ReviewerWorkflow =
                     // Idempotent (PERSIST-010).
                     do! XTraceCapture.captureTerminal journal turn
 
+                    // REVIEW-013/017: the turn is over and its XTrace converged;
+                    // freeze the attempt's closure frontier now.
+                    do! appendAttemptClosed journal turn
+
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
                 else
+                    // The turn still ended — an attempt it recorded is closed so
+                    // the conclusion is not left waiting for a terminal text
+                    // that will never come.
+                    do! appendAttemptClosed journal turn
+
                     eventPort.NotifyTerminal
                         turn.SessionId
                         (TerminalOutcome.Failed "completed with empty terminal output")

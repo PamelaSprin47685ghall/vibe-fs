@@ -161,8 +161,11 @@ module PromptAuthorityRun =
 
     /// PROMPT-005 `PhysicalAccepted`: a real Host message id resolved a claim.
     ///
-    /// Only continuations are recorded. An Authority Root claim resolving does
-    /// not belong in a continuation map, and recording the root a continuation
+    /// The landing is kept as typed `AcceptedDispatch` evidence keyed by
+    /// (session, payload digest) — business layers ask `dispatchStatusFor`
+    /// instead of scanning the Journal. Only continuations additionally enter
+    /// `AcceptedContinuationIds`: an Authority Root claim resolving does not
+    /// belong in a continuation map, and recording the root a continuation
     /// belonged to is deliberately gone — that map existed solely to let
     /// ReviewWitness guess confirmation from a shared root, which REVIEW-003
     /// forbids. Review confirmation now requires the provider input seal
@@ -177,21 +180,47 @@ module PromptAuthorityRun =
         | Some claim ->
             let withoutClaim = Map.remove key projection.PendingClaims
 
-            match claim.Origin with
-            | PromptAuthority.PromptOrigin.Continuation continuation ->
+            let landed: PromptAuthority.AcceptedDispatch =
+                { PromptKey = claim.PromptKey
+                  SessionId = claim.SessionId
+                  Origin = claim.Origin
+                  PayloadDigest = claim.PayloadDigest
+                  PhysicalUserMessageId = physicalMessageId }
+
+            let withEvidence =
                 { projection with
                     PendingClaims = withoutClaim
-                    AcceptedContinuationIds = Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
+                    AcceptedDispatches =
+                        Map.add
+                            (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
+                            landed
+                            projection.AcceptedDispatches }
+
+            match claim.Origin with
+            | PromptAuthority.PromptOrigin.Continuation continuation ->
+                { withEvidence with
+                    AcceptedContinuationIds =
+                        Map.add physicalMessageId continuation withEvidence.AcceptedContinuationIds }
             | PromptAuthority.PromptOrigin.AuthorityRoot _
             | PromptAuthority.PromptOrigin.HostInternal
-            | PromptAuthority.PromptOrigin.UnknownOrigin ->
-                { projection with
-                    PendingClaims = withoutClaim }
+            | PromptAuthority.PromptOrigin.UnknownOrigin -> withEvidence
 
     /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
+    ///
+    /// An explicit abandon of a still-pending claim also drops that payload's
+    /// landing evidence slot, so a later reentry may claim the same logical
+    /// dispatch again. An already-accepted claim is not in `PendingClaims`, so
+    /// its evidence survives — abandonment never erases a physical landing.
     let abandonClaim (key: PromptKey) (projection: PromptAuthority.PromptAuthorityProjection) =
-        { projection with
-            PendingClaims = Map.remove key projection.PendingClaims }
+        match Map.tryFind key projection.PendingClaims with
+        | None -> projection
+        | Some claim ->
+            { projection with
+                PendingClaims = Map.remove key projection.PendingClaims
+                AcceptedDispatches =
+                    Map.remove
+                        (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
+                        projection.AcceptedDispatches }
 
     /// PROMPT-009 resolution order, evaluated top to bottom:
     ///

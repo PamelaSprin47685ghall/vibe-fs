@@ -29,20 +29,23 @@ module MagicTodoAfter =
     /// `deferSend` Fork installs a pending run before any Authority Root exists.
     /// A second Fork would take sendToExistingChild's busy-nudge path and fail
     /// closed with "Busy nudge requires ActiveLogicalRun" — that is T1 red text.
+    ///
+    /// Reentry after a claim never re-decides from the XTrace head: whether the
+    /// assignment still needs a physical send is answered by PromptAuthority's
+    /// durable dispatch evidence (Accepted / Pending / Dispatchable), not by a
+    /// head watermark (REVIEW-018).
     [<RequireQualifiedAccess>]
     type AssignmentDelivery =
         /// No Authority Root yet: first prompt is AgentOwnerRoot.
         | OwnerRoot
-        /// T1 assignment already claimed; wait for XTrace head, do not send again.
-        | AwaitHead
         /// Later checkpoint: assignment continues the dedicated session.
         | Continuation
 
-    let assignmentDelivery (hasActiveProfile: bool) (isFirstAcceptedWrite: bool) : AssignmentDelivery =
-        match hasActiveProfile, isFirstAcceptedWrite with
-        | false, _ -> AssignmentDelivery.OwnerRoot
-        | true, true -> AssignmentDelivery.AwaitHead
-        | true, false -> AssignmentDelivery.Continuation
+    let assignmentDelivery (hasActiveProfile: bool) : AssignmentDelivery =
+        if hasActiveProfile then
+            AssignmentDelivery.Continuation
+        else
+            AssignmentDelivery.OwnerRoot
 
     /// ensureReview plan: Assignment payload when obligation pending.
     let planEnsureReview
@@ -61,7 +64,3 @@ module MagicTodoAfter =
           ReviewerSessionId = dedicated.ReviewerSessionId
           ReviewWorkStartCursor = reviewWorkStart
           ManagerReviewFrontier = prepared.ReviewFrontier }
-
-    /// When to append TodoReviewConcluded: VerdictKnown ∧ LWR record-ready same snapshot.
-    let mayAppendConcluded (verdictKnown: bool) (processReviewLwrRecordReady: bool) : bool =
-        verdictKnown && processReviewLwrRecordReady

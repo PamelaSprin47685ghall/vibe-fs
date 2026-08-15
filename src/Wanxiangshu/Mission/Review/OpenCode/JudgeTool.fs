@@ -121,9 +121,6 @@ module JudgeTool =
         let ContextIncomplete = "tool/judge/context-incomplete"
 
         [<Literal>]
-        let ChallengeProofNotRecorded = "tool/judge/challenge-proof-not-recorded"
-
-        [<Literal>]
         let JudgmentCouldNotBeRecorded = "tool/judge/judgment-could-not-be-recorded"
 
     let private lang (ctx: HostToolContext) =
@@ -134,11 +131,6 @@ module JudgeTool =
 
     let private line (ctx: HostToolContext) path =
         ProviderProse.render (lang ctx) path Map.empty
-
-    let private reviewOwner (scope: ToolRuntimeScope) (reviewerId: string) =
-        match scope.SessionParents.TryGetValue reviewerId with
-        | true, parentId -> Some(SessionId.create parentId)
-        | false, _ -> None
 
     let private jobIdentity (scope: ToolRuntimeScope) (managerSessionId: SessionId) =
         match scope.Journal with
@@ -151,14 +143,6 @@ module JudgeTool =
             with
             | None -> None, None
             | Some job -> Some job.ManagerJobId, Some job.WorktreeIdentity
-
-    let private currentBarrier (scope: ToolRuntimeScope) (reviewerId: string) =
-        match scope.Journal with
-        | None -> None
-        | Some journal ->
-            AgentProjection.tryFind (SessionId.create reviewerId) (AgentJournal.snapshot journal).AgentProjections
-            |> Option.bind (fun session -> session.ReviewGuard)
-            |> Option.bind (fun guard -> guard.CurrentBarrierId)
 
     let private received ctx =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
@@ -205,53 +189,45 @@ module JudgeTool =
             | Ok(value, toolCallId, providerRunId) ->
                 let reviewerId = context.SessionId
 
-                match
-                    scope.Journal,
-                    reviewOwner scope reviewerId,
-                    scope.TreePortFor reviewerId,
-                    currentBarrier scope reviewerId
-                with
-                | None, _, _, _
-                | _, None, _, _
-                | _, _, None, _
-                | _, _, _, None -> return notReceived context Path.ContextIncomplete
-                | Some journal, Some managerSessionId, Some gitTree, Some barrierId ->
-                    let managerJobId, worktreeIdentity = jobIdentity scope managerSessionId
+                match scope.Journal with
+                | None -> return notReceived context Path.ContextIncomplete
+                | Some journal ->
+                    // REVIEW-013: bind this run's seal first. The parked seal
+                    // carries the manager/barrier/tree frozen at transform
+                    // time — the only identity this submission may carry. A
+                    // current-barrier or current-tree read here could
+                    // re-identify an old attempt under a barrier opened after
+                    // the request started.
+                    match!
+                        ReviewSeal.bindToRun
+                            journal
+                            scope.PendingReviewSeals
+                            (SessionId.create reviewerId)
+                            providerRunId
+                    with
+                    | Error ReviewSeal.NoPendingSeal -> return notReceived context Path.ContextIncomplete
+                    | Error(ReviewSeal.AppendFailed _) -> return notReceived context Path.JudgmentCouldNotBeRecorded
+                    | Ok bound ->
+                        let managerJobId, worktreeIdentity = jobIdentity scope bound.ManagerSessionId
 
-                    let submission: VerdictSubmission =
-                        { BarrierId = barrierId
-                          GitTreeHash = GitTreeHash.create (gitTree.GetTreeHash())
-                          ManagerSessionId = managerSessionId
-                          ReviewerSessionId = SessionId.create reviewerId
-                          ManagerJobId = managerJobId
-                          WorktreeIdentity = worktreeIdentity
-                          ProviderRun = providerRunId
-                          ToolCallId = toolCallId
-                          Verdict = value }
+                        let submission: VerdictSubmission =
+                            { BarrierId = bound.BarrierId
+                              GitTreeHash = bound.GitTreeHash
+                              ManagerSessionId = bound.ManagerSessionId
+                              ReviewerSessionId = SessionId.create reviewerId
+                              ManagerJobId = managerJobId
+                              WorktreeIdentity = worktreeIdentity
+                              ProviderRun = providerRunId
+                              ToolCallId = toolCallId
+                              Verdict = value }
 
-                    match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
-                    | Ok VerdictDecision.ChallengeUnproven ->
-                        match!
-                            ReviewSeal.bindToRun
-                                journal
-                                scope.PendingReviewSeals
-                                (SessionId.create reviewerId)
-                                providerRunId
-                        with
-                        | Error ReviewSeal.NoPendingSeal -> return challengeUnproven context
-                        | Error(ReviewSeal.AppendFailed _) -> return notReceived context Path.ChallengeProofNotRecorded
-                        | Ok _ ->
-                            match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
-                            | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
-                            | Ok VerdictDecision.ChallengeUnproven -> return challengeUnproven context
-                            | Ok decision ->
-                                scope.PendingReviewSeals.Remove reviewerId |> ignore
-                                scope.MarkVerdictSubmitted reviewerId
-                                return report context decision
-                    | Ok decision ->
-                        scope.MarkVerdictSubmitted reviewerId
-                        return report context decision
-                    | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
+                        match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
+                        | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
+                        | Ok VerdictDecision.ChallengeUnproven -> return challengeUnproven context
+                        | Ok decision ->
+                            scope.PendingReviewSeals.Remove reviewerId |> ignore
+                            scope.MarkVerdictSubmitted reviewerId
+                            return report context decision
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

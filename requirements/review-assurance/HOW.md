@@ -18,13 +18,13 @@
 ### 2. 投影与 fold（Journal）
 
 - `src/Wanxiangshu/Mission/Review/Barrier/Projection.fs`：
-  - `PerfectChallenge`（第一次 PERFECT 的 durable 证据）、`ProviderInputSeal`（`IncludedToolResultDigests` = 因果证据集）、`ReviewGuardProjection`（barrier/tree/witness/TerminalFrontier/PendingChallenge/Seals/`ObservedAttempts: ReviewAttemptIdentity list`）。attempt 窗口是唯一积分器维护的 bounded typed evidence；业务层禁止从 Journal/XTrace 重建 verdict identity。
-  - `startBarrier`：新 barrier 清 pending challenge 与 attempt 窗口，保留 confirmed witness 可审计（REVIEW-008）；同 barrier 重入幂等。
+  - `PerfectChallenge`（第一次 PERFECT 的 durable 证据）、`ProviderInputSeal`（`IncludedToolResultDigests` = 因果证据集）、`ReviewGuardProjection`（barrier/tree/witness/TerminalFrontier/PendingChallenge/Seals/`ObservedAttempts: ReviewAttemptIdentity list`/`ClosedAttempts: ClosedAttempt list`）。attempt 窗口是唯一积分器维护的 bounded typed evidence；业务层禁止从 Journal/XTrace 重建 verdict identity。
+  - `startBarrier`：新 barrier 清 pending challenge 与 attempt/closure 窗口，保留 confirmed witness 可审计（REVIEW-008）；同 barrier 重入幂等。
   - `applyChallengeIssued`：pending witness 由 challenge 构建，参数只有一个——防两者不一致（REVIEW-005）。
   - `applyVerdict`：REVISE 清 pending（REVIEW-002 条件 7 的机制）；**不**判因果、不构建 Confirmed——writer 证明、fold 应用（seal 窗口有界，重放不重证）。
-  - `applyConfirmedWitness`：以两个 digest + 两个 witness 判 `NotDistinctAttempt`/构建 Confirmed。
+  - `applyAttemptClosed`/`closedAttemptOf`（REVIEW-013/017）：按 attempt identity 幂等记录 closure；消费方用 `closedAttemptOf` 取冻结 frontier，禁止读 session 当前 head。
   - 窗口：`AttemptWindow = 8`、`SealWindow = 8`（PERSIST-008 有界）。
-- `src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs`（`openBarrier`）、`ReviewFactFold.fs`（fold 分派）、`FinalityReviewCohort.fs`（roster/graduate 代数——finality 消费侧）。
+- `src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs`（`openBarrier`）、`ReviewFactFold.fs`（fold 分派，含 `ReviewAttemptClosed`）、`FinalityReviewCohort.fs`（roster/graduate 代数——finality 消费侧）。
 
 ### 3. 确认写入与 continuation（Application/Review）
 
@@ -35,27 +35,31 @@
 - `src/Wanxiangshu/Application/Review/ReviewBarrierWorkflow.fs`（`reverify`：openBarrier → awaitWitness 事件驱动 → readStatus 读 durable 证据，`ConfirmationUnproven`/`ReviewerProducedNoVerdict` 续等）、`ReviewerContinuation.fs`（ensureVerdictSubmitted / ensurePerfectConfirmed）、`ReviewerWorkflow.fs`（observe 唯一业务 writer）。
 - `src/Wanxiangshu/Application/Review/ReviewerEvidence.fs`：`continuationOpen`（sibling REVISE 后撤销 capability）、`classifyNeed`（process → `CompleteRevision` 无 confirmation nudge）、`confirmed` 从 witness 派生。
 
-### 4. Seal 绑定（Mission/Review/Assurance/Seal.fs）
+### 4. Seal 绑定与 attempt scope 冻结（Mission/Review/Assurance/Seal.fs）
 
 - `bindableRun`（HOST-010）：候选 = assistant ∧ ¬Completed ∧ ¬compaction ∧ ParentId = physical user；恰好一个且为最新 id → Ok，否则 `NoBindableRun | AmbiguousRun | NotLatestRun`——四条件合取，缺一 admit 错误答案。
-- `sealTransform`：只在 Reviewer session 的 `messages.transform` 时刻 park seal 候选（`IncludedToolResultDigests` 含 challenge digest）；challenge request 一律 deferred binding。
-- `bindToRun`：`VerdictTool` 以工具持有的 ProviderRunId 查询并 append `ProviderInputSealed`——唯一绑定点；`NoPendingSeal`/`AppendFailed` fail closed。历史上曾在 onTurn 二次绑定（Host 1.18.10 下 run id 不一致，实测每轮 dual-PERFECT 失败）——已删第二 writer。
+- `sealTransform`：只在 Reviewer session 的 `messages.transform` 时刻 park seal 候选（`IncludedToolResultDigests` 含 challenge digest）；challenge request 一律 deferred binding。候选同时冻结 `ManagerSessionId + BarrierId + GitTreeHash`（REVIEW-013 attempt scope）——该 request 启动时的身份，之后任何新 barrier 都不能给这个 attempt 改身份证。
+- `bindToRun`：`JudgeTool` 以工具持有的 ProviderRunId 查询并 append `ProviderInputSealed`，返回带冻结 scope 的候选——唯一绑定点；`NoPendingSeal`/`AppendFailed` fail closed。历史上曾在 onTurn 二次绑定（Host 1.18.10 下 run id 不一致，实测每轮 dual-PERFECT 失败）——已删第二 writer。
+- `JudgeTool.execute`（OpenCode/JudgeTool.fs）：先 bindToRun，再用冻结 scope 构造 `VerdictSubmission` 一次性 `VerdictWorkflow.submit`；不再读 current barrier/current tree。
 
 ### 5. record-ready 与消费（Application/Review/TodoProcessReviewProgram.fs）
 
-- `tryConclude`：**同一 snapshot** 读 checkpoint + reviewer guard；VerdictKnown 从 `ObservedAttempts` 最新 typed identity 读取，不解析 dedupe key、不查原始 Journal、不要求 XTrace 存在 `judge tool_call`。用同一 snapshot 的冻结 range `[ReviewWorkStartCursor, ReviewerRecordFrontier)` 物化 canonical ProcessReviewLWR；非空 report → writeBlob → 以该 typed `ProviderRun/ToolCallId` append `TodoReviewConcluded`。任何不足 → `Pending`（等待信号，不是 provider 红字）。
-- `producerPresence`：无 durable verdict 时，只有 reviewer work-unit 仍可继续（Active/CompletedAwaitingJoin）才允许等待；durable process verdict 已存在后，handle `CompletedAwaitingJoin`/`Retired` 不再代表 producer loss，剩余 producer 是 Journal/XTrace/LWR 的 record-ready 收敛。无 verdict 且 Abandoned/Retired 才 `Absent`。
+- `tryConclude`：**同一 snapshot** 读 checkpoint + reviewer guard；VerdictKnown 从 `ObservedAttempts` 最新 typed identity 读取，且必须存在**匹配的 `ReviewAttemptClosed`**（reviewer 的 reconciled turn 已完成、XTrace 已收敛）；record frontier 取 closure 冻结值，禁止取 session 当前 head——已结束 turn 的迟到 XTrace 尾巴不能穿进下一 checkpoint 的 request range。用同一 snapshot 的冻结 range `[ReviewWorkStartCursor, closure frontier)` 物化 canonical ProcessReviewLWR；非空 report → writeBlob → 以该 typed `ProviderRun/ToolCallId` append `TodoReviewConcluded`。任何不足 → `Pending`（等待信号，不是 provider 红字）。
+- `appendAttemptClosed`（ReviewerWorkflow）：turn 完成（含 terminal capture 收敛）后 append `ReviewAttemptClosed`；无 observed attempt 的 turn 无可关闭对象；append 失败保持未闭合，idle revisit 重跑、fold 按 attempt identity 幂等。
+- `producerPresence`：无 durable verdict 时，只有 reviewer work-unit 仍可继续（Active/CompletedAwaitingJoin）才允许等待；durable process verdict 已存在后，handle `CompletedAwaitingJoin`/`Retired` 不再代表 producer loss，剩余 producer 是 closure/record-ready 收敛。无 verdict 且 Abandoned/Retired 才 `Absent`。
 - `awaitConsumableReview`：Direct CE 有界递归——先采样 `revision` → `tryConclude` → Pending → producer 存在 → `awaitChangeFrom sampledRevision` → 重判；因此判定与订阅之间发生的 append 会令 await 立即完成，不丢 wakeup。producer 缺失 → Error fail closed（REVIEW-017/018）。无 stage/phase/program counter，无 total-review deadline。
+- assignment reentry（DedicatedTodoRuntime.ensureReview）：`TodoProcessReviewAssigned` 在物理发送**前** durable append，冻结 pre-dispatch reviewer frontier；resend 准入读 `PromptAuthorityLedger.dispatchStatusFor`（Accepted/Pending/Dispatchable）——XTrace head 不参与 dispatch 成功判断（REVIEW-018）。
 
 ### 6. 数据流
 
 ```text
 第一次 PERFECT → PerfectChallengeIssued（pending + challenge tool result）
   → ReviewConfirmation 启动下一 provider request（不是确认事实）
-  → transform 时刻 park seal（IncludedToolResultDigests）
-  → 第二次 PERFECT → VerdictTool bindToRun → provenSeal 查 digest
+  → transform 时刻 park seal（冻结 attempt scope + IncludedToolResultDigests）
+  → 第二次 PERFECT → JudgeTool bindToRun → provenSeal 查 digest
   → ConfirmedReviewWitness（自包含）→ Finality cohort 消费（finality）
-TodoProcessReview：一次 judge → ProcessTerminal → VerdictKnown
+TodoProcessReview：一次 judge（冻结 scope 一次 submit）→ ProcessTerminal → VerdictKnown
+  → reviewer turn 完成 → ReviewAttemptClosed（冻结 frontier）
   → tryConclude 同 snapshot record-ready → TodoReviewConcluded（≡ ConsumableReview）
   → T(k+1)/suicide 消费
 ```
@@ -81,6 +85,9 @@ TodoProcessReview：一次 judge → ProcessTerminal → VerdictKnown
 - **same-root / physical-message 猜测绑定**：拒（Host 重排消息时假绿）→ 唯一绑定 + fail closed（REVIEW-010/HOST-010）。
 - **「只有 verdict 即放行」**：拒 → VerdictKnown 与 ConsumableReview 两段式（REVIEW-014）。
 - **sleep/timer 等待 record-ready**：拒（把因果等待退化成运气；waiter 崩溃无法重建）→ awaitChangeFrom + 同 snapshot（REVIEW-017/GLORY-073）。
+- **XTrace head watermark 判 assignment 送达**：拒（XTrace append 顺序 ≠ request 因果顺序；已送达的 assignment 可以两秒不涨 head）→ PromptAuthority durable dispatch evidence（Accepted/Pending/Dispatchable），2s deadline 与 AwaitHead 整体删除（REVIEW-018）。
+- **verdict 即 Concluded**：拒（judge 执行 ≠ reviewer turn 完成；迟到的 XTrace 尾巴会穿进下一 checkpoint 的 range）→ `ReviewAttemptClosed` 冻结 frontier，`TodoReviewConcluded` 只消费 closure 值（REVIEW-013/017）。
+- **judge 读 current barrier/current tree 猜身份**：拒（上一轮未真正结束就开下一 barrier 时，旧 attempt 会被未来 barrier 重标记）→ transform 冻结 scope，绑定后一次性 submit（REVIEW-013）。
 - **infra 失败伪 REVISE**：拒 → typed infra failure + obligation outstanding（REVIEW-018）。
 - **过程 PERFECT 计入 terminal 2N**：拒 → 代数分离（REVIEW-020/GLORY-058）。
 - **onTurn 二次 seal 绑定**：拒（Host 1.18.10 下 reconcile run 与工具 run id 不一致，实测全流失败）→ 唯一绑定点 bindToRun（ReviewSeal.fs 注释记录）。

@@ -78,6 +78,15 @@ type ProviderInputSeal =
         IncludedToolResultDigests: Set<string>
     }
 
+/// REVIEW-013/017: one reviewer attempt's reconciled turn fully closed.
+///
+/// The frontier is frozen at closure time. A consumer that re-read the session's
+/// current head instead would fold a finished attempt's late-landing XTrace tail
+/// into the next barrier's request range.
+type ClosedAttempt =
+    { Attempt: ReviewAttemptIdentity
+      FrozenFrontier: XTraceCursor }
+
 /// Review state for one session.
 ///
 /// PERSIST-008: bounded. Seals are kept per provider run within a window, and
@@ -100,6 +109,10 @@ type ReviewGuardProjection =
         /// integrator records the exact attempt identity once; consumers never
         /// reconstruct it from Journal bytes or semantic trace parts.
         ObservedAttempts: ReviewAttemptIdentity list
+        /// REVIEW-013/017 bounded closed-attempt evidence, newest first. An
+        /// attempt is closed only after its reconciled turn completed and its
+        /// XTrace frontier froze; `TodoReviewConcluded` consumes only these.
+        ClosedAttempts: ClosedAttempt list
     }
 
     member this.IsConfirmed = ReviewWitness.isConfirmed this.Witness
@@ -151,7 +164,8 @@ module ReviewProjection =
           TerminalFrontier = None
           PendingChallenge = None
           Seals = Map.empty
-          ObservedAttempts = [] }
+          ObservedAttempts = []
+          ClosedAttempts = [] }
 
     let private remember key keys =
         key :: (keys |> List.filter ((<>) key)) |> List.truncate AttemptWindow
@@ -195,6 +209,7 @@ module ReviewProjection =
                 TerminalFrontier = None
                 PendingChallenge = None
                 ObservedAttempts = []
+                ClosedAttempts = []
                 Witness =
                     match current.Witness with
                     | ReviewWitness.Confirmed _ -> current.Witness
@@ -333,8 +348,23 @@ module ReviewProjection =
     let hasObservedAttempt (attempt: ReviewAttemptIdentity) (current: ReviewGuardProjection) =
         List.contains attempt current.ObservedAttempts
 
-    let latestObservedAttempt (current: ReviewGuardProjection) =
-        List.tryHead current.ObservedAttempts
+    let latestObservedAttempt (current: ReviewGuardProjection) = List.tryHead current.ObservedAttempts
+
+    /// REVIEW-013/017: record one attempt's closure. Idempotent by attempt
+    /// identity — the reviewer's turn observation may legitimately re-run
+    /// (idle revisit), and re-appending the same closure must be a no-op
+    /// rather than a second window entry.
+    let applyAttemptClosed (closed: ClosedAttempt) (current: ReviewGuardProjection) =
+        { current with
+            ClosedAttempts =
+                closed
+                :: (current.ClosedAttempts
+                    |> List.filter (fun existing -> existing.Attempt <> closed.Attempt))
+                |> List.truncate AttemptWindow }
+
+    /// The closure evidence for one exact attempt, if its turn has closed.
+    let closedAttemptOf (attempt: ReviewAttemptIdentity) (current: ReviewGuardProjection) =
+        current.ClosedAttempts |> List.tryFind (fun closed -> closed.Attempt = attempt)
 
     /// REVIEW-007: the Guard asks only whether the CURRENT tree has a confirmed
     /// PERFECT. A witness for another barrier or tree is auditable but not sufficient.

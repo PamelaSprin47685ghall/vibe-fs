@@ -79,8 +79,10 @@ module MagicTodoFacts =
             TodoReviewId: TodoReviewId
             DedicatedReviewerId: DedicatedReviewerId
             ReviewerSessionId: SessionId
-            /// Exclusive end after assignment authority landed in XTrace.
-            /// Does NOT include the assignment prompt itself.
+            /// Reviewer frontier frozen BEFORE the assignment dispatch (HOST-021).
+            /// The LWR request range [ReviewWorkStartCursor, closure frontier)
+            /// therefore includes the assignment prompt itself and everything
+            /// the reviewer produces for this checkpoint.
             ReviewWorkStartCursor: XTraceCursor
             ManagerReviewFrontier: XTraceCursor
         }

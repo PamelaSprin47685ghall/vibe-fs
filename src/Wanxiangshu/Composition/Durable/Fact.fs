@@ -199,6 +199,20 @@ module Fact =
                ToolCallId: ToolCallId
                Verdict: ReviewGuardVerdict |}
 
+        /// REVIEW-013/017: the reviewer's reconciled turn that carried a verdict
+        /// has fully completed and its XTrace converged. `FrozenFrontierSequence`
+        /// is the exclusive XTraceCursor.Sequence captured at closure time —
+        /// consumers (TodoReviewConcluded) must take their record frontier from
+        /// here, never from the session's current head, so a finished attempt's
+        /// tail cannot leak into the next barrier's request range.
+        | ReviewAttemptClosed of
+            {| ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               ProviderRun: ProviderRunIdentity
+               ToolCallId: ToolCallId
+               FrozenFrontierSequence: int64 |}
+
         /// First PERFECT issued the skeptical challenge as its tool result.
         ///
         /// The digest is of a fixed, versioned sentence (REVIEW-003), so the
@@ -801,6 +815,9 @@ module Fact =
 
         let inline ReviewVerdictRecorded payload =
             AgentFact.Review(ReviewFactCases.ReviewVerdictRecorded payload)
+
+        let inline ReviewAttemptClosed payload =
+            AgentFact.Review(ReviewFactCases.ReviewAttemptClosed payload)
 
         let inline PerfectChallengeIssued payload =
             AgentFact.Review(ReviewFactCases.PerfectChallengeIssued payload)

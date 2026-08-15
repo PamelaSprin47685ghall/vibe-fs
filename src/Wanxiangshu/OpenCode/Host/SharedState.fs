@@ -57,8 +57,16 @@ module SharedState =
     /// REVIEW-010: a seal candidate before its provider run exists (see
     /// `ReviewSeal.bindToRun`). Defined here so the shared dictionary can
     /// be typed before `ReviewSeal` compiles.
+    ///
+    /// REVIEW-013: the attempt's review scope is frozen here at transform
+    /// time — the manager/barrier/tree this request started under. The judge
+    /// tool submits with this frozen scope, so a barrier opened later can
+    /// never re-identify an old attempt.
     type PendingSeal =
         { SessionId: SessionId
+          ManagerSessionId: SessionId
+          BarrierId: ReviewBarrierId
+          GitTreeHash: GitTreeHash
           PhysicalUserMessageId: PhysicalUserMessageId
           SealDigest: SealDigest
           CanonicalVersion: int
