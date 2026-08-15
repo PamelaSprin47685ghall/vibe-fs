@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **47 张 boundary card**。47 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **48 张 boundary card**。48 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -8,6 +8,7 @@
 |---|---|
 | `requirement-system` | 当前接受的产品真理必须有唯一 package owner、显式依赖与唯一 proof ownership。 |
 | `verification-system` | requirement acceptance 必须由分层、可失败、可重放的证据体系定义，而不是测试类型或人工印象。 |
+| `js-semantic-surface` | 语义测试只能经正式、稳定、JS-native 的 semantic surface 进入；Fable runtime representation 不属于 semantic contract。 |
 
 ## 2. Programming / causality
 
@@ -136,6 +137,7 @@
 ```text
 requirement-system       → 无
 verification-system      → requirement-system
+js-semantic-surface      → requirement-system, verification-system
 structured-workflow      → 无
 time-capability          → 无
 causal-wait              → 无

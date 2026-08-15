@@ -148,7 +148,6 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'Decode.fs',
   'Continuation.fs',
   'Repair.fs',
-  'Activation.fs',
   'Background.fs',
   'Idle.fs',
   'JobHandoff.fs',

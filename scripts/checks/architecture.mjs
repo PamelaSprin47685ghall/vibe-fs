@@ -210,7 +210,6 @@ for (const file of productionFs) {
     'Role.Reviewer',
     'SyncDelegateRuntime',
     'ManagerLifecycleGate',
-    'ManagerActivation',
     'ReviewerGuardState',
     'ReviewerEvidence',
     'HostReviewGuard',

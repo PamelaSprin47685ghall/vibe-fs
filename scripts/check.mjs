@@ -26,6 +26,7 @@ const checks = [
   join(root, 'checks/provider-prose-ownership.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
   join(root, 'checks/test-boundary.mjs'),
+  join(root, 'checks/js-boundary-gate.mjs'),
   join(root, 'checks/e2e-watchdog-feed.mjs'),
 ]
 

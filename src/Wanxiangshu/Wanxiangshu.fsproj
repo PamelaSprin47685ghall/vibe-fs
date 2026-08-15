@@ -379,7 +379,6 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
     <Compile Include="Interaction/Repair/InteractionRepair.fs"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fs"/>
-    <Compile Include="Mission/Manager/Activation.fs"/>
     <Compile Include="Mission/Manager/Background.fs"/>
     <Compile Include="Mission/Manager/Idle.fs"/>
     <Compile Include="Mission/Manager/JobHandoff.fs"/>

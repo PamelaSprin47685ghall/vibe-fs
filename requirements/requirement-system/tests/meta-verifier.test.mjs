@@ -246,7 +246,7 @@ test('meta verifier: 已迁移包（5 文档齐备）结构一致，删 PROOF �
   )
 })
 
-test('meta verifier: 全量迁移状态（INDEX 当前 47 包 × 5 文档，无 INDEX 外目录）', () => {
+test('meta verifier: 全量迁移状态（INDEX 当前 48 包 × 5 文档，无 INDEX 外目录）', () => {
   const fromTree = packageNamesFromTreeEntry()
   const fromIndex = packageNamesFromIndexTables()
 
@@ -257,7 +257,7 @@ test('meta verifier: 全量迁移状态（INDEX 当前 47 包 × 5 文档，无 
   )
 
   const allNames = fromIndex
-  assert.equal(allNames.length, 47, `expected 47 packages in INDEX, found ${allNames.length}`)
+  assert.equal(allNames.length, 48, `expected 48 packages in INDEX, found ${allNames.length}`)
 
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())

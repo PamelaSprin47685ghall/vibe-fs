@@ -19,7 +19,6 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
  */
 const VOCABULARY_SURFACES = {
   'Mission/Manager/Background': ['ensureSettled'],
-  'Mission/Manager/Activation': ['ensureAccepted'],
   'Mission/Manager/Idle': ['encourageLabor'],
   'Mission/Manager/JobHandoff': ['completeIfTransferred'],
   'Mission/Review/Judgement/Continuation': ['ensurePerfectConfirmed', 'ensureVerdictSubmitted'],

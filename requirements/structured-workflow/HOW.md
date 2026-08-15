@@ -34,11 +34,11 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（owner 的 Open
 
 | 文件 | 导出 | 角色 |
 |---|---|---|
-| `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | `observe`、`observeIdle` | Manager 终态业务故事：handoff → background → activation → idle labor，全部 CE 顺序表达 |
+| `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | `observe`、`observeIdle` | Manager 终态业务故事：handoff → background → idle labor，全部 CE 顺序表达 |
 | `src/Wanxiangshu/Application/Review/ReviewerWorkflow.fs` | `observe` | Reviewer turn 唯一 continuation writer：`ReviewerEvidence.classifyNeed` 分派 → 具名 Vocabulary 发送承诺，无存储 State/Stage 计数器 |
 | `src/Wanxiangshu/Composition/Turn/Workflow.fs` | `observe` | 极薄 router：按 bounded context 委派（Manager/Reviewer/Ordinary），不计算 pending/shouldContinue/phase |
 
-Manager 词汇：`ManagerBackground.ensureSettled`、`ManagerActivation.ensureAccepted`、
+Manager 词汇：`ManagerBackground.ensureSettled`、
 `ManagerIdle.encourageLabor`、`ManagerJobHandoff.completeIfTransferred`、
 `ManagerFinality.admitLabor` / `classifyEnding`。
 Reviewer 词汇：`ReviewerContinuation.ensurePerfectConfirmed` / `ensureVerdictSubmitted`、
@@ -151,7 +151,6 @@ node scripts/check.mjs
 
 | Vocabulary | 必须证明 |
 |---|---|
-| `ManagerActivation.ensureAccepted` | exactly-once activation traces |
 | `ManagerBackground.ensureSettled` | completion / join / wake permutations |
 | `ManagerIdle.encourageLabor` | independent idle occasions / stale permit |
 | `ReviewerContinuation.ensurePerfectConfirmed` | first PERFECT / challenge / second PERFECT |

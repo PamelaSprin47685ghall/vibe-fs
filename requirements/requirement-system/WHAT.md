@@ -73,14 +73,14 @@ normative authority」= 连元规则都有归属文件。
 
 ## REQUIREMENT-SYSTEM-006：索引完整性
 
-**规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 47 个包每个都有
+**规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 48 个包每个都有
 `{README,WHY,WHAT,HOW,PROOF}.md`；树入口（requirements/README.md）与
 `requirements/INDEX.md` 命名同一包集。
 
 **含义/动机**：包清单是机器可校验的边界；目录级越界（INDEX 外神秘包）与文件级残缺
 （缺 WHY）都必须可红。
 
-**边界**：包数量（当前 47）是设计期结果不是稳定 API；但「树 == 索引」的封闭性永久成立。
+**边界**：包数量（当前 48）是设计期结果不是稳定 API；但「树 == 索引」的封闭性永久成立。
 
 **证据指针**：→ PROOF.md L13。
 
