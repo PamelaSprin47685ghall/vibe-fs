@@ -72,7 +72,6 @@ module JoinDrain =
             Some(
                 Ok
                     { RunId = "abandoned-" + agentId
-                      AgentId = agentId
                       AgentName = record.TargetAgent
                       Role = AgentRoleIdentity.ofRole record.CanonicalRole
                       Outcome = AgentCompletion.abandoned agentId reasonText

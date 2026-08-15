@@ -527,21 +527,18 @@ module HostForkJoin =
         match NonEmptyBatch.toList batch |> List.head with
         | AgentItem(AgentCompletedItem payload) ->
             { RunId = payload.RunId
-              AgentId = payload.AgentId
               AgentName = payload.AgentId
               Role = payload.Role
               Outcome = AgentCompleted payload
               CompletedAt = completedAt }
         | AgentItem(AgentFailedItem payload) ->
             { RunId = payload.RunId
-              AgentId = payload.AgentId
               AgentName = payload.AgentId
               Role = defaultArg payload.Role Role.Distiller
               Outcome = AgentFailed payload
               CompletedAt = completedAt }
         | AgentItem(AgentAbandonedItem(agentId, reason)) ->
             { RunId = "abandoned-" + agentId
-              AgentId = agentId
               AgentName = agentId
               Role = Role.Distiller
               Outcome = AgentAbandoned(agentId, reason)

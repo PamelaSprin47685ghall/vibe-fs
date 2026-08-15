@@ -135,7 +135,7 @@ test('MISC_join_render_fork_error_natural_language', () => {
 
 test('MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
   const completion = (agentName) =>
-    new RunCompletion('run-1', 'a1', agentName, Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
+    new RunCompletion('run-1', agentName, Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
   const viaName = renderCompletedBatch(lang, () => false, () => '', batchOf(completion('fast-coder'), toList([])))
   assert.match(viaName, /# fast-coder has returned\./)
 
@@ -147,7 +147,7 @@ test('MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
 })
 
 test('MISC_join_render_completed_pty_aborted_round_trip', () => {
-  const run = new RunCompletion('pty-9', 'pty-9', '', Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
+  const run = new RunCompletion('pty-9', '', Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
   const wire = renderCompletedBatch(lang, (runId) => runId === 'pty-9', () => '', batchOf(run, toList([])), (id) => (id === 'pty-9' ? 'shell' : 'Terminal'))
   assert.match(wire, /# shell has ended\./)
   assert.ok(!wire.includes('pty_id'))

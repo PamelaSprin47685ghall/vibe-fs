@@ -130,7 +130,6 @@ module ChildRun =
 
     let makeCompleted (run: ChildRun) (outcome: AgentCompletionOutcome) (completedAt: DateTimeOffset) : RunCompletion =
         { RunId = run.RunId
-          AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
           Outcome = AgentCompletion.withRunIdentity run.AgentId run.RunId run.Role outcome
@@ -138,7 +137,6 @@ module ChildRun =
 
     let makeFailed (run: ChildRun) (message: string) (completedAt: DateTimeOffset) : RunCompletion =
         { RunId = run.RunId
-          AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
           Outcome = AgentCompletion.failed run.AgentId run.RunId (Some run.Role) run.ChildSessionId "ERROR" message

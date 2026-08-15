@@ -324,21 +324,18 @@ module JoinResultRenderer =
                 match agentItem with
                 | AgentCompletedItem p ->
                     { RunId = p.RunId
-                      AgentId = p.AgentId
                       AgentName = ""
                       Role = p.Role
                       Outcome = AgentCompleted p
                       CompletedAt = DateTimeOffset.UtcNow }
                 | AgentFailedItem p ->
                     { RunId = p.RunId
-                      AgentId = p.AgentId
                       AgentName = ""
                       Role = defaultArg p.Role Role.Distiller
                       Outcome = AgentFailed p
                       CompletedAt = DateTimeOffset.UtcNow }
                 | AgentAbandonedItem(agentId, reason) ->
                     { RunId = "abandoned-" + agentId
-                      AgentId = agentId
                       AgentName = ""
                       Role = Role.Distiller
                       Outcome = AgentAbandoned(agentId, reason)

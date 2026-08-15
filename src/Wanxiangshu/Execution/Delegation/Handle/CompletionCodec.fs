@@ -218,7 +218,6 @@ module HandleCompletionCodec =
             let runId = runIdOrDefault agentId payload.RunId
 
             { RunId = runId
-              AgentId = agentId
               AgentName = record.TargetAgent
               Role = role
               Outcome =
@@ -236,7 +235,6 @@ module HandleCompletionCodec =
             let runId = runIdOrDefault agentId payload.RunId
 
             { RunId = runId
-              AgentId = agentId
               AgentName = record.TargetAgent
               Role = role
               Outcome =

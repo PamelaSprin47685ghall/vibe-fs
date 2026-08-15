@@ -42,11 +42,11 @@
 | Current owner | `Execution/Session/AgentCompletion.fs` |
 | Old world | HostFork 时代用 `AgentId` 标识 run owner；新世界用 Map key / AgentName |
 | Current consumer | 3 个 F# read site + 多个测试断言 |
-| Consumer evidence | F#：`JoinDrain.fs:339`（`c.AgentId` → `takenIds`）、`JoinResultRenderer.fs:237,255`（`completion.AgentId` → `resolveAgentName`）；写入点：`AgentCompletion.fs:251,258`（PTY 三 case 均 `AgentId = id`）、`Cohort.fs:209,285`、`ChildRun.fs:133,141`。测试：`managed-session-lifecycle/tests/child-run-projection.test.mjs:125`、`host-fork-agent.test.mjs:163`、`host-fork-restart-lifecycle.test.mjs:155`、`host-fork-runtime.test.mjs:99,240,253,276`、`verification-system/tests/support/domain/orchestrator.mjs:58,360,400,718` |
-| Writer alive? | 是（`toRunCompletion` PTY 投影仍在写） |
-| Reader alive? | 是（上述 read sites） |
-| Classification | **DELETE**（先迁 caller） |
-| Exit condition | first-party read sites → 0 → 删字段 → 删 writer → 删 codec/fixture/test 形状 → 全仓 `RunCompletion.AgentId` 零命中 |
+| Consumer evidence | F#：~~`JoinDrain.fs:339`~~、~~`JoinResultRenderer.fs:237,255`~~（已迁 `AgentCompletion.agentId`）；写入点：`AgentCompletion.fs:251,258`（PTY 三 case 均 `AgentId = id`）、`Cohort.fs:209,285`、`ChildRun.fs:133,141`。测试：~~`managed-session-lifecycle/tests/child-run-projection.test.mjs:125`~~、~~`host-fork-agent.test.mjs:163`~~、~~`host-fork-restart-lifecycle.test.mjs:155`~~、~~`host-fork-runtime.test.mjs:99,240,253,276`~~、~~`verification-system/tests/support/domain/orchestrator.mjs:58,360,400,718`~~（已迁 `agentIdOf`） |
+| Writer alive? | ~~是（`toRunCompletion` PTY 投影仍在写）~~ → 否（字段已删） |
+| Reader alive? | ~~是（上述 read sites）~~ → 否（全部迁移） |
+| Classification | **DELETE**（先迁 caller）→ **已删除（CLN-04）** |
+| Exit condition | ~~first-party read sites → 0 → 删字段~~ → **达成**：`RunCompletion.AgentId` 全仓零命中（F# + JS） |
 | Owner | 本仓库 |
 | Removal PR | CLN-03（迁 caller）/ CLN-04（删字段） |
 

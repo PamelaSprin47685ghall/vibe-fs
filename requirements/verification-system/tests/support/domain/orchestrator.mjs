@@ -38,8 +38,7 @@ import { providerLanguage } from './prompt.mjs'
 
 /**
  * Canonical agentId of a RunCompletion: read from Outcome payload
- * (AgentCompleted/Failed payload.AgentId; AgentAbandoned tuple head),
- * never from the deprecated RunCompletion.AgentId field.
+ * (AgentCompleted/Failed payload.AgentId; AgentAbandoned tuple head).
  */
 export const agentIdOf = (completion) => {
   const outcome = caseOf(completion.Outcome)
@@ -720,14 +719,12 @@ export const agentCompletion = (() => {
   /** Build a RunCompletion record for mailbox publish / renderer input. */
   const run = ({
     runId,
-    agentId,
     agentName = '',
     role = 'Coder',
     outcome,
     completedAt = new Date(),
   }) => ({
     RunId: runId,
-    AgentId: agentId,
     AgentName: agentName,
     Role: typeof role === 'string' ? roleOf(role) : role,
     Outcome: outcome,

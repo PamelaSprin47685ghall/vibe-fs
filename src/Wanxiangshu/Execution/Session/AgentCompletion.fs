@@ -119,8 +119,8 @@ module AgentCompletion =
         | AgentFailed payload -> payload.Message
         | AgentAbandoned(_, reason) -> reason
 
-    /// The agentId owning this completion — the canonical Map key. The
-    /// RunCompletion.AgentId field is deprecated; extract from Outcome instead.
+    /// The agentId owning this completion — the canonical Map key, carried by
+    /// the Outcome payload (Completed/Failed) or the Abandoned tuple head.
     let agentId (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted payload -> payload.AgentId
@@ -216,10 +216,6 @@ type RunCompletion =
         /// Unique identity for this run attempt.
         RunId: string
 
-        /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
-        /// backward compatibility. New code should use the Map key or AgentName.
-        AgentId: string
-
         /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
         AgentName: string
 
@@ -256,21 +252,18 @@ module PtyJoinItem =
         match item with
         | PtyExited e ->
             { RunId = id
-              AgentId = id
               AgentName = id
               Role = role
               Outcome = AgentCompletion.ofSimpleText id id role e.Outcome
               CompletedAt = completedAt }
         | PtyFailed f ->
             { RunId = id
-              AgentId = id
               AgentName = id
               Role = role
               Outcome = AgentCompletion.failed id id (Some role) None f.Code f.Message
               CompletedAt = completedAt }
         | PtyAborted a ->
             { RunId = id
-              AgentId = id
               AgentName = id
               Role = role
               Outcome =
