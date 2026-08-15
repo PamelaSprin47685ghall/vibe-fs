@@ -119,11 +119,14 @@ STRUCTURED-WORKFLOW-016 的 shape gate。scanner 以 F# offside/缩进结构识�
 
 门禁先修已经落地：
 
-- `FsToolkit.ErrorHandling 5.2.0`：全仓 `result` / `option` 与 List traverse/sequence
-  vocabulary；Sphinx 不再私造 `ResultBuilder`。
-- `Wanxiangshu.Foundation.TaskResultBuilder`：Fable-compatible `Task<Result<_,_>>` CE；
-  `Task<Result<_,_>>` / `Result<_,_>` 直接 bind，普通 `Task<'T>` 显式
-  `TaskResultCE.ofTask`，避免 `Task<'T>` 与 `Task<Result<_,_>>` overload 推断歧义。
+- `FsToolkit.ErrorHandling 5.2.0`：只使用其 **Fable source surface** 提供的 `result` /
+  `option` 与纯 Result collection vocabulary；Sphinx 不再私造 `ResultBuilder`。禁止引用该包
+  被 `FABLE_COMPILER` 排除的 `Task.map` / `TaskResult.*` / `List.traverseTaskResultM`。
+- `Wanxiangshu.Foundation.TaskResultBuilder` + `TaskValue` / `TaskResult` / `TaskResultList`：本仓
+  Fable-only async Result vocabulary。`Task<Result<_,_>>` / `Result<_,_>` 直接 bind，普通
+  `Task<'T>` 显式 `TaskResultCE.ofTask`；错误映射用 `TaskResult.mapError`，异步短路遍历用
+  `TaskResultList.traverseM`，普通异步映射用 `TaskValue.map`。这些组合子只压平 plumbing，
+  不拥有业务 decision。
 - `WriterStreamSync.readRemote` / `syncWriterStreams` 是 `taskResult` 参考调用点；
   `importRemote` 是 `result` 参考调用点。
 

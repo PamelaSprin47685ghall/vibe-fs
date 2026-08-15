@@ -227,7 +227,7 @@ module FissionAdmission =
         task {
             let! outcome =
                 created
-                |> List.traverseTaskResultM (fun started ->
+                |> TaskResultList.traverseM (fun started ->
                     let lane =
                         parsed.Lanes
                         |> List.find (fun candidate -> candidate.Index = started.Index)

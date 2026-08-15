@@ -101,7 +101,7 @@ module JoinDrain =
 
     let private appendFact (durable: AgentJournal) (parentId: SessionId) (fact: AgentFact) =
         AgentJournal.appendAgent (StreamId.Session parentId) None fact durable
-        |> Task.map (Result.map ignore >> Result.mapError JournalAppendFailure.describe)
+        |> TaskValue.map (Result.map ignore >> Result.mapError JournalAppendFailure.describe)
 
     let private afterRejectAppendFailure
         (durable: AgentJournal)
@@ -171,7 +171,7 @@ module JoinDrain =
                            BadCompletionRef = blobRef
                            BadCompletionDigest = blobDigest
                            Reason = FalseCompletionReason.LegacyAbortWasObservation |})
-                |> Task.map (Result.mapError ForkError.NotFound)
+                |> TaskValue.map (Result.mapError ForkError.NotFound)
 
             do!
                 appendFact
@@ -185,7 +185,7 @@ module JoinDrain =
                            Byname = record.Byname
                            CanonicalRole = record.CanonicalRole
                            Ownership = record.Ownership |})
-                |> Task.map (Result.mapError ForkError.NotFound)
+                |> TaskValue.map (Result.mapError ForkError.NotFound)
 
             do!
                 appendFact
@@ -196,7 +196,7 @@ module JoinDrain =
                            OriginalHandle = record.Handle
                            ReplacementHandle = replacement
                            BadCompletionDigest = blobDigest |})
-                |> Task.map (Result.mapError ForkError.NotFound)
+                |> TaskValue.map (Result.mapError ForkError.NotFound)
         }
 
     let private migrationJoinOutcome (result: Result<unit, ForkError>) : Result<RunCompletion, ForkError> option =
@@ -460,10 +460,10 @@ module JoinDrain =
         match HandleCompletionCodec.decodeBody body, retired with
         | LegacyFalseAbort _, false ->
             rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
-            |> Task.map ignore
+            |> TaskValue.map ignore
         | LegacyFalseAbort _, true ->
             tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest
-            |> Task.map ignore
+            |> TaskValue.map ignore
         | _ -> Task.FromResult()
 
     let private maybeApplyLegacyFalseAbort

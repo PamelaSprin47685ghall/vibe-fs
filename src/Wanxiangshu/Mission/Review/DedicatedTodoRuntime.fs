@@ -161,7 +161,7 @@ module DedicatedTodoReviewerRuntime =
         taskResult {
             let! messages =
                 port.GetMessages managerSessionId
-                |> Task.map (Result.mapError (fun reason -> "snapshot unavailable: " + reason))
+                |> TaskValue.map (Result.mapError (fun reason -> "snapshot unavailable: " + reason))
 
             return! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
         }
@@ -319,7 +319,7 @@ module DedicatedTodoReviewerRuntime =
                     None
                     (MagicTodoFact.TodoProcessReviewAssigned assigned)
                     journal
-                |> Task.map (Result.mapError JournalAppendFailure.describe)
+                |> TaskValue.map (Result.mapError JournalAppendFailure.describe)
 
             return ()
         }
@@ -657,7 +657,7 @@ module DedicatedTodoReviewerRuntime =
                     None
                     (MagicTodoFact.DedicatedTodoReviewerEnlisted enlisted)
                     journal
-                |> Task.map (Result.mapError JournalAppendFailure.describe)
+                |> TaskValue.map (Result.mapError JournalAppendFailure.describe)
 
             return enlisted
         }

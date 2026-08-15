@@ -19,6 +19,7 @@
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
+    <Compile Include="Foundation/FsToolkitFableCompat.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
     <Compile Include="Sphinx/Mcp.fs"/>
     <Compile Include="Sphinx/Types.fs"/>
