@@ -13,7 +13,6 @@ import test from 'node:test'
 
 import {
   agentJournal,
-  forkChildPayload,
   lifecycleWorkRecordProjection,
   listItems,
   promptDispatcher,
@@ -21,6 +20,9 @@ import {
   toList,
   transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
+
+const { instructions } = await import('../../../dist/Execution/Delegation/Fork/Surface.js')
+const en = instructions('en')
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -277,10 +279,10 @@ test('DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async (
 
   const prompts = live.sessions.calls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
   const bobPrompt = prompts.at(-1)[2]
-  assert.ok(bobPrompt.includes(forkChildPayload.attachmentInstruction))
+  assert.ok(bobPrompt.includes(en.Attachment))
   assert.match(bobPrompt, /trace the retry path/)
   assert.ok(
-    bobPrompt.indexOf(forkChildPayload.attachmentInstruction) < bobPrompt.indexOf('trace the retry path'),
+    bobPrompt.indexOf(en.Attachment) < bobPrompt.indexOf('trace the retry path'),
     'the canonical attachment framing precedes the attached LWR',
   )
   live.cleanup()
@@ -301,7 +303,7 @@ test('DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral'
   const promptTexts = afterCalls
     .filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
     .map((call) => call[2])
-  assert.ok(promptTexts.every((text) => !String(text).includes(forkChildPayload.attachmentInstruction)))
+  assert.ok(promptTexts.every((text) => !String(text).includes(en.Attachment)))
   assert.ok(promptTexts.every((text) => !String(text).includes('trace the retry path')))
   live.cleanup()
 })

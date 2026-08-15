@@ -272,9 +272,6 @@
   "requirements/delegation/tests/delegation-tool-contract.test.mjs": {
     "deep-dist-import": 5
   },
-  "requirements/delegation/tests/fork-child-payload.test.mjs": {
-    "export-discovery": 1
-  },
   "requirements/delegation/tests/fork-tool.test.mjs": {
     "deep-dist-import": 9,
     "export-discovery": 3,

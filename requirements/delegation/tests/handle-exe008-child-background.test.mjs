@@ -6,7 +6,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { forkChildPayload } from '../../verification-system/tests/support/domain.mjs'
+
+const { render, instructions } = await import('../../../dist/Execution/Delegation/Fork/Surface.js')
+
+const en = instructions('en')
 
 test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
   const lwrSnapshot = [
@@ -19,15 +22,16 @@ test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
     'Recent work',
     'tail',
   ].join('\n')
-  const rendered = forkChildPayload.render({
-    assignment: 'Summarize the output',
-    commissionerRecord: lwrSnapshot,
-    rootRequirements: [],
-    payload: undefined,
+  const rendered = render('en', {
+    Assignment: 'Summarize the output',
+    CommissionerRecord: lwrSnapshot,
+    Attachment: undefined,
+    RootRequirements: [],
+    Payload: undefined,
   })
   const parsed = parseToml(rendered)
 
-  assert.equal(rendered.includes(forkChildPayload.commissionerRecordInstruction), true)
+  assert.equal(rendered.includes(en.CommissionerRecord), true)
   assert.ok(rendered.includes('commissioner_record ='))
   assert.equal(parsed.commissioner_record, `${lwrSnapshot}\n`)
   // DELEG-019: durable LWR is a TOML field value, not `# Opening` instruction lines.
