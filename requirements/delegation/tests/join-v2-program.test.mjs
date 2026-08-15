@@ -50,7 +50,6 @@ test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
   assert.match(orchestrator, /JOIN_IN_PROGRESS/)
 })
 test('EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
-  assert.equal(typeof joinProgram.joinAny, 'function')
   assert.equal(typeof joinProgram.joinAvailable, 'function')
 })
 
@@ -62,7 +61,6 @@ test('EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
     false,
     `second-runtime exports leaked: ${names.join(', ')}`,
   )
-  assert.ok(names.some((n) => n.includes('joinAny') || n === 'joinAny'), names.join(', '))
   assert.ok(names.some((n) => n.includes('joinAvailable') || n === 'joinAvailable'), names.join(', '))
 })
 

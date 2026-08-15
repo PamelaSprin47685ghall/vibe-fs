@@ -7,7 +7,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   agentCompletion,
-  agentIdOf,
   completionMailbox,
   maxJoinBatch,
 } from '../../verification-system/tests/support/domain.mjs'
@@ -23,12 +22,12 @@ const run = (id) =>
 // ── 4: two completions drained in one batch ──────────────────────────────────
 
 test('EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   completionMailbox.publish(box, run('a'))
   completionMailbox.publish(box, run('b'))
-  const batch = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const batch = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(batch.length, 2)
-  assert.equal(agentIdOf(batch[0]), 'a')
-  assert.equal(agentIdOf(batch[1]), 'b')
+  assert.equal(completionMailbox.ptyIdOf(batch[0]), 'a')
+  assert.equal(completionMailbox.ptyIdOf(batch[1]), 'b')
   assert.equal(completionMailbox.pendingCount(box), 0)
 })

@@ -93,10 +93,7 @@ module JoinInterrupt =
 /// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
 /// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
-/// Join budget uses injected ITimerPort + IClockPort + Deadline.nextWaitMs (G4R-CE).
-type CompletionMailbox(gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPort, ?clockPort: IClockPort) as this =
-    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
-    let clock = defaultArg clockPort (PtyTiming.nodeClockPort ())
+type CompletionMailbox(gate: obj) =
     let agentWakes = Queue<AgentHandleId>()
     let ptyCompletions = Queue<PtyJoinItem>()
     let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
@@ -125,46 +122,6 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPor
           while n < maxCount && q.Count > 0 do
               n <- n + 1
               yield q.Dequeue() ]
-
-    let handleLocalInterrupt now =
-        ignore (this.DrainAgentWakes JoinBatch.Max)
-
-        match this.DrainPtyCompletions 1 with
-        | item :: _ -> Ok(PtyJoinItem.toRunCompletion item now)
-        | [] -> Error ForkError.TimedOut
-
-    let handleSignalReason now loop reason =
-        task {
-            match reason with
-            | MailboxCancelled -> return Error ForkError.Cancelled
-            | LocalInterrupt _ -> return handleLocalInterrupt now
-            | CompletionMayBeAvailable -> return! loop ()
-        }
-
-    let waitNextSignal clockFn expires waitMs loop =
-        task {
-            let handle = timers.Delay waitMs
-
-            let interrupt: Task<JoinInterruptReason> =
-                emitJsExpr handle.Delay "$0.then(function () { return 'DeadlineExpired'; })"
-
-            let! reason = this.WaitForSignal interrupt
-            handle.Cancel()
-            return! handleSignalReason (clockFn ()) loop reason
-        }
-
-    let dispatchWait clockFn expires loop =
-        match Deadline.nextWaitMs clockFn expires with
-        | 0 -> Task.FromResult(Error ForkError.TimedOut)
-        | waitMs -> waitNextSignal clockFn expires waitMs loop
-
-    let waitAndCheckDrained isCancelled clockFn expires loop =
-        if isCancelled () then
-            Task.FromResult(Error ForkError.Cancelled)
-        elif not (hasActive ()) then
-            Task.FromResult(Error ForkError.NothingToJoin)
-        else
-            dispatchWait clockFn expires loop
 
     /// Agent wake only — never carries completion payload.
     member _.PulseAgentHandle(handle: AgentHandleId) =
@@ -240,31 +197,6 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPor
             []
         else
             lock gate (fun () -> drainQueue ptyCompletions maxCount)
-
-    /// Compatibility: wait once, drain at most one PTY completion (or ForkError).
-    /// Agent results never leave this mailbox — Journal is the agent fact source.
-    /// Budget is an absolute Deadline; each wait arms ITimerPort.Delay(nextWaitMs).
-    member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
-        let budgetMs = defaultArg timeoutMs 600_000
-        let clockFn = fun () -> clock.UtcNow()
-
-        let expires =
-            Deadline.ofBudget (clockFn ()) (TimeSpan.FromMilliseconds(float budgetMs))
-
-        let isCancelled () = lock gate (fun () -> cancelled)
-
-        let rec loop () =
-            task {
-                // Clear stale agent wakes so WaitForWake does not spin.
-                ignore (this.DrainAgentWakes JoinBatch.Max)
-                let drained = this.DrainPtyCompletions 1
-
-                match drained with
-                | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item (clock.UtcNow()))
-                | [] -> return! waitAndCheckDrained isCancelled clockFn expires loop
-            }
-
-        loop ()
 
     /// Lifecycle termination only — not tool-call abort (EXEC-017).
     member _.Cancel() =

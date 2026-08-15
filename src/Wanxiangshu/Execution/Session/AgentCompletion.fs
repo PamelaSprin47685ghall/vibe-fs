@@ -237,47 +237,9 @@ module PtyJoinItem =
         | PtyFailed f -> f.PtyId
         | PtyAborted a -> a.PtyId
 
-    /// Compat projection into RunCompletion for JoinWithPermit / Distillation /
-    /// CompletionMailbox.Join only. Production JoinTool batch path keeps PtyJoinItem
-    /// (HostForkRuntime → JoinItem → renderer) so aborted is not lost on wire.
     /// PtyAborted projects with Code = "PTY_ABORTED" so ofRunCompletion can recover it;
     /// never map abort to a generic business AgentFailed without that discriminant.
     let abortedCode = "PTY_ABORTED"
-
-    /// `completedAt` is caller-minted (IClockPort at composition) — no wall-clock reads here.
-    let toRunCompletion (item: PtyJoinItem) (completedAt: DateTimeOffset) : RunCompletion =
-        let id = ptyId item
-        let role = Role.DevOps
-
-        match item with
-        | PtyExited e ->
-            { RunId = id
-              AgentName = id
-              Role = role
-              Outcome = AgentCompletion.ofSimpleText id id role e.Outcome
-              CompletedAt = completedAt }
-        | PtyFailed f ->
-            { RunId = id
-              AgentName = id
-              Role = role
-              Outcome = AgentCompletion.failed id id (Some role) None f.Code f.Message
-              CompletedAt = completedAt }
-        | PtyAborted a ->
-            { RunId = id
-              AgentName = id
-              Role = role
-              Outcome =
-                AgentCompletion.failed
-                    id
-                    id
-                    (Some role)
-                    None
-                    abortedCode
-                    (if String.IsNullOrWhiteSpace a.Message then
-                         a.Outcome
-                     else
-                         a.Message)
-              CompletedAt = completedAt }
 
 /// Project RunCompletion into typed JoinItem (agent vs PTY).
 module JoinItem =

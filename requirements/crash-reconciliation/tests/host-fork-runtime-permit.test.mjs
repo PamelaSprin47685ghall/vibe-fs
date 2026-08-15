@@ -25,7 +25,6 @@ import {
 
 const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const {
-  joinWithPermit,
   joinAvailableWithPermit,
   awaitAgentWithPermit,
 } = await import('../../../dist/Execution/Delegation/Fork/Host/Join.js')
@@ -90,12 +89,12 @@ const validPermit = (j) => {
   return new FamilyRecoveryPermit(PARENT, sequence, RecoveryClosureModule_members(closureOf(j)))
 }
 
-// ── validatePermit branches (via JoinWithPermit / JoinAvailableWithPermit) ───
+// ── validatePermit branches (via JoinAvailableWithPermit) ───────────────────
 
 test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
   const liveCtx = await live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit, [])
+  const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
@@ -107,7 +106,7 @@ test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   const liveCtx = await live()
   const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit, [])
+  const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
   assert.match(err.fields[0], new RegExp(`family recovery permit journalSequence stale: permit=${current + 1000n}`))
@@ -140,7 +139,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
   ])
   assert.deepEqual(listItems(FamilyRecoveryPermitModule_missingFrom(grown, permit)), [])
 
-  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
+  const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'growth must not revoke the permit')
   liveCtx.cleanup()
@@ -149,7 +148,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
 test('HFRT_join_with_valid_permit_passes_validation', async () => {
   const liveCtx = await live()
   const permit = validPermit(liveCtx.journal)
-  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
+  const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'valid permit must reach the join body')
   liveCtx.cleanup()

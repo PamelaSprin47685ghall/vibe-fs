@@ -54,15 +54,15 @@
 
 | 字段 | 值 |
 |---|---|
-| Surface | `JoinDrain.migrationJoinOutcome`（`Execution/Delegation/Handle/JoinDrain.fs:202`，把 `Result<unit, ForkError>` 投影成 `Result<RunCompletion, ForkError> option`）；配套 `migrateOutcomeToUnit`（:415） |
+| Surface | ~~`JoinDrain.migrationJoinOutcome`~~（`Execution/Delegation/Handle/JoinDrain.fs:202`，把 `Result<unit, ForkError>` 投影成 `Result<RunCompletion, ForkError> option`）；配套 ~~`migrateOutcomeToUnit`~~（:415） |
 | Current owner | `Execution/Delegation/Handle/JoinDrain.fs` |
 | Old world | Join API 曾经返回 single-result `RunCompletion`；新世界 `JoinItem` 是 canonical representation |
-| Current consumer | `JoinDrain` 内部 `tryMigrateRetiredFalseAbort` → `migrateOutcomeToUnit`（:435）；`JoinDrain` 外部 `Restart.fs:146` |
+| Current consumer | ~~`JoinDrain` 内部 `tryMigrateRetiredFalseAbort` → `migrateOutcomeToUnit`~~；~~`JoinDrain` 外部 `Restart.fs:146`~~ |
 | Consumer evidence | `JoinDrain.fs:208-218`（`migrateRetiredFalseAbort` 内部）、`JoinDrain.fs:415-435`（`migrateOutcomeToUnit` 链）、`Execution/Delegation/Fork/Host/Restart.fs:146`（`tryMigrateRetiredFalseAbort`） |
-| Writer alive? | 是（`migrationJoinOutcome` 仍是 join 路径的一部分） |
-| Reader alive? | 是（`tryMigrateRetiredFalseAbort` 消费） |
-| Classification | **MIGRATE → DELETE**（迁 caller 到 canonical `JoinItem`） |
-| Exit condition | `JoinDrain` 不再构造 `Result<RunCompletion, ForkError>` single-result 路径 → 删 `migrationJoinOutcome`/`migrateOutcomeToUnit` → join 只消费 `JoinItem` |
+| Writer alive? | 否（~~`migrationJoinOutcome` 仍是 join 路径的一部分~~ 已删） |
+| Reader alive? | 否（~~`tryMigrateRetiredFalseAbort` 消费~~ 已删） |
+| Classification | **DELETED**（CLN-05 迁 caller + CLN-06 删 single-result compat 链） |
+| Exit condition | ~~`JoinDrain` 不再构造 `Result<RunCompletion, ForkError>` single-result 路径~~ ✅ 已达成 |
 | Owner | 本仓库 |
 | Removal PR | CLN-05（迁 caller）/ CLN-06（删兼容路径） |
 

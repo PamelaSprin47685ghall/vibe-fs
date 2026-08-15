@@ -69,13 +69,10 @@ type HostForkRuntime
         /// never enters the Manager's list/join/guard or parent recovery.
         ?ownership: Fact.HandleOwnership,
         /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
-        ?clock: IClockPort,
-        /// Join one-shot deadline port (G4R-CE) — Host may inject; default Node timer.
-        ?timerPort: ITimerPort
+        ?clock: IClockPort
     ) as this =
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
-    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
-    let runtime = ForkRuntime(clock = clockPort, timerPort = timers)
+    let runtime = ForkRuntime(clock = clockPort)
     let children = Dictionary<string, SessionId>()
     // Join visibility is process ownership, not liveness. A run may already have
     // settled and left the live list while its completion is still waiting for join.
@@ -196,7 +193,6 @@ type HostForkRuntime
     member internal _.HandleOwnership = handleOwnership
     member internal _.DeferredFirstPrompts = deferredFirstPrompts
     member internal _.Clock = clockPort
-    member internal _.Timers = timers
     /// Wall-clock read for Session extension modules (avoids raw DateTimeOffset stamps).
     member internal _.Now() = clockPort.UtcNow()
 

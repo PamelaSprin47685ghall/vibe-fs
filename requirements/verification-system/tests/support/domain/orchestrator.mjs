@@ -245,7 +245,6 @@ export const completionMailbox = (() => {
     throw new Error('Session/CompletionMailbox did not export CompletionMailbox')
   }
 
-  const joinFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Join')
   const publishPtyFn = fableInstanceMethod(
     CompletionMailboxModule,
     'CompletionMailbox',
@@ -293,12 +292,6 @@ export const completionMailbox = (() => {
     'WaitForWake',
   )
   const pulseWakeFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'PulseWake')
-  // PtyJoinItem lives in AgentCompletion; toRunCompletion projects for Join wire.
-  const toRunCompletionFn = member(
-    AgentCompletionModuleEarly,
-    'PtyJoinItem',
-    'toRunCompletion',
-  )
   // Type name collides with module name, so Fable does NOT export named case
   // constructors: dist emits `PtyJoinItem` Union + `PtyExit` record class +
   // `PtyJoinItemModule_*` module functions. Construct by tag at the facade
@@ -359,6 +352,9 @@ export const completionMailbox = (() => {
       throw new Error('CompletionMailbox JoinBatch.Max / MaxJoinBatch missing')
     })()
 
+  /** PtyId of a drained PtyJoinItem (PtyExited/PtyFailed/PtyAborted record head). */
+  const ptyIdOf = (item) => item.fields[0].PtyId
+
   /** Build PtyExited item from agent-shaped test fixture fields or id string. */
   const ptyExitedOf = (completionOrId) => {
     if (typeof completionOrId === 'string') {
@@ -383,7 +379,7 @@ export const completionMailbox = (() => {
   }
 
   return {
-    create: (hasActive = () => true) => new Mailbox({}, hasActive),
+    create: () => new Mailbox({}),
     /** GREEN-5: PTY fact publish (replaces publish(RunCompletion)). */
     publishPty: (box, item) => publishPtyFn(box, item),
     /**
@@ -394,24 +390,14 @@ export const completionMailbox = (() => {
     ptyExited: ptyExitedOf,
     ptyFailed: ptyFailedOfPayload,
     ptyAborted: ptyAbortedOfPayload,
-    /** EXEC-020: Code used when PtyAborted is projected through toRunCompletion. */
-    ptyAbortedCode: 'PTY_ABORTED',
-    toRunCompletion: (item) => toRunCompletionFn(item),
     pulseAgentHandle: (box, handle) => pulseAgentFn(box, handle),
-    // timeoutMs === undefined → no deadline (Fable optional is nullish).
-    join: (box, timeoutMs) => joinFn(box, timeoutMs),
     cancel: (box) => cancelFn(box),
     pendingCount: (box) => pendingCountFn(box),
     pendingPtyCount: (box) => pendingPtyCountFn(box),
     isCancelled: (box) => isCancelledFn(box),
     drainPtyCompletions: (box, maxCount) => listItems(drainPtyFn(box, maxCount)),
     drainAgentWakes: (box, maxCount) => listItems(drainAgentWakesFn(box, maxCount)),
-    /**
-     * Drain PTY channel and project to RunCompletion (Join wire shape).
-     * Tests assert AgentId / publish order on this projection.
-     */
-    drainAvailable: (box, maxCount) =>
-      listItems(drainPtyFn(box, maxCount)).map((item) => toRunCompletionFn(item)),
+    ptyIdOf,
     waitForSignal: (box, interrupt) => waitForSignalFn(box, interrupt),
     waitForWake: (box) => waitForWakeFn(box),
     pulseWake: (box) => pulseWakeFn(box),
@@ -681,16 +667,13 @@ const ManagerJobModule = await prod('Change/Job')
 const JoinInterruptReason = CompletionMailboxModule.JoinInterruptReason
 
 export const joinProgram = (() => {
-  const joinAnyFn = JoinModule.joinAny ?? JoinModule.Join_joinAny
   const joinAvailableFn = JoinModule.joinAvailable ?? JoinModule.Join_joinAvailable
-  if (typeof joinAnyFn !== 'function' || typeof joinAvailableFn !== 'function') {
+  if (typeof joinAvailableFn !== 'function') {
     throw new Error(
-      `Join.joinAny/joinAvailable missing; exports: ${Object.keys(JoinModule).join(', ')}`,
+      `Join.joinAvailable missing; exports: ${Object.keys(JoinModule).join(', ')}`,
     )
   }
   return {
-    /** Direct CE: FamilyRecoveryPermit → runtime.JoinWithPermit. */
-    joinAny: joinAnyFn,
     /** EXEC-018 batch: permit + maxCount + interrupt.Wait. */
     joinAvailable: joinAvailableFn,
   }

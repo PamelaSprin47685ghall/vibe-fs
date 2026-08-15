@@ -198,11 +198,6 @@ module JoinDrain =
                 |> TaskValue.map (Result.mapError ForkError.NotFound)
         }
 
-    let private migrationJoinOutcome (result: Result<unit, ForkError>) : Result<RunCompletion, ForkError> option =
-        match result with
-        | Ok() -> None
-        | Error e -> Some(Error e)
-
     /// Retired legacy false abort: deterministic replacement + correction (idempotent).
     let private migrateRetiredFalseAbort
         (durable: AgentJournal)
@@ -211,7 +206,7 @@ module JoinDrain =
         (agentId: string)
         (blobRef: BlobRef)
         (blobDigest: BlobDigest)
-        : Task<Result<RunCompletion, ForkError> option> =
+        : Task<Result<unit, ForkError> option> =
         task {
             let replacement = FalseTerminalMigration.replacementHandle agentId blobDigest
             let projection = AgentJournal.handleProjection durable parentId
@@ -220,7 +215,7 @@ module JoinDrain =
             | Some _ -> return None
             | None ->
                 let! result = appendMigrationFacts durable parentId record replacement blobRef blobDigest
-                return migrationJoinOutcome result
+                return Some result
         }
 
     let private missingBodyOutcome (agentId: string) (lifecycle: HandleLifecycle) =
@@ -411,7 +406,7 @@ module JoinDrain =
         | ForkError.NotFound msg -> msg
         | other -> sprintf "%A" other
 
-    let private migrateOutcomeToUnit (outcome: Result<RunCompletion, ForkError> option) =
+    let private migrateOutcomeToUnit (outcome: Result<unit, ForkError> option) =
         match outcome with
         | None
         | Some(Ok _) -> Ok()

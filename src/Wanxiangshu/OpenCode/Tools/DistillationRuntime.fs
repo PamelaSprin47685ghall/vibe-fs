@@ -35,8 +35,6 @@ module DistillationRuntime =
 
     type IDistillationRuntime =
         abstract Fork: string * Role * string * string option -> Task<Result<ForkResult, string>>
-        /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
-        abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Targeted agent await: fresh permit → HostForkRuntime.AwaitAgentWithPermit.
         abstract AwaitAgentWithPermit: agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Revision sampled before a permit check, closing the readiness-wait race.
@@ -59,20 +57,6 @@ module DistillationRuntime =
         { new IDistillationRuntime with
             member _.Fork(agentId, role, prompt, payload) =
                 runtime.Fork(agentId, role, distillerAgent, prompt, payload)
-
-            member _.JoinWithPermit(timeoutMs) =
-                task {
-                    match! requirePermit () with
-                    | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
-                        // FamilyWaiting: surface TimedOut (wait-not-hard-error). Hard
-                        // FamilyBlocked / other permit errors → NotFound below.
-                        return Error ForkError.TimedOut
-                    | Error msg -> return Error(ForkError.NotFound msg)
-                    | Ok permit ->
-                        match timeoutMs with
-                        | Some ms -> return! HostForkJoin.joinWithPermit runtime permit (Some ms)
-                        | None -> return! HostForkJoin.joinWithPermit runtime permit None
-                }
 
             member _.AwaitAgentWithPermit(agentId, timeoutMs) =
                 task {
@@ -104,15 +88,6 @@ module DistillationRuntime =
                 task {
                     return
                         Error "ofForkRuntime cannot agent-join without FamilyRecoveryPermit; use HostForkRuntime path"
-                }
-
-            member _.JoinWithPermit(_timeoutMs) =
-                task {
-                    return
-                        Error(
-                            ForkError.NotFound
-                                "pure ForkRuntime has no journal; agent Join requires JoinWithPermit under FamilyRecoveryPermit"
-                        )
                 }
 
             member _.AwaitAgentWithPermit(_agentId, _timeoutMs) =

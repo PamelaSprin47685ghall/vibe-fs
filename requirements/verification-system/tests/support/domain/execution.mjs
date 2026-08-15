@@ -242,7 +242,6 @@ export const forkRuntime = (() => {
   const forkFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'Fork')
   const awaitFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'AwaitAgent')
   const cancelFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'CancelAgent')
-  const joinFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'Join')
 
   const roleOf = (name) => {
     const value = AgentRole[name]
@@ -261,7 +260,6 @@ export const forkRuntime = (() => {
     fork: (rt, agentId, role, agentName, prompt) => forkFn(rt, agentId, role, agentName, prompt, undefined),
     awaitAgent: (rt, agentId, timeoutMs) => awaitFn(rt, agentId, timeoutMs),
     cancelAgent: (rt, agentId) => cancelFn(rt, agentId),
-    join: (rt, timeoutMs) => joinFn(rt, timeoutMs),
   }
 })()
 

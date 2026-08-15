@@ -107,7 +107,7 @@
     "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs": 4,
     "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs": 4,
     "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs": 0,
-    "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs": 2,
+    "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs": 1,
     "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs": 0,
     "src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs": 2,
     "src/Wanxiangshu/OpenCode/Tools/StaticTools.fs": 2,

@@ -171,8 +171,8 @@ export const RULES = [
     id: 'join-tool-join-program',
     fileHint: 'JoinTool.fs',
     // EXEC-018 / PR5: JoinTool production path is direct Join.joinAvailable (no AST).
-    pattern: /Join\.joinAvailable|Join\.joinAny/,
-    label: 'JoinTool must call Join.joinAvailable / Join.joinAny',
+    pattern: /Join\.joinAvailable/,
+    label: 'JoinTool must call Join.joinAvailable',
     positive: true,
   },
   {
@@ -181,7 +181,7 @@ export const RULES = [
     // P0 §五 / §十: JoinTool must not bare-call runtime.Join (JoinWithPermit / Join(permit ok elsewhere).
     // Bare = runtime.Join( without leading permit argument.
     pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
-    label: 'JoinTool must not call runtime.Join; use Join.joinAvailable / Join.joinAny',
+    label: 'JoinTool must not call runtime.Join; use Join.joinAvailable',
   },
   {
     // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
@@ -350,7 +350,7 @@ export const RULES = [
   {
     id: 'join-program-requires-permit',
     fileHint: 'Join.fs',
-    pattern: /joinAny[\s\S]{0,120}FamilyRecoveryPermit|joinAvailable[\s\S]{0,160}FamilyRecoveryPermit/,
+    pattern: /joinAvailable[\s\S]{0,160}FamilyRecoveryPermit/,
     label: 'Join ops must take FamilyRecoveryPermit (EXEC-023)',
     positive: true,
   },

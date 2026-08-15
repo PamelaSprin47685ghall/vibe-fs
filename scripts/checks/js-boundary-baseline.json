@@ -293,12 +293,11 @@
   "requirements/delegation/tests/host-fork-join-algebra.test.mjs": {
     "deep-dist-import": 3,
     "export-discovery": 1,
-    "du-shape": 12,
-    "interop-helper": 5
+    "du-shape": 10,
+    "interop-helper": 4
   },
   "requirements/delegation/tests/join-completion.test.mjs": {
-    "interop-helper": 4,
-    "du-shape": 2
+    "interop-helper": 1
   },
   "requirements/delegation/tests/join-guard-roles.test.mjs": {
     "deep-dist-import": 3,

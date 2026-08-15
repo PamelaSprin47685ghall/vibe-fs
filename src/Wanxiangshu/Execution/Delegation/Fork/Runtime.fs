@@ -105,9 +105,7 @@ type ForkRuntime
         ?listener: RunCompletion -> unit,
         ?cleanup: string -> unit,
         /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
-        ?clock: IClockPort,
-        /// Join budget timer (G4R-CE) — default Node timer port.
-        ?timerPort: ITimerPort
+        ?clock: IClockPort
     ) =
 
     let childRunner =
@@ -117,7 +115,6 @@ type ForkRuntime
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
-    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
 
     // DSL-MUTABLE: resource — live child agent registry under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
@@ -125,15 +122,7 @@ type ForkRuntime
     let mutable ptys: Map<string, PtyRecord> = Map.empty
     let lockObj = obj ()
 
-    let mailbox =
-        CompletionMailbox(
-            lockObj,
-            (fun () ->
-                agents |> Map.exists (fun _ run -> ChildRun.isActive run)
-                || not (Map.isEmpty ptys)),
-            timerPort = timers,
-            clockPort = clockPort
-        )
+    let mailbox = CompletionMailbox(lockObj)
 
     let cancelAllAgentsAndClearPtys () =
         lock lockObj (fun () ->
@@ -237,12 +226,6 @@ type ForkRuntime
     // -----------------------------------------------------------------------
     // Public API — Join / signal / drain (EXEC-017 / EXEC-018 / GREEN-5)
     // -----------------------------------------------------------------------
-
-    /// Compatibility single-result join (PTY mailbox only). Prefer WaitForSignal + drains.
-    member _.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
-        match timeoutMs with
-        | Some ms -> mailbox.Join(timeoutMs = ms)
-        | None -> mailbox.Join()
 
     /// EXEC-018: wait for completion/cancel signal or typed local interrupt.
     member _.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =

@@ -47,6 +47,8 @@ const run = (id) =>
     workRecord: `wr-${id}`,
   })
 
+const ptyIdOfDrained = (item) => completionMailbox.ptyIdOf(item)
+
 // ── MaxJoinBatch constant ────────────────────────────────────────────────────
 
 test('EXEC_018_max_join_batch_is_32', () => {
@@ -57,33 +59,33 @@ test('EXEC_018_max_join_batch_is_32', () => {
 // ── 5: 33 completions → first drain 32, second drain 1 ───────────────────────
 
 test('EXEC_018_thirty_three_completions_split_across_two_drains', () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   for (let i = 0; i < 33; i += 1) {
     completionMailbox.publish(box, run(`c${i}`))
   }
   assert.equal(completionMailbox.pendingCount(box), 33)
 
-  const first = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const first = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(first.length, 32)
-  assert.equal(agentIdOf(first[0]), 'c0')
-  assert.equal(agentIdOf(first[31]), 'c31')
+  assert.equal(ptyIdOfDrained(first[0]), 'c0')
+  assert.equal(ptyIdOfDrained(first[31]), 'c31')
   assert.equal(completionMailbox.pendingCount(box), 1)
 
-  const second = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const second = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(second.length, 1)
-  assert.equal(agentIdOf(second[0]), 'c32')
+  assert.equal(ptyIdOfDrained(second[0]), 'c32')
   assert.equal(completionMailbox.pendingCount(box), 0)
 })
 
 // ── 6: no duplicate handle in a drained batch ────────────────────────────────
 
 test('EXEC_018_drained_batch_has_unique_agent_ids', () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   for (const id of ['x', 'y', 'z', 'x2', 'y2']) {
     completionMailbox.publish(box, run(id))
   }
-  const batch = completionMailbox.drainAvailable(box, maxJoinBatch)
-  const ids = batch.map(agentIdOf)
+  const batch = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
+  const ids = batch.map(ptyIdOfDrained)
   assert.deepEqual(ids, [...new Set(ids)])
   assert.equal(ids.length, 5)
 })
@@ -91,13 +93,13 @@ test('EXEC_018_drained_batch_has_unique_agent_ids', () => {
 // ── 7: second drain does not re-deliver consumed completions ─────────────────
 
 test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   completionMailbox.publish(box, run('once'))
-  const first = completionMailbox.drainAvailable(box, 1)
+  const first = completionMailbox.drainPtyCompletions(box, 1)
   assert.equal(first.length, 1)
-  assert.equal(agentIdOf(first[0]), 'once')
+  assert.equal(ptyIdOfDrained(first[0]), 'once')
 
-  const second = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const second = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.deepEqual(second, [])
   assert.equal(completionMailbox.pendingCount(box), 0)
 })
@@ -105,7 +107,7 @@ test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
 // ── 1: WaitForSignal + operator abort → LocalInterrupt OperatorAbort ─────────
 
 test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.OperatorAbort)
@@ -117,7 +119,7 @@ test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async ()
 // ── 1b: WaitForSignal + UserMessageArrived (registry signal, not OperatorAbort)
 
 test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.UserMessageArrived)
@@ -128,7 +130,7 @@ test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async
 })
 
 test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.UserMessageArrived)
@@ -137,8 +139,8 @@ test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
   assert.equal(completionMailbox.isCancelled(box), false, 'user message ≠ Cancel')
   completionMailbox.publish(box, run('after-user-message'))
   assert.equal(completionMailbox.pendingCount(box), 1)
-  const drained = completionMailbox.drainAvailable(box, 1)
-  assert.equal(agentIdOf(drained[0]), 'after-user-message')
+  const drained = completionMailbox.drainPtyCompletions(box, 1)
+  assert.equal(ptyIdOfDrained(drained[0]), 'after-user-message')
 })
 
 // EXEC-017: two active attempts in one session both receive UserMessageArrived.
@@ -240,7 +242,7 @@ test('EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join', async () 
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────
 
 test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.OperatorAbort)
@@ -249,14 +251,14 @@ test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async
   assert.equal(completionMailbox.isCancelled(box), false, 'interrupt ≠ Cancel')
   completionMailbox.publish(box, run('after-interrupt'))
   assert.equal(completionMailbox.pendingCount(box), 1)
-  const drained = completionMailbox.drainAvailable(box, 1)
-  assert.equal(agentIdOf(drained[0]), 'after-interrupt')
+  const drained = completionMailbox.drainPtyCompletions(box, 1)
+  assert.equal(ptyIdOfDrained(drained[0]), 'after-interrupt')
 })
 
 // ── 3: after interrupt, next join/drain obtains the later completion ─────────
 
 test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.OperatorAbort)
@@ -266,21 +268,21 @@ test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () 
 
   // Child finishes after the interrupted join returned.
   completionMailbox.publish(box, run('late-child'))
-  const next = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const next = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(next.length, 1)
-  assert.equal(agentIdOf(next[0]), 'late-child')
+  assert.equal(ptyIdOfDrained(next[0]), 'late-child')
 })
 
 // ── 8: drain-before-interrupt — completion already queued wins ───────────────
 
 test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   completionMailbox.publish(box, run('already-done'))
 
   // Immediate drain path (HostForkRuntime.tryDrainAvailable / WaitForSignal re-drain).
-  const ready = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const ready = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(ready.length, 1)
-  assert.equal(agentIdOf(ready[0]), 'already-done')
+  assert.equal(ptyIdOfDrained(ready[0]), 'already-done')
 
   // Even if interrupt is already signalled, re-drain would still see results first.
   const interrupt = joinInterrupt.create()
@@ -292,9 +294,9 @@ test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => 
     mailboxWakeReason.nameOf(reason) === 'LocalInterrupt' ||
       mailboxWakeReason.nameOf(reason) === 'CompletionMayBeAvailable',
   )
-  const after = completionMailbox.drainAvailable(box, maxJoinBatch)
+  const after = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
   assert.equal(after.length, 1)
-  assert.equal(agentIdOf(after[0]), 'also-done')
+  assert.equal(ptyIdOfDrained(after[0]), 'also-done')
 })
 
 // ── NonEmptyBatch + JoinWaitOutcome shape ────────────────────────────────────
@@ -361,7 +363,7 @@ test('EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_inter
 // ── Cancel is lifecycle only (still available; interrupt path does not call it)
 
 test('EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
-  const box = completionMailbox.create(() => true)
+  const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   interrupt.Signal(JoinInterruptReason.OperatorAbort)

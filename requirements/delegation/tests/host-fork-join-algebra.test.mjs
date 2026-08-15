@@ -18,7 +18,6 @@ const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/
 const { HostForkRuntime, HostForkRuntime__get_IsCancelled: runtimeIsCancelled, HostForkRuntime__Cancel: cancelRuntime } = hostRuntimeModule
 const installRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__InstallRun_'))?.[1]
 const {
-  join: joinAny,
   joinAvailable,
   awaitAgent,
 } = await import('../../../dist/Execution/Delegation/Fork/Host/Join.js')
@@ -83,21 +82,11 @@ test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_join_single_times_out_when_no_completion_arrives', async () => {
-  const liveCtx = await live()
-  installRun(liveCtx.runtime, 'ag9', sessionId('ses_c9'), Role.Coder)
-
-  const result = await joinAny(liveCtx.runtime, [30])
-  assert.equal(result.tag, 1)
-  assert.equal(caseOf(result.fields[0]), 'TimedOut')
-  liveCtx.cleanup()
-})
-
 test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
   const liveCtx = await live()
   cancelRuntime(liveCtx.runtime)
   assert.equal(runtimeIsCancelled(liveCtx.runtime), true)
-  const result = await joinAny(liveCtx.runtime, [10])
+  const result = await joinAvailable(liveCtx.runtime, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'Cancelled')
   liveCtx.cleanup()
