@@ -17,7 +17,8 @@ import {
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
 import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
 import { FsSet } from '../../verification-system/tests/support/domain.mjs'
-import { isNone, isSome, listItems, roles } from '../../verification-system/tests/support/domain.mjs'
+import { isNone, isSome, listItems } from '../../verification-system/tests/support/domain.mjs'
+import { permissions as rolePermissions } from '../../../dist/Foundation/RolesSurface.js'
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
 const caps = (...permissions) => FsSet.ofArray(permissions, permissionComparer)
@@ -35,7 +36,7 @@ const PERMISSION_NAMES = [
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
-  roles.permissions(roles.of(role)).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
 
 const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Grep: 'grep', Edit: 'rewrite', Write: 'write' }
 const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', grep: 'js.grep', rewrite: 'js.edit', write: 'js.write' }
@@ -60,8 +61,8 @@ const layersOf = (s) =>
 
 test('JS001_generate_none_when_no_filesystem_capability', () => {
   for (const role of ['Manager', 'Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
-    const perms = caps(...permsOf(roles.permissions(roles.of(role))))
-    assert.equal(isNone(surface(role, roles.permissions(roles.of(role)))), true, `${role} must get no js-* surface`)
+    const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
+    assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `js-${role.toLowerCase()}`), false)
   }
 })
@@ -69,7 +70,7 @@ test('JS001_generate_none_when_no_filesystem_capability', () => {
 test('JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
   for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
-    const result = surface(role, roles.permissions(roles.of(role)))
+    const result = surface(role, rolePermissions(role.toLowerCase()))
     if (fsPerms.length === 0) {
       assert.equal(isNone(result), true, `${role} has no fs capability`)
     } else {
@@ -207,7 +208,7 @@ test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () =>
   }
 
   for (const [role, marker] of Object.entries(markers)) {
-    const result = surface(role, roles.permissions(roles.of(role)))
+    const result = surface(role, rolePermissions(role.toLowerCase()))
     const examples = listItems(result.Examples)
     assert.equal(examples.length, 1, `${role} gets exactly one Ultra Example`)
     assert.match(examples[0], marker, `${role} gets its responsibility-shaped lesson`)
@@ -216,7 +217,7 @@ test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () =>
     assert.match(result.Description, /Semantic branches belong between programs/)
   }
 
-  const reviewer = surface('Reviewer', roles.permissions(roles.of('Reviewer')))
+  const reviewer = surface('Reviewer', rolePermissions('reviewer'))
   assert.doesNotMatch(listItems(reviewer.Examples)[0], /verdict\s*:/i, 'reviewer example gathers evidence, never authors judgment')
 })
 

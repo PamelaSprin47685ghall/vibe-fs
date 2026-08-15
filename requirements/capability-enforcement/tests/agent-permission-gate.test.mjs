@@ -14,7 +14,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { managedAgentConfig, roles, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
+import { permissions } from '../../../dist/Foundation/RolesSurface.js'
+import { managedAgentConfig, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
 
 const ROLES = [
   'Manager',
@@ -291,7 +292,7 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       suicide: 'Finality',
     })[toolName]
   for (const role of ROLES) {
-    const fromRoles = roles.permissions(roles.of(role))
+    const fromRoles = permissions(role.toLowerCase())
     const config = buildConfig()
     managedAgentConfig.configure(config)
     const fromSchema = [...new Set(allowList(config, agentName('fast', role)).map(permissionOf))].sort()

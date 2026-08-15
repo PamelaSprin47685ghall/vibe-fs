@@ -24,7 +24,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { admitLabor, classifyEnding, EndingDisposition, LaborAdmission } from '../../../dist/Mission/Manager/Finality.js'
-import { Role, Roles_isAllowed, ToolPermission } from '../../../dist/Foundation/Roles.js'
+import { isAllowed } from '../../../dist/Foundation/RolesSurface.js'
 import {
   blobDigest,
   blobRef,
@@ -133,9 +133,9 @@ const foldLife = (facts) => {
 const caseOf = (value) => value.cases()[value.tag]
 
 test('FINALITY-001 only the Manager holds ToolPermission.Finality', () => {
-  assert.equal(Roles_isAllowed(Role.Manager, ToolPermission.Finality), true)
-  for (const role of [Role.Coder, Role.Inspector, Role.DevOps, Role.Browser, Role.Inquiry, Role.Reviewer, Role.Orchestrator, Role.Distiller, Role.Blogger]) {
-    assert.equal(Roles_isAllowed(role, ToolPermission.Finality), false, `role ${role.cases()[role.tag]} must not hold Finality`)
+  assert.equal(isAllowed('manager', 'Finality'), true)
+  for (const role of ['coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'orchestrator', 'distiller', 'blogger']) {
+    assert.equal(isAllowed(role, 'Finality'), false, `role ${role} must not hold Finality`)
   }
 })
 

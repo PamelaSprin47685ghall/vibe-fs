@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { roles } from '../../verification-system/tests/support/domain.mjs'
+import { permissions } from '../../../dist/Foundation/RolesSurface.js'
 import { ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -39,10 +40,10 @@ test('PROMPT_depth_ZH_role_laws_carry_matching_cognition_anchors', () => {
 })
 
 test('PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model', () => {
-  const permissions = roles.permissions(roles.of('Inquiry'))
+  const inquiryPermissions = permissions('inquiry')
   assert.ok(
-    permissions.some((n) => /Sphinx/i.test(n)),
-    `Inquiry must retain Sphinx permission; got ${permissions.join(',')}`,
+    inquiryPermissions.some((n) => /Sphinx/i.test(n)),
+    `Inquiry must retain Sphinx permission; got ${inquiryPermissions.join(',')}`,
   )
 
   const en = readRole('inquiry', 'en.md')

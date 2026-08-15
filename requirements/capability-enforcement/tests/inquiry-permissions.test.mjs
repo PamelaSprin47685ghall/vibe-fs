@@ -16,10 +16,11 @@ import test from 'node:test'
 import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
 import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
 import { ToolRegistry_rolePredicate as rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistry.js'
-import { Role, Roles_isAllowed as isAllowed, ToolPermission } from '../../../dist/Foundation/Roles.js'
+import { Role, ToolPermission } from '../../../dist/Foundation/Roles.js'
 import { StaticTools_toolName as toolName } from '../../../dist/OpenCode/Tools/StaticTools.js'
+import { permissions as rolePermissions, isAllowed as surfaceIsAllowed } from '../../../dist/Foundation/RolesSurface.js'
 
-import { managedAgentConfig, roles, runtimeResources, setItems } from '../../verification-system/tests/support/domain.mjs'
+import { managedAgentConfig, runtimeResources, setItems } from '../../verification-system/tests/support/domain.mjs'
 
 const names = (permissions) => setItems(permissions).map(toolName).sort()
 
@@ -31,7 +32,7 @@ test.before(() => {
 })
 
 test('Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
-  const allowed = roles.permissions(roles.of('Inquiry'))
+  const allowed = rolePermissions('inquiry')
   assert.deepEqual(allowed, ['Fission', 'Inspect', 'Sphinx'])
   assert.equal(allowed.includes('Read'), false)
   assert.equal(allowed.includes('Glob'), false)
@@ -39,11 +40,11 @@ test('Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
 })
 
 test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx_fission', () => {
-  assert.equal(isAllowed(Role.Inquiry, ToolPermission.Inspect), true)
-  assert.equal(isAllowed(Role.Inquiry, ToolPermission.Sphinx), true)
-  assert.equal(isAllowed(Role.Inquiry, ToolPermission.Fission), true)
+  assert.equal(surfaceIsAllowed('inquiry', 'Inspect'), true)
+  assert.equal(surfaceIsAllowed('inquiry', 'Sphinx'), true)
+  assert.equal(surfaceIsAllowed('inquiry', 'Fission'), true)
   for (const permission of READ_PERMISSIONS) {
-    assert.equal(isAllowed(Role.Inquiry, permission), false, `Inquiry must lack ${permission}`)
+    assert.equal(surfaceIsAllowed('inquiry', permission), false, `Inquiry must lack ${permission}`)
   }
 })
 
