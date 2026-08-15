@@ -385,16 +385,16 @@ test('ENFORCER_park_resumed_without_material_projects_raw', async () => {
   })
 })
 
-test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
+test('ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       await primeCycle(scope, journal)
+      const previousHead = 2n
       const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-      // Main session offers material while the transform is parked: the wake
-      // resolves true and the re-chunk finds the new window.
+      // The first cycle catches up through sequence 2. While the continuation is
+      // parked, main produces sequence 3..4. A frozen wake-time/head-time frontier
+      // would exclude them; live-Current catch-up must consume them immediately.
       parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
-        // Re-capture the seed turns plus two NEW turns (capture dedupes by
-        // provenance, so only the fresh turns land in the XTrace).
         await xTraceCapture.captureProjection(
           journal,
           sessionId(MAIN),
@@ -413,10 +413,11 @@ test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
         const out = await run(blogStep('asst-1', 'c1', 'window one'))
         assert.equal(caseOf(out), 'ProjectMessages')
         const next = parkedTransform.peekCurrentRequest(scope, BLOG)
-        assert.notEqual(next, undefined, 'drained context re-armed as live request')
+        assert.notEqual(next, undefined, 'future material must re-arm the same catch-up')
         assert.equal(next.kind, 'Main')
-        assert.equal(next.previousIngested, 2n)
-        assert.equal(next.nextIngested, 4n, 'new turns covered')
+        assert.equal(next.previousIngested, previousHead)
+        assert.equal(next.nextIngested, 4n)
+        assert.ok(next.nextIngested > previousHead, 'same catch-up must cross the head observed before park')
       } finally {
         parkedTransform.host(scope).ParkTransform = original
       }

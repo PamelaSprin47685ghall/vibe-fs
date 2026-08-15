@@ -53,6 +53,19 @@ RED = 满足下列任一：
 
 `BloggerDeltaLimitBytes = 200 * 1024` 只约束单次 delta 渲染字节，不比较、不触发、不动态调参。
 
+### 4.7 catch-up 是连续追平，不冻结 frontier，不把 quiet 当完成
+
+一次 main-material wake 可能需要多个 ≤200 KiB cycle。Y 每次提交后都从当前 canonical
+coverage + 当前 XTrace Current 重新取下一块；**不得**把 wake 时、首次 cycle 时或任一中间时刻的
+XTrace head 冻成 drain frontier。否则 drain 期间新到的真实 material 会被人为推迟到下一次 wake，
+吞吐与时序都发生用户可见退化。
+
+当前瞬间无 material 只表示暂时 caught-up，不表示该连续 drain 已完成。**在同一存活物理执行内**，
+只要 main 仍允许继续，Blogger 必须保持悬挂等待；未来 material 到达后唤醒同一 continuation，再从
+最新 Current 继续追平。把 quiet/caught-up 改成自然 stop，会把持续追平退化成离散批处理，也破坏
+COMPANION-005 / ENFORCER-047/050 的既有行为。process death 是另一条边界：按 CRASH-017/018，旧
+invocation 已中断，restart 不得把这里的“持续等待”解释成跨进程自动恢复。
+
 ## 5. 与相邻包的边界
 
 | 看似相邻 | 为什么不归本包 |
