@@ -2444,27 +2444,19 @@ surface 应跟着 semantic owner 分布。
 
 ### P3 — Pure pilot ✅
 
-迁一个 pure semantic component。
-
-**完成条件：**证明 JSON-shaped contract 可行。
+迁一个 pure semantic component。**完成条件：**证明 JSON-shaped contract 可行。**达成：**`ForkChildPayloadSurface`（注册 surface #1，JSON-shaped 输入输出，assertJsData 证明）。
 
 ### P4 — Stateful pilot ✅
 
-迁 `SessionQuiescenceGate` 一类 abstraction。
+迁 `SessionQuiescenceGate` 一类 abstraction。**完成条件：**证明 opaque capability + behavior surface 可行。**达成：**`QuiescenceSurface`（gate/permit opaque handle，8 个 HOST-004 law）。
 
-**完成条件：**证明 opaque capability + behavior surface 可行。
+### P5 — Representation gate ✅
 
-### P5 — Representation gate
+建立统一 JS-native validator。**完成条件：**Fable runtime value 无法意外穿过新 surface。**达成：**`js-contract.mjs`（assertJsData/assertOpaque）+ charter「注册 surface 必有契约测试」门禁。
 
-建立统一 JS-native validator。
+### P6 — Pure/algebra wave ✅（首批）
 
-**完成条件：**Fable runtime value 无法意外穿过新 surface。
-
-### P6 — Pure/algebra wave
-
-大量迁 projection/decision/codec/policy tests。
-
-**完成条件：**`domain.mjs` 使用量明显下降。
+大量迁 projection/decision/codec/policy tests。**完成条件：**`domain.mjs` 使用量明显下降。**达成：**6 个注册 surface（ForkChildPayload/SyntheticToml/BloggerToml/Quiescence/DelegatedToolEstimate），13 个测试文件迁移，债务 3185→3171、文件 316→312。
 
 ### P7 — Resource/runtime wave
 
