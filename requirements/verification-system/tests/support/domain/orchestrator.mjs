@@ -37,6 +37,18 @@ import { fold } from './journal.mjs'
 import { providerLanguage } from './prompt.mjs'
 
 /**
+ * Canonical agentId of a RunCompletion: read from Outcome payload
+ * (AgentCompleted/Failed payload.AgentId; AgentAbandoned tuple head),
+ * never from the deprecated RunCompletion.AgentId field.
+ */
+export const agentIdOf = (completion) => {
+  const outcome = caseOf(completion.Outcome)
+  const payload = payloadOf(completion.Outcome)
+  if (outcome === 'AgentAbandoned') return payload[0]
+  return payload.AgentId
+}
+
+/**
  * EXEC-009 + EXEC-018 pure durable join drain (JoinDrain.fs).
  * HostForkRuntime.tryDrainAvailable → JoinDrain.drainFromJournal.
  * Tests drive this path — never re-implement sort or hand-build batches around drain.
@@ -55,7 +67,7 @@ export const joinDrain = (() => {
     const payload = payloadOf(c.Outcome)
     return {
       runId: c.RunId,
-      agentId: c.AgentId,
+      agentId: agentIdOf(c),
       agentName: c.AgentName,
       status:
         outcome === 'AgentCompleted'
@@ -357,7 +369,7 @@ export const completionMailbox = (() => {
         Closed: true,
       })
     }
-    const id = completionOrId.AgentId ?? completionOrId.RunId ?? 'pty'
+    const id = agentIdOf(completionOrId)
     const outcomePayload = completionOrId.Outcome
     let outcome = `wr-${id}`
     if (outcomePayload && typeof outcomePayload === 'object') {

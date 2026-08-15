@@ -12,6 +12,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   agentCompletion,
+  agentIdOf,
   caseOf,
   completionMailbox,
   joinInterrupt,
@@ -64,13 +65,13 @@ test('EXEC_018_thirty_three_completions_split_across_two_drains', () => {
 
   const first = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.equal(first.length, 32)
-  assert.equal(first[0].AgentId, 'c0')
-  assert.equal(first[31].AgentId, 'c31')
+  assert.equal(agentIdOf(first[0]), 'c0')
+  assert.equal(agentIdOf(first[31]), 'c31')
   assert.equal(completionMailbox.pendingCount(box), 1)
 
   const second = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.equal(second.length, 1)
-  assert.equal(second[0].AgentId, 'c32')
+  assert.equal(agentIdOf(second[0]), 'c32')
   assert.equal(completionMailbox.pendingCount(box), 0)
 })
 
@@ -82,7 +83,7 @@ test('EXEC_018_drained_batch_has_unique_agent_ids', () => {
     completionMailbox.publish(box, run(id))
   }
   const batch = completionMailbox.drainAvailable(box, maxJoinBatch)
-  const ids = batch.map((c) => c.AgentId)
+  const ids = batch.map(agentIdOf)
   assert.deepEqual(ids, [...new Set(ids)])
   assert.equal(ids.length, 5)
 })
@@ -94,7 +95,7 @@ test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
   completionMailbox.publish(box, run('once'))
   const first = completionMailbox.drainAvailable(box, 1)
   assert.equal(first.length, 1)
-  assert.equal(first[0].AgentId, 'once')
+  assert.equal(agentIdOf(first[0]), 'once')
 
   const second = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.deepEqual(second, [])
@@ -137,7 +138,7 @@ test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
   completionMailbox.publish(box, run('after-user-message'))
   assert.equal(completionMailbox.pendingCount(box), 1)
   const drained = completionMailbox.drainAvailable(box, 1)
-  assert.equal(drained[0].AgentId, 'after-user-message')
+  assert.equal(agentIdOf(drained[0]), 'after-user-message')
 })
 
 // EXEC-017: two active attempts in one session both receive UserMessageArrived.
@@ -249,7 +250,7 @@ test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async
   completionMailbox.publish(box, run('after-interrupt'))
   assert.equal(completionMailbox.pendingCount(box), 1)
   const drained = completionMailbox.drainAvailable(box, 1)
-  assert.equal(drained[0].AgentId, 'after-interrupt')
+  assert.equal(agentIdOf(drained[0]), 'after-interrupt')
 })
 
 // ── 3: after interrupt, next join/drain obtains the later completion ─────────
@@ -267,7 +268,7 @@ test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () 
   completionMailbox.publish(box, run('late-child'))
   const next = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.equal(next.length, 1)
-  assert.equal(next[0].AgentId, 'late-child')
+  assert.equal(agentIdOf(next[0]), 'late-child')
 })
 
 // ── 8: drain-before-interrupt — completion already queued wins ───────────────
@@ -279,7 +280,7 @@ test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => 
   // Immediate drain path (HostForkRuntime.tryDrainAvailable / WaitForSignal re-drain).
   const ready = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.equal(ready.length, 1)
-  assert.equal(ready[0].AgentId, 'already-done')
+  assert.equal(agentIdOf(ready[0]), 'already-done')
 
   // Even if interrupt is already signalled, re-drain would still see results first.
   const interrupt = joinInterrupt.create()
@@ -293,7 +294,7 @@ test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => 
   )
   const after = completionMailbox.drainAvailable(box, maxJoinBatch)
   assert.equal(after.length, 1)
-  assert.equal(after[0].AgentId, 'also-done')
+  assert.equal(agentIdOf(after[0]), 'also-done')
 })
 
 // ── NonEmptyBatch + JoinWaitOutcome shape ────────────────────────────────────
@@ -304,7 +305,7 @@ test('EXEC_018_non_empty_batch_and_join_wait_outcome_constructors', () => {
   assert.ok(batch !== undefined)
   assert.equal(nonEmptyBatch.length(batch), 2)
   assert.deepEqual(
-    nonEmptyBatch.toList(batch).map((c) => c.AgentId),
+    nonEmptyBatch.toList(batch).map(agentIdOf),
     ['h', 't'],
   )
 })

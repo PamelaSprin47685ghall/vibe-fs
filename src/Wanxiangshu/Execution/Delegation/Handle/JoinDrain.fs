@@ -336,7 +336,7 @@ module JoinDrain =
         (refresh: unit -> AgentLinkageProjection)
         (records: HandleRecord list)
         =
-        let takenIds = acc |> List.map (fun c -> c.AgentId) |> Set.ofList
+        let takenIds = acc |> List.map (fun c -> AgentCompletion.agentId c.Outcome) |> Set.ofList
 
         orderedCandidates (refresh ())
         |> List.filter (agentNotTaken takenIds)

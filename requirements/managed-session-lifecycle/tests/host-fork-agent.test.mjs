@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../../verification-system/tests/support/domain.mjs'
+import { agentJournal, agentIdOf, caseOf, listItems, sessionId, toList, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const hostForkAgentModule = await import('../../../dist/Execution/Delegation/Fork/Host/Agent.js')
@@ -160,7 +160,7 @@ test('HFA_fork_send_failure_fails_the_pending_run', async () => {
   assert.equal(drained.tag, 0, drained.tag === 1 ? drained.fields[0] : '')
   const items = listItems(drained.fields[0])
   assert.equal(items.length, 1)
-  assert.equal(items[0].AgentId, 'hf5')
+  assert.equal(agentIdOf(items[0]), 'hf5')
   liveCtx.cleanup()
 })
 

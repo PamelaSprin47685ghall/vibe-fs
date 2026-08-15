@@ -784,7 +784,7 @@ HOW = 今天 + 前三朝考古现场
 | CLN-00    | 建 legacy ledger + cleanup policy                          | ✅ 完成 |
 | CLN-01    | 清死代码、无 caller module、commented implementation             | 极低 |
 | CLN-02    | 删除 `ManagerActivation` no-op vocabulary + stale HOW/tests | ✅ 完成 |
-| CLN-03    | `RunCompletion.AgentId` caller migration                  |  中 |
+| CLN-03    | `RunCompletion.AgentId` caller migration                  | ✅ 完成 |
 | CLN-04    | 删除 deprecated `RunCompletion.AgentId`                     |  中 |
 | CLN-05    | Join single-result compatibility caller migration         |  中 |
 | CLN-06    | 删除 `JoinItem → RunCompletion` internal compatibility path |  中 |

@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   agentCompletion,
+  agentIdOf,
   caseOf,
   completionMailbox,
   fableLibraryDir,
@@ -99,7 +100,7 @@ test('EXEC_join_mailbox_completion_before_deadline_returns_ok', async () => {
 
   const result = await pending
   assert.equal(caseOf(result), 'Ok', 'Ok completion')
-  assert.equal(result.fields[0].AgentId, 'agent-x')
+  assert.equal(agentIdOf(result.fields[0]), 'agent-x')
 })
 
 // ── Immediate terminal claim (no Ready gate) ────────────────────────────────

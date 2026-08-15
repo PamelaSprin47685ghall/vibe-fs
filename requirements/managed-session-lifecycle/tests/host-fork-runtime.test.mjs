@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, handleId, handleProjection, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
+import { agentJournal, agentIdOf, caseOf, handleId, handleProjection, listItems, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 
 const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { HostForkRuntime, HostForkRuntime__get_PendingRunCount: pendingRunCount, HostForkRuntime__get_IsCancelled: runtimeIsCancelled, HostForkRuntime__Cancel: cancelRuntime } = hostRuntimeModule
@@ -250,7 +250,7 @@ test('HFRT_fork_runtime_await_agent_returns_completion', async () => {
   assert.equal(result.tag, 0)
   const completion = result.fields[0]
   assert.equal(caseOf(completion.Outcome), 'AgentCompleted')
-  assert.equal(completion.AgentId, 'fr2')
+  assert.equal(agentIdOf(completion), 'fr2')
 })
 
 test('HFRT_fork_runtime_await_agent_unknown_and_timeout_are_errors', async () => {

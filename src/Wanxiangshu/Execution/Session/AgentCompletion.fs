@@ -119,6 +119,14 @@ module AgentCompletion =
         | AgentFailed payload -> payload.Message
         | AgentAbandoned(_, reason) -> reason
 
+    /// The agentId owning this completion — the canonical Map key. The
+    /// RunCompletion.AgentId field is deprecated; extract from Outcome instead.
+    let agentId (outcome: AgentCompletionOutcome) =
+        match outcome with
+        | AgentCompleted payload -> payload.AgentId
+        | AgentFailed payload -> payload.AgentId
+        | AgentAbandoned(agentId, _) -> agentId
+
     let status (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted _ -> "completed"
