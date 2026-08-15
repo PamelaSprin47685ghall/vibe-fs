@@ -75,6 +75,18 @@ open Wanxiangshu.Strength
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
 
+    let private armRecoveryIfEligible (scope: PluginRuntimeScope) isFissionOwner (turn: ReconciledTurn) =
+        match isFissionOwner, turn.Outcome with
+        | false, (ReconcileProgram.TurnFailed _ | ReconcileProgram.TurnAborted _) ->
+            scope.ArmRecovery turn.SessionId
+
+            for KeyValue(_, companion) in scope.Sessions.Companions do
+                match companion.BloggerSession with
+                | Some bloggerId when bloggerId = turn.SessionId ->
+                    companion.StartRecoveryOpportunity() |> ignore
+                | _ -> ()
+        | _ -> ()
+
     let observe
         (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
@@ -185,24 +197,7 @@ module HostTurnObserver =
                     let isFissionOwner =
                         FissionRuntime.isSilentInterrupt turn.SessionId || durableFissionReplacement
 
-                    if not isFissionOwner then
-                        match turn.Outcome with
-                        | ReconcileProgram.TurnFailed _
-                        | ReconcileProgram.TurnAborted _ ->
-                            scope.ArmRecovery turn.SessionId
-
-                            // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
-                            // recovery opportunity on the Companion that owns it. Opportunity
-                            // = pending material waiter Task; material Offer consumes it once.
-                            for KeyValue(_, companion) in scope.Sessions.Companions do
-                                match companion.BloggerSession with
-                                | Some bloggerId when bloggerId = turn.SessionId ->
-                                    companion.StartRecoveryOpportunity() |> ignore
-                                | _ -> ()
-                        | ReconcileProgram.TurnCompleted
-                        | ReconcileProgram.TurnNeedsContinuation _
-                        | ReconcileProgram.TurnInProgress -> ()
-
+                    armRecoveryIfEligible scope isFissionOwner turn
                     do! XWire.reconcileAttempt journal scope turn
                     TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 

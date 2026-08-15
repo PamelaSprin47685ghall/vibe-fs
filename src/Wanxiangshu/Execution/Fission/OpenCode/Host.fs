@@ -728,14 +728,13 @@ module FissionHost =
                             (AgentJournal.snapshot durable).AgentProjections.Fission
                         |> Option.isSome))
 
-            if isOwnerReplaced then
+            match isOwnerReplaced, journal with
+            | true, _ ->
                 // Old caller physical present was replaced and retired by Fission.
                 // Absorb all turn observations silently; do not cascade or continue.
                 return true
-            else
-                match journal with
-                | None -> return false
-                | Some durable ->
+            | false, None -> return false
+            | false, Some durable ->
                 match
                     FissionProjection.tryMembershipOfLane
                         turn.SessionId

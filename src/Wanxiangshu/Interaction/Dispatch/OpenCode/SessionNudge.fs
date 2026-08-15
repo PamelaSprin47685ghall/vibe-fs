@@ -117,6 +117,13 @@ module HostSessionNudge =
         |> Option.filter (fun path -> System.IO.Directory.Exists path)
         |> Option.orElse SharedState.RootWorkspace
 
+    let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
+        FissionRuntime.isSilentInterrupt sessionId
+        || (journal
+            |> Option.exists (fun durable ->
+                FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
+                |> Option.isSome))
+
     let sendContinuationResult
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -128,10 +135,11 @@ module HostSessionNudge =
         (onAccepted: (PhysicalUserMessageId -> unit) option)
         : Task<Result<PromptKey, string>> =
         task {
-            match journal, tryActiveProfile journal sessionId with
-            | None, _ -> return Error "No journal: a continuation cannot be claimed"
-            | Some _, None -> return Error "No active authority profile"
-            | Some durable, Some profile ->
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return Error "Session is retired by Fission"
+            | false, None, _ -> return Error "No journal: a continuation cannot be claimed"
+            | false, Some _, None -> return Error "No active authority profile"
+            | false, Some durable, Some profile ->
                 let agent = agentForActiveCursor journal sessionId profile
                 let rt = PromptDispatcher.forJournal durable
 
@@ -185,10 +193,11 @@ module HostSessionNudge =
         (awaitMode: PromptDispatcher.AwaitMode)
         : Task<Result<PromptKey, string>> =
         task {
-            match journal, tryActiveProfile journal sessionId with
-            | None, _ -> return Error "No journal: an assistance continuation cannot be claimed"
-            | Some _, None -> return Error "No active authority profile"
-            | Some durable, Some profile ->
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return Error "Session is retired by Fission"
+            | false, None, _ -> return Error "No journal: an assistance continuation cannot be claimed"
+            | false, Some _, None -> return Error "No active authority profile"
+            | false, Some durable, Some profile ->
                 if effectiveAgent <> profile.SelectedAgent && effectiveAgent <> profile.PeerAgent then
                     return Error "Assistance target is outside the active Authority Root agent pair"
                 else
@@ -231,10 +240,11 @@ module HostSessionNudge =
         (repairKind: string)
         : Task<Result<PromptKey, string>> =
         task {
-            match journal, tryActiveProfile journal sessionId with
-            | None, _ -> return Error "No journal: an interaction repair cannot be claimed"
-            | Some _, None -> return Error "No active authority profile"
-            | Some durable, Some profile ->
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return Error "Session is retired by Fission"
+            | false, None, _ -> return Error "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return Error "No active authority profile"
+            | false, Some durable, Some profile ->
                 let rt = PromptDispatcher.forJournal durable
 
                 if rt.RepairAlreadyClaimed profile terminalProviderRun repairKind then
@@ -272,10 +282,11 @@ module HostSessionNudge =
         (triggerProviderRun: ProviderRunIdentity)
         : Task<Result<PromptKey, string>> =
         task {
-            match journal, tryActiveProfile journal sessionId with
-            | None, _ -> return Error "No journal: a manager idle encouragement cannot be claimed"
-            | Some _, None -> return Error "No active authority profile"
-            | Some durable, Some profile ->
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return Error "Session is retired by Fission"
+            | false, None, _ -> return Error "No journal: a manager idle encouragement cannot be claimed"
+            | false, Some _, None -> return Error "No active authority profile"
+            | false, Some durable, Some profile ->
                 let rt = PromptDispatcher.forJournal durable
 
                 if rt.IdleAlreadyClaimed profile lifeId triggerProviderRun then

@@ -88,21 +88,16 @@ module OrdinaryTurnWorkflow =
                         (AgentJournal.snapshot durable).AgentProjections.Fission
                     |> Option.isSome))
 
-        if isFissionReplaced then
+        match isFissionReplaced, context.Turn.Observation, context.Turn.Outcome with
+        | true, _, _ -> AsyncSupport.completedTask ()
+        | false, Some ReconcileProgram.TurnUnknown, _ ->
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+        | false, None, ReconcileProgram.TurnInProgress ->
+            InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+        | false, None, ReconcileProgram.TurnNeedsContinuation _ ->
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+        | false, None, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
             AsyncSupport.completedTask ()
-        else
-            match context.Turn.Observation with
-            | Some ReconcileProgram.TurnUnknown ->
-                InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-            | None ->
-                match context.Turn.Outcome with
-                | ReconcileProgram.TurnInProgress ->
-                    InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
-                | ReconcileProgram.TurnNeedsContinuation _ ->
-                    InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-                | ReconcileProgram.TurnCompleted
-                | ReconcileProgram.TurnAborted _
-                | ReconcileProgram.TurnFailed _ -> AsyncSupport.completedTask ()
 
     /// Own the reconciled ordinary-turn outcome match.
     /// `timerPort` and `abortParent` are injected by Host composition (Process is not Application).
@@ -131,63 +126,43 @@ module OrdinaryTurnWorkflow =
                         (AgentJournal.snapshot durable).AgentProjections.Fission
                     |> Option.isSome))
 
-        if isFissionReplaced then
-            AsyncSupport.completedTask ()
-        else
+        match isFissionReplaced, turn.Observation with
+        | true, _ -> AsyncSupport.completedTask ()
+        | false, Some ReconcileProgram.TurnUnknown ->
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+        | false, None ->
             let completeAgent () =
                 TerminalReporter.complete eventPort journal abortedSessions turn
 
-            match turn.Observation with
-            | Some ReconcileProgram.TurnUnknown ->
+            match turn.Outcome with
+            | ReconcileProgram.TurnInProgress ->
+                InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+            | ReconcileProgram.TurnNeedsContinuation _ ->
+                // Absorb text and reasoning into the XTrace even though this turn is
+                // not completable, then ask for the missing report. Still not fallback.
+                // (The XTrace parts are captured at the transform boundary.)
                 InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-            | None ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnInProgress ->
-                    InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
-                | ReconcileProgram.TurnNeedsContinuation _ ->
-                    // Absorb text and reasoning into the XTrace even though this turn is
-                    // not completable, then ask for the missing report. Still not fallback.
-                    // (The XTrace parts are captured at the transform boundary.)
-                    InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-                | ReconcileProgram.TurnAborted reason ->
-                    let processReplacement = FissionRuntime.tryConsumeSilentInterrupt turn.SessionId
+            | ReconcileProgram.TurnAborted reason ->
+                // LOOP-006: our own kill is bridged into the provider-failure AABB path.
+                // User / cleanup aborts still report Aborted and do not advance the cursor.
+                let loopKill =
+                    match loopSensor with
+                    | Some sensor when sensor.IsArmed turn.SessionId ->
+                        sensor.ClearArmed turn.SessionId
+                        true
+                    | _ -> false
 
-                    let durableReplacement =
-                        journal
-                        |> Option.exists (fun durable ->
-                            FissionProjection.tryActiveForOwner
-                                turn.SessionId
-                                (AgentJournal.snapshot durable).AgentProjections.Fission
-                            |> Option.isSome)
+                if loopKill then
+                    ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
+                else
+                    abortedSessions.Add sessionKey |> ignore
+                    abortParent sessionKey
+                    sessionPort.AbortChildren turn.SessionId |> ignore
 
-                    if processReplacement || durableReplacement then
-                        // The old physical present was replaced by admitted sibling
-                        // lanes. The durable active-group fact is sufficient after a
-                        // crash even when the process-local interrupt marker is gone.
-                        // Do not cascade children/PTY, publish Aborted, or route this
-                        // observation into provider recovery.
-                        AsyncSupport.completedTask ()
-                    else
-                    // LOOP-006: our own kill is bridged into the provider-failure AABB path.
-                    // User / cleanup aborts still report Aborted and do not advance the cursor.
-                    let loopKill =
-                        match loopSensor with
-                        | Some sensor when sensor.IsArmed turn.SessionId ->
-                            sensor.ClearArmed turn.SessionId
-                            true
-                        | _ -> false
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                    |> ignore
 
-                    if loopKill then
-                        ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
-                    else
-                        abortedSessions.Add sessionKey |> ignore
-                        abortParent sessionKey
-                        sessionPort.AbortChildren turn.SessionId |> ignore
-
-                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-                        |> ignore
-
-                        AsyncSupport.completedTask ()
+                    AsyncSupport.completedTask ()
             | ReconcileProgram.TurnFailed error ->
                 ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                     timerPort

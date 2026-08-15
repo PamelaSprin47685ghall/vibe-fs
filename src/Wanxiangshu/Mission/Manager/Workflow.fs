@@ -98,24 +98,18 @@ module ManagerWorkflow =
         : Task =
         let turn = context.Turn
 
-        if isFissionReplaced journal turn.SessionId then
-            AsyncSupport.completedTask ()
-        else
-            match turn.Outcome with
-            | ReconcileProgram.TurnCompleted when
-                not (TerminalPolicy.sessionDead journal turn.SessionId)
-                && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
-                ->
-                match currentLife journal turn.SessionId with
-                | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
-                    ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
-                | _ -> AsyncSupport.completedTask ()
+        match isFissionReplaced journal turn.SessionId, turn.Outcome with
+        | false, ReconcileProgram.TurnCompleted when
+            not (TerminalPolicy.sessionDead journal turn.SessionId)
+            && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
+            ->
+            match currentLife journal turn.SessionId with
+            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
+                ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
             | _ -> AsyncSupport.completedTask ()
+        | _ -> AsyncSupport.completedTask ()
 
-    /// Observe one Manager-role turn. Manager-specific business branches stay here;
-    /// non-Manager terminal semantics are delegated through the injected ordinary
-    /// workflow rather than returned as a handled-bool program counter.
-    let observe
+    let private observeActiveManager
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -130,12 +124,9 @@ module ManagerWorkflow =
         task {
             let turn = context.Turn
 
-            if isFissionReplaced journal turn.SessionId then
-                return ()
-            else
-                match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
-                | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
-                | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
+            match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
+            | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
+            | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnInProgress -> return! observeOrdinary context
                 | ReconcileProgram.TurnCompleted ->
@@ -187,3 +178,33 @@ module ManagerWorkflow =
                                 | None -> return ()
                 | _ -> return! observeOrdinary context
         }
+
+    /// Observe one Manager-role turn. Manager-specific business branches stay here;
+    /// non-Manager terminal semantics are delegated through the injected ordinary
+    /// workflow rather than returned as a handled-bool program counter.
+    let observe
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (joinGuardNudges: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (abortedSessions: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (observeOrdinary: ReconciledTurnContext -> Task)
+        (context: ReconciledTurnContext)
+        : Task =
+        if isFissionReplaced journal context.Turn.SessionId then
+            AsyncSupport.completedTask ()
+        else
+            observeActiveManager
+                sessionPort
+                eventPort
+                journal
+                nudgeSent
+                joinGuardNudges
+                hasLivePty
+                abortedSessions
+                quiescence
+                observeOrdinary
+                context
