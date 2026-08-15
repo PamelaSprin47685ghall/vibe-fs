@@ -10,6 +10,7 @@ node --test requirements/durable-events/tests/local-process-event-log.test.mjs
 node --test requirements/durable-events/tests/canonical-integrator.test.mjs
 node --test requirements/durable-events/tests/event-store-append.test.mjs
 node --test requirements/durable-events/tests/event-store-journal-writer.test.mjs
+node --test requirements/durable-events/tests/journal-payload-closure.test.mjs
 node --test requirements/durable-events/tests/event-store-journal-boot.test.mjs
 node --test requirements/durable-events/tests/workspace-event-store-host.test.mjs
 node --test requirements/durable-events/tests/hook-dispatcher.test.mjs
@@ -31,7 +32,7 @@ node --test requirements/durable-events/tests/integration/persist/leave-unread.t
 | DURABLE-EVENTS-009 | `integration/persist/leave-unread.test.mjs::{local_EventStore_never_reads_or_rewrites_any_legacy_layout,shock_cut_source_has_no_legacy_shape_detection_migration_or_reset}` + `unified-store-gate.test.mjs` no-migrator gate | NEW/FROZEN + REUSE |
 | DURABLE-EVENTS-010 | `local-process-event-log.test.mjs` + `workspace-event-store-host.test.mjs`（`.git/wanxiang/events/<WriterId>.ndjson` 为 runtime substrate） | NEW/FROZEN |
 | DURABLE-EVENTS-011 | `requirements/durable-convergence/tests/writer-stream-sync.test.mjs::DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_without_segments_or_index` | CROSS/FROZEN |
-| DURABLE-EVENTS-012 | `event-store-journal-writer.test.mjs::BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB` + `requirements/speculative-investigation/tests/store.test.mjs::STRENGTH_006_payload_bytes_are_local_content_addressed_payloads` | NEW/FROZEN + CROSS/FROZEN |
+| DURABLE-EVENTS-012 | `journal-payload-closure.test.mjs` + `event-store-journal-writer.test.mjs::{appended_fact_lifts_real_blob_digest_into_persisted_payload_refs,closure_fails_closed_when_a_real_content_address_is_missing,BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB}` + `requirements/speculative-investigation/tests/store.test.mjs::STRENGTH_006_payload_bytes_are_local_content_addressed_payloads` | NEW + CROSS |
 | DURABLE-EVENTS-013 | `canonical-integrator.test.mjs::DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_program` + Casebook/Strength/JsTransaction Current tests | NEW/FROZEN |
 | DURABLE-EVENTS-014 | `event-store-merge.test.mjs::DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent` + `requirements/durable-convergence/tests/replica-merge-laws.test.mjs` | NEW/FROZEN + CROSS/FROZEN |
 | DURABLE-EVENTS-015 | `fold-context-recovery.test.mjs` + Journal one-event fold suites (`host-turn-observed.test.mjs`, domain fact fold tests)；history iteration 已从 `Composition/Durable/Fold.fs` 移除 | REUSE |

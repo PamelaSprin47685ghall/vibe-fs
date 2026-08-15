@@ -145,7 +145,10 @@ bytes/digest 一致。Integrator 可见的当前 truth 必须满足全部 commit
 dangling ref → StorageInvalid。remote sync 时 payload 文件才编码为 Git blob。Domain 不得操作 Git OID。
 
 **含义/动机**：payload 与 event 一样先是本地 durable truth，Git 只是同步载体；同时保持大正文
-内容寻址与去重，不把正文塞回 NDJSON。
+内容寻址与去重，不把正文塞回 NDJSON。Journal fact 的 `payload_refs` 由 fact 自身携带的 blob 字段
+唯一派生（`BlobRef` = `blobs/<sha256>`、`BlobDigest` = `<sha256>`，映射到同一 `PayloadRef`）；
+只有真实 lowercase-sha256 content-address 才是 payload reference，非 content-address 的占位值不是
+payload dependency，不进入 closure。
 **边界**：digest 算法与 remote tree layout 是 HOW；业务只见 opaque PayloadRef。
 **证据**：→ PROOF.md 012。
 

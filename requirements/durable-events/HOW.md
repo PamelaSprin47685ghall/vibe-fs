@@ -149,6 +149,12 @@ Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.r
 AgentJournal.AppendEnvelope：local commit → Integrator live integration；不额外 fold history
 ```
 
+Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`（EventStoreJournalWriter.fs）
+是唯一派生点，把 fact 中所有真实 sha256 content-address（`BlobRef`/`BlobDigest`）映射为 `PayloadRef`；
+`MagicTodoFactCodec.payloadRefs` 对 `Fact.MagicTodo` 的 typed fact 做同样映射。非 content-address 的
+占位值（如测试里的 `blob-1`/`digest:base`）不是 payload reference。append 前 closure 校验（
+`Store.fs validatePayloadClosure`）因此对 Journal 真正生效：引用缺失的真实 payload → StorageInvalid。
+
 任何 `loadEvents(raw,snapshot)` / `EventStoreMergeSpec.merge(...history...)` 出现在业务模块都属于结构性 RED。
 
 ## 恢复 fold 不变量（PERSIST-010）的实现落点
