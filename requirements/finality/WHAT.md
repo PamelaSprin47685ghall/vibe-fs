@@ -328,16 +328,30 @@ retention 所需事实；**不得**保存 rejected/confirmed bool product 或下
 
 ## FINALITY-022：Life 开启条件与隔离
 
-**规范**：只有合法 HumanRoot、非 compaction/continuation/retry/accepted replay，且无 open Life
-或上一 Life 已完成时开启 Life。只有 completed Life 后的新合法 HumanRoot 才新建 Life
-（Reawakening；`ManagerNarrative.ReawakeningPrefix` 是唯一 owner）。新 Life **不继承**旧
-request、roster、blessing、witness、prefix 或 Magic Todo canonical list（正常新 Life 初始为空；
-legacy seed 仅 obligation-ledger OBLIGATION-LEDGER-019 窗口）（GLORY-012/063/064/065）。
+**规范**：HumanRoot Life 的 opening admission 只认一条 typed evidence：当前 immutable
+`AuthorityExecutionProfile` 必须是 `HumanRoot + Manager`，且待处理 physical message id **逐值等于**
+该 profile 的 `AuthorityRootUserMessageId`。仅“这个 session 当前有 HumanRoot authority”、消息 role
+是 user、文本像 opening、XTrace provenance、suicide 文本、title/compaction 排除表，都不得代替这条
+identity equality。无 open Life 时，合法 root 可 Birth；上一 HumanRoot Life 已 completed 后，
+`LifeCompleted` 的 canonical fold 原子释放该 HumanRoot active run（INTERACTION-AUTHORITY-018），
+下一条真实 external + explicit-agent HumanRoot 才可 Reawakening。
 
-**含义 / 动机**：Life 是终结语义的边界；旧 Life 的 blessing/witness 不能污染新 Life 的终结资格。
+AgentOwnerRoot Manager 不走 HumanRoot opening。它只允许在**该 session 从未有任何 Life 历史**时，
+于第一次合法 ending 从 canonical Current XTrace 物化一次 migration Life；一旦 `CompletedLives` 非空，
+`CurrentLife=None` 表示该 Life 已终结，绝不能把同一历史 XTrace 再物化成第二个 migration Life。
+AgentOwnerRoot 的 authority 本身不因 `LifeCompleted` 关闭，因为 owner-directed publish conflict
+resumption 等后续工作仍可合法复用该 session。
 
-**边界**：XTrace 不清空与 cursor range 物化属 semantic-trace；Magic Todo canonical 空账属
-obligation-ledger。
+新 Life **不继承**旧 request、roster、blessing、witness、prefix 或 Magic Todo canonical list
+（正常新 Life 初始为空；legacy seed 仅 obligation-ledger OBLIGATION-LEDGER-019 窗口）
+（GLORY-012/063/064/065）。
+
+**含义 / 动机**：Life 是终结语义的边界；opening identity 由 authority owner 提供而不是
+NarrativeTransform 自行推断；旧 Life 的 blessing/witness 不能污染新 Life，AgentOwner 的一次性
+migration 也不能在 completion 后自激重生。
+
+**边界**：HumanRoot authority closure → `interaction-authority`；XTrace 不清空与 cursor range 物化属
+semantic-trace；Magic Todo canonical 空账属 obligation-ledger。
 
 **证据** → PROOF.md 行 F-22。
 

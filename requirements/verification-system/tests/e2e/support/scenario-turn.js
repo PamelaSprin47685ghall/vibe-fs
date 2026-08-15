@@ -13,8 +13,23 @@
 import { isIdleEvent } from './session-quiescence.js';
 
 export function createScenarioTurn(scenario) {
+  const bySession = new Map();
+
   return {
-    start: (sessionID, options = {}) => new Turn(scenario, sessionID, options),
+    start(sessionID, options = {}) {
+      if (!sessionID) throw new Error('turn.start requires sessionID');
+      const turn = new Turn(scenario, sessionID, options);
+      bySession.set(sessionID, turn);
+      return turn;
+    },
+    current(sessionID) {
+      if (!sessionID) return null;
+      return bySession.get(sessionID) ?? null;
+    },
+    clear(sessionID) {
+      if (sessionID) bySession.delete(sessionID);
+      else bySession.clear();
+    },
   };
 }
 

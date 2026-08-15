@@ -654,29 +654,36 @@ type AssistanceHost
                 return AssistanceTurnDisposition.ClaimedButUnresolved
         }
 
-    let escalateFastOwnerRequest (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) role =
+    /// HOST-027 / AGENT-031: every assistance successor shares one physical
+    /// admission law. AbortWake only claims the ProviderRun; it never sends a
+    /// continuation or creates a child while OpenCode may still be sweeping the
+    /// aborted attempt. A fresh SessionIdle revisit is the transport fence. The
+    /// NEEDHELP arm is consumed only behind that fence, so ordinary fallback can
+    /// never race a half-landed assistance continuation.
+    let withFreshAssistanceQuiescence
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (continueAfterIdle: unit -> Task<AssistanceTurnDisposition>)
+        =
         markOwnerClaim turn
 
-        task {
-            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                return AssistanceTurnDisposition.Handled
-            else
-                return! sendEscalationContinuation turn profile role
-        }
+        match context.Quiescence with
+        | None -> Task.FromResult AssistanceTurnDisposition.Handled
+        | Some _ ->
+            task {
+                if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
+                    return AssistanceTurnDisposition.Handled
+                else
+                    return! continueAfterIdle ()
+            }
 
-    let takeSensorAndConsult (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) requester =
-        task {
-            // The permit itself remains revoked by HOST-004 after an
-            // operator abort and is intentionally not consumed here.
-            // Its presence proves this delivery came from a fresh
-            // SessionIdle wake, which is the transport fence needed
-            // before parenting a new physical child under the aborted
-            // owner session.
-            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                return AssistanceTurnDisposition.Handled
-            else
-                return! beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
-        }
+    let escalateFastOwnerRequest
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        role
+        =
+        withFreshAssistanceQuiescence context turn (fun () -> sendEscalationContinuation turn profile role)
 
     let beginDeepOwnerConsultation
         (context: ReconciledTurnContext)
@@ -684,15 +691,8 @@ type AssistanceHost
         (profile: PromptAuthority.AuthorityExecutionProfile)
         requester
         =
-        // OpenCode may still be completing the physical parent-abort
-        // descendant sweep when AbortWake reconciles. Claim ownership
-        // now, but do not parent a fresh consultation under that session
-        // until a fresh SessionIdle permit proves the abort is quiescent.
-        markOwnerClaim turn
-
-        match context.Quiescence with
-        | None -> Task.FromResult AssistanceTurnDisposition.Handled
-        | Some _ -> takeSensorAndConsult turn profile requester
+        withFreshAssistanceQuiescence context turn (fun () ->
+            beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory)
 
     let handleParsedOwnerRequest
         (context: ReconciledTurnContext)
@@ -704,7 +704,7 @@ type AssistanceHost
         | Error _ -> Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
         | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
             Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
-        | Ok(_, role, AgentTier.Fast, _) -> escalateFastOwnerRequest turn profile role
+        | Ok(_, role, AgentTier.Fast, _) -> escalateFastOwnerRequest context turn profile role
         | Ok(requester, _, AgentTier.Deep, _) -> beginDeepOwnerConsultation context turn profile requester
 
     let handleOwnerRequestForProfile
@@ -884,7 +884,14 @@ type AssistanceHost
         match turn.Outcome with
         | ReconcileProgram.TurnAborted _ when sensor.IsArmed(turn.SessionId, turn.ProviderRun) ->
             handleOwnerRequest context
-        | ReconcileProgram.TurnAborted _ when isClaimedOwnerAttempt turn ->
+        | ReconcileProgram.TurnAborted _
+        | ReconcileProgram.TurnFailed _ when isClaimedOwnerAttempt turn ->
+            // HOST-027: once exact NEEDHELP has claimed this physical owner
+            // ProviderRun, later Host terminal views of that SAME run cannot
+            // reclassify it as provider failure. OpenCode may surface Abort and
+            // Failure wakes for one cancelled transport; ownership is by typed
+            // (SessionId, ProviderRun), not by whichever terminal label arrives
+            // last. Consultation-child TurnFailed remains child-local above.
             Task.FromResult AssistanceTurnDisposition.Handled
         | _ -> Task.FromResult AssistanceTurnDisposition.NotAssistance
 

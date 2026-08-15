@@ -35,7 +35,7 @@
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
 #   [x] fallback                            — continue + assertFallbackContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
-#   [x] reviewer REVISE                     — manager-finality-revise + assertReviewerRevise
+#   [x] reviewer REVISE                     — first unified barrier-reviewer verdict + assertReviewerRevise
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
 #   [x] finality temporarily blocked        — FinalityRejected + assertFinalityTemporarilyBlocked
 #   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
@@ -50,7 +50,8 @@
 #   - AgentOwnerRoot WorkActivated is migration-written on first suicide (FinalityTool
 #     ensureMigrationLife), NOT at fork — never waitFact WorkActivated before manager-idle suicide
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
-#   - REVISE→PERFECT needs bindFinalityReviseThenPerfect retire/activate (same OpeningAssignment)
+#   - REVISE→PERFECT uses one Reviewer protocol: the first unified barrier verdict is REVISE,
+#     then bindFinalityReviseThenPerfect flips later barrier verdicts to PERFECT; no alternate surface
 #   - blogger pad undersize → unmatched companion requests (fail closed)
 #   - wall <6s target vs orch publish chain — risk of §16 miss until flesh/perf pass
 #
@@ -95,6 +96,7 @@ must = [
   "g2-inspector-batch.0",
   "g6-bookkeeper-finalize.0",
   "orch.0",
+  "orch-join-guard.0",
   "manager.0",
   "manager.1",
   "mgr-labor.0",
@@ -104,8 +106,6 @@ must = [
   "continue.0",
   "manager-idle.0",
   "manager-idle.1",
-  "manager-finality-revise.0",
-  "manager-finality-reviewer.0",
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
@@ -137,6 +137,11 @@ flow = [
   # External injections before any wait (register holds / retire hooks / conflict).
   { custom = "holdChildC1UntilLabor" },
   { custom = "bindFinalityReviseThenPerfect" },
+  # Arm before orch.2 can possibly occur. The final Orchestrator lifetime contains
+  # many continuations/idle edges, so its completion barrier is expectation-scoped:
+  # orch.2 provider acceptance freezes the SSE baseline, then Stroke 6 waits for
+  # the root session idle strictly after that baseline.
+  { armIdle = { id = "orch.2" } },
 
   # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
   # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
@@ -178,22 +183,19 @@ flow = [
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   { wait = "manager-idle.0" },
   { waitFact = { name = "WorkActivated", eq = 1 } },
-  { wait = "manager-finality-revise.0" },
-  { wait = "manager-finality-revise.1" },
-  { waitFact = { name = "FinalityRejected", gte = 1 } },
+  { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
   # Same physical ManagerIdle turn repairs, then seeks dual-PERFECT blessing.
+  # Reviewer protocol identity is deliberately not duplicated in the flow; the
+  # durable finality facts are the business barrier.
   { wait = "manager-idle.1" },
   { wait = "coder-fix.0" },
   { wait = "manager-idle.2" },
   { wait = "manager-idle.3" },
-  { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
-  { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
   { wait = "manager-idle.4", timeoutMs = 30000 },
   { wait = "manager-idle.5", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
-  { wait = "barrier-reviewer.0", timeoutMs = 30000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
   # Conflict resume on SAME Manager (no task restart) → resolve → Published
@@ -208,8 +210,11 @@ flow = [
   { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
 
   # Stroke 6 — Orchestrator harvest (same as orch-unhappy: orch.2 after Published).
+  # awaitIdle is anchored at the actual orch.2 request, not at the lifetime-wide
+  # initial prompt cursor; this remains edge-race safe even when idle lands before
+  # the flow reaches this line.
   { wait = "orch.2", timeoutMs = 60000 },
-  { awaitTerminal = true, requireAssistantTerminal = false },
+  { awaitIdle = { after = "orch.2" }, timeoutMs = 60000 },
   { custom = "oracleLongStroke" },
   { assertDeliveries = { id = "coder.1", eq = 1 } },
   { custom = "assertG6ColdFetch" },
@@ -439,6 +444,22 @@ tools = ["commission", "join"]
   [[turn.step]]
   respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
 
+# EXEC-016 / INTERACTION-AUTHORITY-014: ordinary Orchestrator completion with
+# outstanding managed background receives the canonical JoinGuard continuation.
+# This is one protocol declaration, not a Long Stroke-specific prompt guess; if
+# background remains after one harvest, the same declared turn may recur.
+[[turn]]
+id = "orch-join-guard"
+internal = true
+user = "# Work remains away."
+tools = ["commission", "horizon", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Arrived consequences received; continue the orchestration." }
+
 # AgentOwnerRoot Manager (opening is "#" + orch fork prompt). Fork + join; join
 # stays blocked while holdChild keeps coder incomplete for user_message wake.
 # tools MUST match the real Manager provider surface (no todowrite — see flow note).
@@ -577,36 +598,6 @@ tools = ["write"]
   [[turn.step]]
   respond = { type = "text", text = "Coder repaired proof file." }
 
-# Host finality OpeningAssignment. bindFinalityReviseThenPerfect retires REVISE
-# after .1 and activates dual-PERFECT turn (same OpeningAssignment otherwise ties).
-[[turn]]
-id = "manager-finality-revise"
-internal = true
-user = "# Review the current worktree against all authoritative user requirements."
-tools = ["judge"]
-forbiddenTools = ["glob", "grep", "read"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "REVISE" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Finality reviewer rejects the ending." }
-
-[[turn]]
-id = "manager-finality-reviewer"
-internal = true
-user = "# Review RETIRED long-stroke finality — inactive until revise cohort ends."
-tools = ["judge"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager finality reviewer confirmed." }
-
 # ORCH-007 conflict resume — same Manager session; do NOT restart original task.
 [[turn]]
 id = "conflict-resume"
@@ -645,7 +636,7 @@ tools = ["glob", "grep", "read", "judge"]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "First barrier PERFECT submitted; awaiting challenge." }
+  respond = { type = "text", text = "Reviewer submitted the current verdict." }
 
 [[turn]]
 id = "reviewer-confirm"

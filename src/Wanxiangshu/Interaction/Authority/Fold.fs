@@ -95,27 +95,6 @@ module PromptFactFold =
         else
             Ok withAuthority
 
-    let private foldAuthorityLogicalRunClosed
-        (projection: AgentProjectionSet)
-        (payload:
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId |})
-        =
-        let authority =
-            PromptAuthorityLedger.projectionFor payload.SessionId projection
-            |> Option.defaultValue PromptAuthorityLedger.empty
-
-        match PromptAuthorityLedger.foldAuthorityLogicalRunClosed authority payload with
-        | Error reason -> reject "AuthorityLogicalRunClosed" reason
-        | Ok closed ->
-            Ok(
-                updateSession
-                    payload.SessionId
-                    (fun session -> { session with PromptAuthority = Some closed })
-                    projection
-            )
-
     let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         // ── prompt dispatch ─────────────────────────────────────────────────
@@ -156,5 +135,3 @@ module PromptFactFold =
         // ── authority ───────────────────────────────────────────────────────
 
         | PromptFactCases.AuthorityRootAccepted payload -> foldAuthorityRootAccepted projection payload
-
-        | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed projection payload

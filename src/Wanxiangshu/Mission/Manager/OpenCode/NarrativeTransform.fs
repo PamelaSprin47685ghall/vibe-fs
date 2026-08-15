@@ -100,19 +100,6 @@ module ManagerNarrativeTransform =
     let private reawakeningProjection (sessionId: SessionId) (rawText: string) =
         ManagerNarrative.reawakening rawText (reawakeningDocument sessionId) (planningTableDocument sessionId)
 
-    /// Ending-evidence anchors from Finality prose in every ProviderLanguage.
-    let private endingEvidenceFragments =
-        lazy
-            ([ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
-             |> List.collect (fun lang ->
-                 [ FinalityPrompt.Path.Rest
-                   FinalityPrompt.Path.Rejected
-                   FinalityPrompt.Path.Blessed ]
-                 |> List.collect (fun path ->
-                     ProviderProse.instructionLines lang path Map.empty
-                     |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))))
-             |> List.distinct)
-
     let private workActivationAnchors =
         lazy
             ([ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
@@ -124,25 +111,6 @@ module ManagerNarrativeTransform =
 
     let private activeProfile (journal: AgentJournal) (sessionId: SessionId) =
         PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
-
-    /// PROMPT-009: a message the Dispatcher proved to be a continuation. Such a
-    /// message never opens a Life (GLORY-012).
-    let private isAcceptedContinuation (journal: AgentJournal) (sessionId: SessionId) (messageId: string) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.PromptAuthority)
-        |> Option.exists (fun authority ->
-            authority.AcceptedContinuationIds
-            |> Map.exists (fun id _ -> PhysicalUserMessageId.value id = messageId))
-
-    /// The last `role=user` message and its raw object, or `None`.
-    let private lastUserMessage (rawMessages: obj list) =
-        rawMessages
-        |> List.mapi (fun index raw -> index, raw)
-        |> List.choose (fun (index, raw) ->
-            match ProviderWireCapture.decodeMessage raw, ProviderWireDecode.hostMessageId raw with
-            | Some message, Some id when message.Role = "user" -> Some(index, id, raw)
-            | _ -> None)
-        |> List.tryLast
 
     /// The first XTrace cursor of the user message at semantic turn `turnIndex`.
     let private openingCursorOf (traceState: XTraceProjectionState option) (turnIndex: int) =
@@ -159,38 +127,6 @@ module ManagerNarrativeTransform =
 
     let private promptKeyOrEmpty (raw: obj) =
         promptKeyOfMessage raw |> Option.defaultValue (PromptKey.create "")
-
-    let private provenancesOf (parts: XTracePartRef list) =
-        parts |> List.map (fun part -> part.Provenance) |> Set.ofList
-
-    let private isMessageFromCompletedLife (traceState: XTraceProjectionState option) (messageId: string) =
-        option {
-            let! state = traceState
-            let! _ = state.Terminal
-            return provenancesOf state.Parts
-        }
-        |> Option.exists (Set.contains messageId)
-
-    let private isEndingEvidence (text: string) =
-        endingEvidenceFragments.Value
-        |> List.exists (fun fragment -> text.Contains(fragment, StringComparison.OrdinalIgnoreCase))
-
-    let private partIsEndingEvidence part =
-        match part with
-        | ProviderProjection.WireToolCall(_callId, name, _args) -> name = "suicide"
-        | ProviderProjection.WireToolResult(_callId, result) -> isEndingEvidence result
-        | ProviderProjection.WireText text -> isEndingEvidence text
-        | _ -> false
-
-    let private messageHasEndingEvidence (raw: obj) =
-        ProviderWireCapture.decodeMessage raw
-        |> Option.exists (fun message -> message.Parts |> List.exists partIsEndingEvidence)
-
-    let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
-        messageIndex < List.length rawMessages - 1
-        && (rawMessages
-            |> List.skip (messageIndex + 1)
-            |> List.exists messageHasEndingEvidence)
 
     let private narrativePartObj (part: ManagerNarrative.NarrativePart) =
         if part.Synthetic then
@@ -239,12 +175,6 @@ module ManagerNarrativeTransform =
         (rawText: string)
         =
         if List.isEmpty completedLives then
-            birthProjection sessionId rawText
-        else
-            reawakeningProjection sessionId rawText
-
-    let private chooseBirthOrReawakeningByCount (sessionId: SessionId) (completedLifeCount: int) (rawText: string) =
-        if completedLifeCount = 1 then
             birthProjection sessionId rawText
         else
             reawakeningProjection sessionId rawText
@@ -307,66 +237,6 @@ module ManagerNarrativeTransform =
                         messageIndex
                         rawText
                         (chooseBirthOrReawakening sid lifecycle.CompletedLives)
-        }
-
-    let private isTitleRequestMessage (raw: obj) =
-        let fromContent =
-            ProviderWireDecode.topLevelString raw "content"
-            |> Option.exists (fun text ->
-                text.StartsWith("Generate a title for this conversation:", StringComparison.Ordinal))
-
-        let fromParts =
-            ProviderWireCapture.decodeMessage raw
-            |> Option.exists (fun message ->
-                message.Parts
-                |> List.exists (fun part ->
-                    match part with
-                    | ProviderProjection.WireText text ->
-                        text.StartsWith("Generate a title for this conversation:", StringComparison.Ordinal)
-                    | _ -> false))
-
-        fromContent || fromParts
-
-    let private shouldSkipOpening (raw: obj) =
-        isTitleRequestMessage raw || ProviderWireDecode.isCompactionMarker raw
-
-    let private shouldPreserveCompletedOpening
-        (durable: AgentJournal)
-        (sid: SessionId)
-        (messageId: string)
-        (messageIndex: int)
-        (rawMessages: obj list)
-        (traceState: XTraceProjectionState option)
-        =
-        isAcceptedContinuation durable sid messageId
-        || isMessageFromCompletedLife traceState messageId
-        || hasSuicideAfter rawMessages messageIndex
-
-    let private completedOpeningTarget (lifecycle: ManagerLifeProjection) (rawMessages: obj list) =
-        lifecycle.CompletedLives
-        |> List.tryHead
-        |> Option.bind (fun completedLife ->
-            findMessageIndex rawMessages (PhysicalUserMessageId.value completedLife.OpeningUserMessageId)
-            |> Option.map (fun index -> completedLife, index))
-
-    let private rewriteCompletedOpening
-        (durable: AgentJournal)
-        (sid: SessionId)
-        (lifecycle: ManagerLifeProjection)
-        (rawMessages: obj list)
-        : Task<obj list option> =
-        task {
-            match completedOpeningTarget lifecycle rawMessages with
-            | None -> return None
-            | Some(completedLife, completedOpeningIndex) ->
-                let! rawText = readOpeningText durable rawMessages completedLife.OpeningTextRef completedOpeningIndex
-
-                return
-                    rewriteIndexedOpening
-                        rawMessages
-                        completedOpeningIndex
-                        rawText
-                        (chooseBirthOrReawakeningByCount sid (List.length lifecycle.CompletedLives))
         }
 
     let private migrationCandidate (traceState: XTraceProjectionState option) (completedLives: LifeProjection list) =

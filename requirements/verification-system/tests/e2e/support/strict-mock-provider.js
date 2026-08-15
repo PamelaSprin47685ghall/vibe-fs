@@ -63,6 +63,7 @@ export class StrictMockProvider {
     this._url = null;
     this._signals = new StrictMockSignals();
     this._afterExpectation = new Map();
+    this._expectationObservations = new Map();
     /** @type {import('./scenario-runtime.js').ScenarioRuntime | null} */
     this._scenario = null;
     this.onRequest = null;
@@ -121,6 +122,7 @@ export class StrictMockProvider {
   reset() {
     resetState(this._state);
     this._afterExpectation.clear();
+    this._expectationObservations.clear();
   }
   /**
    * Associate a scenario alias with a real session id (HOST-008).
@@ -165,7 +167,10 @@ export class StrictMockProvider {
     if (!Number.isInteger(attempts) || attempts < 1) {
       throw new Error(`afterExpectation attempts must be a positive integer: ${attempts}`);
     }
-    if (this._signals.matchCount(id) >= attempts) return callback();
+    if (this._signals.matchCount(id) >= attempts) {
+      const observed = this._expectationObservations.get(id)?.get(attempts);
+      return callback(observed ?? { id, attempt: attempts, sessionId: null, parentSessionId: null });
+    }
     const callbacks = this._afterExpectation.get(id) || [];
     callbacks.push({ attempts, callback });
     this._afterExpectation.set(id, callbacks);
@@ -202,6 +207,7 @@ export class StrictMockProvider {
     this._state.stopped = true;
     this._signals.stop();
     this._afterExpectation.clear();
+    this._expectationObservations.clear();
   }
 
   async stop() {
@@ -333,7 +339,7 @@ export class StrictMockProvider {
       if (faulted) {
         for (const id of new Set([faulted.id, faulted.turnId])) {
           this._signals.consume({ id, permanent: true });
-          this._runAfterExpectation(id);
+          this._runAfterExpectation(id, context);
         }
       }
       if (fault.kind === 'disconnect') {
@@ -348,11 +354,11 @@ export class StrictMockProvider {
     // `wait = "mgr"` for "the turn happened" and `wait = "mgr.1"` for a specific step.
     for (const id of new Set([entry.id, entry.turnId])) {
       this._signals.consume({ id, permanent: true });
-      this._runAfterExpectation(id);
+      this._runAfterExpectation(id, context);
     }
 
     if (process.env.MOCK_TRACE) {
-      console.error(`[MOCK-TRACE] -> ${entry.id} lane=${entry.lane ?? '(any)'} step=${entry.step} attempt=${selection.attempt}`);
+      console.error(`[MOCK-TRACE] -> ${entry.id} session=${context.sessionId ?? '(none)'} lane=${entry.lane ?? '(any)'} step=${entry.step} attempt=${selection.attempt}`);
     }
 
     this.onExpectationConsumed?.({
@@ -449,17 +455,27 @@ export class StrictMockProvider {
     });
   }
 
-  _runAfterExpectation(id) {
+  _runAfterExpectation(id, context = {}) {
+    const matchCount = this._signals.matchCount(id);
+    const observation = {
+      id,
+      attempt: matchCount,
+      sessionId: context.sessionId ?? null,
+      parentSessionId: context.parentSessionId ?? null,
+    };
+    const byAttempt = this._expectationObservations.get(id) || new Map();
+    byAttempt.set(matchCount, observation);
+    this._expectationObservations.set(id, byAttempt);
+
     const callbacks = this._afterExpectation.get(id);
     if (!callbacks) return;
 
-    const matchCount = this._signals.matchCount(id);
     const waiting = callbacks.filter((hook) => hook.attempts > matchCount);
     if (waiting.length === 0) this._afterExpectation.delete(id);
     else this._afterExpectation.set(id, waiting);
 
     for (const hook of callbacks) {
-      if (hook.attempts <= matchCount) hook.callback();
+      if (hook.attempts <= matchCount) hook.callback(observation);
     }
   }
 }

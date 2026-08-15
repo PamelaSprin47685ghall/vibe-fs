@@ -67,6 +67,10 @@ export class Scenario {
     await this.host.stop({ assert: true });
     this.watchdog?.advance({ reason: 'restart-close-events', lane: 'runtime', blocking: true });
     await this.events.close();
+    // A Host restart cannot continue an old physical turn cursor. New work after
+    // restart must explicitly start a new turn; retaining these cursors would let
+    // the harness "recover" an interrupted invocation that production forbids.
+    this.turn.clear();
     this.watchdog?.advance({ reason: 'restart-start-host', lane: 'runtime', blocking: true });
     const journalMonitorState = { done: false };
     const journalMonitor = observeRestartJournal(this.host.workDir, this.watchdog, journalMonitorState);

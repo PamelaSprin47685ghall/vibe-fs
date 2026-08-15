@@ -102,6 +102,22 @@ const abortedTurn = (session, root, run, role) =>
     undefined,
   )
 
+const failedTurn = (session, root, run, role, error = '503 Service Unavailable') =>
+  new ReconciledTurn(
+    sessionId(session),
+    physicalUser(root),
+    authorityRoot(root),
+    providerRun(run),
+    roles.of(role),
+    undefined,
+    [],
+    'error',
+    undefined,
+    undefined,
+    new TurnOutcome(4, [error]),
+    undefined,
+  )
+
 const fallbackState = (journal, session) => {
   const snapshot = promptDispatcher.journalSnapshot(journal)
   return fallbackProjection.read(fold.session(snapshot, session).Fallback)
@@ -178,7 +194,7 @@ const withHarness = async (selectedAgent, fn) => {
   }
 
   try {
-    await fn({ journal, dispatcher, owner, root, sends, creates, ownedChildren, sensor, host, bindRun })
+    await fn({ journal, dispatcher, owner, root, sends, creates, ownedChildren, sensor, host, bindRun, quiescence })
   } finally {
     providerLanguage.clearAllForTests()
     opened.dispose()
@@ -187,16 +203,40 @@ const withHarness = async (selectedAgent, fn) => {
 }
 
 test('AGENT_031_fast_needhelp_continues_same_session_as_deep_peer_without_moving_fallback', async () => {
-  await withHarness('fast-coder', async ({ journal, owner, root, sends, creates, sensor, host, bindRun }) => {
+  await withHarness('fast-coder', async ({ journal, owner, root, sends, creates, sensor, host, bindRun, quiescence }) => {
     const run = 'asst_fast_help'
     bindRun(run)
     assert.equal(arm(sensor, sessionId(owner), providerRun(run)), true)
     const before = fallbackState(journal, owner)
+    const turn = abortedTurn(owner, root, run, 'Coder')
 
-    const disposition = await handleTurn(host, abortedTurn(owner, root, run, 'Coder'))
-    assert.equal(outcomeName(disposition), 'Handled')
+    beginAttempt(quiescence, turn.SessionId)
+    const abortWake = await rawHandleTurn(
+      host,
+      new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation),
+    )
+    assert.equal(outcomeName(abortWake), 'Handled')
+    assert.equal(sends.length, 0, 'AbortWake may claim NEEDHELP but must not send before fresh SessionIdle')
+
+    const permit = observeIdle(quiescence, turn.SessionId)
+    const idleRevisit = await rawHandleTurn(
+      host,
+      new ReconciledTurnContext(turn, permit, ReconciledTurnDelivery.IdleRevisit),
+    )
+    assert.equal(outcomeName(idleRevisit), 'Handled')
     assert.equal(creates.length, 0)
-    assert.equal(sends.length, 1)
+    assert.equal(sends.length, 1, 'fresh SessionIdle admits exactly one fast→deep continuation')
+
+    const lateFailureView = await rawHandleTurn(
+      host,
+      new ReconciledTurnContext(
+        failedTurn(owner, root, run, 'Coder'),
+        undefined,
+        ReconciledTurnDelivery.Observation,
+      ),
+    )
+    assert.equal(outcomeName(lateFailureView), 'Handled', 'claimed NEEDHELP ProviderRun owns later TurnFailed views')
+    assert.equal(sends.length, 1, 'late provider-failure view must not send fallback or duplicate assistance')
     assert.equal(sends[0].session, owner)
     assert.equal(sends[0].agent, 'deep-coder')
     assert.match(sends[0].text, /同一角色的更强推理/)

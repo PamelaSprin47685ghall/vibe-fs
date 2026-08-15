@@ -34,11 +34,6 @@ import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
 /** ≤50ms wall guard matching scenario-driver FACT_WAKE_GUARD_MS. */
 const FACT_WAKE_GUARD_MS = 50;
 
-/** Host Finality reviewer OpeningAssignment (GLORY-046); TOML compile fragments may differ. */
-const REVIEWER_OPENING = '# Review the current worktree against all authoritative user requirements.';
-/** Digest that never matches production lastUser — retires a finality cohort turn. */
-const REVIEWER_RETIRED = '__reviewer-turn-retired-never-match__';
-
 export const NEEDHELP_CANARY_PROMPT =
   'NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice.';
 
@@ -81,6 +76,19 @@ export function publicToolResults(requests, expectedName) {
  */
 export function armNeedHelpCausalHolds(scenario) {
   const runtime = scenario.provider?._scenario;
+  if (process.env.NEEDHELP_TRACE === '1') {
+    const tracedSessions = new Set();
+    scenario.events?.onEvent?.((event) => {
+      const sessionId = event.sessionID ?? event.properties?.sessionID ?? null;
+      const partText = event.properties?.part?.text ?? '';
+      if (typeof partText === 'string' && partText.includes('NEEDHELP_LONG_STROKE_CANARY') && sessionId) {
+        tracedSessions.add(sessionId);
+      }
+      if (sessionId && tracedSessions.has(sessionId)) {
+        console.error(`[NEEDHELP-EVENT] seq=${event.seq} type=${event.type} session=${sessionId} raw=${event.raw}`);
+      }
+    });
+  }
   assert.ok(runtime?.scenario?.entries, 'NEEDHELP: strict scenario entries required for causal stream holds');
 
   const deferred = () => {
@@ -439,31 +447,33 @@ export async function holdChildC1UntilLabor(scenario) {
 }
 
 /**
- * Host finality OpeningAssignment is identical across cohorts — two declarations
- * with the same prefix would ambiguousTurn. Retire REVISE after its last step and
- * activate dual-PERFECT (manager-unhappy bindReviewers retire shape, lean).
+ * One Reviewer protocol owns Finality and publish review. The Long Stroke injects
+ * exactly one adversity verdict into that protocol: the first barrier judge is
+ * REVISE; once that reviewer reaches its terminal text, every later barrier judge
+ * is PERFECT. No alternate prompt/tool surface is manufactured for Finality.
  */
 export async function bindFinalityReviseThenPerfect(scenario) {
   const runtime = scenario.provider?._scenario;
   assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for finality bind');
 
-  const setTurnFor = (turnId, turnText) => {
-    for (const entry of runtime.scenario.entries) {
-      if (entry.turnId === turnId) entry.turn = turnText;
-    }
+  const verdictEntry = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'barrier-reviewer' && entry.step === 0,
+  );
+  assert.ok(verdictEntry, 'long-stroke: unified barrier-reviewer verdict entry is required');
+
+  const setVerdict = (verdict) => {
+    verdictEntry.respond = { type: 'tool-call', tool: 'judge', args: { verdict } };
   };
 
-  // Start: revise matches OpeningAssignment; perfect stays retired.
-  setTurnFor('manager-finality-revise', REVIEWER_OPENING);
-  setTurnFor('manager-finality-reviewer', REVIEWER_RETIRED);
+  setVerdict('REVISE');
 
+  let firstBarrierTerminalSeen = false;
   const originalConsume = runtime.consume.bind(runtime);
   runtime.consume = (body, selection, context) => {
     originalConsume(body, selection, context);
-    const id = selection?.entry?.id;
-    if (id === 'manager-finality-revise.1') {
-      setTurnFor('manager-finality-revise', REVIEWER_RETIRED);
-      setTurnFor('manager-finality-reviewer', REVIEWER_OPENING);
+    if (!firstBarrierTerminalSeen && selection?.entry?.id === 'barrier-reviewer.1') {
+      firstBarrierTerminalSeen = true;
+      setVerdict('PERFECT');
     }
   };
 }
@@ -630,7 +640,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'reviewer-revise',
     covered: true,
-    injection: 'manager-finality-revise judge(verdict=REVISE) + bindFinalityReviseThenPerfect',
+    injection: 'first unified barrier-reviewer judge(verdict=REVISE) + bindFinalityReviseThenPerfect',
     oracle: 'assertReviewerRevise',
   },
   {

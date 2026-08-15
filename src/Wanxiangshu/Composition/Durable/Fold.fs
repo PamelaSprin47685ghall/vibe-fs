@@ -150,8 +150,18 @@ module Fold =
 
                     ManagerLifecycleProjection.fold current fact
                     |> Result.map (fun updated ->
+                        let authority =
+                            match fact with
+                            | ManagerLifecycleFact.LifeCompleted _ ->
+                                session.PromptAuthority
+                                |> Option.defaultValue PromptAuthorityLedger.empty
+                                |> PromptAuthorityLedger.closeCompletedHumanRootManager
+                                |> Some
+                            | _ -> session.PromptAuthority
+
                         { session with
-                            ManagerLife = Some updated }))
+                            ManagerLife = Some updated
+                            PromptAuthority = authority }))
                 projection.AgentProjections
             |> Result.map (fun agents ->
                 { projection with

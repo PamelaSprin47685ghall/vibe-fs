@@ -163,6 +163,10 @@ system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset Fall
 
 - 含义：`[NEEDHELP]` abort 的 owner 是 assistance：不得进入 ProviderFailure/LoopKill、不得推进
   FallbackCursor、不得增加 consecutive failure 或 retry budget（`increase-strength.md` §6/§14）。
+  AbortWake 只 claim 当前 ProviderRun，**不得**在 abort stack 内发送 Fast→Deep continuation 或创建
+  consultation child；Fast escalation 与 Deep consultation 共用同一物理 admission：必须等该 session
+  的 fresh `SessionIdle` revisit 后才消费 NEEDHELP arm 并执行下一动作。这样 continuation 不会在
+  OpenCode 的 abort descendant sweep 尚未结束时“消息已落地但 provider 未启动”，再被 fallback 误判失败。
 - 边界：sentinel 检测/arm/abort 机制 → `host-boundary`；deep 命中后的 consultation child →
   `delegation`；Pair Hint wire → `provider-projection` + `prefix-stability`；craft 正文 →
   `cognitive-environment`。
@@ -214,6 +218,25 @@ Continuation 的归属只看 `ActiveLogicalRun`，绝不回退到 `LastAuthority
 
 - 含义：stale profile 正是「必须不能冒充 active run」的东西。
 - 证据：→ PROOF.md R3、R7。
+
+## INTERACTION-AUTHORITY-018 — HumanRoot Manager 的 LifeCompleted 原子释放 active run
+
+HumanRoot Manager 的 `LifeCompleted` 是该 HumanRoot Logical Run 的 durable terminal evidence；
+其 canonical fold **同时**把匹配的 `ActiveLogicalRun` 置空，并清空 run-scoped
+`PendingClaims / AcceptedContinuationIds / ClaimSequences`，但保留 `LastAuthorityProfile` 作为历史。
+禁止再追加一条平行的 `LogicalRunClosed` durable fact——同一终止事实不得有两个 writer / 两次 append。
+
+AgentOwnerRoot 不受此派生关闭影响：它在 Manager Life 完成后仍可能承担 owner-directed 的
+publish conflict resumption 等工作，其 authority lifetime 由 owner/session lifecycle 管理。
+因此 FINALITY-022 的 Reawakening 只发生在 HumanRoot 边界：旧 HumanRoot Life 完成后，下一条
+真实 external + explicit-agent message 才可建立新的 HumanRoot；continuation / review / synthetic
+message 因无 active run 只能 fail closed，绝不能复活旧 run。
+
+- 含义：`LifeCompleted` 与 HumanRoot authority closure 是一个 durable truth 的两个 projection 视图，
+  不是两个 durable 事实；避免 LifeCompleted 已落盘但 close append 失败的两阶段裂缝。
+- 边界：`LifeCompleted` 的业务资格与 AgentOwner migration Life 归 `finality`；普通 session / child 的
+  物理 retirement 归 `managed-session-lifecycle`。
+- 证据：→ PROOF.md R18。
 
 ## 反向覆盖核对（COVERAGE.md 归属）
 

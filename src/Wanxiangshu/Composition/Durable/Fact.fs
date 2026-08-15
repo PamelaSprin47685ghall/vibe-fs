@@ -139,14 +139,6 @@ module Fact =
                CanonicalRole: string
                SelectedTier: string |}
 
-        /// The current HumanRoot Logical Run reached its durable terminal boundary.
-        /// LastAuthorityProfile remains historical evidence; run-scoped continuation
-        /// authority is released so a later external HumanRoot may start a new run.
-        | AuthorityLogicalRunClosed of
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId |}
-
     type FallbackFactCases =
 
         /// One confirmed failed attempt advanced the cursor.
@@ -805,9 +797,6 @@ module Fact =
 
         let inline AuthorityRootAccepted payload =
             AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)
-
-        let inline AuthorityLogicalRunClosed payload =
-            AgentFact.Prompt(PromptFactCases.AuthorityLogicalRunClosed payload)
 
     /// Constructor surface for the FallbackFact family: each function wraps its
     /// family case in the single-case Fallback dispatch.

@@ -216,7 +216,11 @@ test('IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_activ
     /match message\.ExplicitAgent with[\s\S]{0,120}Some agent when isValidAgent agent[\s\S]{0,80}HumanRoot/,
     '禁止旧 fail-open：仅凭 ExplicitAgent 抬权、不看 ActiveProfile',
   )
-  assert.match(ingress, /ExplicitAgent, runtime\.ActiveProfile/, '提升配对 ExplicitAgent 与 ActiveProfile（None = 仅首条）')
+  assert.match(
+    ingress,
+    /match explicitAgent, runtime\.ActiveProfile sessionId with/,
+    '提升必须在同一个 decision 中配对 ExplicitAgent 与 ActiveProfile（None = 仅首条）',
+  )
 })
 
 // ── INTERACTION-AUTHORITY-016：accepted root claim 不入 continuation map ────

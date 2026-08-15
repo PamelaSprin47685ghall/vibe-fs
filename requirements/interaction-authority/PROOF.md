@@ -29,8 +29,9 @@ node --test requirements/interaction-authority/tests/continuation-origin.test.mj
 | R15 | INTERACTION-AUTHORITY-012（idle 续推 occasion 一次） | `requirements/interaction-authority/tests/idle-continuation-authority.test.mjs::HOST_004_idle_manager_continuation_consumes_one_permit_and_claims_once`（permit 语义归 causal-wait；同 occasion 只发一次归本包） | REUSE | `node --test requirements/interaction-authority/tests/idle-continuation-authority.test.mjs` |
 | R16 | INTERACTION-AUTHORITY-004（repair=continuation 判定） | `requirements/interaction-authority/tests/completed-turn-classifier.test.mjs::RECON_needs_interactionRepair_role_by_outcome_table`（TurnOutcome 分类归 host-boundary；「repair 是 continuation 而非 fallback/新 root」归本包） | REUSE | `node --test requirements/interaction-authority/tests/completed-turn-classifier.test.mjs` |
 | R17 | INTERACTION-AUTHORITY-005（来源解析 family） | `requirements/interaction-authority/tests/continuation-origin.test.mjs::IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root` + `PROMPT_004_009_an_accepted_id_outranks_host_compaction` + `PROMPT_004_a_human_root_is_never_inferred_by_a_pure_function` | REUSE | `node --test tests/unit/prompt/authority.test.mjs` |
+| R18 | INTERACTION-AUTHORITY-018 | `requirements/interaction-authority/tests/logical-run-close.test.mjs::IA_018_LifeCompleted_derives_HumanRoot_run_closure_without_a_second_durable_fact` + `IA_018_AgentOwnerRoot_is_not_closed_by_Manager_LifeCompleted` | NEW | `node --test requirements/interaction-authority/tests/logical-run-close.test.mjs` |
 
-统计：17 行落点；NEW 2 文件 18 断言全绿；REUSE 7 个既有文件（SPLIT@cutover 前留在原处）。
+统计：18 行落点；HumanRoot terminal closure 由 `LifeCompleted` fold 派生，无第二 durable close fact；AgentOwnerRoot 反例单独锁定。
 
 ## authority.test.mjs 断言级 SPLIT（PROOF-MAP mandatory split #1）已执行（Wave 2a）：锚点并入本包 authority-root / continuation-origin
 

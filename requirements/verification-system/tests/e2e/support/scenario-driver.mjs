@@ -266,7 +266,11 @@ function armIdleBarrier(scenario, ctx, target, attempts = 1) {
     capture = resolve;
   });
   const barrier = { key, baseline };
-  scenario.provider.afterExpectation(target, () => capture(scenario.events.lastSeq), attempts);
+  scenario.provider.afterExpectation(
+    target,
+    (observation) => capture({ seq: scenario.events.lastSeq, sessionId: observation?.sessionId ?? null }),
+    attempts,
+  );
   ctx.idleBarriers.set(key, barrier);
   return barrier;
 }
@@ -276,11 +280,10 @@ async function awaitIdleBarrier(scenario, ctx, step) {
   const attempts = step.awaitIdle.attempts ?? 1;
   const anchor = step.awaitIdle.arm ?? target;
   const anchorAttempts = step.awaitIdle.armAttempts ?? attempts;
-  const sessionId = step.awaitIdle.session === 'child' ? ctx.childId
+  const explicitSessionId = step.awaitIdle.session === 'child' ? ctx.childId
     : step.awaitIdle.session === 'guard' ? (ctx.guardId || ctx.sessions?.guard)
     : step.awaitIdle.session === 'nudge' ? (ctx.nudgeId || ctx.sessions?.nudge)
-    : (step.awaitIdle.session && ctx.sessions?.[step.awaitIdle.session]) || ctx.sessionId;
-  assert.ok(sessionId, 'awaitIdle requires session');
+    : step.awaitIdle.session ? ctx.sessions?.[step.awaitIdle.session] : null;
 
   const barrier = armIdleBarrier(scenario, ctx, anchor, anchorAttempts);
   scenario.watchdog?.setWindow(step.timeoutMs ?? null);
@@ -289,10 +292,15 @@ async function awaitIdleBarrier(scenario, ctx, step) {
     if (anchor !== target || anchorAttempts !== attempts) {
       await scenario.provider.waitForExpectationAttempt(anchor, anchorAttempts, step.timeoutMs);
     }
-    const after = await barrier.baseline;
+    const observed = await barrier.baseline;
+    const sessionId = explicitSessionId || observed.sessionId;
+    assert.ok(sessionId, `awaitIdle ${target} has no physical session identity`);
+    if (process.env.MOCK_TRACE) {
+      console.error(`[IDLE-BARRIER] target=${target} session=${sessionId} afterSeq=${observed.seq} currentSeq=${scenario.events.lastSeq}`);
+    }
     await scenario.events.awaitEvent((event) => {
       const eventSession = event.sessionID ?? event.properties?.sessionID;
-      return event.seq > after && eventSession === sessionId && isIdleEvent(event);
+      return event.seq > observed.seq && eventSession === sessionId && isIdleEvent(event);
     }, step.timeoutMs ?? null);
     ctx.idleBarriers?.delete(barrier.key);
     scenario.watchdog?.advance({
@@ -364,7 +372,7 @@ async function runFlow(scenario, doc, ctx) {
         : (step.session && ctx.sessions?.[step.session]) || ctx.sessionId;
       assert.ok(sid, 'prompt requires session');
       if (step.startTurn !== false) {
-        ctx.turn = scenario.turn.start(sid, step.afterSeq ? { afterSeq: step.afterSeq } : undefined);
+        scenario.turn.start(sid, step.afterSeq ? { afterSeq: step.afterSeq } : undefined);
       }
       await sendPrompt(scenario, sid, step.prompt);
       return;
@@ -378,7 +386,7 @@ async function runFlow(scenario, doc, ctx) {
         : step.session === 'guard' ? (ctx.guardId || ctx.sessions?.guard)
         : step.session === 'nudge' ? (ctx.nudgeId || ctx.sessions?.nudge)
         : (step.session && ctx.sessions?.[step.session]) || ctx.sessionId;
-      const turn = ctx.turn || scenario.turn.start(sid);
+      const turn = scenario.turn.current(sid) || scenario.turn.start(sid);
       await turn.awaitTerminal({
         timeoutMs: step.timeoutMs ?? null,
         requireActivity: step.requireActivity !== false,
@@ -795,7 +803,7 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
     }
 
     if (doc.prompt) {
-      ctx.turn = scenario.turn.start(ctx.sessionId);
+      scenario.turn.start(ctx.sessionId);
       await sendPrompt(scenario, ctx.sessionId, doc.prompt);
     }
 
