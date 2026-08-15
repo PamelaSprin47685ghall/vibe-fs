@@ -47,6 +47,7 @@ export const BUILD_VERIFICATION_FILES = new Set([
  */
 export const SURFACE_MODULES = [
   'Context/Companion/Blogger/TomlSurface.js',
+  'Execution/Delegation/DelegatedToolEstimateSurface.js',
   'Execution/Delegation/Fork/Surface.js',
   'Foundation/SyntheticTomlSurface.js',
   'OpenCode/Host/QuiescenceSurface.js',

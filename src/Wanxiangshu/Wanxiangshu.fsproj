@@ -164,6 +164,7 @@
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
+    <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fs"/>
     <Compile Include="Execution/Session/SessionStartedAtProjection.fs"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>

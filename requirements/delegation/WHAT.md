@@ -343,7 +343,7 @@ replace 重置、在 remaining=0 后停止增长。
 边界：动态提示文案 craft → `cognitive-environment`；HOST-013 occurrence 组装/冻结 →
 `guidance-delivery` + `prefix-stability`；时间采样不是本命题。
 
-证据：GAP-012；`requirements/delegation/tests/delegated-tool-estimate.test.mjs`、
+证据：GAP-012；`requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs`、
 `requirements/delegation/tests/delegation-tool-contract.test.mjs`。
 
 ## DELEG-023：委托失败仅在所有恢复路径耗尽后向调用方报告

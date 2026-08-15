@@ -266,9 +266,6 @@
   "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs": {
     "deep-dist-import": 2
   },
-  "requirements/delegation/tests/delegated-tool-estimate.test.mjs": {
-    "deep-dist-import": 2
-  },
   "requirements/delegation/tests/delegation-tool-contract.test.mjs": {
     "deep-dist-import": 5
   },
