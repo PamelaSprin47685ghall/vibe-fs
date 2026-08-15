@@ -143,7 +143,12 @@ type InjectedSessionPort
         else
             SessionExecutionBinding.normalizeUserFacingPrompt sessionId opts
 
-    let sendThroughPort (port: IOpenCodePort) (sessionId: SessionId) (text: string) (sendOptions: OpenCodePromptOptions) =
+    let sendThroughPort
+        (port: IOpenCodePort)
+        (sessionId: SessionId)
+        (text: string)
+        (sendOptions: OpenCodePromptOptions)
+        =
         task {
             // chat.params runs inside the Host send. Mark this interval so
             // its root-session observer cannot mistake our own continuation

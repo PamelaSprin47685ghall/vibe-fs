@@ -107,12 +107,10 @@ module ForkChildPayload =
             // Child → parent join is the opposite plane (`# LWR` via
             // JoinResultRenderer / SyntheticToml.comment) — do not conflate.
             @ (match commissionerRecord with
-               | Some record ->
-                   [ SyntheticToml.field "commissioner_record" (SyntheticToml.renderString record) ]
+               | Some record -> [ SyntheticToml.field "commissioner_record" (SyntheticToml.renderString record) ]
                | None -> [])
             @ (match attachment with
-               | Some record ->
-                   [ SyntheticToml.field "attached_work_record" (SyntheticToml.renderString record) ]
+               | Some record -> [ SyntheticToml.field "attached_work_record" (SyntheticToml.renderString record) ]
                | None -> [])
             @ (requirements
                |> List.mapi (fun index text ->

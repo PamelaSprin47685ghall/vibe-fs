@@ -184,21 +184,12 @@ module PtyTool =
         |> Result.requireSome (prose language Path.OpenTerminal.AuthorityRequired)
 
     /// Evidence → Decision: terminal name must be free before ForkPty.
-    let private requirePtyNameAvailable
-        (language: ProviderLanguage)
-        (runtime: HostForkRuntime)
-        (name: string)
-        =
+    let private requirePtyNameAvailable (language: ProviderLanguage) (runtime: HostForkRuntime) (name: string) =
         runtime.TryPtyByName name
         |> Result.requireNone (namedProse language Path.OpenTerminal.AlreadyInUse (name.Trim()))
 
     /// Evidence → Decision: bind name or untrack the freshly forked PTY.
-    let private bindOpenedTerminal
-        (language: ProviderLanguage)
-        (runtime: HostForkRuntime)
-        (name: string)
-        (id: PtyId)
-        =
+    let private bindOpenedTerminal (language: ProviderLanguage) (runtime: HostForkRuntime) (name: string) (id: PtyId) =
         match runtime.TryBindTerminalName(name, id) with
         | Ok() -> Ok(instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim())))
         | Error bindError ->
@@ -233,7 +224,10 @@ module PtyTool =
             let! runtime = scope.RuntimeFor context
             let! agent = requireManagedAgent language scope context
             do! requirePtyNameAvailable language runtime name
-            let directory = scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+            let directory =
+                scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
+
             let! id = runtime.ForkPty(command, agent, ?cwd = directory)
             return! bindOpenedTerminal language runtime name id
         }

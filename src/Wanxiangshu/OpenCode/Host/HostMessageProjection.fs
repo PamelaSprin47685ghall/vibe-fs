@@ -39,7 +39,11 @@ module HostMessageProjection =
 
     let private partKind (p: obj) : string =
         let typeVal = if isNull p then null else readField p "type"
-        if isNull typeVal then "" else (unbox<string> typeVal).ToLowerInvariant()
+
+        if isNull typeVal then
+            ""
+        else
+            (unbox<string> typeVal).ToLowerInvariant()
 
     let private isNonEmptyTextPart (p: obj) : bool =
         let textVal = if isNull p then null else readField p "text"
@@ -62,8 +66,7 @@ module HostMessageProjection =
         let textVal = readField raw "text"
 
         let fromText =
-            not (isNull textVal)
-            && not (String.IsNullOrWhiteSpace(unbox<string> textVal))
+            not (isNull textVal) && not (String.IsNullOrWhiteSpace(unbox<string> textVal))
 
         fromContent || fromText
 
@@ -79,8 +82,7 @@ module HostMessageProjection =
         || kind = "tool-result"
         || kind = "tool_result"
 
-    let private hasToolFromParts (rawParts: obj array) : bool =
-        rawParts |> Array.exists isToolPart
+    let private hasToolFromParts (rawParts: obj array) : bool = rawParts |> Array.exists isToolPart
 
     let private hasToolFromTopLevel (raw: obj) : bool =
         let toolCallsVal = readField raw "tool_calls"
@@ -92,9 +94,12 @@ module HostMessageProjection =
         hasToolFromParts rawParts || hasToolFromTopLevel raw
 
     let private tryNonEmptyString (value: obj) : string option =
-        if isNull value then None
-        elif String.IsNullOrWhiteSpace(unbox<string> value) then None
-        else Some(unbox<string> value)
+        if isNull value then
+            None
+        elif String.IsNullOrWhiteSpace(unbox<string> value) then
+            None
+        else
+            Some(unbox<string> value)
 
     let private reasoningFromPart (p: obj) : string option =
         let kind = partKind p

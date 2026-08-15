@@ -276,11 +276,7 @@ module MagicTodoProjection =
         | Some _, Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
         | _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
 
-    let private commitmentAfterAccept
-        (life: LifeMagicTodoState)
-        (writeId: TodoWriteId)
-        (planCompleteDeclared: bool)
-        =
+    let private commitmentAfterAccept (life: LifeMagicTodoState) (writeId: TodoWriteId) (planCompleteDeclared: bool) =
         match life.FirstPlanCommitment with
         | None when planCompleteDeclared -> Some writeId, None, Some writeId
         | None -> None, None, None
@@ -300,7 +296,9 @@ module MagicTodoProjection =
                 InputDigest = Some payload.InputDigest
                 OutputDigest = Some payload.OutputDigest }
 
-        let firstAccepted = life.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
+        let firstAccepted =
+            life.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
+
         let firstCommitment, previousCommitted, latestCommitted =
             commitmentAfterAccept life payload.TodoWriteId cp.PlanCompleteDeclared
 
@@ -416,8 +414,7 @@ module MagicTodoProjection =
         (field: string)
         : Result<unit, MagicTodoFoldRejection> =
         match Map.tryFind sessionKey state.ReviewerLifeBySession with
-        | Some indexedLife when indexedLife <> lifeId ->
-            Error(MagicTodoFoldRejection.IdentityCorruption field)
+        | Some indexedLife when indexedLife <> lifeId -> Error(MagicTodoFoldRejection.IdentityCorruption field)
         | _ -> Ok()
 
     let private decideDedicatedEnlist

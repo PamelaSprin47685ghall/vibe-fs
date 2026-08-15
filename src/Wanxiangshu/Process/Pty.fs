@@ -66,10 +66,7 @@ module private PtyPortSupport =
                 return Error ex.Message
         }
 
-    let parkOrReject
-        (readWaiters: Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>)
-        (id: PtyId)
-        =
+    let parkOrReject (readWaiters: Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>) (id: PtyId) =
         if readWaiters.ContainsKey id then
             AlreadyInProgress
         else
@@ -123,8 +120,7 @@ module private PtyPortSupport =
             let! killResult = handler id (PtyCommand.Signal PtySignal.Kill)
 
             match killResult with
-            | Error err ->
-                return raise (InvalidOperationException(sprintf "PTY kill failed for %s: %s" id.Value err))
+            | Error err -> return raise (InvalidOperationException(sprintf "PTY kill failed for %s: %s" id.Value err))
             | Ok() -> do! exitTask
         }
 
@@ -132,10 +128,7 @@ module private PtyPortSupport =
         task {
             let! exited = PtyTiming.raceExit exitTask grace
 
-            if exited then
-                ()
-            else
-                do! applyKill handler exitTask id
+            if exited then () else do! applyKill handler exitTask id
         }
 
     let awaitRegisteredExit (handler: PtyBackendHandler) (exitTaskOpt: Task option) (grace: int) (id: PtyId) =
@@ -379,8 +372,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
             for id in ids do
                 requestTerminate id
 
-                let exitTaskOpt =
-                    lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
+                let exitTaskOpt = lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
 
                 do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
                 lock gate (fun () -> exitTasks.Remove id |> ignore)

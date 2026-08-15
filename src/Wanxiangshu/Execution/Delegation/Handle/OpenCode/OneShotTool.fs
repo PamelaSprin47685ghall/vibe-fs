@@ -157,7 +157,10 @@ module OneShotAgentTool =
         }
 
     let private providerRunOf (terminal: AgentRunResult) =
-        if isNull (box terminal.ProviderRun) then ProviderRunIdentity.create "" else terminal.ProviderRun
+        if isNull (box terminal.ProviderRun) then
+            ProviderRunIdentity.create ""
+        else
+            terminal.ProviderRun
 
     let private ignoreAbortResult (pending: Task<Result<unit, string>>) =
         task {
@@ -185,10 +188,7 @@ module OneShotAgentTool =
             | None -> do! ignoreAbortResult (startAbort ())
         }
 
-    let private noteSendFailure
-        (succeed: string -> string option -> unit)
-        (sendResult: Result<PromptKey, string>)
-        =
+    let private noteSendFailure (succeed: string -> string option -> unit) (sendResult: Result<PromptKey, string>) =
         match sendResult with
         | Error sendError -> succeed (sprintf "send failed: %s" sendError) None
         | Ok _ -> ()
@@ -234,12 +234,7 @@ module OneShotAgentTool =
         (completion: TaskCompletionSource<Result<string * string option, string>>)
         =
         task {
-            do!
-                XTraceCapture.captureTerminalText
-                    scope.Journal
-                    childId
-                    terminal.TerminalText
-                    (providerRunOf terminal)
+            do! XTraceCapture.captureTerminalText scope.Journal childId terminal.TerminalText (providerRunOf terminal)
 
             let! workRecord = childWorkRecord scope childId
 
@@ -290,11 +285,10 @@ module OneShotAgentTool =
         // reasoning stream as if it were the answer.
         // EXEC-028: Completed requires child LWR (includeOpening=false); missing → Error.
         | TerminalOutcome.Completed terminal ->
-            settleCompletedTerminal scope childId terminal succeed latch completion |> ignore
-        | TerminalOutcome.Aborted reason ->
-            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
-        | TerminalOutcome.Failed error ->
-            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
+            settleCompletedTerminal scope childId terminal succeed latch completion
+            |> ignore
+        | TerminalOutcome.Aborted reason -> fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
+        | TerminalOutcome.Failed error -> fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
 
     let private raceCompletionDeadline
         (outputTask: Task<Result<string * string option, string>>)
@@ -388,7 +382,9 @@ module OneShotAgentTool =
             // ORIGINAL oneshot assignment (not the rendered relay
             // envelope), matching HostForkAgent. PromptIngress skips
             // Opening for AgentOwnerRoot; capture before send.
-            do! XTraceCapture.captureOpening scope.Journal childId request.Prompt [] |> TaskResultCE.ofTask
+            do!
+                XTraceCapture.captureOpening scope.Journal childId request.Prompt []
+                |> TaskResultCE.ofTask
 
             // Ok carries (formal text, optional WorkRecord); Error is the
             // Result.Error channel (timeout sibling) — not SetException.

@@ -65,11 +65,7 @@ module ProjectionMessageEdit =
     let private encodeParts (parts: WirePart list) : Result<obj list, string> =
         parts |> List.traverseResultM encodeWirePart
 
-    let private derivedHostMessageId
-        (sha256: string -> string)
-        (index: int)
-        (message: WireMessage)
-        =
+    let private derivedHostMessageId (sha256: string -> string) (index: int) (message: WireMessage) =
         let single: ProviderWireProjection =
             { ProviderId = None
               ModelId = None
@@ -96,8 +92,7 @@ module ProjectionMessageEdit =
 
             return
                 createObj
-                    [ "info",
-                      box (createObj [ "id", box id; "sessionID", box sessionId; "role", box message.Role ])
+                    [ "info", box (createObj [ "id", box id; "sessionID", box sessionId; "role", box message.Role ])
                       "parts", box (List.toArray parts) ]
         }
 
@@ -226,15 +221,7 @@ module ProjectionMessageEdit =
         | None -> Error "Strength Host adapter found an orphan tool result"
         | Some(_, name, args) -> Ok(strengthCompletedPart callId name args resultCanonical)
 
-    let private strengthRawMessage
-        (sessionId: string)
-        (sha256: string -> string)
-        index
-        message
-        hostId
-        role
-        parts
-        =
+    let private strengthRawMessage (sessionId: string) (sha256: string -> string) index message hostId role parts =
         let id = strengthHostMessageId sha256 index message hostId
 
         createObj
@@ -272,8 +259,7 @@ module ProjectionMessageEdit =
         (results: (ToolCallId * string) list)
         : Result<obj, string> =
         result {
-            let! pendingCalls, regularParts, callIndex, callMessage, callHostId =
-                requirePendingBatch pendingBatch
+            let! pendingCalls, regularParts, callIndex, callMessage, callHostId = requirePendingBatch pendingBatch
 
             do! requireToolRole message.Role
             do! requireResultPartsOnly message results
@@ -363,16 +349,7 @@ module ProjectionMessageEdit =
             | [], None -> Ok(List.rev acc)
             | [], Some _ -> Error "Strength Host adapter ended with an incomplete tool batch"
             | (index, (message, hostId, _)) :: tail, pendingBatch ->
-                continueStrengthMessage
-                    sessionId
-                    sha256
-                    encodeMessages
-                    tail
-                    pendingBatch
-                    acc
-                    index
-                    message
-                    hostId
+                continueStrengthMessage sessionId sha256 encodeMessages tail pendingBatch acc index message hostId
 
         encodeMessages triples None []
 
@@ -450,7 +427,10 @@ module ProjectionMessageEdit =
         : Result<obj list, string> =
         result {
             let! decodedRaw = decodeRaw rawMessages
-            let renderedRows = List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+
+            let renderedRows =
+                List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+
             return! mergeInsertions sessionId sha256 renderedRows decodedRaw
         }
 

@@ -286,11 +286,7 @@ module FinalityTool =
             }
         | None -> Task.FromResult None
 
-    let private endingPrerequisiteRefusal
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (lastWords: string)
-        =
+    let private endingPrerequisiteRefusal (scope: ToolRuntimeScope) (context: HostToolContext) (lastWords: string) =
         if String.IsNullOrWhiteSpace lastWords then
             Some(refuse context Path.CallAgainWithLastWords)
         elif context.ToolCallId.IsNone || context.ProviderRunId.IsNone then
@@ -309,9 +305,7 @@ module FinalityTool =
         task {
             let reviewerPort, _ = finalityPorts scope sid
 
-            match!
-                FinalityWorkflow.resume reviewerPort scope.Journal sid life.LifeId request.RequestId
-            with
+            match! FinalityWorkflow.resume reviewerPort scope.Journal sid life.LifeId request.RequestId with
             | Some outcome -> return renderOutcome outcome
             | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
         }
@@ -359,7 +353,7 @@ module FinalityTool =
         taskResult {
             let! blob =
                 journal.WriteBlob lastWords
-                |> Task.map (Result.mapError (fun _ -> refuse context Path.SeekEndWhenReady))
+                |> TaskValue.map (Result.mapError (fun _ -> refuse context Path.SeekEndWhenReady))
 
             let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
             let reviewerPort, treePort = finalityPorts scope sid
@@ -386,7 +380,7 @@ module FinalityTool =
 
             return renderOutcome outcome
         }
-        |> Task.map (function
+        |> TaskValue.map (function
             | Ok text
             | Error text -> text)
 
@@ -433,12 +427,10 @@ module FinalityTool =
 
         // Split arms (no `(A|B) as disposition`) — Fable FS0038 double-bind.
         match ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment with
-        | ManagerFinality.EndingDisposition.ContinuePlanning ->
-            Task.FromResult(refuse context Path.ContinueWorking)
+        | ManagerFinality.EndingDisposition.ContinuePlanning -> Task.FromResult(refuse context Path.ContinueWorking)
         | ManagerFinality.EndingDisposition.AlreadyCompleted ->
             Task.FromResult(ToolHostCodec.tomlObject [ "status", tString "already_completed" ])
-        | ManagerFinality.EndingDisposition.ResumeRequest request ->
-            resumeFinalityRequest scope sid life request
+        | ManagerFinality.EndingDisposition.ResumeRequest request -> resumeFinalityRequest scope sid life request
         | ManagerFinality.EndingDisposition.RecoverRequestWithoutReviewers request ->
             recoverEmptyMembers scope sid life request
         | ManagerFinality.EndingDisposition.WaitForCurrentRequest ->

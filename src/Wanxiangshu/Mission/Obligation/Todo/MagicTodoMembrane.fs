@@ -133,7 +133,9 @@ module MagicTodoMembrane =
         (expectedDigest: BlobDigest)
         : Task<Result<ObligationList, PrepareRejection>> =
         taskResult {
-            let! body = journal.Writer.BlobWriter.Read blobRef |> TaskResult.mapError PrepareRejection.BlobRead
+            let! body =
+                journal.Writer.BlobWriter.Read blobRef
+                |> TaskResult.mapError PrepareRejection.BlobRead
 
             do!
                 Result.requireTrue
@@ -152,7 +154,9 @@ module MagicTodoMembrane =
         (expectedDigest: BlobDigest)
         : Task<Result<string, PrepareRejection>> =
         taskResult {
-            let! body = journal.Writer.BlobWriter.Read blobRef |> TaskResult.mapError PrepareRejection.BlobRead
+            let! body =
+                journal.Writer.BlobWriter.Read blobRef
+                |> TaskResult.mapError PrepareRejection.BlobRead
 
             do!
                 Result.requireTrue
@@ -255,8 +259,7 @@ module MagicTodoMembrane =
         | None -> Task.FromResult(Ok None)
         | Some concluded ->
             taskResult {
-                let! report =
-                    readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
+                let! report = readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
 
                 return
                     Some
@@ -278,8 +281,7 @@ module MagicTodoMembrane =
                 Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints
                 |> Result.requireSome (PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
 
-            let! proposal =
-                readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+            let! proposal = readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
 
             return
                 bridge
@@ -361,14 +363,7 @@ module MagicTodoMembrane =
             Task.FromResult(Error(PrepareRejection.AwaitingConsumableReview pending))
         | AdmissionOutcome.Rejected rejection -> Task.FromResult(Error(PrepareRejection.Admission rejection))
         | AdmissionOutcome.IdempotentReplay replayWriteId ->
-            replayPreparedBridge
-                journal
-                managerSessionId
-                lifeId
-                life
-                currentObligations
-                previousReview
-                replayWriteId
+            replayPreparedBridge journal managerSessionId lifeId life currentObligations previousReview replayWriteId
         | AdmissionOutcome.FreshPrepare preparedPlan ->
             freshPrepareBridge
                 journal
@@ -476,16 +471,10 @@ module MagicTodoMembrane =
             ProviderProse.render
                 lang
                 MagicTodoSurface.Path.PreviousReviewBody
-                (MagicTodoSurface.previousReviewSubs
-                    (ProcessReviewVerdict.wire previous.Verdict)
-                    previous.ReportText)
+                (MagicTodoSurface.previousReviewSubs (ProcessReviewVerdict.wire previous.Verdict) previous.ReportText)
         | _ -> ""
 
-    let private enrichAcceptedResult
-        (managerSessionId: SessionId)
-        (isT1Commitment: bool)
-        (rendered: string)
-        =
+    let private enrichAcceptedResult (managerSessionId: SessionId) (isT1Commitment: bool) (rendered: string) =
         if isT1Commitment then
             ManagerNarrative.wrapT1AcceptedResult
                 (ProviderProse.documentFor managerSessionId ManagerNarrative.Path.T1Revelation Map.empty)
@@ -535,7 +524,8 @@ module MagicTodoMembrane =
                     MagicTodoSurface.Path.ObligationWriteResult
                     (MagicTodoSurface.obligationWriteSubs previousBody acceptedEpilogue)
 
-            let enrichedResult = enrichAcceptedResult bridge.ManagerSessionId isT1Commitment rendered
+            let enrichedResult =
+                enrichAcceptedResult bridge.ManagerSessionId isT1Commitment rendered
 
             let! _ =
                 AgentJournal.appendMagicTodo
@@ -549,8 +539,7 @@ module MagicTodoMembrane =
             return
                 { EnrichedResult = enrichedResult
                   NeedsDedicatedEnlist = life.Dedicated.IsNone
-                  NeedsEnsureReview =
-                    checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
+                  NeedsEnsureReview = checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
         }
 
     let accept
@@ -657,13 +646,7 @@ module MagicTodoHostHooks =
         =
         task {
             match!
-                MagicTodoMembrane.prepare
-                    durable
-                    sessionId
-                    locality
-                    providerInputDigest
-                    planComplete
-                    obligations
+                MagicTodoMembrane.prepare durable sessionId locality providerInputDigest planComplete obligations
             with
             | Ok value -> return ObligationLedgerWorkflow.PreparationAttempt.Prepared value
             | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
@@ -698,9 +681,7 @@ module MagicTodoHostHooks =
         | ObligationLedgerWorkflow.PreparationFailure.ReviewWaitFailed reason ->
             fatalInfrastructure sessionText ("await ConsumableReview failed: " + reason)
         | ObligationLedgerWorkflow.PreparationFailure.MissingPendingReview ->
-            fatalInfrastructure
-                sessionText
-                "lag-1 wait without pending ConsumableReview (projection inconsistent)"
+            fatalInfrastructure sessionText "lag-1 wait without pending ConsumableReview (projection inconsistent)"
         | ObligationLedgerWorkflow.PreparationFailure.ReviewDidNotConverge ->
             fatalInfrastructure
                 sessionText
@@ -775,11 +756,7 @@ module MagicTodoHostHooks =
         match processReview with
         | None -> Task.FromResult(Error "Magic Todo process review runtime disappeared after before")
         | Some port ->
-            port.EnsureReview
-                durable
-                prepared.ManagerSessionId
-                prepared.ManagerLifeId
-                prepared.Prepared.TodoWriteId
+            port.EnsureReview durable prepared.ManagerSessionId prepared.ManagerLifeId prepared.Prepared.TodoWriteId
 
     let private applyEnrichedResult (output: obj) (accepted: MagicTodoMembrane.AcceptOutcome) =
         if not (String.IsNullOrEmpty accepted.EnrichedResult) then
@@ -819,8 +796,7 @@ module MagicTodoHostHooks =
             let ensureReview (_accepted: MagicTodoMembrane.AcceptOutcome) =
                 ensureReviewPort processReview durable prepared
 
-            let! outcome =
-                ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
+            let! outcome = ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
 
             acceptResolvedCheckpoint sessionText outcome output
         }
@@ -859,8 +835,13 @@ module MagicTodoHostHooks =
         =
         task {
             let durable = requirePort "Magic Todo requires a durable AgentJournal" journal
-            let snapshots = requirePort "Magic Todo requires the full session snapshot port" snapshot
-            let reviews = requirePort "Magic Todo requires the process review runtime" processReview
+
+            let snapshots =
+                requirePort "Magic Todo requires the full session snapshot port" snapshot
+
+            let reviews =
+                requirePort "Magic Todo requires the process review runtime" processReview
+
             let sessionText = requiredText input "sessionID"
             let callText = requiredText input "callID"
             let sessionId = SessionId.create sessionText

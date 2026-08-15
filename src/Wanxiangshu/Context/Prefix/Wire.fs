@@ -233,8 +233,7 @@ module XWire =
                     AgentPairCursor.initial
                     physical
                     providerRun
-                    (PromptAuthority.PromptOrigin.AuthorityRoot
-                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
                     ProviderRequestKind.StrengthReplica
                     false
                     (fun () -> Error NoCandidateReason.NoCoverage)
@@ -292,18 +291,14 @@ module XWire =
     // Activate + Reanchor 同批 → ConflictingPrefixLifecycle（fail-closed）。
     // hostReanchor 仅在 Snapshot=None 时填充 → prefixIntent 必为 Keep。
     // Activate + Reanchor 冲突由 plan fail-closed 覆盖（unit 已证明）。
-    let private intentsForHostReanchor
-        (hostReanchor: HostReanchorFact option)
-        (prefixIntent: ProjectionIntent)
-        =
+    let private intentsForHostReanchor (hostReanchor: HostReanchorFact option) (prefixIntent: ProjectionIntent) =
         match hostReanchor with
         | Some _ -> [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
         | None -> [ prefixIntent ]
 
     let private renderPrefixMessages (rawMessages: obj list) (intents: ProjectionIntent list) =
         match ProjectionPlanner.plan intents with
-        | Error conflict ->
-            raise (InvalidOperationException(sprintf "X-wire projection conflict: %A" conflict))
+        | Error conflict -> raise (InvalidOperationException(sprintf "X-wire projection conflict: %A" conflict))
         | Ok ordered ->
             // ReanchorAfterCompaction 是 wire no-op；prefix 写回仍用
             // applyRenderedPrefix（与既有 Host id 字节合同一致）。
@@ -376,8 +371,7 @@ module XWire =
                 let mayRecover =
                     RecoverySlot.mayRecover arming fallback.Cursor.Offset (BlogProjection.hasCoverage blog)
 
-                let! candidateResult =
-                    selectCandidateWhenRecoverable mayRecover durable sessionId snapshot state cutoff
+                let! candidateResult = selectCandidateWhenRecoverable mayRecover durable sessionId snapshot state cutoff
 
                 let selectProbe () = candidateResult
 
@@ -387,8 +381,7 @@ module XWire =
                         fallback.Cursor
                         physical
                         providerRun
-                        (PromptAuthority.PromptOrigin.Continuation
-                            PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                        (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                         ProviderRequestKind.WorkMain
                         mayRecover
                         selectProbe
@@ -401,10 +394,7 @@ module XWire =
                     readFrozenRecordPrefixBody durable plan.Profile.ProjectionChoice snapshot.CommittedPrefix
 
                 let memoryPreamble =
-                    ProviderProse.render
-                        (ProviderProse.languageOf sessionId)
-                        CompanionPrompt.MemoryPreamble
-                        Map.empty
+                    ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
 
                 let prefixIntent =
                     XPrefixProjection.forChoice
@@ -444,9 +434,7 @@ module XWire =
             | Some _, None, _ ->
                 raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
             | Some _, _, None ->
-                raise (
-                    InvalidOperationException "X-wire cannot plan a retry without the public session snapshot"
-                )
+                raise (InvalidOperationException "X-wire cannot plan a retry without the public session snapshot")
             | Some arming, Some physical, Some snapshotPort ->
                 do! planArmedWorkMainRetry snapshotPort durable scope sessionId arming physical output rawMessages
         }
@@ -463,9 +451,7 @@ module XWire =
             | Some binding, Some snapshotPort ->
                 do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
             | Some _, None ->
-                raise (
-                    InvalidOperationException "StrengthReplica cannot plan without the public session snapshot"
-                )
+                raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
             | None, _ -> do! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
@@ -511,12 +497,7 @@ module XWire =
                            ProbeId = probe.ProbeId
                            SolvingProviderRun = turn.ProviderRun |}
 
-                let! _ =
-                    AgentJournal.appendAgent
-                        (StreamId.Session turn.SessionId)
-                        (Some turn.ProviderRun)
-                        fact
-                        durable
+                let! _ = AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
 
                 ()
             | _ -> ()

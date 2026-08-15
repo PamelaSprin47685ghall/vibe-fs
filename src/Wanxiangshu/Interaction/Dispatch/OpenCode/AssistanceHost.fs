@@ -184,7 +184,7 @@ type AssistanceHost
             runText
             requestingAgent
 
-    let requireFlag (cond: bool) = if cond then Some () else None
+    let requireFlag (cond: bool) = if cond then Some() else None
 
     let tryParseNonNeg (text: string) =
         match Int32.TryParse text with
@@ -318,8 +318,10 @@ type AssistanceHost
             :> Task
 
     let terminalEvidence succeeded agentId handle childId body =
-        if succeeded then TerminalEvidence.completed agentId handle childId body
-        else TerminalEvidence.failed agentId handle childId body
+        if succeeded then
+            TerminalEvidence.completed agentId handle childId body
+        else
+            TerminalEvidence.failed agentId handle childId body
 
     let commitActiveTerminal owner evidence =
         match JoinableCompletion.tryFromProvenTerminal evidence with
@@ -339,15 +341,7 @@ type AssistanceHost
         | HandleLifecycle.CompletedAwaitingJoin _ -> consumeCompleted owner record
         | _ -> AsyncSupport.completedTask ()
 
-    let deliverAdviceAfterSend
-        owner
-        logicalRun
-        requester
-        childId
-        (record: HandleRecord)
-        providerPrompt
-        directory
-        =
+    let deliverAdviceAfterSend owner logicalRun requester childId (record: HandleRecord) providerPrompt directory =
         task {
             match!
                 sendContinuation
@@ -377,15 +371,7 @@ type AssistanceHost
                 do! consumeIfAwaitingJoin owner record
                 return AssistanceTurnDisposition.Handled
             else
-                return!
-                    deliverAdviceAfterSend
-                        owner
-                        logicalRun
-                        requester
-                        childId
-                        record
-                        providerPrompt
-                        directory
+                return! deliverAdviceAfterSend owner logicalRun requester childId record providerPrompt directory
         }
 
     let settleFailedConsultation owner logicalRun agentId childId record requester error =
@@ -433,7 +419,8 @@ type AssistanceHost
             let! parentOpt = parentRecord owner |> TaskResultCE.ofTask
 
             let! commissionerRecord =
-                parentOpt |> Result.requireSome "canonical parent LifecycleWorkRecord unavailable"
+                parentOpt
+                |> Result.requireSome "canonical parent LifecycleWorkRecord unavailable"
 
             let assignment = consultationAssignment owner
             let lang = ProviderProse.languageOf owner
@@ -447,7 +434,9 @@ type AssistanceHost
             let providerPrompt =
                 ForkChildPayload.relay forkProse assignment (Some commissionerRecord) None [] None
 
-            do! XTraceCapture.captureOpening journal childId assignment [] |> TaskResultCE.ofTask
+            do!
+                XTraceCapture.captureOpening journal childId assignment []
+                |> TaskResultCE.ofTask
 
             let! runtime =
                 journal
@@ -602,8 +591,7 @@ type AssistanceHost
                       "provider_error", error ]
 
                 return AssistanceTurnDisposition.ClaimedButUnresolved
-            | Ok childId ->
-                return! afterConsultationChildCreated owner logicalRun requester directory agentId childId
+            | Ok childId -> return! afterConsultationChildCreated owner logicalRun requester directory agentId childId
         }
 
     let startFreshConsultation owner logicalRun requester directory =
@@ -741,15 +729,7 @@ type AssistanceHost
             | Some profile -> return! handleOwnerRequestForProfile context turn profile
         }
 
-    let finalizeConsultationAdvice
-        owner
-        logicalRun
-        requester
-        childId
-        (record: HandleRecord)
-        providerPrompt
-        directory
-        =
+    let finalizeConsultationAdvice owner logicalRun requester childId (record: HandleRecord) providerPrompt directory =
         let refreshed = childRecord childId |> Option.map fst |> Option.defaultValue record
         deliverAdvice owner logicalRun requester childId refreshed providerPrompt directory
 
@@ -766,8 +746,7 @@ type AssistanceHost
         task {
             match! recordTerminal owner agentId childId record false failure with
             | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-            | Ok() ->
-                return! finalizeConsultationAdvice owner logicalRun requester childId record failure directory
+            | Ok() -> return! finalizeConsultationAdvice owner logicalRun requester childId record failure directory
         }
 
     let finalizeConsultationSuccess
@@ -795,14 +774,7 @@ type AssistanceHost
                         directory
         }
 
-    let completeConsultationTurn
-        (turn: ReconciledTurn)
-        (record: HandleRecord)
-        agentId
-        owner
-        logicalRun
-        requester
-        =
+    let completeConsultationTurn (turn: ReconciledTurn) (record: HandleRecord) agentId owner logicalRun requester =
         task {
             // Assistance consumes this hidden child before ordinary
             // TurnWorkflow reaches TerminalReporter; HostTurnObserver
@@ -849,15 +821,7 @@ type AssistanceHost
             ()
         }
 
-    let abortConsultationTurn
-        (turn: ReconciledTurn)
-        (record: HandleRecord)
-        agentId
-        owner
-        logicalRun
-        requester
-        reason
-        =
+    let abortConsultationTurn (turn: ReconciledTurn) (record: HandleRecord) agentId owner logicalRun requester reason =
         // If the consultation itself asks for help, consume that arm but
         // never recurse into another consultation. The typed control
         // cause proves this consultation attempt is unusable; ordinary
@@ -866,8 +830,10 @@ type AssistanceHost
         let recursive = sensor.TryTake(turn.SessionId, turn.ProviderRun)
 
         let failureReason =
-            if recursive then "recursive NEEDHELP from consultation is not allowed"
-            else "consultation aborted: " + reason
+            if recursive then
+                "recursive NEEDHELP from consultation is not allowed"
+            else
+                "consultation aborted: " + reason
 
         let failure = consultationFailedPrompt owner failureReason
 
@@ -875,15 +841,7 @@ type AssistanceHost
             if recursive then
                 do! recordRecursiveAbortFailure owner agentId turn.SessionId record failure
 
-            return!
-                finalizeConsultationAdvice
-                    owner
-                    logicalRun
-                    requester
-                    turn.SessionId
-                    record
-                    failure
-                    turn.Directory
+            return! finalizeConsultationAdvice owner logicalRun requester turn.SessionId record failure turn.Directory
         }
 
     let handleConsultationWhileOwnerActive
@@ -895,8 +853,7 @@ type AssistanceHost
         requester
         =
         match turn.Outcome with
-        | ReconcileProgram.TurnCompleted ->
-            completeConsultationTurn turn record agentId owner logicalRun requester
+        | ReconcileProgram.TurnCompleted -> completeConsultationTurn turn record agentId owner logicalRun requester
         | ReconcileProgram.TurnFailed _ ->
             // Provider-attempt failure remains child-local and follows the
             // ordinary A/A/B/B recovery path. Assistance does not turn one
@@ -920,8 +877,7 @@ type AssistanceHost
                 // Owner was cancelled/retired or accepted a newer Authority Root.
                 // A late child terminal may not resurrect it.
                 return AssistanceTurnDisposition.Handled
-            | Some _ ->
-                return! handleConsultationWhileOwnerActive turn record agentId owner logicalRun requester
+            | Some _ -> return! handleConsultationWhileOwnerActive turn record agentId owner logicalRun requester
         }
 
     let handleOwnerSideTurn (context: ReconciledTurnContext) (turn: ReconciledTurn) =

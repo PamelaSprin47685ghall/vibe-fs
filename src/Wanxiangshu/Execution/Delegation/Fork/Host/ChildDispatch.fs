@@ -63,10 +63,7 @@ module HostForkChildDispatch =
            | HandleLifecycle.Abandoned _
            | HandleLifecycle.Retired -> false
 
-    let private isProcessOwnedActiveHandle
-        (handles: AgentLinkageProjection)
-        (agentId: string, childId: SessionId)
-        =
+    let private isProcessOwnedActiveHandle (handles: AgentLinkageProjection) (agentId: string, childId: SessionId) =
         match HandleProjection.tryFind (HandleController.agentHandle agentId) handles with
         | Some record -> isActiveOwnedHandle childId record
         | None -> false
@@ -140,9 +137,7 @@ module HostForkChildDispatch =
             HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
             // ofTask keeps Result intact so Error still settles failRun (not bare bind).
-            let! sent =
-                sendChildPrompt agentId childId role agent payload
-                |> TaskResultCE.ofTask
+            let! sent = sendChildPrompt agentId childId role agent payload |> TaskResultCE.ofTask
 
             match decideExistingSendAcceptance sent result with
             | Ok accepted -> return accepted
@@ -357,8 +352,7 @@ module HostForkChildDispatch =
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
         task {
-            let! cancelResult =
-                HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
+            let! cancelResult = HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
 
             requireOk "Parent handle abandon failed" cancelResult
 

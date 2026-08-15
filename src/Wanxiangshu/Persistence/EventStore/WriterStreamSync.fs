@@ -86,14 +86,17 @@ module WriterStreamSync =
         }
 
     let private requireBlobMode (entry: TreeEntry) =
-        if entry.Mode = blobMode then Ok()
-        else Error(asStorage (sprintf "sync leaf is not a blob: %s" entry.Name))
+        if entry.Mode = blobMode then
+            Ok()
+        else
+            Error(asStorage (sprintf "sync leaf is not a blob: %s" entry.Name))
 
     let private readBlobEntry (raw: IGitRawStore) (entry: TreeEntry) =
         taskResult {
             do! requireBlobMode entry
+            let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject entry.Oid)
 
-            match! raw.ReadObject entry.Oid with
+            match bytesOpt with
             | None -> return! Error(asStorage (sprintf "missing sync blob: %s" entry.Name))
             | Some bytes -> return entry.Name, bytes
         }
@@ -102,7 +105,7 @@ module WriterStreamSync =
         (raw: IGitRawStore)
         (entries: TreeEntry list)
         : Task<Result<(string * byte[]) list, ConvergeError>> =
-        entries |> List.traverseTaskResultM (readBlobEntry raw)
+        entries |> TaskResultList.traverseM (readBlobEntry raw)
 
     let private writerTextFromBlob (name: string, bytes: byte[]) =
         if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
@@ -111,11 +114,7 @@ module WriterStreamSync =
         let writerId = name.Substring(0, name.Length - ".ndjson".Length)
         writerId, Encoding.UTF8.GetString bytes
 
-    let private readRemoteTrees
-        (raw: IGitRawStore)
-        (writerTree: TreeEntry)
-        (payloadTree: TreeEntry)
-        =
+    let private readRemoteTrees (raw: IGitRawStore) (writerTree: TreeEntry) (payloadTree: TreeEntry) =
         taskResult {
             let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
             let! writerBlobs = readBlobList raw writerEntries
@@ -206,7 +205,11 @@ module WriterStreamSync =
         // Payloads are content-addressed and may be safely imported before facts.
         // Validate the combined k-way history/closure before changing writer truth.
         result {
-            do! payloads |> List.traverseResultM (mergeOnePayload commonDir) |> Result.map ignore
+            do!
+                payloads
+                |> List.traverseResultM (mergeOnePayload commonDir)
+                |> Result.map ignore
+
             do! validateUnion commonDir writers
             do! writers |> List.traverseResultM (mergeOneWriter commonDir) |> Result.map ignore
             return ()

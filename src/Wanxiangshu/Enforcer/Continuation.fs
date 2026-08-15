@@ -129,8 +129,7 @@ module EnforcerContinuation =
     /// Evidence → Decision: last assistant messageId → provider run identity.
     let private providerRunFromLastAssistant (rawMessages: obj list) (fallbackId: string) =
         match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
-            ProviderRunIdentity.create messageId
+        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) -> ProviderRunIdentity.create messageId
         | _ -> ProviderRunIdentity.create fallbackId
 
     /// Evidence → Decision: ConfirmedFailurePort Result → optional admission.
@@ -187,10 +186,7 @@ module EnforcerContinuation =
         AgentProjection.mainSealedForBlogger ctx.Owner (AgentJournal.snapshot ctx.Durable).AgentProjections
         && not (ctx.Scope.IsDrainOpen sessionKey)
 
-    let private rebuildFromOption
-        (ctx: Context)
-        (currentCtx: BloggerRequestContext option)
-        : Task<obj list> =
+    let private rebuildFromOption (ctx: Context) (currentCtx: BloggerRequestContext option) : Task<obj list> =
         task {
             match currentCtx with
             | Some c ->
@@ -238,9 +234,7 @@ module EnforcerContinuation =
 
                 return
                     ctx.Project(
-                        EnforcerRepair.withRepairInstruction
-                            (rebuilt |> Option.defaultValue ctx.RawMessages)
-                            requestKey
+                        EnforcerRepair.withRepairInstruction (rebuilt |> Option.defaultValue ctx.RawMessages) requestKey
                     )
         }
 
@@ -265,7 +259,8 @@ module EnforcerContinuation =
                         admission
                         sessionKey
                         reason
-                        (fun () -> fatalProjectRaw ctx sessionKey currentCtx "blog aabb exhausted; auto-recovery budget spent")
+                        (fun () ->
+                            fatalProjectRaw ctx sessionKey currentCtx "blog aabb exhausted; auto-recovery budget spent")
                         (fun () -> projectRepairInstruction ctx sessionKey live reason)
         }
 
@@ -379,7 +374,8 @@ module EnforcerContinuation =
         | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->
             Diagnostic.emit
                 "enforcer-cycle-nudge-pending"
-                [ "session_id", sessionKey; "result", "same terminal re-entry while nudge in flight" ]
+                [ "session_id", sessionKey
+                  "result", "same terminal re-entry while nudge in flight" ]
 
             Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued _ ->
@@ -414,7 +410,9 @@ module EnforcerContinuation =
         task {
             let sessionKey = key ctx
             let! currentCtx = peekOrResolveCycleContext ctx sessionKey
-            let liveCtx = EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+
+            let liveCtx =
+                EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
 
             if EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages then
                 return ctx.Project ctx.RawMessages
@@ -459,11 +457,7 @@ module EnforcerContinuation =
         (sessionKey: string)
         (caughtUpReason: string)
         : ContinuationOutcome =
-        if
-            AgentProjection.mainSealedForBlogger
-                mainSessionId
-                (AgentJournal.snapshot ctx.Durable).AgentProjections
-        then
+        if AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections then
             BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
         else
             ctx.Scope.ClearCurrentRequest sessionKey
@@ -508,9 +502,7 @@ module EnforcerContinuation =
         : ContinuationOutcome =
         match EnforcerRepair.tryOpenByBlogger ctx.Durable mainSessionId ctx.BloggerSessionId with
         | Some _ ->
-            Diagnostic.fatal
-                "enforcer-cycle-failed"
-                [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
+            Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
 
             ctx.Project ctx.RawMessages
         | None ->
@@ -629,15 +621,9 @@ module EnforcerContinuation =
                 return CycleDisposition.CommitUnknown
         }
 
-    let private sealIfMainSealedAfterCommit
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        =
+    let private sealIfMainSealedAfterCommit (ctx: Context) (mainSessionId: SessionId) (sessionKey: string) =
         if
-            AgentProjection.mainSealedForBlogger
-                mainSessionId
-                (AgentJournal.snapshot ctx.Durable).AgentProjections
+            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections
             && not (ctx.Scope.IsDrainOpen sessionKey)
         then
             BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
@@ -713,24 +699,9 @@ module EnforcerContinuation =
         : Task<CycleDisposition> =
         match liveCtx with
         | Some(BloggerRequestContext.Squash squash) ->
-            dispositionAfterSquashCommit
-                ctx
-                mainSessionId
-                sessionKey
-                liveCtx
-                providerRun
-                squash
-                merged.MergedText
+            dispositionAfterSquashCommit ctx mainSessionId sessionKey liveCtx providerRun squash merged.MergedText
         | Some(BloggerRequestContext.Main main) ->
-            dispositionForMainCycle
-                ctx
-                mainSessionId
-                sessionKey
-                liveCtx
-                providerRun
-                toolCallIds
-                merged
-                main
+            dispositionForMainCycle ctx mainSessionId sessionKey liveCtx providerRun toolCallIds merged main
         | None -> fatalClearWorking ctx mainSessionId sessionKey liveCtx "missing CurrentRequest"
 
     /// Evidence → Decision: validateCycle Error/Ok → inject / fatal / commit disposition.
@@ -758,15 +729,7 @@ module EnforcerContinuation =
                 return! fatalClearWorking ctx mainSessionId sessionKey liveCtx "protocol-repair-exhausted"
             | Error reason -> return! fatalClearWorking ctx mainSessionId sessionKey liveCtx reason
             | Ok(merged, toolCallIds) ->
-                return!
-                    dispositionForValidatedCycle
-                        ctx
-                        mainSessionId
-                        sessionKey
-                        liveCtx
-                        providerRun
-                        merged
-                        toolCallIds
+                return! dispositionForValidatedCycle ctx mainSessionId sessionKey liveCtx providerRun merged toolCallIds
         }
 
     /// Evidence → Decision: empty-text AABB admission → exhaust or project repair.
@@ -795,7 +758,8 @@ module EnforcerContinuation =
 
                 Diagnostic.fatal
                     "enforcer-cycle-failed"
-                    [ "session_id", sessionKey; "result", "blog aabb exhausted; auto-recovery budget spent" ]
+                    [ "session_id", sessionKey
+                      "result", "blog aabb exhausted; auto-recovery budget spent" ]
 
                 do!
                     BloggerAbandon.openRequest
@@ -813,10 +777,7 @@ module EnforcerContinuation =
                 return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey)
         }
 
-    let private finishWorking
-        (ctx: Context)
-        (liveCtx: BloggerRequestContext option)
-        : Task<ContinuationOutcome> =
+    let private finishWorking (ctx: Context) (liveCtx: BloggerRequestContext option) : Task<ContinuationOutcome> =
         task {
             match liveCtx with
             | Some live ->
@@ -908,9 +869,7 @@ module EnforcerContinuation =
         : Task<ContinuationOutcome> =
         task {
             if
-                AgentProjection.mainSealedForBlogger
-                    mainSessionId
-                    (AgentJournal.snapshot ctx.Durable).AgentProjections
+                AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections
             then
                 BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
                 ctx.Scope.ClearCurrentRequest sessionKey
@@ -965,14 +924,12 @@ module EnforcerContinuation =
         (disposition: CycleDisposition)
         : Task<ContinuationOutcome> =
         match disposition with
-        | CycleDisposition.InjectRepair live ->
-            finishInjectRepair ctx mainSessionId sessionKey messageId liveCtx live
+        | CycleDisposition.InjectRepair live -> finishInjectRepair ctx mainSessionId sessionKey messageId liveCtx live
         | CycleDisposition.CommitUnknown -> Task.FromResult(ctx.Project ctx.RawMessages)
         | CycleDisposition.AbandonThenCatchUp ->
             resumeCatchUp ctx mainSessionId sessionKey "stale-cycle-catch-up-complete"
         | CycleDisposition.Working -> finishWorking ctx liveCtx
-        | CycleDisposition.Committed afterSquashMain ->
-            finishCommitted ctx mainSessionId sessionKey afterSquashMain
+        | CycleDisposition.Committed afterSquashMain -> finishCommitted ctx mainSessionId sessionKey afterSquashMain
 
     /// Branch 2 — ENFORCER-044: merge/commit on completed blog tool parts when
     /// this plugin owns the cycle (live CurrentRequest).
@@ -998,7 +955,10 @@ module EnforcerContinuation =
             let mainSessionId = ctx.Owner
             let providerRun = ProviderRunIdentity.create messageId
             let sessionKey = key ctx
-            let liveCtx = EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+
+            let liveCtx =
+                EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+
             let snapshot = AgentJournal.snapshot ctx.Durable
 
             let alreadyEntry =
@@ -1021,8 +981,7 @@ module EnforcerContinuation =
             elif liveCtx.IsNone then
                 return unownedLiveBlogOutcome ctx mainSessionId sessionKey assistantCompleted
             else
-                let! disposition =
-                    runOwnedCycleBody ctx mainSessionId sessionKey messageId calls liveCtx providerRun
+                let! disposition = runOwnedCycleBody ctx mainSessionId sessionKey messageId calls liveCtx providerRun
 
                 return! finishOwnedDisposition ctx mainSessionId sessionKey messageId liveCtx disposition
         }

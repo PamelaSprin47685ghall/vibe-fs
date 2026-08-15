@@ -218,7 +218,8 @@ module CanonicalIntegrator =
     let private matchingBusinessRules (envelope: EventEnvelope) =
         businessRules |> List.filter (fun rule -> rule.Accepts envelope)
 
-    let private tryRule name = businessRules |> List.tryFind (fun rule -> rule.Name = name)
+    let private tryRule name =
+        businessRules |> List.tryFind (fun rule -> rule.Name = name)
 
     let private encodeCutPayload (payload: CutPayload) =
         Encode.object
@@ -243,7 +244,9 @@ module CanonicalIntegrator =
 
     let private structuralStep (state: IntegratorState) (normalized: EventEnvelope) =
         let current =
-            state.Currents |> Map.tryFind structuralRule.Name |> Option.defaultValue structuralRule.Initial
+            state.Currents
+            |> Map.tryFind structuralRule.Name
+            |> Option.defaultValue structuralRule.Initial
 
         match structuralRule.Integrate current normalized with
         | Ok next ->
@@ -252,7 +255,8 @@ module CanonicalIntegrator =
         | Error _ -> state
 
     let private applyCutForRule (state: IntegratorState) (payload: CutPayload) (rule: IntegrationRule) =
-        let current = state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+        let current =
+            state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
         match rule.ApplyCut current payload.ResetJson with
         | Error _ -> state
@@ -267,7 +271,8 @@ module CanonicalIntegrator =
         |> Option.defaultValue state
 
     let private evaluateBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
-        let prior = state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+        let prior =
+            state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
         match rule.Integrate prior normalized with
         | Ok next -> RuleAdvanced next
@@ -353,9 +358,7 @@ module CanonicalIntegrator =
         | Some existing ->
             CanonicalEventCodec.checkIdentity existing normalized
             |> Result.mapError (sprintf "identity collision: %A")
-            |> Result.map (fun () ->
-                { State = state
-                  FailedRules = [] })
+            |> Result.map (fun () -> { State = state; FailedRules = [] })
         | None -> integrateNew state normalized key
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
@@ -365,9 +368,7 @@ module CanonicalIntegrator =
         let rec integrate (state: IntegratorState) (remaining: EventEnvelope list) =
             match remaining with
             | [] -> Ok state
-            | head :: tail ->
-                integrateOne state head
-                |> Result.bind (fun step -> integrate step.State tail)
+            | head :: tail -> integrateOne state head |> Result.bind (fun step -> integrate step.State tail)
 
         EventKWayMerge.merge streams
         |> Result.mapError (sprintf "writer-stream replay invalid: %A")
@@ -417,27 +418,18 @@ module CanonicalIntegrator =
         let mutable loadedCommonDir: string option = None
 
         let currentForRule (rule: IntegrationRule) (currentState: IntegratorState) =
-            currentState.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+            currentState.Currents
+            |> Map.tryFind rule.Name
+            |> Option.defaultValue rule.Initial
 
         let validateCutPlan (rule: IntegrationRule) current (plan: SemanticCutPlan) =
             rule.ApplyCut current plan.ResetJson |> Result.map (fun _ -> plan)
 
-        let inferCutPlan
-            (rule: IntegrationRule)
-            current
-            (failed: EventEnvelope)
-            (fault: RuleFault)
-            afterFullReplay
-            =
+        let inferCutPlan (rule: IntegrationRule) current (failed: EventEnvelope) (fault: RuleFault) afterFullReplay =
             rule.PlanCut current failed fault.Reason afterFullReplay
             |> Result.bind (validateCutPlan rule current)
 
-        let retryCutPlanAfterFullReplay
-            (rule: IntegrationRule)
-            (failed: EventEnvelope)
-            (fault: RuleFault)
-            firstReason
-            =
+        let retryCutPlanAfterFullReplay (rule: IntegrationRule) (failed: EventEnvelope) (fault: RuleFault) firstReason =
             match loadedCommonDir with
             | Some commonDir when trySpendFullReplayBudget () ->
                 result {
@@ -457,7 +449,11 @@ module CanonicalIntegrator =
                                 firstReason
                                 secondReason)
                 }
-            | _ -> Error("cut-tail inference failed and full replay budget is unavailable: " + firstReason)
+            | _ ->
+                Error(
+                    "cut-tail inference failed and full replay budget is unavailable: "
+                    + firstReason
+                )
 
         let chooseCutPlan firstAttempt retry =
             match firstAttempt with
@@ -480,7 +476,12 @@ module CanonicalIntegrator =
                         (retryCutPlanAfterFullReplay rule failed fault)
             }
 
-        let cutEnvelope (currentState: IntegratorState) (rule: IntegrationRule) (fault: RuleFault) (plan: SemanticCutPlan) =
+        let cutEnvelope
+            (currentState: IntegratorState)
+            (rule: IntegrationRule)
+            (fault: RuleFault)
+            (plan: SemanticCutPlan)
+            =
             let streamId = ProjectionCutTailEvent.streamId rule.Name
 
             let existingHeads =

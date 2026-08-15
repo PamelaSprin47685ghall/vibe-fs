@@ -261,17 +261,7 @@ module FissionTool =
                 let! _ = appendDelivery durable owner None groupId completionId lane.Index
                 return ()
             else
-                return!
-                    continueLiveLane
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lane
-                        completionId
-                        payload
+                return! continueLiveLane scope durable profile effectiveAgent groupId owner lane completionId payload
         }
 
     let private deliverLaneGuarded
@@ -346,9 +336,7 @@ module FissionTool =
             && group.PreFissionCompletionIds
                |> Set.forall (fun id ->
                    let delivered =
-                       group.CompletionDeliveries
-                       |> Map.tryFind id
-                       |> Option.defaultValue Set.empty
+                       group.CompletionDeliveries |> Map.tryFind id |> Option.defaultValue Set.empty
 
                    Map.containsKey id group.CapturedCompletions
                    && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
@@ -393,17 +381,7 @@ module FissionTool =
         =
         task {
             for lane in lanes |> List.sortBy (fun lane -> lane.Index) do
-                do!
-                    deliverOneLane
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        completionId
-                        payload
-                        lane
+                do! deliverOneLane scope durable profile effectiveAgent groupId owner completionId payload lane
         }
 
     let private broadcastAfterBegin
@@ -458,16 +436,7 @@ module FissionTool =
                 return ()
             else
                 return!
-                    broadcastAfterBegin
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lanes
-                        completionId
-                        payload
+                    broadcastAfterBegin scope durable profile effectiveAgent groupId owner lanes completionId payload
         }
 
     let private payloadFromWorkRecord workRecord fallback =
@@ -491,17 +460,7 @@ module FissionTool =
             let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
             let payload = payloadFromWorkRecord workRecord terminal.TerminalText
 
-            do!
-                captureAndBroadcast
-                    scope
-                    durable
-                    profile
-                    effectiveAgent
-                    groupId
-                    owner
-                    lanes
-                    completionId
-                    payload
+            do! captureAndBroadcast scope durable profile effectiveAgent groupId owner lanes completionId payload
         }
 
     let private dispatchTerminalOutcome
@@ -596,16 +555,7 @@ module FissionTool =
 
             let subscription =
                 eventPort.SubscribeTerminalListener(
-                    onPreAgentTerminal
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lanes
-                        childId
-                        completionId
+                    onPreAgentTerminal scope durable profile effectiveAgent groupId owner lanes childId completionId
                 )
 
             FissionRuntime.trackGroupResource groupId subscription
@@ -676,27 +626,9 @@ module FissionTool =
         match scope.EventPort with
         | None -> ()
         | Some eventPort ->
-            installAgentBroadcasts
-                eventPort
-                scope
-                durable
-                profile
-                effectiveAgent
-                groupId
-                owner
-                lanes
-                preAgents
+            installAgentBroadcasts eventPort scope durable profile effectiveAgent groupId owner lanes preAgents
 
-            installPtyBroadcasts
-                scope
-                durable
-                profile
-                effectiveAgent
-                groupId
-                owner
-                lanes
-                prePtys
-                ownerRuntime
+            installPtyBroadcasts scope durable profile effectiveAgent groupId owner lanes prePtys ownerRuntime
 
     let private parentWorkRecordPort (scope: ToolRuntimeScope) sessionId =
         task {
@@ -862,7 +794,9 @@ module FissionTool =
         task {
             let effectiveAgent = currentEffectiveAgent profile ctx
             let groupId = groupIdFor owner toolCallId
-            let directory = scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+            let directory =
+                scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
 
             let preCompletionIds =
                 (preAgents |> List.map (fst >> FissionExternalId.agent))
@@ -953,17 +887,7 @@ module FissionTool =
             | None, _
             | _, Error _ -> return consequence language Path.Unavailable
             | Some profile, Ok ownerRuntime ->
-                return!
-                    admitWhenEventPortReady
-                        scope
-                        durable
-                        ctx
-                        language
-                        parsed
-                        toolCallId
-                        owner
-                        profile
-                        ownerRuntime
+                return! admitWhenEventPortReady scope durable ctx language parsed toolCallId owner profile ownerRuntime
         }
 
     let private executeWithJournal
@@ -999,8 +923,7 @@ module FissionTool =
             | _, None -> return consequence language Path.Unavailable
             | Some _, Some _ when String.IsNullOrWhiteSpace ctx.SessionId ->
                 return consequence language Path.Unavailable
-            | Some toolCallId, Some durable ->
-                return! executeWithJournal scope ctx language parsed toolCallId durable
+            | Some toolCallId, Some durable -> return! executeWithJournal scope ctx language parsed toolCallId durable
         }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =

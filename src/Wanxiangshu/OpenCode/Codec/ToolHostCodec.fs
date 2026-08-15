@@ -58,15 +58,15 @@ module private HostArgDecode =
     // CHARACTERS as items. Array-test first — a non-array is absent, never a char sequence.
     let textsFromArrayValue (value: obj) =
         if emitJsExpr value "Array.isArray($0)" then
-            unbox<obj array> value
-            |> Array.choose nonNullText
-            |> Array.toList
-            |> Some
+            unbox<obj array> value |> Array.choose nonNullText |> Array.toList |> Some
         else
             None
 
     let tryTextsFromArrayValue (value: obj) =
-        try textsFromArrayValue value with _ -> None
+        try
+            textsFromArrayValue value
+        with _ ->
+            None
 
     // Fable erases unbox<float> to identity, so a string would pass through where
     // .NET would throw. Type-test instead: a non-number is absent, never a wrong-typed Some.
@@ -77,7 +77,10 @@ module private HostArgDecode =
             None
 
     let tryNumberFromValue (value: obj) =
-        try numberFromValue value with _ -> None
+        try
+            numberFromValue value
+        with _ ->
+            None
 
     let nonNegativeIntegerFromValue (value: obj) : Result<int option, unit> =
         if emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0" then
@@ -92,7 +95,10 @@ module private HostArgDecode =
             None
 
     let tryBoolFromValue (value: obj) =
-        try boolFromValue value with _ -> None
+        try
+            boolFromValue value
+        with _ ->
+            None
 
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
 type HostToolArguments internal (raw: obj) =
@@ -220,7 +226,10 @@ module ToolHostCodec =
     let newHandleId () : string = jsNative
 
     let private tryUnboxString (raw: obj) (name: string) =
-        try Some(unbox<string> raw?(name)) with _ -> None
+        try
+            Some(unbox<string> raw?(name))
+        with _ ->
+            None
 
     let private contextString (raw: obj) (name: string) =
         if isNull raw || isNull raw?(name) then
@@ -286,6 +295,7 @@ module ToolHostCodec =
         fromParts
         |> Option.orElse (contextString raw "prompt")
         |> Option.orElse (contextString raw "input")
+
     let decodeContext (raw: obj) =
         { SessionId = contextString raw "sessionID" |> Option.defaultValue ""
           Agent = contextString raw "agent"

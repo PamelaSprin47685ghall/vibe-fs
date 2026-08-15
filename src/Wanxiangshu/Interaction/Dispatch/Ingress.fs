@@ -46,6 +46,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
+open System.Threading.Tasks
 
 /// chat.message authority policy (PROMPT-004).
 ///
@@ -58,6 +59,16 @@ module PromptIngress =
         match PromptAuthority.parseAgentName value with
         | Ok _ -> true
         | Error _ -> false
+
+    let private promoteUnknownOrigin
+        (runtime: PromptDispatcher.Runtime)
+        (sessionId: SessionId)
+        (explicitAgent: string option)
+        =
+        match explicitAgent, runtime.ActiveProfile sessionId with
+        | Some agent, None when isValidAgent agent ->
+            PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
+        | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
 
     /// PROMPT-004 / PROMPT-009: start from what the journal already knows.
     ///
@@ -76,12 +87,123 @@ module PromptIngress =
         (physicalMessageId: PhysicalUserMessageId)
         =
         match runtime.ResolveOrigin physicalMessageId message.PromptKey message.IsHostCompaction sessionId with
-        | PromptAuthority.PromptOrigin.UnknownOrigin ->
-            match message.ExplicitAgent, runtime.ActiveProfile sessionId with
-            | Some agent, None when isValidAgent agent ->
-                PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
-            | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
+        | PromptAuthority.PromptOrigin.UnknownOrigin -> promoteUnknownOrigin runtime sessionId message.ExplicitAgent
         | resolved -> resolved
+
+    let private markAcceptedRoot
+        (bindUserMessage: string -> string -> unit)
+        (registerOwned: string -> unit)
+        (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        =
+        let sessionKey = SessionId.value sessionId
+        let messageKey = PhysicalUserMessageId.value physicalMessageId
+        bindUserMessage sessionKey messageKey
+        registerOwned sessionKey
+        let root = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
+        onAuthorityRoot |> Option.iter (fun f -> f (sessionId, root))
+
+    let private captureOpeningIfAny (journal: AgentJournal option) (sessionId: SessionId) (openingText: string option) =
+        match openingText with
+        | Some text -> XTraceCapture.captureOpening journal sessionId text []
+        | None -> task { () }
+
+    let private acceptHumanRoot
+        (runtime: PromptDispatcher.Runtime)
+        (bindUserMessage: string -> string -> unit)
+        (registerOwned: string -> unit)
+        (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        (explicitAgent: string option)
+        (openingText: string option)
+        =
+        task {
+            match! runtime.AcceptHumanRoot sessionId physicalMessageId explicitAgent with
+            | Error _ -> ()
+            | Ok _ ->
+                markAcceptedRoot bindUserMessage registerOwned onAuthorityRoot sessionId physicalMessageId
+                do! captureOpeningIfAny journal sessionId openingText
+        }
+
+    let private acceptAgentOwnerRoot
+        (runtime: PromptDispatcher.Runtime)
+        (bindUserMessage: string -> string -> unit)
+        (registerOwned: string -> unit)
+        (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        (promptKey: PromptKey)
+        =
+        task {
+            match! runtime.AcceptAgentOwnerRoot promptKey sessionId physicalMessageId with
+            | Error _ -> ()
+            | Ok _ -> markAcceptedRoot bindUserMessage registerOwned onAuthorityRoot sessionId physicalMessageId
+        }
+
+    let private acceptContinuation
+        (runtime: PromptDispatcher.Runtime)
+        (bindContinuationMessage: string -> string -> unit)
+        (registerOwned: string -> unit)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        (promptKey: PromptKey)
+        =
+        task {
+            match! runtime.AcceptContinuation promptKey sessionId physicalMessageId with
+            | Error _ -> ()
+            | Ok _ ->
+                let sessionKey = SessionId.value sessionId
+                let messageKey = PhysicalUserMessageId.value physicalMessageId
+                bindContinuationMessage sessionKey messageKey
+                registerOwned sessionKey
+        }
+
+    let private withPromptKey (promptKey: PromptKey option) (work: PromptKey -> Task<unit>) =
+        match promptKey with
+        | Some key -> work key
+        | None -> task { () }
+
+    let private dispatchAccepted
+        (runtime: PromptDispatcher.Runtime)
+        (journal: AgentJournal option)
+        (bindUserMessage: string -> string -> unit)
+        (bindContinuationMessage: string -> string -> unit)
+        (registerOwned: string -> unit)
+        (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (message: PromptIngressCodec.DecodedMessage)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        =
+        match resolveOrigin runtime sessionId message physicalMessageId with
+        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->
+            acceptHumanRoot
+                runtime
+                bindUserMessage
+                registerOwned
+                onAuthorityRoot
+                journal
+                sessionId
+                physicalMessageId
+                message.ExplicitAgent
+                message.Text
+        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
+            withPromptKey message.PromptKey (fun key ->
+                acceptAgentOwnerRoot
+                    runtime
+                    bindUserMessage
+                    registerOwned
+                    onAuthorityRoot
+                    sessionId
+                    physicalMessageId
+                    key)
+        | PromptAuthority.PromptOrigin.Continuation _ ->
+            withPromptKey message.PromptKey (fun key ->
+                acceptContinuation runtime bindContinuationMessage registerOwned sessionId physicalMessageId key)
+        | PromptAuthority.PromptOrigin.HostInternal
+        | PromptAuthority.PromptOrigin.UnknownOrigin -> task { () }
 
     let private handle
         (journal: AgentJournal option)
@@ -98,53 +220,20 @@ module PromptIngress =
             match journal, message.SessionId, message.PhysicalUserMessageId with
             | Some durable, Some sessionId, Some physicalMessageId ->
                 let runtime = PromptDispatcher.forJournal durable
-                let sessionKey = SessionId.value sessionId
-                let messageKey = PhysicalUserMessageId.value physicalMessageId
-
                 // AGENT-007: nothing is cached here. The accepted `AuthorityRootAccepted`
                 // fact is the record of the role, and every consumer reads it back from
                 // the projection — so there is no second copy to fall out of step.
-                let acceptedRoot () =
-                    bindUserMessage sessionKey messageKey
-                    registerOwned sessionKey
-                    let root = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
-                    onAuthorityRoot |> Option.iter (fun f -> f (sessionId, root))
-
-                let captureOpeningIfHumanRoot () =
-                    task {
-                        match message.Text with
-                        | Some text -> do! XTraceCapture.captureOpening journal sessionId text []
-                        | None -> ()
-                    }
-
-                match resolveOrigin runtime sessionId message physicalMessageId with
-                | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->
-                    match! runtime.AcceptHumanRoot sessionId physicalMessageId message.ExplicitAgent with
-                    | Ok _ ->
-                        acceptedRoot ()
-                        do! captureOpeningIfHumanRoot ()
-                    | Error _ -> ()
-
-                | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
-                    match message.PromptKey with
-                    | Some key ->
-                        match! runtime.AcceptAgentOwnerRoot key sessionId physicalMessageId with
-                        | Ok _ -> acceptedRoot ()
-                        | Error _ -> ()
-                    | None -> ()
-
-                | PromptAuthority.PromptOrigin.Continuation _ ->
-                    match message.PromptKey with
-                    | Some key ->
-                        match! runtime.AcceptContinuation key sessionId physicalMessageId with
-                        | Ok _ ->
-                            bindContinuationMessage sessionKey messageKey
-                            registerOwned sessionKey
-                        | Error _ -> ()
-                    | None -> ()
-
-                | PromptAuthority.PromptOrigin.HostInternal
-                | PromptAuthority.PromptOrigin.UnknownOrigin -> ()
+                do!
+                    dispatchAccepted
+                        runtime
+                        journal
+                        bindUserMessage
+                        bindContinuationMessage
+                        registerOwned
+                        onAuthorityRoot
+                        message
+                        sessionId
+                        physicalMessageId
             | _ -> ()
         }
 

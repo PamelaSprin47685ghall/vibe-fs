@@ -223,37 +223,38 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
                                     { Fact = "semantic-cut"
                                       Reason = reason }
                                 )
-                            ), []
+                            ),
+                            []
                     | Committed envelope ->
                         return
                             lock gate (fun () ->
-                                    // The EventStore append already validated and committed the
-                                    // canonical Integrator transition. AgentJournal only observes
-                                    // Current and publishes its process-local revision wake.
-                                    let updated = this.Snapshot
-                                    revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
+                                // The EventStore append already validated and committed the
+                                // canonical Integrator transition. AgentJournal only observes
+                                // Current and publishes its process-local revision wake.
+                                let updated = this.Snapshot
+                                revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
 
-                                    let change =
-                                        { Revision = revision
-                                          Envelope = envelope }
+                                let change =
+                                    { Revision = revision
+                                      Envelope = envelope }
 
-                                    lastChange <- Some change
+                                lastChange <- Some change
 
-                                    let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
-                                    let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
+                                let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
+                                let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
 
-                                    for subRev, tcs in waiters do
-                                        if JournalRevision.isAfter revision subRev then
-                                            ready.Add(tcs, change)
-                                        else
-                                            kept.Add(subRev, tcs)
+                                for subRev, tcs in waiters do
+                                    if JournalRevision.isAfter revision subRev then
+                                        ready.Add(tcs, change)
+                                    else
+                                        kept.Add(subRev, tcs)
 
-                                    waiters.Clear()
+                                waiters.Clear()
 
-                                    for item in kept do
-                                        waiters.Add item
+                                for item in kept do
+                                    waiters.Add item
 
-                                    Ok(updated, envelope), List.ofSeq ready)
+                                Ok(updated, envelope), List.ofSeq ready)
                 }
 
             for tcs, change in notify do

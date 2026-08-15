@@ -173,8 +173,8 @@ module JournalPayloadClosure =
 /// It never enumerates history and never folds facts itself. CanonicalIntegrator
 /// owns both boot replay and live integration; this type only assigns journal
 /// envelope identity/sequence and appends one universal EventEnvelope.
-type EventStoreJournalWriter
-    private (runtimeId: RuntimeId, init: Envelope, blobWriter: IBlobWriter, store: IEventStore) =
+type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blobWriter: IBlobWriter, store: IEventStore)
+    =
     let gate = obj ()
     // DSL-MUTABLE: resource — RuntimeStarted is lazy; load alone writes nothing.
     let mutable runtimeStartedCommitted = false
@@ -191,7 +191,10 @@ type EventStoreJournalWriter
     member _.BlobWriter = blobWriter
     member _.FilePath = ""
     member _.LocalSeq = lock gate (fun () -> currentSeq)
-    member _.LastCommittedLocalSeq = lock gate (fun () -> if runtimeStartedCommitted then currentSeq - 1L else 0L)
+
+    member _.LastCommittedLocalSeq =
+        lock gate (fun () -> if runtimeStartedCommitted then currentSeq - 1L else 0L)
+
     member _.IsPoisoned = lock gate (fun () -> poisoned)
     member _.TryCurrent(key: string) = store.TryCurrent key
 
@@ -201,7 +204,10 @@ type EventStoreJournalWriter
         | AppendError.SemanticCut cut -> sprintf "semantic cut %s: %s" cut.Rule cut.Reason
         | AppendError.AppendFailed reason -> "append failed: " + reason
 
-    static member private commitEnvelope (store: IEventStore) (envelope: Envelope) : Task<Result<AppendReceipt, AppendError>> =
+    static member private commitEnvelope
+        (store: IEventStore)
+        (envelope: Envelope)
+        : Task<Result<AppendReceipt, AppendError>> =
         let streamId = EventStoreJournalCodec.encodeStreamId envelope.Stream
 
         let parents =
@@ -243,7 +249,10 @@ type EventStoreJournalWriter
         : Task<IJournalWriter * Envelope> =
         task {
             let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
-            let writer = EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+
+            let writer =
+                EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+
             return writer :> IJournalWriter, init
         }
 
@@ -258,7 +267,9 @@ type EventStoreJournalWriter
             match EventStoreJournalWriter.currentJournalProjection store with
             | Error rejection -> return Error rejection
             | Ok projection ->
-                let writer = EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+                let writer =
+                    EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+
                 return Ok(writer :> IJournalWriter, init, projection)
         }
 
@@ -277,7 +288,10 @@ type EventStoreJournalWriter
         }
 
     member private this.EnsureRuntimeStartedLocked() : Task<Result<unit, string>> =
-        if runtimeStartedCommitted then Task.FromResult(Ok()) else this.CommitRuntimeStartedLocked()
+        if runtimeStartedCommitted then
+            Task.FromResult(Ok())
+        else
+            this.CommitRuntimeStartedLocked()
 
     static member private businessCommitResult (eventId: EventId) (envelope: Envelope) (receipt: AppendReceipt) =
         match AppendReceipt.cutFor envelope.EventId receipt with

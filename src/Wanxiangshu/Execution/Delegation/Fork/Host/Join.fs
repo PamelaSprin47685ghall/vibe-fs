@@ -95,12 +95,7 @@ module HostForkJoin =
             || runtime.Runtime.PendingCompletionCount > runtime.Runtime.PendingPtyCount
 
         if hasActiveAgents then
-            Some(
-                Error(
-                    ForkError.NotFound
-                        "agent join requires journal; journal=None is fail-closed for agent handles"
-                )
-            )
+            Some(Error(ForkError.NotFound "agent join requires journal; journal=None is fail-closed for agent handles"))
         else
             runtime.Runtime.DrainPtyCompletions cap
             |> List.map JoinItem.ofPtyJoinItem
@@ -165,10 +160,7 @@ module HostForkJoin =
         if currentSeq < permitSeq then
             Error(
                 ForkError.NotFound(
-                    sprintf
-                        "family recovery permit journalSequence stale: permit=%d current=%d"
-                        permitSeq
-                        currentSeq
+                    sprintf "family recovery permit journalSequence stale: permit=%d current=%d" permitSeq currentSeq
                 )
             )
         else
@@ -199,10 +191,7 @@ module HostForkJoin =
             do! refuseIfPermitJournalStale currentSeq permitSeq
 
             let current =
-                RecoveryClosureProjection.discover
-                    root
-                    (AgentJournal.snapshot durable).AgentProjections
-                    currentSeq
+                RecoveryClosureProjection.discover root (AgentJournal.snapshot durable).AgentProjections currentSeq
 
             // EXEC-023 monotone admission: the permit proves the family it recovered is
             // closed, so what invalidates it is a member GOING MISSING — not the family
@@ -221,8 +210,7 @@ module HostForkJoin =
         | Error e, _ -> Error e
         | Ok(), None ->
             Error(
-                ForkError.NotFound
-                    "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
+                ForkError.NotFound "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
             )
         | Ok(), Some durable -> validatePermitAgainstJournal durable root permitSeq permit
 
@@ -293,9 +281,7 @@ module HostForkJoin =
             // Tagged race arms without nested task{} (dsl-ownership).
             // kind: 0=wake(+reason), 1=journal change, 2=user interrupt.
             let wakeTask: Task<obj> =
-                emitJsExpr
-                    (runtime.Runtime.WaitForWake())
-                    "$0.then(function (r) { return { kind: 0, reason: r }; })"
+                emitJsExpr (runtime.Runtime.WaitForWake()) "$0.then(function (r) { return { kind: 0, reason: r }; })"
 
             let changeTask: Task<obj> =
                 emitJsExpr (durable.AwaitChangeFrom fromRev) "$0.then(function () { return { kind: 1 }; })"
@@ -303,9 +289,7 @@ module HostForkJoin =
             let interruptTask: Task<obj> =
                 emitJsExpr interrupt "$0.then(function (r) { return { kind: 2, reason: r }; })"
 
-            let! winner =
-                emitJsExpr (wakeTask, changeTask, interruptTask) "Promise.race([$0, $1, $2])"
-                : Task<obj>
+            let! winner = emitJsExpr (wakeTask, changeTask, interruptTask) "Promise.race([$0, $1, $2])": Task<obj>
 
             runtime.Runtime.PulseWake()
             return winner
@@ -369,7 +353,10 @@ module HostForkJoin =
 
         loop ()
 
-    let private runJoinLoopWithRelease (runtime: HostForkRuntime) (body: unit -> Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>) =
+    let private runJoinLoopWithRelease
+        (runtime: HostForkRuntime)
+        (body: unit -> Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>)
+        =
         task {
             try
                 return! body ()
@@ -451,8 +438,7 @@ module HostForkJoin =
         let allowed = fissionLaneAllowed runtime durable groupId laneIndex
 
         task {
-            let! drained =
-                JoinDrain.drainFromJournalWhere durable runtime.ParentId cap (runtime.Clock.UtcNow()) allowed
+            let! drained = JoinDrain.drainFromJournalWhere durable runtime.ParentId cap (runtime.Clock.UtcNow()) allowed
 
             match drained with
             | Error error -> return Some(Error error)
@@ -466,9 +452,7 @@ module HostForkJoin =
             let _, fromRevision = durable.SnapshotWithRevision
 
             let changeTask: Task<obj> =
-                emitJsExpr
-                    (durable.AwaitChangeFrom fromRevision)
-                    "$0.then(function () { return { kind: 0 }; })"
+                emitJsExpr (durable.AwaitChangeFrom fromRevision) "$0.then(function () { return { kind: 0 }; })"
 
             let interruptTask: Task<obj> =
                 emitJsExpr interrupt "$0.then(function (reason) { return { kind: 1, reason: reason }; })"
@@ -484,7 +468,8 @@ module HostForkJoin =
         (cap: int)
         (interrupt: Task<JoinInterruptReason>)
         =
-        let tryDrain () = tryDrainFissionLane runtime durable groupId laneIndex cap
+        let tryDrain () =
+            tryDrainFissionLane runtime durable groupId laneIndex cap
 
         let rec loop () =
             task {

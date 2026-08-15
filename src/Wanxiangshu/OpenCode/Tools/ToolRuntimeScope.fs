@@ -148,7 +148,8 @@ type ToolRuntimeScope
 
     let resumableAgentId (record: HandleRecord) =
         match record.Ownership, HandleId.tryAgent record.Handle with
-        | Fact.HandleOwnership.HostOwnedHidden, _ -> Error "host-owned hidden child is not resumable by the user session"
+        | Fact.HandleOwnership.HostOwnedHidden, _ ->
+            Error "host-owned hidden child is not resumable by the user session"
         | Fact.HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
         | Fact.HandleOwnership.DurableParentHandle, Some handleId -> Ok(AgentHandleId.value handleId)
 
@@ -325,7 +326,10 @@ type ToolRuntimeScope
         if String.IsNullOrWhiteSpace ctx.SessionId then
             Error "Missing sessionID"
         else
-            SessionId.create ctx.SessionId |> logicalOwnerFor |> SessionId.value |> getOrCreateRuntime
+            SessionId.create ctx.SessionId
+            |> logicalOwnerFor
+            |> SessionId.value
+            |> getOrCreateRuntime
 
     /// CRASH-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM

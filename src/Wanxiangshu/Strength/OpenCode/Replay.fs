@@ -138,7 +138,7 @@ module StrengthReplay =
 
             let! strengthProjection =
                 durability.LoadProjection()
-                |> Task.map (Result.mapError (fun error -> "Strength replay projection failed: " + error))
+                |> TaskValue.map (Result.mapError (fun error -> "Strength replay projection failed: " + error))
 
             let! plans =
                 StrengthLifecycle.replayPlans
@@ -177,10 +177,7 @@ module StrengthReplay =
             match strengthDurability with
             | None -> return []
             | Some durability ->
-                return!
-                    plansOrFailClosed
-                        strengthFailClosed
-                        (replayWithDurability journal durability sessionId outObj)
+                return! plansOrFailClosed strengthFailClosed (replayWithDurability journal durability sessionId outObj)
         }
 
     /// Host id inside stable provenance g:N/msg:{id}/part:P.
@@ -248,8 +245,10 @@ module StrengthReplay =
         |> List.forall id
 
     let private contiguousTraceRange (sequences: int64 list) : StrengthTraceRange option =
-        if List.isEmpty sequences then None
-        elif not (isContiguousFromFirst sequences) then None
+        if List.isEmpty sequences then
+            None
+        elif not (isContiguousFromFirst sequences) then
+            None
         else
             Some
                 { StartInclusive = List.head sequences
@@ -261,8 +260,7 @@ module StrengthReplay =
         let byStableId =
             parts
             |> List.filter (fun part ->
-                stableHostIdOfProvenance part.Provenance
-                |> Option.exists expectedIdSet.Contains)
+                stableHostIdOfProvenance part.Provenance |> Option.exists expectedIdSet.Contains)
 
         let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
 
@@ -295,10 +293,7 @@ module StrengthReplay =
         task {
             match!
                 durability.Append(
-                    StrengthEvents.traced
-                        plan.Prepared.DecisionId
-                        traced.StartInclusive
-                        traced.EndExclusive
+                    StrengthEvents.traced plan.Prepared.DecisionId traced.StartInclusive traced.EndExclusive
                 )
             with
             | StrengthDurableAppend.Applied
@@ -317,8 +312,7 @@ module StrengthReplay =
         task {
             match! recoverPlanTraceRange durable plan parts with
             | Error error -> failClosed ("Strength Traced recovery failed: " + error)
-            | Ok None ->
-                failClosed "Strength Promoted frame is absent from XTrace after replay capture"
+            | Ok None -> failClosed "Strength Promoted frame is absent from XTrace after replay capture"
             | Ok(Some traced) -> do! appendTracedOrFailClosed durability failClosed plan traced
         }
 
@@ -330,8 +324,7 @@ module StrengthReplay =
         (plans: StrengthReplayPlan list)
         : Task =
         task {
-            let pending =
-                plans |> List.filter (fun plan -> plan.ExistingTraceRange.IsNone)
+            let pending = plans |> List.filter (fun plan -> plan.ExistingTraceRange.IsNone)
 
             for plan in pending do
                 do! commitPlanTrace durable durability failClosed updated.Parts plan

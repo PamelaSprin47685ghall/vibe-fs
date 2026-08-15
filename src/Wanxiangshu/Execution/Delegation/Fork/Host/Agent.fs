@@ -206,8 +206,7 @@ module HostForkAgent =
         match snapshot with
         | None ->
             Task.FromResult(
-                Error
-                    "Cannot start reviewer: original user requirements are unavailable without a session transcript"
+                Error "Cannot start reviewer: original user requirements are unavailable without a session transcript"
             )
         | Some port -> resolveReviewRequirementInputs port promptInputs Map.empty []
 
@@ -583,13 +582,7 @@ module HostForkAgent =
 
                 return
                     Some(
-                        ForkChildPayload.relay
-                            (forkInstructions runtime.ParentId)
-                            prompt
-                            parentWorkRecord
-                            None
-                            []
-                            None
+                        ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt parentWorkRecord None [] None
                     )
             }
 
@@ -651,7 +644,8 @@ module HostForkAgent =
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
                 |> Option.defaultValue agentName
 
-            let activeRun = lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+            let activeRun =
+                lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
             if activeRun then
                 return!
@@ -685,16 +679,7 @@ module HostForkAgent =
                         runtime.HandleOwnership
 
                 return!
-                    reuseAfterRelink
-                        runtime
-                        agentId
-                        childId
-                        role
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
-                        linkResult
+                    reuseAfterRelink runtime agentId childId role agentName prompt renderedPrompt wasDormant linkResult
         }
 
     let private reuseLiveChild
@@ -725,15 +710,7 @@ module HostForkAgent =
             | _, None -> return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
             | Some record, Some agentName ->
                 return!
-                    reuseWithManagedAgent
-                        runtime
-                        agentId
-                        childId
-                        record.Role
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
+                    reuseWithManagedAgent runtime agentId childId record.Role agentName prompt renderedPrompt wasDormant
         }
 
     type HostForkRuntime with

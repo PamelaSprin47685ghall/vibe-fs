@@ -99,10 +99,7 @@ module HandleCompletionCodec =
         let hasKey: bool =
             emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
 
-        if not hasKey then
-            ""
-        else
-            coerceFieldValue (raw?(key))
+        if not hasKey then "" else coerceFieldValue (raw?(key))
 
     let private fieldOpt (raw: obj) (key: string) : string option =
         let hasKey: bool =
@@ -163,12 +160,7 @@ module HandleCompletionCodec =
         | "failed" -> failedV2 runId raw
         | _ -> Invalid(CompletionDecodeError.UnknownFinality status)
 
-    let private decodeV2Finality
-        (finalityField: string option)
-        (runId: string)
-        (raw: obj)
-        (json: string)
-        =
+    let private decodeV2Finality (finalityField: string option) (runId: string) (raw: obj) (json: string) =
         match finalityField with
         | None -> Invalid CompletionDecodeError.MissingFinality
         | Some "completed" -> completedV2 runId raw
@@ -348,8 +340,7 @@ module HandleCompletionCodec =
         (record: HandleRecord)
         : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
         match record.Lifecycle with
-        | HandleLifecycle.CompletedAwaitingJoin completion ->
-            tryReadBodyCompletedAwaiting journal completion
+        | HandleLifecycle.CompletedAwaitingJoin completion -> tryReadBodyCompletedAwaiting journal completion
         | HandleLifecycle.Active
         | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> System.Threading.Tasks.Task.FromResult(Ok(None, None, None))

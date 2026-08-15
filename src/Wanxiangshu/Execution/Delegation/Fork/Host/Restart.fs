@@ -104,9 +104,7 @@ module HostForkRestart =
             runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
 
             ChildRecoveryResult.RecoveryBlocked(
-                Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (
-                    ChildRecoveryBlock.Reason reason
-                )
+                Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty.one (ChildRecoveryBlock.Reason reason)
             )
 
     /// Active handle: Domain recoverChild via production interpreter.
@@ -265,9 +263,7 @@ module HostForkRestart =
         (body: string)
         (decoded: DurableAgentCompletionV2)
         =
-        ignore (
-            JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
-        )
+        ignore (JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body)
 
         // GREEN-5: wake only; JoinDrain re-reads Journal for payload.
         runtime.PulseAgentHandle agentHandle
@@ -573,9 +569,7 @@ module HostForkRestart =
         (someCase: Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty<'a> -> HandleFamilyRecovery)
         (items: ResizeArray<'a>)
         =
-        match
-            Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq items)
-        with
+        match Wanxiangshu.Execution.Session.Recovery.SessionRecovery.NonEmpty.ofList (List.ofSeq items) with
         | Some ne -> someCase ne
         | None -> HandleFamilyRecovery.NoLinkedHandles
 

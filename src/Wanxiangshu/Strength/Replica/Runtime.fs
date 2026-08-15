@@ -267,8 +267,7 @@ module private StrengthReplicaRuntimeLogic =
             match tryState replica with
             | None -> return false
             | Some state ->
-                let! transformed =
-                    StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
+                let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
 
                 return applyTransformOutcome liveRegistry replaceState complete replica state transformed
         }
@@ -449,13 +448,7 @@ type StrengthReplicaRuntime
             match liveRegistry.TryFindByOwner owner with
             | None -> ()
             | Some binding ->
-                do!
-                    StrengthReplicaRuntimeLogic.cancelReplicaBinding
-                        tryState
-                        complete
-                        abortReplica
-                        liveRegistry
-                        binding
+                do! StrengthReplicaRuntimeLogic.cancelReplicaBinding tryState complete abortReplica liveRegistry binding
         }
 
     member private _.ObserveDryRun(state: StrengthReplicaDecisionState) =

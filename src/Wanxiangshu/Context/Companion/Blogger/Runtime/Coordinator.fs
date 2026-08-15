@@ -232,7 +232,9 @@ module BloggerCoordinator =
             let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
             let epoch = BloggerRequestContext.observedPrefixEpoch ctx
             let frameEpoch = BloggerRequestContext.frameEpochId ctx
-            let kind, prevSeq, nextSeq, selectedDigests, contextPayload = encodeContextPayload ctx
+
+            let kind, prevSeq, nextSeq, selectedDigests, contextPayload =
+                encodeContextPayload ctx
 
             // One open request per Blogger. Restart / re-offer with a new RequestId
             // must supersede a stale open slot (fold rejects two opens on one session).
@@ -251,7 +253,9 @@ module BloggerCoordinator =
                 |> Option.bind (fun s -> s.BloggerCycles)
                 |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
-            do! abandonStaleOpen journal mainSessionId bloggerSessionId requestId staleOpen |> TaskResultCE.ofTask
+            do!
+                abandonStaleOpen journal mainSessionId bloggerSessionId requestId staleOpen
+                |> TaskResultCE.ofTask
 
             let! contextRef, contextDigest = resolveContextBlob journal existingOpen promptKey contextPayload
 
@@ -508,14 +512,7 @@ module BloggerCoordinator =
             host
             journal
             key
-            (nextMainContext
-                mainSessionId
-                bloggerSessionId
-                observedEpoch
-                blog
-                xTrace
-                floorSequence
-                projection)
+            (nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection)
 
     let private continueAfterSquashAttempt
         (scope: IParkedTransformHost)

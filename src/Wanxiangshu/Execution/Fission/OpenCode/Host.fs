@@ -158,16 +158,14 @@ module FissionHost =
         match HandleProjection.tryFind handle (AgentJournal.handleProjection durable ownerSessionId) with
         | Some { Lifecycle = HandleLifecycle.Retired } -> task { return true }
         | Some { Lifecycle = HandleLifecycle.CompletedAwaitingJoin _ }
-        | Some { Lifecycle = HandleLifecycle.Abandoned _ } ->
-            ensureRetiredAfterConsume durable ownerSessionId handle
+        | Some { Lifecycle = HandleLifecycle.Abandoned _ } -> ensureRetiredAfterConsume durable ownerSessionId handle
         | Some { Lifecycle = HandleLifecycle.Active }
         | None -> task { return false }
 
     let private consumeOnePreFission durable (group: FissionGroupProjection) completionId =
         match agentIdOfExternal completionId with
         | None -> task { return true }
-        | Some agentId ->
-            tryConsumeCompletedHandle durable group.OwnerSessionId (HandleController.agentHandle agentId)
+        | Some agentId -> tryConsumeCompletedHandle durable group.OwnerSessionId (HandleController.agentHandle agentId)
 
     let private continuePreFissionConsume ok rest consume =
         if ok then consume rest else task { return false }
@@ -268,8 +266,7 @@ module FissionHost =
 
     let private ownerAuthority projections ownerSessionId =
         PromptAuthorityLedger.activeProfile ownerSessionId projections
-        |> Option.orElseWith (fun () ->
-            PromptAuthorityLedger.lastAuthorityProfile ownerSessionId projections)
+        |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile ownerSessionId projections)
 
     let private notifyOwnerConverged
         (eventPort: IEventObservationPort)
@@ -368,14 +365,8 @@ module FissionHost =
                    AggregateWorkRecordRef = aggregateBlob.BlobRef
                    AggregateWorkRecordDigest = aggregateBlob.BlobDigest |})
 
-    let private publishAfterConverge
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        groupId
-        =
-        match
-            FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
-        with
+    let private publishAfterConverge (eventPort: IEventObservationPort) (durable: AgentJournal) groupId =
+        match FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission with
         | Some converged -> publishConverged eventPort durable converged
         | None -> task { return false }
 
@@ -403,9 +394,7 @@ module FissionHost =
         =
         let terminalIndex = group.LaneCount - 1
 
-        match
-            Map.tryFind terminalIndex group.LaneSessions, Map.tryFind terminalIndex group.LaneProviderRuns
-        with
+        match Map.tryFind terminalIndex group.LaneSessions, Map.tryFind terminalIndex group.LaneProviderRuns with
         | Some terminalLane, Some terminalRun ->
             commitConvergenceWithTerminal eventPort durable owner group aggregateBlob terminalLane terminalRun
         | _ -> task { return false }
@@ -520,13 +509,7 @@ module FissionHost =
             | None -> return! captureNewPayload durable group completionId payload
         }
 
-    let private appendDeliveryFact
-        (durable: AgentJournal)
-        groupId
-        ownerSessionId
-        completionId
-        laneIndex
-        =
+    let private appendDeliveryFact (durable: AgentJournal) groupId ownerSessionId completionId laneIndex =
         appendFission
             durable
             ownerSessionId
@@ -672,16 +655,7 @@ module FissionHost =
         | None -> task { return () }
         | Some now when completionDeliveredTo laneIndex completionId now -> task { return () }
         | Some now ->
-            deliverOneLaneSession
-                sessionPort
-                durable
-                directoryFor
-                groupId
-                completionId
-                authority
-                now
-                laneIndex
-                payload
+            deliverOneLaneSession sessionPort durable directoryFor groupId completionId authority now laneIndex payload
 
     let private deliverAllLanes
         (sessionPort: ISessionHostPort)
@@ -695,16 +669,7 @@ module FissionHost =
         =
         task {
             for laneIndex in [ 0 .. group.LaneCount - 1 ] do
-                do!
-                    deliverOneLane
-                        sessionPort
-                        durable
-                        directoryFor
-                        groupId
-                        completionId
-                        laneIndex
-                        authority
-                        payload
+                do! deliverOneLane sessionPort durable directoryFor groupId completionId laneIndex authority payload
         }
 
     let private deliverPayloadWithAuthority
@@ -723,16 +688,7 @@ module FissionHost =
         | None -> task { return () }
         | Some authority ->
             task {
-                do!
-                    deliverAllLanes
-                        sessionPort
-                        durable
-                        directoryFor
-                        groupId
-                        completionId
-                        group
-                        authority
-                        payload
+                do! deliverAllLanes sessionPort durable directoryFor groupId completionId group authority payload
 
                 let! _ = tryConverge eventPort durable group.OwnerSessionId
                 return ()
@@ -803,15 +759,7 @@ module FissionHost =
             match FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission with
             | None -> return ()
             | Some group ->
-                return!
-                    deliverCapturedInGroup
-                        sessionPort
-                        eventPort
-                        durable
-                        directoryFor
-                        groupId
-                        group
-                        completionId
+                return! deliverCapturedInGroup sessionPort eventPort durable directoryFor groupId group completionId
         }
 
     let private abortAllLaneSessions (sessionPort: ISessionHostPort) (group: FissionGroupProjection) =
@@ -842,6 +790,7 @@ module FissionHost =
             | Error _ -> return ()
             | Ok() ->
                 do! abortAllLaneSessions sessionPort group
+
                 eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed reason)
                 |> ignore
 
@@ -954,13 +903,7 @@ module FissionHost =
         =
         task {
             if laneHasOutstandingExternal durable laneIndex group then
-                let! _ =
-                    HostJoinGuard.nudge
-                        sessionPort
-                        journal
-                        joinGuardNudges
-                        turn.SessionId
-                        turn.Directory
+                let! _ = HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
 
                 return true
             elif not (sharedInputsAccounted laneIndex group) then
@@ -985,15 +928,7 @@ module FissionHost =
         | FissionGroupTerminal.Converged _
         | FissionGroupTerminal.Failed _ -> task { return true }
         | FissionGroupTerminal.Open ->
-            observeOpenLaneCompletion
-                sessionPort
-                eventPort
-                journal
-                joinGuardNudges
-                durable
-                group
-                laneIndex
-                turn
+            observeOpenLaneCompletion sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
     let private observeLaneOutcome
         (sessionPort: ISessionHostPort)
@@ -1019,15 +954,7 @@ module FissionHost =
                 return true
             }
         | ReconcileProgram.TurnCompleted ->
-            observeCompletedLane
-                sessionPort
-                eventPort
-                journal
-                joinGuardNudges
-                durable
-                group
-                laneIndex
-                turn
+            observeCompletedLane sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
     let private observeDurableLaneTurn
         (sessionPort: ISessionHostPort)
@@ -1044,15 +971,7 @@ module FissionHost =
         with
         | None -> task { return false }
         | Some(group, laneIndex) ->
-            observeLaneOutcome
-                sessionPort
-                eventPort
-                journal
-                joinGuardNudges
-                durable
-                group
-                laneIndex
-                turn
+            observeLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
     /// Returns true when this turn belongs to Fission and its terminal semantics
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
@@ -1081,12 +1000,5 @@ module FissionHost =
                 return true
             | false, None -> return false
             | false, Some durable ->
-                return!
-                    observeDurableLaneTurn
-                        sessionPort
-                        eventPort
-                        journal
-                        joinGuardNudges
-                        durable
-                        turn
+                return! observeDurableLaneTurn sessionPort eventPort journal joinGuardNudges durable turn
         }

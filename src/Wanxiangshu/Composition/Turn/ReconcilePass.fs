@@ -444,14 +444,7 @@ module ReconcilePass =
         : MaterializeContinuation =
         match result with
         | Error error ->
-            classifySnapshotError
-                consecutiveErrors
-                maxErrors
-                rereadsRemaining
-                candidate
-                turns
-                lastSnapshot
-                error
+            classifySnapshotError consecutiveErrors maxErrors rereadsRemaining candidate turns lastSnapshot error
         | Ok messages -> classifySnapshotOk wake rereadsRemaining candidate activeBinding turns messages
 
     and private applyContinuation

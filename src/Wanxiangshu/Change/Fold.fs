@@ -54,7 +54,10 @@ module OrchestratorFactFold =
 
     /// PublishClaimed evidence → fold decision (ORCH-004 requires a rebased candidate).
     let private foldPublishClaimed
-        (payload: {| ManagerJobId: ManagerJobId; TargetRef: TargetRef; ExpectedHead: CommitHash |})
+        (payload:
+            {| ManagerJobId: ManagerJobId
+               TargetRef: TargetRef
+               ExpectedHead: CommitHash |})
         (projection: AgentProjectionSet)
         : Result<AgentProjectionSet, FoldRejection> =
         match

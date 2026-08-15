@@ -161,19 +161,14 @@ module EventStore =
             | [] -> Ok(List.rev acc)
             | head :: tail ->
                 result {
-                    let! nextSeen, nextAcc =
-                        stepAgainstCurrent integrator (EventEnvelope.normalize head) seen acc
+                    let! nextSeen, nextAcc = stepAgainstCurrent integrator (EventEnvelope.normalize head) seen acc
 
                     return! loop tail nextSeen nextAcc
                 }
 
         loop events Map.empty []
 
-    let private parentKnown
-        (integrator: ICanonicalIntegrator)
-        (batchIds: Set<string>)
-        (parent: EventId)
-        =
+    let private parentKnown (integrator: ICanonicalIntegrator) (batchIds: Set<string>) (parent: EventId) =
         Set.contains (EventId.value parent) batchIds
         || Option.isSome (integrator.TryEvent parent)
 
@@ -240,10 +235,7 @@ module EventStore =
                 return! validateFreshBatch commonDir integrator fresh
         }
 
-    let private commitPrepared
-        (log: ProcessEventLog)
-        (prepared: PreparedIntegration)
-        : AppendReceipt =
+    let private commitPrepared (log: ProcessEventLog) (prepared: PreparedIntegration) : AppendReceipt =
         ProcessEventLog.append log prepared.DurableEvents
         prepared.Commit()
         { Cuts = prepared.Cuts }
@@ -256,8 +248,7 @@ module EventStore =
         result {
             let! prepared =
                 integrator.PrepareLive fresh
-                |> Result.mapError (fun reason ->
-                    AppendError.AppendFailed("integration preparation failed: " + reason))
+                |> Result.mapError (fun reason -> AppendError.AppendFailed("integration preparation failed: " + reason))
 
             return commitPrepared log prepared
         }
@@ -269,9 +260,7 @@ module EventStore =
         (events: EventEnvelope list)
         : Result<AppendReceipt, AppendError> =
         result {
-            let! fresh =
-                validateForAppend commonDir integrator events
-                |> Result.mapError asAppendStorage
+            let! fresh = validateForAppend commonDir integrator events |> Result.mapError asAppendStorage
 
             if List.isEmpty fresh then
                 return AppendReceipt.empty

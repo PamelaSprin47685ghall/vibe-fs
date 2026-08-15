@@ -212,9 +212,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 (CausalOwner.create "OrchestratorJob" [ "job", ManagerJobId.value jobId ])
                 [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
                 (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
-                [ WaitEscape.DeadlineAt(
-                      DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
-                  )
+                [ WaitEscape.DeadlineAt(DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs))
                   WaitEscape.ProcessLifetime ]
                 "OrchestratorHost.awaitManager"
 
@@ -255,16 +253,17 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | false, _ -> runtime.AdoptChild(agentId, sessionId)
 
     let conflictTimeoutBody (grepOut: string) =
-        if String.IsNullOrWhiteSpace grepOut then "(no grep body)" else grepOut.Trim()
+        if String.IsNullOrWhiteSpace grepOut then
+            "(no grep body)"
+        else
+            grepOut.Trim()
 
     let waitConflictResolved (path: string) (deadline: DateTimeOffset) : Task<Result<unit, string>> =
         let rec loop () =
             taskResult {
                 let! grepCode, grepOut, _ =
                     OrchestratorGit.run (
-                        OrchestratorGit.command
-                            path
-                            [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
+                        OrchestratorGit.command path [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
                     )
                     |> TaskResultCE.ofTask
 
@@ -311,8 +310,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             // The Host pending is advanced by the existing session callbacks.
             // Do not spawn a second detached waiter: it owns no state transition
             // and would retain timeout/polling handles after Continue returns.
-            let! _fork =
-                runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
+            let! _fork = runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
 
             let resolutionDeadline =
                 DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
@@ -436,8 +434,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let activeJobs =
                 deps.Journal
                 |> Option.map (fun journal ->
-                    OrchestratorProjection.activeJobs
-                        (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+                    OrchestratorProjection.activeJobs (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
                 |> Option.defaultValue []
 
             // Sweep orphaned manager artifacts before resuming jobs, so a

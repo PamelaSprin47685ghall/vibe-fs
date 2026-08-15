@@ -7,6 +7,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -213,28 +214,31 @@ module ProcessEventLog =
             AppendAllText log.FilePath text "utf8"
             durabilityBarrier log.FilePath
 
+    let private decodeWriterLine (label: string) (line: string) : Result<EventEnvelope, StorageInvalid> =
+        if String.IsNullOrEmpty line then
+            Error(StorageInvalid.NonCanonical(sprintf "writer file contains empty interior line: %s" label))
+        else
+            CanonicalEventCodec.tryDecode (line + "\n")
+
+    let private decodeWriterLines (label: string) (lines: string[]) : Result<EventEnvelope list, StorageInvalid> =
+        let rec decode index acc =
+            result {
+                if index >= lines.Length - 1 then
+                    return List.rev acc
+                else
+                    let! envelope = decodeWriterLine label lines.[index]
+                    return! decode (index + 1) (envelope :: acc)
+            }
+
+        decode 0 []
+
     let decodeWriterText (label: string) (text: string) : Result<EventEnvelope list, StorageInvalid> =
         if String.IsNullOrEmpty text then
             Ok []
         elif not (text.EndsWith("\n", StringComparison.Ordinal)) then
             Error(StorageInvalid.NonCanonical(sprintf "writer file has incomplete trailing line: %s" label))
         else
-            let lines = text.Split('\n')
-
-            let rec decode index acc =
-                if index >= lines.Length - 1 then
-                    Ok(List.rev acc)
-                else
-                    let line = lines.[index]
-
-                    if String.IsNullOrEmpty line then
-                        Error(StorageInvalid.NonCanonical(sprintf "writer file contains empty interior line: %s" label))
-                    else
-                        match CanonicalEventCodec.tryDecode (line + "\n") with
-                        | Error error -> Error error
-                        | Ok envelope -> decode (index + 1) (envelope :: acc)
-
-            decode 0 []
+            decodeWriterLines label (text.Split('\n'))
 
     let private decodeFile (path: string) : Result<EventEnvelope list, StorageInvalid> =
         decodeWriterText path (readTextFileSync path "utf8")
@@ -257,6 +261,11 @@ module ProcessEventLog =
             let writer = name.Substring(0, name.Length - ".ndjson".Length)
             writer, readTextFileSync (join2 (eventsDirectory commonDir) name) "utf8")
 
+    let private writeExtendedWriter (path: string) (existing: string) (incoming: string) =
+        if incoming.Length > existing.Length then
+            writeTextFileSync path incoming "utf8"
+            durabilityBarrier path
+
     /// Replace/import one writer file only when the incoming bytes extend the
     /// local complete-line prefix. Divergence is fail-closed physical corruption.
     let mergeWriterText (commonDir: string) (writerId: string) (incoming: string) : Result<unit, string> =
@@ -267,10 +276,7 @@ module ProcessEventLog =
         let existing = if existsSync path then readTextFileSync path "utf8" else ""
 
         if existing = incoming || incoming.StartsWith(existing, StringComparison.Ordinal) then
-            if incoming.Length > existing.Length then
-                writeTextFileSync path incoming "utf8"
-                durabilityBarrier path
-
+            writeExtendedWriter path existing incoming
             Ok()
         elif existing.StartsWith(incoming, StringComparison.Ordinal) then
             Ok()
@@ -281,37 +287,34 @@ module ProcessEventLog =
     /// The canonical Integrator owns cross-stream ordering and interpretation.
     let readStreams (commonDir: string) : Result<(string * EventEnvelope list) list, StorageInvalid> =
         let rec read remaining acc =
-            match remaining with
-            | [] -> Ok(List.rev acc)
-            | name :: tail ->
-                let path = join2 (eventsDirectory commonDir) name
-
-                match decodeFile path with
-                | Error error -> Error error
-                | Ok events ->
+            result {
+                match remaining with
+                | [] -> return List.rev acc
+                | name :: tail ->
+                    let path = join2 (eventsDirectory commonDir) name
+                    let! events = decodeFile path
                     let writer = name.Substring(0, name.Length - ".ndjson".Length)
-                    read tail ((writer, events) :: acc)
+                    return! read tail ((writer, events) :: acc)
+            }
 
         read (writerFileNames commonDir) []
 
     let private payloadDigest (content: byte[]) =
         createHash "sha256" |> fun hash -> hashUpdate hash content |> hashHex
 
+    let private ensurePayloadBytes path digest content =
+        if not (existsSync path) then
+            writeBytesFileSync path content
+            durabilityBarrier path
+        elif readBytesFileSync path <> content then
+            failwith (sprintf "payload digest collision: %s" digest)
+
     let writePayload (commonDir: string) (content: byte[]) : PayloadRef =
         let directory = payloadsDirectory commonDir
         ensureDirectory directory
         let digest = payloadDigest content
         let path = join2 directory digest
-
-        if existsSync path then
-            let existing = readBytesFileSync path
-
-            if existing <> content then
-                failwith (sprintf "payload digest collision: %s" digest)
-        else
-            writeBytesFileSync path content
-            durabilityBarrier path
-
+        ensurePayloadBytes path digest content
         PayloadRef.create digest
 
     let readPayload (commonDir: string) (payloadRef: PayloadRef) : byte[] option =
@@ -334,27 +337,34 @@ module ProcessEventLog =
         |> Array.toList
         |> List.map (fun name -> name, readBytesFileSync (join2 directory name))
 
-    let mergePayloadFile (commonDir: string) (name: string) (content: byte[]) : Result<unit, string> =
-        if String.IsNullOrWhiteSpace name || name.IndexOfAny([| '/'; '\\' |]) >= 0 then
-            Error "invalid payload filename"
+    let private writeOrReusePayload path name content =
+        if not (existsSync path) then
+            writeBytesFileSync path content
+            durabilityBarrier path
+            Ok()
+        elif readBytesFileSync path = content then
+            Ok()
         else
+            Error(sprintf "payload identity collision: %s" name)
+
+    let mergePayloadFile (commonDir: string) (name: string) (content: byte[]) : Result<unit, string> =
+        result {
+            do!
+                if String.IsNullOrWhiteSpace name || name.IndexOfAny([| '/'; '\\' |]) >= 0 then
+                    Error "invalid payload filename"
+                else
+                    Ok()
+
             let expected = payloadDigest content
 
-            if expected <> name then
-                Error(sprintf "payload filename/digest mismatch: %s" name)
-            else
-                let directory = payloadsDirectory commonDir
-                ensureDirectory directory
-                let path = join2 directory name
-
-                if existsSync path then
-                    let existing = readBytesFileSync path
-
-                    if existing = content then
-                        Ok()
-                    else
-                        Error(sprintf "payload identity collision: %s" name)
+            do!
+                if expected <> name then
+                    Error(sprintf "payload filename/digest mismatch: %s" name)
                 else
-                    writeBytesFileSync path content
-                    durabilityBarrier path
                     Ok()
+
+            let directory = payloadsDirectory commonDir
+            ensureDirectory directory
+            let path = join2 directory name
+            return! writeOrReusePayload path name content
+        }

@@ -58,9 +58,7 @@ module SessionExecutionBinding =
     let private rememberAgent (childKey: string) (proposed: string) =
         match agents.TryGetValue childKey with
         | true, existing when existing <> proposed ->
-            invalidOp (
-                sprintf "PROMPT-006: parented session '%s' agent changed (%s -> %s)" childKey existing proposed
-            )
+            invalidOp (sprintf "PROMPT-006: parented session '%s' agent changed (%s -> %s)" childKey existing proposed)
         | _ -> agents.[childKey] <- proposed
 
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
@@ -235,11 +233,7 @@ module SessionExecutionBinding =
         else
             providerModelDriftError baseModel model
 
-    let private validateParentedProvider
-        (key: string)
-        (agent: string)
-        (model: OpencodeModel)
-        : Result<bool, string> =
+    let private validateParentedProvider (key: string) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         match agents.TryGetValue key, models.TryGetValue key with
         | (true, baseAgent), (true, baseModel) -> validateFrozenBinding baseAgent baseModel agent model
         | _ -> Error "PROMPT-006: parented provider run has no frozen agent/model binding"
@@ -361,20 +355,12 @@ module SessionExecutionBinding =
         | None -> Error "PROMPT-006: parented session has no frozen agent binding"
         | Some baseAgent -> normalizeManagedByIntent sessionId baseAgent opts
 
-    let private normalizeUserFacingByIntent
-        (baseAgent: string)
-        (model: OpencodeModel)
-        (opts: OpenCodePromptOptions)
-        =
+    let private normalizeUserFacingByIntent (baseAgent: string) (model: OpencodeModel) (opts: OpenCodePromptOptions) =
         match opts.BindingIntent with
         | SessionBindingIntent.Preserve -> preserveBinding "user-facing session" baseAgent (Some model) opts
         | SessionBindingIntent.ExplicitExecutionOverride -> normalizeOverride opts
 
-    let private normalizeUserFacingWithAgent
-        (sessionId: SessionId)
-        (baseAgent: string)
-        (opts: OpenCodePromptOptions)
-        =
+    let private normalizeUserFacingWithAgent (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
         match tryModel sessionId |> Option.orElseWith (fun () -> configuredModel baseAgent) with
         | None -> Error "PROMPT-006: user-facing session has no provable model binding"
         | Some model ->

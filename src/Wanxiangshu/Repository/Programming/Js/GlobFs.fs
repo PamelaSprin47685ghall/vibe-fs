@@ -123,7 +123,10 @@ module JsGlobFs =
 
     let private findBraceGroup (s: string) : (string * string list * string) option =
         let rec scan (i: int) (depth: int) (start: int) =
-            if i >= s.Length then None else continueBraceScan i depth start
+            if i >= s.Length then
+                None
+            else
+                continueBraceScan i depth start
 
         and continueBraceScan (i: int) (depth: int) (start: int) =
             match braceCharStep s i depth start with
@@ -187,7 +190,12 @@ module JsGlobFs =
 
     let private parseIgnoreBody (baseRel: string) (negated: bool) (body: string) : IgnoreRule option =
         let directoryOnly = body.EndsWith("/")
-        let spec = if directoryOnly then body.Substring(0, body.Length - 1) else body
+
+        let spec =
+            if directoryOnly then
+                body.Substring(0, body.Length - 1)
+            else
+                body
 
         compilePathPattern spec
         |> Result.toOption
@@ -198,7 +206,12 @@ module JsGlobFs =
               DirectoryOnly = directoryOnly })
 
     let private parseIgnoreLine (baseRel: string) (raw: string) : IgnoreRule option =
-        let line = if raw.EndsWith("\r") then raw.Substring(0, raw.Length - 1) else raw
+        let line =
+            if raw.EndsWith("\r") then
+                raw.Substring(0, raw.Length - 1)
+            else
+                raw
+
         let trimmed = line.Trim()
 
         if trimmed = "" || trimmed.StartsWith("#") then
@@ -207,7 +220,10 @@ module JsGlobFs =
             let negated = trimmed.StartsWith("!")
             let body = if negated then trimmed.Substring(1) else trimmed
 
-            if body = "" then None else parseIgnoreBody baseRel negated body
+            if body = "" then
+                None
+            else
+                parseIgnoreBody baseRel negated body
 
     let private loadIgnoreFile (filePath: string) (baseRel: string) : IgnoreRule list =
         match JsUtf8Fs.readUtf8 filePath with
@@ -215,10 +231,14 @@ module JsGlobFs =
         | Ok text -> text.Split([| '\n' |]) |> Array.toList |> List.choose (parseIgnoreLine baseRel)
 
     let private localIgnorePath (ruleBase: string) (rel: string) : string option =
-        if ruleBase = "" then Some rel
-        elif rel = ruleBase then Some ""
-        elif rel.StartsWith(ruleBase + "/") then Some(rel.Substring(ruleBase.Length + 1))
-        else None
+        if ruleBase = "" then
+            Some rel
+        elif rel = ruleBase then
+            Some ""
+        elif rel.StartsWith(ruleBase + "/") then
+            Some(rel.Substring(ruleBase.Length + 1))
+        else
+            None
 
     let private isIgnored (rules: ResizeArray<IgnoreRule>) (rel: string) (isDir: bool) : bool =
         let rec go i ignored =
@@ -291,13 +311,12 @@ module JsGlobFs =
         (dir: string)
         (entry: string)
         : VisibleEntry =
-        if entry = ".git" then SkipEntry else classifyNonGitEntry rules rel dir entry
+        if entry = ".git" then
+            SkipEntry
+        else
+            classifyNonGitEntry rules rel dir entry
 
-    let private applyVisibleEntry
-        (files: ResizeArray<string>)
-        (walk: string -> string -> unit)
-        (action: VisibleEntry)
-        =
+    let private applyVisibleEntry (files: ResizeArray<string>) (walk: string -> string -> unit) (action: VisibleEntry) =
         match action with
         | SkipEntry -> ()
         | RecurseDirectory(full, childRel) -> walk full childRel
@@ -312,8 +331,7 @@ module JsGlobFs =
         (entries: string list)
         =
         for entry in entries do
-            classifyVisibleEntry rules rel dir entry
-            |> applyVisibleEntry files walk
+            classifyVisibleEntry rules rel dir entry |> applyVisibleEntry files walk
 
     let private collectVisibleFiles (root: string) : string list =
         let files = ResizeArray<string>()

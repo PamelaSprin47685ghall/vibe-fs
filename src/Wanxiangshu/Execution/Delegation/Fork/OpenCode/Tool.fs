@@ -472,8 +472,7 @@ module ForkTool =
                         ?expectedToolCalls = request.ExpectedToolCalls
                     )
             else
-                return!
-                    runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls)
+                return! runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls)
         }
 
     let private sealManagerAffinity
@@ -491,8 +490,7 @@ module ForkTool =
             | Ok() ->
                 announceChild runtime context agentKey
 
-                return
-                    successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+                return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
         }
 
     let private commitNewManagerFork
@@ -512,15 +510,7 @@ module ForkTool =
             match forkResult with
             | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
             | Ok _ ->
-                return!
-                    sealManagerAffinity
-                        scope
-                        runtime
-                        context
-                        handleId
-                        language
-                        request
-                        Path.Fork.ChargeNotPlaced
+                return! sealManagerAffinity scope runtime context handleId language request Path.Fork.ChargeNotPlaced
         }
 
     let private finishNewManagerFork
@@ -537,16 +527,7 @@ module ForkTool =
             match! resolveAttachment scope handles request with
             | Error path -> return consequence (prose language path)
             | Ok attachment ->
-                return!
-                    commitNewManagerFork
-                        scope
-                        runtime
-                        context
-                        request
-                        language
-                        managed
-                        role
-                        attachment
+                return! commitNewManagerFork scope runtime context request language managed role attachment
         }
 
     let private placeNewManagerFork
@@ -567,14 +548,11 @@ module ForkTool =
 
     let private reuseWhileActive (runtime: HostForkRuntime) agentId (request: Request) language =
         task {
-            match!
-                runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls)
-            with
+            match! runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls) with
             | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
             | Ok _ when request.Attach.IsSome ->
                 return successInstruction (namedProse language Path.Fork.AttachBusy (request.Name.Trim()))
-            | Ok _ ->
-                return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+            | Ok _ -> return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
         }
 
     let private commitIdleReuse
@@ -594,14 +572,7 @@ module ForkTool =
             | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
             | Ok _ ->
                 return!
-                    sealManagerAffinity
-                        scope
-                        runtime
-                        context
-                        agentId
-                        language
-                        request
-                        Path.Fork.PersonCannotTakeCharge
+                    sealManagerAffinity scope runtime context agentId language request Path.Fork.PersonCannotTakeCharge
         }
 
     let private reuseWhileIdle
@@ -617,9 +588,7 @@ module ForkTool =
         task {
             match! resolveAttachment scope handles request with
             | Error path -> return consequence (prose language path)
-            | Ok attachment ->
-                return!
-                    commitIdleReuse scope runtime context request language record agentId attachment
+            | Ok attachment -> return! commitIdleReuse scope runtime context request language record agentId attachment
         }
 
     let private reuseFoundAgent
@@ -632,7 +601,8 @@ module ForkTool =
         (record: AgentRecord)
         agentId
         =
-        let activeRun = lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+        let activeRun =
+            lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
         if activeRun then
             reuseWhileActive runtime agentId request language
@@ -666,14 +636,7 @@ module ForkTool =
         match HandleId.tryAgent handle.Handle with
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
         | Some handleId ->
-            reuseResolvedAgent
-                scope
-                runtime
-                context
-                request
-                language
-                handles
-                (AgentHandleId.value handleId)
+            reuseResolvedAgent scope runtime context request language handles (AgentHandleId.value handleId)
 
     let private executeManagerNewCalling
         (scope: ToolRuntimeScope)
@@ -700,8 +663,7 @@ module ForkTool =
         =
         match existingByname with
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
-        | Some handle ->
-            executeManagerReusePerson scope runtime context request language handles handle
+        | Some handle -> executeManagerReusePerson scope runtime context request language handles handle
 
     let private executeManagerWithRuntime
         (scope: ToolRuntimeScope)
@@ -711,7 +673,9 @@ module ForkTool =
         language
         =
         let handles = agentHandles scope context
-        let existingByname = handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+        let existingByname =
+            handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
 
         if hasCalling request then
             executeManagerNewCalling scope runtime context request language handles existingByname
@@ -768,8 +732,7 @@ module ForkTool =
                     ?expectedToolCalls = request.ExpectedToolCalls
                 )
             with
-            | Ok _ ->
-                return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+            | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
             | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
         }
 
@@ -802,8 +765,7 @@ module ForkTool =
                     ?expectedToolCalls = request.ExpectedToolCalls
                 )
             with
-            | Ok _ ->
-                return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+            | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
             | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
         }
 

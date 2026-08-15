@@ -210,11 +210,11 @@ module ManagerNarrativeTransform =
         match ProviderWireDecode.decodePart part with
         | Some(ProviderProjection.WireText _) -> false
         | _ -> true
+
     let private rewriteRawMessage (raw: obj) (projection: ManagerNarrative.NarrativeProjection) =
         let parts = ProviderWireDecode.rawPartsOf raw
 
-        let narrativeParts =
-            projection.Parts |> List.map narrativePartObj |> List.toArray
+        let narrativeParts = projection.Parts |> List.map narrativePartObj |> List.toArray
 
         let nonText = parts |> List.filter isNonTextPart |> List.toArray
         let rewritten = Array.append narrativeParts nonText
@@ -251,20 +251,13 @@ module ManagerNarrativeTransform =
         else
             reawakeningProjection sessionId rawText
 
-    let private chooseBirthOrReawakeningByCount
-        (sessionId: SessionId)
-        (completedLifeCount: int)
-        (rawText: string)
-        =
+    let private chooseBirthOrReawakeningByCount (sessionId: SessionId) (completedLifeCount: int) (rawText: string) =
         if completedLifeCount = 1 then
             birthProjection sessionId rawText
         else
             reawakeningProjection sessionId rawText
 
-    let private narrativeWhenNonEmpty
-        (choose: string -> ManagerNarrative.NarrativeProjection)
-        (rawText: string)
-        =
+    let private narrativeWhenNonEmpty (choose: string -> ManagerNarrative.NarrativeProjection) (rawText: string) =
         if String.IsNullOrWhiteSpace rawText then
             None
         else
@@ -283,12 +276,7 @@ module ManagerNarrativeTransform =
         |> Option.map textPartsOf
         |> Option.defaultValue ""
 
-    let private readOpeningText
-        (durable: AgentJournal)
-        (rawMessages: obj list)
-        (blobRef: BlobRef)
-        (messageIndex: int)
-        =
+    let private readOpeningText (durable: AgentJournal) (rawMessages: obj list) (blobRef: BlobRef) (messageIndex: int) =
         task {
             match! durable.Writer.BlobWriter.Read blobRef with
             | Ok text -> return text
@@ -379,8 +367,7 @@ module ManagerNarrativeTransform =
             match completedOpeningTarget lifecycle rawMessages with
             | None -> return None
             | Some(completedLife, completedOpeningIndex) ->
-                let! rawText =
-                    readOpeningText durable rawMessages completedLife.OpeningTextRef completedOpeningIndex
+                let! rawText = readOpeningText durable rawMessages completedLife.OpeningTextRef completedOpeningIndex
 
                 return
                     rewriteIndexedOpening
@@ -421,13 +408,7 @@ module ManagerNarrativeTransform =
                 let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
                 let! result =
-                    ManagerLifeWorkflow.ensureMigrated
-                        durable
-                        sid
-                        lifeId
-                        messageIdValue
-                        opening.AssignmentText
-                        cursor
+                    ManagerLifeWorkflow.ensureMigrated durable sid lifeId messageIdValue opening.AssignmentText cursor
 
                 requireWorkflowUnit result
                 return true
@@ -453,13 +434,10 @@ module ManagerNarrativeTransform =
                 let cursor =
                     openingCursorOf traceState messageIndex
                     |> Option.defaultValue (
-                        traceState
-                        |> Option.map XTraceProjection.headSequence
-                        |> Option.defaultValue 0L
+                        traceState |> Option.map XTraceProjection.headSequence |> Option.defaultValue 0L
                     )
 
-                let! result =
-                    ManagerLifeWorkflow.ensureOpening durable sid lifeId messageIdValue rawText cursor
+                let! result = ManagerLifeWorkflow.ensureOpening durable sid lifeId messageIdValue rawText cursor
 
                 requireWorkflowUnit result
                 return Some(rewriteMessage rawMessages messageIndex narrative)
@@ -485,15 +463,7 @@ module ManagerNarrativeTransform =
             if migrated then
                 return None
             else
-                return!
-                    openNewHumanRootLife
-                        durable
-                        sid
-                        lifecycle
-                        traceState
-                        rawMessages
-                        messageIndex
-                        messageIdValue
+                return! openNewHumanRootLife durable sid lifecycle traceState rawMessages messageIndex messageIdValue
         }
 
     type private HumanRootOpening =
@@ -524,24 +494,14 @@ module ManagerNarrativeTransform =
         (rawMessages: obj list)
         : Task<obj list option> =
         task {
-            match
-                isHumanRootManager durable sid, decideHumanRootOpening durable sid rawMessages traceState
-            with
+            match isHumanRootManager durable sid, decideHumanRootOpening durable sid rawMessages traceState with
             | false, _ -> return None
             | true, Skip -> return None
             // A post-completion continuation must keep the completed
             // Life's opening rewrite byte-stable (ARCH-004).
             | true, PreserveCompleted -> return! rewriteCompletedOpening durable sid lifecycle rawMessages
             | true, OpenNew(messageIndex, messageId) ->
-                return!
-                    openAfterMigrationCheck
-                        durable
-                        sid
-                        lifecycle
-                        traceState
-                        rawMessages
-                        messageIndex
-                        messageId
+                return! openAfterMigrationCheck durable sid lifecycle traceState rawMessages messageIndex messageId
         }
 
     let private transformWithJournal

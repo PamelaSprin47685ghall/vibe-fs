@@ -206,17 +206,7 @@ module TodoProcessReviewProgram =
             match readyReport report with
             | None -> return ConcludeOutcome.Pending "process-review LWR not record-ready"
             | Some body ->
-                return!
-                    appendConcluded
-                        journal
-                        lifeId
-                        writeId
-                        checkpoint
-                        assignment
-                        verdict
-                        attempt
-                        endExclusive
-                        body
+                return! appendConcluded journal lifeId writeId checkpoint assignment verdict attempt endExclusive body
         }
 
     let private concludeWithClosure
@@ -353,8 +343,7 @@ module TodoProcessReviewProgram =
         (revision: JournalRevision)
         : Task<Result<unit, string>> =
         match producerPresence journal lifeId writeId with
-        | ProducerPresence.Absent detail ->
-            Task.FromResult(Error("process review cannot progress: " + detail))
+        | ProducerPresence.Absent detail -> Task.FromResult(Error("process review cannot progress: " + detail))
         | ProducerPresence.Present ->
             task {
                 let! _ = AgentJournal.awaitChangeFrom revision journal

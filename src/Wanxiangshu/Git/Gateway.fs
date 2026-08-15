@@ -49,12 +49,13 @@ module GitGateway =
             Some(GitObjectId.create fields.[0])
 
     let private parseLsRemote (stdout: string) : GitObjectId option =
-        stdout.Split('\n')
-        |> Array.toList
-        |> List.tryPick tryObjectIdFromLsRemoteLine
+        stdout.Split('\n') |> Array.toList |> List.tryPick tryObjectIdFromLsRemoteLine
 
     let private requireExit0 stdout stderr code =
-        if code <> 0 then Error(transportError stdout stderr) else Ok()
+        if code <> 0 then
+            Error(transportError stdout stderr)
+        else
+            Ok()
 
     let private requireFetchedObjectId (actual: string) =
         if String.IsNullOrWhiteSpace actual then

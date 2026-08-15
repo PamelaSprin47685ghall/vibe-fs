@@ -72,10 +72,7 @@ module PluginHost =
                     | Some payloadRef ->
                         return
                             Error(
-                                sprintf
-                                    "durable payload unreadable at %s: %s"
-                                    runtimeDir
-                                    (PayloadRef.value payloadRef)
+                                sprintf "durable payload unreadable at %s: %s" runtimeDir (PayloadRef.value payloadRef)
                             )
                     | None ->
                         try
@@ -85,10 +82,13 @@ module PluginHost =
                                 task {
                                     match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
                                     | Error err -> return Error err
-                                    | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
+                                    | Ok(writer, _, projection) ->
+                                        return AgentJournal.createFromProjection writer projection
                                 }
 
-                            match! SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
+                            match!
+                                SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal
+                            with
                             | Ok journal -> return Ok(Some journal)
                             | Error rejection ->
                                 Diagnostic.emit

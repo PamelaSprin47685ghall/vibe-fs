@@ -258,8 +258,7 @@ module ExecutorTool =
         (requirePermit: DistillationRuntime.RequirePermit)
         =
         match scope.Journal with
-        | Some journal ->
-            Distillation.asDistillationRuntime (scope.ExecutorRuntimeFor context) journal requirePermit
+        | Some journal -> Distillation.asDistillationRuntime (scope.ExecutorRuntimeFor context) journal requirePermit
         | None -> Distillation.ofForkRuntime (ForkRuntime())
 
     let private spooledInstructions (summary: string) =

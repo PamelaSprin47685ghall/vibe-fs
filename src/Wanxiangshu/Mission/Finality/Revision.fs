@@ -150,18 +150,14 @@ module RevisionWorkflow =
             return revision, states |> Seq.toList
         }
 
-    let private unavailableSiblingReason
-        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
-        =
+    let private unavailableSiblingReason (states: (SessionId * ReviewBarrierId * RecordReadiness) list) =
         states
         |> List.tryPick (fun (_, _, state) ->
             match state with
             | RecordReadiness.Unavailable reason -> Some reason
             | _ -> None)
 
-    let private readySiblingRecords
-        (states: (SessionId * ReviewBarrierId * RecordReadiness) list)
-        =
+    let private readySiblingRecords (states: (SessionId * ReviewBarrierId * RecordReadiness) list) =
         states
         |> List.choose (fun (sid, barrierId, state) ->
             match state with
@@ -184,7 +180,8 @@ module RevisionWorkflow =
         (siblings: (SessionId * ReviewBarrierId) list)
         =
         let awaitingJournal =
-            states |> List.exists (fun (_, _, state) -> state = RecordReadiness.AwaitJournal)
+            states
+            |> List.exists (fun (_, _, state) -> state = RecordReadiness.AwaitJournal)
 
         match unavailableSiblingReason states, awaitingJournal with
         | Some reason, _ -> SiblingPollOutcome.Failed reason
@@ -277,9 +274,7 @@ module RevisionWorkflow =
                 |> Option.map (fun active -> active.SiblingSteers)
                 |> Option.defaultValue Map.empty
 
-            let! prepared =
-                records
-                |> List.traverseTaskResultM (prepareSiblingSteer journal existingSteers)
+            let! prepared = records |> TaskResultList.traverseM (prepareSiblingSteer journal existingSteers)
 
             let newFacts =
                 prepared
@@ -288,16 +283,8 @@ module RevisionWorkflow =
 
             let! _ =
                 newFacts
-                |> List.traverseTaskResultM (fun (sid, barrierId, blob) ->
-                    appendNewSiblingSteerFact
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        sid
-                        barrierId
-                        blob
+                |> TaskResultList.traverseM (fun (sid, barrierId, blob) ->
+                    appendNewSiblingSteerFact journal managerSessionId lifeId requestId requestTree sid barrierId blob
                     |> TaskResultCE.ofTask)
 
             return prepared |> List.map (fun (sid, _, text, _) -> sid, text)
@@ -332,14 +319,7 @@ module RevisionWorkflow =
             match! commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
             | Error _ ->
                 return!
-                    concludeUndecided
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        rejectingReviewer
-                        barrierId
+                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
             | Ok prepared ->
                 let! outcome =
                     sealRejected
@@ -372,14 +352,7 @@ module RevisionWorkflow =
             match! stagePrimaryRejectionRecord journal rejectingReviewer barrierId with
             | Error _ ->
                 return!
-                    concludeUndecided
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        rejectingReviewer
-                        barrierId
+                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
             | Ok(workRecord, primaryBlob) ->
                 return!
                     rejectAfterPrimary
@@ -493,8 +466,7 @@ module RevisionWorkflow =
 
     let private tryRevisionBarrierId (memberRef: ReviewMemberRef) (guard: ReviewGuardProjection) =
         match guard.CurrentBarrierId, guard.Witness with
-        | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
-            Some barrierId
+        | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId -> Some barrierId
         | _ -> None
 
     let private tryRevisionSibling
@@ -510,8 +482,7 @@ module RevisionWorkflow =
     let pendingRevision (snapshot: ProjectionSet) (request: FinalityRequestProjection) =
         request.Members
         |> Map.toList
-        |> List.tryPick (fun (reviewerSessionId, memberRef) ->
-            tryRevisionSibling snapshot memberRef reviewerSessionId)
+        |> List.tryPick (fun (reviewerSessionId, memberRef) -> tryRevisionSibling snapshot memberRef reviewerSessionId)
 
     let durableRevisionSiblings
         (snapshot: ProjectionSet)
@@ -612,13 +583,7 @@ module RevisionWorkflow =
                         snapshot
                         activeRequest
             | Some activeRequest ->
-                return!
-                    resumeClosedRejectedRequest
-                        reviewerPort
-                        journal
-                        managerSessionId
-                        requestId
-                        activeRequest
+                return! resumeClosedRejectedRequest reviewerPort journal managerSessionId requestId activeRequest
         }
 
     let resumeRejectedRequest
@@ -630,13 +595,7 @@ module RevisionWorkflow =
         : Task<FinalityOutcome option> =
         task {
             try
-                return!
-                    resumeRejectedRequestBody
-                        reviewerPort
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
+                return! resumeRejectedRequestBody reviewerPort journal managerSessionId lifeId requestId
             with _ ->
                 return Some(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
         }

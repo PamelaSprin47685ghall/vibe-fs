@@ -21,10 +21,56 @@ open Wanxiangshu.Strength
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+
+[<RequireQualifiedAccess>]
+module private PtyHostHelpers =
+    let bindTerminalName
+        (gate: obj)
+        (terminalByName: System.Collections.Generic.Dictionary<string, string>)
+        (name: string)
+        (id: PtyId)
+        =
+        lock gate (fun () ->
+            match terminalByName.TryGetValue(name.Trim()) with
+            | true, existing when existing <> id.Value ->
+                Error(sprintf "Terminal name '%s' is already in use" (name.Trim()))
+            | _ ->
+                terminalByName.[name.Trim()] <- id.Value
+                Ok())
+
+    let ptyByName
+        (gate: obj)
+        (terminalByName: System.Collections.Generic.Dictionary<string, string>)
+        (ptyRuns: System.Collections.Generic.HashSet<string>)
+        (known: PtyId -> bool)
+        (name: string)
+        =
+        lock gate (fun () ->
+            match terminalByName.TryGetValue(name.Trim()) with
+            | true, id when ptyRuns.Contains id && known (PtyId.Create id) -> Some(PtyId.Create id)
+            | _ -> None)
+
+    let ensureLf (prompt: string) =
+        if
+            prompt.EndsWith("\n", StringComparison.Ordinal)
+            || prompt.EndsWith("\r", StringComparison.Ordinal)
+        then
+            prompt
+        else
+            prompt + "\n"
+
+    let emptyRead (id: PtyId) : PtyRead =
+        { Id = id; Output = ""; Closed = false }
+
+    let mapRead (id: PtyId) (output: string, closed: bool) : PtyRead =
+        { Id = id
+          Output = output
+          Closed = closed }
 
 [<AutoOpen>]
 module HostForkRuntimePty =
@@ -64,92 +110,62 @@ module HostForkRuntimePty =
             if String.IsNullOrWhiteSpace name then
                 Error "Terminal name is required"
             else
-                lock this.Gate (fun () ->
-                    match this.TerminalByName.TryGetValue(name.Trim()) with
-                    | true, existing when existing <> id.Value ->
-                        Error(sprintf "Terminal name '%s' is already in use" (name.Trim()))
-                    | _ ->
-                        this.TerminalByName.[name.Trim()] <- id.Value
-                        Ok())
+                PtyHostHelpers.bindTerminalName this.Gate this.TerminalByName name id
 
         member this.TryPtyByName(name: string) : PtyId option =
             if String.IsNullOrWhiteSpace name then
                 None
             else
-                lock this.Gate (fun () ->
-                    match this.TerminalByName.TryGetValue(name.Trim()) with
-                    | true, id when this.PtyRuns.Contains id && this.PtyPort.Known(PtyId.Create id) ->
-                        Some(PtyId.Create id)
-                    | _ -> None)
+                PtyHostHelpers.ptyByName this.Gate this.TerminalByName this.PtyRuns this.PtyPort.Known name
 
         member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
-            task {
-                if String.IsNullOrWhiteSpace command then
-                    return Error "PTY command is required"
-                else
-                    let id = Pty.newId ()
-                    this.TrackPtyRun id
-                    this.RegisterPtySnapshot id command
+            taskResult {
+                do!
+                    if String.IsNullOrWhiteSpace command then
+                        Error "PTY command is required"
+                    else
+                        Ok()
 
-                    try
-                        this.PtyPort.Fork(command, agent, ptyId = id, ?cwd = cwd) |> ignore
-                        return Ok id
-                    with ex ->
-                        this.UntrackPtyRun id.Value
-                        return Error ex.Message
+                let id = Pty.newId ()
+                this.TrackPtyRun id
+                this.RegisterPtySnapshot id command
+
+                try
+                    this.PtyPort.Fork(command, agent, ptyId = id, ?cwd = cwd) |> ignore
+                    return id
+                with ex ->
+                    this.UntrackPtyRun id.Value
+                    return! Error ex.Message
             }
 
         member this.TryPty(id: string) =
             if String.IsNullOrWhiteSpace id then
                 None
+            elif this.OwnsPty(PtyId.Create id) && this.PtyPort.Known(PtyId.Create id) then
+                Some(PtyId.Create id)
             else
-                let candidate = PtyId.Create id
-
-                if this.OwnsPty candidate && this.PtyPort.Known candidate then
-                    Some candidate
-                else
-                    None
+                None
 
         member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyRead, string>> =
-            task {
-                if not (this.OwnsPty id) then
-                    return Error(sprintf "Unknown PTY id: %s" id.Value)
-                elif not (this.PtyPort.Exists id) then
-                    return Error(sprintf "Unknown PTY id: %s" id.Value)
-                else
-                    match signal with
-                    | Some value ->
-                        let! sent = this.PtyPort.Send(id, PtyCommand.Signal value)
+            taskResult {
+                do!
+                    if not (this.OwnsPty id) then
+                        Error(sprintf "Unknown PTY id: %s" id.Value)
+                    elif not (this.PtyPort.Exists id) then
+                        Error(sprintf "Unknown PTY id: %s" id.Value)
+                    else
+                        Ok()
 
-                        match sent with
-                        | Ok() -> return Ok { Id = id; Output = ""; Closed = false }
-                        | Error err -> return Error err
-                    | None when String.IsNullOrEmpty prompt ->
-                        let! read = this.PtyPort.Read id
-
-                        match read with
-                        | Ok(output, closed) ->
-                            return
-                                Ok
-                                    { Id = id
-                                      Output = output
-                                      Closed = closed }
-                        | Error err -> return Error err
-                    | None ->
-                        // Agents often omit the trailing Enter; shells then hang waiting
-                        // for it. Ensure write ends with LF unless CR/LF is already present.
-                        let payload =
-                            if
-                                prompt.EndsWith("\n", StringComparison.Ordinal)
-                                || prompt.EndsWith("\r", StringComparison.Ordinal)
-                            then
-                                prompt
-                            else
-                                prompt + "\n"
-
-                        let! writeResult = this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes payload))
-
-                        match writeResult with
-                        | Ok() -> return Ok { Id = id; Output = ""; Closed = false }
-                        | Error err -> return Error err
+                match signal with
+                | Some value ->
+                    do! this.PtyPort.Send(id, PtyCommand.Signal value)
+                    return PtyHostHelpers.emptyRead id
+                | None when String.IsNullOrEmpty prompt ->
+                    let! output, closed = this.PtyPort.Read id
+                    return PtyHostHelpers.mapRead id (output, closed)
+                | None ->
+                    // Agents often omit the trailing Enter; shells then hang waiting
+                    // for it. Ensure write ends with LF unless CR/LF is already present.
+                    do! this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes (PtyHostHelpers.ensureLf prompt)))
+                    return PtyHostHelpers.emptyRead id
             }

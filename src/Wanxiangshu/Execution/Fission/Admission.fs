@@ -176,9 +176,7 @@ module FissionAdmission =
             | [] -> return List.rev createdRev
             | lane :: rest ->
                 let! laneSessionId =
-                    mapCreateLaneError
-                        createdRev
-                        (runtime.Dependencies.CreateLane ownerSessionId parentSessionId lane)
+                    mapCreateLaneError createdRev (runtime.Dependencies.CreateLane ownerSessionId parentSessionId lane)
 
                 let started =
                     { Index = lane.Index
@@ -229,8 +227,7 @@ module FissionAdmission =
                 created
                 |> TaskResultList.traverseM (fun started ->
                     let lane =
-                        parsed.Lanes
-                        |> List.find (fun candidate -> candidate.Index = started.Index)
+                        parsed.Lanes |> List.find (fun candidate -> candidate.Index = started.Index)
 
                     let startup = FissionStartup.render parsed.Count lane ownerWorkRecord
                     runtime.Dependencies.StartLane started.SessionId startup)

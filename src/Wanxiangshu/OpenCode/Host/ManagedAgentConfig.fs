@@ -73,7 +73,10 @@ module ManagedAgentConfig =
 
         if isNull asString then
             None
-        elif String.IsNullOrWhiteSpace(string asString) || string asString = "[object Object]" then
+        elif
+            String.IsNullOrWhiteSpace(string asString)
+            || string asString = "[object Object]"
+        then
             modelFromProviderFields other
         else
             Some(string asString)
@@ -113,12 +116,9 @@ module ManagedAgentConfig =
         | InvalidManagedAgent(name, detail) -> sprintf "Invalid managed agent '%s': %s" name detail
 
     let private requireAgents (config: obj) : Result<obj, ConfigGateError> =
-        if isNull config then
-            Error MissingAgentMap
-        elif isNull (config?agent) then
-            Error MissingAgentMap
-        else
-            Ok(config?agent)
+        if isNull config then Error MissingAgentMap
+        elif isNull (config?agent) then Error MissingAgentMap
+        else Ok(config?agent)
 
     let private rejectLegacy (agents: obj) : Result<unit, ConfigGateError> =
         match
@@ -141,7 +141,10 @@ module ManagedAgentConfig =
             do! requireNonEmptyModel name model |> Result.map ignore
         }
 
-    let private validateRoleBinding (agents: obj) (name: string) : Result<string * ManagedAgentBinding, ConfigGateError> =
+    let private validateRoleBinding
+        (agents: obj)
+        (name: string)
+        : Result<string * ManagedAgentBinding, ConfigGateError> =
         result {
             let! managed =
                 ManagedAgent.tryParse name
@@ -168,9 +171,7 @@ module ManagedAgentConfig =
 
     let private collectBindings (agents: obj) : Result<Map<string, ManagedAgentBinding>, ConfigGateError> =
         result {
-            let! entries =
-                ManagedAgent.requiredNames
-                |> List.traverseResultM (validateRequiredName agents)
+            let! entries = ManagedAgent.requiredNames |> List.traverseResultM (validateRequiredName agents)
 
             return entries |> List.choose id |> Map.ofList
         }
@@ -183,8 +184,7 @@ module ManagedAgentConfig =
         let deepName = ManagedAgent.nameOf AgentTier.Deep role
 
         match Map.tryFind fastName bindings, Map.tryFind deepName bindings with
-        | Some fast, Some deep when fast.Model = deep.Model ->
-            Error(DuplicatePairModel(fastName, deepName, fast.Model))
+        | Some fast, Some deep when fast.Model = deep.Model -> Error(DuplicatePairModel(fastName, deepName, fast.Model))
         | _ -> Ok()
 
     let private validateRolePairs (bindings: Map<string, ManagedAgentBinding>) : Result<unit, ConfigGateError> =
@@ -214,8 +214,7 @@ module ManagedAgentConfig =
         let deepBk = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Deep
 
         match readEntryModel agents fastBk, readEntryModel agents deepBk with
-        | Some fastModel, Some deepModel ->
-            rejectDuplicateTrimmedModels fastBk deepBk (Some(fastModel, deepModel))
+        | Some fastModel, Some deepModel -> rejectDuplicateTrimmedModels fastBk deepBk (Some(fastModel, deepModel))
         | _ -> Ok()
 
     let validate (config: obj) : Result<ManagedAgentInventory, string> =
@@ -315,12 +314,9 @@ module ManagedAgentConfig =
         StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFromEnvironment ())
         SphinxMcpConfig.apply config (SphinxMcpConfig.launchFromEnvironment ())
 
-        if isNull config then
-            ()
-        elif isNull (config?agent) then
-            ()
-        else
-            applyAgentsOwnedFields config (config?agent) inventory
+        if isNull config then ()
+        elif isNull (config?agent) then ()
+        else applyAgentsOwnedFields config (config?agent) inventory
 
     let private liveInventory: ManagedAgentInventory option ref = ref None
 

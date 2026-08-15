@@ -79,9 +79,7 @@ type PluginRecoveryScope(journal: AgentJournal option) =
             |> Option.map (AgentJournal.revision >> JournalRevision.value)
             |> Option.defaultValue 0L
 
-        Task.FromResult(
-            FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root sequence)
-        )
+        Task.FromResult(FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root sequence))
 
     member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = this.RequireFamilyRecovery root
 

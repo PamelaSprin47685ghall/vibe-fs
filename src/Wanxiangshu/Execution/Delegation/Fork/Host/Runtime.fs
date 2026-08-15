@@ -398,7 +398,9 @@ type HostForkRuntime
 
         childCreated agentId role childId
 
-    member internal this.ActivateDormantChildIfNeeded(wasDormant: bool, agentId: string, childId: SessionId, role: Role) =
+    member internal this.ActivateDormantChildIfNeeded
+        (wasDormant: bool, agentId: string, childId: SessionId, role: Role)
+        =
         if wasDormant then
             this.ActivateDormantChild(agentId, childId, role)
 

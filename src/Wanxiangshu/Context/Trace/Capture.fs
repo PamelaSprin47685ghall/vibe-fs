@@ -173,8 +173,7 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return ()
-            | Some durable ->
-                do! captureOpeningWhenAbsent durable sessionId assignmentText authoritativeRequirements
+            | Some durable -> do! captureOpeningWhenAbsent durable sessionId assignmentText authoritativeRequirements
         }
 
     let private isReplayTerminal (durable: AgentJournal) (sessionId: SessionId) (text: string) : bool =
@@ -209,9 +208,12 @@ module XTraceCapture =
         (providerRun: ProviderRunIdentity)
         : Task<unit> =
         task {
-            if String.IsNullOrWhiteSpace text then return ()
-            elif isReplayTerminal durable sessionId text then return ()
-            else do! appendTerminalOutput durable sessionId text providerRun
+            if String.IsNullOrWhiteSpace text then
+                return ()
+            elif isReplayTerminal durable sessionId text then
+                return ()
+            else
+                do! appendTerminalOutput durable sessionId text providerRun
         }
 
     /// COMPANION-003 / EXEC-009: capture terminal text into XTrace.
@@ -359,7 +361,9 @@ module XTraceCapture =
         task {
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId
-            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+            let recorded =
+                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -462,7 +466,9 @@ module XTraceCapture =
             do! validateStableCapturePrerequisites (Some durable) sessionId messageIds messages
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId
-            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+            let recorded =
+                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -507,7 +513,9 @@ module XTraceCapture =
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId
             let provenance = sprintf "g:%d/last_words" generation
-            let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+            let recorded =
+                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
             if Set.contains provenance recorded then
                 return ()

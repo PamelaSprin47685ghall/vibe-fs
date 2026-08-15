@@ -94,8 +94,7 @@ module HostReviewGuard =
     let private occasionIdentity =
         function
         | GuardNudgeOccasion.MissingVerdict barrierId -> "barrier:" + ReviewBarrierId.value barrierId
-        | GuardNudgeOccasion.PerfectConfirmation providerRun ->
-            "perfect-run:" + ProviderRunIdentity.value providerRun
+        | GuardNudgeOccasion.PerfectConfirmation providerRun -> "perfect-run:" + ProviderRunIdentity.value providerRun
 
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
@@ -119,10 +118,7 @@ module HostReviewGuard =
     /// instances can observe different provider runs for the same barrier; the
     /// barrier is the durable review requirement and therefore the idempotency key.
     let private guardNudgeKey (targetSessionId: SessionId) (occasion: GuardNudgeOccasion) =
-        sprintf
-            "review-guard:%s:%s"
-            (SessionId.value targetSessionId)
-            (occasionIdentity occasion)
+        sprintf "review-guard:%s:%s" (SessionId.value targetSessionId) (occasionIdentity occasion)
 
     let private currentBarrier (journal: AgentJournal) (targetSessionId: SessionId) =
         AgentProjection.tryFind targetSessionId (AgentJournal.snapshot journal).AgentProjections
@@ -281,10 +277,7 @@ module HostReviewGuard =
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
-    let continuationPort
-        (sessionPort: ISessionHostPort)
-        (journal: AgentJournal option)
-        : ReviewerContinuationPort =
+    let continuationPort (sessionPort: ISessionHostPort) (journal: AgentJournal option) : ReviewerContinuationPort =
         { NudgeMissingVerdict =
             fun sessionId ->
                 task {

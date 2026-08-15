@@ -166,12 +166,18 @@ module FactCodec =
 
     /// Evidence → Decision: one brace-depth step inside an auto-encoded payload object.
     let private stepJsonObjectScan (json: string) (i: int) (depth: int) : ObjectScanStep =
-        if i >= json.Length then Exhausted
-        elif json.[i] = '{' then Advance(i + 1, depth + 1)
-        elif json.[i] = '}' && depth = 1 then Found i
-        elif json.[i] = '}' then Advance(i + 1, depth - 1)
-        elif json.[i] = '"' then Advance(skipJsonString json (i + 1), depth)
-        else Advance(i + 1, depth)
+        if i >= json.Length then
+            Exhausted
+        elif json.[i] = '{' then
+            Advance(i + 1, depth + 1)
+        elif json.[i] = '}' && depth = 1 then
+            Found i
+        elif json.[i] = '}' then
+            Advance(i + 1, depth - 1)
+        elif json.[i] = '"' then
+            Advance(skipJsonString json (i + 1), depth)
+        else
+            Advance(i + 1, depth)
 
     let private findMatchingObjectClose (json: string) (openBrace: int) : int option =
         let rec loop i depth =
@@ -219,10 +225,7 @@ module FactCodec =
             // two optional fields before its closing brace of that object. A single
             // first-object close is enough: HandleCompleted's payload has no nested
             // objects that open before the outer close in the auto-encoded shape.
-            insertFieldsBeforeObjectClose
-                json
-                "\"HandleCompleted\""
-                "\"CompletionRef\":null,\"CompletionDigest\":null"
+            insertFieldsBeforeObjectClose json "\"HandleCompleted\"" "\"CompletionRef\":null,\"CompletionDigest\":null"
 
     /// GLORY-002 / SURFACE-006: `HandleLinked` gained `Ownership`. Old lines
     /// lack the key; inject `DurableParentHandle` so replay keeps the pre-change

@@ -177,8 +177,7 @@ module ManagerLifecycleProjection =
 
     let private requireOpenRequest (requestId: FinalityRequestId) (life: LifeProjection) =
         match life.ActiveFinality with
-        | Some ({ Resolution = FinalityResolution.Open } as request) when request.RequestId = requestId ->
-            Ok request
+        | Some({ Resolution = FinalityResolution.Open } as request) when request.RequestId = requestId -> Ok request
         | _ -> Error ManagerLifeFoldRejection.UnknownRequest
 
     /// GLORY-055: closed request may be replaced; an open one may not.
@@ -423,7 +422,11 @@ module ManagerLifecycleProjection =
                 LastBlessing = Some blessing }
             state
 
-    let private undecideFinality (life: LifeProjection) (request: FinalityRequestProjection) (state: ManagerLifeProjection) =
+    let private undecideFinality
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (state: ManagerLifeProjection)
+        =
         withLife
             { life with
                 ActiveFinality =

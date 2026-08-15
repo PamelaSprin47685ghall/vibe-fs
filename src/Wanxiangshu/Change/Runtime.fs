@@ -143,7 +143,12 @@ type Orchestrator
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         taskResult {
             let! dirty = git.IsDirty(WorktreePath.create repoPath) |> TaskResultCE.ofTask
-            do! if dirty then Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty") else Ok()
+
+            do!
+                if dirty then
+                    Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty")
+                else
+                    Ok()
 
             let path = defaultArg worktreePath (defaultWorktreePath jobId)
             // PERSIST-009: effect identity is deterministic before git runs.
@@ -206,7 +211,8 @@ type Orchestrator
                         appendFact StreamId.Workspace fact
                         |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist manager job")
 
-                    if journalPort.IsSome then worktree.MarkDurable()
+                    if journalPort.IsSome then
+                        worktree.MarkDurable()
 
                     let job =
                         { JobId = jobId

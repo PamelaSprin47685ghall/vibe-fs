@@ -217,7 +217,11 @@ module FissionProjection =
         | None, Some _ -> Error(FissionProjectionRejection.DuplicateOwnerActive payload.OwnerSessionId)
         | None, None -> Ok(admitFresh state payload)
 
-    let private decideLaneMaterialization (state: FissionProjectionState) (payload: LaneMaterializedPayload) (group: FissionGroupProjection) =
+    let private decideLaneMaterialization
+        (state: FissionProjectionState)
+        (payload: LaneMaterializedPayload)
+        (group: FissionGroupProjection)
+        =
         match
             Map.tryFind payload.LaneIndex group.LaneSessions,
             Map.tryFind payload.LaneIndex group.LaneWork,
@@ -236,10 +240,7 @@ module FissionProjection =
             let next =
                 { group with
                     LaneWork =
-                        Map.add
-                            payload.LaneIndex
-                            (payload.WorkRecordRef, payload.WorkRecordDigest)
-                            group.LaneWork
+                        Map.add payload.LaneIndex (payload.WorkRecordRef, payload.WorkRecordDigest) group.LaneWork
                     LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
 
             Ok(replaceGroup state payload.GroupId next)
@@ -251,7 +252,11 @@ module FissionProjection =
             Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
         | Some group -> decideLaneMaterialization state payload group
 
-    let private decideCompletionCapture (state: FissionProjectionState) (payload: CompletionCapturedPayload) (group: FissionGroupProjection) =
+    let private decideCompletionCapture
+        (state: FissionProjectionState)
+        (payload: CompletionCapturedPayload)
+        (group: FissionGroupProjection)
+        =
         match Map.tryFind payload.CompletionId group.CapturedCompletions with
         | Some existing when existing = (payload.PayloadRef, payload.PayloadDigest) -> Ok state
         | Some _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
@@ -293,7 +298,11 @@ module FissionProjection =
 
             Ok(replaceGroup state payload.GroupId next)
 
-    let private decideExternalAffinity (state: FissionProjectionState) (payload: ExternalAffinityPayload) (group: FissionGroupProjection) =
+    let private decideExternalAffinity
+        (state: FissionProjectionState)
+        (payload: ExternalAffinityPayload)
+        (group: FissionGroupProjection)
+        =
         match Map.tryFind payload.ExternalId group.ExternalAffinities with
         | Some existing when existing = payload.LaneIndex -> Ok state
         | Some _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
@@ -311,7 +320,11 @@ module FissionProjection =
             Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
         | Some group -> decideExternalAffinity state payload group
 
-    let private decideConverged (state: FissionProjectionState) (payload: ConvergedPayload) (group: FissionGroupProjection) =
+    let private decideConverged
+        (state: FissionProjectionState)
+        (payload: ConvergedPayload)
+        (group: FissionGroupProjection)
+        =
         match group.Terminal with
         | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest) when
             existingLane = payload.TerminalLaneSessionId

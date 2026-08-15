@@ -78,12 +78,7 @@ module ChildRecoveryWorkflow =
         match HandleCompletionCodec.decodeBody body with
         | Current decoded ->
             let proof =
-                JoinableCompletion.fromDecoded
-                    ports.AgentId
-                    ports.Handle
-                    ports.ChildSession
-                    decoded
-                    body
+                JoinableCompletion.fromDecoded ports.AgentId ports.Handle ports.ChildSession decoded body
 
             DurableHandleEvidence.CompletedAwaitingJoin proof
         | LegacyFalseAbort _ -> DurableHandleEvidence.Active

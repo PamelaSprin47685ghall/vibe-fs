@@ -54,10 +54,7 @@ module HostEventCodec =
             None
 
     let private tryReadSessionId (raw: obj) : SessionId option =
-        if isNull raw then
-            None
-        else
-            tryReadSessionIdFromPayload raw
+        if isNull raw then None else tryReadSessionIdFromPayload raw
 
     let trySessionId (raw: obj) = tryReadSessionId raw
 
@@ -175,7 +172,4 @@ module HostEventCodec =
     let tryDecode (rawInput: obj) : HostSignal option =
         let raw = unwrap rawInput
 
-        if isNull raw then
-            None
-        else
-            decodeHostSignal raw
+        if isNull raw then None else decodeHostSignal raw

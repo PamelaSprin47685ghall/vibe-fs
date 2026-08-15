@@ -170,7 +170,10 @@ module EnforcerFrameRecovery =
         | None -> []
 
     let private hostSourceLabel isPhysical =
-        if isPhysical then "physical-delta" else "synthetic-projection"
+        if isPhysical then
+            "physical-delta"
+        else
+            "synthetic-projection"
 
     let private wireText (msg: ProviderProjection.WireMessage) =
         msg.Parts
@@ -196,15 +199,11 @@ module EnforcerFrameRecovery =
                       "parts", box [| createObj [ "type", box "text"; "text", box (wireText msg) ] |] ]
             )
 
-    let private messagesToHost
-        (items: (ProviderProjection.WireMessage * string option * bool) list)
-        : obj list option =
+    let private messagesToHost (items: (ProviderProjection.WireMessage * string option * bool) list) : obj list option =
         let rec fold acc remaining =
             match remaining with
             | [] -> Some(List.rev acc)
-            | head :: tail ->
-                toHostMessage head
-                |> Option.bind (fun hostMsg -> fold (hostMsg :: acc) tail)
+            | head :: tail -> toHostMessage head |> Option.bind (fun hostMsg -> fold (hostMsg :: acc) tail)
 
         fold [] items
 
@@ -356,7 +355,10 @@ module EnforcerFrameRecovery =
         | Some _ -> ""
 
     let private parseInt64Text (text: string) : int64 option =
-        if String.IsNullOrWhiteSpace text then None else Some(int64 (float text))
+        if String.IsNullOrWhiteSpace text then
+            None
+        else
+            Some(int64 (float text))
 
     let private asInt64 (raw: obj) (key: string) : int64 option =
         match tryJsonField raw key with
@@ -369,7 +371,10 @@ module EnforcerFrameRecovery =
         | Some _ -> None
 
     let private parseIntText (text: string) : int option =
-        if String.IsNullOrWhiteSpace text then None else Some(int (float text))
+        if String.IsNullOrWhiteSpace text then
+            None
+        else
+            Some(int (float text))
 
     let private asInt (raw: obj) (key: string) : int option =
         match tryJsonField raw key with
@@ -413,7 +418,8 @@ module EnforcerFrameRecovery =
                 |> Option.defaultValue openReq.PreviousIngestedThroughSequence
 
             let nextIngest =
-                asInt64 raw "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
+                asInt64 raw "next_ingest"
+                |> Option.defaultValue openReq.NextIngestedThroughSequence
 
             Some(
                 BloggerRequestContext.Main

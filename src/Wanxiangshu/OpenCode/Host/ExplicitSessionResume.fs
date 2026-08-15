@@ -30,7 +30,10 @@ module ExplicitSessionResume =
         + "Use the Wanxiangshu restart briefing attached to this command. Do not assume the interrupted tool completed."
 
     let private commandsOf (config: obj) =
-        if isNull config?command then createObj [] else config?command
+        if isNull config?command then
+            createObj []
+        else
+            config?command
 
     let registerCommand (config: obj) : unit =
         if not (isNull config) then
@@ -40,7 +43,8 @@ module ExplicitSessionResume =
                 commands
                 (createObj
                     [ "template" ==> commandTemplate
-                      "description" ==> "Resume this session explicitly after a Wanxiangshu/OpenCode restart" ])
+                      "description"
+                      ==> "Resume this session explicitly after a Wanxiangshu/OpenCode restart" ])
 
             config?command <- commands
 
@@ -74,10 +78,14 @@ module ExplicitSessionResume =
             (lifecycleText record.Lifecycle)
             detail
 
-    let private textPart text = createObj [ "type" ==> "text"; "text" ==> text ]
+    let private textPart text =
+        createObj [ "type" ==> "text"; "text" ==> text ]
 
     let private existingParts (output: obj) : obj array =
-        if isNull output || isNull output?parts then [||] else unbox<obj array> output?parts
+        if isNull output || isNull output?parts then
+            [||]
+        else
+            unbox<obj array> output?parts
 
     let private appendVisiblePart (output: obj) (text: string) =
         if not (isNull output) then
@@ -95,7 +103,8 @@ module ExplicitSessionResume =
         | Surviving of string
         | Unavailable of string
 
-    let private sanitizeReason (reason: string) = reason.Replace("\n", " ").Replace("\r", " ")
+    let private sanitizeReason (reason: string) =
+        reason.Replace("\n", " ").Replace("\r", " ")
 
     let private unavailable prefix reason record =
         Unavailable(renderLine prefix record (" reason=" + sanitizeReason reason))
@@ -154,13 +163,9 @@ module ExplicitSessionResume =
         : Task<ResumeObservation array> =
         match journal, snapshot with
         | None, _ ->
-            Task.FromResult(
-                [| Unavailable("- durable journal unavailable; no child sessions were re-enlisted") |]
-            )
-        | Some durable, None ->
-            candidateRecords durable parentId |> unverifiedObservations |> Task.FromResult
-        | Some durable, Some snapshotPort ->
-            candidateRecords durable parentId |> inspectAll parentId snapshotPort adopt
+            Task.FromResult([| Unavailable("- durable journal unavailable; no child sessions were re-enlisted") |])
+        | Some durable, None -> candidateRecords durable parentId |> unverifiedObservations |> Task.FromResult
+        | Some durable, Some snapshotPort -> candidateRecords durable parentId |> inspectAll parentId snapshotPort adopt
 
     let private survivingLine =
         function
@@ -174,7 +179,11 @@ module ExplicitSessionResume =
 
     let private renderLines (selector: ResumeObservation -> string option) (items: ResumeObservation array) =
         let lines: string array = items |> Array.choose selector
-        if lines.Length = 0 then "- none" else String.Join("\n", lines)
+
+        if lines.Length = 0 then
+            "- none"
+        else
+            String.Join("\n", lines)
 
     let private continueArguments (arguments: string) =
         if String.IsNullOrWhiteSpace arguments then

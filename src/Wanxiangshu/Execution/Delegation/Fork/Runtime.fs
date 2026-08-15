@@ -54,7 +54,10 @@ module private ForkRuntimeControl =
             ()
 
     let forkCreatedOrNudged (isNew: bool) (agentId: string) =
-        if isNew then ForkResult.Created agentId else ForkResult.Nudged agentId
+        if isNew then
+            ForkResult.Created agentId
+        else
+            ForkResult.Nudged agentId
 
     let awaitPendingNoTimeout (pending: Task<RunCompletion>) =
         task {
@@ -161,8 +164,7 @@ type ForkRuntime
                 let work (_ct: CancellationToken) =
                     task {
                         try
-                            return!
-                                ForkRuntimeControl.runChildWork workOpt childRunner agentId role promptOpt
+                            return! ForkRuntimeControl.runChildWork workOpt childRunner agentId role promptOpt
                         with ex ->
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
@@ -350,7 +352,6 @@ type ForkRuntime
     /// Cancel all active runs and PTYs, drain pending waiters.
     member _.Cancel() : unit =
         if mailbox.Cancel() then
-            cancelAllAgentsAndClearPtys ()
-            |> ForkRuntimeControl.cleanupAgentIds cleanupPort
+            cancelAllAgentsAndClearPtys () |> ForkRuntimeControl.cleanupAgentIds cleanupPort
 
     member this.Close() : unit = this.Cancel()

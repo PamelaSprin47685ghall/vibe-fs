@@ -182,6 +182,7 @@ module JsAnchorFs =
 
     let private grepHitsOnText (rel: string) (text: string) (spec: AnchorSpec) : JsGrepHit list =
         let offsets = lineOffsets text
+
         locateHits text spec
         |> List.map (fun (index, matched) -> grepHitAt rel offsets index matched)
 
@@ -228,17 +229,16 @@ module JsAnchorFs =
             let start = nthIndex text needle 0 occurrence
 
             if start < 0 then
-                return!
-                    Error(
-                        JsFailure.AnchorNotFound(
-                            "anchor did not match at occurrence " + string occurrence
-                        )
-                    )
+                return! Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
             else
                 return start, start + needle.Length
         }
 
-    let private regexOccurrenceOrMissing (text: string) (pattern: string) (occurrence: int) : Result<int * int, JsFailure> =
+    let private regexOccurrenceOrMissing
+        (text: string)
+        (pattern: string)
+        (occurrence: int)
+        : Result<int * int, JsFailure> =
         let re = regexGlobal pattern
         let m = findRegexOccurrence text re occurrence
 

@@ -191,12 +191,7 @@ module StrengthReplicaTransform =
                   binding.SemanticDigest
                   binding.LocalizedMirrorMessages
           match frame with
-          | Some bundle ->
-              yield
-                  ProjectionIntent.strengthReplicaLocal
-                      binding.OwnerSessionId
-                      binding.DecisionId
-                      bundle
+          | Some bundle -> yield ProjectionIntent.strengthReplicaLocal binding.OwnerSessionId binding.DecisionId bundle
           | None -> () ]
 
     let private retireWith
@@ -224,11 +219,7 @@ module StrengthReplicaTransform =
         (replicaSessionId: SessionId)
         : Task<StrengthReplicaTransformOutcome> =
         let rendered =
-            ProjectionRenderer.renderMessagesWithHostIds
-                sha256
-                (snapshotOf currentWire)
-                currentWire.Messages
-                ordered
+            ProjectionRenderer.renderMessagesWithHostIds sha256 (snapshotOf currentWire) currentWire.Messages ordered
 
         match ProjectionMessageEdit.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered with
         | Error error -> retireWith runtime sessions replicaSessionId error batches
@@ -252,23 +243,9 @@ module StrengthReplicaTransform =
         : Task<StrengthReplicaTransformOutcome> =
         match ProjectionPlanner.plan (replicaIntents binding frame) with
         | Error conflict ->
-            retireWith
-                runtime
-                sessions
-                replicaSessionId
-                (sprintf "projection-conflict:%A" conflict)
-                batches
+            retireWith runtime sessions replicaSessionId (sprintf "projection-conflict:%A" conflict) batches
         | Ok ordered ->
-            applyPlanned
-                sha256
-                sessionIdText
-                output
-                currentWire
-                ordered
-                batches
-                runtime
-                sessions
-                replicaSessionId
+            applyPlanned sha256 sessionIdText output currentWire ordered batches runtime sessions replicaSessionId
 
     let private applyUnderBudget
         (sha256: string -> string)
@@ -282,13 +259,7 @@ module StrengthReplicaTransform =
         (replicaSessionId: SessionId)
         : Task<StrengthReplicaTransformOutcome> =
         match localFrameOf sha256 binding batches with
-        | Error error ->
-            retireWith
-                runtime
-                sessions
-                replicaSessionId
-                (sprintf "invalid-replica-frame:%A" error)
-                batches
+        | Error error -> retireWith runtime sessions replicaSessionId (sprintf "invalid-replica-frame:%A" error) batches
         | Ok frame ->
             applyWithFrame
                 sha256
@@ -316,16 +287,7 @@ module StrengthReplicaTransform =
         if List.length batches >= StrengthBudget.requestLimit binding.Budget then
             retireWith runtime sessions replicaSessionId "provider-request-budget-reached" batches
         else
-            applyUnderBudget
-                sha256
-                binding
-                sessionIdText
-                output
-                currentWire
-                batches
-                runtime
-                sessions
-                replicaSessionId
+            applyUnderBudget sha256 binding sessionIdText output currentWire batches runtime sessions replicaSessionId
 
     let private applyWithBinding
         (sha256: string -> string)
@@ -342,16 +304,7 @@ module StrengthReplicaTransform =
             let batches = batchesForReplica rawMessages currentWire
 
             return!
-                applyBatches
-                    sha256
-                    binding
-                    sessionIdText
-                    output
-                    currentWire
-                    batches
-                    runtime
-                    sessions
-                    replicaSessionId
+                applyBatches sha256 binding sessionIdText output currentWire batches runtime sessions replicaSessionId
         }
 
     let private applyWithSessionId
@@ -365,8 +318,7 @@ module StrengthReplicaTransform =
 
         match runtime.TryFindByReplica replicaSessionId with
         | None -> task { return StrengthReplicaTransformOutcome.NotReplica }
-        | Some binding ->
-            applyWithBinding sha256 runtime sessions output binding sessionIdText replicaSessionId
+        | Some binding -> applyWithBinding sha256 runtime sessions output binding sessionIdText replicaSessionId
 
     let apply
         (sha256: string -> string)

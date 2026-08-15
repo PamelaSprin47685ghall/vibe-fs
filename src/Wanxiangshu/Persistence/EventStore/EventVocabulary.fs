@@ -45,7 +45,8 @@ module ProjectionCutTailEvent =
     [<Literal>]
     let EventType = "ProjectionCutTail"
 
-    let streamId rule = EventStreamId.create ("integrator/cut-tail/" + rule)
+    let streamId rule =
+        EventStreamId.create ("integrator/cut-tail/" + rule)
 
 [<RequireQualifiedAccess>]
 module AuthoritativeEventTypes =

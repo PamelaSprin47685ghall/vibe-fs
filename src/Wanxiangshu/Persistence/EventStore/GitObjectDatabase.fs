@@ -338,9 +338,7 @@ module GitObjectDatabase =
             else
                 let! packedText = readFileText packed "utf8"
 
-                return
-                    packedText.Split('\n')
-                    |> Array.tryPick (oidFromPackedRefLine refName)
+                return packedText.Split('\n') |> Array.tryPick (oidFromPackedRefLine refName)
         }
 
     /// The ref's value: the loose ref file first, then `packed-refs` (a `gc`/`pack-refs` may have
@@ -477,6 +475,5 @@ module GitObjectDatabase =
 
             match handleOpt with
             | None -> return false
-            | Some handle ->
-                return! swapWithLock gitDir refName expectedOld newOid handle lockPath refPath
+            | Some handle -> return! swapWithLock gitDir refName expectedOld newOid handle lockPath refPath
         }

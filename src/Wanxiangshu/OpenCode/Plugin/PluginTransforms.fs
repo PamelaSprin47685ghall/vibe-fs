@@ -121,16 +121,11 @@ module PluginTransforms =
             match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
             | Ok startedAt -> return Some startedAt
             | Error reason ->
-                Diagnostic.emit
-                    "host-013-session-start-bind-failed"
-                    [ "session_id", sessionId; "result", reason ]
+                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
 
                 let! _ = sessionPort.AbortSession(SessionId.create sessionId)
 
-                return
-                    raise (
-                        InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason)
-                    )
+                return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
         }
 
     let private tryBindSessionStartedAt
@@ -195,9 +190,7 @@ module PluginTransforms =
         (strengthFailFuse: string -> unit)
         : Task<XTraceProjectionState option> =
         task {
-            match!
-                XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages
-            with
+            match! XTraceCapture.captureMessageViewStable journal sessionIdentity ids capturedMessages with
             | Ok state -> return state
             | Error error -> return raiseStrengthFailClosed strengthFailFuse error
         }
@@ -257,12 +250,7 @@ module PluginTransforms =
             let stableMessageIds = tryStableHostMessageIds rawMessages
 
             let! traceState =
-                captureTraceState
-                    journal
-                    sessionIdentity
-                    stableMessageIds
-                    capturedMessages
-                    strengthFailFuse
+                captureTraceState journal sessionIdentity stableMessageIds capturedMessages strengthFailFuse
 
             do!
                 StrengthReplay.commitTracedAfterCapture
@@ -277,12 +265,7 @@ module PluginTransforms =
 
             do! applyManagerNarrativeRewrite journal (Some sessionId) traceState rawMessages outObj
 
-            do!
-                ManagerNarrativeTransform.applyAcceptedActivation
-                    journal
-                    (Some sessionId)
-                    traceState
-                    rawMessages
+            do! ManagerNarrativeTransform.applyAcceptedActivation journal (Some sessionId) traceState rawMessages
         }
 
     let private applySessionXTracePipeline
@@ -306,11 +289,7 @@ module PluginTransforms =
                 strengthReplayPlans
         | None -> Task.FromResult()
 
-    let private projectOrKeepRaw
-        (sessionId: string)
-        (bloggerMessages: obj list)
-        (messages: obj list)
-        : obj list =
+    let private projectOrKeepRaw (sessionId: string) (bloggerMessages: obj list) (messages: obj list) : obj list =
         if List.isEmpty messages then
             Diagnostic.emit
                 "enforcer-empty-project"
@@ -322,15 +301,11 @@ module PluginTransforms =
             messages
 
     let private messagesOrRaw (bloggerMessages: obj list) (messages: obj list) : obj list =
-        if List.isEmpty messages then
-            bloggerMessages
-        else
-            messages
+        if List.isEmpty messages then bloggerMessages else messages
 
     let private terminalRunFromMessages (rawMessages: obj list) : ProviderRunIdentity =
         match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
-            ProviderRunIdentity.create messageId
+        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) -> ProviderRunIdentity.create messageId
         | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
     let private makeRecoveryProbe
@@ -358,13 +333,9 @@ module PluginTransforms =
                     outObj
                     (projectOrKeepRaw sessionId bloggerMessages messages)
             | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
-                HostMessageProjection.replaceMessagesInPlace
-                    outObj
-                    (messagesOrRaw bloggerMessages messages)
+                HostMessageProjection.replaceMessagesInPlace outObj (messagesOrRaw bloggerMessages messages)
 
-                Diagnostic.emit
-                    "enforcer-stop-physical-run"
-                    [ "session_id", sessionId; "result", reason ]
+                Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", reason ]
 
                 let! _ = sessionPort.AbortSession sid
                 ()
@@ -470,10 +441,7 @@ module PluginTransforms =
             runEnforcerIfMainAssociated scope journal durable sessionPort sid sessionId outObj
         | _ -> Task.FromResult()
 
-    let private skipPairGuideline
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        : bool =
+    let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId ->
             SessionAssociationProjection.isCompanion
@@ -507,25 +475,13 @@ module PluginTransforms =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId ->
             task {
-                let! guidance =
-                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+                let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
 
-                return
-                    PairProgrammingCalibration.composeWithElapsed
-                        guidance
-                        elapsed
-                        toolEstimate
-                        guideline
+                return PairProgrammingCalibration.composeWithElapsed guidance elapsed toolEstimate guideline
             }
-        | _ ->
-            Task.FromResult(
-                PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline
-            )
+        | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
 
-    let private abortSessionIfPresent
-        (sessionPort: ISessionHostPort)
-        (projectionSessionIdOpt: string option)
-        : Task =
+    let private abortSessionIfPresent (sessionPort: ISessionHostPort) (projectionSessionIdOpt: string option) : Task =
         match projectionSessionIdOpt with
         | Some sessionId ->
             task {
@@ -574,8 +530,7 @@ module PluginTransforms =
 
             let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
 
-            let! markerText =
-                composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
+            let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
 
             let! injectResult =
                 PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
@@ -594,13 +549,7 @@ module PluginTransforms =
         if skipPairGuideline journal projectionSessionIdOpt then
             Task.FromResult()
         else
-            injectPairProgrammingGuideline
-                journal
-                projectionSessionIdOpt
-                sessionStartedAt
-                clock
-                sessionPort
-                outObj
+            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
     let private sealTaskFor
         (snapshotOpt: ISessionSnapshotPort option)
@@ -667,12 +616,7 @@ module PluginTransforms =
                     tryBindSessionStartedAt journal projectionSessionIdOpt sessionStartCandidate sessionPort
 
                 let! strengthReplayPlans =
-                    strengthReplayPlansFor
-                        journal
-                        strengthDurability
-                        strengthFailFuse
-                        projectionSessionIdOpt
-                        outObj
+                    strengthReplayPlansFor journal strengthDurability strengthFailFuse projectionSessionIdOpt outObj
 
                 // COMPANION-003/007: keep the XTrace in step with the
                 // provider-visible semantic projection at the transform
@@ -714,13 +658,7 @@ module PluginTransforms =
                 // docs/what/enforcer.md ENFORCER-044/047/050: Blogger continuation only.
                 // Main-session material is decided once in
                 // CompanionTransform → BloggerCoordinator.onMainMaterial.
-                do!
-                    applyBloggerEnforcerContinuation
-                        scope
-                        journal
-                        sessionPort
-                        projectionSessionIdOpt
-                        outObj
+                do! applyBloggerEnforcerContinuation scope journal sessionPort projectionSessionIdOpt outObj
 
                 // STRENGTH-009: freeze the post-Enforcer semantic view and
                 // complete any eligible speculation before the Pair marker.
@@ -731,14 +669,7 @@ module PluginTransforms =
                 // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                 // 再在 ResultGap 写入本次 completed auto-injected Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
-                do!
-                    maybeInjectPairGuideline
-                        journal
-                        projectionSessionIdOpt
-                        sessionStartedAt
-                        clock
-                        sessionPort
-                        outObj
+                do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
                 // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                 // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

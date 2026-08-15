@@ -306,6 +306,7 @@ module PluginHooks =
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                     hooks?tool <- toolRegistration.Tools
+
                     let adoptExisting parent record =
                         toolRegistration.Runtime.AdoptExistingChild(parent, record)
 

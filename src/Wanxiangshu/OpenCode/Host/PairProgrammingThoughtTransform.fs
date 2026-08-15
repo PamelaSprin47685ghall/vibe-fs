@@ -201,8 +201,10 @@ module PairProgrammingThoughtTransform =
         part
 
     let private reprimandToolPart (lang: ProviderLanguage option) (part: obj) : obj =
-        if not (isHyphenToolPart part) then part
-        else applyHyphenReprimand (reprimandText lang) part
+        if not (isHyphenToolPart part) then
+            part
+        else
+            applyHyphenReprimand (reprimandText lang) part
 
     let private isJsArray (value: obj) : bool =
         not (isNull value) && emitJsExpr value "Array.isArray($0)"
@@ -235,8 +237,10 @@ module PairProgrammingThoughtTransform =
             rawMsg
 
     let private sanitizeActiveHyphenMessage (lang: ProviderLanguage option) (rawMsg: obj) : obj =
-        if isNull rawMsg || isPairProgrammingThought rawMsg then rawMsg
-        else sanitizeNonMarkerMessage lang rawMsg
+        if isNull rawMsg || isPairProgrammingThought rawMsg then
+            rawMsg
+        else
+            sanitizeNonMarkerMessage lang rawMsg
 
     /// Transform any active LLM calls to `-` on real messages from failed into completed with reprimand.
     let sanitizeActiveToolCalls (lang: ProviderLanguage option) (rawMessages: obj list) : obj list =
@@ -303,8 +307,7 @@ module PairProgrammingThoughtTransform =
             |> fun value -> value.ToLowerInvariant()
 
     let private partTypeKind (part: obj) : string option =
-        tryUnboxString part?``type``
-        |> Option.map (fun t -> t.ToLowerInvariant())
+        tryUnboxString part?``type`` |> Option.map (fun t -> t.ToLowerInvariant())
 
     let private isToolPartKind (kind: string) =
         kind = "tool"
@@ -314,16 +317,20 @@ module PairProgrammingThoughtTransform =
         || kind = "tool_result"
 
     let private isToolPart (part: obj) : bool =
-        if isNull part then false
-        else partTypeKind part |> Option.exists isToolPartKind
+        if isNull part then
+            false
+        else
+            partTypeKind part |> Option.exists isToolPartKind
 
     let private statusFromState (state: obj) : string option =
         tryUnboxString state?status
         |> Option.map (fun status -> status.ToLowerInvariant())
 
     let private partStatus (part: obj) : string option =
-        if isNull part then None
-        else tryObj part?state |> Option.bind statusFromState
+        if isNull part then
+            None
+        else
+            tryObj part?state |> Option.bind statusFromState
 
     let private isPendingToolStatus (status: string option) =
         match status with
@@ -490,8 +497,10 @@ module PairProgrammingThoughtTransform =
         (cursorAfter: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
         (pair: PairProgrammingGuidelineWire)
         =
-        if isCursorProvider providerId then placeCursorResultGap cursorAfter pair
-        else addAtGap starts before after pair pair.ResultGap
+        if isCursorProvider providerId then
+            placeCursorResultGap cursorAfter pair
+        else
+            addAtGap starts before after pair pair.ResultGap
 
     let private ordered (entries: ResizeArray<PairProgrammingGuidelineWire>) =
         entries |> Seq.sortBy (fun pair -> pair.Ordinal) |> Seq.toList
@@ -500,10 +509,7 @@ module PairProgrammingThoughtTransform =
         for pair in ordered entries do
             output.Add(buildPairMessage pair.CallId pair.MarkerText)
 
-    let private tryBucket
-        (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (address: string)
-        =
+    let private tryBucket (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>) (address: string) =
         match table.TryGetValue address with
         | true, entries -> Some entries
         | _ -> None
@@ -595,6 +601,7 @@ module PairProgrammingThoughtTransform =
         match xs with
         | message :: tail when isToolCallMessage message -> takeToolCalls (message :: found) tail
         | _ -> found, xs
+
     let private gapsAfterToolBatch (lastCall: obj) (lastResult: obj) =
         match ProviderWireDecode.hostMessageId lastCall, ProviderWireDecode.hostMessageId lastResult with
         | Some callId, Some resultId ->
@@ -615,12 +622,7 @@ module PairProgrammingThoughtTransform =
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
 
-    let private decideFromBatchEnds
-        (lastIsUser: bool)
-        (last: obj)
-        (resultRun: obj list)
-        (callRun: obj list)
-        =
+    let private decideFromBatchEnds (lastIsUser: bool) (last: obj) (resultRun: obj list) (callRun: obj list) =
         match List.rev resultRun, List.rev callRun with
         | lastResult :: _, lastCall :: _ -> gapsAfterToolBatch lastCall lastResult
         | _ when lastIsUser ->
@@ -793,16 +795,7 @@ module PairProgrammingThoughtTransform =
 
             let! callGap, resultGap = decideCurrentPlacement realMessages
 
-            return!
-                commitPairInjection
-                    providerId
-                    history
-                    append
-                    sessionId
-                    markerText
-                    realMessages
-                    callGap
-                    resultGap
+            return! commitPairInjection providerId history append sessionId markerText realMessages callGap resultGap
         }
 
     let tryInject

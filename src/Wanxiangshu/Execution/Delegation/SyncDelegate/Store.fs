@@ -140,11 +140,7 @@ module private SyncDelegateStoreOps =
             callsByOwnerScope.[ownerKey] <- list
             list
 
-    let cancelPendingBatch
-        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
-        key
-        error
-        =
+    let cancelPendingBatch (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>) key error =
         failInvocations pendingBatches.[key].Items.Values error
         pendingBatches.Remove key |> ignore
 
@@ -156,10 +152,7 @@ module private SyncDelegateStoreOps =
         failInvocations activeBatches.[key] error
         activeBatches.Remove key |> ignore
 
-    let detachDelegates
-        (callsByDelegate: Dictionary<string, SyncDelegateCall>)
-        (calls: SyncDelegateCall list)
-        =
+    let detachDelegates (callsByDelegate: Dictionary<string, SyncDelegateCall>) (calls: SyncDelegateCall list) =
         for call in calls do
             callsByDelegate.Remove(sessionKey call.Delegate) |> ignore
 
@@ -267,8 +260,7 @@ module private SyncDelegateStoreOps =
             | Error error -> SyncDelegateAdmission.Rejected error
             | Ok batchState when batchState.Items.ContainsKey currentKey ->
                 SyncDelegateAdmission.Rejected "sync delegate rejected: duplicate ToolCallId in batch"
-            | Ok batchState ->
-                completeOrWaitBatch pendingBatches activeBatches key batchState currentKey invocation
+            | Ok batchState -> completeOrWaitBatch pendingBatches activeBatches key batchState currentKey invocation
 
     let admitByBatch
         (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)

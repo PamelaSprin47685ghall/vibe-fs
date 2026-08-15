@@ -48,8 +48,7 @@ module StrengthDurability =
             task {
                 match! StrengthStore.append store HostDigest.sha256Hex event with
                 | Ok _ -> return StrengthDurableAppend.Applied
-                | Error(AppendError.SemanticCut cut) ->
-                    return StrengthDurableAppend.SemanticRejected cut.Reason
+                | Error(AppendError.SemanticCut cut) -> return StrengthDurableAppend.SemanticRejected cut.Reason
                 | Error err -> return StrengthDurableAppend.StorageFailed(sprintf "%A" err)
             }
 

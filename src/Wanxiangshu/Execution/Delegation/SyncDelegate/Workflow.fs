@@ -33,9 +33,7 @@ module internal SyncDelegateWorkflow =
 
     let private completeMergedSiblings (siblings: SyncDelegateInvocation list) (canonicalCall: ToolCallId) =
         for sibling in siblings do
-            AsyncSupport.trySetResult
-                sibling.Completion
-                (Ok(SyncDelegateInvocationResult.MergedInto canonicalCall))
+            AsyncSupport.trySetResult sibling.Completion (Ok(SyncDelegateInvocationResult.MergedInto canonicalCall))
             |> ignore
 
     let private completeUngroupedSiblings (siblings: SyncDelegateInvocation list) =
@@ -166,7 +164,10 @@ module internal SyncDelegateWorkflow =
         task {
             let call, registration = begun
             use _registration = registration
-            let request = SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
+
+            let request =
+                SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
+
             let! answered = sendAndAwait deps store role batchOwner delegateSession call request
             completeBatch invocations answered
         }
@@ -217,7 +218,9 @@ module internal SyncDelegateWorkflow =
                 invocations |> List.map (fun item -> item.Charge) |> String.concat "\n\n"
 
             let combinedProviderPrompt = preparedPrompts |> String.concat "\n\n"
-            let sendAgent = deps.ResolveBoundAgent delegateSession |> Option.defaultValue attachedAgent
+
+            let sendAgent =
+                deps.ResolveBoundAgent delegateSession |> Option.defaultValue attachedAgent
 
             do!
                 beginAndDispatch
@@ -342,8 +345,7 @@ module internal SyncDelegateWorkflow =
             match store.Admit invocation with
             | SyncDelegateAdmission.Rejected error -> AsyncSupport.trySetResult completion (Error error) |> ignore
             | SyncDelegateAdmission.Waiting -> ()
-            | SyncDelegateAdmission.Ready invocations ->
-                do! runReadyBatch store deps ownerScope role invocations
+            | SyncDelegateAdmission.Ready invocations -> do! runReadyBatch store deps ownerScope role invocations
 
             return! completion.Task
         }

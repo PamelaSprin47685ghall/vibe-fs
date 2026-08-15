@@ -331,7 +331,10 @@ module DedicatedTodoReviewerRuntime =
 
     let private concludeReview (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) =
         taskResult {
-            let! outcome = TodoProcessReviewProgram.tryConclude journal lifeId writeId |> TaskResultCE.ofTask
+            let! outcome =
+                TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                |> TaskResultCE.ofTask
+
             return! concludeFromOutcome outcome
         }
 
@@ -443,12 +446,7 @@ module DedicatedTodoReviewerRuntime =
                 assignmentDirectory
                 assignmentText
         | MagicTodoAfter.AssignmentDelivery.Continuation ->
-            sendContinuationAssignment
-                sessions
-                journal
-                enlisted.ReviewerSessionId
-                assignmentDirectory
-                assignmentText
+            sendContinuationAssignment sessions journal enlisted.ReviewerSessionId assignmentDirectory assignmentText
 
     type private AssignmentDispatchDecision =
         | AlreadyAcceptedOrPending
@@ -469,9 +467,7 @@ module DedicatedTodoReviewerRuntime =
         | PromptAuthorityLedger.DispatchStatus.Pending -> AlreadyAcceptedOrPending
         | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
             let hasActiveProfile =
-                PromptAuthorityLedger.activeProfile
-                    reviewerSessionId
-                    (AgentJournal.snapshot journal).AgentProjections
+                PromptAuthorityLedger.activeProfile reviewerSessionId (AgentJournal.snapshot journal).AgentProjections
                 |> Option.isSome
 
             NeedsDispatch(MagicTodoAfter.assignmentDelivery hasActiveProfile)
@@ -493,16 +489,7 @@ module DedicatedTodoReviewerRuntime =
             match assignmentDispatchDecision journal enlisted.ReviewerSessionId payloadDigest with
             | AlreadyAcceptedOrPending -> return! concludeReview journal lifeId writeId
             | NeedsDispatch delivery ->
-                do!
-                    sendAssignmentDelivery
-                        sessions
-                        journal
-                        runtime
-                        handleId
-                        enlisted
-                        agentName
-                        delivery
-                        assignmentText
+                do! sendAssignmentDelivery sessions journal runtime handleId enlisted agentName delivery assignmentText
 
                 return! concludeReview journal lifeId writeId
         }
@@ -578,17 +565,7 @@ module DedicatedTodoReviewerRuntime =
             // Accepted = the payload landed; Pending = outcome
             // undetermined, recovery owns it; Dispatchable = a
             // new claim is allowed.
-            return!
-                deliverOrConclude
-                    sessions
-                    journal
-                    lifeId
-                    writeId
-                    enlisted
-                    handleId
-                    agentName
-                    runtime
-                    assignmentText
+            return! deliverOrConclude sessions journal lifeId writeId enlisted handleId agentName runtime assignmentText
         }
 
     type private CheckpointAdmission =
@@ -682,8 +659,7 @@ module DedicatedTodoReviewerRuntime =
                       DedicatedReviewerId = dedicated.DedicatedReviewerId
                       ReviewerSessionId = dedicated.ReviewerSessionId }
             )
-        | None ->
-            forkAndEnlistDedicated journal managerSessionId lifeId dedicatedId handleId agentName runtime
+        | None -> forkAndEnlistDedicated journal managerSessionId lifeId dedicatedId handleId agentName runtime
 
     let private ensureReviewForCheckpoint
         (sessions: ISessionHostPort)
@@ -702,7 +678,9 @@ module DedicatedTodoReviewerRuntime =
             let handleId = agentIdOf dedicatedId
             let runtime = forkRuntime sessions snapshot journal managerSessionId
             let agentName = reviewerAgentName journal managerSessionId
-            let! enlisted = enlistDedicatedReviewer journal managerSessionId lifeId life dedicatedId handleId agentName runtime
+
+            let! enlisted =
+                enlistDedicatedReviewer journal managerSessionId lifeId life dedicatedId handleId agentName runtime
 
             do!
                 ensureReusableReviewerWorkUnit
@@ -808,7 +786,10 @@ module DedicatedTodoReviewerRuntime =
         : Task<Result<unit, string>> =
         taskResult {
             do! ensureReview timerPort sessions snapshot gitTree journal managerSessionId lifeId writeId
-            let! outcome = TodoProcessReviewProgram.tryConclude journal lifeId writeId |> TaskResultCE.ofTask
+
+            let! outcome =
+                TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                |> TaskResultCE.ofTask
 
             match awaitConcludeDecision outcome with
             | Done -> return ()

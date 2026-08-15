@@ -75,12 +75,7 @@ module private ProcessGitLsTree =
             entryFromMeta name (meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries))
 
 module private ProcessGitExec =
-    let complete
-        (tcs: TaskCompletionSource<int * byte[] * string>)
-        (error: obj)
-        (stdout: obj)
-        (_stderr: obj)
-        : unit =
+    let complete (tcs: TaskCompletionSource<int * byte[] * string>) (error: obj) (stdout: obj) (_stderr: obj) : unit =
         if isNull error then
             let outBytes: byte[] = emitJsExpr stdout "Buffer.from($0)"
             AsyncSupport.trySetResult tcs (0, outBytes, "") |> ignore
@@ -420,8 +415,7 @@ module ProcessGitRawStore =
                 | None -> createObj [ "encoding", box "buffer"; "maxBuffer", box (64 * 1024 * 1024) ]
 
             try
-                execFile "git" argv options (fun error stdout stderr ->
-                    ProcessGitExec.complete tcs error stdout stderr)
+                execFile "git" argv options (fun error stdout stderr -> ProcessGitExec.complete tcs error stdout stderr)
             with ex ->
                 AsyncSupport.trySetResult tcs (1, Array.empty, ex.Message) |> ignore
 

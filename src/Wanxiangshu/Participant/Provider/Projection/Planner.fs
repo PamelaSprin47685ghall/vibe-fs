@@ -86,8 +86,7 @@ module ProjectionPlanner =
                 | _ -> false)
             ->
             Ok(Some first)
-        | ProjectionIntent.ActivatePrefixEpoch _ ->
-            Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
+        | ProjectionIntent.ActivatePrefixEpoch _ -> Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
         | _ -> Ok(Some first)
 
     /// Evidence → Decision: Work-base prefix selection among keep / activate / mirror.
@@ -228,16 +227,13 @@ module ProjectionPlanner =
         let rec merge remaining kept =
             match remaining with
             | [] -> Ok(List.rev kept)
-            | head :: tail ->
-                mergeStrengthStep kept head
-                |> Result.bind (fun nextKept -> merge tail nextKept)
+            | head :: tail -> mergeStrengthStep kept head |> Result.bind (fun nextKept -> merge tail nextKept)
 
         merge insertions []
 
     let private strengthSortKey (insertion: StrengthFrameInsertion) =
         match insertion.Anchor with
-        | StrengthFrameAnchor.BeforeMessageIndex index ->
-            0, index, StrengthDecisionId.value insertion.DecisionId
+        | StrengthFrameAnchor.BeforeMessageIndex index -> 0, index, StrengthDecisionId.value insertion.DecisionId
         | StrengthFrameAnchor.Append -> 1, 0, StrengthDecisionId.value insertion.DecisionId
 
     /// Merge InsertStrengthFrames: same DecisionId+digest is idempotent;
@@ -288,9 +284,7 @@ module ProjectionPlanner =
         | Some intent -> intent :: acc
 
     /// Evidence → Decision: ActivatePrefixEpoch ⊥ ReanchorAfterCompaction.
-    let private ensurePrefixLifecycleCompatible
-        (reduced: ProjectionIntent list)
-        : Result<unit, ProjectionConflict> =
+    let private ensurePrefixLifecycleCompatible (reduced: ProjectionIntent list) : Result<unit, ProjectionConflict> =
         let hasActivate =
             reduced
             |> List.exists (function

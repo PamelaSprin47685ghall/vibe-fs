@@ -101,8 +101,7 @@ module LifecycleWorkRecordProjection =
         task {
             match! durable.Writer.BlobWriter.Read terminalRef with
             | Error _ -> return None
-            | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest ->
-                return None
+            | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest -> return None
             | Ok terminalText when String.IsNullOrWhiteSpace terminalText -> return None
             | Ok terminalText -> return Some terminalText
         }
@@ -314,13 +313,7 @@ module LifecycleWorkRecordProjection =
 
                 return
                     Some(
-                        LifecycleWorkRecord.materialize
-                            openingMaterial
-                            frames
-                            trace
-                            coverage
-                            openingEnd
-                            includeOpening
+                        LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd includeOpening
                     )
         }
 
@@ -334,8 +327,7 @@ module LifecycleWorkRecordProjection =
         task {
             match AgentProjection.tryFind sessionId snapshot.AgentProjections with
             | None -> return None
-            | Some session ->
-                return! materializeOpenedSession durable snapshot session includeOpening coverageOverride
+            | Some session -> return! materializeOpenedSession durable snapshot session includeOpening coverageOverride
         }
 
     let lifecycleWorkRecord

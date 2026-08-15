@@ -116,6 +116,55 @@ module BloggerDelta =
     let private isAfterOrAt (cursor: SemanticCursor) (turn: int) (part: int) =
         turn > cursor.TurnIndex || (turn = cursor.TurnIndex && part >= cursor.PartIndex)
 
+    let private partBody (part: BloggerDeltaPart) =
+        match part with
+        | BloggerDeltaPart.TextPart text
+        | BloggerDeltaPart.ReasoningPart text -> Some text
+        | BloggerDeltaPart.ToolCallPart(_, args) -> Some args
+        | BloggerDeltaPart.ToolResultPart text -> Some text
+        | BloggerDeltaPart.ImageOmitted _
+        | BloggerDeltaPart.MediaOmitted _ -> None
+
+    let private replacePartBody (part: BloggerDeltaPart) (replacement: string) =
+        match part with
+        | BloggerDeltaPart.TextPart _ -> BloggerDeltaPart.TextPart replacement
+        | BloggerDeltaPart.ReasoningPart _ -> BloggerDeltaPart.ReasoningPart replacement
+        | BloggerDeltaPart.ToolCallPart(tool, _) -> BloggerDeltaPart.ToolCallPart(tool, replacement)
+        | BloggerDeltaPart.ToolResultPart _ -> BloggerDeltaPart.ToolResultPart replacement
+        | other -> other
+
+    let private adjustPrefixSearch
+        (budget: int)
+        (documentBytes: int -> int)
+        (mid: int)
+        (low: int)
+        (highBound: int)
+        (bestLength: int)
+        =
+        if documentBytes mid <= budget then
+            mid + 1, highBound, mid
+        else
+            low, mid - 1, bestLength
+
+    let private longestFittingPrefix (budget: int) (documentBytes: int -> int) (high: int) =
+        // DSL-MUTABLE: algorithm-scratch — binary-search low bound
+        let mutable low = 0
+        // DSL-MUTABLE: algorithm-scratch — binary-search high bound
+        let mutable highBound = high
+        // DSL-MUTABLE: algorithm-scratch — binary-search best-so-far bound
+        let mutable bestLength = 0
+
+        while low <= highBound do
+            let mid = low + (highBound - low) / 2
+            let nextLow, nextHigh, nextBest =
+                adjustPrefixSearch budget documentBytes mid low highBound bestLength
+
+            low <- nextLow
+            highBound <- nextHigh
+            bestLength <- nextBest
+
+        bestLength
+
     /// CTX-013 third level: cut one part's body so the rendered CHUNK fits.
     ///
     /// The budget applies to the rendered document, not to the item in isolation.
@@ -136,16 +185,7 @@ module BloggerDelta =
     /// The tail is discarded, never carried to the next chunk. A part that is always
     /// over the limit would otherwise be re-sent forever.
     let private truncateItem (budget: int) (item: BloggerDeltaItem) : BloggerDeltaItem =
-        let body =
-            match item.Part with
-            | BloggerDeltaPart.TextPart text
-            | BloggerDeltaPart.ReasoningPart text -> Some text
-            | BloggerDeltaPart.ToolCallPart(_, args) -> Some args
-            | BloggerDeltaPart.ToolResultPart text -> Some text
-            | BloggerDeltaPart.ImageOmitted _
-            | BloggerDeltaPart.MediaOmitted _ -> None
-
-        match body with
+        match partBody item.Part with
         // An omission marker has no body to cut. It is already a handful of bytes,
         // so a budget it cannot meet means the budget is smaller than the fixed item
         // scaffolding — a configuration error, not something to repair by emitting an
@@ -153,22 +193,13 @@ module BloggerDelta =
         | None -> item
         | Some text ->
             let normalized = SyntheticToml.normalizeNewlines text
-
-            let withBody replacement =
-                match item.Part with
-                | BloggerDeltaPart.TextPart _ -> BloggerDeltaPart.TextPart replacement
-                | BloggerDeltaPart.ReasoningPart _ -> BloggerDeltaPart.ReasoningPart replacement
-                | BloggerDeltaPart.ToolCallPart(tool, _) -> BloggerDeltaPart.ToolCallPart(tool, replacement)
-                | BloggerDeltaPart.ToolResultPart _ -> BloggerDeltaPart.ToolResultPart replacement
-                | other -> other
-
             let suffix = "\n" + BloggerToml.TruncationMarker
 
             let rendered length =
                 let kept = normalized.Substring(0, length)
 
                 { item with
-                    Part = withBody (kept + suffix)
+                    Part = replacePartBody item.Part (kept + suffix)
                     Truncated = true }
 
             let overhead =
@@ -187,23 +218,54 @@ module BloggerDelta =
             // `renderString` uses can measure it. The scaffolding is rendered once;
             // each step counts a prefix of `normalized` without allocating a
             // near-budget candidate document.
-            // DSL-MUTABLE: algorithm-scratch — binary-search low bound
-            let mutable low = 0
-            // DSL-MUTABLE: algorithm-scratch — binary-search high bound
-            let mutable high = normalized.Length
-            // DSL-MUTABLE: algorithm-scratch — binary-search best-so-far bound
-            let mutable bestLength = 0
+            rendered (longestFittingPrefix budget documentBytes normalized.Length)
 
-            while low <= high do
-                let mid = low + (high - low) / 2
+    type private PendingEntry =
+        {| Turn: int
+           Part: int
+           Item: BloggerDeltaItem |}
 
-                if documentBytes mid <= budget then
-                    bestLength <- mid
-                    low <- mid + 1
-                else
-                    high <- mid - 1
+    let private fitsLimit (limitBytes: int) (accepted: PendingEntry list) (entry: PendingEntry) =
+        let candidate = accepted @ [ entry ]
+        let rendered = renderChunk (candidate |> List.map (fun e -> e.Item))
+        SyntheticToml.byteCount rendered <= limitBytes
 
-            rendered bestLength
+    let private accumulateUntilLimit (limitBytes: int) (pending: PendingEntry list) =
+        // Accumulate while the rendered document still fits. Rendering the whole
+        // accumulation each time — rather than summing per-item sizes — is what
+        // makes the limit exact: `renderChunk` adds the header, separators and a trailing newline
+        // that a per-item sum would miss.
+        let rec loop remaining accepted =
+            match remaining with
+            | entry :: rest when fitsLimit limitBytes accepted entry -> loop rest (accepted @ [ entry ])
+            | _ -> accepted
+
+        loop pending []
+
+    let private itemsFromAccepted (limitBytes: int) (first: PendingEntry) (accepted: PendingEntry list) =
+        match accepted with
+        | [] ->
+            // Level three: the first pending part does not fit alone, so it is
+            // cut. The cursor still passes the WHOLE original part.
+            let truncated = truncateItem limitBytes first.Item
+            [ truncated ], first.Turn, first.Part
+        | _ ->
+            let last = List.last accepted
+            accepted |> List.map (fun e -> e.Item), last.Turn, last.Part
+
+    let private advanceCursor (partsPerTurn: Map<int, int>) (lastTurn: int) (lastPart: int) =
+        let consumedWholeTurn =
+            partsPerTurn
+            |> Map.tryFind lastTurn
+            |> Option.map (fun count -> lastPart = count - 1)
+            |> Option.defaultValue false
+
+        if consumedWholeTurn then
+            { TurnIndex = lastTurn + 1
+              PartIndex = 0 }
+        else
+            { TurnIndex = lastTurn
+              PartIndex = lastPart + 1 }
 
     /// CTX-013: the next chunk to send, or `None` when nothing is left to consume.
     ///
@@ -232,54 +294,9 @@ module BloggerDelta =
         match pending with
         | [] -> None
         | first :: _ ->
-            // Accumulate while the rendered document still fits. Rendering the whole
-            // accumulation each time — rather than summing per-item sizes — is what
-            // makes the limit exact: `renderChunk` adds the header, separators and a trailing newline
-            // that a per-item sum would miss.
-            // DSL-MUTABLE: algorithm-scratch — accumulate accepted items until limit
-            let mutable accepted
-                : {| Turn: int
-                     Part: int
-                     Item: BloggerDeltaItem |} list =
-                []
-
-            // DSL-MUTABLE: algorithm-scratch — stop flag for accumulation loop
-            let mutable stopped = false
-
-            for entry in pending do
-                if not stopped then
-                    let candidate = accepted @ [ entry ]
-                    let rendered = renderChunk (candidate |> List.map (fun e -> e.Item))
-
-                    if SyntheticToml.byteCount rendered <= limitBytes then
-                        accepted <- candidate
-                    else
-                        stopped <- true
-
-            let finalItems, lastTurn, lastPart =
-                match accepted with
-                | [] ->
-                    // Level three: the first pending part does not fit alone, so it is
-                    // cut. The cursor still passes the WHOLE original part.
-                    let truncated = truncateItem limitBytes first.Item
-                    [ truncated ], first.Turn, first.Part
-                | _ ->
-                    let last = List.last accepted
-                    accepted |> List.map (fun e -> e.Item), last.Turn, last.Part
-
-            let consumedWholeTurn =
-                partsPerTurn
-                |> Map.tryFind lastTurn
-                |> Option.map (fun count -> lastPart = count - 1)
-                |> Option.defaultValue false
-
-            let nextCursor =
-                if consumedWholeTurn then
-                    { TurnIndex = lastTurn + 1
-                      PartIndex = 0 }
-                else
-                    { TurnIndex = lastTurn
-                      PartIndex = lastPart + 1 }
+            let accepted = accumulateUntilLimit limitBytes pending
+            let finalItems, lastTurn, lastPart = itemsFromAccepted limitBytes first accepted
+            let nextCursor = advanceCursor partsPerTurn lastTurn lastPart
 
             // Every turn strictly before the cursor's turn is now complete. Derived
             // from the cursor rather than counted separately, so the two cannot drift.

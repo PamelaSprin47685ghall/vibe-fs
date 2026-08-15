@@ -129,10 +129,7 @@ module NodeProcessHost =
     let private tryChunkBytes (chunk: obj) : byte[] option =
         let bytes = if isNull chunk then [||] else toBytes chunk
 
-        if bytes.Length = 0 then
-            None
-        else
-            Some bytes
+        if bytes.Length = 0 then None else Some bytes
 
     let private recordChunk (handler: byte[] -> unit) (chunk: obj) =
         try
@@ -166,7 +163,12 @@ module NodeProcessHost =
             with _ ->
                 ()
 
-    let private wireExitHandlers (child: obj) (exitTcs: TaskCompletionSource<int>) (exitedRef: bool ref) (onExited: (unit -> unit) ResizeArray) =
+    let private wireExitHandlers
+        (child: obj)
+        (exitTcs: TaskCompletionSource<int>)
+        (exitedRef: bool ref)
+        (onExited: (unit -> unit) ResizeArray)
+        =
         emitJsExpr
             (child,
              (fun (code: obj) ->
@@ -181,7 +183,13 @@ module NodeProcessHost =
             "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
         |> ignore
 
-    let private assembleChild (child: obj) (onStdout: byte[] -> unit) (onStderr: byte[] -> unit) (cmd: Command) (ct: CancellationToken) =
+    let private assembleChild
+        (child: obj)
+        (onStdout: byte[] -> unit)
+        (onStderr: byte[] -> unit)
+        (cmd: Command)
+        (ct: CancellationToken)
+        =
         let exitTcs = TaskCompletionSource<int>()
         let onExited = ResizeArray<unit -> unit>()
         let exitedRef = ref false

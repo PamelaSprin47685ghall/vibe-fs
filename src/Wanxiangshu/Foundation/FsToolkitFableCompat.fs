@@ -37,4 +37,3 @@ module TaskResultList =
             }
 
         collect [] items
-

@@ -129,10 +129,7 @@ module FileMutationTools =
         }
 
     let private optionalJsString (value: obj) =
-        if isNull value then
-            None
-        else
-            Some(string value)
+        if isNull value then None else Some(string value)
 
     let private jsErrorCode (ex: exn) =
         try

@@ -67,9 +67,7 @@ module OrchestratorProgram =
         mapTask (Result.mapError mapper) operation
 
     let private append (deps: OrchestratorProgramDeps) (job: ManagerJob) fact =
-        taskResult {
-            do! deps.AppendFact StreamId.Workspace fact |> mapTaskError (failed job)
-        }
+        taskResult { do! deps.AppendFact StreamId.Workspace fact |> mapTaskError (failed job) }
 
     /// REVIEW-008: one barrier per review round, never reused.
     ///
@@ -171,9 +169,7 @@ module OrchestratorProgram =
                 deps.Manager.ResumeManager job.JobId job.Worktree.Path prompt
                 |> mapTask (
                     Result.mapError (fun error ->
-                        failed
-                            job
-                            (sprintf "Rebase conflict (%s); manager continuation failed: %s" rebaseError error))
+                        failed job (sprintf "Rebase conflict (%s); manager continuation failed: %s" rebaseError error))
                 )
 
             do!
@@ -336,7 +332,9 @@ module OrchestratorProgram =
     let private resumeConflictResolution
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (conflict: {| CandidateCommit: CommitHash; ConflictFiles: string list |})
+        (conflict:
+            {| CandidateCommit: CommitHash
+               ConflictFiles: string list |})
         =
         taskResult {
             let prompt = OrchestratorPrompts.buildConflictResumePrompt conflict.ConflictFiles
@@ -358,7 +356,9 @@ module OrchestratorProgram =
     let private resumeAttemptPublish
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (claim: {| RebasedCommit: CommitHash; ExpectedHead: CommitHash |})
+        (claim:
+            {| RebasedCommit: CommitHash
+               ExpectedHead: CommitHash |})
         =
         taskResult {
             let! attempt = publishUnderGate deps job claim.ExpectedHead
@@ -370,7 +370,9 @@ module OrchestratorProgram =
     let private resumeBackfill
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (landed: {| RebasedCommit: CommitHash; ResultingTargetHead: CommitHash |})
+        (landed:
+            {| RebasedCommit: CommitHash
+               ResultingTargetHead: CommitHash |})
         =
         // ORCH-007 branch 1: the ff already happened and only the fact is
         // missing. Written without re-acquiring the gate — there is no ref
@@ -389,7 +391,8 @@ module OrchestratorProgram =
             do!
                 releaseTerminalWorktree deps job
                 |> mapTask (
-                    Result.mapError (fun error -> failed job (sprintf "Backfilled Published but cleanup failed: %s" error))
+                    Result.mapError (fun error ->
+                        failed job (sprintf "Backfilled Published but cleanup failed: %s" error))
                 )
 
             return OrchestratorVerdict.Published(job.JobId, landed.ResultingTargetHead)
@@ -411,11 +414,7 @@ module OrchestratorProgram =
     /// `recoveryAction` decides; this only executes. Adding a second condition here
     /// would put the recovery decision in two places, and ORCH-007's fixed branch
     /// order only holds if there is one.
-    let private resumeFromDurableFacts
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (action: JobRecoveryAction)
-        =
+    let private resumeFromDurableFacts (deps: OrchestratorProgramDeps) (job: ManagerJob) (action: JobRecoveryAction) =
         match action with
         | ResumeManager -> resumeAwaitManager deps job
         | RebaseReviewPublish _ -> publishEventually deps job 0

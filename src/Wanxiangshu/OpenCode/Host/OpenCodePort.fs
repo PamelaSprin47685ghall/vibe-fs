@@ -63,24 +63,40 @@ module OpenCodePort =
         | None -> opts.Agent |> Option.bind ManagedAgentConfig.tryBoundModel
 
     let private responseBody (res: obj) =
-        if not (isNull res) && not (isNull res?data) then res?data else res
+        if not (isNull res) && not (isNull res?data) then
+            res?data
+        else
+            res
 
     let private trySessionId (body: obj) =
-        if not (isNull body) && not (isNull body?id) then Some(SessionId.create (unbox<string> body?id))
-        else None
+        if not (isNull body) && not (isNull body?id) then
+            Some(SessionId.create (unbox<string> body?id))
+        else
+            None
 
     let private tryMessageId (data: obj) =
-        if not (isNull data) && not (isNull data?id) then Some(PhysicalUserMessageId.create (unbox<string> data?id))
-        else None
+        if not (isNull data) && not (isNull data?id) then
+            Some(PhysicalUserMessageId.create (unbox<string> data?id))
+        else
+            None
 
     let private optionalParentId (item: obj) =
-        if isNull item?parentID then None else Some(SessionId.create (unbox<string> item?parentID))
+        if isNull item?parentID then
+            None
+        else
+            Some(SessionId.create (unbox<string> item?parentID))
 
     let private optionalAgent (item: obj) =
-        if isNull item?agent then None else Some(unbox<string> item?agent)
+        if isNull item?agent then
+            None
+        else
+            Some(unbox<string> item?agent)
 
     let private optionalTitle (item: obj) =
-        if isNull item?title then None else Some(unbox<string> item?title)
+        if isNull item?title then
+            None
+        else
+            Some(unbox<string> item?title)
 
     let private tryChildInfo (item: obj) =
         if isNull item || isNull item?id then
@@ -110,17 +126,27 @@ module OpenCodePort =
         else None
 
     let private parsePostSuccessBody (text: string) =
-        if String.IsNullOrWhiteSpace text then createObj [] else Fable.Core.JS.JSON.parse text
+        if String.IsNullOrWhiteSpace text then
+            createObj []
+        else
+            Fable.Core.JS.JSON.parse text
 
     let private parseGetBody (body: string) =
-        if String.IsNullOrWhiteSpace body then box [||] else Fable.Core.JS.JSON.parse body
+        if String.IsNullOrWhiteSpace body then
+            box [||]
+        else
+            Fable.Core.JS.JSON.parse body
 
     let private tryWorkDirectory (input: obj) =
         if isNull input || isNull input?directory then
             None
         else
             let directory = unbox<string> input?directory
-            if String.IsNullOrWhiteSpace directory then None else Some directory
+
+            if String.IsNullOrWhiteSpace directory then
+                None
+            else
+                Some directory
 
     let private readResponseTextSafe (response: obj) : Task<string> =
         task {
@@ -250,7 +276,11 @@ module OpenCodePort =
                         let sessObj = client?session
                         let createFn = sessObj?create
                         let! res = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
-                        return! responseBody res |> trySessionId |> Result.requireSome "Missing session id in response"
+
+                        return!
+                            responseBody res
+                            |> trySessionId
+                            |> Result.requireSome "Missing session id in response"
                     with ex ->
                         return! Error ex.Message
                 }
@@ -294,7 +324,11 @@ module OpenCodePort =
                         let sessObj = client?session
                         let createFn = sessObj?create
                         let! res = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
-                        return! responseBody res |> trySessionId |> Result.requireSome "Missing session id in response"
+
+                        return!
+                            responseBody res
+                            |> trySessionId
+                            |> Result.requireSome "Missing session id in response"
                     with ex ->
                         return! Error ex.Message
                 }
@@ -325,7 +359,10 @@ module OpenCodePort =
                             resolveCloseFn sessObj
                             |> Result.requireSome "No close/delete session method on SDK client"
 
-                        let! _ = unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = cId |})) |> TaskResultCE.ofTask
+                        let! _ =
+                            unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = cId |}))
+                            |> TaskResultCE.ofTask
+
                         return ()
                     with ex ->
                         return! Error ex.Message

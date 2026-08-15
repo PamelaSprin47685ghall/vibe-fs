@@ -3,6 +3,7 @@ namespace Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -62,9 +63,62 @@ module EventKWayMerge =
         match Map.tryFind key seen with
         | None -> Ok false
         | Some existing ->
-            match CanonicalEventCodec.checkIdentity existing candidate with
-            | Ok() -> Ok true
-            | Error error -> Error error
+            CanonicalEventCodec.checkIdentity existing candidate
+            |> Result.map (fun () -> true)
+
+    let private readyHead (seen: Map<string, EventEnvelope>) (writerId: string) (events: EventEnvelope list) =
+        match events with
+        | head :: _ when
+            Map.containsKey (eventKey head.EventId) seen
+            || List.forall (fun parent -> Map.containsKey (eventKey parent) seen) head.Parents
+            ->
+            Some(writerId, head)
+        | _ -> None
+
+    let private frontierError
+        (seen: Map<string, EventEnvelope>)
+        (remaining: Map<string, EventEnvelope list>)
+        (nonEmpty: (string * EventEnvelope list) list)
+        =
+        let pendingIds = allPendingIds remaining
+
+        let missing =
+            nonEmpty
+            |> List.collect (fun (_, events) ->
+                match events with
+                | [] -> []
+                | head :: _ -> head.Parents)
+            |> List.filter (fun parent ->
+                let key = eventKey parent
+                not (Map.containsKey key seen) && not (Set.contains key pendingIds))
+            |> List.sortBy eventKey
+            |> List.tryHead
+
+        match missing with
+        | Some parent -> Error(StorageInvalid.MissingParent parent)
+        | None -> Error(StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier")
+
+    let private advance
+        (remaining: Map<string, EventEnvelope list>)
+        (seen: Map<string, EventEnvelope>)
+        (acc: EventEnvelope list)
+        (writerId: string)
+        (head: EventEnvelope)
+        =
+        result {
+            let! duplicate = collisionOrDuplicate seen head
+            let nextQueues = Map.add writerId (List.tail remaining.[writerId]) remaining
+
+            if duplicate then
+                return nextQueues, seen, acc
+            else
+                return nextQueues, Map.add (eventKey head.EventId) head seen, head :: acc
+        }
+
+    let private nonEmptyQueues (remaining: Map<string, EventEnvelope list>) =
+        remaining
+        |> Map.toList
+        |> List.filter (fun (_, events) -> not (List.isEmpty events))
 
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
@@ -77,64 +131,27 @@ module EventKWayMerge =
             (seen: Map<string, EventEnvelope>)
             (acc: EventEnvelope list)
             =
-            let nonEmpty =
-                remaining
-                |> Map.toList
-                |> List.filter (fun (_, events) -> not (List.isEmpty events))
-
-            match nonEmpty with
+            match nonEmptyQueues remaining with
             | [] -> Ok(List.rev acc)
-            | _ ->
+            | nonEmpty -> stepReady remaining seen acc nonEmpty
+
+        and stepReady
+            (remaining: Map<string, EventEnvelope list>)
+            (seen: Map<string, EventEnvelope>)
+            (acc: EventEnvelope list)
+            (nonEmpty: (string * EventEnvelope list) list)
+            =
+            result {
                 let ready =
                     nonEmpty
-                    |> List.choose (fun (writerId, events) ->
-                        match events with
-                        | [] -> None
-                        | head :: _ ->
-                            let duplicateReady = Map.containsKey (eventKey head.EventId) seen
-
-                            let parentsReady =
-                                head.Parents
-                                |> List.forall (fun parent -> Map.containsKey (eventKey parent) seen)
-
-                            if duplicateReady || parentsReady then
-                                Some(writerId, head)
-                            else
-                                None)
+                    |> List.choose (fun (writerId, events) -> readyHead seen writerId events)
                     |> List.sortBy (fun (writerId, event) -> eventKey event.EventId, writerId)
 
                 match ready with
                 | (writerId, head) :: _ ->
-                    match collisionOrDuplicate seen head with
-                    | Error error -> Error error
-                    | Ok duplicate ->
-                        let tail = remaining.[writerId] |> List.tail
-                        let nextQueues = Map.add writerId tail remaining
-
-                        if duplicate then
-                            loop nextQueues seen acc
-                        else
-                            loop nextQueues (Map.add (eventKey head.EventId) head seen) (head :: acc)
-                | [] ->
-                    let pendingIds = allPendingIds remaining
-
-                    let missing =
-                        nonEmpty
-                        |> List.collect (fun (_, events) ->
-                            match events with
-                            | [] -> []
-                            | head :: _ -> head.Parents)
-                        |> List.filter (fun parent ->
-                            let key = eventKey parent
-                            not (Map.containsKey key seen) && not (Set.contains key pendingIds))
-                        |> List.sortBy eventKey
-                        |> List.tryHead
-
-                    match missing with
-                    | Some parent -> Error(StorageInvalid.MissingParent parent)
-                    | None ->
-                        Error(
-                            StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier"
-                        )
+                    let! nextQueues, nextSeen, nextAcc = advance remaining seen acc writerId head
+                    return! loop nextQueues nextSeen nextAcc
+                | [] -> return! frontierError seen remaining nonEmpty
+            }
 
         loop queues Map.empty []

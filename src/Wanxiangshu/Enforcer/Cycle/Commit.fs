@@ -136,7 +136,8 @@ module EnforcerCycleCommit =
         (latestBlog: BlogProjectionState)
         : CycleCommitOutcome option =
         if
-            coverage.PreviousIngestedThroughSequence <> latestBlog.Coverage.IngestedThroughSequence
+            coverage.PreviousIngestedThroughSequence
+            <> latestBlog.Coverage.IngestedThroughSequence
             || coverage.PreviousCoverableTurnCutoffExclusive
                <> latestBlog.Coverage.CoverableTurnCutoffExclusive
             || coverage.FrameEpochId <> latestBlog.FrameEpochId
@@ -186,13 +187,7 @@ module EnforcerCycleCommit =
         (fact: AgentFact)
         : Task<Result<unit, CycleCommitOutcome>> =
         task {
-            match!
-                AgentJournal.appendAgent
-                    (StreamId.Session mainSessionId)
-                    (Some providerRun)
-                    fact
-                    journal
-            with
+            match! AgentJournal.appendAgent (StreamId.Session mainSessionId) (Some providerRun) fact journal with
             | Ok _ -> return Ok()
             | Error failure -> return Error(classifyAppendFailure failure)
         }
@@ -230,13 +225,10 @@ module EnforcerCycleCommit =
                                    BloggerSessionId = bloggerSessionId
                                    RequestId = coverage.RequestId
                                    FrameEpochId = coverage.FrameEpochId
-                                   PreviousIngestedThroughSequence =
-                                    coverage.PreviousIngestedThroughSequence
+                                   PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
                                    NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
-                                   PreviousCoverableTurnCutoffExclusive =
-                                    coverage.PreviousCoverableTurnCutoffExclusive
-                                   NextCoverableTurnCutoffExclusive =
-                                    coverage.NextCoverableTurnCutoffExclusive
+                                   PreviousCoverableTurnCutoffExclusive = coverage.PreviousCoverableTurnCutoffExclusive
+                                   NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
                                    NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
                                    TextRef = textBlob.BlobRef
                                    TextDigest = textBlob.BlobDigest
@@ -285,18 +277,10 @@ module EnforcerCycleCommit =
             match already, declared with
             | Some _, _ -> return CycleCommitOutcome.KnownCommitted
             | None, None ->
-                return
-                    CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
+                return CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
             | None, Some coverage ->
                 return!
-                    commitWithCoverage
-                        journal
-                        mainSessionId
-                        bloggerSessionId
-                        providerRun
-                        toolCallIds
-                        merged
-                        coverage
+                    commitWithCoverage journal mainSessionId bloggerSessionId providerRun toolCallIds merged coverage
         }
 
     [<RequireQualifiedAccess>]
@@ -305,7 +289,10 @@ module EnforcerCycleCommit =
         | Rejected of reason: string
         | Ready of blog: BlogProjectionState * coveredFrameCount: int
 
-    let private validateSquashFrames (blog: BlogProjectionState) (squash: BloggerSquashRequestContext) : SquashAdmission =
+    let private validateSquashFrames
+        (blog: BlogProjectionState)
+        (squash: BloggerSquashRequestContext)
+        : SquashAdmission =
         let k = squash.CoveredFrameCount
         let selected = List.truncate k (BlogProjection.frames blog)
         let digests = selected |> List.map (fun f -> f.Digest)
@@ -330,8 +317,7 @@ module EnforcerCycleCommit =
         | Some linked when linked = bloggerSessionId ->
             validateSquashFrames (session.Blog |> Option.defaultValue BlogProjection.empty) squash
         | Some _ -> SquashAdmission.Rejected "Squash completion belongs to a different Blogger session"
-        | None ->
-            SquashAdmission.Rejected "BlogObservationsSquashed requires a durably linked Blogger session"
+        | None -> SquashAdmission.Rejected "BlogObservationsSquashed requires a durably linked Blogger session"
 
     let private decideSquashSession
         (projections: ProjectionSet)
@@ -340,8 +326,7 @@ module EnforcerCycleCommit =
         (squash: BloggerSquashRequestContext)
         : SquashAdmission =
         match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-        | None ->
-            SquashAdmission.Rejected "BlogObservationsSquashed requires an existing work session projection"
+        | None -> SquashAdmission.Rejected "BlogObservationsSquashed requires an existing work session projection"
         | Some session -> decideSquashLink session bloggerSessionId squash
 
     let private admitSquash
@@ -412,14 +397,5 @@ module EnforcerCycleCommit =
             | SquashAdmission.AlreadyCommitted -> return CycleCommitOutcome.KnownCommitted
             | SquashAdmission.Rejected reason -> return CycleCommitOutcome.KnownNotCommitted reason
             | SquashAdmission.Ready(blog, k) ->
-                return!
-                    commitReadySquash
-                        journal
-                        mainSessionId
-                        bloggerSessionId
-                        providerRun
-                        squash
-                        squashText
-                        blog
-                        k
+                return! commitReadySquash journal mainSessionId bloggerSessionId providerRun squash squashText blog k
         }

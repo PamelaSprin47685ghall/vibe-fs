@@ -73,9 +73,7 @@ module private SatelliteLeaseFlow =
                       Directory = spec.Directory }
                 )
 
-            return
-                { SessionId = child
-                  Origin = origin }
+            return { SessionId = child; Origin = origin }
         }
 
     let replacementOrConflict
@@ -156,11 +154,11 @@ module private SatelliteLeaseFlow =
 
             let! rootChildren =
                 sessions.ListChildren rootId
-                |> Task.map (Result.mapError (recoverError spec.Kind))
+                |> TaskValue.map (Result.mapError (recoverError spec.Kind))
 
             let! ownerChildren =
                 listOwnerChildren sessions rootId owner
-                |> Task.map (Result.mapError (recoverError spec.Kind))
+                |> TaskValue.map (Result.mapError (recoverError spec.Kind))
 
             let merged =
                 (rootChildren @ ownerChildren) |> List.distinctBy (fun child -> child.SessionId)

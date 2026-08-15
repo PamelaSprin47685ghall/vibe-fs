@@ -76,10 +76,16 @@ module EnforcerCycleDecode =
         | None -> optUnboxString part?callId
 
     let private statusOf (part: obj) : string option =
-        if isNull part?state then None else optUnboxString part?state?status
+        if isNull part?state then
+            None
+        else
+            optUnboxString part?state?status
 
     let private inputOf (part: obj) : obj =
-        if isNull part?state || isNull part?state?input then createEmpty else part?state?input
+        if isNull part?state || isNull part?state?input then
+            createEmpty
+        else
+            part?state?input
 
     let private toolNameOf (part: obj) : string =
         match optUnboxString part?tool with
@@ -109,7 +115,10 @@ module EnforcerCycleDecode =
         if isNull message?info then message else message?info
 
     let private timeCompleted (source: obj) =
-        if isNull source || isNull source?time then null else source?time?completed
+        if isNull source || isNull source?time then
+            null
+        else
+            source?time?completed
 
     /// The last assistant message of a transform snapshot and its parts.
     /// Host sets `time.completed` only when the run ends or is interrupted
@@ -131,14 +140,16 @@ module EnforcerCycleDecode =
         else Some(unbox<string> info?id)
 
     let private messageParts (message: obj) : obj list =
-        if isNull message?parts then [] else unbox<obj array> message?parts |> Array.toList
+        if isNull message?parts then
+            []
+        else
+            unbox<obj array> message?parts |> Array.toList
 
     let private assistantStepFromMessage (message: obj) : (string * obj list * bool) option =
         let info = messageInfo message
 
         match messageRole info, messageIdOf info with
-        | Some "assistant", Some messageId ->
-            Some(messageId, messageParts message, assistantIsCompleted message)
+        | Some "assistant", Some messageId -> Some(messageId, messageParts message, assistantIsCompleted message)
         | _ -> None
 
     /// Last assistant terminal as (messageId, calls, completed); public so the
@@ -146,7 +157,10 @@ module EnforcerCycleDecode =
     let lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
         rawMessages
         |> List.choose (fun message ->
-            if isNull message then None else assistantStepFromMessage message)
+            if isNull message then
+                None
+            else
+                assistantStepFromMessage message)
         |> List.tryLast
 
     /// Decode a raw JS object into a string-keyed map (the codec's input shape).
@@ -172,8 +186,7 @@ module EnforcerCycleDecode =
             // protocol-skip diagnostics that are never recovery inputs.
             Diagnostic.emit
                 "enforcer-blog-call-invalid"
-                [ "result",
-                  sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
+                [ "result", sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
 
             None
 
@@ -215,8 +228,7 @@ module EnforcerCycleDecode =
             // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
             Diagnostic.emit
                 "enforcer-protocol-violation"
-                [ "result",
-                  "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
+                [ "result", "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
                   "call_count", string (List.length calls) ]
 
     let private validateMergedBounds

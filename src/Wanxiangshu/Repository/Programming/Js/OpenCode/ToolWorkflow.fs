@@ -280,13 +280,7 @@ module JsToolWorkflow =
                     let api = JsToolsBindings.createApi root staging
 
                     let! resultJson =
-                        JsSandbox.runSurface
-                            baseClassSource
-                            modelSource
-                            api
-                            deadlineMs
-                            deadlineEpochMs
-                            outputBoundBytes
+                        JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
 
                     let! value = JsToolsData.parse resultJson
                     let mutations = staging |> Seq.toList

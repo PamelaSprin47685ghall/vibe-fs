@@ -191,9 +191,7 @@ module JsMutationFs =
         let resolvePath path = resolveToolPath root path
 
         result {
-            let! snapshotList =
-                plan
-                |> List.traverseResultM (fun (path, _) -> snapshotOne resolvePath path)
+            let! snapshotList = plan |> List.traverseResultM (fun (path, _) -> snapshotOne resolvePath path)
 
             return! applyWrites resolvePath snapshotList plan
         }

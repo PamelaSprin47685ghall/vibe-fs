@@ -69,7 +69,10 @@ module SembleSearchCodec =
             content.Split([| '\n' |], StringSplitOptions.None).Length
 
     let private resolveTotalLines (declared: int) (content: string) (endLine: int) =
-        if declared > 0 then declared else max (snippetLines content) endLine
+        if declared > 0 then
+            declared
+        else
+            max (snippetLines content) endLine
 
     let private hitFromNonNull (item: obj) : SembleMcp.Hit option =
         let filePath = asString item?file_path
@@ -110,17 +113,17 @@ module SembleSearchCodec =
             []
 
     let parseText (text: string) : SembleMcp.Hit list =
-        if String.IsNullOrWhiteSpace text then [] else parseTextBody text
+        if String.IsNullOrWhiteSpace text then
+            []
+        else
+            parseTextBody text
 
     let private parseToolContent (content: obj) : SembleMcp.Hit list =
         let items: obj array = unbox content
 
-        if isNull items || items.Length = 0 then
-            []
-        elif isNull items.[0] then
-            []
-        else
-            parseText (asString items.[0]?text)
+        if isNull items || items.Length = 0 then []
+        elif isNull items.[0] then []
+        else parseText (asString items.[0]?text)
 
     let private parseToolResultBody (result: obj) : SembleMcp.Hit list =
         try

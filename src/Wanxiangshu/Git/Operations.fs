@@ -33,7 +33,10 @@ module GitOperations =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
     let private stderrOr (missing: string) (stderr: string) =
-        if String.IsNullOrWhiteSpace stderr then missing else stderr.Trim()
+        if String.IsNullOrWhiteSpace stderr then
+            missing
+        else
+            stderr.Trim()
 
     let private verifyClean runner repo =
         task {
@@ -90,7 +93,10 @@ module GitOperations =
         sprintf "refs/heads/%s" (TargetRef.value target)
 
     let private checkedOutBranch (branchCode: int) (branchOut: string) =
-        if branchCode = 0 then branchOut.Trim() else "<detached HEAD>"
+        if branchCode = 0 then
+            branchOut.Trim()
+        else
+            "<detached HEAD>"
 
     let private requirePublishBranch
         (runner: Command -> Task<int * string * string>)
@@ -154,7 +160,14 @@ module GitOperations =
                 return! verifyHead runner repoPath candidate
             else
                 let message = failure mergeOut mergeError
-                return Error(if isRefMoved message then OrchestratorConstants.targetRefMovedError else message)
+
+                return
+                    Error(
+                        if isRefMoved message then
+                            OrchestratorConstants.targetRefMovedError
+                        else
+                            message
+                    )
         }
 
     /// ff-only publish inside the short Integration Gate (ORCH-005).
@@ -192,8 +205,7 @@ module GitOperations =
             if addCode <> 0 then
                 return Error(failure "" addErr)
             else
-                let! code, stdout, stderr =
-                    runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+                let! code, stdout, stderr = runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
                 return if code = 0 then Ok() else Error(failure stdout stderr)
         }

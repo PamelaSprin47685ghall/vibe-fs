@@ -175,10 +175,7 @@ module SessionSnapshotPort =
             chooseNamedToolPart part
 
     let private trySessionToolPart (part: obj) : SessionToolPart option =
-        if isNull part then
-            None
-        else
-            chooseToolKindPart part
+        if isNull part then None else chooseToolKindPart part
 
     let private decodeToolPartsOrEmpty (parts: obj array) : SessionToolPart array =
         try
@@ -266,10 +263,7 @@ module SessionSnapshotPort =
             readString source?metadata?(PromptMetadataCodec.PromptKeyField)
 
     let private promptKeyFromPart (part: obj) =
-        if isNull part then
-            None
-        else
-            promptKeyFromMetadata part
+        if isNull part then None else promptKeyFromMetadata part
 
     let private tryPickPromptKeyFromParts (parts: obj array) =
         try
@@ -451,9 +445,7 @@ module SessionSnapshotPort =
                                   "query", box (messagesQuery workspaceDirectory)
                                   "headers", box (headersObj ()) ]
 
-                        let! response =
-                            unbox<Task<obj>> (messagesFn?call (sessObj, payload))
-                            |> TaskResultCE.ofTask
+                        let! response = unbox<Task<obj>> (messagesFn?call (sessObj, payload)) |> TaskResultCE.ofTask
 
                         return projectMessages (unwrapPayload response)
                     with ex ->
