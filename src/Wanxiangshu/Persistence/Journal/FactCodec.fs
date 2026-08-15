@@ -250,17 +250,6 @@ module FactCodec =
         else
             insertFieldsBeforeObjectClose json "\"HandleLinked\"" "\"Byname\":\"\""
 
-    /// EXEC-029: historical ManagerJobCreated facts predate provider road names.
-    /// Empty Byname keeps replay compatible; the projection falls back to the
-    /// persisted ManagerAgent for those old facts only.
-    let private migrateManagerJobByname (json: string) : string =
-        if json.IndexOf("\"ManagerJobCreated\"", StringComparison.Ordinal) < 0 then
-            json
-        elif json.IndexOf("\"Byname\"", StringComparison.Ordinal) >= 0 then
-            json
-        else
-            insertFieldsBeforeObjectClose json "\"ManagerJobCreated\"" "\"Byname\":\"\""
-
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
@@ -274,7 +263,6 @@ module FactCodec =
                 |> migrateHandleCompleted
                 |> migrateHandleOwnership
                 |> migrateHandleByname
-                |> migrateManagerJobByname
                 |> rewriteLegacyObservationTags,
                 extra = extra
             )

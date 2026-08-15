@@ -120,14 +120,19 @@
 | Owner | 本仓库 |
 | Removal PR | CLN-08..N |
 
-### LEGACY-013：`FactCodec.migrateManagerJobByname`
+### LEGACY-013：`FactCodec.migrateManagerJobByname` — DELETED
 
 | 字段 | 值 |
 |---|---|
-| Surface | `Persistence/Journal/FactCodec.fs:256` |
-| Current owner | `Persistence/Journal/FactCodec.fs` |
+| Surface | `Persistence/Journal/FactCodec.fs:256`（删除于 CLN-08，commit 待记） |
+| Current owner | 无（已删除） |
 | Old world | 旧 `ManagerJobByname` 记录缺字段 |
-| Current consumer | `deserializeFact` pipeline（:277） |
+| Current consumer | 无（`deserializeFact` pipeline 已移除该步骤） |
+| Census | 零测试覆盖；真实 journal 样本（.git/wanxiang/events/ 11 journals）`ManagerJobCreated` 全部含 `Byname` 字段，零缺字段行 |
+| Classification | **DELETE**（无测试、无真实旧数据） |
+| Exit condition | 已满足 → 代码已删除 |
+| Owner | 本仓库 |
+| Removal PR | CLN-08 |
 | Consumer evidence | durable sample：fact-codec.test.mjs |
 | Writer alive? | 否 |
 | Reader alive? | 是 |
