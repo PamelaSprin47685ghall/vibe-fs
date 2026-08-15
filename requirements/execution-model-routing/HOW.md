@@ -4,7 +4,7 @@
 
 ## 1. 首次生成的推荐 MJS
 
-`~/.config/opencode/wanxiangshu.mjs` 是普通 ESM，default export 一个同步函数。文件不存在时，当前版本 bootstrap resource 的正文就是下面这份推荐模板（实现只允许无语义的 EOF newline 差异）；bootstrap 只负责原子写出该 resource，避免 loader 再维护另一份隐藏默认。
+`~/.config/opencode/wanxiangshu.mjs` 是普通 ESM，default export 一个同步函数。文件不存在时，bootstrap 原子写出随包发布的 `resources/wanxiangshu.mjs`；下面展示它的推荐策略与风格，实际生成字节以该 resource 为唯一实现源，避免 loader 再维护另一份隐藏默认。
 
 ```js
 // Wanxiangshu model scheduler. Edit this file freely.
@@ -12,7 +12,7 @@
 // Return a target to acquire it, or null to wait for an occupancy change.
 
 const count = (running, model, reasoning) =>
-  running.filter(x => x.model === model && x.reasoning === reasoning).length
+  running.filter((item) => item.model === model && item.reasoning === reasoning).length
 
 const pick = (running, candidates) => {
   for (const [model, reasoning, limit] of candidates) {
@@ -22,33 +22,33 @@ const pick = (running, candidates) => {
 }
 
 const FASTEST = [
-  ["gemma4:31b", "none", 16],
-  ["deepseek-v4-flash", "none", 16],
+  ["ollama-cloud/gemma4:31b", "none", 16],
+  ["opencode-go/deepseek-v4-flash", "none", 16],
 ]
 
 const FASTEST_II = [
-  ["deepseek-v4-flash", "none", 16],
+  ["opencode-go/deepseek-v4-flash", "none", 16],
 ]
 
 const FASTER = [
-  ["step-3.5-flash-2603", "none", 8],
+  ["stepfun/step-3.5-flash-2603", "none", 8],
 ]
 
 const MEDIUM = [
-  ["deepseek-v4-flash", "low", 8],
+  ["opencode-go/deepseek-v4-flash", "low", 8],
 ]
 
 const HIGHER = [
-  ["cursor-grok-4.6-high", "high", 4],
-  ["glm-5.2", "high", 4],
+  ["cursor/cursor-grok-4.6-xhigh", "xhigh", 4],
+  ["neuralwatt/glm-5.2-flex", "high", 4],
 ]
 
 const FAST_BROWSER = [
-  ["minimax-m3", "none", 8],
+  ["ollama-cloud/minimax-m3", "none", 8],
 ]
 
 const DEEP_BROWSER = [
-  ["minimax-m3", "none", 4],
+  ["opencode-go/minimax-m3", "none", 4],
 ]
 
 const pools = new Map([
@@ -85,11 +85,11 @@ export default function route(role, running) {
 
 这就是推荐的 MJS 风格：**小纯函数 + 明确常量 + 显式 role 表 + `running` 计数 + 顺序 `pick` + 满载 `null`**。不依赖闭包外可变状态，不读时钟/网络/Host，不把模型策略藏进 runtime。
 
-当前推荐模型对应此前七档意图：最快非推理 `gemma4:31b` / `deepseek-v4-flash`；快速只读 `step-3.5-flash-2603`；常规中档 `deepseek-v4-flash` low；高档 `cursor-grok-4.6-high` / `glm-5.2` high；Browser 使用廉价非推理视觉模型 `minimax-m3`，fast/deep 两个 role 可保留不同 admission limit。
+当前推荐模型对应此前七档意图：最快非推理 `ollama-cloud/gemma4:31b` / `opencode-go/deepseek-v4-flash`；快速只读 `stepfun/step-3.5-flash-2603`；常规中档 `opencode-go/deepseek-v4-flash` low；高档 `cursor/cursor-grok-4.6-xhigh` xhigh / `neuralwatt/glm-5.2-flex` high；Browser 分别使用 `ollama-cloud/minimax-m3` 与 `opencode-go/minimax-m3` 的非推理档，fast/deep 两个 role 可保留不同 admission limit。
 
 这些模型名/limit 是**首次生成模板的当前推荐值**，不是 runtime schema。用户可以直接编辑整个 MJS：删掉七档、换模型、换计数方法、让 fast/deep 共池都合法。已有文件在升级时绝不被新模板覆盖。
 
-`model` 是非空 OpenCode model selector/name；需要 provider 消歧时用户可写完整 `provider/model`。`reasoning` 直接映射 OpenCode 的 reasoning/variant 档位，非推理显式写 `none`。返回值结构之外的策略信息不穿过 ABI。
+`model` 必须是完整非空 `provider/model`；裸 `modelID` 非法，因为 provider 同样属于 MJS routing authority。`reasoning` 直接映射 OpenCode 的 reasoning/variant 档位，非推理显式写 `none`。返回值结构之外的策略信息不穿过 ABI。
 
 ## 2. bootstrap + loader
 

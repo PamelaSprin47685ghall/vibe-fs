@@ -1,23 +1,21 @@
 # execution-model-routing — PROOF
 
-当前 WHAT 已定，production 尚未迁移；本包因此继续记录一个聚合 proof gap（GAP-016）。实现时按下表先落可红 oracle，再改 production。
+运行命令：包内测试用 `node --test requirements/execution-model-routing/tests/*.test.mjs`；真实 Host provider-wire canary 用 `node requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs`。
 
-| 命题 | 目标 proof | 状态 |
-|---|---|---|
-| EMR-001 sole MJS authority + bootstrap | planned oracle `scheduler-module-config`：固定 `.mjs` 路径；缺失时 atomic create-if-absent 推荐模板并从磁盘 import；并发 EEXIST 不覆盖；已有文件绝不改写；create/import/default-export failure fail closed；拒绝 opencode/env/runtime-default fallback | GAP-016 |
-| EMR-002 scheduler ABI | planned oracle `scheduler-abi`：`role + running → {model,reasoning}|null`；重复项保留；throw/Promise/invalid target fail closed | GAP-016 |
-| EMR-003 running lease multiset / process sharing | planned oracle `routing-occupancy`：每 `(SessionId,EffectiveAgent)` 一个 occurrence、A/B 同 target 仍重复；`worktree-shared-capacity`：两个 PluginRuntimeScope/instance 观察同一 multiset | GAP-016 |
-| EMR-004 event-driven null/wait | planned oracle `routing-event-loop`：required `null` 不发 provider/不推进 fallback；occupancy event 才重试；无 timer/busy-loop；取消 waiter；较早 null 不阻塞后续可调度 role | GAP-016 |
-| EMR-005 MJS owns policy | planned oracle `routing-policy-boundary`：production 无 `ExecutionLane`/`max_sessions`/candidate/first-free 内建策略；runtime 对合法 target 只做结构校验 | GAP-016 |
-| EMR-006 stable session×agent lease / AABB orthogonal | planned oracle `session-model-lease`：普通 prompt 复用；A/A 与 B/B 各自稳定；A/B 可完全相同；peer 判定不看 target | GAP-016 |
-| EMR-007 release drives retry | planned oracle `routing-event-loop`：session retire 每 lease 删除一个 occurrence、重复 cleanup 幂等；真实 occupancy change 触发 pending 一轮 | GAP-016 |
-| EMR-008 opencode model non-authority | planned oracle `managed-agent-model-projection`：Host conflict 不改变 MJS lease；无 duplicate-pair-model validation | GAP-016 |
-| EMR-009 user-facing model non-authority | planned oracle `managed-request-model-routing` + `host-boundary` physical canary：外部 model/reasoning 被 managed lease 覆盖，实际 provider target 与 lease 一致 | GAP-016 |
+| 命题 | 落点测试（文件 + 锚点） | 类型 | 运行命令 |
+|---|---|---|---|
+| EMR-001 sole MJS authority + bootstrap | `tests/scheduler-module-config.test.mjs`：missing create、已有文件不覆盖、并发 bootstrap 原子 winner、invalid module fail closed；`tests/recommended-template.test.mjs`：发布 resource 可直接执行且全部使用完整 `provider/model` | NEW | `node --test requirements/execution-model-routing/tests/scheduler-module-config.test.mjs requirements/execution-model-routing/tests/recommended-template.test.mjs` |
+| EMR-002 scheduler ABI | `tests/scheduler-module-config.test.mjs`：`role + running → target|null`、重复项保留、Promise/throw/非法 target fail closed；`tests/model-routing-runtime.test.mjs`：scheduler program error poison pending + future demand | NEW | `node --test requirements/execution-model-routing/tests/scheduler-module-config.test.mjs requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
+| EMR-003 running lease multiset / process sharing | `tests/model-routing-runtime.test.mjs`：同 target 的 A/B lease 仍贡献两个 occurrence；`tests/process-shared-routing.test.mjs`：两个真实 plugin instance 在同一 Node/OpenCode process 共享 `running`，第二实例看见第一实例 occupancy | NEW | `node --test requirements/execution-model-routing/tests/model-routing-runtime.test.mjs requirements/execution-model-routing/tests/process-shared-routing.test.mjs` |
+| EMR-004 event-driven null/wait | `tests/model-routing-runtime.test.mjs`：required `null` pending、release event 唤醒、较早 null 不阻塞后续 role、optional null 不入 pending、scheduler error poison | NEW | `node --test requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
+| EMR-005 MJS owns policy | `tests/routing-authority-boundary.test.mjs`：production 无 `ExecutionLane` / `max_sessions` / first-free 内建策略；`tests/recommended-template.test.mjs`：七组只是可编辑推荐 policy | NEW | `node --test requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs requirements/execution-model-routing/tests/recommended-template.test.mjs` |
+| EMR-006 stable session×agent lease / AABB orthogonal | `tests/model-routing-runtime.test.mjs`：同 `(session,agent)` 不重调 scheduler；`requirements/participant-identity/tests/session-execution-binding.test.mjs`：base/peer 各取自身 lease、peer 合法性不依赖物理 model 不同 | NEW + REUSE | `node --test requirements/execution-model-routing/tests/model-routing-runtime.test.mjs requirements/participant-identity/tests/session-execution-binding.test.mjs` |
+| EMR-007 release drives retry | `tests/model-routing-runtime.test.mjs`：session release 幂等、每 lease 删除一个 occurrence、真实 occupancy release 唤醒 waiter；`SessionExecutionBinding.drop` / plugin dispose 路径由 identity/Host hook 回归交叉证明 | NEW + REUSE | `node --test requirements/execution-model-routing/tests/model-routing-runtime.test.mjs requirements/host-boundary/tests/host-hooks.test.mjs` |
+| EMR-008 opencode model non-authority | `tests/routing-authority-boundary.test.mjs`：无旧 model inventory / `tryBoundModel` / duplicate-pair authority；`requirements/capability-enforcement/tests/managed-agent-config.test.mjs`：model 可缺失/相同/任意且 owned-field projection 不触碰 model | NEW + REUSE | `node --test requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs requirements/capability-enforcement/tests/managed-agent-config.test.mjs` |
+| EMR-009 user-facing model non-authority | `tests/open-code-port-routing.test.mjs`：explicit provider/model + top-level variant 投影；`tests/routing-authority-boundary.test.mjs` 与 `requirements/host-boundary/tests/{host-hooks,chat-params-hook}.test.mjs`：chat.message acquire+rewrite、chat.params validation-only；真实 Host canary `requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs` 证明输入 `test-model` 最终 provider wire = MJS lease `test-model-b` | NEW + REUSE + PHYSICAL | `node --test requirements/execution-model-routing/tests/open-code-port-routing.test.mjs requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs requirements/host-boundary/tests/host-hooks.test.mjs requirements/host-boundary/tests/chat-params-hook.test.mjs`；`node requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs` |
 
 ## GAP
 
-| GAP | 缺口 | 状态 | 关闭条件 |
+| GAP | 缺口 | 状态 | 关闭证据 |
 |---|---|---|---|
-| GAP-016 | 新 auto-bootstrap MJS scheduler / event-driven occupancy 合同已有 normative 文档，但 production 仍需完成 managed request model/reasoning Host physical canary 与旧 proof 全量迁移 | OPEN | 上述 managed-routing oracle 全部落地并可红→绿；bootstrap resource 与 HOW 推荐模板一致；managed request Host physical canary 通过；旧 static inventory、内建 lane/capacity 路径与 duplicate-pair validation 从 production/旧 proof 删除 |
-
-本包当前不得宣称实现完成；GAP-016 关闭前 README/CHANGELOG 不应把 `.mjs` scheduler 写成已发布行为。
+| GAP-016 | auto-bootstrap sole MJS scheduler / event-driven process-shared managed lease / stable session binding / managed provider routing | CLOSED | production `a0886281`；上述 EMR-001..009 独立 oracle；真实 Host canary 已证明外部 placeholder model 被 MJS lease 覆盖并进入实际 provider wire |

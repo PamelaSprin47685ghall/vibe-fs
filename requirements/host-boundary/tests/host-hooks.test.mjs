@@ -305,20 +305,22 @@ const triggeredHooks = (hooks) =>
   )
 
 test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async () => {
+  const routedSession = 'ses_model_route_hook_probe'
+
   await withPlugin(async (hooks) => {
     await hooks.config(hostFinalConfig())
     const messageOutput = {
       message: {
         id: 'msg_routed_probe',
         role: 'user',
-        sessionID: SESSION,
+        sessionID: routedSession,
         agent: 'deep-coder',
         model: { providerID: 'host-placeholder', modelID: 'wrong-model' },
       },
       parts: [],
     }
 
-    await hooks['chat.message']({ sessionID: SESSION, agent: 'deep-coder' }, messageOutput)
+    await hooks['chat.message']({ sessionID: routedSession, agent: 'deep-coder' }, messageOutput)
     assert.equal(messageOutput.message.model.providerID, 'provider')
     assert.equal(messageOutput.message.model.modelID, 'deep-coder-model')
     assert.equal(messageOutput.message.model.variant, 'none')
@@ -326,7 +328,7 @@ test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async 
     const output = { temperature: 0, options: { sentinel: true } }
     await hooks['chat.params'](
       {
-        sessionID: SESSION,
+        sessionID: routedSession,
         agent: 'deep-coder',
         model: { providerID: 'provider', modelID: 'deep-coder-model' },
         message: messageOutput.message,
