@@ -96,8 +96,7 @@ test('AGENT_030_configure_injects_mcp_on_ok_and_error', () => {
   assert.equal(typeof okConfig.mcp[serverName].enabled, 'boolean')
 
   const bad = buildConfig()
-  bad.agent['fast-inquiry'].model = 'shared'
-  bad.agent['deep-inquiry'].model = 'shared'
+  delete bad.agent['fast-inquiry']
   assert.equal(managedAgentConfig.configure(bad).ok, false)
   assert.equal(bad.mcp[serverName].type, 'local')
 })

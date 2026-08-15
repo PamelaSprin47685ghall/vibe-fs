@@ -233,23 +233,33 @@ module SessionExecutionBinding =
                     Error "PROMPT-006: provider model/reasoning drift from internal send binding"
                 else
                     validateLease sessionId observedAgent model
-            | _ when parents.ContainsKey key ->
-                match agents.TryGetValue key with
-                | false, _ -> Error "PROMPT-006: parented provider run has no frozen agent binding"
-                | true, baseAgent ->
-                    let allowed =
-                        observedAgent = baseAgent
-                        || (tryPeerName baseAgent |> Option.exists ((=) observedAgent))
-
-                    if allowed then
-                        validateLease sessionId observedAgent model
-                    else
-                        Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent observedAgent)
             | _ ->
-                match agents.TryGetValue key with
-                | true, selected when selected = observedAgent -> validateLease sessionId observedAgent model
-                | true, selected -> Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" selected observedAgent)
-                | false, _ -> Ok false)
+                match providerAttemptBindings.TryGetValue key with
+                | true, expected ->
+                    if expected.Agent <> observedAgent then
+                        Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expected.Agent observedAgent)
+                    elif not (sameModel expected.Model model) then
+                        Error "PROMPT-006: provider model/reasoning drift from accepted prompt binding"
+                    else
+                        validateLease sessionId observedAgent model
+                | false, _ when parents.ContainsKey key ->
+                    match agents.TryGetValue key with
+                    | false, _ -> Error "PROMPT-006: parented provider run has no frozen agent binding"
+                    | true, baseAgent ->
+                        let allowed =
+                            observedAgent = baseAgent
+                            || (tryPeerName baseAgent |> Option.exists ((=) observedAgent))
+
+                        if allowed then
+                            validateLease sessionId observedAgent model
+                        else
+                            Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent observedAgent)
+                | false, _ ->
+                    match agents.TryGetValue key with
+                    | true, selected when selected = observedAgent -> validateLease sessionId observedAgent model
+                    | true, selected ->
+                        Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" selected observedAgent)
+                    | false, _ -> Ok false)
 
     let effectiveAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =
         match opts.BindingIntent with

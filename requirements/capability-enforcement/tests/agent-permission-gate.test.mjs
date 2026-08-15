@@ -196,13 +196,14 @@ test('AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
 })
 
 test('AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
-  // The live-config regression: a duplicated fast/deep model pair makes
-  // `configureFromHostConfig` return Error, but the permission writes must
-  // still land — otherwise bash opens for every role.
-  const config = buildConfig({ duplicateBrowserModel: true })
+  // The live-config regression: a catalog validation failure used to
+  // short-circuit BEFORE any write. EMR-008 made duplicate fast/deep models
+  // legal, so the error path is a leftover legacy agent name.
+  const config = buildConfig()
+  config.agent.coder = { model: 'some-model' }
   const outcome = managedAgentConfig.configure(config)
-  assert.equal(outcome.ok, false, 'duplicate pair must fail the gate')
-  assert.match(outcome.error, /same model/)
+  assert.equal(outcome.ok, false, 'legacy agent name must fail the gate')
+  assert.match(outcome.error, /Legacy agent name 'coder'/)
 
   for (const tier of TIERS) {
     for (const role of ROLES) {
@@ -221,10 +222,11 @@ test('AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
 })
 
 test('AGENT_007_validation_error_is_still_reported', () => {
-  const config = buildConfig({ duplicateBrowserModel: true })
+  const config = buildConfig()
+  config.agent.coder = { model: 'some-model' }
   const outcome = managedAgentConfig.validate(config)
   assert.equal(outcome.ok, false)
-  assert.match(outcome.error, /fast-browser\/deep-browser/)
+  assert.match(outcome.error, /Legacy agent name 'coder'/)
 })
 
 test('AGENT_002_missing_agent_fails_validation', () => {

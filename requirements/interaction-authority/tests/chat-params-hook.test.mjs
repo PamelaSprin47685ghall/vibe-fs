@@ -68,7 +68,7 @@ test('CHAT_PARAMS_parented_session_requires_provider_message_binding', async () 
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   assert.throws(
     () => applyHook(hook, { sessionID: 'ses_chat_params_child', agent: 'fast-coder' }, output),
-    /chat\.params input\.message has no agent\/model binding/,
+    /no observable provider\/model binding/,
   )
   assert.equal(output.model.modelID, 'fast-haiku', 'chat.params never rewrites Host output')
 })

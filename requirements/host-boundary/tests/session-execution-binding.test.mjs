@@ -57,6 +57,7 @@ test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_s
   const deepModel = { providerID: 'provider', modelID: 'deep-coder-leased', variant: 'none' }
 
   binding.observeUserFacingAgent(sid, 'fast-coder')
+  await routing.ModelRouting_acquireManaged(sid, 'deep-coder')
 
   // Physical chat.message acceptance hands the typed continuation binding to the
   // provider-attempt boundary. The SendPrompt call stack is already gone when

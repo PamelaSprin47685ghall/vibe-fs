@@ -250,20 +250,34 @@ test('C0_park_only_after_KnownCommitted', () => {
   // CommitUnknown/AbandonThenCatchUp); park lives only under Committed.
   assert.match(host, /type CycleDisposition/,
     'commit outcomes must collapse into CycleDisposition before park')
-  const committedArm = host.indexOf('| CycleDisposition.Committed')
-  const park = host.indexOf('ParkTransform', committedArm)
-  assert.ok(committedArm >= 0 && park > committedArm,
-    'ParkTransform must sit under CycleDisposition.Committed (KnownCommitted path)')
-  const beforeCommitted = host.slice(0, committedArm)
+  // Committed → finishCommitted → drain → finishCaughtUpAfterCommit →
+  // parkAfterCatchUpClear → ParkTransform. Helpers are defined above the
+  // disposition match, so source-order "ParkTransform after Committed arm"
+  // is the wrong probe.
+  assert.match(
+    host,
+    /CycleDisposition\.Committed afterSquashMain -> finishCommitted/,
+    'Committed arm must enter finishCommitted',
+  )
+  assert.match(host, /return! drainAfterCommitMaterial/, 'finishCommitted drains before park')
+  assert.match(host, /None, None -> return! finishCaughtUpAfterCommit/)
+  assert.match(host, /return! parkAfterCatchUpClear/)
+  const parkFn = host.indexOf('let private parkAfterCatchUpClear')
+  const park = host.indexOf('ParkTransform', parkFn)
+  assert.ok(parkFn >= 0 && park > parkFn,
+    'ParkTransform must sit under parkAfterCatchUpClear on the Committed catch-up path')
+  const disposition = host.indexOf('let private finishOwnedDisposition')
+  const commitBranch = host.indexOf('let commitBranch', disposition)
+  const matchBlock = host.slice(disposition, commitBranch > disposition ? commitBranch : undefined)
   const nonCommittedPark = [
     '| CycleDisposition.Working',
     '| CycleDisposition.InjectRepair',
     '| CycleDisposition.CommitUnknown',
     '| CycleDisposition.AbandonThenCatchUp',
   ].some((arm) => {
-    const a = beforeCommitted.lastIndexOf(arm)
+    const a = matchBlock.lastIndexOf(arm)
     if (a < 0) return false
-    const p = beforeCommitted.indexOf('ParkTransform', a)
+    const p = matchBlock.indexOf('ParkTransform', a)
     return p > a
   })
   assert.equal(nonCommittedPark, false,
@@ -297,23 +311,24 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   // Stale PendingOffer must not be preferred over re-chunk.
   assert.match(
     host,
-    /TryTakePendingOffer key \|> ignore[\s\S]{0,400}RefreshMainContext/,
+    /TryTakePendingOffer \w+ \|> ignore[\s\S]{0,400}RefreshMainContext/,
     'PendingOffer is discarded; next window always re-chunks from coverage',
   )
 })
 
 test('C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
-  const committed = host.indexOf('| CycleDisposition.Committed afterSquashMain')
-  const quiet = host.indexOf('| None, None ->', committed)
-  const park = host.indexOf('ParkTransform', quiet)
-  const wakeRefresh = host.indexOf('RefreshMainContext', park)
+  const quiet = host.indexOf('| None, None -> return! finishCaughtUpAfterCommit')
+  const parkFn = host.indexOf('let private parkAfterCatchUpClear')
+  const park = host.indexOf('ParkTransform', parkFn)
+  const wakeFn = host.indexOf('let private afterParkResumed')
+  const wakeRefresh = host.indexOf('RefreshMainContext', wakeFn)
 
-  assert.ok(committed >= 0 && quiet > committed, 'Committed catch-up must have an explicit quiet branch')
-  assert.ok(park > quiet, 'caught-up/quiet must enter ParkTransform instead of completing immediately')
-  assert.ok(wakeRefresh > park, 'park wake must re-read live Current before choosing the next window')
+  assert.ok(quiet >= 0, 'Committed catch-up must have an explicit quiet branch')
+  assert.ok(parkFn >= 0 && park > parkFn, 'caught-up/quiet must enter ParkTransform instead of completing immediately')
+  assert.ok(wakeFn >= 0 && wakeRefresh > wakeFn, 'park wake must re-read live Current before choosing the next window')
 
-  const quietBranch = host.slice(quiet, wakeRefresh)
+  const quietBranch = host.slice(quiet, wakeRefresh > quiet ? wakeRefresh : quiet + 400)
   assert.doesNotMatch(
     quietBranch,
     /return ctx\.Stop "(?:caught-up|catch-up-complete|quiet)/,

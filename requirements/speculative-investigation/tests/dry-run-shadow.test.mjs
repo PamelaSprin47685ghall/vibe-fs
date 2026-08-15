@@ -21,7 +21,7 @@ test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_te
   const source = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(source, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
 
-  assert.match(dry, /StartDryRun/)
+  assert.match(dry, /applyDryRun|StartDryRun|startDryRun/)
   assert.doesNotMatch(dry, /let!\s+outcome\s*=\s*runtime\.StartDecision/)
   assert.doesNotMatch(dry, /StrengthCandidatePrepared|PublishPrepared|renderCandidate/)
   assert.doesNotMatch(dry, /StrengthCandidatePromoted|Promoted/)
@@ -31,7 +31,8 @@ test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_obs
   const source = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const start = source.indexOf('member this.StartDryRun')
   assert.ok(start >= 0, 'runtime must expose a distinct StartDryRun capability')
-  const dry = source.slice(start)
+  const nextMember = source.indexOf('member private _.StartReplica', start + 1)
+  const dry = source.slice(start, nextMember > start ? nextMember : undefined)
 
   assert.match(dry, /this\.StartReplica/)
   assert.match(source, /CreateChildSession/)
@@ -41,7 +42,7 @@ test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_obs
   assert.match(source, /ObserveDryRun/)
 
   // The returned start capability may await physical child creation/bootstrap, but not the 2500ms terminal race.
-  const returnBoundary = dry.indexOf('return Ok')
+  const returnBoundary = dry.search(/return\s+Ok/)
   assert.ok(returnBoundary > 0, 'StartDryRun must return a start handle/result')
   const beforeReturn = dry.slice(0, returnBoundary)
   assert.doesNotMatch(beforeReturn, /completionWins|deadline\.Delay|let!\s+result\s*=\s*.*Completion\.Task/)

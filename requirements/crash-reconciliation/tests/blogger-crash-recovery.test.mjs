@@ -105,8 +105,8 @@ test('C5_window_D_never_forces_parked_without_a_waiter', () => {
   // session stalls. Window D must leave flight clear; receipts are re-checked
   // by the drain path after the next commit.
   const windowD = recoverySrc.slice(
-    recoverySrc.indexOf('hasAnyReceipt && not hasOpen'),
-    recoverySrc.indexOf('for mainSessionId, openReq in openRequests durable'),
+    recoverySrc.indexOf('let private receiptedIdleDecision'),
+    recoverySrc.indexOf('let private companionBloggerId'),
   )
   assert.ok(
     !/restoreRuntime/.test(windowD),
