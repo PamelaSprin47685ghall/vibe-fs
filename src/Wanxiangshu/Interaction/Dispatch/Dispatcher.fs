@@ -276,6 +276,20 @@ module PromptDispatcher =
                 hostCompaction
                 (this.ProjectionFor sessionId)
 
+        /// Physical execution routing reads the same durable claim that owns the
+        /// dispatch. Host message fields are never execution authority for a plugin prompt.
+        member this.PendingClaim(sessionId: SessionId, promptKey: PromptKey) =
+            Map.tryFind promptKey (this.ProjectionFor sessionId).PendingClaims
+
+        /// PhysicalAccepted consumes PendingClaims. Execution capability may be
+        /// handed to the provider only after the exact dispatch appears here.
+        member this.DispatchAccepted(sessionId: SessionId, claim: PromptAuthority.PromptClaim) =
+            let key = PromptAuthority.acceptedDispatchKey sessionId claim.PayloadDigest
+
+            match Map.tryFind key (this.ProjectionFor sessionId).AcceptedDispatches with
+            | Some accepted when accepted.PromptKey = claim.PromptKey -> true
+            | _ -> false
+
         /// FALLBACK-008: has this occasion already spent its one interaction repair.
         ///
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a

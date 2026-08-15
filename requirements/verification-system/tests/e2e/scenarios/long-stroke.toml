@@ -96,7 +96,6 @@ must = [
   "g2-inspector-batch.0",
   "g6-bookkeeper-finalize.0",
   "orch.0",
-  "orch-join-guard.0",
   "manager.0",
   "manager.1",
   "mgr-labor.0",
@@ -444,10 +443,10 @@ tools = ["commission", "join"]
   [[turn.step]]
   respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
 
-# EXEC-016 / INTERACTION-AUTHORITY-014: ordinary Orchestrator completion with
-# outstanding managed background receives the canonical JoinGuard continuation.
-# This is one protocol declaration, not a Long Stroke-specific prompt guess; if
-# background remains after one harvest, the same declared turn may recur.
+# EXEC-016 / INTERACTION-AUTHORITY-014: conditional protocol declaration only.
+# Ordinary Orchestrator completion receives JoinGuard exactly when a join obligation
+# still has outstanding managed background. Long Stroke does not force that state;
+# if it occurs physically, strict mock still recognizes the canonical continuation.
 [[turn]]
 id = "orch-join-guard"
 internal = true

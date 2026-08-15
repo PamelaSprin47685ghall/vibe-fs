@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -74,6 +75,120 @@ open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
+
+    [<RequireQualifiedAccess>]
+    type private ChatExecutionAdmission =
+        | NoRoute
+        | ExternalManaged of SessionId * string
+        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * string
+        | Rejected of string
+
+    [<RequireQualifiedAccess>]
+    type private RoutedChatExecution =
+        | NoRoute
+        | ExternalManaged of SessionId * string * OpencodeModel
+        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * string * OpencodeModel
+
+    let private managedAgent (value: string option) =
+        value
+        |> Option.map (fun agent -> agent.Trim())
+        |> Option.filter (fun agent ->
+            not (String.IsNullOrWhiteSpace agent) && (ManagedAgent.requiredNames |> List.contains agent))
+
+    let private outputSessionId (output: obj) =
+        let message = if isNull output then null else output?message
+
+        if isNull message || isNull message?sessionID then
+            None
+        else
+            string message?sessionID |> fun value -> value.Trim() |> SessionId.create |> Some
+
+    let private externalAdmission sessionId explicitAgent =
+        match managedAgent explicitAgent with
+        | Some agent -> ChatExecutionAdmission.ExternalManaged(sessionId, agent)
+        | None -> ChatExecutionAdmission.NoRoute
+
+    let private pluginAdmission journal sessionId promptKey =
+        result {
+            let! durable = journal |> Result.requireSome "PROMPT-006: plugin prompt has no durable authority journal"
+            let runtime = PromptDispatcher.forJournal durable
+
+            let! claim =
+                runtime.PendingClaim(sessionId, promptKey)
+                |> Result.requireSome (
+                    sprintf "PROMPT-006: PromptKey %s has no pending execution claim" (PromptKey.value promptKey)
+                )
+
+            let! agent =
+                managedAgent claim.EffectiveAgent
+                |> Result.requireSome (
+                    sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value promptKey)
+                )
+
+            return ChatExecutionAdmission.PluginManaged(runtime, claim, agent)
+        }
+        |> function
+            | Ok admission -> admission
+            | Error error -> ChatExecutionAdmission.Rejected error
+
+    let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) output =
+        let sessionId = decoded.SessionId |> Option.orElseWith (fun () -> outputSessionId output)
+
+        match decoded.IsHostCompaction, sessionId, decoded.PromptKey with
+        | true, _, _ -> ChatExecutionAdmission.NoRoute
+        | false, Some sid, Some promptKey -> pluginAdmission journal sid promptKey
+        | false, Some sid, None -> externalAdmission sid decoded.ExplicitAgent
+        | _ -> ChatExecutionAdmission.NoRoute
+
+    let private routeChatExecution (scope: PluginRuntimeScope) admission =
+        task {
+            match admission with
+            | ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
+            | ChatExecutionAdmission.Rejected error -> return invalidOp error
+            | ChatExecutionAdmission.ExternalManaged(sessionId, agent) ->
+                let sessionText = SessionId.value sessionId
+                scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
+                SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                let! target = ModelRouting.acquireManaged sessionId agent
+                return RoutedChatExecution.ExternalManaged(sessionId, agent, ModelRouting.toOpenCodeModel target)
+            | ChatExecutionAdmission.PluginManaged(runtime, claim, agent) ->
+                let sessionText = SessionId.value claim.SessionId
+                scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
+                let! target = ModelRouting.acquireManaged claim.SessionId agent
+                return RoutedChatExecution.PluginManaged(runtime, claim, agent, ModelRouting.toOpenCodeModel target)
+        }
+
+    let private routedModel = function
+        | RoutedChatExecution.NoRoute -> None
+        | RoutedChatExecution.ExternalManaged(_, _, model)
+        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
+
+    let private projectRoutedModel output routed =
+        match routedModel routed with
+        | None -> ()
+        | Some model ->
+            let message = if isNull output then null else output?message
+            if isNull message then invalidOp "EMR-009: managed chat.message routing has no mutable output.message"
+            message?model <- box model
+
+    let private acceptPluginExecution
+        (runtime: PromptDispatcher.Runtime)
+        (claim: PromptAuthority.PromptClaim)
+        (agent: string)
+        (model: OpencodeModel)
+        =
+        if runtime.DispatchAccepted(claim.SessionId, claim) then
+            SessionExecutionBinding.acceptPromptExecution claim.SessionId claim.PromptKey agent model
+        else
+            invalidOp (
+                sprintf "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted" (PromptKey.value claim.PromptKey)
+            )
+
+    let private commitExecutionCapability = function
+        | RoutedChatExecution.PluginManaged(runtime, claim, agent, model) ->
+            acceptPluginExecution runtime claim agent model
+        | RoutedChatExecution.NoRoute
+        | RoutedChatExecution.ExternalManaged _ -> ()
 
     let private eventString (value: obj) =
         if isNull value then
@@ -428,45 +543,13 @@ module HostSignalBootstrap =
                         // createHook; this local value only gates routing + join wake.
                         let decoded = PromptIngressCodec.decode input output
 
-                        // EMR-009: for a real managed user message, the Host-created model
-                        // is only a placeholder. Acquire the Wanxiangshu lease and
-                        // mutate the canonical UserMessage before the provider loop.
-                        let message = if isNull output then null else output?message
-
-                        let sessionText =
-                            if not (isNull input) && not (isNull input?sessionID) then
-                                string input?sessionID
-                            elif not (isNull message) && not (isNull message?sessionID) then
-                                string message?sessionID
-                            else
-                                ""
-
-                        let agentText =
-                            if not (isNull message) && not (isNull message?agent) then
-                                string message?agent
-                            elif not (isNull input) && not (isNull input?agent) then
-                                string input?agent
-                            else
-                                ""
-
-                        if
-                            not decoded.IsHostCompaction
-                            && not (String.IsNullOrWhiteSpace sessionText)
-                            && not (String.IsNullOrWhiteSpace agentText)
-                            && (ManagedAgent.requiredNames |> List.contains (agentText.Trim()))
-                        then
-                            let sessionText = sessionText.Trim()
-                            let sessionId = SessionId.create sessionText
-                            let agent = agentText.Trim()
-                            scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
-                            SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                            let! target = ModelRouting.acquireManaged sessionId agent
-                            let routed = ModelRouting.toOpenCodeModel target
-
-                            if isNull message then
-                                invalidOp "EMR-009: chat.message managed routing has no mutable output.message"
-
-                            message?model <- box routed
+                        // EMR-009 / PROMPT-006: route from typed authority evidence.
+                        // Keyless external roots use their explicit managed agent;
+                        // plugin prompts use PendingClaim.EffectiveAgent. Host message
+                        // agent/model fields are never authority for a continuation.
+                        let admission = chatExecutionAdmission journal decoded output
+                        let! routedExecution = routeChatExecution scope admission
+                        projectRoutedModel output routedExecution
 
                         match durabilityActivation.Value with
                         | Ok() -> ()
@@ -490,6 +573,7 @@ module HostSignalBootstrap =
                         | _ -> ()
 
                         do! promptIngressHook input output
+                        commitExecutionCapability routedExecution
                     }
 
             let cancelSignals (ids: SessionId seq) =

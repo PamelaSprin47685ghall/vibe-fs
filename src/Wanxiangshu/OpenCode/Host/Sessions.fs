@@ -138,24 +138,22 @@ type InjectedSessionPort
         }
 
     let routeSendOptions (sessionId: SessionId) (opts: SessionPromptOptions) =
-        task {
-            match SessionExecutionBinding.effectiveAgent sessionId opts with
-            | Error error -> return Error error
-            | Ok effectiveAgent ->
-                // EMR-004/006: required execution waits on the scheduler rather than
-                // turning capacity backpressure into a provider/business failure.
-                let! target = ModelRouting.acquireManaged sessionId effectiveAgent
+        taskResult {
+            let! effectiveAgent = SessionExecutionBinding.effectiveAgent sessionId opts
+            // EMR-004/006: required execution waits on the scheduler rather than
+            // turning capacity backpressure into a provider/business failure.
+            let! target = ModelRouting.acquireManaged sessionId effectiveAgent |> TaskResultCE.ofTask
 
-                let routed =
-                    { opts with
-                        Agent = Some effectiveAgent
-                        Model = Some(ModelRouting.toOpenCodeModel target) }
+            let routed =
+                { opts with
+                    Agent = Some effectiveAgent
+                    Model = Some(ModelRouting.toOpenCodeModel target) }
 
-                return
-                    if managedChild sessionId then
-                        SessionExecutionBinding.normalizeManagedPrompt sessionId routed
-                    else
-                        SessionExecutionBinding.normalizeUserFacingPrompt sessionId routed
+            return!
+                if managedChild sessionId then
+                    SessionExecutionBinding.normalizeManagedPrompt sessionId routed
+                else
+                    SessionExecutionBinding.normalizeUserFacingPrompt sessionId routed
         }
 
     let sendThroughPort
@@ -164,19 +162,24 @@ type InjectedSessionPort
         (text: string)
         (sendOptions: OpenCodePromptOptions)
         =
-        task {
-            // chat.params runs inside the Host send. Mark this interval so
-            // its root-session observer cannot mistake our own continuation
-            // or typed override for a new external user choice.
-            SessionExecutionBinding.beginInternalSend sessionId sendOptions
+        // Pass the outcome through unchanged. This layer knows less about
+        // acceptance than the port does; execution identity is handed off by
+        // PromptKey at chat.message -> messages.transform, never by this call stack.
+        port.SendPrompt sessionId text sendOptions
 
-            try
-                // Pass the outcome through unchanged. This layer knows less
-                // about acceptance than the port does; narrowing here is how
-                // AcceptanceUnknown used to become a plain error.
-                return! port.SendPrompt sessionId text sendOptions
-            finally
-                SessionExecutionBinding.endInternalSend sessionId
+    let sendAvailablePort sessionId text sendOptions =
+        match underlyingPort with
+        | Some port -> sendThroughPort port sessionId text sendOptions
+        | None ->
+            Task.FromResult(
+                Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
+            )
+
+    let sendRoutedPrompt sessionId text opts =
+        task {
+            match! routeSendOptions sessionId opts with
+            | Error error -> return Fatal error
+            | Ok sendOptions -> return! sendAvailablePort sessionId text sendOptions
         }
 
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
@@ -248,23 +251,17 @@ type InjectedSessionPort
                     lock lockObj (fun () -> activeListeners.Remove(sessionId) |> ignore) }
 
         member me.SendPrompt(sessionId, text, opts) =
-            task {
-                let hasListener = lock lockObj (fun () -> activeListeners.Contains(sessionId))
+            let hasListener = lock lockObj (fun () -> activeListeners.Contains(sessionId))
 
-                if not hasListener then
-                    // Fatal, not Retryable: the listener is registered by the caller
-                    // before it sends, so this is a call-order defect. Retrying the
-                    // same wrong order cannot fix it.
-                    return Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
-                else
-                    match! routeSendOptions sessionId opts with
-                    | Error error -> return Fatal error
-                    | Ok sendOptions ->
-                        match underlyingPort with
-                        | Some port -> return! sendThroughPort port sessionId text sendOptions
-                        | None ->
-                            return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
-            }
+            if not hasListener then
+                // Fatal, not Retryable: the listener is registered by the caller
+                // before it sends, so this is a call-order defect. Retrying the
+                // same wrong order cannot fix it.
+                Task.FromResult(
+                    Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
+                )
+            else
+                sendRoutedPrompt sessionId text opts
 
         member _.InterruptSessionOnly(sessionId) =
             task {

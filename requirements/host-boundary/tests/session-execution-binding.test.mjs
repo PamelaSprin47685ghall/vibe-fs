@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { after } from 'node:test'
 import test from 'node:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -51,6 +51,18 @@ after(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
+test('PROMPT_006_production_wires_prompt_acceptance_to_the_exact_provider_attempt', () => {
+  const hostSignal = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
+  const transforms = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url), 'utf8')
+  const sessions = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/Sessions.fs', import.meta.url), 'utf8')
+  const bindingSource = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs', import.meta.url), 'utf8')
+
+  assert.match(hostSignal, /SessionExecutionBinding\.acceptPromptExecution/)
+  assert.match(transforms, /SessionExecutionBinding\.beginProviderAttempt/)
+  assert.doesNotMatch(sessions, /beginInternalSend|endInternalSend/)
+  assert.doesNotMatch(bindingSource, /internalBindings|beginInternalSend|endInternalSend/)
+})
+
 test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_stack_returns', async () => {
   const sid = sessionId('ses_binding_async_override')
   const promptKey = { fields: ['prompt-deep-continuation'] }
@@ -69,6 +81,14 @@ test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_s
   const allowed = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
   assert.equal(allowed.tag, 0, allowed.tag === 0 ? '' : allowed.fields?.[0])
   assert.equal(allowed.fields[0], true)
+
+  // One physical user prompt can drive several provider attempts across tool
+  // calls. The exact same PromptKey remains execution authority for that turn.
+  const resumed = binding.beginProviderAttempt(sid, promptKey)
+  assert.equal(resumed.tag, 0, resumed.tag === 0 ? '' : resumed.fields?.[0])
+  const resumedAllowed = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
+  assert.equal(resumedAllowed.tag, 0, resumedAllowed.tag === 0 ? '' : resumedAllowed.fields?.[0])
+  assert.equal(resumedAllowed.fields[0], true)
 
   // The override is not session authority. A later provider attempt with no
   // matching PromptKey falls back to the root/base binding and must reject deep.

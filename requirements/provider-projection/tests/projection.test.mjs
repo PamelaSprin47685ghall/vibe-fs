@@ -18,6 +18,7 @@ const {
   decodeMessageView,
   decodeRequest,
   lastUserMessageId,
+  lastUserPromptKey,
   formalText,
 } = await import('../../../dist/OpenCode/Codec/ProviderWireCapture.js')
 const {
@@ -188,6 +189,27 @@ test('MISC_projection_last_user_message_id', () => {
   assert.equal(lastUserMessageId(toList([{ info: { id: 'a1' }, role: 'assistant', parts: [{ type: 'text', text: 'x' }] }])), undefined)
   const noId = lastUserMessageId(toList([{ role: 'user', parts: [{ type: 'text', text: 'q' }] }]))
   assert.equal(noId, undefined, 'user message without host id contributes nothing')
+})
+
+test('PROMPT_006_provider_attempt_uses_only_the_latest_user_turn_prompt_key', () => {
+  const keyed = {
+    info: { id: 'u-keyed', role: 'user', metadata: { wanxiangshu_prompt_key: 'prompt-old' } },
+    role: 'user',
+    parts: [{ type: 'text', text: 'plugin continuation' }],
+  }
+  const latestKeyed = lastUserPromptKey(toList([keyed]))
+  assert.equal(latestKeyed.fields[0], 'prompt-old')
+
+  const external = {
+    info: { id: 'u-external', role: 'user' },
+    role: 'user',
+    parts: [{ type: 'text', text: 'new external root' }],
+  }
+  assert.equal(
+    lastUserPromptKey(toList([keyed, external])),
+    undefined,
+    'a keyless latest user turn must not inherit an older plugin PromptKey',
+  )
 })
 
 test('MISC_projection_formal_text_excludes_non_text_parts', () => {

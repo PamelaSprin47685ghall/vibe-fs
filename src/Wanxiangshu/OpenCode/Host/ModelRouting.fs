@@ -17,6 +17,12 @@ type private PendingDemand =
       Role: string
       Completion: TaskCompletionSource<ModelRoutingTarget> }
 
+[<RequireQualifiedAccess>]
+type private ManagedLookup =
+    | Existing of ModelRoutingTarget
+    | Waiting of PendingDemand
+    | Unscheduled
+
 module ModelRouting =
 
     [<Import("homedir", "node:os")>]
@@ -110,6 +116,30 @@ module ModelRouting =
 
         if isNull value?code then None else Some(string value?code)
 
+    let private acceptBootstrapLinkError error =
+        match errorCode error with
+        | Some "EEXIST" -> ()
+        | _ -> raise error
+
+    let private publishBootstrap tempPath path =
+        try
+            linkSync (tempPath, path)
+        with ex ->
+            acceptBootstrapLinkError ex
+
+    let private removeBootstrapTemp tempPath =
+        try
+            unlinkSync tempPath
+        with _ ->
+            ()
+
+    let private publishBootstrapTemplate tempPath path template =
+        try
+            writeFileSync (tempPath, template, createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
+            publishBootstrap tempPath path
+        finally
+            removeBootstrapTemp tempPath
+
     let bootstrapAndLoadAt (path: string) (template: string) : Task<obj> =
         task {
             if String.IsNullOrWhiteSpace path then
@@ -122,21 +152,7 @@ module ModelRouting =
             // module. Publish a fully-written same-directory inode with an atomic
             // hard-link instead; EEXIST means another bootstrap already won.
             let tempPath = path + ".tmp-" + randomUuid ()
-
-            try
-                writeFileSync (tempPath, template, createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
-
-                try
-                    linkSync (tempPath, path)
-                with ex ->
-                    match errorCode ex with
-                    | Some "EEXIST" -> ()
-                    | _ -> raise ex
-            finally
-                try
-                    unlinkSync tempPath
-                with _ ->
-                    ()
+            publishBootstrapTemplate tempPath path template
 
             let fileUrl = string (pathToFileUrl path)?href
             let! moduleObj = importModule fileUrl
@@ -191,6 +207,17 @@ module ModelRouting =
         completion.SetException(error)
         completion.Task
 
+    let private normalizeLeaseInput sessionId agent =
+        if String.IsNullOrWhiteSpace sessionId then
+            Error(ArgumentException("sessionId must be non-empty") :> exn)
+        elif String.IsNullOrWhiteSpace agent then
+            Error(ArgumentException("agent must be non-empty") :> exn)
+        else
+            Ok(sessionId.Trim(), agent.Trim())
+
+    let private normalizeSessionId sessionId =
+        if String.IsNullOrWhiteSpace sessionId then None else Some(sessionId.Trim())
+
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
         let managed = Dictionary<string, ModelRoutingTarget>()
@@ -221,17 +248,18 @@ module ModelRouting =
             pending.Remove demand |> ignore
             pendingManaged.Remove demand.LeaseKey |> ignore
 
+        let failDemand error demand =
+            try
+                demand.Completion.SetException(error)
+            with _ ->
+                ()
+
         let poison (error: exn) =
             fatalError <- Some error
             let waiting = pending |> Seq.toArray
             pending.Clear()
             pendingManaged.Clear()
-
-            for demand in waiting do
-                try
-                    demand.Completion.SetException(error)
-                with _ ->
-                    ()
+            waiting |> Array.iter (failDemand error)
 
         let trySchedule role =
             invokeScheduler scheduler role (running ())
@@ -248,22 +276,30 @@ module ModelRouting =
             removeDemand demand
             AsyncSupport.trySetResult demand.Completion target |> ignore
 
+        let commitScheduled demand scheduled =
+            match scheduled with
+            | None -> false
+            | Some target ->
+                commit demand target
+                true
+
+        let schedulePendingDemand demand =
+            if pending.Contains demand then
+                scheduleOrPoison demand.Role |> commitScheduled demand
+            else
+                false
+
         let rec drainDemands () =
             ensureHealthy ()
-            // DSL-MUTABLE: algorithm-scratch — drain-loop progress flag
-            let mutable progress = true
 
-            while progress && pending.Count > 0 do
-                progress <- false
-                let wave = pending |> Seq.toArray
+            pending
+            |> Seq.toArray
+            |> Array.map schedulePendingDemand
+            |> Array.exists id
+            |> continueDrain
 
-                for demand in wave do
-                    if pending.Contains demand then
-                        match scheduleOrPoison demand.Role with
-                        | None -> ()
-                        | Some target ->
-                            commit demand target
-                            progress <- true
+        and continueDrain progressed =
+            if progressed && pending.Count > 0 then drainDemands ()
 
         let acquireManagedTask sessionId agent =
             lock gate (fun () ->

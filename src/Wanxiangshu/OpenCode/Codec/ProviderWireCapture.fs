@@ -152,6 +152,18 @@ module ProviderWireCapture =
             | _ -> None)
         |> List.tryLast
 
+    /// Execution binding follows the latest physical user turn, not the most recent
+    /// PromptKey anywhere in history. If the latest user turn is external/keyless,
+    /// an older plugin PromptKey must not leak into the new provider attempt.
+    let lastUserPromptKey (rawMessages: obj list) : PromptKey option =
+        rawMessages
+        |> List.choose (fun raw ->
+            match decodeMessage raw with
+            | Some message when message.Role = "user" -> Some(ProviderWireDecode.promptKeyOfMessage raw)
+            | _ -> None)
+        |> List.tryLast
+        |> Option.flatten
+
     /// HOST-005: this turn's formal assistant text, excluding reasoning and tool
     /// parts. The Companion B record is built from it (COMPANION-005).
     let formalText (rawObj: obj) : string =
