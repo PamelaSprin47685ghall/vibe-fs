@@ -789,7 +789,7 @@ HOW = 今天 + 前三朝考古现场
 | CLN-05    | Join single-result compatibility caller migration         |  ✅ |
 | CLN-06    | 删除 `JoinItem → RunCompletion` internal compatibility path |  ✅ |
 | CLN-07    | FactCodec legacy migration inventory，只分类不删                |  ✅ |
-| CLN-08..N | 每种 durable decode 单独裁决（census 完成：LEGACY-010..014 分类已定）   | 中高 |
+| CLN-08..N | 每种 durable decode 单独裁决（LEGACY-013 已删除，LEGACY-010/011/012/014 BOUNDED-COMPAT 保持） | 中高 |
 | CLN-X     | `false abort` runtime migration retirement                |  高 |
 | CLN-Y     | Host V1 compatibility sink 加 creditor + exit contract     |  低 |
 | CLN-Z     | retire historical absence ratchets                        |  ✅ |
@@ -2458,23 +2458,26 @@ surface 应跟着 semantic owner 分布。
 
 大量迁 projection/decision/codec/policy tests。**完成条件：**`domain.mjs` 使用量明显下降。**达成：**6 个注册 surface（ForkChildPayload/SyntheticToml/BloggerToml/Quiescence/DelegatedToolEstimate），13 个测试文件迁移，债务 3185→3171、文件 316→312。
 
-### P7 — Resource/runtime wave
+### P7 — Resource/runtime wave ✅（首波）
 
 迁 stateful runtime。
 
 **完成条件：**普通测试不再扫描 instance mangling。
+**达成：**`RolesSurface`（第 7 个注册 surface，Role/ToolPermission 以 string 跨界，default-deny）；label 唯一表示上移 `Roles.fs`，ManagedAgentCatalog 委托；5 个测试文件（agent-permission-gate/inquiry-permissions/prompt-semantic-depth/js-surface/manager-finality-disposition）迁移；`Roles_isAllowed` 与 `roles.permissions` 用法清零，债务 3171→3169。
 
-### P8 — Effect/integration wave
+### P8 — Effect/integration wave ✅（增量）
 
 迁 Host/effect tests。
 
 **完成条件：**contractual effect 成为 observable，而不是 private choreography。
+**达成：**CLN-08 执行 census 裁决——删除 `FactCodec.migrateManagerJobByname`（零测试零真实数据，decode 链私有步骤退役）；剩余 101 处 `roles.of('X')` 传 Fable API 属 P10 API 层翻译范围。
 
-### P9 — Delete legacy adapters
+### P9 — Delete legacy adapters ✅（增量）
 
 逐 family 删除 `domain/*` adapters。
 
 **完成条件：**semantic tests 不再 import `domain.mjs`。
+**达成：**删除六个零引用零依赖死 adapter（forkChildPayload/processEstimate/packageResources/orchestratorProgram/setCount/setContains），-106 行；328 文件仍 import domain.mjs（后续 wave）。
 
 ### P10 — Quarantine Fable
 
