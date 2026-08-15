@@ -751,7 +751,7 @@ export function assertG2InspectorPrefixLaw(scenario) {
   // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
   // g2-inspector-qN.0. After EXEC-031 the child completes with ordinary assistant
   // text — no return tool on the wire.
-  assert.ok(q1.length >= 1, 'G2: Inspector Q1 provider request missing');
+  assert.ok(q1.length >= 2, 'G2: Inspector Q1 must record both faulted attempt and retry');
   assert.ok(q2.length >= 1, 'G2: Inspector Q2 provider request missing');
   assert.ok(q3.length >= 1, 'G2: Inspector Q3 provider request missing');
 
@@ -766,7 +766,7 @@ export function assertG2InspectorPrefixLaw(scenario) {
   assert.equal(modelOf(q2[0]), model, 'G2: same model Q1→Q2');
   assert.equal(modelOf(q3[0]), model, 'G2: same model Q2→Q3');
 
-  const wire1 = wireOf(q1[0]);
+  const wire1 = wireOf(q1[q1.length - 1]);
   const wire2 = wireOf(q2[0]);
   const wire3 = wireOf(q3[0]);
   assert.equal(sealHolds(wire1, q2[0]), true, 'G2: sealHolds Q1 prefix-of Q2');

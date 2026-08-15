@@ -121,6 +121,22 @@ const completedTurn = (session, root, run, role, text = 'independent perspective
     undefined,
   )
 
+const failedTurn = (session, root, run, role, error = '503 Service Unavailable') =>
+  new ReconciledTurn(
+    sessionId(session),
+    physicalUser(root),
+    authorityRoot(root),
+    providerRun(run),
+    roles.of(role),
+    undefined,
+    [reconcileSupervisor.textPart(error)],
+    'error',
+    undefined,
+    undefined,
+    new TurnOutcome(4, [error]),
+    undefined,
+  )
+
 const fallbackState = (journal, session) => {
   const snapshot = promptDispatcher.journalSnapshot(journal)
   return fallbackProjection.read(fold.session(snapshot, session).Fallback)
@@ -292,3 +308,44 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
     assert.equal(sends.length, 1, 'late consultation result must not send anything back to dropped owner')
   })
 })
+
+test('AGENT_031_consultation_child_transient_failure_does_not_fail_consultation_and_returns_after_retry', async () => {
+  await withHarness('deep-coder', async ({ journal, owner, root, sends, creates, ownedChildren, sensor, host, bindRun }) => {
+    const run = 'asst_deep_retry_help'
+    bindRun(run)
+    assert.equal(arm(sensor, sessionId(owner), providerRun(run)), true)
+
+    const first = await handleTurn(host, abortedTurn(owner, root, run, 'Coder'))
+    assert.equal(outcomeName(first), 'Handled')
+    assert.equal(creates.length, 1)
+    assert.equal(creates[0].options.Agent, 'deep-inquiry')
+    assert.equal(sends.length, 1)
+
+    // Consultation child turn 1 fails with transient provider error
+    const childFail = failedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_fail', 'Inquiry', '503 Service Unavailable')
+    const failHandled = await handleTurn(host, childFail)
+    assert.equal(outcomeName(failHandled), 'NotAssistance', 'transient child failure must not be claimed by AssistanceHost')
+    assert.equal(sends.length, 1, 'transient failure must not deliver advice to owner prematurely')
+
+    // Consultation child retry succeeds
+    xTraceCapture.captureProjection(
+      journal,
+      sessionId('ses_consult_1'),
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text(sends[0].text)] },
+          { role: 'assistant', parts: [xTraceCapture.text('perspective after retry')] },
+        ],
+      }),
+    )
+
+    const childDone = completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_done', 'Inquiry', 'perspective after retry')
+    const returned = await handleTurn(host, childDone)
+    assert.equal(outcomeName(returned), 'Handled')
+    assert.equal(sends.length, 2)
+    assert.equal(sends[1].session, owner)
+    assert.match(sends[1].text, /consultation_record/)
+    assert.match(sends[1].text, /perspective after retry/)
+  })
+})
+

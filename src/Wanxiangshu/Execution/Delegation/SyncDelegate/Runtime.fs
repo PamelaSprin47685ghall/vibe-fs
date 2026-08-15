@@ -197,7 +197,8 @@ type SyncDelegateRuntime
                 |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile childId projections)
                 |> Option.map (fun profile -> profile.SelectedAgent)
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
-          DescribeWait = SyncDelegateWait.describe }
+          DescribeWait = SyncDelegateWait.describe
+          SubscribeTerminal = fun sessionId listener -> sessions.SubscribeTerminal(sessionId, listener) }
 
     let singletonResult taskResult =
         task {
@@ -288,10 +289,10 @@ type SyncDelegateRuntime
         task {
             match turn.Role with
             | Some(Role.Inspector | Role.Coder) ->
-                match store.TryPopCallByDelegate turn.SessionId with
-                | Some call ->
-                    match turn.Outcome with
-                    | ReconcileProgram.TurnCompleted ->
+                match turn.Outcome with
+                | ReconcileProgram.TurnCompleted ->
+                    match store.TryPopCallByDelegate turn.SessionId with
+                    | Some call ->
                         // Completion marker for ManagerLife/Reviewer. HandleTurn
                         // does not use Terminal to build the inspect payload;
                         // the bounded WorkRecord is the invocation's parts range.
@@ -323,12 +324,13 @@ type SyncDelegateRuntime
                             // residual OneShot analog). The session stays reusable.
                             store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
                             return true
-                    | ReconcileProgram.TurnFailed error
-                    | ReconcileProgram.TurnAborted error ->
-                        store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))
-                        return true
-                    | _ -> return true
-                | None -> return false
+                    | None -> return false
+                | _ ->
+                    // Transient failures (TurnFailed / TurnInProgress / TurnNeedsContinuation)
+                    // remain child-local and allow ordinary fallback recovery to proceed.
+                    // Only exhausted retries or definitive aborts (via SubscribeTerminal)
+                    // report failure to the caller.
+                    return false
             | _ -> return false
         }
 

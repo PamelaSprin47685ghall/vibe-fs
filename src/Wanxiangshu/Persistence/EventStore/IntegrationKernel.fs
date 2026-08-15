@@ -62,6 +62,13 @@ module StructuralProjection =
         |> Option.defaultValue Set.empty
         |> Set.toList
 
+    let allHeads (projection: StructuralProjection) : EventId list =
+        projection.Heads
+        |> Map.toSeq
+        |> Seq.collect (fun (_, heads) -> heads |> Set.toSeq)
+        |> Seq.toList
+        |> List.distinct
+
     let apply (projection: StructuralProjection) (envelope: EventEnvelope) =
         let key = EventStreamId.value envelope.StreamId
         let prior = Map.tryFind key projection.Heads |> Option.defaultValue Set.empty
@@ -86,6 +93,7 @@ type ICanonicalIntegrator =
     abstract TryEvent: eventId: EventId -> EventEnvelope option
     abstract TryHeads: streamId: EventStreamId -> EventId list
     abstract TryHead: streamId: EventStreamId -> EventId option
+    abstract AllHeads: unit -> EventId list
 
 [<RequireQualifiedAccess>]
 module IntegrationCurrent =

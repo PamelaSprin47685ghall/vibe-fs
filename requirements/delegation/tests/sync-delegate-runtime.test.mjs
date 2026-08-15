@@ -57,6 +57,22 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
+const failedTurn = (delegateKey, role, error = '503 Service Unavailable', runId = 'asst_fail') =>
+  new ReconciledTurn(
+    sessionId(delegateKey),
+    physicalUser('msg_phys_fail'),
+    authorityRoot('msg_root_fail'),
+    providerRun(runId),
+    role,
+    undefined,
+    [reconcileSupervisor.textPart(error)],
+    'error',
+    undefined,
+    undefined,
+    new TurnOutcome(4, [error]),
+    undefined,
+  )
+
 let activeJournal
 const transcripts = new Map()
 
@@ -85,9 +101,21 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
   const prompts = []
   let physicalSeq = 0
   const ownerTier = { current: tier }
+  const terminalListeners = new Map()
 
   const sessions = {
-    SubscribeTerminal: () => ({ Dispose: () => {} }),
+    SubscribeTerminal: (session, listener) => {
+      const key = idValue.session(session)
+      const listeners = terminalListeners.get(key) ?? []
+      listeners.push(listener)
+      terminalListeners.set(key, listeners)
+      return {
+        Dispose: () => {
+          const current = terminalListeners.get(key) ?? []
+          terminalListeners.set(key, current.filter((l) => l !== listener))
+        },
+      }
+    },
     SendPrompt: async (session, text, options) => {
       physicalSeq += 1
       prompts.push({
@@ -107,6 +135,14 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
       })
       return okResult(child)
     },
+  }
+
+  const notifyTerminal = (delegateKey, outcome) => {
+    const key = String(delegateKey)
+    const listeners = terminalListeners.get(key) ?? []
+    for (const listener of listeners) {
+      listener(sessionId(key), outcome)
+    }
   }
 
   const attached = createAttached()
@@ -143,6 +179,7 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
       sessions,
       journal: opened.journal,
       ownerTier,
+      notifyTerminal,
     })
   } finally {
     disposeRuntime(runtime)
@@ -403,3 +440,57 @@ test('EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', asyn
     assert.doesNotMatch(secondDone.value, /^Opening\n/m)
   })
 })
+
+test('EXEC_033_sync_delegate_transient_failure_does_not_fail_call_and_returns_after_retry', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts }) => {
+    const owner = 'ses_owner_retry'
+    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect with transient failure')
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    // Turn 1 fails with transient provider failure (e.g. 503 / network error)
+    const failed = await handleTurn(
+      runtime,
+      failedTurn(delegateId, roles.of('Inspector'), '503 Service Unavailable', 'asst_fail_1'),
+      undefined,
+    )
+    assert.equal(failed, false, 'transient failure must NOT be handled/claimed as terminal by SyncDelegateRuntime')
+
+    // The caller promise must STILL be in-flight and pending (not rejected or resolved with error!)
+    let settledEarly = false
+    pending.then(() => { settledEarly = true }).catch(() => { settledEarly = true })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(settledEarly, false, 'pending invoke must not fail while retries are possible')
+
+    // Turn 2 (retry attempt) succeeds with answer
+    await captureLastAssistant(delegateId, 'inspector answer after retry')
+    const succeeded = await handleTurn(
+      runtime,
+      completionTurn(delegateId, roles.of('Inspector'), 'inspector answer after retry', 'asst_retry_2'),
+      undefined,
+    )
+    assert.equal(succeeded, true, 'successful retry completion must be handled by SyncDelegateRuntime')
+
+    const done = resultOf(await pending)
+    assert.equal(done.ok, true, done.error)
+    assert.match(done.value, /inspector answer after retry/)
+  })
+})
+
+test('EXEC_033_sync_delegate_exhausted_failure_via_terminal_event_fails_call', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts, notifyTerminal }) => {
+    const owner = 'ses_owner_exhausted'
+    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect with exhausted failure')
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    // All retries exhausted -> TerminalOutcome.Failed fired
+    const { TerminalOutcome } = await import('../../../dist/OpenCode/Host/Events.js')
+    notifyTerminal(delegateId, new TerminalOutcome(2, ['provider budget exhausted']))
+
+    const done = resultOf(await pending)
+    assert.equal(done.ok, false, 'exhausted failure must fail the pending invoke')
+    assert.match(done.error, /provider budget exhausted/)
+  })
+})
+

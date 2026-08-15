@@ -65,11 +65,11 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      OpenCode 1.18 dedicated session.idle wake was admitted at the Host boundary,
 #                      a full strict diagnostic traversal measured 728 durable envelopes.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat for that same complete traversal;
-#                      the measured legal upper bound is 3441 frames.
+#                      the measured legal upper bound is 3480 frames.
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 728, maxSseEvents = 3441, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 728, maxSseEvents = 3480, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -114,7 +114,7 @@ flow = [
   { assertDeliveries = { id = "needhelp-owner-deep.0", eq = 1 } },
   { assertDeliveries = { id = "needhelp-consult.0", eq = 1 } },
   { assertDeliveries = { id = "needhelp-owner-advice.0", eq = 1 } },
-  { assertDeliveries = { id = "g2-inspector-q1.0", eq = 1 } },
+  { assertDeliveries = { id = "g2-inspector-q1.0", eq = 2 } },
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q3.0", eq = 1 } },
   { assertDeliveries = { id = "g6-bookkeeper-finalize.0", eq = 1 } },
@@ -1079,6 +1079,15 @@ reason = "frame-commit"
 turn = "blogger"
 step = 55
 reason = "frame-commit"
+
+# G2 inspector transient provider error on attempt 1: host/provider retries, attempt 2 delivers A1.
+[[fault]]
+turn = "g2-inspector-q1"
+step = 0
+delivery = "provider-error"
+status = 500
+retryable = true
+attempts = [1]
 
 # Sole physical fault: one settled non-retryable provider-error (no AABB here).
 [[fault]]

@@ -153,6 +153,22 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
+const failedTurn = (delegateKey, role, error = '503 Service Unavailable', runId = 'asst_fail') =>
+  new ReconciledTurn(
+    sessionId(delegateKey),
+    physicalUser('msg_phys_fail'),
+    authorityRoot('msg_root_fail'),
+    providerRun(runId),
+    role,
+    undefined,
+    [reconcileSupervisor.textPart(error)],
+    'error',
+    undefined,
+    undefined,
+    new TurnOutcome(4, [error]),
+    undefined,
+  )
+
 const captureLastAssistant = (journal, delegateKey, answer) => {
   xTraceCapture.captureProjection(
     journal,
@@ -183,9 +199,21 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   const prompts = []
   const inspectorPrompts = []
   let physicalSeq = 0
+  const terminalListeners = new Map()
 
   const sessions = {
-    SubscribeTerminal: () => ({ Dispose: () => {} }),
+    SubscribeTerminal: (session, listener) => {
+      const key = idValue.session(session)
+      const listeners = terminalListeners.get(key) ?? []
+      listeners.push(listener)
+      terminalListeners.set(key, listeners)
+      return {
+        Dispose: () => {
+          const current = terminalListeners.get(key) ?? []
+          terminalListeners.set(key, current.filter((l) => l !== listener))
+        },
+      }
+    },
     SendPrompt: async (session, text, options) => {
       physicalSeq += 1
       prompts.push({
@@ -205,6 +233,14 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
       })
       return okResult(child)
     },
+  }
+
+  const notifyTerminal = (delegateKey, outcome) => {
+    const key = String(delegateKey)
+    const listeners = terminalListeners.get(key) ?? []
+    for (const listener of listeners) {
+      listener(sessionId(key), outcome)
+    }
   }
 
   const attached = createAttached()
@@ -251,7 +287,7 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
   }
 
   try {
-    await fn({ runtime, journal: opened.journal, createCalls, prompts, inspectorPrompts, scope, delegatedRemaining })
+    await fn({ runtime, journal: opened.journal, createCalls, prompts, inspectorPrompts, scope, delegatedRemaining, notifyTerminal })
   } finally {
     disposeRuntime(runtime)
     opened.dispose()
@@ -492,3 +528,104 @@ test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () =>
     assert.equal(parseToml(text).error, undefined)
   })
 })
+
+test('INSPECT_transient_failure_retries_and_returns_successful_work_record', async () => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
+    const owner = 'ses_owner_insp_retry'
+    const tool = inspectSpec(factory, scope, runtime)
+    const pending = tool.Execute(
+      makeArgs({ charge: 'inspect with transient retry' }),
+      context(owner),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Inspector Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    // Turn 1 fails with transient provider error
+    const failed = await handleTurn(
+      runtime,
+      failedTurn(delegateId, roles.of('Inspector'), '503 Service Unavailable', 'asst_fail_1'),
+      undefined,
+    )
+    assert.equal(failed, false, 'transient failure must NOT complete tool prematurely')
+
+    // Tool execution must still be in flight
+    let settledEarly = false
+    pending.then(() => { settledEarly = true }).catch(() => { settledEarly = true })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(settledEarly, false, 'inspect tool execution must remain pending during retry')
+
+    // Turn 2 succeeds after retry
+    await settlePendingInvoke(
+      runtime,
+      journal,
+      delegateId,
+      roles.of('Inspector'),
+      'findings verified after retry',
+      'asst_retry_2',
+    )
+
+    const text = await pending
+    assert.match(text, /findings verified after retry/)
+    assert.match(text, /Recent work/)
+    assert.equal(parseToml(text).error, undefined)
+  })
+})
+
+test('CODER_establish_behavior_transient_failure_retries_and_returns_successful_work_record', async () => {
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
+    const owner = 'ses_owner_coder_retry'
+    const tool = establishSpec(factory, scope, runtime)
+    const pending = tool.Execute(
+      makeArgs({ charge: 'establish behavior with retry' }),
+      context(owner),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Coder Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    // Turn 1 fails
+    const failed = await handleTurn(
+      runtime,
+      failedTurn(delegateId, roles.of('Coder'), 'rate_limit_exceeded', 'asst_coder_fail_1'),
+      undefined,
+    )
+    assert.equal(failed, false)
+
+    // Turn 2 succeeds
+    await settlePendingInvoke(
+      runtime,
+      journal,
+      delegateId,
+      roles.of('Coder'),
+      'behavior established after retry',
+      'asst_coder_retry_2',
+    )
+
+    const text = await pending
+    assert.match(text, /behavior established after retry/)
+    assert.match(text, /Recent work/)
+    assert.equal(parseToml(text).error, undefined)
+  })
+})
+
+test('INSPECT_exhausted_failure_via_terminal_event_returns_incomplete_error', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts, scope, notifyTerminal }) => {
+    const owner = 'ses_owner_insp_exhausted'
+    const tool = inspectSpec(factory, scope, runtime)
+    const pending = tool.Execute(
+      makeArgs({ charge: 'inspect with exhausted failure' }),
+      context(owner),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Inspector Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    const { TerminalOutcome } = await import('../../../dist/OpenCode/Host/Events.js')
+    notifyTerminal(delegateId, new TerminalOutcome(2, ['provider budget exhausted']))
+
+    const text = await pending
+    assert.match(text, /could not complete|未能完成|incomplete|failed/i)
+  })
+})
+

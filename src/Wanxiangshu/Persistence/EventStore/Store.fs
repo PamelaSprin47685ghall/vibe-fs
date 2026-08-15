@@ -53,6 +53,7 @@ type IEventStore =
     abstract TryEvent: eventId: EventId -> EventEnvelope option
     abstract TryHeads: streamId: EventStreamId -> EventId list
     abstract TryHead: streamId: EventStreamId -> EventId option
+    abstract AllHeads: unit -> EventId list
 
 [<RequireQualifiedAccess>]
 module EventStore =
@@ -257,4 +258,5 @@ module EventStore =
             member _.TryCurrent(key) = integrator.TryCurrent key
             member _.TryEvent(eventId) = integrator.TryEvent eventId
             member _.TryHeads(streamId) = integrator.TryHeads streamId
-            member _.TryHead(streamId) = integrator.TryHead streamId }
+            member _.TryHead(streamId) = integrator.TryHead streamId
+            member _.AllHeads() = integrator.AllHeads() }

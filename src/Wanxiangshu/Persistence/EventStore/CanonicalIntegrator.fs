@@ -320,4 +320,10 @@ module CanonicalIntegrator =
             member this.TryHead(streamId) =
                 match this.TryHeads streamId with
                 | [ head ] -> Some head
-                | _ -> None }
+                | _ -> None
+
+            member _.AllHeads() =
+                lock gate (fun () ->
+                    match Map.tryFind "Structural" state.Currents with
+                    | None -> []
+                    | Some current -> StructuralProjection.allHeads (unbox<StructuralProjection> current)) }

@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.OpenCode
 
 /// Composition-internal CE module: referenced only by SyncDelegateRuntime.
 module internal SyncDelegateWorkflow =
@@ -23,7 +24,8 @@ module internal SyncDelegateWorkflow =
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
           ResolveBoundAgent: SessionId -> string option
-          DescribeWait: SyncDelegateWait -> DiagnosticWait }
+          DescribeWait: SyncDelegateWait -> DiagnosticWait
+          SubscribeTerminal: SessionId -> TerminalCompletionListener -> System.IDisposable }
 
     let private completeError (invocations: SyncDelegateInvocation list) error =
         for invocation in invocations do
@@ -165,6 +167,27 @@ module internal SyncDelegateWorkflow =
 
                                 let! answered =
                                     task {
+                                        use _terminalSub =
+                                            deps.SubscribeTerminal delegateSession (fun _ outcome ->
+                                                match outcome with
+                                                | TerminalOutcome.Failed error ->
+                                                    match store.TryPopCallByDelegate delegateSession with
+                                                    | Some call ->
+                                                        store.FailCall(
+                                                            call,
+                                                            sprintf "SyncDelegate run failed: %s" error
+                                                        )
+                                                    | None -> ()
+                                                | TerminalOutcome.Aborted reason ->
+                                                    match store.TryPopCallByDelegate delegateSession with
+                                                    | Some call ->
+                                                        store.FailCall(
+                                                            call,
+                                                            sprintf "SyncDelegate run aborted: %s" reason
+                                                        )
+                                                    | None -> ()
+                                                | TerminalOutcome.Completed _ -> ())
+
                                         match! deps.SendPrompt call request with
                                         | Error error -> return Error error
                                         | Ok _ ->

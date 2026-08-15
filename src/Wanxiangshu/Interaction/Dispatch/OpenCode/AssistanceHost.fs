@@ -111,6 +111,7 @@ type AssistanceHost
     let claimGate = obj ()
     let claimedOwnerAttempts = HashSet<string>()
     let droppedOwners = HashSet<string>()
+    let terminalSubscriptions = Dictionary<string, IDisposable>()
 
     let assistanceLines (sessionId: SessionId) (path: string) =
         ProviderProse.instructionLines (ProviderProse.languageOf sessionId) path Map.empty
@@ -372,6 +373,54 @@ type AssistanceHost
                     return AssistanceTurnDisposition.ClaimedButUnresolved
         }
 
+    let registerChildSubscription (childId: SessionId) =
+        let key = SessionId.value childId
+
+        lock claimGate (fun () ->
+            if not (terminalSubscriptions.ContainsKey key) then
+                let sub =
+                    sessions.SubscribeTerminal(
+                        childId,
+                        fun _ outcome ->
+                            match outcome with
+                            | TerminalOutcome.Failed error ->
+                                match childRecord childId with
+                                | Some(record, (agentId, owner, logicalRun, requester)) ->
+                                    match ownerStillOnRun owner logicalRun with
+                                    | None -> ()
+                                    | Some _ ->
+                                        let failure = consultationFailedPrompt owner error
+
+                                        task {
+                                            match! recordTerminal owner agentId childId record false failure with
+                                            | Ok() ->
+                                                let refreshed =
+                                                    childRecord childId |> Option.map fst |> Option.defaultValue record
+
+                                                let! _ =
+                                                    deliverAdvice
+                                                        owner
+                                                        logicalRun
+                                                        requester
+                                                        childId
+                                                        refreshed
+                                                        failure
+                                                        None
+
+                                                ()
+                                            | Error _ -> ()
+                                        }
+                                        |> ignore
+                                | None -> ()
+                            | _ -> ()
+                    )
+
+                terminalSubscriptions.[key] <- sub)
+
+    let trackChildOwned (childId: SessionId) =
+        registerChildSubscription childId
+        onChildOwned childId
+
     let sendConsultationRoot owner logicalRun requester childId directory =
         task {
             match! parentRecord owner with
@@ -442,7 +491,7 @@ type AssistanceHost
                 // Finite per-LogicalRun guard. Reuse/recover the one consultation
                 // resource; once it is spent, the owner still receives a bounded
                 // continuation rather than being left aborted with no successor.
-                onChildOwned record.ChildSessionId
+                trackChildOwned record.ChildSessionId
 
                 match record.Lifecycle with
                 | HandleLifecycle.Active -> return AssistanceTurnDisposition.Handled
@@ -515,7 +564,7 @@ type AssistanceHost
                             sessions.AbortSession childId |> ignore
                             return AssistanceTurnDisposition.ClaimedButUnresolved
                         | Ok() ->
-                            onChildOwned childId
+                            trackChildOwned childId
 
                             match! sendConsultationRoot owner logicalRun requester childId directory with
                             | Ok _ -> return AssistanceTurnDisposition.Handled
@@ -671,16 +720,11 @@ type AssistanceHost
                                     (advicePrompt owner childWorkRecord)
                                     turn.Directory
 
-                | ReconcileProgram.TurnFailed error ->
-                    let failure = consultationFailedPrompt owner error
-
-                    match! recordTerminal owner agentId turn.SessionId record false failure with
-                    | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-                    | Ok() ->
-                        let refreshed =
-                            childRecord turn.SessionId |> Option.map fst |> Option.defaultValue record
-
-                        return! deliverAdvice owner logicalRun requester turn.SessionId refreshed failure turn.Directory
+                | ReconcileProgram.TurnFailed _ ->
+                    // Provider-attempt failure remains child-local and follows the
+                    // ordinary A/A/B/B recovery path. Assistance does not turn one
+                    // failed attempt into consultation failure while retries can continue.
+                    return AssistanceTurnDisposition.NotAssistance
 
                 | ReconcileProgram.TurnAborted reason ->
                     // If the consultation itself asks for help, consume that arm but
@@ -740,7 +784,7 @@ type AssistanceHost
                     match tryDecodeRecord record with
                     | None -> ()
                     | Some(agentId, owner, logicalRun, requester) ->
-                        onChildOwned childId
+                        trackChildOwned childId
 
                         match ownerStillOnRun owner logicalRun, record.Lifecycle with
                         | None, _ -> ()
@@ -776,6 +820,15 @@ type AssistanceHost
     member _.DropSignals(sessionId: SessionId) =
         sensor.DropSession sessionId
         dropOwnerClaims sessionId
+
+        lock claimGate (fun () ->
+            let key = SessionId.value sessionId
+
+            match terminalSubscriptions.TryGetValue key with
+            | true, sub ->
+                sub.Dispose()
+                terminalSubscriptions.Remove key |> ignore
+            | false, _ -> ())
 
     /// Owner deletion closes its active consultation resource. Child deletion
     /// alone only removes stream state; the durable handle remains the recovery truth.

@@ -129,7 +129,14 @@ type EventStoreJournalWriter
 
     static member private commitEnvelope (store: IEventStore) (envelope: Envelope) : Task<Result<unit, AppendError>> =
         let streamId = EventStoreJournalCodec.encodeStreamId envelope.Stream
-        let parents = store.TryHead streamId |> Option.toList
+
+        let parents =
+            match envelope.Fact with
+            | Fact.Runtime(RuntimeStarted _) ->
+                let heads = store.AllHeads()
+                if List.isEmpty heads then [] else heads
+            | _ -> store.TryHead streamId |> Option.toList
+
         let encoded = EventStoreJournalCodec.encode parents [] envelope
         store.Append [ encoded ]
 
