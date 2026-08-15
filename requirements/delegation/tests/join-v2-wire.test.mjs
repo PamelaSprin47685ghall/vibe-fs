@@ -12,9 +12,10 @@ import {
   agentCompletion,
   joinResultRenderer,
   nonEmptyBatch,
-  syntheticToml,
   verdictMailbox,
 } from '../../verification-system/tests/support/domain.mjs'
+
+const { comment: tomlComment } = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 
 const runtime = joinResultRenderer.stubRuntime()
 
@@ -90,7 +91,7 @@ test('EXEC_004_child_to_parent_lwr_is_hashed_comment_not_toml_field', () => {
   assert.match(wire, /^# Recent work$/m)
   assert.match(wire, /^# verified on main$/m)
 
-  const expectedComment = syntheticToml.comment(lwr)
+  const expectedComment = tomlComment(lwr)
   assert.ok(wire.includes(expectedComment))
   for (const line of expectedComment.split('\n')) {
     assert.ok(line.startsWith('#'), `child→parent LWR line must be #: ${JSON.stringify(line)}`)
@@ -112,7 +113,7 @@ test('EXEC_004_work_record_lines_are_hash_prefixed_including_malicious', () => {
   const batch = nonEmptyBatch.ofHeadTail(agentRun('a1', 'fast-coder', malicious))
   const wire = joinResultRenderer.renderCompletedBatch(runtime, batch)
 
-  const expectedComment = syntheticToml.comment(malicious)
+  const expectedComment = tomlComment(malicious)
   assert.ok(wire.includes(expectedComment))
 
   for (const line of expectedComment.split('\n')) {

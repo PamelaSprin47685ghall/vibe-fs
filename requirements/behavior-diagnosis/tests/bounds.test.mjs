@@ -30,10 +30,11 @@ import {
   bloggerRequestContext,
   parkedTransform,
   runtimeResources,
-  syntheticToml,
   authorityRoot,
   logicalRunId,
 } from '../../verification-system/tests/support/domain.mjs'
+
+const { byteCount: tomlByteCount } = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 
 // EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
 // Production installs at SpikePlugin.init; this suite drives Host without init.
@@ -200,9 +201,9 @@ test('ENFORCER_042_merged_evidence_over_128KiB_fails_closed', async () => {
 
 test('ENFORCER_042_bound_constants_match_utf8_byte_thresholds', () => {
   // At the exact cap: NOT over (gate uses strict >). UTF-8 single-byte ASCII.
-  assert.equal(syntheticToml.byteCount('a'.repeat(MAX_BLOG_TEXT_BYTES)), MAX_BLOG_TEXT_BYTES)
-  assert.equal(syntheticToml.byteCount('b'.repeat(MAX_EVIDENCE_BYTES)), MAX_EVIDENCE_BYTES)
+  assert.equal(tomlByteCount('a'.repeat(MAX_BLOG_TEXT_BYTES)), MAX_BLOG_TEXT_BYTES)
+  assert.equal(tomlByteCount('b'.repeat(MAX_EVIDENCE_BYTES)), MAX_EVIDENCE_BYTES)
   // One byte past the cap: over.
-  assert.equal(syntheticToml.byteCount('a'.repeat(MAX_BLOG_TEXT_BYTES + 1)), MAX_BLOG_TEXT_BYTES + 1)
-  assert.equal(syntheticToml.byteCount('b'.repeat(MAX_EVIDENCE_BYTES + 1)), MAX_EVIDENCE_BYTES + 1)
+  assert.equal(tomlByteCount('a'.repeat(MAX_BLOG_TEXT_BYTES + 1)), MAX_BLOG_TEXT_BYTES + 1)
+  assert.equal(tomlByteCount('b'.repeat(MAX_EVIDENCE_BYTES + 1)), MAX_EVIDENCE_BYTES + 1)
 })

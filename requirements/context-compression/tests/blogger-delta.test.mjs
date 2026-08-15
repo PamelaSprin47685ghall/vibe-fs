@@ -16,7 +16,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerDelta as delta, bloggerToml as toml, companionPrompt as prompt, syntheticToml as syn } from '../../verification-system/tests/support/domain.mjs'
+import { bloggerDelta as delta, companionPrompt as prompt } from '../../verification-system/tests/support/domain.mjs'
+import { byteCount as tomlByteCount } from '../../../dist/Foundation/SyntheticTomlSurface.js'
+
+const toml = await import('../../../dist/Context/Companion/Blogger/TomlSurface.js')
+const syn = { byteCount: tomlByteCount }
+
+const textItem = (text, role = 'user') => ({
+  Role: role,
+  Part: { Kind: 'text', Text: text, Tool: '', Args: '', MediaType: '' },
+  Truncated: false,
+})
 
 const origin = delta.cursor(0, 0)
 
@@ -126,7 +136,7 @@ test('CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () =>
   // nothing for one.
   const body = 'observed work ' + 'x'.repeat(500)
   const messages = delta.messages([{ role: 'user', parts: [delta.text(body)] }])
-  const item = toml.item({ role: 'user', part: toml.text(body) })
+  const item = textItem(body)
   const dataOnlyBytes = syn.byteCount(toml.render([item]))
   const limit = dataOnlyBytes + 100
 
@@ -227,7 +237,7 @@ test('CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
   assert.equal(chunk.itemCount, 1)
   assert.deepEqual(chunk.truncatedFlags, [true], 'the item must declare it was cut')
   assert.equal(chunk.bytes <= limit, true, `truncated chunk of ${chunk.bytes} bytes exceeds ${limit}`)
-  assert.equal(chunk.toml.includes(toml.truncationMarker), true, 'the fixed marker must be present')
+  assert.equal(chunk.toml.includes(toml.TruncationMarker), true, 'the fixed marker must be present')
 })
 
 test('CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
@@ -260,7 +270,7 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
 
   assert.equal(chunk.bytes <= limit, true)
   assert.equal(chunk.toml.includes('\uFFFD'), false, 'no replacement character from a split sequence')
-  assert.equal(chunk.toml.includes(toml.truncationMarker), true)
+  assert.equal(chunk.toml.includes(toml.TruncationMarker), true)
 
   // The claim in this test's name, actually exercised. Byte-level checks cannot see a
   // document that is malformed, and the truncation path is where malformation is most
@@ -272,7 +282,7 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   assert.equal(parsed.new_work_to_record.length, 1)
   assert.equal(parsed.new_work_to_record[0].truncated, true)
   assert.equal(
-    parsed.new_work_to_record[0].user.includes(toml.truncationMarker),
+    parsed.new_work_to_record[0].user.includes(toml.TruncationMarker),
     true,
     'the marker survives parsing as data',
   )
@@ -296,7 +306,7 @@ test('CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
 
   assert.equal(chunk.bytes <= limit, true, `truncated chunk of ${chunk.bytes} bytes exceeds ${limit}`)
   assert.equal(syn.byteCount(chunk.toml), chunk.bytes)
-  assert.equal(chunk.toml.includes(toml.truncationMarker), true)
+  assert.equal(chunk.toml.includes(toml.TruncationMarker), true)
 
   const parsed = parseToml(chunk.toml)
   assert.equal(parsed.new_work_to_record.length, 1)

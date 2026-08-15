@@ -7,16 +7,18 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { toolResultBound, syntheticToml } from '../../verification-system/tests/support/domain.mjs'
+import { toolResultBound } from '../../verification-system/tests/support/domain.mjs'
+
+const { byteCount } = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 
 const hostLines = (text) => text.split('\n').length
-const hostBytes = (text) => syntheticToml.byteCount(text)
+const hostBytes = (text) => byteCount(text)
 
 test('TOOL_RESULT_BOUND_constants_match_host_defaults_exactly', () => {
   assert.equal(toolResultBound.hostMaxLines, 2000)
   assert.equal(toolResultBound.hostMaxBytes, 51200)
   assert.equal(toolResultBound.markerBytes, 34)
-  assert.equal(syntheticToml.byteCount(toolResultBound.marker), 34)
+  assert.equal(byteCount(toolResultBound.marker), 34)
   assert.equal(toolResultBound.contentMaxLines, 1998)
   assert.equal(toolResultBound.contentMaxBytes, 51166)
   // Static identity: content + marker fill Host budgets exactly.
