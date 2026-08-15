@@ -11,6 +11,7 @@ import test from 'node:test'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'ses_glory_rewrite'
+const ROOT = `root-${SESSION}`
 
 const userMessage = (id, text) => ({
   info: { id, role: 'user', sessionID: SESSION },
@@ -42,11 +43,11 @@ test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => 
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
-    // Request 1: the planning request. The Opening message is rewritten once.
-    const out1 = { messages: [userMessage('msg-open-1', 'Start manager work.')] }
+    // Request 1: the planning request. The exact authority-root message is rewritten once.
+    const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)
 
-    const firstRewritten = textOf(out1.messages, 'msg-open-1')
+    const firstRewritten = textOf(out1.messages, ROOT)
     assert.ok(firstRewritten.startsWith('Start manager work.'), `opening must keep the raw text: ${firstRewritten}`)
     assert.ok(firstRewritten.includes('The Planning Table'), 'Planning Table must be attached')
 
@@ -54,14 +55,14 @@ test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => 
     // conversation, appends the Activation continuation, and transforms again.
     const out2 = {
       messages: [
-        userMessage('msg-open-1', 'Start manager work.'),
+        userMessage(ROOT, 'Start manager work.'),
         assistantMessage('asst-1', 'Plan: verify, then finish.'),
         userMessage('msg-act-1', ACTIVATION),
       ],
     }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out2)
 
-    const secondRewritten = textOf(out2.messages, 'msg-open-1')
+    const secondRewritten = textOf(out2.messages, ROOT)
     assert.equal(
       secondRewritten,
       firstRewritten,
@@ -100,11 +101,26 @@ test('GLORY_012_host_title_request_never_opens_a_life', async () => {
     )
 
     // The real HumanRoot still opens the Life on the next request.
-    const outPlan = { messages: [userMessage('msg-open-1', 'Start manager work.')] }
+    const outPlan = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, outPlan)
     assert.ok(
-      textOf(outPlan.messages, 'msg-open-1').includes('The Planning Table'),
+      textOf(outPlan.messages, ROOT).includes('The Planning Table'),
       'the real HumanRoot must still be Birthed',
+    )
+  })
+})
+
+test('FINALITY_022_active_HumanRoot_profile_does_not_make_another_user_message_a_root', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+
+    const out = { messages: [userMessage('msg-not-root', 'ordinary later user-shaped message')] }
+    await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out)
+
+    assert.equal(
+      textOf(out.messages, 'msg-not-root'),
+      'ordinary later user-shaped message',
+      'Life opening requires the exact AuthorityRootUserMessageId, not session-level HumanRoot authority',
     )
   })
 })
@@ -116,21 +132,21 @@ test('GLORY_015_rewrite_survives_a_persisted_rewritten_message', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
-    const out1 = { messages: [userMessage('msg-open-1', 'Start manager work.')] }
+    const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)
-    const rewritten = textOf(out1.messages, 'msg-open-1')
+    const rewritten = textOf(out1.messages, ROOT)
 
     // Simulate a persisted rewritten opening plus a work-time request.
     const out2 = {
       messages: [
-        userMessage('msg-open-1', rewritten),
+        userMessage(ROOT, rewritten),
         assistantMessage('asst-1', 'Plan.'),
         userMessage('msg-work-1', 'Continue working.'),
       ],
     }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out2)
 
-    const re = textOf(out2.messages, 'msg-open-1')
+    const re = textOf(out2.messages, ROOT)
     assert.equal(re, rewritten, 'no stacked tail on a persisted rewritten message')
     assert.equal(textOf(out2.messages, 'msg-work-1'), 'Continue working.', 'work-time message never rewritten')
   })
