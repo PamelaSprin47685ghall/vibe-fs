@@ -11,6 +11,8 @@ const {
   SessionDirectories,
   SessionParents,
   VerdictSessions,
+  ReviewGuardNudges,
+  clearReviewGuardNudgesForTests,
 } = await import('../../../dist/OpenCode/Host/SharedState.js')
 
 test('SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
@@ -27,10 +29,14 @@ test('SHARED_dictionaries_are_live_singletons_shared_across_importers', async ()
 
     SessionDirectories.set('shared-test-dir', '/tmp/x')
     assert.equal(again.SessionDirectories.get('shared-test-dir'), '/tmp/x')
+
+    ReviewGuardNudges.add('shared-test-guard')
+    assert.equal(again.ReviewGuardNudges.has('shared-test-guard'), true)
   } finally {
     SessionParents.delete(key)
     VerdictSessions.delete('shared-test-verdict')
     SessionDirectories.delete('shared-test-dir')
+    clearReviewGuardNudgesForTests()
   }
 })
 

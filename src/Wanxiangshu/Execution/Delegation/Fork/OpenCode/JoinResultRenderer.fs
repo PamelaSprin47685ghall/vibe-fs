@@ -79,6 +79,12 @@ open Wanxiangshu.Strength
 
 /// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + WorkRecord only.
 /// No status / count / ordinal / kind / agent / code / message DTO plane.
+///
+/// Directional LWR plane (DELEG-013 / DELEG-019 / PROVIDER-PROJECTION-009):
+/// child → parent join MUST keep the WorkRecord as entry-local `# LWR`
+/// (`SyntheticToml.comment`). Do NOT wrap it in `work_record = …` or any other
+/// TOML data field. Parent → child fork payload is the opposite contract
+/// (`commissioner_record` / `attached_work_record` fields) — do not conflate.
 module JoinResultRenderer =
 
     [<RequireQualifiedAccess>]
@@ -232,6 +238,7 @@ module JoinResultRenderer =
         let instructions = [ bynameLine lang Path.AgentReturned name ]
 
         let body =
+            // Child → parent: `# LWR` (entry-local comment). Never a TOML field.
             if String.IsNullOrWhiteSpace payload.WorkRecord then
                 []
             else

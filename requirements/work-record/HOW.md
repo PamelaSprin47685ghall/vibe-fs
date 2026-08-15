@@ -59,7 +59,7 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 
 | 消费方 | 消费什么 |
 |---|---|
-| `delegation`（EXEC-004/028/031） | 子→父 / SyncDelegate 的 bounded record（includeOpening=false） |
+| `delegation`（EXEC-004/028/031） | 子→父 / SyncDelegate 的 bounded record（includeOpening=false）。**wire plane 归消费方**：join completed = `# LWR`（`SyntheticToml.comment`）；fork child 首 prompt = TOML field（`commissioner_record` / `attached_work_record`）。本包只物化正文，不决定 plane。 |
 | `review-assurance` / `review-judgement`（REVIEW-016） | ProcessReviewLWR（RecordCoverage + RawGap） |
 | `finality`（GLORY-004/050） | FinalityReviewLWR（request-range bounded） |
 | `obligation-ledger`（TODO-006/008） | ManagerCheckpointLWR（ReviewFrontier） |

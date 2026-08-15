@@ -33,6 +33,7 @@
   - `provenSeal`：`Map.tryFind providerRun guard.Seals` 且 `IncludedToolResultDigests ∋ ChallengeContentDigest` → 因果证明；否则 `ChallengeUnproven`。
   - 分支：`AlreadyCounted`（REVIEW-004 去重）→ `ProcessTerminal`（REVIEW-013 过程一次判断）→ `Revised` / `ChallengeIssued` / `Confirmed` / `ChallengeUnproven`。
 - `src/Wanxiangshu/Application/Review/ReviewBarrierWorkflow.fs`（`reverify`：openBarrier → awaitWitness 事件驱动 → readStatus 读 durable 证据，`ConfirmationUnproven`/`ReviewerProducedNoVerdict` 续等）、`ReviewerContinuation.fs`（ensureVerdictSubmitted / ensurePerfectConfirmed）、`ReviewerWorkflow.fs`（observe 唯一业务 writer）。
+- `HostReviewGuard`（`Mission/Review/OpenCode/HostGuard.fs`）：missing-verdict / confirm-perfect 物理发送。预留键在 `SharedState.ReviewGuardNudges`（HOST-012），**不含 RuntimeId**——每实例 Journal RuntimeId 不同，含之则 root/worktree 对同一 occasion 双发 `ReviewerVerdictRequired`。本地 journal 的 `PendingClaims` 仍作同实例二次闸。
 - `src/Wanxiangshu/Application/Review/ReviewerEvidence.fs`：`continuationOpen`（sibling REVISE 后撤销 capability）、`classifyNeed`（process → `CompleteRevision` 无 confirmation nudge）、`confirmed` 从 witness 派生。
 
 ### 4. Seal 绑定与 attempt scope 冻结（Mission/Review/Assurance/Seal.fs）

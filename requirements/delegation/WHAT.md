@@ -245,26 +245,41 @@ fork child 首 prompt 由 `ForkChildAssignment { Assignment; CommissionerRecord;
 是两个概念：无 warm-start 时字节相同；有 keywords 时只 enrich `ProviderPrompt`。禁止解析 rendered TOML
 反推 Charge（EXEC-031/032、ARCH-010/011）。
 
-**CommissionerRecord / Attachment 的 wire 形态（硬约束，禁止再回归）：**
+**方向不对称（硬约束，禁止混用）：**
 
-1. 解释性说明（「这是 Commissioner 的历史 / 这是附件背景」）可以进 ARCH-010 **instruction header**（`# …`）。
-2. **canonical `LifecycleWorkRecord` 正文本身必须作为 ordinary WorkRecord prose 进入 ARCH-010 body**——段标题保持
-   纯文本 `Opening` / `Chronicle` / `Recent work`（`work-record` 物化合同）。
-3. **禁止**把 LWR 按行 `Split` 进 `instructions` 再经 `SyntheticToml.comment` 逐行加 `# `（否则子 session 会看到
-   `# Opening` / `# Chronicle`，把背景记录误读成指令骨架）。
-4. **禁止**把 LWR 封进 opaque TOML 字段（历史 `parent_work_record = """…"""` / 同类信封）。
+| 方向 | surface | LWR wire 形态 |
+|------|---------|---------------|
+| **父 → 子** | fork child 首 prompt（本条款 / DELEG-021） | TOML **data field**：`commissioner_record` / `attached_work_record` |
+| **子 → 父** | join completed（DELEG-013 / EXEC-004） | **`# LWR`**：`SyntheticToml.comment` 逐行 `# `，**禁止** `work_record =` 字段 |
 
-历史事故：`9d6cf339` 在角色 prompt 迁移提交里旁路把 CommissionerRecord 从 body prose 挪进 instruction comments，
-测试期望被一并改写，回归静默通过。本条款把该形态永久定为非法。
+同一段 LWR 正文（段标题仍是纯文本 `Opening` / `Chronicle` / `Recent work`）；`# ` 前缀只在
+**子→父 join wire** 由 `SyntheticToml.comment` 注入。父→子把同一正文放进 field value，段标题保持未加 `#`。
 
-含义/动机：类型化载荷让「任务」与「背景」在源码层可分，渲染器不猜测 instruction/data 分界；LWR 是 bounded
-work statement，不是第二套 instruction header。
+**CommissionerRecord / Attachment（仅父→子）的 wire 形态：**
+
+1. 解释性说明（命名 `commissioner_record` / `attached_work_record`）进 ARCH-010 **instruction header**（`# …`）。
+2. **canonical `LifecycleWorkRecord` 正文必须作为 ARCH-010 data field 进入 body**：
+   `commissioner_record = '''…'''` / `attached_work_record = '''…'''`
+   （`SyntheticToml.field` + `renderString`；多行用 `'''` literal）。
+3. **禁止**在父→子路径把 LWR 按行 `Split` 进 `instructions` 再经 `SyntheticToml.comment` 变成
+   `# Opening` / `# Chronicle`。
+4. **禁止**把 LWR 当裸 prose 直接 dump 进 body（字段外的自由文本块）。
+5. **禁止**复活已退役字段名 `parent_work_record`。
+
+历史事故：`9d6cf339` 把 CommissionerRecord 从 TOML 数据字段旁路挪进 instruction comments（`# Opening`），
+测试期望被一并改写后静默绿。本条款把父→子「字段信封」永久定为合法形态；**不得**把该禁令误推到
+子→父 join——join 必须保持 `# LWR`（见 DELEG-013 / `EXEC_004_child_to_parent_lwr_is_hashed_comment_not_toml_field`）。
+
+含义/动机：类型化载荷让「任务」与「背景」在源码层可分；父→子 LWR 是 data containment 的值。
+子→父 join 把同一 record 当 entry-local 认知后果（instruction plane），不是第二份 TOML schema。
 
 证据：MOVE `tests/fork-child-payload.test.mjs`
-（`FORK_CHILD_PAYLOAD_commissioner_record_is_prose_with_instruction`、
-`FORK_CHILD_PAYLOAD_commissioner_lwr_stays_body_prose_not_hashed_instructions`、
+（`FORK_CHILD_PAYLOAD_commissioner_record_is_toml_data_field`、
+`FORK_CHILD_PAYLOAD_commissioner_lwr_is_toml_field_not_hashed_instructions`、
 `FORK_CHILD_PAYLOAD_*` 全组）；REUSE `tests/handle-exe008-child-background.test.mjs`
-（`EXEC_008_child_background_uses_latest_durable_snapshot`）。
+（`EXEC_008_child_background_uses_latest_durable_snapshot`）；方向互补硬锁 REUSE
+`tests/join-v2-wire.test.mjs`（`EXEC_004_child_to_parent_lwr_is_hashed_comment_not_toml_field`、
+`EXEC_004_work_record_lines_are_hash_prefixed_including_malicious`）。
 
 ## DELEG-020：委托语义不依赖当前工具名
 
@@ -279,9 +294,10 @@ work statement，不是第二套 instruction header。
 ## DELEG-021：fork attachment 只附背景，不转移 charge / authority
 
 `fork(..., attach?)` 可把同一 mission 内另一已知 person 的 canonical
-`LifecycleWorkRecord(includeOpening=true)` 作为 **ordinary WorkRecord prose** 放进被委托者的新 work-unit 首 prompt
-（与 DELEG-019 的 CommissionerRecord 同形态：instruction 只命名「这是附件背景」，LWR 正文进 body，
-**禁止** `# Opening` 式逐行 comment，**禁止** opaque `attached_work_record` 字段信封）。
+`LifecycleWorkRecord(includeOpening=true)` 作为 **`attached_work_record` TOML 数据字段**放进被委托者的新 work-unit 首 prompt
+（与 DELEG-019 的 `commissioner_record` 同形态、同属**父→子**方向：instruction 只命名字段，LWR 正文是 field value，
+**禁止**在父→子路径写成 `# Opening` 式逐行 comment，**禁止**字段外裸 prose）。
+子→父 join 仍用 `# LWR`（DELEG-013），不得与本条款混用。
 `attach` 只接受 parent handle projection 中可按 Byname 解析的 person；不接受任意 Host SessionId。
 attachment 是 data，不是 assignment：不改变本次 `charge`，不把附件中的未竟工作变成被委托者义务，
 不复制附件 person 的 Persona / authority / runtime topology。
@@ -296,7 +312,7 @@ Session clone。canonical LWR 是唯一可跨 participant 携带的 bounded work
 
 证据：GAP-011；`requirements/delegation/tests/fork-attachment.test.mjs`
 （`DELEG_021_attachment_is_background_between_commissioner_and_requirements`、
-`DELEG_021_attachment_lwr_stays_body_prose_not_hashed_instructions`、
+`DELEG_021_attachment_lwr_is_toml_field_not_hashed_instructions`、
 `DELEG_021_blank_attachment_is_absent_not_an_empty_section`、
 `DELEG_021_attachment_text_cannot_replace_the_assignment`）。
 

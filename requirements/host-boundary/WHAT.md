@@ -128,10 +128,13 @@ closed。禁止用 after 的 callID 与别处 messageID 猜测配对；禁止使
 
 ## HOST-BOUNDARY-010：多实例边界 — 共享身份注册表，每实例私有状态；不跨 await
 
-**规范**：跨 worktree 实例：`SessionParents` / `VerdictSessions` / `SessionDirectories` 是模块级
-共享单例；`AgentJournal` / Companions 缓存 / `OwnedSessions` / `UserMessageBindings` / hook 订阅
-每实例独有（`PluginRuntimeScope`）。共享表只由单一 Node.js event loop 访问，单次查改不跨
-`await`；跨异步边界先复制不可变快照；禁止「读取 → await → 按旧值回写」RMW（HOST-012 C2）。
+**规范**：跨 worktree 实例：`SessionParents` / `VerdictSessions` / `SessionDirectories` /
+`ReviewGuardNudges` 是模块级共享单例；`AgentJournal` / Companions 缓存 / `OwnedSessions` /
+`UserMessageBindings` / hook 订阅 / 每实例 `NudgeSent` 每实例独有（`PluginRuntimeScope`）。
+共享表只由单一 Node.js event loop 访问，单次查改不跨 `await`；跨异步边界先复制不可变快照；
+禁止「读取 → await → 按旧值回写」RMW（HOST-012 C2）。
+`ReviewGuardNudges` 的 key **不得**含 RuntimeId（每实例 Journal 各有 RuntimeId；含之则
+root/worktree 双实例对同一 missing-verdict occasion 各发一次 `ReviewerVerdictRequired`）。
 
 **含义/动机**：第二 worktree 实例读不到主实例 verdict 是实测边界（why/host.md §7）；
 共享 Journal writer 会折叠写盘。

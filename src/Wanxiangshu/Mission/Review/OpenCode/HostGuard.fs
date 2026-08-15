@@ -51,34 +51,18 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Resources
-open Wanxiangshu.Resources
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 module HostReviewGuard =
 
@@ -95,11 +79,9 @@ module HostReviewGuard =
 
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
-    /// Derived from PROMPT-005 `PendingClaims`, which is the durable record of a
-    /// continuation that was claimed and has not yet resolved. Deduplication must
-    /// read that record rather than a guard-specific acceptance flag: "a plugin
-    /// prompt landed" is a fact PROMPT-005 already owns, and a second name for it
-    /// can disagree with the first.
+    /// Derived from PROMPT-005 `PendingClaims` on the *calling* instance journal.
+    /// Cross-instance at-most-once is owned by SharedState.ReviewGuardNudges —
+    /// journals do not share RuntimeId or PendingClaims across plugin instances.
     let private hasOutstandingGuardClaim
         (journal: AgentJournal)
         (targetSessionId: SessionId)
@@ -112,21 +94,25 @@ module HostReviewGuard =
             |> Map.exists (fun _ claim -> claim.Origin = PromptAuthority.PromptOrigin.Continuation kind))
         |> Option.defaultValue false
 
-    // OpenCode creates one plugin instance for the root and one for every manager
-    // worktree. This reservation is process-wide so two instances reconciling the
-    // same guard requirement cannot both pass the durable preflight before either claim lands.
-    let private processNudgeKeys = HashSet<string>()
-
+    /// HOST-012: session-scoped reservation identity. Never RuntimeId — each
+    /// plugin instance has its own journal RuntimeId; including it made the
+    /// shared lock miss the twin instance and double-delivered ReviewerVerdictRequired.
     let private guardNudgeKey
-        (runtimeId: RuntimeId)
         (targetSessionId: SessionId)
+        (kind: PromptAuthority.ContinuationKind)
         (dedupeOccasion: string)
         (reason: string)
         =
+        let kindLabel =
+            match kind with
+            | PromptAuthority.ContinuationKind.ReviewConfirmation -> "confirm"
+            | PromptAuthority.ContinuationKind.ReviewerGuard -> "guard"
+            | _ -> "other"
+
         sprintf
             "review-guard:%s:%s:%s:%s"
-            (RuntimeId.value runtimeId)
             (SessionId.value targetSessionId)
+            kindLabel
             dedupeOccasion
             reason
 
@@ -135,60 +121,41 @@ module HostReviewGuard =
         | true, dir -> Some dir
         | false, _ -> None
 
+    let private tryReserve (nudgeKey: string) (journal: AgentJournal) (targetSessionId: SessionId) (kind: PromptAuthority.ContinuationKind) =
+        lock SharedState.ReviewGuardNudgeGate (fun () ->
+            if
+                hasOutstandingGuardClaim journal targetSessionId kind
+                || SharedState.ReviewGuardNudges.Contains nudgeKey
+            then
+                false
+            else
+                SharedState.ReviewGuardNudges.Add nudgeKey |> ignore
+                true)
+
+    let private releaseKey (nudgeKey: string) =
+        lock SharedState.ReviewGuardNudgeGate (fun () -> SharedState.ReviewGuardNudges.Remove nudgeKey |> ignore)
+
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (nudgeKeys: HashSet<string>)
         (targetSessionId: SessionId)
         (dedupeOccasion: string)
         (reason: string)
         (prompt: string)
-        (agent: string)
+        (continuationKind: PromptAuthority.ContinuationKind)
         : Task<GuardNudgeOutcome> =
         task {
             match journal with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
             | Some durable ->
-                let nudgeKey =
-                    guardNudgeKey (AgentJournal.runtimeId durable) targetSessionId dedupeOccasion reason
+                let nudgeKey = guardNudgeKey targetSessionId continuationKind dedupeOccasion reason
 
-                let continuationKind =
-                    match agent, reason with
-                    | "reviewer", r when r.Contains("confirm-perfect") ->
-                        PromptAuthority.ContinuationKind.ReviewConfirmation
-                    | _ -> PromptAuthority.ContinuationKind.ReviewerGuard
-
-                // The synchronous check+reservation is the atomic point. A rejected
-                // send releases it; an admitted/unknown send keeps it, because PROMPT-011
-                // forbids licensing a duplicate while physical acceptance is unresolved.
-                let reserved =
-                    lock processNudgeKeys (fun () ->
-                        if
-                            hasOutstandingGuardClaim durable targetSessionId continuationKind
-                            || nudgeKeys.Contains nudgeKey
-                            || processNudgeKeys.Contains nudgeKey
-                        then
-                            false
-                        else
-                            nudgeKeys.Add nudgeKey |> ignore
-                            processNudgeKeys.Add nudgeKey |> ignore
-                            true)
-
-                if not reserved then
+                // Synchronous check+reservation is the atomic point. Rejected /
+                // dead-worktree / Failed releases; admitted/unknown keeps it
+                // (PROMPT-011: no second license while physical acceptance is unresolved).
+                if not (tryReserve nudgeKey durable targetSessionId continuationKind) then
                     return GuardNudgeOutcome.AlreadyOutstanding
                 else
-                    let releaseKey () =
-                        lock processNudgeKeys (fun () ->
-                            nudgeKeys.Remove nudgeKey |> ignore
-                            processNudgeKeys.Remove nudgeKey |> ignore)
-
-                    // (a) Send-time directory guard. The recorded worktree may still
-                    // exist while its AGENTS.md has already been unlinked, so a prompt
-                    // built from it would drop the 102-byte instruction block. Only a
-                    // *recorded* directory that is gone or missing AGENTS.md is a real
-                    // seal-break condition: `None` (manager-forked children are never
-                    // registered in SessionDirectories) is the normal root-fallback
-                    // path and must keep sending.
                     let recordedDir = sessionDirectory targetSessionId
 
                     let worktreeIsAlive =
@@ -197,7 +164,7 @@ module HostReviewGuard =
                         | Some dir -> Directory.Exists dir && File.Exists(Path.Combine(dir, "AGENTS.md"))
 
                     if not worktreeIsAlive then
-                        releaseKey ()
+                        releaseKey nudgeKey
                         return GuardNudgeOutcome.NoLongerRequired
                     else
                         // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
@@ -214,26 +181,24 @@ module HostReviewGuard =
                         match sent with
                         | Ok key -> return GuardNudgeOutcome.Sent key
                         | Error error ->
-                            releaseKey ()
+                            releaseKey nudgeKey
                             return GuardNudgeOutcome.Failed error
         }
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (nudgeKeys: HashSet<string>)
         (sessionId: SessionId)
         (triggerProviderRun: ProviderRunIdentity)
         =
         sendGuardNudge
             sessionPort
             journal
-            nudgeKeys
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "missing-verdict"
             (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-            "reviewer"
+            PromptAuthority.ContinuationKind.ReviewerGuard
 
     /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only
     /// makes the Host start the next provider request; the confirmation itself comes
@@ -281,31 +246,28 @@ module HostReviewGuard =
     let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (nudgeKeys: HashSet<string>)
         (sessionId: SessionId)
         (triggerProviderRun: ProviderRunIdentity)
         =
         sendGuardNudge
             sessionPort
             journal
-            nudgeKeys
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "confirm-perfect"
             (reviewChallengeVisibleBytes sessionId)
-            "reviewer"
+            PromptAuthority.ContinuationKind.ReviewConfirmation
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
     let continuationPort
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (nudgeKeys: HashSet<string>)
         : ReviewerContinuationPort =
         { NudgeMissingVerdict =
             fun sessionId providerRun ->
                 task {
-                    let! _ = nudgeReviewer sessionPort journal nudgeKeys sessionId providerRun
+                    let! _ = nudgeReviewer sessionPort journal sessionId providerRun
                     // Preserve existing boundary: missing-verdict send failure was
                     // not terminal; the next durable observation may re-enter.
                     return Ok()
@@ -313,7 +275,7 @@ module HostReviewGuard =
           SendPerfectChallenge =
             fun sessionId providerRun ->
                 task {
-                    match! requestPerfectConfirmation sessionPort journal nudgeKeys sessionId providerRun with
+                    match! requestPerfectConfirmation sessionPort journal sessionId providerRun with
                     | GuardNudgeOutcome.Failed reason -> return Error reason
                     | _ -> return Ok()
                 } }

@@ -170,7 +170,7 @@ module HostSignalBootstrap =
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
 
             let reviewerContinuationPort =
-                HostReviewGuard.continuationPort sessionPort journal scope.Sessions.NudgeSent
+                HostReviewGuard.continuationPort sessionPort journal
 
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with

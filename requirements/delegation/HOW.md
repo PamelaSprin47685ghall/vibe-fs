@@ -12,26 +12,48 @@
 | `commission` | Orchestrator | 独立集成之路；calling 在场=新路，缺省=续做；可选 tool-call estimate | `Application/Orchestration/*.fs`、`Infrastructure/Git/WorktreeResource.fs` |
 | `inspect` / `establish-behavior` / `repair-behavior` | SyncDelegate callers | 同步委托；普通 completion → bounded WorkRecord；可选 tool-call estimate | `Session/{SyncDelegateRuntime,SyncDelegateWorkflow,SyncDelegateWait,SyncDelegateCallStore}.fs` |
 
+### LWR 跨边界 wire：方向不对称
+
+```text
+父 → 子（fork child 首 prompt）  commissioner_record / attached_work_record = '''…'''
+子 → 父（join completed）         SyntheticToml.comment(LWR)  →  # Chronicle / # Recent work …
+```
+
+LWR 段标题字面始终是纯文本（`LifecycleWorkRecord.render`）；`# ` 只在子→父 join 的
+`JoinResultRenderer` 经 `SyntheticToml.comment` 注入。禁止把父→子的「字段信封」裁决
+反向套到 join，也禁止把 join 的 `# LWR` 裁决反向套到 fork child payload。
+
 ### fork child 首 prompt：CommissionerRecord / Attachment（DELEG-019 / DELEG-021）
 
 `ForkChildPayload.render`（`src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs`）：
 
 - **instructions**：Assignment + Base +（可选）CommissionerRecord *instruction* +（可选）Attachment
   *instruction* +（可选）Requirements *instruction*。
-- **body**：可选 `content` 字段 → **CommissionerRecord LWR 原文 prose** → **Attachment LWR 原文 prose** →
-  `[[root_requirement]]` table array。
+- **body**：可选 `content` → **`commissioner_record = <renderString LWR>`** →
+  **`attached_work_record = <renderString LWR>`** → `[[root_requirement]]` table array。
 
-LWR 以整块 body prose 进入文档，**不得** `record.Split('\n')` 后再塞进 `instructions`
-（那会经 `SyntheticToml.document` → `comment` 变成 `# Opening` / `# Chronicle`）。段标题纯文本合同属
-`work-record`；本包只负责不要在委派 envelope 上二次加 `# `。
+父→子路径上，LWR 必须是 TOML 数据字段的值，**不得** `record.Split('\n')` 后再塞进 `instructions`
+（那会经 `SyntheticToml.document` → `comment` 变成 `# Opening` / `# Chronicle`），也不得当裸 prose dump。
+已退役名 `parent_work_record` 不得再出现。
+
+### join completed：子→父 `# LWR`（DELEG-013 / EXEC-004）
+
+`JoinResultRenderer.renderAgentCompleted`（`Fork/OpenCode/JoinResultRenderer.fs`）：
+
+- **instructions**：自然语言后果（「`<byname>` has returned.」）。
+- **body**：非空 WorkRecord → **`SyntheticToml.comment payload.WorkRecord`**（entry-local `# LWR`）。
+- **禁止** `work_record = …` / 其它 TOML 字段包裹子→父 LWR；空 LWR 只发 framing，不发空 comment。
+
+（NEEDHELP advice 的 `consultation_record` 是另一 projection surface，见 DELEG-018；
+不改变 join 的 `# LWR` 合同。）
 
 ### fork attachment（DELEG-021）
 
 `attach` 在 parent `HandleProjection` 以 Byname 定位 sibling/retired child，再调用唯一
 `LifecycleWorkRecord(includeOpening=true)` projector。`ForkChildPayload` 只接收 `Attachment: string option`，
-在 CommissionerRecord prose 之后、`[[root_requirement]]` 之前放入 attachment LWR body prose；不解析 LWR、
-不复制 Journal projection、不发明 `attached_work_record` 字段。new fork 与 idle reuse 可物化；busy reuse
-不物化，只返回自然语言 deferred 说明。unknown/self 在任何 send 前拒绝。
+渲染为 `attached_work_record` 字段（位于 `commissioner_record` 之后、`[[root_requirement]]` 之前）；
+不解析 LWR、不复制 Journal projection。new fork 与 idle reuse 可物化；busy reuse 不物化，只返回自然语言
+deferred 说明。unknown/self 在任何 send 前拒绝。
 
 ### delegated tool estimate（DELEG-022）
 

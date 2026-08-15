@@ -1,8 +1,10 @@
 // RVGD: HostReviewGuard — REVIEW-003/007 guard nudges over real journal + fake port.
+// HOST-012: reservation lives in SharedState.ReviewGuardNudges (no RuntimeId) so
+// root + worktree plugin instances cannot both deliver ReviewerVerdictRequired.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -15,7 +17,7 @@ const { nudgeReviewer, requestPerfectConfirmation } =
   await import('../../../dist/Mission/Review/OpenCode/HostGuard.js')
 const { openBarrier } = await import('../../../dist/Mission/Review/Barrier/Workflow.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const { SessionDirectories } = await import('../../../dist/OpenCode/Host/SharedState.js')
+const { SessionDirectories, clearReviewGuardNudgesForTests } = await import('../../../dist/OpenCode/Host/SharedState.js')
 
 const VERDICT_NUDGE = '# Your previous response did not submit a verdict.'
 
@@ -41,6 +43,8 @@ const rootFact = (sid, agent = 'reviewer') =>
 
 const outcomeName = (outcome) => outcome.cases()[outcome.tag]
 
+const clearGuardNudges = () => clearReviewGuardNudgesForTests()
+
 const openSeeded = async (sid, agent = 'reviewer') => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })
@@ -50,26 +54,30 @@ const openSeeded = async (sid, agent = 'reviewer') => {
   return { opened, cleanup: () => {
     try { opened.dispose() } catch {}
     rmSync(dir, { recursive: true, force: true })
+    clearGuardNudges()
   } }
 }
 
 test('RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
-  const outcome = await nudgeReviewer(capturingPort([]), null, new Set(), sessionId('ses_rv'), logicalRunId('run_1'))
+  clearGuardNudges()
+  const outcome = await nudgeReviewer(capturingPort([]), null, sessionId('ses_rv'), logicalRunId('run_1'))
   assert.equal(outcomeName(outcome), 'Failed')
   assert.match(outcome.fields[0], /requires an AgentJournal/)
 })
 
 test('RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
+  clearGuardNudges()
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
   try {
-    const outcome = await nudgeReviewer(capturingPort([]), opened.journal, new Set(), sessionId('ses_rv'), logicalRunId('run_1'))
+    const outcome = await nudgeReviewer(capturingPort([]), opened.journal, sessionId('ses_rv'), logicalRunId('run_1'))
     assert.equal(outcomeName(outcome), 'Failed')
     assert.match(outcome.fields[0], /No active authority profile/)
   } finally {
     opened.dispose()
     rmSync(dir, { recursive: true, force: true })
+    clearGuardNudges()
   }
 })
 
@@ -78,17 +86,49 @@ test('RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
   const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
-    const first = await nudgeReviewer(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_1'))
+    const first = await nudgeReviewer(capturingPort(captured), opened.journal, sid, logicalRunId('run_1'))
     assert.equal(outcomeName(first), 'Sent', JSON.stringify(first.fields?.[0]))
     assert.ok(first.fields[0], 'Sent carries a PromptKey')
     assert.equal(captured.length, 1)
     assert.ok(captured[0].text.startsWith(VERDICT_NUDGE), `verdict guard prompt expected: ${captured[0].text}`)
     assert.equal(captured[0].session, sid)
 
-    const second = await nudgeReviewer(capturingPort([]), opened.journal, new Set(), sid, logicalRunId('run_1'))
-    assert.equal(outcomeName(second), 'AlreadyOutstanding', 'durable claim must suppress a second nudge')
+    const second = await nudgeReviewer(capturingPort([]), opened.journal, sid, logicalRunId('run_1'))
+    assert.equal(outcomeName(second), 'AlreadyOutstanding', 'shared reservation must suppress a second nudge')
   } finally {
     cleanup()
+  }
+})
+
+test('RVGD_nudgeReviewer_cross_instance_reservation_suppresses_twin_send', async () => {
+  // Two journals = two plugin instances (distinct RuntimeId). The old key
+  // embedded RuntimeId so each instance reserved a different slot and both
+  // delivered ReviewerVerdictRequired — the always-double-send failure.
+  const sid = sessionId('ses_rv_xinst')
+  const a = await openSeeded(sid, 'reviewer')
+  const bDir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-b-'))
+  const bOpened = await agentJournal.create({ directory: bDir })
+  assert.equal(bOpened.ok, true)
+  const bAppended = await AgentJournalModule_appendAgent(
+    stream.session(sid),
+    undefined,
+    rootFact(sid, 'reviewer'),
+    bOpened.journal,
+  )
+  assert.equal(caseOf(bAppended), 'Ok')
+  try {
+    const captured = []
+    const first = await nudgeReviewer(capturingPort(captured), a.opened.journal, sid, logicalRunId('run_x'))
+    assert.equal(outcomeName(first), 'Sent', JSON.stringify(first.fields?.[0]))
+    assert.equal(captured.length, 1)
+
+    const twin = await nudgeReviewer(capturingPort(captured), bOpened.journal, sid, logicalRunId('run_x'))
+    assert.equal(outcomeName(twin), 'AlreadyOutstanding', 'twin instance must not deliver a second identical nudge')
+    assert.equal(captured.length, 1, 'exactly one physical SendPrompt for one missing-verdict occasion')
+  } finally {
+    try { bOpened.dispose() } catch {}
+    rmSync(bDir, { recursive: true, force: true })
+    a.cleanup()
   }
 })
 
@@ -97,14 +137,14 @@ test('RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', asyn
   const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
-    const first = await requestPerfectConfirmation(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_2'))
+    const first = await requestPerfectConfirmation(capturingPort(captured), opened.journal, sid, logicalRunId('run_2'))
     assert.equal(outcomeName(first), 'Sent', JSON.stringify(first.fields?.[0]))
     assert.ok(first.fields[0])
     assert.equal(captured.length, 1)
     assert.ok(captured[0].text.length > 0, 'confirmation prompt must be non-empty')
     assert.notEqual(captured[0].text, VERDICT_NUDGE, 'confirmation uses the rendered challenge, not the verdict guard')
 
-    const second = await requestPerfectConfirmation(capturingPort([]), opened.journal, new Set(), sid, logicalRunId('run_2'))
+    const second = await requestPerfectConfirmation(capturingPort([]), opened.journal, sid, logicalRunId('run_2'))
     assert.equal(outcomeName(second), 'AlreadyOutstanding')
   } finally {
     cleanup()
@@ -118,7 +158,7 @@ test('RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', asy
   SessionDirectories.set('ses_rv3', worktree)
   try {
     const captured = []
-    const outcome = await nudgeReviewer(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_3'))
+    const outcome = await nudgeReviewer(capturingPort(captured), opened.journal, sid, logicalRunId('run_3'))
     assert.equal(outcomeName(outcome), 'NoLongerRequired', 'a recorded worktree without AGENTS.md is dead')
     assert.equal(captured.length, 0, 'no prompt may be sent to a dead worktree')
   } finally {
@@ -136,7 +176,7 @@ test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
   SessionDirectories.set('ses_rv4', worktree)
   try {
     const captured = []
-    const outcome = await nudgeReviewer(capturingPort(captured), opened.journal, new Set(), sid, logicalRunId('run_4'))
+    const outcome = await nudgeReviewer(capturingPort(captured), opened.journal, sid, logicalRunId('run_4'))
     assert.equal(outcomeName(outcome), 'Sent', JSON.stringify(outcome.fields?.[0]))
     assert.equal(captured.length, 1)
   } finally {
@@ -147,6 +187,7 @@ test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
 })
 
 test('RVGD_openBarrier_is_the_shared_review_barrier_writer', async () => {
+  clearGuardNudges()
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)

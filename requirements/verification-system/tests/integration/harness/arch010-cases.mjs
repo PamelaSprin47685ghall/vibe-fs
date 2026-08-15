@@ -171,7 +171,11 @@ export const arch010Cases = [
       );
       assertTrue(
         payloads['fork: parent record'].includes('Parent investigated the race.'),
-        'the parent-record fixture must carry commissioner history in the instruction header',
+        'the parent-record fixture must carry commissioner history as data',
+      );
+      assertTrue(
+        payloads['fork: parent record'].includes('commissioner_record ='),
+        'commissioner history must be the commissioner_record TOML data field',
       );
       assertTrue(
         !payloads['fork: parent record'].includes('parent_work_record ='),
@@ -233,16 +237,17 @@ export const arch010Cases = [
       const parsed = parseToml(document);
 
       assertEq(parsed.assignment, undefined, 'the assignment is instruction text, never a field');
-      assertTrue(document.includes('# nested literal'), 'commissioner history stays in the instruction header');
+      assertTrue(document.includes('# nested literal'), 'assignment injection stays in the instruction header');
       assertTrue(!('parent_work_record' in parsed), 'the retired parent_work_record field must not appear');
-      assertTrue(!('commissioner_record' in parsed), 'commissioner history must not use an opaque string field');
+      assertTrue('commissioner_record' in parsed, 'commissioner history must be the commissioner_record data field');
+      // Bodies containing `'''` cannot use the literal multi-line form, so this lands in a basic
+      // string — no literal-block trailing newline, but every byte of the injection survives.
+      assertEq(parsed.commissioner_record, ASSIGNMENT_INJECTION, 'the whole commissioner injection must survive as a data value');
       assertTrue(!('instruction' in parsed), 'the injected instruction field must not reach the top level');
       assertTrue(!('status' in parsed), 'the injected status field must not reach the top level');
       assertTrue(!('item' in parsed), 'the injected table header must not create a table');
       assertEq(parsed.root_requirement.length, 1, 'exactly the one declared requirement entry');
       assertEq(parsed.root_requirement[0].ordinal, 1, 'the injected ordinal must not win');
-      // Bodies containing `'''` cannot use the literal multi-line form, so this lands in a basic
-      // string — no literal-block trailing newline, but every byte of the injection survives.
       assertEq(parsed.root_requirement[0].text, INJECTION, 'the whole injection must survive inside the requirement value');
 
       // The comment token is in the TEXT the model reads, which is the other half of containment: the

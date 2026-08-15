@@ -1,7 +1,7 @@
 // tests/unit/Execution/fork-child-payload.test.mjs — ARCH-010 / FORK_CHILD_PAYLOAD.
 //
-// Fork child payload: assignment → instruction comments; commissioner record as
-// WorkRecord prose; root_requirement table array; optional content field.
+// Fork child payload: assignment → instruction comments; commissioner LWR as
+// `commissioner_record` TOML data field; root_requirement table array; optional content.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -61,7 +61,7 @@ const expectedBytes = (
   }
 
   if (commissionerRecord !== undefined && commissionerRecord.trim() !== '') {
-    body.push(commissionerRecord.trim())
+    body.push(`commissioner_record = ${basicString(commissionerRecord.trim())}`)
   }
 
   for (let i = 0; i < requirements.length; i += 1) {
@@ -134,20 +134,19 @@ test('FORK_CHILD_PAYLOAD_payload_multiline_round_trips_through_toml', () => {
   assert.equal(parsed.content, `${payload}\n`)
 })
 
-test('FORK_CHILD_PAYLOAD_commissioner_record_is_prose_with_instruction', () => {
+test('FORK_CHILD_PAYLOAD_commissioner_record_is_toml_data_field', () => {
   const document = fork.render({ assignment: ASSIGNMENT, commissionerRecord: RECORD })
+  const parsed = parseToml(document)
 
   assert.equal(document, expectedBytes(ASSIGNMENT, { commissionerRecord: RECORD }))
-  assert.ok(document.includes(RECORD))
-  assert.ok(!document.includes('parent_work_record'))
+  assert.equal(parsed.commissioner_record, RECORD)
   assert.ok(document.includes(instructionComment(fork.commissionerRecordInstruction)))
-  // LWR body prose must not be re-commented as `# …` instruction lines.
   assert.ok(!document.includes(`# ${RECORD}`))
 })
 
-// DELEG-019 hard lock: Commissioner LWR stays ordinary WorkRecord prose in the body.
-// Regression root: 9d6cf339 Split the record into instructions → `# Opening` / `# Chronicle`.
-test('FORK_CHILD_PAYLOAD_commissioner_lwr_stays_body_prose_not_hashed_instructions', () => {
+// DELEG-019 hard lock: Commissioner LWR is a TOML data field, never `# Opening` instructions
+// and never bare prose dumped outside a field. Regression: 9d6cf339 Split → hashed comments.
+test('FORK_CHILD_PAYLOAD_commissioner_lwr_is_toml_field_not_hashed_instructions', () => {
   const lwr = [
     'Opening',
     'Investigate the fallback race.',
@@ -159,15 +158,16 @@ test('FORK_CHILD_PAYLOAD_commissioner_lwr_stays_body_prose_not_hashed_instructio
     'still open',
   ].join('\n')
   const document = fork.render({ assignment: ASSIGNMENT, commissionerRecord: lwr })
+  const parsed = parseToml(document)
 
   assert.ok(document.includes(instructionComment(fork.commissionerRecordInstruction)))
-  assert.ok(document.includes('\n\nOpening\n'), 'Opening must be bare body prose')
-  assert.ok(document.includes('\nChronicle\n'), 'Chronicle must be bare body prose')
-  assert.ok(document.includes('\nRecent work\n'), 'Recent work must be bare body prose')
+  assert.ok(document.includes('commissioner_record ='))
+  assert.equal(parsed.commissioner_record, `${lwr}\n`)
   assert.equal(document.includes('# Opening'), false, 'must not hash LWR section headings')
   assert.equal(document.includes('# Chronicle'), false)
   assert.equal(document.includes('# Recent work'), false)
-  assert.equal(document.includes('parent_work_record'), false)
+  // Bare prose outside the field would appear as a top-level non-field block after the header.
+  assert.equal(/\n\nOpening\n/.test(document.replace(/commissioner_record = '''[\s\S]*?'''/, '')), false)
 })
 
 test('FORK_CHILD_PAYLOAD_blank_commissioner_record_is_absent_not_empty', () => {
@@ -176,10 +176,11 @@ test('FORK_CHILD_PAYLOAD_blank_commissioner_record_is_absent_not_empty', () => {
 
     assert.equal(document, expectedBytes(ASSIGNMENT, {}))
     assert.ok(!document.includes(fork.commissionerRecordInstruction))
+    assert.equal(parseToml(document).commissioner_record, undefined)
   }
 
-  const trimmed = fork.render({ assignment: ASSIGNMENT, commissionerRecord: `  ${RECORD}  ` })
-  assert.ok(trimmed.includes(RECORD))
+  const trimmed = parseToml(fork.render({ assignment: ASSIGNMENT, commissionerRecord: `  ${RECORD}  ` }))
+  assert.equal(trimmed.commissioner_record, RECORD)
 })
 
 test('FORK_CHILD_PAYLOAD_requirements_render_table_array_with_one_based_ordinals', () => {
@@ -226,7 +227,7 @@ test('FORK_CHILD_PAYLOAD_full_shape_orders_content_before_record_before_requirem
     }),
   )
   const contentIndex = document.indexOf('content =')
-  const recordIndex = document.indexOf(RECORD)
+  const recordIndex = document.indexOf('commissioner_record =')
   const reqIndex = document.indexOf('[[root_requirement]]')
   assert.ok(contentIndex < recordIndex && recordIndex < reqIndex)
   assert.ok(!document.includes('\n\n\n'), 'no double blank lines in the body')

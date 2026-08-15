@@ -76,8 +76,10 @@ Review 双 PERFECT（消费点归各 owner）。
   comment），还是当作结构化数据读取（→ field/table/value）」。
 - 非法判据：trusted/untrusted、current/historical、来源方、祈使句外形。
 - 已正确 surface 清单（禁止回退）：FinalityPrompt rejected/blessed → comment blocks；
-  Join completed work_record → entry-local comment；ForkChildPayload parent_work_record →
-  data；ReviewChallenge → comment-only；RuntimeNudge.* → document。
+  **Join completed work_record → entry-local `# LWR` comment（子→父；禁止 `work_record =`）**；
+  **ForkChildPayload `commissioner_record` / `attached_work_record` → data field（父→子；禁止
+  Split→`# Opening`）**；ReviewChallenge → comment-only；RuntimeNudge.* → document。
+  同一 LWR 在两向合法采用不同 plane（PROVIDER-PROJECTION-009）；方向不得混用。
 
 ## 失败路径
 

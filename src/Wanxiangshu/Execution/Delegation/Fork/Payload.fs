@@ -100,15 +100,19 @@ module ForkChildPayload =
              | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
                  [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
              | _ -> [])
-            // Commissioner / attachment history as ordinary WorkRecord prose in the
-            // ARCH-010 body (DELEG-019/021). Do NOT Split into instructions: that
-            // would become `# Opening` / `# Chronicle` via SyntheticToml.comment.
-            // Do NOT wrap as opaque TOML fields (historical parent_work_record).
+            // Commissioner / attachment LWR as ARCH-010 data fields (DELEG-019/021).
+            // Parent → child only: instruction header names the field; the record
+            // itself is a TOML string value — never Split into `# Opening` /
+            // `# Chronicle` comments, never dumped as bare prose outside a field.
+            // Child → parent join is the opposite plane (`# LWR` via
+            // JoinResultRenderer / SyntheticToml.comment) — do not conflate.
             @ (match commissionerRecord with
-               | Some record -> [ record ]
+               | Some record ->
+                   [ SyntheticToml.field "commissioner_record" (SyntheticToml.renderString record) ]
                | None -> [])
             @ (match attachment with
-               | Some record -> [ record ]
+               | Some record ->
+                   [ SyntheticToml.field "attached_work_record" (SyntheticToml.renderString record) ]
                | None -> [])
             @ (requirements
                |> List.mapi (fun index text ->

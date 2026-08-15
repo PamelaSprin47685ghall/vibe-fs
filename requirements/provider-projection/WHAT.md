@@ -118,12 +118,19 @@ TOML 反解析出控制流。
 以下**都不是**合法判据：trusted→comment、untrusted→data；current→comment、
 historical→data；来自 child→data、来自 Host→comment；像祈使句→comment、像事实→data。
 分类发生在**每一次投影边界**；同一来源内容在不同 surface 可合法采用不同 plane。
+典型方向不对称：同一段 `LifecycleWorkRecord` 在**父→子** fork payload 进 data field
+（`commissioner_record` / `attached_work_record`），在**子→父** join completed 进
+entry-local `# LWR` comment（`SyntheticToml.comment`）——禁止把一侧的裁决套到另一侧。
 
 **含义**：显式采用是安全边界——内容不能自行升格为指令；可信度/来源/历史性只影响 owner
 是否愿意采用，不决定 wire plane。
 **边界**：具体 surface（FinalityPrompt、JoinResult、ForkChildPayload、ReviewChallenge…）
 的 schema 与语义归各 owner；「分类判据」的本体归本包。
-**证据**：corrective.md §1/§2（已正确 surface 清单）。
+**证据**：corrective.md §1/§2（已正确 surface 清单）；方向互补硬锁见
+`requirements/delegation/tests/join-v2-wire.test.mjs`
+`EXEC_004_child_to_parent_lwr_is_hashed_comment_not_toml_field` 与
+`requirements/delegation/tests/fork-child-payload.test.mjs`
+`FORK_CHILD_PAYLOAD_commissioner_lwr_is_toml_field_not_hashed_instructions`。
 
 ## PROVIDER-PROJECTION-010：representation 不反向创造 authority/state/lifecycle
 
