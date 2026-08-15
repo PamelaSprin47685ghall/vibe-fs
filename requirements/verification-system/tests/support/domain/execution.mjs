@@ -265,7 +265,7 @@ export const forkRuntime = (() => {
 
 /**
  * Distillation map/reduce: distillSpool cancels owned children on failure.
- * Fake IDistillationRuntime: Fork / JoinWithPermit / AwaitAgentWithPermit / CancelAgent.
+ * Fake IDistillationRuntime: Fork / AwaitAgentWithPermit / CancelAgent.
  * Permit-gated in production (requirePermit → HostForkRuntime).
  */
 export const distillationRuntime = (() => {
@@ -285,7 +285,7 @@ export const distillationRuntime = (() => {
     /** Hard fail: FamilyBlocked / real join timeout → ForkError.NotFound (no Waiting retry). */
     notFound: (agentId = 'missing') => errorResult(new ForkError(4, [agentId])),
     /**
-     * Fake IDistillationRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
+     * Fake IDistillationRuntime. AwaitAgentWithPermit returns Promise of Result.
      * Default → TimedOut so await fails after fork.
      */
     fake: ({ fork, join, awaitAgent, awaitRecoveryReadiness, cancel } = {}) => {

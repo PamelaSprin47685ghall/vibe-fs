@@ -13,6 +13,9 @@ open Wanxiangshu.Resources
 /// boundary (JS-SEMANTIC-SURFACE-003/005); the F# core keeps its records.
 module ForkChildPayloadSurface =
 
+    /// Guard for JS absent fields. Written explicitly (not just isNull) so the
+    /// undefined case is visible at the surface; isNull alone would cover it
+    /// via loose equality, but the double check documents the JS contract.
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
