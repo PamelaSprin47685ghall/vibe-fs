@@ -106,7 +106,6 @@
     "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs": 6,
     "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs": 4,
     "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs": 1,
-    "src/Wanxiangshu/OpenCode/Host/PluginHost.fs": 5,
     "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs": 3,
     "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs": 2,
     "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs": 3,

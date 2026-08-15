@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.EventStore
@@ -37,69 +38,74 @@ module PluginHost =
     [<Import("pid", "node:process")>]
     let processId: int = jsNative
 
+    let private nonBlankDirectory (directory: string) : string option =
+        if String.IsNullOrWhiteSpace directory then
+            None
+        else
+            Some directory
+
     let workspaceDirectory (input: obj) : string option =
         if isNull input || isNull input?directory then
             None
         else
-            let directory = unbox<string> input?directory
+            input?directory |> unbox<string> |> nonBlankDirectory
 
-            if String.IsNullOrWhiteSpace directory then
-                None
-            else
-                Some directory
+    let private readDurableStreams commonDir runtimeDir =
+        ProcessEventLog.readStreams commonDir
+        |> Result.mapError (fun error -> sprintf "durable bytes unreadable at %s: %A" runtimeDir error)
+
+    let private requirePayloadIntegrity commonDir runtimeDir streams : Result<unit, string> =
+        streams
+        |> List.collect snd
+        |> List.collect (fun envelope -> envelope.PayloadRefs)
+        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
+        |> Option.map (fun payloadRef ->
+            sprintf "durable payload unreadable at %s: %s" runtimeDir (PayloadRef.value payloadRef))
+        |> Option.map Error
+        |> Option.defaultValue (Ok())
+
+    let private semanticUnavailable reason : Result<AgentJournal option, string> =
+        Diagnostic.emit "journal-semantic-unavailable" [ "result", reason ]
+        Ok None
+
+    let private resolveJournalAvailability (availability: Result<AgentJournal, FoldRejection>) =
+        match availability with
+        | Ok journal -> Ok(Some journal)
+        | Error rejection -> semanticUnavailable (sprintf "%s (%s)" rejection.Reason rejection.Fact)
+
+    let private acquireWorkspaceJournal commonDir runtimeDir : Task<Result<AgentJournal option, string>> =
+        task {
+            try
+                let port = WorkspaceEventStore.bootPort commonDir
+
+                let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
+                    taskResult {
+                        let! writer, _, projection = port.ResumeOrCreate(runtimeId, processId, startedAt)
+                        return! AgentJournal.createFromProjection writer projection
+                    }
+
+                let! acquired = SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal
+                return resolveJournalAvailability acquired
+            with ex ->
+                return semanticUnavailable ex.Message
+        }
+
+    let private createWorkspaceJournal workspace : Task<Result<AgentJournal option, string>> =
+        taskResult {
+            let commonDir = RuntimePath.gitCommonDir workspace
+            let runtimeDir = RuntimePath.forWorkspace workspace
+            let! streams = readDurableStreams commonDir runtimeDir
+            do! requirePayloadIntegrity commonDir runtimeDir streams
+            return! acquireWorkspaceJournal commonDir runtimeDir
+        }
 
     /// Load may read durable bytes, but it never repairs semantic state. Physical
-    /// corruption is a load error; a domain fold/replay rejection only disables the
-    /// journal capability for this plugin instance.
+    /// corruption is a load error; a domain fold rejection only disables the journal
+    /// capability for this plugin instance.
     let createJournal (input: obj) : Task<Result<AgentJournal option, string>> =
-        task {
-            match workspaceDirectory input with
-            | None -> return Ok None
-            | Some workspace ->
-                let commonDir = RuntimePath.gitCommonDir workspace
-                let runtimeDir = RuntimePath.forWorkspace workspace
-
-                match ProcessEventLog.readStreams commonDir with
-                | Error error -> return Error(sprintf "durable bytes unreadable at %s: %A" runtimeDir error)
-                | Ok streams ->
-                    let missingPayload =
-                        streams
-                        |> List.collect snd
-                        |> List.collect (fun envelope -> envelope.PayloadRefs)
-                        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
-
-                    match missingPayload with
-                    | Some payloadRef ->
-                        return
-                            Error(
-                                sprintf "durable payload unreadable at %s: %s" runtimeDir (PayloadRef.value payloadRef)
-                            )
-                    | None ->
-                        try
-                            let port = WorkspaceEventStore.bootPort commonDir
-
-                            let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
-                                task {
-                                    match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
-                                    | Error err -> return Error err
-                                    | Ok(writer, _, projection) ->
-                                        return AgentJournal.createFromProjection writer projection
-                                }
-
-                            match!
-                                SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal
-                            with
-                            | Ok journal -> return Ok(Some journal)
-                            | Error rejection ->
-                                Diagnostic.emit
-                                    "journal-semantic-unavailable"
-                                    [ "result", sprintf "%s (%s)" rejection.Reason rejection.Fact ]
-
-                                return Ok None
-                        with ex ->
-                            Diagnostic.emit "journal-semantic-unavailable" [ "result", ex.Message ]
-                            return Ok None
-        }
+        match workspaceDirectory input with
+        | None -> Task.FromResult(Ok None)
+        | Some workspace -> createWorkspaceJournal workspace
 
     let gitTreePortFromInput (input: obj) : GitTreePort option =
         if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
