@@ -210,7 +210,7 @@
 
 ## REPOSITORY-PROGRAMMING-021 — 静态门禁：禁手写 per-role js-* 变体
 
-**规范陈述**：生产源码中禁止手写 per-role `js-*` 工具变体。唯一合法的 `js-*` 工具名是 `JsToolGenerator` 在运行时构造的名字（`js-` + roleName）；任何字面量 per-role `js-*` 名出现在生产源码（除权限矩阵的合法枚举：`src/Wanxiangshu/Tools/StaticTools.fs`）意味着引入了手写变体 → fail closed。G3 rebase debt 的 `js-student`/`js-teacher`/`StudentCompileJs`/`StudentLearnJs`/`StudentTeacherJs` 等 token 永久禁止（FORBIDDEN）。
+**规范陈述**：生产源码中禁止手写 per-role `js-*` 工具变体。唯一合法的 `js-*` 工具名是 `JsToolGenerator` 在运行时构造的名字（`js-` + roleName）；任何字面量 per-role `js-*` 名出现在生产源码（除权限矩阵的合法枚举：`src/Wanxiangshu/Tools/StaticTools.fs`）意味着引入了手写变体 → fail closed。
 
 **含义/动机**：手写变体是「生成器不存在的第五份实现」——它不经过 capability 投影，必然与唯一权威漂移。静态门禁让「新增手写 js-* 工具」在编译/门禁期就红。
 

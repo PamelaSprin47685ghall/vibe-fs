@@ -38,7 +38,7 @@
 
 ### 静态门禁
 
-`scripts/checks/js-surface-gate.mjs`：`FORBIDDEN_TOKENS`（js-student/js-teacher 等 G3 debt）+ `HANDWRITTEN_ROLE_TOOL_TOKENS`（js-coder 等字面量）→ 扫描 `src/Wanxiangshu/**`；唯一合法静态枚举 = `src/Wanxiangshu/Tools/StaticTools.fs`（权限矩阵 schema 层）。`requirements/repository-programming/tests/js-surface-gate.test.mjs` 原为门禁的单元 oracle，已随本包 MOVE 为 `js-surface-gate.test.mjs`。
+`scripts/checks/js-surface-gate.mjs`：`HANDWRITTEN_ROLE_TOOL_TOKENS`（js-coder 等字面量）→ 扫描 `src/Wanxiangshu/**`；唯一合法静态枚举 = `src/Wanxiangshu/Tools/StaticTools.fs`（权限矩阵 schema 层）。`requirements/repository-programming/tests/js-surface-gate.test.mjs` 原为门禁的单元 oracle，已随本包 MOVE 为 `js-surface-gate.test.mjs`。G3 debt 考古 token（js-student/js-teacher 等 `FORBIDDEN_TOKENS`）已随 CLN-Z 退役。
 
 ## 主流程（唯一实现序）
 
@@ -83,7 +83,7 @@ resolve Attempt → immutable profile（AttemptExecutionProfile.ToolCapabilitySe
 
 ### 判定为 GARBAGE（migration/clean-break 沉积，不进入永久 WHAT）
 
-- `js-student`/`js-teacher`/`StudentLearnJs`/`StudentCompileJs`/`StudentTeacherJs`：G3 rebase debt，已删领域（`PROMPT-012` absence）。`FORBIDDEN_TOKENS` 是 absence ratchet；新世界基线稳定后可删（PROOF-MAP DELETE 清单）。
+- `js-student`/`js-teacher`/`StudentLearnJs`/`StudentCompileJs`/`StudentTeacherJs`：G3 rebase debt，已删领域（`PROMPT-012` absence）。`FORBIDDEN_TOKENS` absence ratchet 已随 CLN-Z 退役（阶段 3：设计本身使旧世界不可表达）。
 - 旧结果面 golden（`status = "ok"` / `result = "{...}"` / 逗号拼接 `written`）：`js-tools-toml-result.md` 已 clean-break，旧字符串结果不迁移。
 
 ### 不归本包（COVERAGE 交叉确认）

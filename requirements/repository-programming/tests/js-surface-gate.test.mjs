@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  FORBIDDEN_TOKENS,
   HANDWRITTEN_ROLE_TOOL_TOKENS,
   scanEntries,
 } from '../../../scripts/checks/js-surface-gate.mjs'
@@ -11,7 +10,6 @@ import {
 test('JS_SURFACE_GATE_handwritten_tokens_use_inquiry_not_meditator', () => {
   assert.ok(HANDWRITTEN_ROLE_TOOL_TOKENS.includes('js-inquiry'))
   assert.ok(!HANDWRITTEN_ROLE_TOOL_TOKENS.includes('js-meditator'))
-  assert.ok(!FORBIDDEN_TOKENS.includes('js-meditator'))
 })
 
 test('JS_SURFACE_GATE_rejects_handwritten_js_coder_outside_permission_matrix', () => {

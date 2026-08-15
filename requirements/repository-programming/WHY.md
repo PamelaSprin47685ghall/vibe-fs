@@ -51,7 +51,7 @@ RED = 模型看到无权方法（surface 与 capability 脱钩）
 - **五套漂移 RPC 风险**（历史 change（js-capability-projected-tools））：手写 `read/edit/write/glob/grep` 各一套实现会把基础设施重复七遍；generator 若接收 `role` 自行重算权限，会形成第二张漂移矩阵。
 - **结果面曾经固化缺陷**（历史 change（js-tools-toml-result））：JS-016 声称走 Synthetic TOML，实际把 `run()` 的 JSON `stringify` 进一个字符串字段——`status = "ok"` / `result = "{...}"` / 逗号拼接 `written`，两套语法叠信封，路径含逗号不可消歧。`requirements/repository-programming/tests/js-workflow.test.mjs` 的旧 golden 曾把缺陷锁成正确形状。本 Change 重做结果面（REPOSITORY-PROGRAMMING-016），`status`/`result`/`written`/`created` 是已拒绝方向。
 - **Grep 曾被误判为「可表达即不需要 primitive」**（历史 why/js-tools 条款）：`glob()+file()+RegExp` 可表达 grep，但 glob 假阴性让组合零命中；修正为 `ToolPermission.Grep` 投影为 Host `grep()` member（REPOSITORY-PROGRAMMING-009）。
-- **Student/Teacher 已删**：`js-student`/`js-teacher` 是 G3 rebase debt，`FORBIDDEN_TOKENS` 保证它们永不复活（REPOSITORY-PROGRAMMING-021；DELETE 类 ratchet，历史 change（js-capability-projected-tools）§6）。
+- **Student/Teacher 已删**：`js-student`/`js-teacher` 是 G3 rebase debt（历史 change（js-capability-projected-tools）§6）。absence ratchet（`FORBIDDEN_TOKENS`）已随 CLN-Z 退役——旧世界删除后设计本身（generator 运行时构造 `js-` + roleName）使手写变体不可表达。
 
 ## 历史拒绝方案（被拒 ≠ 永久命题，记录 WHY）
 

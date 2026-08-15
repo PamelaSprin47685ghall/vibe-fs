@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // JS-001 / JS-004 static gate: no handwritten role→JS tool matrix, no
-// G3-rebase-debt js-student/js-teacher surface, no Meditator filesystem JS.
+// Meditator filesystem JS.
 //
 // The only legitimate js-* tool name is the one JsToolGenerator.toolNameFor
 // builds at runtime ("js-" + roleName). Any literal per-role js-* name in
@@ -12,17 +12,6 @@ import { readFileSync } from 'node:fs'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
-
-/** G3 rebase debt: Student/Teacher must never get a js-* surface again. */
-export const FORBIDDEN_TOKENS = [
-  'js-student',
-  'js-teacher',
-  'JsStudent',
-  'JsTeacher',
-  'StudentCompileJs',
-  'StudentLearnJs',
-  'StudentTeacherJs',
-]
 
 /**
  * Literal per-role js-* tool names — only the generator may produce them, at
@@ -56,9 +45,6 @@ export const scanEntries = (entries) => {
       violations.push({ file, line: i + 1, token, kind, text: lines[i].trim() })
     const skipHandwritten = PERMISSION_MATRIX_FILES.includes(norm(file))
     for (let i = 0; i < lines.length; i++) {
-      for (const token of FORBIDDEN_TOKENS) {
-        if (lines[i].includes(token)) check(i, token, 'forbidden')
-      }
       if (!skipHandwritten) {
         for (const token of HANDWRITTEN_ROLE_TOOL_TOKENS) {
           if (lines[i].includes(token)) check(i, token, 'handwritten-role-tool')
@@ -75,7 +61,7 @@ const main = () => {
     .map((file) => ({ file: norm(file), text: readFileSync(file, 'utf8') }))
   const violations = scanEntries(entries)
   if (violations.length === 0) {
-    console.log('js-surface-gate: OK — no handwritten js-* role variants, no Student/Teacher js surface')
+    console.log('js-surface-gate: OK — no handwritten js-* role variants')
     return
   }
   console.error(`js-surface-gate: ${violations.length} 处违规`)
