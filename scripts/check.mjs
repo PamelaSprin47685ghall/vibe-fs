@@ -67,7 +67,7 @@ for (const script of checks) {
   // REQUIREMENT-SYSTEM-018: dogfooded packages run strict; the rest of the tree
   // is ratcheted by requirement-trace-migration.json (only-shrink).
   if (script.endsWith('requirement-trace.mjs')) {
-    args.push('--strict=requirement-system')
+    args.push('--strict=requirement-system,verification-system')
   }
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)

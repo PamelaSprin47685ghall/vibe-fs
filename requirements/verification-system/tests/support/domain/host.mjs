@@ -838,10 +838,10 @@ export const runtimeResources = (() => {
 
 /**
  * AGENT-002/007: Host-final agent config gate. `configureFromHostConfig` is the
- * plugin's `config` hook body: it validates the 20 managed agents and applies
+ * plugin's `config` hook body: it projects the 22 managed catalog names and
  * Wanxiangshu-owned `mode` / `permission` / `prompt` fields onto the Host's
- * live config object (never model bindings). Tests observe the writes on the
- * same object the Host's Agent.state will read.
+ * live config object (never model bindings). Missing names are created.
+ * Tests observe the writes on the same object the Host's Agent.state will read.
  */
 export const managedAgentConfig = (() => {
   const api = bind(ManagedAgentConfigModule, 'ManagedAgentConfig', ['validate', 'configureFromHostConfig'])

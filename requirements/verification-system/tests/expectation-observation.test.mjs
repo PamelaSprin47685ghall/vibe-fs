@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { StrictMockProvider } from './e2e/support/strict-mock-provider.js'
 
-test('VERIFY_afterExpectation_observation_preserves_physical_session_for_early_and_late_barriers', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] afterExpectation observation preserves physical session for early and late barriers', () => {
   const provider = new StrictMockProvider()
   let early = null
   provider.afterExpectation('orch.2', (observation) => { early = observation })

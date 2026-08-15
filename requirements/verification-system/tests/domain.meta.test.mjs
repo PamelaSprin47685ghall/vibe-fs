@@ -44,20 +44,20 @@ const {
 // offset. Under a non-UTC TZ every comparison shifts, and Deadline.isExpired
 // reports true for a deadline that has not passed.
 
-test('utcOffset produces a value carrying an explicit offset', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] utcOffset produces a value carrying an explicit offset', () => {
   const value = utcOffset('2026-01-01T00:00:00Z')
   assert.ok('offset' in value, 'facade clock values must carry an offset property')
   assert.equal(value.offset, 0, 'facade clock values must be UTC')
   assert.equal(value.getTime(), Date.parse('2026-01-01T00:00:00Z'))
 })
 
-test('a bare Date lacks the offset that F# comparison depends on', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] a bare Date lacks the offset that F# comparison depends on', () => {
   // Documents WHY utcOffset exists. If this ever starts passing, Fable changed
   // its date representation and the facade's rationale must be re-checked.
   assert.equal('offset' in new Date('2026-01-01T00:00:00Z'), false)
 })
 
-test('deadline comparisons are correct through the facade clock', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] deadline comparisons are correct through the facade clock', () => {
   const dl = deadline.ofBudget('2026-01-01T00:00:00Z', 5000)
 
   assert.equal(deadline.remainingMs(clockAt('2026-01-01T00:00:02Z'), dl), 3000)
@@ -69,7 +69,7 @@ test('deadline comparisons are correct through the facade clock', () => {
   assert.equal(deadline.isExpired(clockAt('2026-01-01T00:00:06Z'), dl), true)
 })
 
-test('deadline verdict does not depend on the ambient timezone', () => {
+test('WHAT[VERIFICATION-SYSTEM-007] deadline verdict does not depend on the ambient timezone', () => {
   // The naive-Date bug is invisible under TZ=UTC and wrong everywhere else.
   // The facade must give the same answer regardless of process TZ.
   const original = process.env.TZ
@@ -93,7 +93,7 @@ test('deadline verdict does not depend on the ambient timezone', () => {
 // so List.fold immediately returns the initial state: the projection stays
 // empty and every assertion about it describes nothing at all.
 
-test('a raw array folds to nothing, which is why toList exists', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] a raw array folds to nothing, which is why toList exists', async () => {
   const List = await import(`${domain.introspect.fableLibraryDir}/List.js`)
   assert.equal(
     List.fold((accumulator, item) => accumulator + item, 0, [1, 2, 3]),
@@ -103,12 +103,12 @@ test('a raw array folds to nothing, which is why toList exists', async () => {
   assert.equal(List.fold((accumulator, item) => accumulator + item, 0, toList([1, 2, 3])), 6)
 })
 
-test('toList round-trips through listItems', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] toList round-trips through listItems', () => {
   assert.deepEqual(listItems(toList([1, 2, 3])), [1, 2, 3])
   assert.deepEqual(listItems(toList([])), [])
 })
 
-test('fold.apply converts arrays instead of silently folding nothing', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] fold.apply converts arrays instead of silently folding nothing', () => {
   const session = sessionId('ses_meta')
   const accepted = envelope({
     seq: 1,
@@ -130,7 +130,7 @@ test('fold.apply converts arrays instead of silently folding nothing', () => {
   assert.deepEqual(Object.keys(fold.sessions(projection.value)), ['ses_meta'])
 })
 
-test('fold.apply rejects a single envelope passed where a sequence was meant', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] fold.apply rejects a single envelope passed where a sequence was meant', () => {
   const session = sessionId('ses_meta')
   const single = envelope({
     seq: 1,
@@ -146,7 +146,7 @@ test('fold.apply rejects a single envelope passed where a sequence was meant', (
 // is inserted earlier in the union. Resolving name → ordinal from cases()
 // converts that into a named failure.
 
-test('facts are built by case name, and an unknown name fails loudly', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] facts are built by case name, and an unknown name fails loudly', () => {
   const session = sessionId('ses_meta')
   const built = agentFact('FallbackCursorAdvanced', {
     SessionId: session,
@@ -163,7 +163,7 @@ test('facts are built by case name, and an unknown name fails loudly', () => {
   assert.throws(() => agentFact('FallbackCursorAdvancedTypo', {}), /no AgentFact family has case/)
 })
 
-test('asFact wraps an AgentFact as the top-level Agent case', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] asFact wraps an AgentFact as the top-level Agent case', () => {
   const session = sessionId('ses_meta')
   const wrapped = asFact(agentFact('CompanionBloggerClosed', { SessionId: session }))
 
@@ -171,19 +171,19 @@ test('asFact wraps an AgentFact as the top-level Agent case', () => {
   assert.equal(agentFactCaseOf(payloadOf(wrapped)), 'CompanionBloggerClosed')
 })
 
-test('caseOf refuses a non-union value instead of returning undefined', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] caseOf refuses a non-union value instead of returning undefined', () => {
   assert.throws(() => caseOf({ tag: 0 }), /expects an F# union/)
   assert.equal(caseOf(undefined), undefined)
 })
 
-test('stream cases resolve by name', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] stream cases resolve by name', () => {
   assert.equal(caseOf(stream.workspace()), 'Workspace')
   assert.equal(caseOf(stream.session(sessionId('ses_meta'))), 'Session')
 })
 
 // ── the persisted shape is the contract surface ─────────────────────────────
 
-test('an envelope survives NDJSON round trip and still folds', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] an envelope survives NDJSON round trip and still folds', () => {
   const session = sessionId('ses_rt')
 
   // FALLBACK-001: the cursor is created by the Authority Root, so an advance with
@@ -241,13 +241,13 @@ test('an envelope survives NDJSON round trip and still folds', () => {
   assert.deepEqual(cursor.read(sessions.ses_rt.Fallback.Cursor), { offset: 1, failures: 1 })
 })
 
-test('journal.deserialize reports a decode failure as data, not an exception', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] journal.deserialize reports a decode failure as data, not an exception', () => {
   const result = journal.deserialize('{"not":"an envelope"}')
   assert.equal(result.ok, false)
   assert.equal(typeof result.error, 'string')
 })
 
-test('pre-0.5.0 journals are refused rather than guessed (PERSIST-005)', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] pre-0.5.0 journals are refused rather than guessed (PERSIST-005)', () => {
   // The markers are the pre-0.5.0 projection fields that a modulo-4 cursor
   // migration would have to invent values for. Asserting the whole set means
   // dropping one is a failure here rather than a silent acceptance of an old
@@ -276,7 +276,7 @@ test('pre-0.5.0 journals are refused rather than guessed (PERSIST-005)', () => {
   }
 })
 
-test('a current-schema journal line is not mistaken for a legacy one', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] a current-schema journal line is not mistaken for a legacy one', () => {
   const session = sessionId('ses_current')
   const line = journal.serialize(
     envelope({
@@ -302,12 +302,12 @@ test('a current-schema journal line is not mistaken for a legacy one', () => {
 
 // ── pure domain values reachable without any Host mock ──────────────────────
 
-test('fallback cursor exposes offsets as case names, not ordinals', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] fallback cursor exposes offsets as case names, not ordinals', () => {
   assert.deepEqual([0, 1, 2, 3].map(cursor.side), ['SideA', 'SideA', 'SideB', 'SideB'])
   assert.deepEqual(cursor.sideSequence(6), ['SideA', 'SideA', 'SideB', 'SideB', 'SideA', 'SideA'])
 })
 
-test('cursor.effectiveAgent accepts a plain object as the F# record', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] cursor.effectiveAgent accepts a plain object as the F# record', () => {
   const pair = { SelectedAgent: 'fast-coder', PeerAgent: 'deep-coder' }
   const agentAt = (offset) => cursor.effectiveAgent(pair, cursor.atOffset(offset))
 
@@ -316,11 +316,11 @@ test('cursor.effectiveAgent accepts a plain object as the F# record', () => {
 
 // ── the facade must stay wired to a real build ──────────────────────────────
 
-test('the facade resolves exactly one versioned fable-library directory', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the facade resolves exactly one versioned fable-library directory', () => {
   assert.match(domain.introspect.fableLibraryDir, /fable-library-js\.\d+\.\d+\.\d+$/)
 })
 
-test('the AgentFact union is non-empty, so case resolution is meaningful', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the AgentFact union is non-empty, so case resolution is meaningful', () => {
   const names = agentFactCaseNames()
   assert.ok(names.length > 0)
   assert.equal(new Set(names).size, names.length, 'case names must be unique')
@@ -337,7 +337,7 @@ test('the AgentFact union is non-empty, so case resolution is meaningful', () =>
 // what keeps the next one from shipping — it needs no knowledge of which members
 // exist, so a newly bound member is covered the moment it is added.
 
-test('no facade member is undefined', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] no facade member is undefined', () => {
   const undefinedMembers = []
 
   for (const [name, value] of Object.entries(domain)) {
@@ -363,7 +363,7 @@ test('no facade member is undefined', () => {
   )
 })
 
-test('member resolution prefers a real export over the escaped spelling', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] member resolution prefers a real export over the escaped spelling', () => {
   // The `$` spellings are tried LAST. If they were tried first, a module
   // exporting both `foo` and `foo$` — Fable does this when a value and a type
   // share a name — would bind the wrong one.

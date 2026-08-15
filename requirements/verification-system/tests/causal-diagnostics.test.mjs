@@ -16,7 +16,7 @@ import { gatherDiagnostics } from './e2e/support/diagnostics-collect.js'
 import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
 import { formatCausalSection } from './e2e/support/diagnostics-causal.js'
 
-test('CAUSAL_DIAG_gather_reads_causal_waits_file', async () => {
+test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-gather-'))
   const dir = path.join(workDir, '.wanxiangshu', 'diagnostics')
   fs.mkdirSync(dir, { recursive: true })
@@ -60,7 +60,7 @@ test('CAUSAL_DIAG_gather_reads_causal_waits_file', async () => {
   }
 })
 
-test('CAUSAL_DIAG_format_puts_frontier_before_e2e_events', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] format puts frontier before e2e events', () => {
   const text = formatDiagnostics({
     events: [{ seq: 1, time: '00:00:00.000', type: 'session.idle' }],
     causalFrontier: [{
@@ -81,7 +81,7 @@ test('CAUSAL_DIAG_format_puts_frontier_before_e2e_events', () => {
   assert.ok(e2eAt > frontierAt, 'CAUSAL FRONTIER must precede E2E DIAGNOSTICS')
 })
 
-test('CAUSAL_DIAG_formatCausalSection_banner_is_first_line', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] formatCausalSection banner is first line', () => {
   const lines = formatCausalSection({
     causalFrontier: [{
       kind: 'ExternalProducerFrontier',
@@ -96,7 +96,7 @@ test('CAUSAL_DIAG_formatCausalSection_banner_is_first_line', () => {
   assert.equal(lines[0], '════════════ CAUSAL FRONTIER ════════════')
 })
 
-test('CAUSAL_WATCHDOG_onTimeout_prints_frontier_before_event_tail', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] watchdog onTimeout prints frontier before event tail', () => {
   const source = fs.readFileSync(
     fileURLToPath(new URL('./e2e/support/scenario-parallel.js', import.meta.url)),
     'utf8',

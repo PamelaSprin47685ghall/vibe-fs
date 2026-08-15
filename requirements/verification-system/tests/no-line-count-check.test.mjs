@@ -36,7 +36,7 @@ const codeFiles = (dir) => {
   return out
 }
 
-test('VERIFY_012_no_line_count_check_wording_in_package_or_gates', () => {
+test('WHAT[VERIFICATION-SYSTEM-012] no line-count check wording in package or gates', () => {
   const scopes = [
     join(ROOT, 'scripts/checks'),
     join(ROOT, 'requirements/verification-system/tests'),

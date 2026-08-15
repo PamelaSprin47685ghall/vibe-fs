@@ -87,7 +87,7 @@ const syntheticSource = ({ heading = ANCHOR, items = EXPECTED_TEXTS } = {}) =>
 
 // ── the derivation ──────────────────────────────────────────────────────────
 
-test('VERIFY_004_the_forbidden_degradations_are_read_from_the_SSOT_in_order', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] forbidden degradations are read from the SSOT in order', () => {
   // Whole strings, in order. A substring or count check would pass a list whose
   // items had been reworded, and a reworded item is a different degradation.
   assert.deepEqual(
@@ -100,7 +100,7 @@ test('VERIFY_004_the_forbidden_degradations_are_read_from_the_SSOT_in_order', ()
   assert.equal(SSOT_ORIGIN, 'requirements/verification-system/WHAT.md')
 })
 
-test('VERIFY_004_every_item_carries_a_unique_id_bound_to_the_text_it_names', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] every item carries a unique id bound to the text it names', () => {
   assert.deepEqual(
     DEGRADATIONS.map((degradation) => [degradation.id, degradation.text]),
     EXPECTED_PAIRS,
@@ -110,7 +110,7 @@ test('VERIFY_004_every_item_carries_a_unique_id_bound_to_the_text_it_names', () 
   assert.equal(new Set(ids).size, ids.length, `duplicate id: ${ids.join(', ')}`)
 })
 
-test('VERIFY_004_each_item_records_the_SSOT_line_it_was_read_from', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] each item records the SSOT line it was read from', () => {
   // The completeness gate reports an id; whoever reads that report needs the line
   // to go argue with. Asserted as consecutive from the first rather than as pinned
   // numbers — the numbers move with any edit above the clause, but the items being
@@ -125,7 +125,7 @@ test('VERIFY_004_each_item_records_the_SSOT_line_it_was_read_from', () => {
 
 // ── fail closed: a restructured SSOT must not read as an empty list ─────────
 
-test('VERIFY_004_a_missing_anchor_names_the_heading_and_the_file_it_looked_in', () => {
+test('WHAT[VERIFICATION-SYSTEM-004] a missing anchor names the heading and the file it looked in', () => {
   assert.throws(
     () => parseDegradations(syntheticSource({ heading: '### 别的小节' }), { origin: 'synthetic/10.md' }),
     (error) => {
@@ -140,7 +140,7 @@ test('VERIFY_004_a_missing_anchor_names_the_heading_and_the_file_it_looked_in', 
   )
 })
 
-test('VERIFY_004_an_empty_block_is_a_restructured_SSOT_not_a_list_of_zero', () => {
+test('WHAT[VERIFICATION-SYSTEM-004] an empty block is a restructured SSOT not a list of zero', () => {
   assert.throws(
     () => parseDegradations(syntheticSource({ items: [] }), { origin: 'synthetic/10.md' }),
     (error) => {
@@ -151,7 +151,7 @@ test('VERIFY_004_an_empty_block_is_a_restructured_SSOT_not_a_list_of_zero', () =
   )
 })
 
-test('VERIFY_004_a_section_with_no_fenced_block_at_all_fails_closed', () => {
+test('WHAT[VERIFICATION-SYSTEM-004] a section with no fenced block at all fails closed', () => {
   // The clause file holds several other ```text blocks. Scanning past the end of
   // this section would silently hand back VERIFY-005's hard-block list instead.
   const source = ['### 禁止退化清单', '', '以下任一出现即为门禁退化：', '', '## VERIFY-005', '', '```text', 'Kernel 引用 Host raw obj', '```', ''].join('\n')
@@ -165,7 +165,7 @@ test('VERIFY_004_a_section_with_no_fenced_block_at_all_fails_closed', () => {
   )
 })
 
-test('VERIFY_004_an_item_with_no_id_and_an_id_with_no_item_both_fail_closed', () => {
+test('WHAT[VERIFICATION-SYSTEM-004] an item with no id and an id with no item both fail closed', () => {
   // Both directions matter. An unnamed item would enter the list with no way for a
   // case to cite it; a stale id would let a case cite a degradation the SSOT has
   // stopped forbidding and still pass.

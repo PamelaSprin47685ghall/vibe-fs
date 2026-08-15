@@ -72,6 +72,23 @@ test('WHAT[REQUIREMENT-SYSTEM-018] whatHeadings extracts PREFIX-NNN with title a
   ])
 })
 
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips regex literals containing quotes', () => {
+  const src = [
+    "const re = /join\\(root,\\s*'checks\\/([^']+)'\\)/g",
+    "test('WHAT[D-001] call after a regex literal still fires', () => {})",
+    'const division = 6 / 3',
+    "test('WHAT[D-002] division does not confuse the scanner', () => {})",
+  ].join('\n')
+  const calls = scanTestSource('<virtual>', src)
+  assert.deepEqual(
+    calls.map((c) => c.title),
+    [
+      'WHAT[D-001] call after a regex literal still fires',
+      'WHAT[D-002] division does not confuse the scanner',
+    ],
+  )
+})
+
 test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown / multi-primary / unproved', () => {
   const graph = buildTraceGraph(ROOT)
   assert.ok(graph.whats.size > 0, 'requirements tree must define WHAT propositions')

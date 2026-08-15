@@ -21,7 +21,7 @@ const REQUIRED = [
   /repeat-until-pass/i,
 ]
 
-test('VERIFICATION-SYSTEM-003 sole e2e entry declares unsimulatable physical contracts', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physical contracts', () => {
   const text = readFileSync(ENTRY, 'utf8')
   assert.equal(text.includes(MARKER), true, 'e2e entry must name PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003)')
   for (const contract of REQUIRED) {
@@ -30,7 +30,7 @@ test('VERIFICATION-SYSTEM-003 sole e2e entry declares unsimulatable physical con
   assert.equal(text.replace(MARKER, '').includes(MARKER), false)
 })
 
-test('VERIFICATION-SYSTEM-003 active-join user-message injection waits for physical ToolPart running', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] active-join user-message injection waits for physical ToolPart running', () => {
   const scenario = readFileSync(LONG_STROKE, 'utf8')
   const entry = readFileSync(ENTRY, 'utf8')
   const joinExpectation = scenario.indexOf('{ wait = "manager.1" }')
@@ -46,7 +46,7 @@ test('VERIFICATION-SYSTEM-003 active-join user-message injection waits for physi
   assert.match(entry, /toolStatus\s*===\s*['"]running['"]/)
 })
 
-test('VERIFICATION-SYSTEM-003 format-build-test does not repeat-until-pass', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] format-build-test does not repeat-until-pass', () => {
   const { scripts } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
   const command = scripts['format-build-test']
   assert.equal(typeof command, 'string')

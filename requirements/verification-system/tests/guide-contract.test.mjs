@@ -45,7 +45,7 @@ const assertCallable = (mod, modulePath, names) => {
 
 // ── directly executable workflow surfaces (ARCH-001) ───────────────────────
 
-test('VERIFY_005_AgentProgram_publishes_its_flow_entrypoints', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints', async () => {
   const mod = await load('Execution/Agent/Program')
 
   // FLOW pilot: forkAgent + Flow.lift wrapper removed; plain task entrypoints remain.
@@ -53,7 +53,7 @@ test('VERIFY_005_AgentProgram_publishes_its_flow_entrypoints', async () => {
   assertCallable(mod, 'Execution/Agent/Program', ['validateSession', 'runAgentFlow'])
 })
 
-test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] CompanionProgram publishes its flow entrypoints', async () => {
   const mod = await load('Context/Companion/Program')
 
   // Exactly two. `shouldReplacePrefix` was the third until package X9 deleted it:
@@ -63,7 +63,7 @@ test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
   assertCallable(mod, 'Context/Companion/Program', ['buildDelta', 'runCompanionFlow'])
 })
 
-test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] OrchestratorProgram publishes exactly one entrypoint', async () => {
   // PR3 direct-CE cutover: Application/Orchestration/Program.fs is the sole
   // production entrypoint. Domain AST + OrchestratorInterpreter are deleted.
   await assert.rejects(
@@ -101,7 +101,7 @@ test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async ()
   assertCallable(mod, 'Change/Program', ['run'])
 })
 
-test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] Domain ReconcileProgram publishes pure decisions', async () => {
   const mod = await load('Composition/Turn/Program')
   const names = surfaceOf(mod)
 
@@ -119,7 +119,7 @@ test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => 
   )
 })
 
-test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] ProcessRunner publishes its run entrypoints', async () => {
   const mod = await load('Process/ProcessRunner')
 
   assert.deepEqual(surfaceOf(mod).sort(), ['run', 'runWithHost', 'runWithLauncher'])
@@ -128,7 +128,7 @@ test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
 
 // ── the bounded parallelism kernel the workflows fan out through ────────────
 
-test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the Parallel kernel publishes only bounded parallelism', async () => {
   const mod = await load('Foundation/Parallel')
 
   // docs/what/flow.md (Direct CE) superseded the Flow monad; its monadic surface
@@ -149,7 +149,7 @@ test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async 
 
 // ── the journal surface every program writes through ────────────────────────
 
-test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the journal publishes boot append and snapshot', async () => {
   const [journal, esWriter, envelope, codec, state] = await Promise.all([
     load('Persistence/Journal/AgentJournal'),
     load('Persistence/Journal/EventStoreJournalWriter'),
@@ -190,7 +190,7 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
   }
 })
 
-test('VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the outcome kernel publishes the two commit results', async () => {
   const mod = await load('Foundation/Outcome')
 
   // PERSIST-002 has exactly two append outcomes, so `CommitResult` is one generic
@@ -201,7 +201,7 @@ test('VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results', async () 
 
 // ── the plugin entrypoint package.json points at ────────────────────────────
 
-test('VERIFY_008_the_published_plugin_entrypoint_loads', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the published plugin entrypoint loads', async () => {
   // `package.json` `main` / `exports["."]` resolve here. A build that emits every
   // domain module but not this one produces an installable package that does
   // nothing, and no other test would notice.
@@ -210,7 +210,7 @@ test('VERIFY_008_the_published_plugin_entrypoint_loads', async () => {
   assert.ok(surfaceOf(mod).length > 0, 'OpenCode/Plugin/Plugin must publish at least one export')
 })
 
-test('VERIFY_008_every_emitted_module_actually_loads', async () => {
+test('WHAT[VERIFICATION-SYSTEM-008] every emitted module actually loads', async () => {
   // The gap this closes: `dotnet build` type-checks the F#, and the layer 1 tests
   // import only what `domain.mjs` binds — which is Kernel/Domain/Journal/Process.
   // Nothing imported `OpenCode/*`, so a module could be emitted with a broken
@@ -241,7 +241,7 @@ test('VERIFY_008_every_emitted_module_actually_loads', async () => {
 
 // ── the facade is wired to a real build ─────────────────────────────────────
 
-test('VERIFY_008_the_contract_and_the_facade_read_the_same_build', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] the contract and the facade read the same build', () => {
   // Both resolve `dist` independently. If they ever disagreed, this file
   // would be asserting against artifacts no test actually uses.
   assert.match(introspect.buildRoot, /\/dist\/$/)

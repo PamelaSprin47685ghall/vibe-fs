@@ -14,22 +14,31 @@ import {
   scanE2EWatchdogFeed,
 } from '../../../scripts/checks/e2e-watchdog-feed.mjs'
 
-test('E2E_WATCHDOG_FEED_case_files_do_not_feed_watchdog_directly', () => {
-  // Top-level only — walk must not recurse into cases/ or support/.
+test('WHAT[VERIFICATION-SYSTEM-002] sole top-level e2e entry is entry.test.mjs', () => {
+  // One World：第 4 层恰好一个真实 E2E 入口。顶层文件清单必须包含
+  // tests/e2e/entry.test.mjs（唯一 Long Stroke）。
   const files = e2eTestCaseFiles()
 
-  // Sole entry path is the required-exactly-one-when-present cutover target.
   assert.ok(
     files.some((file) => file.endsWith('/tests/e2e/entry.test.mjs') || file.endsWith('tests/e2e/entry.test.mjs')),
     'expected top-level sole entry e2e/entry.test.mjs (verification-system package) in scope',
   )
+})
 
-  // Missing/empty cases/ must be tolerated: do not walk or require that directory.
-  // (If it happens to exist, it is simply out of scope.)
+test('WHAT[VERIFICATION-SYSTEM-003] e2e case ceiling is zero — no cases/ channel', () => {
+  // E2E_CASE_CEILING = 0：case 天花板只降不升。机器面 = 顶层清单不递归
+  // cases/ 或 support/；缺失或空 cases/ 必须被容忍（不存在 = 零 case），
+  // 不许 walk 或 require 该目录。
+  const files = e2eTestCaseFiles()
 
   for (const file of files) {
     assert.ok(existsSync(file), `e2e top-level test file missing: ${file}`)
   }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-006] top-level e2e tests never feed watchdog directly', () => {
+  // watchdog 只由 support/ 因果原语投喂；顶层测试直接调用 watchdog.advance( 即违规。
+  const files = e2eTestCaseFiles()
 
   const violations = []
   for (const file of files) {

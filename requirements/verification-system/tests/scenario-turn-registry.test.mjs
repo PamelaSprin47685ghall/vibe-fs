@@ -12,7 +12,7 @@ const fakeEvents = () => ({
   },
 })
 
-test('VERIFY_turn_registry_keeps_physical_cursor_identity_per_session', async () => {
+test('WHAT[VERIFICATION-SYSTEM-006] turn registry keeps physical cursor identity per session', async () => {
   const events = fakeEvents()
   const turns = createScenarioTurn({ events })
 
@@ -32,7 +32,7 @@ test('VERIFY_turn_registry_keeps_physical_cursor_identity_per_session', async ()
   assert.equal(root.activitySeq, 1)
 })
 
-test('VERIFY_turn_registry_restart_clear_forgets_all_pre_restart_cursors', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] turn registry restart clear forgets all pre-restart cursors', () => {
   const turns = createScenarioTurn({ events: fakeEvents() })
   turns.start('root')
   turns.start('child')

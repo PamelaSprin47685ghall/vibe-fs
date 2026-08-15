@@ -34,7 +34,7 @@ import {
 
 // ── Deterministic queue enumerates races without waiting ────────────────────
 
-test('TEMPORAL_deterministic_queue_enumerates_races_explicitly', () => {
+test('WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explicitly', () => {
   const a = ['A1', 'A2']
   const b = ['B1']
   const interleavings = DeterministicEventQueue.interleavings(a, b)
@@ -51,7 +51,7 @@ test('TEMPORAL_deterministic_queue_enumerates_races_explicitly', () => {
 
 // ── DeterministicCompletionSource resolves in explicit order ────────────────
 
-test('TEMPORAL_completion_source_order_is_explicit', async () => {
+test('WHAT[VERIFICATION-SYSTEM-007] completion source order is explicit', async () => {
   const src = new DeterministicCompletionSource()
   const e1 = src.enqueue()
   const e2 = src.enqueue()
@@ -96,7 +96,7 @@ const advanceAgentFact = (run, previous, next, count) =>
 
 const fallbackOf = (projection) => fallbackProjection.read(fold.session(projection, SES_A).Fallback)
 
-test('TEMPORAL_runTrace_advances_clock_and_appends_durably', async () => {
+test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably', async () => {
   const vt = createVirtualClock()
   const dir = `temporal-runtrace-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const created = await agentJournal.create({ directory: dir, runtime: 'rt_trace', pid: 4242 })
@@ -128,7 +128,7 @@ test('TEMPORAL_runTrace_advances_clock_and_appends_durably', async () => {
 
 // ── RecordedProviderPort stub is deterministic ───────────────────────────────
 
-test('TEMPORAL_recorded_provider_port_replays_in_enqueued_order', async () => {
+test('WHAT[VERIFICATION-SYSTEM-007] recorded provider port replays in enqueued order', async () => {
   const port = createRecordedProviderPort()
   port.enqueue({ text: 'first' })
   port.enqueue({ text: 'second' })

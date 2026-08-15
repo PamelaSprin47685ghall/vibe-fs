@@ -28,6 +28,23 @@ const isIdentPart = (ch) => /[A-Za-z0-9_$]/.test(ch)
 const isSpace = (ch) => ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n'
 
 /**
+ * Heuristic: is the `/` at index i the start of a regex literal rather than a
+ * division operator? Division follows an operand (identifier, `)`, `]`, `}`,
+ * literal). A regex follows an operator/start. Ambiguity exists, but test
+ * titles live in strings; a mis-classified division only risks skipping a
+ * `test(` in the same expression — a division result is not a call site.
+ */
+const isRegexSlash = (text, i) => {
+  if (text[i + 1] === '/' || text[i + 1] === '*') return false
+  let j = i - 1
+  while (j >= 0 && isSpace(text[j])) j--
+  if (j < 0) return true
+  const prev = text[j]
+  if (/[A-Za-z0-9_$)\]}]/.test(prev)) return false
+  return true
+}
+
+/**
  * Scan one JS test source for test call sites.
  * Accepts a source string (for unit tests) or a file path.
  */
@@ -90,6 +107,34 @@ export function scanTestSource(file, source) {
       }
     }
   }
+  /** Regex literal: skip to the unescaped closing `/` (handling `[...]`). */
+  const skipRegex = () => {
+    const start = i
+    i++ // opening `/`
+    let inClass = false
+    let guard = 0
+    while (i < n) {
+      if (++guard > 1_000_000) throw new Error(`skipRegex runaway in ${file}`)
+      const ch = text[i]
+      if (ch === '\\') i += 2
+      else if (ch === '\n') {
+        // Unterminated on this line — not a regex literal; restore and let the
+        // caller treat the `/` as an ordinary character.
+        i = start
+        return
+      } else if (ch === '[') {
+        inClass = true
+        i++
+      } else if (ch === ']') {
+        inClass = false
+        i++
+      } else if (ch === '/' && !inClass) {
+        i++
+        return
+      } else i++
+    }
+    i = start
+  }
 
   const skipWs = () => {
     while (i < n && isSpace(text[i])) {
@@ -125,11 +170,17 @@ export function scanTestSource(file, source) {
     return { title: null, dynamic: false }
   }
 
+  let steps = 0
   while (i < n) {
+    if (++steps > 1_000_000) throw new Error(`scan loop runaway in ${file}`)
     const ch = text[i]
     if (ch === '/' && text[i + 1] === '/') skipLineComment()
     else if (ch === '/' && text[i + 1] === '*') skipBlockComment()
-    else if (ch === '"' || ch === "'") skipString(ch)
+    else if (ch === '/' && isRegexSlash(text, i)) {
+      const before = i
+      skipRegex()
+      if (i === before) i++ // unterminated — treat the `/` as an ordinary char
+    } else if (ch === '"' || ch === "'") skipString(ch)
     else if (ch === '`') skipTemplate()
     else if (isIdentStart(ch)) {
       const start = i

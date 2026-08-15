@@ -14,14 +14,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-test('isCountedSseEvent excludes server.heartbeat only', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] isCountedSseEvent excludes server.heartbeat only', () => {
   assert.equal(isCountedSseEvent({ type: 'server.heartbeat' }), false);
   assert.equal(isCountedSseEvent({ type: 'message.updated' }), true);
   assert.equal(isCountedSseEvent({ type: '' }), false);
   assert.equal(isCountedSseEvent({}), false);
 });
 
-test('normalizeEventCeilings rejects non-positive integers', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] normalizeEventCeilings rejects non-positive integers', () => {
   assert.deepEqual(normalizeEventCeilings({}), {});
   assert.deepEqual(normalizeEventCeilings({ maxJournalEvents: 12, maxSseEvents: 34 }), {
     maxJournalEvents: 12,
@@ -31,13 +31,13 @@ test('normalizeEventCeilings rejects non-positive integers', () => {
   assert.throws(() => normalizeEventCeilings({ maxSseEvents: 1.2 }), /positive integer/);
 });
 
-test('eventCeilingSetupProblems matches schema contract', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] eventCeilingSetupProblems matches schema contract', () => {
   assert.deepEqual(eventCeilingSetupProblems(undefined), []);
   assert.ok(eventCeilingSetupProblems({ maxJournalEvents: 0 })[0].includes('maxJournalEvents'));
   assert.ok(eventCeilingSetupProblems({ maxSseEvents: -3 })[0].includes('maxSseEvents'));
 });
 
-test('attachEventCeilings breaches maxSseEvents without counting heartbeats', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] attachEventCeilings breaches maxSseEvents without counting heartbeats', () => {
   const listeners = [];
   const scenario = {
     host: { workDir: '/tmp/does-not-need-to-exist-for-sse-only' },
@@ -81,7 +81,7 @@ test('attachEventCeilings breaches maxSseEvents without counting heartbeats', ()
   assert.equal(breached.sseEvents, 3);
 });
 
-test('long-stroke.toml declares theoretical exact event ceilings', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact event ceilings', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });

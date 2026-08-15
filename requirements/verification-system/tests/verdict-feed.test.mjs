@@ -12,7 +12,7 @@ import { classifyVerdict } from './support/verdict-feed.mjs'
 
 const event = (type, data = {}) => ({ type, data })
 
-test('VERIFY_004_a_verdict_renews_the_silence_window', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] a verdict renews the silence window', () => {
   // Whole objects, not truthiness. mjs has no compile-time rename protection, so `blocking` read as
   // `undefined` would be falsy and a truthiness assertion would report the opposite of the truth
   // while passing — the exact failure this repository measured four times in package K9.
@@ -35,7 +35,7 @@ test('VERIFY_004_a_verdict_renews_the_silence_window', () => {
   })
 })
 
-test('VERIFY_004_bytes_moving_is_recorded_and_does_not_renew', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew', () => {
   // 「不算进展：…任何『有字节在动』的证据」. `test:stdout` is the load-bearing member: a test that
   // hangs while printing is what turns a verdict feed back into a wall-clock timer, and
   // `hangs-with-handle-and-chatter.fixture.mjs` is built from exactly that shape.
@@ -48,7 +48,7 @@ test('VERIFY_004_bytes_moving_is_recorded_and_does_not_renew', () => {
   }
 })
 
-test('VERIFY_004_scheduling_noise_is_not_fed_at_all', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] scheduling noise is not fed at all', () => {
   // `null` rather than a background default. `test:enqueue` and `test:dequeue` fire per test before
   // anything has happened, so defaulting unknown events to background would fill the watchdog dump's
   // "last background progress" line with scheduling noise and point the reader at the wrong lane.
@@ -61,7 +61,7 @@ test('VERIFY_004_scheduling_noise_is_not_fed_at_all', () => {
   assert.equal(classifyVerdict({ type: 42 }), null)
 })
 
-test('VERIFY_004_a_verdict_without_a_name_or_file_still_carries_attribution', () => {
+test('WHAT[VERIFICATION-SYSTEM-006] a verdict without a name or file still carries attribution', () => {
   // `Watchdog.advance` rejects an empty reason or lane by design — VERIFY-004 makes both part of the
   // timeout dump, and W6 records that a default of 'unattributed' would keep every canary green
   // while the dump lost the one thing the clause requires it to carry. So the classifier must never
