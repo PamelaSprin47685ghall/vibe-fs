@@ -78,6 +78,13 @@ module ManagerWorkflow =
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
+    let private isFissionReplaced journal sessionId =
+        FissionRuntime.isSilentInterrupt sessionId
+        || (journal
+            |> Option.exists (fun durable ->
+                FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
+                |> Option.isSome))
+
     /// A fresh idle observation may arrive after this terminal fact was already
     /// delivered on another wake. Only idle-derived labor may run again here.
     let observeIdle
@@ -91,16 +98,19 @@ module ManagerWorkflow =
         : Task =
         let turn = context.Turn
 
-        match turn.Outcome with
-        | ReconcileProgram.TurnCompleted when
-            not (TerminalPolicy.sessionDead journal turn.SessionId)
-            && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
-            ->
-            match currentLife journal turn.SessionId with
-            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
-                ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
+        if isFissionReplaced journal turn.SessionId then
+            AsyncSupport.completedTask ()
+        else
+            match turn.Outcome with
+            | ReconcileProgram.TurnCompleted when
+                not (TerminalPolicy.sessionDead journal turn.SessionId)
+                && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
+                ->
+                match currentLife journal turn.SessionId with
+                | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
+                    ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
+                | _ -> AsyncSupport.completedTask ()
             | _ -> AsyncSupport.completedTask ()
-        | _ -> AsyncSupport.completedTask ()
 
     /// Observe one Manager-role turn. Manager-specific business branches stay here;
     /// non-Manager terminal semantics are delegated through the injected ordinary
@@ -120,9 +130,12 @@ module ManagerWorkflow =
         task {
             let turn = context.Turn
 
-            match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
-            | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
-            | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
+            if isFissionReplaced journal turn.SessionId then
+                return ()
+            else
+                match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
+                | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
+                | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnInProgress -> return! observeOrdinary context
                 | ReconcileProgram.TurnCompleted ->

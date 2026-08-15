@@ -709,8 +709,8 @@ module FissionHost =
         }
 
     /// Returns true when this turn belongs to Fission and its terminal semantics
-    /// were consumed here. Non-terminal lane turns return false so ordinary
-    /// repair/recovery behavior still runs.
+    /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
+    /// turns return false so ordinary repair/recovery behavior still runs.
     let observeLaneTurn
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -719,9 +719,23 @@ module FissionHost =
         (turn: ReconciledTurn)
         : Task<bool> =
         task {
-            match journal with
-            | None -> return false
-            | Some durable ->
+            let isOwnerReplaced =
+                FissionRuntime.isSilentInterrupt turn.SessionId
+                || (journal
+                    |> Option.exists (fun durable ->
+                        FissionProjection.tryActiveForOwner
+                            turn.SessionId
+                            (AgentJournal.snapshot durable).AgentProjections.Fission
+                        |> Option.isSome))
+
+            if isOwnerReplaced then
+                // Old caller physical present was replaced and retired by Fission.
+                // Absorb all turn observations silently; do not cascade or continue.
+                return true
+            else
+                match journal with
+                | None -> return false
+                | Some durable ->
                 match
                     FissionProjection.tryMembershipOfLane
                         turn.SessionId

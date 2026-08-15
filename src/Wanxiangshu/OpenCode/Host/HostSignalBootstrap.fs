@@ -225,9 +225,10 @@ module HostSignalBootstrap =
                 | AttemptAborted sessionId ->
                     // Fission retires only the replaced physical present. It is not
                     // an owner cancellation: do not revoke owner resources or cancel
-                    // speculation/children here. OrdinaryTurnWorkflow consumes the
-                    // same typed mark and suppresses parent terminal publication.
+                    // speculation/children here. Revoke the physical attempt's idle
+                    // continuation capability so the retired conversation never continues.
                     if FissionRuntime.isSilentInterrupt sessionId then
+                        scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
                         reconciler.Signal signal
                     else
                         // HOST-027: an exact NEEDHELP armed mark means this abort was

@@ -146,6 +146,13 @@ module InteractionRepairWorkflow =
                 |> Map.tryFind turn.PhysicalUserMessageId
                 |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
 
+    let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
+        FissionRuntime.isSilentInterrupt sessionId
+        || (journal
+            |> Option.exists (fun durable ->
+                FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
+                |> Option.isSome))
+
     /// GLORY-070 / HOST-004 rev.3: a stable idle that never produced a final
     /// report is repaired exactly once (reconcile maps dedupe the turn token),
     /// and only when the pass carried idle evidence. ProviderRetryAttempt
@@ -158,7 +165,7 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         : Task =
-        if isRecoveryContinue journal context.Turn then
+        if isFissionReplaced journal context.Turn.SessionId || isRecoveryContinue journal context.Turn then
             AsyncSupport.completedTask ()
         else
             trySendIdleRepair
@@ -181,7 +188,7 @@ module InteractionRepairWorkflow =
         : Task =
         let turn = context.Turn
 
-        if isRecoveryContinue journal turn then
+        if isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn then
             AsyncSupport.completedTask ()
         elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
             trySendIdleRepair

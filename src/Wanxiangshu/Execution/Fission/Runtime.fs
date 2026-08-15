@@ -84,7 +84,7 @@ module FissionRuntime =
         lock gate (fun () -> silentInterrupts.Contains(SessionId.value ownerSessionId))
 
     let tryConsumeSilentInterrupt ownerSessionId =
-        lock gate (fun () -> silentInterrupts.Remove(SessionId.value ownerSessionId))
+        lock gate (fun () -> silentInterrupts.Contains(SessionId.value ownerSessionId))
 
     let bindHandleAffinity ownerSessionId handleId laneIndex =
         lock gate (fun () -> handleAffinities.[handleKey ownerSessionId handleId] <- laneIndex)
