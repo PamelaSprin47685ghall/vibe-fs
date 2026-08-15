@@ -78,6 +78,82 @@ module Fold =
         | AgentFact.Fission fission -> FissionFactFold.fold projection fission
         | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
 
+    let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) payload =
+        match MagicTodoFactCodec.tryDecode payload with
+        | Error reason -> reject "MagicTodo" ("invalid canonical payload: " + reason)
+        | Ok(MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase) ->
+            ProjectionUpdate.tryUpdatePrefix
+                rebase.SessionId
+                (PrefixEpochProjection.applyRebase
+                    rebase.PreviousEpochId
+                    rebase.NextEpochId
+                    { FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
+                      FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
+                      CutoffExclusive = rebase.CutoffExclusive
+                      CoveredPrefixDigest = rebase.CoveredPrefixDigest
+                      SealRoot = rebase.SealRoot
+                      SyntheticMessageId = rebase.SyntheticMessageId })
+                projection.AgentProjections
+            |> ProjectionUpdate.prefixOutcome "PrefixRebaseCommittedV2" projection.AgentProjections
+            |> Result.map (fun agents ->
+                { projection with
+                    AgentProjections = agents })
+        | Ok fact ->
+            MagicTodoProjection.fold eventId projection.AgentProjections.MagicTodo fact
+            |> Result.mapError (fun rejection ->
+                { Fact = "MagicTodo"
+                  Reason = sprintf "%A" rejection })
+            |> Result.map (fun magicTodo ->
+                { projection with
+                    AgentProjections =
+                        { projection.AgentProjections with
+                            MagicTodo = magicTodo } })
+
+    let private managerLifecycleSessionId fact =
+        match fact with
+        | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
+        | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
+        | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
+        | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
+
+    let private updateSessionAuthority session fact =
+        match fact with
+        | ManagerLifecycleFact.LifeCompleted _ ->
+            session.PromptAuthority
+            |> Option.defaultValue PromptAuthorityLedger.empty
+            |> PromptAuthorityLedger.closeCompletedHumanRootManager
+            |> Some
+        | _ -> session.PromptAuthority
+
+    let private foldManagerLifecycle (projection: ProjectionSet) fact =
+        let sessionId = managerLifecycleSessionId fact
+
+        AgentProjection.tryUpdate
+            sessionId
+            (fun session ->
+                let current =
+                    session.ManagerLife |> Option.defaultValue ManagerLifecycleProjection.empty
+
+                ManagerLifecycleProjection.fold current fact
+                |> Result.map (fun updated ->
+                    let authority = updateSessionAuthority session fact
+
+                    { session with
+                        ManagerLife = Some updated
+                        PromptAuthority = authority }))
+            projection.AgentProjections
+        |> Result.map (fun agents ->
+            { projection with
+                AgentProjections = agents })
+        |> Result.mapError (fun _ ->
+            { Fact = "ManagerLifecycle"
+              Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
+
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
         | Runtime(RuntimeStarted runtime) ->
@@ -96,79 +172,12 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | MagicTodo payload ->
-            match MagicTodoFactCodec.tryDecode payload with
-            | Error reason -> reject "MagicTodo" ("invalid canonical payload: " + reason)
-            | Ok(MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase) ->
-                ProjectionUpdate.tryUpdatePrefix
-                    rebase.SessionId
-                    (PrefixEpochProjection.applyRebase
-                        rebase.PreviousEpochId
-                        rebase.NextEpochId
-                        { FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
-                          FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
-                          CutoffExclusive = rebase.CutoffExclusive
-                          CoveredPrefixDigest = rebase.CoveredPrefixDigest
-                          SealRoot = rebase.SealRoot
-                          SyntheticMessageId = rebase.SyntheticMessageId })
-                    projection.AgentProjections
-                |> ProjectionUpdate.prefixOutcome "PrefixRebaseCommittedV2" projection.AgentProjections
-                |> Result.map (fun agents ->
-                    { projection with
-                        AgentProjections = agents })
-            | Ok fact ->
-                MagicTodoProjection.fold envelope.EventId projection.AgentProjections.MagicTodo fact
-                |> Result.mapError (fun rejection ->
-                    { Fact = "MagicTodo"
-                      Reason = sprintf "%A" rejection })
-                |> Result.map (fun magicTodo ->
-                    { projection with
-                        AgentProjections =
-                            { projection.AgentProjections with
-                                MagicTodo = magicTodo } })
+        | MagicTodo payload -> foldMagicTodo projection envelope.EventId payload
         | ManagerLifecycle fact ->
             // GLORY-010: lifecycle facts fold onto the session's lifecycle
             // projection. Replays are idempotent inside the projection fold;
             // every rejection names a line no correct writer produces (fatal).
-            let sessionId =
-                match fact with
-                | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
-                | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
-                | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
-
-            AgentProjection.tryUpdate
-                sessionId
-                (fun session ->
-                    let current =
-                        session.ManagerLife |> Option.defaultValue ManagerLifecycleProjection.empty
-
-                    ManagerLifecycleProjection.fold current fact
-                    |> Result.map (fun updated ->
-                        let authority =
-                            match fact with
-                            | ManagerLifecycleFact.LifeCompleted _ ->
-                                session.PromptAuthority
-                                |> Option.defaultValue PromptAuthorityLedger.empty
-                                |> PromptAuthorityLedger.closeCompletedHumanRootManager
-                                |> Some
-                            | _ -> session.PromptAuthority
-
-                        { session with
-                            ManagerLife = Some updated
-                            PromptAuthority = authority }))
-                projection.AgentProjections
-            |> Result.map (fun agents ->
-                { projection with
-                    AgentProjections = agents })
-            |> Result.mapError (fun _ ->
-                { Fact = "ManagerLifecycle"
-                  Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
+            foldManagerLifecycle projection fact
 
 // Historical enumeration intentionally has no Journal-owned API. Boot and
 // live facts both enter through CanonicalIntegrator, which invokes only

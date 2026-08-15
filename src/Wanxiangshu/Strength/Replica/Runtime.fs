@@ -134,26 +134,38 @@ module private StrengthReplicaRuntimeLogic =
             | Ok() -> return Ok()
         }
 
+    let private safeAcquire (acquire: SessionId -> string -> OpencodeModel option) replica fastAgent =
+        try
+            Ok(acquire replica fastAgent)
+        with ex ->
+            Error ex
+
+    let private executeAcquireModel
+        (sessions: ISessionHostPort)
+        (acquire: SessionId -> string -> OpencodeModel option)
+        (replica: SessionId)
+        (fastAgent: string)
+        : Task<Result<OpencodeModel option, string>> =
+        task {
+            match safeAcquire acquire replica fastAgent with
+            | Ok(Some model) -> return Ok(Some model)
+            | Ok None ->
+                let! _ = sessions.AbortSession replica
+                return Error "model-capacity-unavailable"
+            | Error ex ->
+                let! _ = sessions.AbortSession replica
+                return raise ex
+        }
+
     let acquireOptionalModelOrAbort
         (sessions: ISessionHostPort)
         (tryAcquireModel: (SessionId -> string -> OpencodeModel option) option)
         (replica: SessionId)
         (fastAgent: string)
         : Task<Result<OpencodeModel option, string>> =
-        task {
-            match tryAcquireModel with
-            | None -> return Ok None
-            | Some acquire ->
-                try
-                    match acquire replica fastAgent with
-                    | Some model -> return Ok(Some model)
-                    | None ->
-                        let! _ = sessions.AbortSession replica
-                        return Error "model-capacity-unavailable"
-                with ex ->
-                    let! _ = sessions.AbortSession replica
-                    return raise ex
-        }
+        match tryAcquireModel with
+        | None -> Task.FromResult(Ok None)
+        | Some acquire -> executeAcquireModel sessions acquire replica fastAgent
 
     let tryClaimCollector
         (gate: obj)

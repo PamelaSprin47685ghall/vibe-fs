@@ -374,12 +374,15 @@ module CanonicalIntegrator =
             // DSL-MUTABLE: algorithm-scratch — first integrateOne failure cuts this replay
             let mutable failure: string option = None
 
-            while not (List.isEmpty remaining) && failure.IsNone do
+            let advance () =
                 match integrateOne state (List.head remaining) with
                 | Ok step ->
                     state <- step.State
                     remaining <- List.tail remaining
                 | Error reason -> failure <- Some reason
+
+            while not (List.isEmpty remaining) && failure.IsNone do
+                advance ()
 
             match failure with
             | Some reason -> Error reason

@@ -227,12 +227,15 @@ module ProcessEventLog =
         // DSL-MUTABLE: algorithm-scratch — writer-line cursor
         let mutable index = 0
 
-        while index < lines.Length - 1 && failure.IsNone do
+        let advance () =
             match decodeWriterLine label lines.[index] with
             | Ok envelope ->
                 acc <- envelope :: acc
                 index <- index + 1
             | Error invalid -> failure <- Some invalid
+
+        while index < lines.Length - 1 && failure.IsNone do
+            advance ()
 
         match failure with
         | Some invalid -> Error invalid

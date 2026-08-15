@@ -248,7 +248,7 @@ module ModelRouting =
             pending.Remove demand |> ignore
             pendingManaged.Remove demand.LeaseKey |> ignore
 
-        let failDemand error demand =
+        let failDemand (error: exn) (demand: PendingDemand) =
             try
                 demand.Completion.SetException(error)
             with _ ->
@@ -301,117 +301,118 @@ module ModelRouting =
         and continueDrain progressed =
             if progressed && pending.Count > 0 then drainDemands ()
 
+        let acquireFreshDemand sessionId agent key =
+            match scheduleOrPoison agent with
+            | Some target ->
+                rememberManaged sessionId key target
+                drainDemands ()
+                Task.FromResult target
+            | None ->
+                let completion =
+                    TaskCompletionSource<ModelRoutingTarget>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+
+                let demand =
+                    { SessionId = sessionId
+                      LeaseKey = key
+                      Role = agent
+                      Completion = completion }
+
+                pending.Add demand
+                pendingManaged.[key] <- demand
+                completion.Task
+
         let acquireManagedTask sessionId agent =
             lock gate (fun () ->
                 ensureHealthy ()
                 let key = leaseKey sessionId agent
 
-                match managed.TryGetValue key with
-                | true, target -> Task.FromResult target
-                | false, _ ->
-                    match pendingManaged.TryGetValue key with
-                    | true, demand -> demand.Completion.Task
-                    | false, _ ->
-                        match scheduleOrPoison agent with
-                        | Some target ->
-                            rememberManaged sessionId key target
-                            drainDemands ()
-                            Task.FromResult target
-                        | None ->
-                            let completion =
-                                TaskCompletionSource<ModelRoutingTarget>(
-                                    TaskCreationOptions.RunContinuationsAsynchronously
-                                )
+                match managed.TryGetValue key, pendingManaged.TryGetValue key with
+                | (true, target), _ -> Task.FromResult target
+                | (false, _), (true, demand) -> demand.Completion.Task
+                | (false, _), (false, _) -> acquireFreshDemand sessionId agent key)
 
-                            let demand =
-                                { SessionId = sessionId
-                                  LeaseKey = key
-                                  Role = agent
-                                  Completion = completion }
+        let acquireManagedSafe sessionId agent =
+            try
+                acquireManagedTask sessionId agent
+            with ex ->
+                failedTask<ModelRoutingTarget> ex
 
-                            pending.Add demand
-                            pendingManaged.[key] <- demand
-                            completion.Task)
+        let tryAcquireFresh sessionId agent key =
+            match scheduleOrPoison agent with
+            | None -> None
+            | Some target ->
+                rememberManaged sessionId key target
+                drainDemands ()
+                Some target
+
+        let tryAcquireLocked sessionId agent =
+            ensureHealthy ()
+            let key = leaseKey sessionId agent
+
+            match managed.TryGetValue key, pendingManaged.ContainsKey key with
+            | (true, target), _ -> Some target
+            | (false, _), true -> None
+            | (false, _), false -> tryAcquireFresh sessionId agent key
+
+        let tryLeaseLocked sessionId agent =
+            match managed.TryGetValue(leaseKey sessionId agent) with
+            | true, target -> Some target
+            | false, _ -> None
+
+        let releaseSessionLocked sessionId =
+            let changed =
+                match managedBySession.TryGetValue sessionId with
+                | true, keys ->
+                    let removedAny =
+                        keys
+                        |> Seq.toArray
+                        |> Array.fold (fun acc key -> managed.Remove key || acc) false
+
+                    managedBySession.Remove sessionId |> ignore
+                    removedAny
+                | false, _ -> false
+
+            pending
+            |> Seq.filter (fun demand -> demand.SessionId = sessionId)
+            |> Seq.toArray
+            |> Array.iter (fun demand ->
+                removeDemand demand
+                AsyncSupport.trySetCanceled demand.Completion |> ignore)
+
+            if changed && fatalError.IsNone then
+                drainDemands ()
 
         member _.AcquireManaged(sessionId: string, agent: string) : Task<ModelRoutingTarget> =
-            if String.IsNullOrWhiteSpace sessionId then
-                failedTask<ModelRoutingTarget> (ArgumentException("sessionId must be non-empty"))
-            elif String.IsNullOrWhiteSpace agent then
-                failedTask<ModelRoutingTarget> (ArgumentException("agent must be non-empty"))
-            else
-                try
-                    acquireManagedTask (sessionId.Trim()) (agent.Trim())
-                with ex ->
-                    failedTask<ModelRoutingTarget> ex
+            match normalizeLeaseInput sessionId agent with
+            | Error ex -> failedTask<ModelRoutingTarget> ex
+            | Ok(normSessionId, normAgent) -> acquireManagedSafe normSessionId normAgent
 
         member _.TryAcquireManaged(sessionId: string, agent: string) : ModelRoutingTarget option =
-            if String.IsNullOrWhiteSpace sessionId || String.IsNullOrWhiteSpace agent then
-                None
-            else
-                lock gate (fun () ->
-                    ensureHealthy ()
-                    let sessionId = sessionId.Trim()
-                    let agent = agent.Trim()
-                    let key = leaseKey sessionId agent
-
-                    match managed.TryGetValue key with
-                    | true, target -> Some target
-                    | false, _ when pendingManaged.ContainsKey key -> None
-                    | false, _ ->
-                        match scheduleOrPoison agent with
-                        | None -> None
-                        | Some target ->
-                            rememberManaged sessionId key target
-                            drainDemands ()
-                            Some target)
+            match normalizeLeaseInput sessionId agent with
+            | Error _ -> None
+            | Ok(normSessionId, normAgent) -> lock gate (fun () -> tryAcquireLocked normSessionId normAgent)
 
         member _.TryLease(sessionId: string, agent: string) : ModelRoutingTarget option =
-            if String.IsNullOrWhiteSpace sessionId || String.IsNullOrWhiteSpace agent then
-                None
-            else
-                lock gate (fun () ->
-                    match managed.TryGetValue(leaseKey (sessionId.Trim()) (agent.Trim())) with
-                    | true, target -> Some target
-                    | false, _ -> None)
+            match normalizeLeaseInput sessionId agent with
+            | Error _ -> None
+            | Ok(normSessionId, normAgent) -> lock gate (fun () -> tryLeaseLocked normSessionId normAgent)
 
         member _.ReleaseSession(sessionId: string) =
-            if not (String.IsNullOrWhiteSpace sessionId) then
-                lock gate (fun () ->
-                    let sessionId = sessionId.Trim()
-                    // DSL-MUTABLE: algorithm-scratch — occupancy changed by this release
-                    let mutable changed = false
-
-                    match managedBySession.TryGetValue sessionId with
-                    | true, keys ->
-                        for key in keys |> Seq.toArray do
-                            changed <- managed.Remove key || changed
-
-                        managedBySession.Remove sessionId |> ignore
-                    | false, _ -> ()
-
-                    let cancelled =
-                        pending
-                        |> Seq.filter (fun demand -> demand.SessionId = sessionId)
-                        |> Seq.toArray
-
-                    for demand in cancelled do
-                        removeDemand demand
-                        AsyncSupport.trySetCanceled demand.Completion |> ignore
-
-                    if changed && fatalError.IsNone then
-                        drainDemands ())
+            normalizeSessionId sessionId
+            |> Option.iter (fun normSessionId -> lock gate (fun () -> releaseSessionLocked normSessionId))
 
         member _.CancelPendingSession(sessionId: string) =
-            if not (String.IsNullOrWhiteSpace sessionId) then
+            normalizeSessionId sessionId
+            |> Option.iter (fun normSessionId ->
                 lock gate (fun () ->
-                    let sessionId = sessionId.Trim()
-
                     pending
-                    |> Seq.filter (fun demand -> demand.SessionId = sessionId)
+                    |> Seq.filter (fun demand -> demand.SessionId = normSessionId)
                     |> Seq.toArray
                     |> Array.iter (fun demand ->
                         removeDemand demand
-                        AsyncSupport.trySetCanceled demand.Completion |> ignore))
+                        AsyncSupport.trySetCanceled demand.Completion |> ignore)))
 
         member _.SnapshotOccupied() = lock gate (fun () -> running ())
         member _.PendingCount = lock gate (fun () -> pending.Count)

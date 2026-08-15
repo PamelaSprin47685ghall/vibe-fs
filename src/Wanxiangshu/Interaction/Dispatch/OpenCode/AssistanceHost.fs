@@ -667,15 +667,17 @@ type AssistanceHost
         =
         markOwnerClaim turn
 
-        match context.Quiescence with
-        | None -> Task.FromResult AssistanceTurnDisposition.Handled
-        | Some _ ->
+        let execute () =
             task {
                 if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
                     return AssistanceTurnDisposition.Handled
                 else
                     return! continueAfterIdle ()
             }
+
+        match context.Quiescence with
+        | None -> Task.FromResult AssistanceTurnDisposition.Handled
+        | Some _ -> execute ()
 
     let escalateFastOwnerRequest
         (context: ReconciledTurnContext)

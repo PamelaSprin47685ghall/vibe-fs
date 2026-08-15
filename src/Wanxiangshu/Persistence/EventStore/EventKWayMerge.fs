@@ -101,6 +101,38 @@ module EventKWayMerge =
         |> Map.toList
         |> List.filter (fun (_, events) -> not (List.isEmpty events))
 
+    type private MergeStep =
+        | Done of Result<EventEnvelope list, StorageInvalid>
+        | Next of Map<string, EventEnvelope list> * Map<string, EventEnvelope> * EventEnvelope list
+
+    let private advanceHead seen (remaining: Map<string, EventEnvelope list>) acc writerId head =
+        match collisionOrDuplicate seen head with
+        | Error invalid -> Done(Error invalid)
+        | Ok true ->
+            let nextRemaining = Map.add writerId (List.tail remaining.[writerId]) remaining
+            Next(nextRemaining, seen, acc)
+        | Ok false ->
+            let nextRemaining = Map.add writerId (List.tail remaining.[writerId]) remaining
+            let nextSeen = Map.add (eventKey head.EventId) head seen
+            Next(nextRemaining, nextSeen, head :: acc)
+
+    let private advanceReadyHeads seen remaining acc nonEmpty =
+        let ready =
+            nonEmpty
+            |> List.choose (fun (writerId, events) -> readyHead seen writerId events)
+            |> List.sortBy (fun (writerId, event) -> eventKey event.EventId, writerId)
+
+        match ready with
+        | (writerId, head) :: _ -> advanceHead seen remaining acc writerId head
+        | [] -> Done(frontierError seen remaining nonEmpty)
+
+    let private advanceMergeStep seen remaining acc =
+        let nonEmpty = nonEmptyQueues remaining
+
+        match nonEmpty with
+        | [] -> Done(Ok(List.rev acc))
+        | _ -> advanceReadyHeads seen remaining acc nonEmpty
+
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
@@ -112,25 +144,15 @@ module EventKWayMerge =
         let mutable acc: EventEnvelope list = []
         let mutable outcome: Result<EventEnvelope list, StorageInvalid> option = None
 
+        let advance () =
+            match advanceMergeStep seen remaining acc with
+            | Done result -> outcome <- Some result
+            | Next(nextRemaining, nextSeen, nextAcc) ->
+                remaining <- nextRemaining
+                seen <- nextSeen
+                acc <- nextAcc
+
         while outcome.IsNone do
-            match nonEmptyQueues remaining with
-            | [] -> outcome <- Some(Ok(List.rev acc))
-            | nonEmpty ->
-                let ready =
-                    nonEmpty
-                    |> List.choose (fun (writerId, events) -> readyHead seen writerId events)
-                    |> List.sortBy (fun (writerId, event) -> eventKey event.EventId, writerId)
-
-                match ready with
-                | (writerId, head) :: _ ->
-                    match collisionOrDuplicate seen head with
-                    | Error invalid -> outcome <- Some(Error invalid)
-                    | Ok duplicate ->
-                        remaining <- Map.add writerId (List.tail remaining.[writerId]) remaining
-
-                        if not duplicate then
-                            seen <- Map.add (eventKey head.EventId) head seen
-                            acc <- head :: acc
-                | [] -> outcome <- Some(frontierError seen remaining nonEmpty)
+            advance ()
 
         outcome.Value

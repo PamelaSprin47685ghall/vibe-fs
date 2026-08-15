@@ -314,6 +314,22 @@ module HostSignalBootstrap =
                     ?onSnapshot = Some onSnapshot
                 )
 
+            let handleOrdinaryAbort sessionId signal =
+                if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
+                    scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+
+                scope.Strength.StrengthReplicaRuntime
+                |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
+
+                reconciler.Signal signal
+
+            let handleAttemptAborted sessionId signal =
+                if FissionRuntime.isSilentInterrupt sessionId then
+                    scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+                    reconciler.Signal signal
+                else
+                    handleOrdinaryAbort sessionId signal
+
             /// FALLBACK-003: every Host signal is a wake and nothing else.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
@@ -343,22 +359,7 @@ module HostSignalBootstrap =
                     // an owner cancellation: do not revoke owner resources or cancel
                     // speculation/children here. Revoke the physical attempt's idle
                     // continuation capability so the retired conversation never continues.
-                    if FissionRuntime.isSilentInterrupt sessionId then
-                        scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
-                        reconciler.Signal signal
-                    else
-                        // HOST-027: an exact NEEDHELP armed mark means this abort was
-                        // requested by Assistance itself. Do not revoke that attempt's
-                        // idle right: the following SessionIdle is the causal proof that
-                        // permits the deep consultation. Ordinary operator aborts remain
-                        // fail-closed and revoke before reconciliation.
-                        if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
-                            scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
-
-                        scope.Strength.StrengthReplicaRuntime
-                        |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
-
-                        reconciler.Signal signal
+                    handleAttemptAborted sessionId signal
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
                     (emitJsExpr
                         (HostSessionDeletion.handle
@@ -378,29 +379,27 @@ module HostSignalBootstrap =
             let isOwned sessionId =
                 scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)
 
-            let isNeedHelpEligible sessionId =
-                if not (isOwned sessionId) then
-                    false
-                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then
-                    false
-                else
-                    let companion =
-                        journal
-                        |> Option.exists (fun durable ->
-                            SessionAssociationProjection.isCompanion
-                                sessionId
-                                (AgentJournal.snapshot durable).AgentProjections.Associations)
+            let isEligibleRole (profile: PromptAuthority.AuthorityExecutionProfile) =
+                match profile.CanonicalRole with
+                | Role.Blogger
+                | Role.Distiller -> false
+                | _ -> true
 
-                    if companion then
-                        false
-                    else
-                        match HostSessionNudge.tryActiveProfile journal sessionId with
-                        | Some profile ->
-                            match profile.CanonicalRole with
-                            | Role.Blogger
-                            | Role.Distiller -> false
-                            | _ -> true
-                        | None -> false
+            let isCompanionSession sessionId =
+                journal
+                |> Option.exists (fun durable ->
+                    SessionAssociationProjection.isCompanion
+                        sessionId
+                        (AgentJournal.snapshot durable).AgentProjections.Associations)
+
+            let isNeedHelpEligible sessionId =
+                if not (isOwned sessionId) then false
+                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then false
+                elif isCompanionSession sessionId then false
+                else
+                    match HostSessionNudge.tryActiveProfile journal sessionId with
+                    | Some profile -> isEligibleRole profile
+                    | None -> false
 
             let loopSensor =
                 LoopSensor(isOwned, (fun sessionId -> sessionPort.AbortSession sessionId))
@@ -510,16 +509,18 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
+            let reactivateBlogger mainSessionId durable root =
+                let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
+
+                match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
+                | None -> ()
+                | Some bloggerId ->
+                    BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
+
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with
                 | None -> ()
-                | Some durable ->
-                    let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
-
-                    match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
-                    | None -> ()
-                    | Some bloggerId ->
-                        BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
+                | Some durable -> reactivateBlogger mainSessionId durable root
 
             let promptIngressHook =
                 PromptIngress.createHook
