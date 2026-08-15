@@ -71,14 +71,14 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
             detectors.[key] <- created
             created
 
-    member private this.Kill (sessionId: SessionId) (effective: float option) (step: int) =
+    member private this.Kill (sessionId: SessionId) (weightedDistinctTokens: float option) (step: int) =
         if this.TryArm sessionId then
             let fields =
                 [ "session_id", SessionId.value sessionId
                   "result", "armed"
                   "detector_step", string step ]
-                @ (match effective with
-                   | Some value -> [ "effective_character_count", sprintf "%.4f" value ]
+                @ (match weightedDistinctTokens with
+                   | Some value -> [ "weighted_distinct_token_count", sprintf "%.4f" value ]
                    | None -> [])
 
             Diagnostic.emit "loop-kill" fields
@@ -123,4 +123,4 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                         LoopDetector.pushText detector delta.Delta)
 
                 if evaluation.IsLoop then
-                    this.Kill delta.SessionId (Some evaluation.EffectiveCharacterCount) evaluation.Step
+                    this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step

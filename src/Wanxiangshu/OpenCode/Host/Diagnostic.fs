@@ -42,7 +42,7 @@ module Diagnostic =
               // ENFORCER-042 protocol-violation
               "call_count"
               // LOOP-010
-              "effective_character_count"
+              "weighted_distinct_token_count"
               "detector_step" ]
 
     /// CTX-014 禁止字段。出现在 `src/Wanxiangshu/**/*.fs` 即负向测试红灯（与灭绝表同机制）。

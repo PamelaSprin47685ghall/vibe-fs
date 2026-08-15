@@ -36,7 +36,7 @@ module LoopDetector =
           WeightedDistinctTokenCount: float
           Step: int }
 
-    /// DSL-MUTABLE: physical — transient detector token counts
+    /// DSL-state-combination: physical — Step and WeightedDistinctTokenCount are attempt-local transient detector counters.
     type Detector =
         { mutable Step: int
           mutable WeightedDistinctTokenCount: float

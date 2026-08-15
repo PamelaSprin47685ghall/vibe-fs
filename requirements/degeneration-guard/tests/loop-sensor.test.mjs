@@ -29,7 +29,7 @@ import {
 import * as PromptDispatcher from '../../../dist/Interaction/Dispatch/Dispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-// Slow prior: enough single-character 4-grams to pull N_eff under 140.
+// Enough repeated text to drive weighted-distinct tokens below the calibrated midpoint.
 const loopText = (character = 'x') => character.repeat(4000)
 
 const rawDelta = (session, field, text) => ({
