@@ -622,7 +622,7 @@ export const diagnostic = (() => {
  */
 export const loopDetector = (() => {
   const m = bind(LoopDetectorModule, 'LoopDetector', [
-    'TokenizerVocabularySize',
+    'TokenVocabularySize',
     'HalfLife',
     'Lambda',
     'NormalWeightedDistinctCount',
@@ -641,7 +641,7 @@ export const loopDetector = (() => {
   })
 
   return {
-    tokenizerVocabularySize: m.TokenizerVocabularySize,
+    tokenizerVocabularySize: m.TokenVocabularySize,
     halfLife: m.HalfLife,
     lambda: m.Lambda,
     normalWeightedDistinctCount: m.NormalWeightedDistinctCount,

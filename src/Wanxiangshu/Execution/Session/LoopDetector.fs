@@ -8,14 +8,14 @@ open Fable.Core.JsInterop
 [<RequireQualifiedAccess>]
 module LoopDetector =
 
-    module private Tokenizer =
-        [<Import("encode", "gpt-tokenizer/encoding/o200k_base")>]
+    module private TokenEncoding =
+        [<Import("encode", "./GptTokens.js")>]
         let encode (_text: string) : int[] = jsNative
 
-        [<Import("vocabularySize", "gpt-tokenizer/encoding/o200k_base")>]
+        [<Import("vocabularySize", "./GptTokens.js")>]
         let vocabularySize: int = jsNative
 
-    let TokenizerVocabularySize = Tokenizer.vocabularySize
+    let TokenVocabularySize = TokenEncoding.vocabularySize
     let HalfLife = 64.0
     let Lambda = Math.Pow(2.0, -1.0 / HalfLife)
 
@@ -70,7 +70,7 @@ module LoopDetector =
 
     let pushText (detector: Detector) (text: string) : Evaluation =
         if not (String.IsNullOrEmpty text) then
-            for token in Tokenizer.encode text do
+            for token in TokenEncoding.encode text do
                 pushToken detector token
 
         evaluate detector
