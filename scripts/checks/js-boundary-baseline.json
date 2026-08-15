@@ -995,9 +995,6 @@
     "du-shape": 4,
     "interop-helper": 14
   },
-  "requirements/provider-projection/tests/synthetic-toml.test.mjs": {
-    "export-discovery": 1
-  },
   "requirements/provider-projection/tests/tool-host-codec-full.test.mjs": {
     "deep-dist-import": 1,
     "du-shape": 1,

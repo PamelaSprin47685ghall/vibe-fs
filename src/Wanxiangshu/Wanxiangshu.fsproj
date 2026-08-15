@@ -77,6 +77,7 @@
     <Compile Include="Mission/Obligation/Todo/Lwr.fs"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Foundation/SyntheticToml.fs"/>
+    <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
     <Compile Include="Interaction/Dispatch/AssistancePrompt.fs"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
     <Compile Include="Mission/Manager/Narrative.fs"/>
@@ -95,6 +96,7 @@
     <Compile Include="Execution/Session/LoopDetector.fs"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
     <Compile Include="Context/Companion/Blogger/Toml.fs"/>
+    <Compile Include="Context/Companion/Blogger/TomlSurface.fs"/>
     <Compile Include="Context/Companion/Prompt.fs"/>
     <Compile Include="Context/Companion/Identity.fs"/>
     <Compile Include="Context/Companion/Builder.fs"/>

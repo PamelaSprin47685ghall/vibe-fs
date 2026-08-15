@@ -46,7 +46,9 @@ export const BUILD_VERIFICATION_FILES = new Set([
  * is established (P3 pilot: ForkChildPayloadSurface).
  */
 export const SURFACE_MODULES = [
+  'Context/Companion/Blogger/TomlSurface.js',
   'Execution/Delegation/Fork/Surface.js',
+  'Foundation/SyntheticTomlSurface.js',
   'OpenCode/Host/QuiescenceSurface.js',
 ]
 
