@@ -109,6 +109,31 @@ module SessionRecoveryWorkflow =
                 | None -> return SessionRecovery.SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
             }
 
+    let private claimRecoveryBlock sessionId (item: PromptRecovery.Reconciled) =
+        match item.Outcome with
+        | PromptRecovery.ClaimOutcome.Unreadable reason ->
+            Some(RecoveryBlock.SnapshotUnreadable(sessionId, reason))
+        | PromptRecovery.ClaimOutcome.StillPending _ ->
+            Some(RecoveryBlock.PendingClaimUnknown(sessionId, item.PromptKey))
+        | PromptRecovery.ClaimOutcome.Proven _ -> None
+
+    let private provenClaimKey (item: PromptRecovery.Reconciled) =
+        match item.Outcome with
+        | PromptRecovery.ClaimOutcome.Proven _ -> Some item.PromptKey
+        | _ -> None
+
+    let private recoverSessionClaims sessionId sequence forSession =
+        let unreadable = forSession |> List.choose (claimRecoveryBlock sessionId)
+
+        match NonEmpty.ofList unreadable with
+        | Some blocks -> SessionRecovery.SessionRecovery.Blocked blocks
+        | None ->
+            let keys = forSession |> List.choose provenClaimKey
+
+            SessionRecovery.SessionRecovery.Recovered(
+                RecoveryReceipt.create sessionId sequence None keys []
+            )
+
     /// Default RecoverPromptClaims using PromptRecovery.reconcile.
     let defaultRecoverPromptClaims
         (journal: AgentJournal)
@@ -132,33 +157,9 @@ module SessionRecoveryWorkflow =
 
                 let forSession = reconciled |> List.filter (fun item -> item.SessionId = sessionId)
 
-                if List.isEmpty forSession then
-                    return SessionRecovery.SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
-                else
-                    let unreadable =
-                        forSession
-                        |> List.choose (fun item ->
-                            match item.Outcome with
-                            | PromptRecovery.ClaimOutcome.Unreadable reason ->
-                                Some(RecoveryBlock.SnapshotUnreadable(sessionId, reason))
-                            | PromptRecovery.ClaimOutcome.StillPending _ ->
-                                Some(RecoveryBlock.PendingClaimUnknown(sessionId, item.PromptKey))
-                            | PromptRecovery.ClaimOutcome.Proven _ -> None)
-
-                    match NonEmpty.ofList unreadable with
-                    | Some blocks -> return SessionRecovery.SessionRecovery.Blocked blocks
-                    | None ->
-                        let keys =
-                            forSession
-                            |> List.choose (fun item ->
-                                match item.Outcome with
-                                | PromptRecovery.ClaimOutcome.Proven _ -> Some item.PromptKey
-                                | _ -> None)
-
-                        return
-                            SessionRecovery.SessionRecovery.Recovered(
-                                RecoveryReceipt.create sessionId sequence None keys []
-                            )
+                match forSession with
+                | [] -> return SessionRecovery.SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence)
+                | _ -> return recoverSessionClaims sessionId sequence forSession
             }
 
     let private recoverManagerJobOutcome (ports: SessionRecoveryPorts) (jobId: ManagerJobId) : Task<SessionRecovery> =
@@ -178,6 +179,50 @@ module SessionRecoveryWorkflow =
                 return sessionRecoveryOfJobFamily job.ManagerSessionId sequence family
         }
 
+    let private nodeSessionAndJob (node: RecoveryNode) =
+        match node with
+        | RecoveryNode.WorkSession id -> id, None
+        | RecoveryNode.AgentChild(_, id, _) -> id, None
+        | RecoveryNode.Companion(_, id) -> id, None
+        | RecoveryNode.Blogger(_, id) -> id, None
+        | RecoveryNode.ManagerJob(jobId, id) -> id, Some jobId
+        | RecoveryNode.Reviewer(jobId, id) -> id, Some jobId
+
+    let private recoverJobParts (ports: SessionRecoveryPorts) maybeJob =
+        match maybeJob with
+        | None -> Task.FromResult([])
+        | Some jobId ->
+            task {
+                let! jobOutcome = recoverManagerJobOutcome ports jobId
+                return [ jobOutcome ]
+            }
+
+    let private recoverOneNode (ports: SessionRecoveryPorts) sequence node =
+        task {
+            let sessionId, maybeJob = nodeSessionAndJob node
+            let! claimOutcome = ports.RecoverPromptClaims sessionId
+            let! bloggerOutcome = ports.RecoverBlogger sessionId
+            let! handleFamily = ports.RestoreHandles sessionId
+            let handleOutcome = sessionRecoveryOfHandleFamily sessionId sequence handleFamily
+            let! jobParts = recoverJobParts ports maybeJob
+            let merged = combine (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
+            return sessionId, merged
+        }
+
+    let rec private recoverNodesList
+        (ports: SessionRecoveryPorts)
+        sequence
+        (nodes: RecoveryNode list)
+        (acc: Map<SessionId, SessionRecovery>)
+        : Task<Map<SessionId, SessionRecovery>> =
+        task {
+            match nodes with
+            | [] -> return acc
+            | node :: rest ->
+                let! sessionId, merged = recoverOneNode ports sequence node
+                return! recoverNodesList ports sequence rest (Map.add sessionId merged acc)
+        }
+
     /// Child-first direct CE for one parent family (RECOVERY-FAMILY-001/002).
     let recoverFamilyDirect (ports: SessionRecoveryPorts) (parentSession: SessionId) : Task<FamilyRecovery> =
         task {
@@ -193,44 +238,7 @@ module SessionRecoveryWorkflow =
             | Error blocks -> return FamilyRecovery.FamilyBlocked blocks
             | Ok validated ->
                 let ordered = (ValidatedClosure.value validated).Nodes
-
-                let rec recoverNodes
-                    (nodes: RecoveryNode list)
-                    (acc: Map<SessionId, SessionRecovery>)
-                    : Task<Map<SessionId, SessionRecovery>> =
-                    task {
-                        match nodes with
-                        | [] -> return acc
-                        | node :: rest ->
-                            let sessionId, maybeJob =
-                                match node with
-                                | RecoveryNode.WorkSession id -> id, None
-                                | RecoveryNode.AgentChild(_, id, _) -> id, None
-                                | RecoveryNode.Companion(_, id) -> id, None
-                                | RecoveryNode.Blogger(_, id) -> id, None
-                                | RecoveryNode.ManagerJob(jobId, id) -> id, Some jobId
-                                | RecoveryNode.Reviewer(jobId, id) -> id, Some jobId
-
-                            let! claimOutcome = ports.RecoverPromptClaims sessionId
-                            let! bloggerOutcome = ports.RecoverBlogger sessionId
-                            let! handleFamily = ports.RestoreHandles sessionId
-                            let handleOutcome = sessionRecoveryOfHandleFamily sessionId sequence handleFamily
-
-                            let! jobParts =
-                                match maybeJob with
-                                | None -> Task.FromResult([])
-                                | Some jobId ->
-                                    task {
-                                        let! jobOutcome = recoverManagerJobOutcome ports jobId
-                                        return [ jobOutcome ]
-                                    }
-
-                            let merged = combine (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
-
-                            return! recoverNodes rest (Map.add sessionId merged acc)
-                    }
-
-                let! results = recoverNodes ordered Map.empty
+                let! results = recoverNodesList ports sequence ordered Map.empty
                 let closed = ValidatedClosure.value validated
                 let recovered = { Closure = closed; Results = results }
                 return authorizeFamilyResume parentSession closed.JournalSequence recovered

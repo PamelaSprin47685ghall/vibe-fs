@@ -120,6 +120,46 @@ module FetchTool =
     let private unavailable language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
+    let private evaluateUpdatedFreshness language workspaceRoot sessionId (updated: Case) =
+        task {
+            let again = CasebookReplay.replayAll workspaceRoot updated.Observations
+
+            match CasebookWorkflow.checkFreshness updated again with
+            | ReplayResult.Fresh ->
+                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                return refreshed language updated.A
+            | ReplayResult.Stale -> return stale language updated.A
+        }
+
+    let private tryFetchRefreshed language workspaceRoot store sessionId fallbackAnswer =
+        task {
+            match! CasebookWorkflow.fetchCase store 256 sessionId with
+            | Error _
+            | Ok None -> return stale language fallbackAnswer
+            | Ok(Some updated) -> return! evaluateUpdatedFreshness language workspaceRoot sessionId updated
+        }
+
+    let private handleStaleCase language workspaceRoot store sessionId answer =
+        task {
+            match! CasebookBookkeeper.refreshStale store workspaceRoot sessionId with
+            | Ok true -> return! tryFetchRefreshed language workspaceRoot store sessionId answer
+            | Ok false
+            | Error _ -> return stale language answer
+        }
+
+    let private handleResolvedCase language workspaceRoot store (case: Case) =
+        task {
+            let sessionId = case.SessionId
+            let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
+
+            match CasebookWorkflow.checkFreshness case replayed with
+            | ReplayResult.Fresh ->
+                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                return fresh language case.A
+            | ReplayResult.Stale ->
+                return! handleStaleCase language workspaceRoot store sessionId case.A
+        }
+
     let private runFetch
         (language: ProviderLanguage)
         (workspaceRoot: string)
@@ -130,31 +170,25 @@ module FetchTool =
             match! CasebookIndex.resolve store 256 shelfmark with
             | Error _ -> return unavailable language
             | Ok None -> return noCase language
-            | Ok(Some case) ->
-                let sessionId = case.SessionId
-                let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
-
-                match CasebookWorkflow.checkFreshness case replayed with
-                | ReplayResult.Fresh ->
-                    do! CasebookLifecycle.touchAccess workspaceRoot sessionId
-                    return fresh language case.A
-                | ReplayResult.Stale ->
-                    match! CasebookBookkeeper.refreshStale store workspaceRoot sessionId with
-                    | Ok true ->
-                        match! CasebookWorkflow.fetchCase store 256 sessionId with
-                        | Error _
-                        | Ok None -> return stale language case.A
-                        | Ok(Some updated) ->
-                            let again = CasebookReplay.replayAll workspaceRoot updated.Observations
-
-                            match CasebookWorkflow.checkFreshness updated again with
-                            | ReplayResult.Fresh ->
-                                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
-                                return refreshed language updated.A
-                            | ReplayResult.Stale -> return stale language updated.A
-                    | Ok false
-                    | Error _ -> return stale language case.A
+            | Ok(Some case) -> return! handleResolvedCase language workspaceRoot store case
         }
+
+    let private createFlightWork language workspaceRoot store shelfmark =
+        task {
+            try
+                return! runFetch language workspaceRoot store shelfmark
+            finally
+                lock fetchGate (fun () -> fetchInFlight.Remove shelfmark |> ignore)
+        }
+
+    let private getOrCreateFlightWork language workspaceRoot store shelfmark =
+        lock fetchGate (fun () ->
+            match fetchInFlight.TryGetValue shelfmark with
+            | true, existing -> existing
+            | false, _ ->
+                let work = createFlightWork language workspaceRoot store shelfmark
+                fetchInFlight.[shelfmark] <- work
+                work)
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
         { Name = "fetch"
@@ -169,21 +203,5 @@ module FetchTool =
                     if String.IsNullOrWhiteSpace shelfmark then
                         return ToolHostCodec.tomlObjectWithInstructions [ prose language Path.ShelfmarkRequired ] []
                     else
-                        let! result =
-                            lock fetchGate (fun () ->
-                                match fetchInFlight.TryGetValue shelfmark with
-                                | true, existing -> existing
-                                | false, _ ->
-                                    let work =
-                                        task {
-                                            try
-                                                return! runFetch language workspaceRoot store shelfmark
-                                            finally
-                                                lock fetchGate (fun () -> fetchInFlight.Remove shelfmark |> ignore)
-                                        }
-
-                                    fetchInFlight.[shelfmark] <- work
-                                    work)
-
-                        return result
+                        return! getOrCreateFlightWork language workspaceRoot store shelfmark
                 } }

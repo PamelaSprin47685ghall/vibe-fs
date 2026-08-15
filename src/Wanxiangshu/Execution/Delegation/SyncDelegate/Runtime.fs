@@ -186,6 +186,61 @@ type SyncDelegateRuntime
           DescribeWait = SyncDelegateWait.describe
           SubscribeTerminal = fun sessionId listener -> sessions.SubscribeTerminal(sessionId, listener) }
 
+    let failPoppedCalls delegateSessionId reason =
+        let rec popAll () =
+            match store.TryPopCallByDelegate delegateSessionId with
+            | Some call ->
+                store.FailCall(call, reason)
+                popAll ()
+            | None -> ()
+
+        popAll ()
+
+    let resolveWorkRecord (turnSessionId: SessionId) (call: SyncDelegateCall) endCursor =
+        match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
+        | None -> Task.FromResult None
+        | Some startCursor ->
+            projectWorkRecord
+                turnSessionId
+                { StartInclusive = { Sequence = startCursor }
+                  EndExclusive = { Sequence = endCursor } }
+
+    let finishCompletedCall turnSessionId (call: SyncDelegateCall) workRecord =
+        match workRecord with
+        | Some record when not (String.IsNullOrWhiteSpace record) ->
+            if call.Role = SyncDelegateRole.Inspector then noteInspectorAnswer (sessionKey turnSessionId) record
+
+            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
+            true
+        | _ ->
+            // EXEC-031 / EXEC-026: fail closed. A Completed turn
+            // without a bounded WorkRecord is a protocol defect, not
+            // a licence to fall back to the last message (EXEC-028
+            // residual OneShot analog). The session stays reusable.
+            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
+            true
+
+    let handleCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) =
+        task {
+            // Completion marker for ManagerLife/Reviewer. HandleTurn
+            // does not use Terminal to build the inspect payload;
+            // the bounded WorkRecord is the invocation's parts range.
+            do! XTraceCapture.captureTerminal (Some journal) turn
+
+            // Exclusive range end = XTrace.head (one-past last part).
+            let endCursor = xTraceHead turn.SessionId
+
+            let! workRecord = resolveWorkRecord turn.SessionId call endCursor
+            return finishCompletedCall turn.SessionId call workRecord
+        }
+
+    let handleCompletedRoleTurn (turn: ReconciledTurn) =
+        task {
+            match store.TryPopCallByDelegate turn.SessionId with
+            | Some call -> return! handleCompletedCall turn call
+            | None -> return false
+        }
+
     let singletonResult taskResult =
         task {
             match! taskResult with
@@ -219,14 +274,7 @@ type SyncDelegateRuntime
     member _.StageDeletedInspector(ownerSessionId: SessionId, inspectorSessionId: SessionId) : bool =
         match attached.TryFind(ownerSessionId, SyncDelegateRole.Inspector) with
         | Some bound when bound = inspectorSessionId ->
-            let rec popAll () =
-                match store.TryPopCallByDelegate inspectorSessionId with
-                | Some call ->
-                    store.FailCall(call, "Sync delegate Inspector session was deleted")
-                    popAll ()
-                | None -> ()
-
-            popAll ()
+            failPoppedCalls inspectorSessionId "Sync delegate Inspector session was deleted"
 
             attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
 
@@ -282,51 +330,15 @@ type SyncDelegateRuntime
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
-            match turn.Role with
-            | Some(Role.Inspector | Role.Coder) ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnCompleted ->
-                    match store.TryPopCallByDelegate turn.SessionId with
-                    | Some call ->
-                        // Completion marker for ManagerLife/Reviewer. HandleTurn
-                        // does not use Terminal to build the inspect payload;
-                        // the bounded WorkRecord is the invocation's parts range.
-                        do! XTraceCapture.captureTerminal (Some journal) turn
-
-                        // Exclusive range end = XTrace.head (one-past last part).
-                        let endCursor = xTraceHead turn.SessionId
-
-                        let! workRecord =
-                            match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
-                            | None -> Task.FromResult None
-                            | Some startCursor ->
-                                projectWorkRecord
-                                    turn.SessionId
-                                    { StartInclusive = { Sequence = startCursor }
-                                      EndExclusive = { Sequence = endCursor } }
-
-                        match workRecord with
-                        | Some record when not (String.IsNullOrWhiteSpace record) ->
-                            if call.Role = SyncDelegateRole.Inspector then
-                                noteInspectorAnswer (sessionKey turn.SessionId) record
-
-                            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-                            return true
-                        | _ ->
-                            // EXEC-031 / EXEC-026: fail closed. A Completed turn
-                            // without a bounded WorkRecord is a protocol defect, not
-                            // a licence to fall back to the last message (EXEC-028
-                            // residual OneShot analog). The session stays reusable.
-                            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
-                            return true
-                    | None -> return false
-                | _ ->
-                    // Transient failures (TurnFailed / TurnInProgress / TurnNeedsContinuation)
-                    // remain child-local and allow ordinary fallback recovery to proceed.
-                    // Only exhausted retries or definitive aborts (via SubscribeTerminal)
-                    // report failure to the caller.
-                    return false
-            | _ -> return false
+            match turn.Role, turn.Outcome with
+            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted ->
+                return! handleCompletedRoleTurn turn
+            | _ ->
+                // Transient failures (TurnFailed / TurnInProgress / TurnNeedsContinuation)
+                // remain child-local and allow ordinary fallback recovery to proceed.
+                // Only exhausted retries or definitive aborts (via SubscribeTerminal)
+                // report failure to the caller.
+                return false
         }
 
     member _.CancelSession(sessionId: SessionId) : unit =

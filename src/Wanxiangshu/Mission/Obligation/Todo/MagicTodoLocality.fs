@@ -81,20 +81,21 @@ module MagicTodoLocality =
         | CarrierChanged
         | InputMismatch
 
+    let private stepCapturablePart callId (part: MessagePart) index count loop =
+        match part with
+        | MessagePart.Activity _ -> loop (index + 1) count
+        | MessagePart.ToolCall(id, _, _) when id = callId -> count
+        | MessagePart.ToolResult(id, _) when id = callId -> count
+        | _ -> loop (index + 1) (count + 1)
+
     /// Capturable XTrace parts in this Host message before `toolCallId`.
     /// Activity is transport-only and does not occupy an XTrace cursor.
     let private capturablePartsBeforeTool (parts: MessagePart array) (toolCallId: ToolCallId) : int =
         let callId = ToolCallId.value toolCallId
 
         let rec loop index count =
-            if index >= parts.Length then
-                0
-            else
-                match parts.[index] with
-                | MessagePart.Activity _ -> loop (index + 1) count
-                | MessagePart.ToolCall(id, _, _) when id = callId -> count
-                | MessagePart.ToolResult(id, _) when id = callId -> count
-                | _ -> loop (index + 1) (count + 1)
+            if index >= parts.Length then 0
+            else stepCapturablePart callId parts.[index] index count loop
 
         loop 0 0
 
@@ -111,6 +112,110 @@ module MagicTodoLocality =
             + 1L
             + int64 (capturablePartsBeforeTool message.Parts toolCallId) }
 
+    let private resolveCapturedToolCall trace (located: SessionSnapshotPort.ToolCallLocation) (part: XTracePartRef) =
+        let toolPartOrdinal =
+            XTraceProjection.parts trace
+            |> List.filter (fun candidate ->
+                candidate.ProviderRun = Some located.ProviderRun
+                && candidate.Kind = "tool_call"
+                && candidate.Cursor.Sequence <= part.Cursor.Sequence)
+            |> List.length
+
+        let todowriteCallIds =
+            XTraceProjection.parts trace
+            |> List.filter (fun candidate ->
+                candidate.ProviderRun = Some located.ProviderRun
+                && candidate.Kind = "tool_call"
+                && candidate.ToolName = Some "todowrite")
+            |> List.choose (fun candidate -> candidate.ToolCallId)
+            |> List.distinct
+
+        Ok
+            { ProviderRun = located.ProviderRun
+              HostToolPartId = located.HostToolPartId
+              ToolCallId = located.ToolCallId
+              ToolName = located.ToolName
+              InputCanonical = located.InputCanonical
+              State = located.State
+              TodowriteCallIdsInMessage = todowriteCallIds
+              ToolPartOrdinal = toolPartOrdinal
+              ReviewFrontier = part.Cursor
+              Range =
+                { Start = part.Cursor
+                  EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
+
+    let private resolvePendingInMessage trace (located: SessionSnapshotPort.ToolCallLocation) (message: SessionMessage) =
+        let partMatches =
+            message.ToolParts
+            |> Array.mapi (fun index part -> index, part)
+            |> Array.filter (fun (_, part) ->
+                part.HostToolPartId = located.HostToolPartId
+                && part.ToolCallId = located.ToolCallId)
+
+        match Array.toList partMatches with
+        | [ (index, _) ] ->
+            let frontier = pendingReviewFrontier trace message located.ToolCallId
+
+            let todowriteCallIds =
+                message.ToolParts
+                |> Array.filter (fun part -> part.ToolName = "todowrite")
+                |> Array.map (fun part -> part.ToolCallId)
+                |> Array.distinct
+                |> Array.toList
+
+            Ok
+                { ProviderRun = located.ProviderRun
+                  HostToolPartId = located.HostToolPartId
+                  ToolCallId = located.ToolCallId
+                  ToolName = located.ToolName
+                  InputCanonical = located.InputCanonical
+                  State = located.State
+                  TodowriteCallIdsInMessage = todowriteCallIds
+                  ToolPartOrdinal = index + 1
+                  ReviewFrontier = frontier
+                  Range =
+                    { Start = frontier
+                      EndExclusive = { Sequence = frontier.Sequence + 1L } } }
+        | _ ->
+            Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+
+    let private resolvePendingAssistantMessage trace messages (located: SessionSnapshotPort.ToolCallLocation) =
+        let providerRunText = ProviderRunIdentity.value located.ProviderRun
+
+        let messageMatches =
+            messages
+            |> List.filter (fun message -> message.Role = "assistant" && message.Id = providerRunText)
+
+        match messageMatches with
+        | [ message ] -> resolvePendingInMessage trace located message
+        | _ ->
+            Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+
+    let private resolvePendingToolCall trace (messages: SessionMessage list) (located: SessionSnapshotPort.ToolCallLocation) =
+        if located.State <> SnapshotToolPartState.Pending then
+            Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        else
+            resolvePendingAssistantMessage trace messages located
+
+    let private resolveLocated trace messages (located: SessionSnapshotPort.ToolCallLocation) =
+        let matches =
+            XTraceProjection.parts trace
+            |> List.filter (fun part ->
+                part.ProviderRun = Some located.ProviderRun
+                && part.ToolCallId = Some located.ToolCallId
+                && part.HostToolPartId = Some located.HostToolPartId)
+
+        match matches with
+        | [ part ] -> resolveCapturedToolCall trace located part
+        | [] -> resolvePendingToolCall trace messages located
+        | _ ->
+            Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+
+    let private resolveWithTrace messages (located: SessionSnapshotPort.ToolCallLocation) xTrace =
+        match xTrace with
+        | None -> Error LocalityRejection.XTraceUnavailable
+        | Some trace -> resolveLocated trace messages located
+
     let resolve
         (sessionId: SessionId)
         (messages: SessionMessage list)
@@ -124,127 +229,7 @@ module MagicTodoLocality =
                 AgentProjection.tryFind sessionId projection.AgentProjections
                 |> Option.bind (fun session -> session.XTrace)
 
-            match xTrace with
-            | None -> Error LocalityRejection.XTraceUnavailable
-            | Some trace ->
-                let matches =
-                    XTraceProjection.parts trace
-                    |> List.filter (fun part ->
-                        part.ProviderRun = Some located.ProviderRun
-                        && part.ToolCallId = Some located.ToolCallId
-                        && part.HostToolPartId = Some located.HostToolPartId)
-
-                match matches with
-                | [] ->
-                    // before-hook: ToolPart is persisted, this call is not yet in
-                    // XTrace. SDK snapshot is the identity source. Before(Tk) is
-                    // the cursor the tool-call will occupy, not next-assigned
-                    // (that cursor belongs to preceding uncaptured text).
-                    match located.State with
-                    | SnapshotToolPartState.Pending ->
-                        let providerRunText = ProviderRunIdentity.value located.ProviderRun
-
-                        let messageMatches =
-                            messages
-                            |> List.filter (fun message -> message.Role = "assistant" && message.Id = providerRunText)
-
-                        match messageMatches with
-                        | [ message ] ->
-                            let partMatches =
-                                message.ToolParts
-                                |> Array.mapi (fun index part -> index, part)
-                                |> Array.filter (fun (_, part) ->
-                                    part.HostToolPartId = located.HostToolPartId
-                                    && part.ToolCallId = located.ToolCallId)
-
-                            match Array.toList partMatches with
-                            | [ (index, _) ] ->
-                                let frontier = pendingReviewFrontier trace message located.ToolCallId
-
-                                let todowriteCallIds =
-                                    message.ToolParts
-                                    |> Array.filter (fun part -> part.ToolName = "todowrite")
-                                    |> Array.map (fun part -> part.ToolCallId)
-                                    |> Array.distinct
-                                    |> Array.toList
-
-                                Ok
-                                    { ProviderRun = located.ProviderRun
-                                      HostToolPartId = located.HostToolPartId
-                                      ToolCallId = located.ToolCallId
-                                      ToolName = located.ToolName
-                                      InputCanonical = located.InputCanonical
-                                      State = located.State
-                                      TodowriteCallIdsInMessage = todowriteCallIds
-                                      ToolPartOrdinal = index + 1
-                                      ReviewFrontier = frontier
-                                      Range =
-                                        { Start = frontier
-                                          EndExclusive = { Sequence = frontier.Sequence + 1L } } }
-                            | _ ->
-                                Error(
-                                    LocalityRejection.XTraceMissing(
-                                        located.ProviderRun,
-                                        located.ToolCallId,
-                                        located.HostToolPartId
-                                    )
-                                )
-                        | _ ->
-                            Error(
-                                LocalityRejection.XTraceMissing(
-                                    located.ProviderRun,
-                                    located.ToolCallId,
-                                    located.HostToolPartId
-                                )
-                            )
-                    | SnapshotToolPartState.Completed _
-                    | SnapshotToolPartState.Failed _ ->
-                        Error(
-                            LocalityRejection.XTraceMissing(
-                                located.ProviderRun,
-                                located.ToolCallId,
-                                located.HostToolPartId
-                            )
-                        )
-                | [ part ] ->
-                    let toolPartOrdinal =
-                        XTraceProjection.parts trace
-                        |> List.filter (fun candidate ->
-                            candidate.ProviderRun = Some located.ProviderRun
-                            && candidate.Kind = "tool_call"
-                            && candidate.Cursor.Sequence <= part.Cursor.Sequence)
-                        |> List.length
-
-                    let todowriteCallIds =
-                        XTraceProjection.parts trace
-                        |> List.filter (fun candidate ->
-                            candidate.ProviderRun = Some located.ProviderRun
-                            && candidate.Kind = "tool_call"
-                            && candidate.ToolName = Some "todowrite")
-                        |> List.choose (fun candidate -> candidate.ToolCallId)
-                        |> List.distinct
-
-                    Ok
-                        { ProviderRun = located.ProviderRun
-                          HostToolPartId = located.HostToolPartId
-                          ToolCallId = located.ToolCallId
-                          ToolName = located.ToolName
-                          InputCanonical = located.InputCanonical
-                          State = located.State
-                          TodowriteCallIdsInMessage = todowriteCallIds
-                          ToolPartOrdinal = toolPartOrdinal
-                          ReviewFrontier = part.Cursor
-                          Range =
-                            { Start = part.Cursor
-                              EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
-                | _ ->
-                    Error(
-                        LocalityRejection.XTraceAmbiguous(
-                            located.ProviderRun,
-                            located.ToolCallId,
-                            located.HostToolPartId
-                        )
-                    )
+            resolveWithTrace messages located xTrace
 
     let materializeInput
         (localized: LocalizedToolCall)

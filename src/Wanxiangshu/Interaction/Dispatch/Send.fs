@@ -85,6 +85,20 @@ module PromptDispatcherSend =
             effectiveAgent
             payloadDigest
 
+    let private handleAdmittedPhysical
+        (submitted: TransportReceipt -> Task<Result<unit, string>>)
+        (acceptPhysical: PhysicalUserMessageId -> Task<Result<unit, string>>)
+        (acceptanceCallback: (PhysicalUserMessageId -> unit) option)
+        (physicalId: PhysicalUserMessageId)
+        (key: PromptKey)
+        : Task<Result<PromptKey, string>> =
+        taskResult {
+            let! _ = submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId))
+            let! _ = acceptPhysical physicalId
+            acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
+            return key
+        }
+
     type PromptDispatcher.Runtime with
 
         /// Record the Host's answer and report what the caller may conclude.
@@ -138,14 +152,7 @@ module PromptDispatcherSend =
                     // The Host answered with a real id. That answer is still the
                     // transport receipt — it is simply not admission-shaped — so the
                     // four-stage chain stays intact instead of skipping Submitted.
-                    match! submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId)) with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        match! acceptPhysical physicalId with
-                        | Error error -> return Error error
-                        | Ok() ->
-                            acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
-                            return Ok key
+                    return! handleAdmittedPhysical submitted acceptPhysical acceptanceCallback physicalId key
 
                 | Retryable error -> return! abandon (PromptAbandonReason.SendFailed error) error
                 | Fatal error -> return! abandon (PromptAbandonReason.SendFailed error) error
@@ -171,7 +178,7 @@ module PromptDispatcherSend =
             (tools: Map<string, bool> option)
             (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
-            task {
+            taskResult {
                 let payloadDigest = HostDigest.sha256Hex text
 
                 let origin =
@@ -180,43 +187,39 @@ module PromptDispatcherSend =
                 let key =
                     deriveKey (this.ProjectionFor sessionId) sessionId None None origin (Some agent) payloadDigest
 
-                match PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest agent with
-                | Error error -> return Error error
-                | Ok claim ->
-                    let claimed =
-                        PromptFact.PluginPromptClaimed
-                            {| PromptKey = key
-                               SessionId = sessionId
-                               ContinuationKind = PromptDispatcher.originLabel origin
-                               LogicalRunId = None
-                               AuthorityRootUserMessageId = None
-                               EffectiveAgent = claim.EffectiveAgent
-                               PayloadDigest = payloadDigest |}
+                let! claim = PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest agent
 
-                    match! this.Persist sessionId None claimed with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        // EXEC-003: the terminal listener must exist before the prompt
-                        // does, or a fast completion has nobody to deliver to.
-                        use _listener = this.SubscribeNoOp port sessionId
+                let claimed =
+                    PromptFact.PluginPromptClaimed
+                        {| PromptKey = key
+                           SessionId = sessionId
+                           ContinuationKind = PromptDispatcher.originLabel origin
+                           LogicalRunId = None
+                           AuthorityRootUserMessageId = None
+                           EffectiveAgent = claim.EffectiveAgent
+                           PayloadDigest = payloadDigest |}
 
-                        let options =
-                            { Model = model
-                              Agent = Some agent
-                              Directory = directory
-                              Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
-                              Tools = tools
-                              BindingIntent = SessionBindingIntent.Preserve }
+                let! _ = this.Persist sessionId None claimed
 
-                        let! outcome = port.SendPrompt(sessionId, text, options)
+                // EXEC-003: the terminal listener must exist before the prompt
+                // does, or a fast completion has nobody to deliver to.
+                use _listener = this.SubscribeNoOp port sessionId
 
-                        return!
-                            this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
-                                task {
-                                    match! this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent with
-                                    | Ok _ -> return Ok()
-                                    | Error error -> return Error error
-                                })
+                let options =
+                    { Model = model
+                      Agent = Some agent
+                      Directory = directory
+                      Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
+                      Tools = tools
+                      BindingIntent = SessionBindingIntent.Preserve }
+
+                let! outcome = port.SendPrompt(sessionId, text, options) |> TaskResultCE.ofTask
+
+                let acceptFn physicalId =
+                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
+                    |> TaskValue.map (Result.map ignore)
+
+                return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
             }
 
         member this.SendAgentOwnerRoot
@@ -266,7 +269,7 @@ module PromptDispatcherSend =
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
-            task {
+            taskResult {
                 let origin = PromptAuthority.PromptOrigin.Continuation continuation
                 let originLabel = PromptDispatcher.originLabel origin
 
@@ -293,32 +296,31 @@ module PromptDispatcherSend =
                            EffectiveAgent = claim.EffectiveAgent
                            PayloadDigest = payloadDigest |}
 
-                match! this.Persist sessionId None claimed with
-                | Error error -> return Error error
-                | Ok() ->
-                    use _listener = this.SubscribeNoOp port sessionId
+                let! _ = this.Persist sessionId None claimed
 
-                    let options =
-                        { Model = None
-                          Agent = Some effectiveAgent
-                          Directory = directory
-                          Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
-                          Tools = tools
-                          BindingIntent =
-                            if effectiveAgent = profile.SelectedAgent then
-                                SessionBindingIntent.Preserve
-                            else
-                                SessionBindingIntent.ExplicitExecutionOverride }
+                use _listener = this.SubscribeNoOp port sessionId
 
-                    let! outcome = port.SendPrompt(sessionId, text, options)
+                let bindingIntent =
+                    if effectiveAgent = profile.SelectedAgent then
+                        SessionBindingIntent.Preserve
+                    else
+                        SessionBindingIntent.ExplicitExecutionOverride
 
-                    return!
-                        this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
-                            task {
-                                match! this.AcceptContinuation key sessionId physicalId with
-                                | Ok _ -> return Ok()
-                                | Error error -> return Error error
-                            })
+                let options =
+                    { Model = None
+                      Agent = Some effectiveAgent
+                      Directory = directory
+                      Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
+                      Tools = tools
+                      BindingIntent = bindingIntent }
+
+                let! outcome = port.SendPrompt(sessionId, text, options) |> TaskResultCE.ofTask
+
+                let acceptFn physicalId =
+                    this.AcceptContinuation key sessionId physicalId
+                    |> TaskValue.map (Result.map ignore)
+
+                return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
             }
 
         member this.SendContinuation

@@ -87,6 +87,11 @@ module ManagerWorkflow =
 
     /// A fresh idle observation may arrive after this terminal fact was already
     /// delivered on another wake. Only idle-derived labor may run again here.
+    let private mayEncourageLabor journal hasLivePty role sessionId =
+        not (isFissionReplaced journal sessionId)
+        && not (TerminalPolicy.sessionDead journal sessionId)
+        && not (TerminalPolicy.outstandingBackground journal hasLivePty role sessionId)
+
     let observeIdle
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -97,17 +102,93 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn
+        let lifeOpt = currentLife journal turn.SessionId
 
-        match isFissionReplaced journal turn.SessionId, turn.Outcome with
-        | false, ReconcileProgram.TurnCompleted when
-            not (TerminalPolicy.sessionDead journal turn.SessionId)
-            && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
+        match turn.Outcome, mayEncourageLabor journal hasLivePty turn.Role turn.SessionId, lifeOpt with
+        | ReconcileProgram.TurnCompleted, true, Some life when
+            ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue
             ->
-            match currentLife journal turn.SessionId with
-            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
-                ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
-            | _ -> AsyncSupport.completedTask ()
+            ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
         | _ -> AsyncSupport.completedTask ()
+
+    let private handleLaborContinuation
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (life: LifeProjection)
+        : Task =
+        match ManagerFinality.admitLabor life with
+        | ManagerFinality.LaborAdmission.FinalityOwnsLife -> AsyncSupport.completedTask ()
+        | ManagerFinality.LaborAdmission.LaborMayContinue ->
+            ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
+
+    let private handleSettledManager
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        : Task =
+        match currentLife journal turn.SessionId with
+        | Some life ->
+            handleLaborContinuation sessionPort eventPort journal nudgeSent quiescence context life
+        | None -> AsyncSupport.completedTask ()
+
+    let private handleCompletedManager
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (joinGuardNudges: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (abortedSessions: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        : Task =
+        let sessionKey = SessionId.value turn.SessionId
+        let wasAborted = abortedSessions.Contains sessionKey
+        abortedSessions.Remove sessionKey |> ignore
+
+        if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+            AsyncSupport.completedTask ()
+        else
+            task {
+                let! settled =
+                    ManagerBackground.ensureSettled
+                        sessionPort
+                        eventPort
+                        journal
+                        joinGuardNudges
+                        hasLivePty
+                        turn
+
+                match settled with
+                | ManagerBackground.BackgroundSettlement.Deferred -> return ()
+                | ManagerBackground.BackgroundSettlement.Settled ->
+                    let! _ =
+                        handleSettledManager
+                            sessionPort
+                            eventPort
+                            journal
+                            nudgeSent
+                            quiescence
+                            context
+                            turn
+                    return ()
+            }
+            :> Task
+
+    let private handleManagerTurnOutcome observeOrdinary context (turn: ReconciledTurn) handleCompleted : Task =
+        match turn.Outcome with
+        | ReconcileProgram.TurnInProgress -> observeOrdinary context
+        | ReconcileProgram.TurnCompleted -> handleCompleted ()
+        | _ -> observeOrdinary context
 
     let private observeActiveManager
         (sessionPort: ISessionHostPort)
@@ -123,61 +204,28 @@ module ManagerWorkflow =
         : Task =
         task {
             let turn = context.Turn
+            let! handoff = ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn
 
-            match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
+            match handoff with
             | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
             | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnInProgress -> return! observeOrdinary context
-                | ReconcileProgram.TurnCompleted ->
-                    let sessionKey = SessionId.value turn.SessionId
-                    let wasAborted = abortedSessions.Contains sessionKey
-                    abortedSessions.Remove sessionKey |> ignore
+                let handleCompleted () =
+                    handleCompletedManager
+                        sessionPort
+                        eventPort
+                        journal
+                        nudgeSent
+                        joinGuardNudges
+                        hasLivePty
+                        abortedSessions
+                        quiescence
+                        context
+                        turn
 
-                    if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                        return ()
-                    else
-                        match!
-                            ManagerBackground.ensureSettled
-                                sessionPort
-                                eventPort
-                                journal
-                                joinGuardNudges
-                                hasLivePty
-                                turn
-                        with
-                        | ManagerBackground.BackgroundSettlement.Deferred -> return ()
-                        | ManagerBackground.BackgroundSettlement.Settled ->
-                            match currentLife journal turn.SessionId with
-                            | Some life when
-                                ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.FinalityOwnsLife
-                                ->
-                                return ()
-                            | _ ->
-                                // GLORY-018/070: production has no planning-terminal →
-                                // ManagerWorkActivation protocol. LifeOpened is already
-                                // sufficient to continue; T1/BlindPlan progression is
-                                // represented by Magic Todo / WorkRecord facts, not an
-                                // Activation continuation.
-                                match currentLife journal turn.SessionId with
-                                | Some life ->
-                                    match ManagerFinality.admitLabor life with
-                                    | ManagerFinality.LaborAdmission.FinalityOwnsLife -> return ()
-                                    | ManagerFinality.LaborAdmission.LaborMayContinue ->
-                                        do!
-                                            ManagerIdle.encourageLabor
-                                                sessionPort
-                                                eventPort
-                                                journal
-                                                nudgeSent
-                                                quiescence
-                                                context
-                                                life
-
-                                        return ()
-                                | None -> return ()
-                | _ -> return! observeOrdinary context
+                let! _ = handleManagerTurnOutcome observeOrdinary context turn handleCompleted
+                return ()
         }
+        :> Task
 
     /// Observe one Manager-role turn. Manager-specific business branches stay here;
     /// non-Manager terminal semantics are delegated through the injected ordinary

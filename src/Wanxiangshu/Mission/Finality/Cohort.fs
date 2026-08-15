@@ -108,6 +108,17 @@ module CohortWorkflow =
             | Some current, ReviewWitness.RevisionWitness _ when current = barrierId -> true
             | _ -> false)
 
+    let private promoteCancelledDecision (hasDurable: unit -> bool) (error: string) =
+        if hasDurable () then Ok() else Error error
+
+    let private resolveReverifyOutcome hasDurable (outcome: Result<unit, string> option) (isCancelled: bool) =
+        match outcome, isCancelled with
+        | None, _ -> promoteCancelledDecision hasDurable "review attempt cancelled"
+        | Some(Error error), true -> promoteCancelledDecision hasDurable error
+        | Some(Error error), false -> Error error
+        | Some(Ok()), true -> promoteCancelledDecision hasDurable "review attempt cancelled"
+        | Some(Ok()), false -> Ok()
+
     let private driveMember
         (reviewerPort: FinalityReviewerPort)
         (journal: AgentJournal)
@@ -118,22 +129,11 @@ module CohortWorkflow =
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         let awaitOrCancel () =
             task {
-                let promoteCancelled () =
-                    if hasDurableRevisionRequired journal memberInfo.ReviewerSessionId memberInfo.BarrierId then
-                        Ok()
-                    else
-                        Error "review attempt cancelled"
+                let hasDurable () =
+                    hasDurableRevisionRequired journal memberInfo.ReviewerSessionId memberInfo.BarrierId
 
-                match! raceWithCancel cancel (reviewerPort.AwaitTerminal memberInfo.ReviewerSessionId) with
-                | None -> return promoteCancelled ()
-                | Some(Error error) when cancel.IsCancelled ->
-                    if hasDurableRevisionRequired journal memberInfo.ReviewerSessionId memberInfo.BarrierId then
-                        return Ok()
-                    else
-                        return Error error
-                | Some(Error error) -> return Error error
-                | Some(Ok()) when cancel.IsCancelled -> return promoteCancelled ()
-                | Some(Ok()) -> return Ok()
+                let! outcome = raceWithCancel cancel (reviewerPort.AwaitTerminal memberInfo.ReviewerSessionId)
+                return resolveReverifyOutcome hasDurable outcome cancel.IsCancelled
             }
 
         ReviewBarrierWorkflow.reverify
@@ -143,6 +143,18 @@ module CohortWorkflow =
             managerSessionId
             memberInfo.BarrierId
             tree
+
+    let private recordWinner (cancel: CancelToken) (winnerOpt: 'a option ref) (result: 'a) =
+        match winnerOpt.Value with
+        | None ->
+            winnerOpt.Value <- Some result
+            cancel.Cancel()
+        | Some _ -> ()
+
+    let private finishRemaining tcs (winnerOpt: 'a option ref) (all: 'a list) =
+        match winnerOpt.Value with
+        | Some winner -> AsyncSupport.trySetResult tcs (Choice1Of2(winner, all)) |> ignore
+        | None -> AsyncSupport.trySetResult tcs (Choice2Of2 all) |> ignore
 
     let private concurrentAllOrShortCircuit
         (cancel: CancelToken)
@@ -161,20 +173,12 @@ module CohortWorkflow =
                 results.Add result
 
                 if isShortCircuit result then
-                    match shortCircuitWinner.Value with
-                    | None ->
-                        shortCircuitWinner.Value <- Some result
-                        cancel.Cancel()
-                    | Some _ -> ()
+                    recordWinner cancel shortCircuitWinner result
 
                 remaining.Value <- remaining.Value - 1
 
                 if remaining.Value = 0 then
-                    let all = List.ofSeq results
-
-                    match shortCircuitWinner.Value with
-                    | Some winner -> AsyncSupport.trySetResult tcs (Choice1Of2(winner, all)) |> ignore
-                    | None -> AsyncSupport.trySetResult tcs (Choice2Of2 all) |> ignore
+                    finishRemaining tcs shortCircuitWinner (List.ofSeq results)
 
             if List.isEmpty tasks then
                 AsyncSupport.trySetResult tcs (Choice2Of2 []) |> ignore
@@ -190,6 +194,132 @@ module CohortWorkflow =
             return! tcs.Task
         }
 
+    let private startReviewStep
+        (reviewerPort: FinalityReviewerPort)
+        (prepared: PreparedReviewer)
+        (barrierId: ReviewBarrierId)
+        (slot: FinalityReviewCohort.CohortSlot)
+        (members: EnlistedMember list)
+        =
+        task {
+            let memberInfo: EnlistedMember =
+                { ReviewerSessionId = prepared.ReviewerSessionId
+                  BarrierId = barrierId
+                  ReviewerOrdinal = slot.ReviewerOrdinal
+                  AgentId = slot.AgentId
+                  IsNew = prepared.IsNew }
+
+            match! reviewerPort.StartReview memberInfo with
+            | Error error -> return Error error
+            | Ok() -> return Ok(members @ [ memberInfo ])
+        }
+
+    let private openBarrierAndStartReview
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (requestTree: GitTreeHash)
+        (prepared: PreparedReviewer)
+        (barrierId: ReviewBarrierId)
+        (slot: FinalityReviewCohort.CohortSlot)
+        (members: EnlistedMember list)
+        =
+        task {
+            match!
+                ReviewBarrier.openBarrier
+                    (Some journal)
+                    managerSessionId
+                    prepared.ReviewerSessionId
+                    barrierId
+                    requestTree
+            with
+            | Error error -> return Error error
+            | Ok() -> return! startReviewStep reviewerPort prepared barrierId slot members
+        }
+
+    let private recordEnlistedFact
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (slot: FinalityReviewCohort.CohortSlot)
+        (prepared: PreparedReviewer)
+        (barrierId: ReviewBarrierId)
+        =
+        FinalityJournal.appendLifecycle
+            journal
+            (ManagerLifecycleFact.FinalityReviewerEnlisted
+                {| SessionId = managerSessionId
+                   LifeId = life.LifeId
+                   RequestId = request.RequestId
+                   ReviewerSessionId = prepared.ReviewerSessionId
+                   ReviewerOrdinal = slot.ReviewerOrdinal
+                   BarrierId = barrierId
+                   GitTreeHash = request.GitTreeHash
+                   IsNewReviewer = prepared.IsNew |})
+
+    let private prepareSlotAndOpen
+        (reviewerPort: FinalityReviewerPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (members: EnlistedMember list)
+        (slot: FinalityReviewCohort.CohortSlot)
+        =
+        task {
+            let existingMember =
+                slot.ReviewerSessionId
+                |> Option.bind (fun sid -> Map.tryFind sid request.Members)
+
+            let barrierId =
+                existingMember
+                |> Option.map (fun memberRef -> memberRef.BarrierId)
+                |> Option.defaultWith (fun () -> ReviewBarrierId.create (Guid.NewGuid().ToString("N")))
+
+            let physicalRequest: FinalityReviewerRequest =
+                { ManagerSessionId = managerSessionId
+                  LifeId = life.LifeId
+                  RequestId = request.RequestId
+                  RequestTree = request.GitTreeHash
+                  AgentId = slot.AgentId
+                  ReviewerSessionId = slot.ReviewerSessionId
+                  ReviewerOrdinal = slot.ReviewerOrdinal
+                  IsNew = slot.IsNew }
+
+            match! reviewerPort.PrepareSession physicalRequest with
+            | Error error -> return Error error
+            | Ok prepared ->
+                if existingMember.IsNone then
+                    do! recordEnlistedFact journal managerSessionId life request slot prepared barrierId
+
+                return!
+                    openBarrierAndStartReview
+                        reviewerPort
+                        journal
+                        managerSessionId
+                        request.GitTreeHash
+                        prepared
+                        barrierId
+                        slot
+                        members
+        }
+
+    let private foldEnlistSlot
+        reviewerPort
+        journal
+        managerSessionId
+        life
+        request
+        (acc: Task<Result<EnlistedMember list, string>>)
+        (slot: FinalityReviewCohort.CohortSlot)
+        =
+        task {
+            match! acc with
+            | Error error -> return Error error
+            | Ok members -> return! prepareSlotAndOpen reviewerPort journal managerSessionId life request members slot
+        }
+
     let enlistRequiredReviewers
         (reviewerPort: FinalityReviewerPort)
         (journal: AgentJournal)
@@ -201,70 +331,7 @@ module CohortWorkflow =
             FinalityReviewCohort.rosterOf (AgentJournal.snapshot journal).AgentProjections life request
 
         slots
-        |> List.fold
-            (fun (acc: Task<Result<EnlistedMember list, string>>) slot ->
-                task {
-                    match! acc with
-                    | Error error -> return Error error
-                    | Ok members ->
-                        let existingMember =
-                            slot.ReviewerSessionId
-                            |> Option.bind (fun sid -> Map.tryFind sid request.Members)
-
-                        let barrierId =
-                            existingMember
-                            |> Option.map (fun memberRef -> memberRef.BarrierId)
-                            |> Option.defaultWith (fun () -> ReviewBarrierId.create (Guid.NewGuid().ToString("N")))
-
-                        let physicalRequest =
-                            { ManagerSessionId = managerSessionId
-                              LifeId = life.LifeId
-                              RequestId = request.RequestId
-                              RequestTree = request.GitTreeHash
-                              AgentId = slot.AgentId
-                              ReviewerSessionId = slot.ReviewerSessionId
-                              ReviewerOrdinal = slot.ReviewerOrdinal
-                              IsNew = slot.IsNew }
-
-                        match! reviewerPort.PrepareSession physicalRequest with
-                        | Error error -> return Error error
-                        | Ok prepared ->
-                            if existingMember.IsNone then
-                                do!
-                                    FinalityJournal.appendLifecycle
-                                        journal
-                                        (ManagerLifecycleFact.FinalityReviewerEnlisted
-                                            {| SessionId = managerSessionId
-                                               LifeId = life.LifeId
-                                               RequestId = request.RequestId
-                                               ReviewerSessionId = prepared.ReviewerSessionId
-                                               ReviewerOrdinal = slot.ReviewerOrdinal
-                                               BarrierId = barrierId
-                                               GitTreeHash = request.GitTreeHash
-                                               IsNewReviewer = prepared.IsNew |})
-
-                            match!
-                                ReviewBarrier.openBarrier
-                                    (Some journal)
-                                    managerSessionId
-                                    prepared.ReviewerSessionId
-                                    barrierId
-                                    request.GitTreeHash
-                            with
-                            | Error error -> return Error error
-                            | Ok() ->
-                                let memberInfo =
-                                    { ReviewerSessionId = prepared.ReviewerSessionId
-                                      BarrierId = barrierId
-                                      ReviewerOrdinal = slot.ReviewerOrdinal
-                                      AgentId = slot.AgentId
-                                      IsNew = prepared.IsNew }
-
-                                match! reviewerPort.StartReview memberInfo with
-                                | Error error -> return Error error
-                                | Ok() -> return Ok(members @ [ memberInfo ])
-                })
-            (Task.FromResult(Ok []))
+        |> List.fold (foldEnlistSlot reviewerPort journal managerSessionId life request) (Task.FromResult(Ok []))
 
     let reviewUntilFirstRevisionOrAllConfirmed
         (reviewerPort: FinalityReviewerPort)

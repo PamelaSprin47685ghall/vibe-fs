@@ -94,6 +94,31 @@ module PromptRecovery =
             else
                 None)
 
+    let private acceptClaimOrigin (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId physical =
+        match claim.Origin with
+        | PromptAuthority.PromptOrigin.AuthorityRoot _ ->
+            runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical
+            |> TaskValue.map (Result.map ignore)
+        | PromptAuthority.PromptOrigin.Continuation _
+        | PromptAuthority.PromptOrigin.HostInternal
+        | PromptAuthority.PromptOrigin.UnknownOrigin ->
+            runtime.AcceptContinuation claim.PromptKey sessionId physical
+            |> TaskValue.map (Result.map ignore)
+
+    let private reconcileWithPhysical (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId physical report =
+        task {
+            let! accepted = acceptClaimOrigin runtime claim sessionId physical
+
+            match accepted with
+            | Ok() -> return report (Proven physical)
+            | Error reason -> return report (Unreadable reason)
+        }
+
+    let private reconcileMessages (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId messages report =
+        match findPhysical claim.PromptKey messages with
+        | Some physical -> reconcileWithPhysical runtime claim sessionId physical report
+        | None -> Task.FromResult(report (StillPending claim.Receipt.IsSome))
+
     /// Resolve one pending claim.
     ///
     /// The budget is checked only AFTER the search fails. Checking first would
@@ -113,67 +138,43 @@ module PromptRecovery =
 
             match! snapshot.GetMessages sessionId with
             | Error reason -> return report (Unreadable reason)
-            | Ok messages ->
-                match findPhysical claim.PromptKey messages with
-                | Some physical ->
-                    // The claim's own origin decides which acceptance this is: an
-                    // AgentOwnerRoot claim must also register its Authority Root
-                    // (PROMPT-005 order), a continuation must not.
-                    let! accepted =
-                        match claim.Origin with
-                        | PromptAuthority.PromptOrigin.AuthorityRoot _ ->
-                            task {
-                                match! runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical with
-                                | Ok _ -> return Ok()
-                                | Error reason -> return Error reason
-                            }
-                        | PromptAuthority.PromptOrigin.Continuation _
-                        | PromptAuthority.PromptOrigin.HostInternal
-                        | PromptAuthority.PromptOrigin.UnknownOrigin ->
-                            task {
-                                match! runtime.AcceptContinuation claim.PromptKey sessionId physical with
-                                | Ok _ -> return Ok()
-                                | Error reason -> return Error reason
-                            }
+            | Ok messages -> return! reconcileMessages runtime claim sessionId messages report
+        }
 
-                    match accepted with
-                    | Ok() -> return report (Proven physical)
-                    | Error reason -> return report (Unreadable reason)
+    let private reconcileUnsettledClaims runtime snapshot unsettledClaims =
+        task {
+            let results = ResizeArray<Reconciled>()
 
-                | None -> return report (StillPending claim.Receipt.IsSome)
+            for sessionId, claim in unsettledClaims do
+                let! outcome = reconcileClaim runtime snapshot sessionId claim
+                results.Add outcome
+
+            return results |> Seq.toList
         }
 
     /// Detached reconciliation library: prove a pending claim from physical Host
     /// evidence, or leave it pending. Ordinary plugin lifecycle never calls this.
     /// A process restart is not authority to abandon an unresolved old tool.
     let reconcile (journal: AgentJournal option) (snapshotOpt: ISessionSnapshotPort option) : Task<Reconciled list> =
-        task {
-            match journal, snapshotOpt with
-            // No journal means no durable claim to reconcile. No snapshot port means
-            // no way to prove acceptance, and PROMPT-011 forbids resending, so there
-            // is nothing this pass could legitimately do.
-            | None, _
-            | _, None -> return []
-            | Some durable, Some snapshot ->
-                let runtime = PromptDispatcher.forJournal durable
-                let projections = (AgentJournal.snapshot durable).AgentProjections
+        match journal, snapshotOpt with
+        // No journal means no durable claim to reconcile. No snapshot port means
+        // no way to prove acceptance, and PROMPT-011 forbids resending, so there
+        // is nothing this pass could legitimately do.
+        | None, _
+        | _, None -> Task.FromResult []
+        | Some durable, Some snapshot ->
+            let runtime = PromptDispatcher.forJournal durable
+            let projections = (AgentJournal.snapshot durable).AgentProjections
 
-                let pending =
-                    projections.Sessions
-                    |> Map.toList
-                    |> List.collect (fun (sessionId, session) ->
-                        session.PromptAuthority
-                        |> Option.map (fun authority ->
-                            authority.PendingClaims
-                            |> Map.toList
-                            |> List.map (fun (_, claim) -> sessionId, claim))
-                        |> Option.defaultValue [])
+            let unsettled =
+                projections.Sessions
+                |> Map.toList
+                |> List.collect (fun (sessionId, session) ->
+                    session.PromptAuthority
+                    |> Option.map (fun authority ->
+                        authority.PendingClaims
+                        |> Map.toList
+                        |> List.map (fun (_, claim) -> sessionId, claim))
+                    |> Option.defaultValue [])
 
-                let results = ResizeArray<Reconciled>()
-
-                for sessionId, claim in pending do
-                    let! outcome = reconcileClaim runtime snapshot sessionId claim
-                    results.Add outcome
-
-                return results |> Seq.toList
-        }
+            reconcileUnsettledClaims runtime snapshot unsettled
