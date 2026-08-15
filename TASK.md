@@ -2442,7 +2442,7 @@ surface 应跟着 semantic owner 分布。
 
 **完成条件：**数字只会下降。
 
-### P3 — Pure pilot
+### P3 — Pure pilot ✅
 
 迁一个 pure semantic component。
 

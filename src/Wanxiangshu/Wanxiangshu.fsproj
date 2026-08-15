@@ -237,6 +237,7 @@
     <Compile Include="Resources/ModelRoutingResource.fs"/>
     <Compile Include="Resources/ProviderResources.fs"/>
     <Compile Include="Resources/ProviderProse.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Resources/RuntimeResources.fs"/>

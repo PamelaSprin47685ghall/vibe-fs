@@ -37,7 +37,23 @@ export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/js-semantic-surface/tests/surface-charter.test.mjs',
 ])
 
-const A_DEEP_IMPORT = /(?:from\s*|import\s*\(\s*)['"][^'"]*dist\/(?!fable_modules)[^'"]+\.js['"]/
+/**
+ * Registered semantic-surface modules (JS-SEMANTIC-SURFACE-002/003).
+ *
+ * A semantic test may import a registered surface directly: the surface IS the
+ * legal entry point (owner boundary translation, JSON-shaped in/out). Deep
+ * imports of any other dist module remain debt. Register here when a surface
+ * is established (P3 pilot: ForkChildPayloadSurface).
+ */
+export const SURFACE_MODULES = [
+  'Execution/Delegation/Fork/Surface.js',
+]
+
+const SURFACE_ALT = SURFACE_MODULES.map((m) => m.replace(/[.]/g, '\\.')).join('|')
+
+const A_DEEP_IMPORT = new RegExp(
+  `(?:from\\s*|import\\s*\\(\\s*)['"][^'"]*dist/(?!fable_modules)(?!(?:${SURFACE_ALT})['"])[^'"]+\\.js['"]`,
+)
 const B_EXPORT_DISCOVERY = /Object\.(?:keys|entries|values)\(/
 const C1_DU_SHAPE = /\.cases\(\)|\.fields\b|\.tag\b/
 const C2_FSHARP = /\bFSharp(?:List|Map|Set|Option|Result)\b/
