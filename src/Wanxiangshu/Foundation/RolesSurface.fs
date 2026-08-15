@@ -37,6 +37,32 @@ module RolesSurface =
         | "Sphinx" -> Some ToolPermission.Sphinx
         | _ -> None
 
+    let private permissionLabel (permission: ToolPermission) : string =
+        match permission with
+        | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Join -> "Join"
+        | ToolPermission.Horizon -> "Horizon"
+        | ToolPermission.TodoWrite -> "TodoWrite"
+        | ToolPermission.Fission -> "Fission"
+        | ToolPermission.Read -> "Read"
+        | ToolPermission.Write -> "Write"
+        | ToolPermission.Edit -> "Edit"
+        | ToolPermission.Glob -> "Glob"
+        | ToolPermission.Grep -> "Grep"
+        | ToolPermission.Move -> "Move"
+        | ToolPermission.Remove -> "Remove"
+        | ToolPermission.Inspect -> "Inspect"
+        | ToolPermission.Behavior -> "Behavior"
+        | ToolPermission.Exec -> "Exec"
+        | ToolPermission.Pty -> "Pty"
+        | ToolPermission.Network -> "Network"
+        | ToolPermission.Judge -> "Judge"
+        | ToolPermission.Chronicle -> "Chronicle"
+        | ToolPermission.Fetch -> "Fetch"
+        | ToolPermission.Finality -> "Finality"
+        | ToolPermission.BashHoneypot -> "BashHoneypot"
+        | ToolPermission.Sphinx -> "Sphinx"
+
     /// The ten canonical role labels, sorted.
     let allRoleLabels: string array =
         [ Role.Manager
@@ -61,31 +87,7 @@ module RolesSurface =
         | Some role ->
             Roles.permissions role
             |> Set.toList
-            |> List.map (fun p ->
-                match p with
-                | ToolPermission.Fork -> "Fork"
-                | ToolPermission.Join -> "Join"
-                | ToolPermission.Horizon -> "Horizon"
-                | ToolPermission.TodoWrite -> "TodoWrite"
-                | ToolPermission.Fission -> "Fission"
-                | ToolPermission.Read -> "Read"
-                | ToolPermission.Write -> "Write"
-                | ToolPermission.Edit -> "Edit"
-                | ToolPermission.Glob -> "Glob"
-                | ToolPermission.Grep -> "Grep"
-                | ToolPermission.Move -> "Move"
-                | ToolPermission.Remove -> "Remove"
-                | ToolPermission.Inspect -> "Inspect"
-                | ToolPermission.Behavior -> "Behavior"
-                | ToolPermission.Exec -> "Exec"
-                | ToolPermission.Pty -> "Pty"
-                | ToolPermission.Network -> "Network"
-                | ToolPermission.Judge -> "Judge"
-                | ToolPermission.Chronicle -> "Chronicle"
-                | ToolPermission.Fetch -> "Fetch"
-                | ToolPermission.Finality -> "Finality"
-                | ToolPermission.BashHoneypot -> "BashHoneypot"
-                | ToolPermission.Sphinx -> "Sphinx")
+            |> List.map permissionLabel
             |> List.sort
             |> List.toArray
 
