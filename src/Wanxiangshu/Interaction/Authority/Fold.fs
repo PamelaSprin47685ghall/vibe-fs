@@ -46,6 +46,76 @@ module PromptFactFold =
 
     let private reject = FoldRejection.reject
 
+    let private foldAuthorityRootAccepted
+        (projection: AgentProjectionSet)
+        (payload:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               AuthorityKind: string
+               SelectedAgent: string
+               PeerAgent: string
+               CanonicalRole: string
+               SelectedTier: string |})
+        =
+        // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
+        // rather than by a separate reset fact, because the reset is not an
+        // independent event — it IS this fact.
+        //
+        // REVIEW-007: a HumanRoot also creates a review requirement. An
+        // AgentOwnerRoot does not: the agent that forked the work is
+        // accountable for it, and requiring review of every internal prompt
+        // would make the Guard fire on its own continuations.
+        let withAuthority =
+            updateSession
+                payload.SessionId
+                (fun session ->
+                    { session with
+                        PromptAuthority =
+                            Some(
+                                PromptAuthorityLedger.foldAuthorityRootAccepted
+                                    (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
+                                    payload
+                            )
+                        Fallback =
+                            Some(
+                                FallbackProjection.forAuthority
+                                    payload.LogicalRunId
+                                    payload.AuthorityRootUserMessageId
+                            ) })
+                projection
+
+        if payload.AuthorityKind = "HumanRoot" then
+            Ok(
+                updateRequirements
+                    payload.SessionId
+                    (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
+                    withAuthority
+            )
+        else
+            Ok withAuthority
+
+    let private foldAuthorityLogicalRunClosed
+        (projection: AgentProjectionSet)
+        (payload:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId |})
+        =
+        let authority =
+            PromptAuthorityLedger.projectionFor payload.SessionId projection
+            |> Option.defaultValue PromptAuthorityLedger.empty
+
+        match PromptAuthorityLedger.foldAuthorityLogicalRunClosed authority payload with
+        | Error reason -> reject "AuthorityLogicalRunClosed" reason
+        | Ok closed ->
+            Ok(
+                updateSession
+                    payload.SessionId
+                    (fun session -> { session with PromptAuthority = Some closed })
+                    projection
+            )
+
     let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         // ── prompt dispatch ─────────────────────────────────────────────────
@@ -85,55 +155,6 @@ module PromptFactFold =
 
         // ── authority ───────────────────────────────────────────────────────
 
-        | PromptFactCases.AuthorityRootAccepted payload ->
-            // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
-            // rather than by a separate reset fact, because the reset is not an
-            // independent event — it IS this fact.
-            //
-            // REVIEW-007: a HumanRoot also creates a review requirement. An
-            // AgentOwnerRoot does not: the agent that forked the work is
-            // accountable for it, and requiring review of every internal prompt
-            // would make the Guard fire on its own continuations.
-            let withAuthority =
-                updateSession
-                    payload.SessionId
-                    (fun session ->
-                        { session with
-                            PromptAuthority =
-                                Some(
-                                    PromptAuthorityLedger.foldAuthorityRootAccepted
-                                        (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
-                                        payload
-                                )
-                            Fallback =
-                                Some(
-                                    FallbackProjection.forAuthority
-                                        payload.LogicalRunId
-                                        payload.AuthorityRootUserMessageId
-                                ) })
-                    projection
+        | PromptFactCases.AuthorityRootAccepted payload -> foldAuthorityRootAccepted projection payload
 
-            if payload.AuthorityKind = "HumanRoot" then
-                Ok(
-                    updateRequirements
-                        payload.SessionId
-                        (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
-                        withAuthority
-                )
-            else
-                Ok withAuthority
-
-        | PromptFactCases.AuthorityLogicalRunClosed payload ->
-            let authority =
-                PromptAuthorityLedger.projectionFor payload.SessionId projection
-                |> Option.defaultValue PromptAuthorityLedger.empty
-
-            match PromptAuthorityLedger.foldAuthorityLogicalRunClosed authority payload with
-            | Error reason -> reject "AuthorityLogicalRunClosed" reason
-            | Ok closed ->
-                Ok(
-                    updateSession
-                        payload.SessionId
-                        (fun session -> { session with PromptAuthority = Some closed })
-                        projection
-                )
+        | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed projection payload
