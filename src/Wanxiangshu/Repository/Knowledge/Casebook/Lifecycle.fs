@@ -97,85 +97,112 @@ module CasebookLifecycle =
         CasebookDraftStore.clear inspectorSessionId
         collector.Drain inspectorSessionId |> ignore
 
+    let private runFinalize
+        (workspaceRoot: string)
+        (inspectorSessionId: string)
+        (draft: CasebookDraft)
+        (a: string)
+        : Task<Result<unit, string>> =
+        taskResult {
+            try
+                let commonDir = RuntimePath.gitCommonDir workspaceRoot
+                let store = WorkspaceEventStore.acquire commonDir
+                let observations = collector.Drain inspectorSessionId
+
+                let lastQ =
+                    draft.Turns
+                    |> List.tryLast
+                    |> Option.map (fun turn -> turn.Q)
+                    |> Option.defaultValue ""
+
+                let transcript = CasebookDraftStore.transcript draft.Turns
+
+                let! q', a' =
+                    BookkeeperRuntime.runTransaction
+                        BookkeeperRequest.CaseFinalize
+                        inspectorSessionId
+                        lastQ
+                        a
+                        observations
+                        (Some transcript)
+
+                let case: Case =
+                    { SessionId = inspectorSessionId
+                      Q = q'
+                      A = a'
+                      Observations = observations
+                      LastAccessOrder = 0L }
+
+                do! CasebookWorkflow.finalizeCase store case
+                CasebookIndex.invalidate ()
+                let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
+                return ()
+            with ex ->
+                collector.Drain inspectorSessionId |> ignore
+                return! Error ex.Message
+        }
+
+    let private finalizeWithDraft
+        (workspaceRoot: string)
+        (inspectorSessionId: string)
+        (draft: CasebookDraft)
+        (lastAnswer: string option)
+        : Task<Result<unit, string>> =
+        task {
+            match lastAnswer with
+            | None ->
+                collector.Drain inspectorSessionId |> ignore
+                return Ok()
+            | Some a -> return! runFinalize workspaceRoot inspectorSessionId draft a
+        }
+
+    let private finalizeIfDrafted (workspaceRoot: string) (inspectorSessionId: string) : Task<Result<unit, string>> =
+        task {
+            match CasebookDraftStore.tryTake inspectorSessionId with
+            | None ->
+                collector.Drain inspectorSessionId |> ignore
+                return Ok()
+            | Some draft ->
+                let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
+                return! finalizeWithDraft workspaceRoot inspectorSessionId draft lastAnswer
+        }
+
     /// Graceful owner scope close: if draft has Q+A, drain observations, run
     /// exactly one CaseFinalize child session with the full turn transcript,
     /// then finalizeCase once. Unexpected cleanup never runs Bookkeeper.
     let tryFinalizeInspector (workspaceRoot: string) (inspectorSessionId: string) : Task<Result<unit, string>> =
         task {
-            if not (CasebookFeature.isEnabled workspaceRoot) then
+            if CasebookFeature.isEnabled workspaceRoot then
+                return! finalizeIfDrafted workspaceRoot inspectorSessionId
+            else
                 cleanupInspector inspectorSessionId
                 return Ok()
-            else
-                match CasebookDraftStore.tryTake inspectorSessionId with
-                | None ->
-                    collector.Drain inspectorSessionId |> ignore
-                    return Ok()
-                | Some draft ->
-                    let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
+        }
 
-                    match lastAnswer with
-                    | None ->
-                        collector.Drain inspectorSessionId |> ignore
-                        return Ok()
-                    | Some a ->
-                        try
-                            let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                            let store = WorkspaceEventStore.acquire commonDir
-                            let observations = collector.Drain inspectorSessionId
+    let private refreshWhenTouched (store: IEventStore) (touched: Result<unit, string>) : Task<unit> =
+        task {
+            match touched with
+            | Ok() ->
+                CasebookIndex.invalidate ()
+                let! _ = CasebookIndex.refresh store 256
+                return ()
+            | Error _ -> return ()
+        }
 
-                            let lastQ =
-                                draft.Turns
-                                |> List.tryLast
-                                |> Option.map (fun turn -> turn.Q)
-                                |> Option.defaultValue ""
-
-                            let transcript = CasebookDraftStore.transcript draft.Turns
-
-                            match!
-                                BookkeeperRuntime.runTransaction
-                                    BookkeeperRequest.CaseFinalize
-                                    inspectorSessionId
-                                    lastQ
-                                    a
-                                    observations
-                                    (Some transcript)
-                            with
-                            | Error err -> return Error err
-                            | Ok(q', a') ->
-                                let case: Case =
-                                    { SessionId = inspectorSessionId
-                                      Q = q'
-                                      A = a'
-                                      Observations = observations
-                                      LastAccessOrder = 0L }
-
-                                match! CasebookWorkflow.finalizeCase store case with
-                                | Ok() ->
-                                    CasebookIndex.invalidate ()
-                                    let! _ = CasebookIndex.refresh store 256
-                                    return Ok()
-                                | Error err -> return Error err
-                        with ex ->
-                            collector.Drain inspectorSessionId |> ignore
-                            return Error ex.Message
+    let private touchAccessEnabled (workspaceRoot: string) (sessionId: string) : Task<unit> =
+        task {
+            try
+                let commonDir = RuntimePath.gitCommonDir workspaceRoot
+                let store = WorkspaceEventStore.acquire commonDir
+                let! touched = CasebookWorkflow.touchCaseAccess store sessionId
+                do! refreshWhenTouched store touched
+            with _ ->
+                ()
         }
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =
         task {
-            if not (CasebookFeature.isEnabled workspaceRoot) then
-                return ()
-            else
-                try
-                    let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                    let store = WorkspaceEventStore.acquire commonDir
-
-                    match! CasebookWorkflow.touchCaseAccess store sessionId with
-                    | Ok() ->
-                        CasebookIndex.invalidate ()
-                        let! _ = CasebookIndex.refresh store 256
-                        return ()
-                    | Error _ -> return ()
-                with _ ->
-                    return ()
+            if CasebookFeature.isEnabled workspaceRoot then
+                do! touchAccessEnabled workspaceRoot sessionId
         }

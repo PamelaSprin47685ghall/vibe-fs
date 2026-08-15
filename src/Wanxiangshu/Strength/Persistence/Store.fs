@@ -136,6 +136,12 @@ module StrengthStore =
         |> Encode.toString 0
         |> Encoding.UTF8.GetBytes
 
+    let private validateBundleDigest (digest: string) (byteLength: int) (bundle: StrengthFrameBundle) =
+        if bundle.Digest <> digest || bundle.ByteLength <> byteLength then
+            Error "Strength frame payload digest/length mismatch"
+        else
+            Ok bundle
+
     let decodeFrameBundlePayload (sha256: string -> string) (content: byte[]) : Result<StrengthFrameBundle, string> =
         let exchangeDecoder =
             Decode.object (fun get ->
@@ -155,16 +161,15 @@ module StrengthStore =
                 get.Required.Field "byte_length" Decode.int,
                 get.Required.Field "batches" (Decode.list batchDecoder))
 
-        match Encoding.UTF8.GetString content |> Decode.fromString decoder with
-        | Error error -> Error error
-        | Ok(version, digest, byteLength, batches) when version <> 1 ->
-            Error(sprintf "unsupported Strength frame payload version: %d" version)
-        | Ok(_, digest, byteLength, batches) ->
-            match StrengthFrame.tryBuild sha256 byteLength batches with
-            | Error error -> Error(sprintf "invalid Strength frame payload: %A" error)
-            | Ok bundle when bundle.Digest <> digest || bundle.ByteLength <> byteLength ->
-                Error "Strength frame payload digest/length mismatch"
-            | Ok bundle -> Ok bundle
+        Encoding.UTF8.GetString content
+        |> Decode.fromString decoder
+        |> Result.bind (fun (version, digest, byteLength, batches) ->
+            if version <> 1 then
+                Error(sprintf "unsupported Strength frame payload version: %d" version)
+            else
+                StrengthFrame.tryBuild sha256 byteLength batches
+                |> Result.mapError (sprintf "invalid Strength frame payload: %A")
+                |> Result.bind (validateBundleDigest digest byteLength))
 
     let private payloadRefsOf =
         function
@@ -197,9 +202,8 @@ module StrengthStore =
                 get.Required.Field "frame_digest" Decode.string,
                 get.Required.Field "byte_length" Decode.int)
 
-        match Decode.fromValue "$" decoder payload with
-        | Error error -> Error error
-        | Ok(owner, decision, target, replica, budgetText, anchor, digest, byteLength) ->
+        Decode.fromValue "$" decoder payload
+        |> Result.bind (fun (owner, decision, target, replica, budgetText, anchor, digest, byteLength) ->
             match StrengthBudget.parse budgetText with
             | None -> Error(sprintf "invalid Strength budget: %s" budgetText)
             | Some budget ->
@@ -214,7 +218,7 @@ module StrengthStore =
                         digest
                         byteLength
                         refs
-                )
+                ))
 
     let private decodePromoted payload refs : Result<StrengthEvent, string> =
         let decoder =
@@ -266,27 +270,36 @@ module StrengthStore =
         | eventType when eventType = StrengthEventTypes.CandidateAbandoned -> decodeAbandoned envelope.Payload
         | other -> Error(sprintf "not a Strength event: %s" other)
 
+    let private requireFrameMatches (prepared: StrengthCandidatePrepared) (bundle: StrengthFrameBundle) =
+        if bundle.Digest <> prepared.FrameDigest then
+            Error "Strength Prepared frame digest does not match payload"
+        elif bundle.ByteLength <> prepared.ByteLength then
+            Error "Strength Prepared byte length does not match payload"
+        else
+            Ok()
+
     let loadFrameBundle
         (store: IEventStore)
         (sha256: string -> string)
         (prepared: StrengthCandidatePrepared)
         : Task<Result<StrengthFrameBundle, string>> =
-        task {
+        taskResult {
             match prepared.MaterialPayloads with
             | [ payloadRef ] ->
-                match! store.ReadPayload payloadRef with
-                | Error error -> return Error error
-                | Ok None -> return Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
-                | Ok(Some bytes) ->
-                    match decodeFrameBundlePayload sha256 bytes with
-                    | Error error -> return Error error
-                    | Ok bundle when bundle.Digest <> prepared.FrameDigest ->
-                        return Error "Strength Prepared frame digest does not match payload"
-                    | Ok bundle when bundle.ByteLength <> prepared.ByteLength ->
-                        return Error "Strength Prepared byte length does not match payload"
-                    | Ok bundle -> return Ok bundle
-            | [] -> return Error "Strength Prepared has no frame payload"
-            | _ -> return Error "Strength Prepared has ambiguous frame payload closure"
+                let! payloadOpt = store.ReadPayload payloadRef
+
+                let! bytes =
+                    payloadOpt
+                    |> Option.map Ok
+                    |> Option.defaultValue (
+                        Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
+                    )
+
+                let! bundle = decodeFrameBundlePayload sha256 bytes
+                do! requireFrameMatches prepared bundle
+                return bundle
+            | [] -> return! Error "Strength Prepared has no frame payload"
+            | _ -> return! Error "Strength Prepared has ambiguous frame payload closure"
         }
 
     let private appendReceiptResult eventId (receipt: AppendReceipt) =
@@ -315,34 +328,30 @@ module StrengthStore =
     /// STRENGTH-006: payload bytes become local content-addressed PayloadRefs
     /// before the Prepared event is appended. Git object identity is absent from
     /// the runtime path; remote sync blobifies these files later.
+    let private appendToPublish =
+        function
+        | AppendError.StorageInvalid error -> PublishError.StorageInvalid error
+        | AppendError.SemanticCut cut -> PublishError.SemanticCut cut
+        | AppendError.AppendFailed reason -> PublishError.PublishFailed reason
+
     let publishWithPayloads
         (store: IEventStore)
         (sha256: string -> string)
         (contents: byte[] list)
         (buildEvent: PayloadRef list -> StrengthEvent)
         : Task<Result<StrengthEvent, PublishError>> =
-        task {
-            let rec writePayloads remaining acc =
-                task {
-                    match remaining with
-                    | [] -> return Ok(List.rev acc |> PayloadRefs.canonicalize)
-                    | bytes :: tail ->
-                        match! store.WritePayload bytes with
-                        | Error error -> return Error(PublishError.PublishFailed error)
-                        | Ok payloadRef -> return! writePayloads tail (payloadRef :: acc)
-                }
+        let writePayloads: Task<Result<PayloadRef list, PublishError>> =
+            contents
+            |> TaskResultList.traverseM (fun bytes ->
+                store.WritePayload bytes |> TaskResult.mapError PublishError.PublishFailed)
+            |> TaskValue.map (Result.map PayloadRefs.canonicalize)
 
-            match! writePayloads contents [] with
-            | Error error -> return Error error
-            | Ok payloadRefs ->
-                let event = buildEvent payloadRefs
-                let envelope = toEnvelope sha256 event
-
-                match! store.Append [ envelope ] with
-                | Ok receipt -> return publishReceiptResult event envelope.EventId receipt
-                | Error(AppendError.StorageInvalid error) -> return Error(PublishError.StorageInvalid error)
-                | Error(AppendError.SemanticCut cut) -> return Error(PublishError.SemanticCut cut)
-                | Error(AppendError.AppendFailed reason) -> return Error(PublishError.PublishFailed reason)
+        taskResult {
+            let! payloadRefs = writePayloads
+            let event = buildEvent payloadRefs
+            let envelope = toEnvelope sha256 event
+            let! receipt = store.Append [ envelope ] |> TaskResult.mapError appendToPublish
+            return! publishReceiptResult event envelope.EventId receipt
         }
 
     /// Small facades keep callers on the durable adapter rather than reaching

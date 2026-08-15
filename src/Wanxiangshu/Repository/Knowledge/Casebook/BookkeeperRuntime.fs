@@ -234,6 +234,115 @@ module BookkeeperRuntime =
             unbindSession (SessionId.value childId)
         }
 
+    let private completeOnOutcome
+        (completion: TaskCompletionSource<Result<unit, string>>)
+        (outcome: TerminalOutcome)
+        : unit =
+        match outcome with
+        | TerminalOutcome.Completed _ -> AsyncSupport.trySetResult completion (Ok()) |> ignore
+        | TerminalOutcome.Failed error -> AsyncSupport.trySetResult completion (Error error) |> ignore
+        | TerminalOutcome.Aborted reason -> AsyncSupport.trySetResult completion (Error reason) |> ignore
+
+    let private sendFailureOf =
+        function
+        | Retryable reason -> Some reason
+        | Fatal reason -> Some reason
+        | AcceptanceUnknown reason -> Some reason
+        | AdmittedWithReceipt _
+        | AdmittedWithPhysicalMessage _ -> None
+
+    let private awaitCompletion
+        (sessions: ISessionHostPort)
+        (txId: string)
+        (childId: SessionId)
+        (completion: TaskCompletionSource<Result<unit, string>>)
+        (disposeSub: unit -> unit)
+        : Task<Result<string * string, string>> =
+        task {
+            let timedOut: Task<Result<unit, string>> =
+                emitJsExpr
+                    CompletionTimeoutMs
+                    "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['bookkeeper transaction timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
+
+            let finished = completion.Task
+
+            let! waited = (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
+
+            disposeSub ()
+
+            match waited with
+            | Error err ->
+                BookkeeperStaging.abort txId
+                do! retire sessions childId
+                return Error err
+            | Ok() ->
+                let taken = BookkeeperStaging.take txId
+                do! retire sessions childId
+                return taken
+        }
+
+    let private runChild
+        (sessions: ISessionHostPort)
+        (txId: string)
+        (childId: SessionId)
+        (kind: BookkeeperRequest)
+        (ownerSessionId: string)
+        (q: string)
+        (a: string)
+        (observations: Observation list)
+        (extraTranscript: string option)
+        : Task<Result<string * string, string>> =
+        task {
+            let childKey = SessionId.value childId
+            bindSession childKey txId ownerSessionId
+
+            let completion =
+                TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            // DSL-MUTABLE: subscription — bookkeeper terminal subscription
+            let mutable subscription: System.IDisposable option = None
+
+            subscription <-
+                Some(sessions.SubscribeTerminal(childId, (fun _ outcome -> completeOnOutcome completion outcome)))
+
+            let promptText = envelope kind ownerSessionId q a observations extraTranscript
+            let! sent = sessions.SendPrompt(childId, promptText, promptOptions)
+
+            let disposeSub () =
+                subscription |> Option.iter (fun active -> active.Dispose())
+                subscription <- None
+
+            match sendFailureOf sent with
+            | Some reason ->
+                disposeSub ()
+                BookkeeperStaging.abort txId
+                do! retire sessions childId
+                return Error reason
+            | None -> return! awaitCompletion sessions txId childId completion disposeSub
+        }
+
+    let private runWithPort
+        (sessions: ISessionHostPort)
+        (kind: BookkeeperRequest)
+        (ownerSessionId: string)
+        (q: string)
+        (a: string)
+        (observations: Observation list)
+        (extraTranscript: string option)
+        : Task<Result<string * string, string>> =
+        task {
+            let txId = Guid.NewGuid().ToString("N")
+            BookkeeperStaging.beginTransaction txId q a
+
+            let! created = sessions.CreateChildSession(SessionId.create ownerSessionId, childOptions txId)
+
+            match created with
+            | Error err ->
+                BookkeeperStaging.abort txId
+                return Error err
+            | Ok childId -> return! runChild sessions txId childId kind ownerSessionId q a observations extraTranscript
+        }
+
     let runTransaction
         (kind: BookkeeperRequest)
         (ownerSessionId: string)
@@ -245,82 +354,5 @@ module BookkeeperRuntime =
         task {
             match currentPort () with
             | None -> return Error "bookkeeper session port unavailable"
-            | Some sessions ->
-                let txId = Guid.NewGuid().ToString("N")
-                BookkeeperStaging.beginTransaction txId q a
-
-                let! created = sessions.CreateChildSession(SessionId.create ownerSessionId, childOptions txId)
-
-                match created with
-                | Error err ->
-                    BookkeeperStaging.abort txId
-                    return Error err
-                | Ok childId ->
-                    let childKey = SessionId.value childId
-                    bindSession childKey txId ownerSessionId
-
-                    let completion =
-                        TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                    // DSL-MUTABLE: subscription — bookkeeper terminal subscription
-                    let mutable subscription: System.IDisposable option = None
-
-                    subscription <-
-                        Some(
-                            sessions.SubscribeTerminal(
-                                childId,
-                                fun _ outcome ->
-                                    match outcome with
-                                    | TerminalOutcome.Completed _ ->
-                                        AsyncSupport.trySetResult completion (Ok()) |> ignore
-                                    | TerminalOutcome.Failed error ->
-                                        AsyncSupport.trySetResult completion (Error error) |> ignore
-                                    | TerminalOutcome.Aborted reason ->
-                                        AsyncSupport.trySetResult completion (Error reason) |> ignore
-                            )
-                        )
-
-                    let promptText = envelope kind ownerSessionId q a observations extraTranscript
-                    let! sent = sessions.SendPrompt(childId, promptText, promptOptions)
-
-                    let sendError =
-                        match sent with
-                        | Retryable reason -> Some reason
-                        | Fatal reason -> Some reason
-                        | AcceptanceUnknown reason -> Some reason
-                        | AdmittedWithReceipt _
-                        | AdmittedWithPhysicalMessage _ -> None
-
-                    let disposeSub () =
-                        subscription |> Option.iter (fun active -> active.Dispose())
-                        subscription <- None
-
-                    match sendError with
-                    | Some reason ->
-                        disposeSub ()
-                        BookkeeperStaging.abort txId
-                        do! retire sessions childId
-                        return Error reason
-                    | None ->
-                        let timedOut: Task<Result<unit, string>> =
-                            emitJsExpr
-                                CompletionTimeoutMs
-                                "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['bookkeeper transaction timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
-
-                        let finished = completion.Task
-
-                        let! waited =
-                            (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
-
-                        disposeSub ()
-
-                        match waited with
-                        | Error err ->
-                            BookkeeperStaging.abort txId
-                            do! retire sessions childId
-                            return Error err
-                        | Ok() ->
-                            let taken = BookkeeperStaging.take txId
-                            do! retire sessions childId
-                            return taken
+            | Some sessions -> return! runWithPort sessions kind ownerSessionId q a observations extraTranscript
         }

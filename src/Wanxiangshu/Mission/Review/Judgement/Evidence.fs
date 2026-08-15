@@ -73,39 +73,41 @@ module ReviewerEvidence =
                 reviewGuard.CurrentBarrierId = Some memberRef.BarrierId
                 && ReviewWitness.isRevision reviewGuard.Witness))
 
+    let private finalityMembership
+        (snapshot: ProjectionSet)
+        (request: FinalityRequestProjection)
+        (reviewerKey: string)
+        (barrierId: ReviewBarrierId)
+        =
+        match Map.tryFind (SessionId.create reviewerKey) request.Members with
+        | None -> true
+        | Some enlisted when enlisted.BarrierId <> barrierId -> true
+        | Some _ ->
+            ManagerLifecycleProjection.isOpen request
+            && not (cohortHasRevision snapshot.AgentProjections request)
+
+    let private reviewerFinality
+        (durable: AgentJournal)
+        (reviewGuard: ReviewGuardProjection)
+        (reviewerKey: string)
+        : bool option =
+        match reviewGuard.CurrentManagerSessionId, reviewGuard.CurrentBarrierId with
+        | Some managerSessionId, Some barrierId ->
+            let snapshot = AgentJournal.snapshot durable
+
+            AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.ManagerLife)
+            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife |> Option.bind (fun life -> life.ActiveFinality))
+            |> Option.map (fun request -> finalityMembership snapshot request reviewerKey barrierId)
+        | _ -> None
+
     /// Whether the barrier still authorizes reviewer continuation. Finality may
     /// stop waiting after a sibling REVISE; that closed request must also revoke
     /// the reviewer's challenge capability. Non-Finality review owners have no
     /// ManagerLife projection and remain eligible.
     let continuationOpen journal reviewerKey =
         match journal, guard journal reviewerKey with
-        | Some durable, Some reviewGuard ->
-            match reviewGuard.CurrentManagerSessionId, reviewGuard.CurrentBarrierId with
-            | Some managerSessionId, Some barrierId ->
-                let snapshot = AgentJournal.snapshot durable
-
-                let managerLife =
-                    AgentProjection.tryFind managerSessionId snapshot.AgentProjections
-                    |> Option.bind (fun session -> session.ManagerLife)
-
-                match managerLife with
-                | None -> true
-                | Some lifecycle ->
-                    // Finality may revoke continuation only for a reviewer that is
-                    // actually a member of the current finality request at this
-                    // barrier. Ordinary Orchestrator review barriers reuse the same
-                    // completed Manager session, so "ManagerLife exists" is not
-                    // evidence that this reviewer belongs to Finality.
-                    match lifecycle.CurrentLife |> Option.bind (fun life -> life.ActiveFinality) with
-                    | None -> true
-                    | Some request ->
-                        match Map.tryFind (SessionId.create reviewerKey) request.Members with
-                        | None -> true
-                        | Some enlisted when enlisted.BarrierId <> barrierId -> true
-                        | Some _ ->
-                            ManagerLifecycleProjection.isOpen request
-                            && not (cohortHasRevision snapshot.AgentProjections request)
-            | _ -> true
+        | Some durable, Some reviewGuard -> reviewerFinality durable reviewGuard reviewerKey |> Option.defaultValue true
         | _ -> true
 
     /// Whether this reviewer has produced any verdict for the current barrier.
@@ -145,6 +147,18 @@ module ReviewerEvidence =
         | EnsureVerdictSubmitted
         | CompleteRevision
 
+    let private classifyUnconfirmed (reviewGuard: ReviewGuardProjection) =
+        match reviewGuard.Witness with
+        | witness when ReviewWitness.isPerfectPending witness && not reviewGuard.IsConfirmed ->
+            Need.EnsurePerfectConfirmed
+        | _ when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
+        | _ -> Need.CompleteRevision
+
+    let private classifyWithGuard (reviewerId: SessionId) (reviewGuard: ReviewGuardProjection) =
+        match ReviewWitness.confirmedReviewer reviewGuard.Witness with
+        | Some id when id = reviewerId -> Need.CompleteConfirmed
+        | _ -> classifyUnconfirmed reviewGuard
+
     let classifyNeed journal reviewerKey =
         let reviewerId = SessionId.create reviewerKey
 
@@ -163,12 +177,4 @@ module ReviewerEvidence =
             // REVIEW-013: process PERFECT/REVISE is terminal. No confirmation nudge.
             Need.CompleteRevision
         | None, None -> Need.EnsureVerdictSubmitted
-        | None, Some reviewGuard ->
-            match ReviewWitness.confirmedReviewer reviewGuard.Witness with
-            | Some id when id = reviewerId -> Need.CompleteConfirmed
-            | _ ->
-                match reviewGuard.Witness with
-                | witness when ReviewWitness.isPerfectPending witness && not reviewGuard.IsConfirmed ->
-                    Need.EnsurePerfectConfirmed
-                | _ when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
-                | _ -> Need.CompleteRevision
+        | None, Some reviewGuard -> classifyWithGuard reviewerId reviewGuard

@@ -95,81 +95,98 @@ module StrengthProjection =
         && prepared.FrameDigest = promoted.FrameDigest
         && prepared.MaterialPayloads = promoted.MaterialPayloads
 
+    let private registerPrepared (projection: StrengthProjection) (prepared: StrengthCandidatePrepared) =
+        let tkey = targetKey prepared.TargetProviderRun
+
+        match Map.tryFind tkey projection.ByTargetRun with
+        | Some existingDecision when existingDecision <> prepared.DecisionId ->
+            Error(StrengthProjectionError.TargetAlreadyBound prepared.TargetProviderRun)
+        | _ ->
+            let view =
+                { Prepared = prepared
+                  Promoted = false
+                  TraceRange = None
+                  Abandoned = false }
+
+            Ok
+                { ByDecision = Map.add (decisionKey prepared.DecisionId) view projection.ByDecision
+                  ByTargetRun = Map.add tkey prepared.DecisionId projection.ByTargetRun }
+
+    let private applyPrepared (projection: StrengthProjection) (prepared: StrengthCandidatePrepared) =
+        let dkey = decisionKey prepared.DecisionId
+
+        match Map.tryFind dkey projection.ByDecision with
+        | Some existing when existing.Prepared = prepared -> Ok projection
+        | Some _ -> Error(StrengthProjectionError.PreparedConflict prepared.DecisionId)
+        | None -> registerPrepared projection prepared
+
+    let private applyPromoted (projection: StrengthProjection) (promoted: StrengthCandidatePromoted) =
+        let dkey = decisionKey promoted.DecisionId
+
+        match Map.tryFind dkey projection.ByDecision with
+        | None -> Error(StrengthProjectionError.PromotionWithoutPrepared promoted.DecisionId)
+        | Some view when view.Abandoned -> Error(StrengthProjectionError.PromotionAfterAbandon promoted.DecisionId)
+        | Some view when not (samePromotion view.Prepared promoted) ->
+            Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
+        | Some view when view.Promoted -> Ok projection
+        | Some view ->
+            Ok
+                { projection with
+                    ByDecision = Map.add dkey { view with Promoted = true } projection.ByDecision }
+
+    let private attachTraceRange
+        (projection: StrengthProjection)
+        (decisionId: StrengthDecisionId)
+        (range: StrengthTraceRange)
+        (view: StrengthCandidateView)
+        : Result<StrengthProjection, StrengthProjectionError> =
+        match view.TraceRange with
+        | Some existing when existing = range -> Ok projection
+        | Some _ -> Error(StrengthProjectionError.TraceConflict decisionId)
+        | None ->
+            Ok
+                { projection with
+                    ByDecision =
+                        Map.add (decisionKey decisionId) { view with TraceRange = Some range } projection.ByDecision }
+
+    let private applyTraced (projection: StrengthProjection) (traced: StrengthFramesTraced) =
+        let dkey = decisionKey traced.DecisionId
+
+        match Map.tryFind dkey projection.ByDecision with
+        | None -> Error(StrengthProjectionError.TraceWithoutPrepared traced.DecisionId)
+        | Some view when not view.Promoted -> Error(StrengthProjectionError.TraceWithoutPromotion traced.DecisionId)
+        | Some _ when traced.StartInclusive < 0L || traced.EndExclusive <= traced.StartInclusive ->
+            Error(StrengthProjectionError.InvalidTraceRange traced.DecisionId)
+        | Some view ->
+            let range =
+                { StartInclusive = traced.StartInclusive
+                  EndExclusive = traced.EndExclusive }
+
+            attachTraceRange projection traced.DecisionId range view
+
+    let private applyAbandoned (projection: StrengthProjection) (abandoned: StrengthCandidateAbandoned) =
+        let dkey = decisionKey abandoned.DecisionId
+
+        match Map.tryFind dkey projection.ByDecision with
+        | None -> Error(StrengthProjectionError.AbandonWithoutPrepared abandoned.DecisionId)
+        | Some view when view.Promoted -> Error(StrengthProjectionError.AbandonAfterPromotion abandoned.DecisionId)
+        | Some view when view.Prepared.TargetProviderRun <> abandoned.TargetProviderRun ->
+            Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
+        | Some view when view.Abandoned -> Ok projection
+        | Some view ->
+            Ok
+                { ByDecision = Map.add dkey { view with Abandoned = true } projection.ByDecision
+                  ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
+
     let apply
         (projection: StrengthProjection)
         (event: StrengthEvent)
         : Result<StrengthProjection, StrengthProjectionError> =
         match event with
-        | StrengthEvent.Prepared prepared ->
-            let dkey = decisionKey prepared.DecisionId
-            let tkey = targetKey prepared.TargetProviderRun
-
-            match Map.tryFind dkey projection.ByDecision with
-            | Some existing when existing.Prepared = prepared -> Ok projection
-            | Some _ -> Error(StrengthProjectionError.PreparedConflict prepared.DecisionId)
-            | None ->
-                match Map.tryFind tkey projection.ByTargetRun with
-                | Some existingDecision when existingDecision <> prepared.DecisionId ->
-                    Error(StrengthProjectionError.TargetAlreadyBound prepared.TargetProviderRun)
-                | _ ->
-                    let view =
-                        { Prepared = prepared
-                          Promoted = false
-                          TraceRange = None
-                          Abandoned = false }
-
-                    Ok
-                        { ByDecision = Map.add dkey view projection.ByDecision
-                          ByTargetRun = Map.add tkey prepared.DecisionId projection.ByTargetRun }
-
-        | StrengthEvent.Promoted promoted ->
-            let dkey = decisionKey promoted.DecisionId
-
-            match Map.tryFind dkey projection.ByDecision with
-            | None -> Error(StrengthProjectionError.PromotionWithoutPrepared promoted.DecisionId)
-            | Some view when view.Abandoned -> Error(StrengthProjectionError.PromotionAfterAbandon promoted.DecisionId)
-            | Some view when not (samePromotion view.Prepared promoted) ->
-                Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
-            | Some view when view.Promoted -> Ok projection
-            | Some view ->
-                Ok
-                    { projection with
-                        ByDecision = Map.add dkey { view with Promoted = true } projection.ByDecision }
-
-        | StrengthEvent.Traced traced ->
-            let dkey = decisionKey traced.DecisionId
-
-            match Map.tryFind dkey projection.ByDecision with
-            | None -> Error(StrengthProjectionError.TraceWithoutPrepared traced.DecisionId)
-            | Some view when not view.Promoted -> Error(StrengthProjectionError.TraceWithoutPromotion traced.DecisionId)
-            | Some _ when traced.StartInclusive < 0L || traced.EndExclusive <= traced.StartInclusive ->
-                Error(StrengthProjectionError.InvalidTraceRange traced.DecisionId)
-            | Some view ->
-                let range =
-                    { StartInclusive = traced.StartInclusive
-                      EndExclusive = traced.EndExclusive }
-
-                match view.TraceRange with
-                | Some existing when existing = range -> Ok projection
-                | Some _ -> Error(StrengthProjectionError.TraceConflict traced.DecisionId)
-                | None ->
-                    Ok
-                        { projection with
-                            ByDecision = Map.add dkey { view with TraceRange = Some range } projection.ByDecision }
-
-        | StrengthEvent.Abandoned abandoned ->
-            let dkey = decisionKey abandoned.DecisionId
-
-            match Map.tryFind dkey projection.ByDecision with
-            | None -> Error(StrengthProjectionError.AbandonWithoutPrepared abandoned.DecisionId)
-            | Some view when view.Promoted -> Error(StrengthProjectionError.AbandonAfterPromotion abandoned.DecisionId)
-            | Some view when view.Prepared.TargetProviderRun <> abandoned.TargetProviderRun ->
-                Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
-            | Some view when view.Abandoned -> Ok projection
-            | Some view ->
-                Ok
-                    { ByDecision = Map.add dkey { view with Abandoned = true } projection.ByDecision
-                      ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
+        | StrengthEvent.Prepared prepared -> applyPrepared projection prepared
+        | StrengthEvent.Promoted promoted -> applyPromoted projection promoted
+        | StrengthEvent.Traced traced -> applyTraced projection traced
+        | StrengthEvent.Abandoned abandoned -> applyAbandoned projection abandoned
 
 // No history-fold API by design. CanonicalIntegrator is the sole history
 // enumerator and registers `apply` as this module's one-event oracle.
