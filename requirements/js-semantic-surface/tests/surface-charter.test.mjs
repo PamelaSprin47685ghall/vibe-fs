@@ -182,3 +182,23 @@ test('JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
     )
   }
 })
+
+test('JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree', () => {
+  // Allowlist cannot grant immunity to a path that does not exist: every
+  // registered surface must map to a real .fs compilation unit whose module
+  // name ends in Surface. A bogus entry is a silent debt exemption.
+  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
+  const block = scannerSource.match(/SURFACE_MODULES = \[[\s\S]*?\]/)
+  const registered = [...block[0].matchAll(/'([^']+\.js)'/g)].map((m) => m[1])
+
+  const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+
+  for (const modulePath of registered) {
+    const stem = modulePath.replace(/\.js$/, '')
+    const exact = `<Compile Include="${stem}.fs"/>`
+    assert.ok(
+      fsproj.includes(exact),
+      `registered surface ${modulePath} has no <Compile Include="${stem}.fs"/> in Wanxiangshu.fsproj — allowlist entry must name a real surface module`,
+    )
+  }
+})

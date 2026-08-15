@@ -303,7 +303,6 @@ export const distillationRuntime = (() => {
       const runtime = {
         Fork: (agentId, _role, _prompt, _payload) =>
           Promise.resolve(typeof fork === 'function' ? fork(agentId) : okResult(new ForkResult(0, [agentId]))),
-        JoinWithPermit: (timeoutMs) => Promise.resolve(joinOrAwait(timeoutMs)),
         AwaitAgentWithPermit: (agentId, timeoutMs) => {
           lastAwaitedAgent = agentId
           return Promise.resolve(joinOrAwait(timeoutMs, agentId))

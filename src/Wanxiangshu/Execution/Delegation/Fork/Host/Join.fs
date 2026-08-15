@@ -201,7 +201,7 @@ module HostForkJoin =
             do! refuseIfPermitMembersLost current permit
         }
 
-    /// Permit gate shared by JoinWithPermit / JoinAvailableWithPermit / AwaitAgentWithPermit.
+    /// Permit gate shared by JoinAvailableWithPermit / AwaitAgentWithPermit.
     let private validatePermit (runtime: HostForkRuntime) (permit: FamilyRecoveryPermit) : Result<unit, ForkError> =
         let root = FamilyRecoveryPermit.root permit
         let permitSeq = FamilyRecoveryPermit.journalSequence permit
@@ -210,7 +210,7 @@ module HostForkJoin =
         | Error e, _ -> Error e
         | Ok(), None ->
             Error(
-                ForkError.NotFound "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
+                ForkError.NotFound "family recovery permit requires journal; pure PTY join must not use permit-gated join"
             )
         | Ok(), Some durable -> validatePermitAgainstJournal durable root permitSeq permit
 

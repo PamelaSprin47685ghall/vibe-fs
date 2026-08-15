@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
+open Fable.Core
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
@@ -11,6 +12,9 @@ open Wanxiangshu.Resources
 /// Translation JS representation → F# types happens here, at the owner
 /// boundary (JS-SEMANTIC-SURFACE-003/005); the F# core keeps its records.
 module ForkChildPayloadSurface =
+
+    [<Emit("$0===undefined||$0===null")>]
+    let private isUndefined (value: obj) : bool = jsNative
 
     let private languageOf (lang: string) : ProviderLanguage =
         ProviderLanguage.tryParse lang
@@ -48,10 +52,10 @@ module ForkChildPayloadSurface =
                    Payload: string option |})
         : string =
         let prose = proseOf lang
-        let assignment = if isNull input.Assignment then "" else input.Assignment
+        let assignment = if isNull input.Assignment || isUndefined input.Assignment then "" else input.Assignment
 
         let requirements =
-            if isNull input.RootRequirements then
+            if isNull input.RootRequirements || isUndefined input.RootRequirements then
                 []
             else
                 List.ofArray input.RootRequirements

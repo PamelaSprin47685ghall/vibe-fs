@@ -358,13 +358,13 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
   const wrap = [
     'module DistillationRuntime',
     'let asDistillationRuntime runtime requirePermit =',
-    '    member _.JoinWithPermit(timeoutMs) =',
+    '    member _.AwaitAgentWithPermit(agentId, timeoutMs) =',
     '        match! requirePermit () with',
-    '        | Ok permit -> runtime.JoinWithPermit(permit)',
+    '        | Ok permit -> runtime.AwaitAgentWithPermit(agentId, timeoutMs)',
   ].join('\n')
   const host = [
     'module HostForkRuntime',
-    'member this.JoinWithPermit(permit) =',
+    'member this.AwaitAgentWithPermit(agentId, timeoutMs) =',
     '    let permitDigest = FamilyRecoveryPermit.closureDigest permit',
     '    let current = RecoveryClosureProjection.discover root projections currentSeq',
     '    if current.Digest <> permitDigest then Error mismatch',

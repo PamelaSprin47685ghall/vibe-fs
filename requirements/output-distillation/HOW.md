@@ -31,7 +31,7 @@ ProcessOutcome.Spooled(spoolPath, …)          // 物理采集（process-execut
 
 ### 定向 await 合同（DISTILL-008，`DistillationRuntime.fs`）
 
-- `IDistillationRuntime`：`Fork` / `JoinWithPermit` / `AwaitAgentWithPermit` / `CurrentJournalRevision` /
+- `IDistillationRuntime`：`Fork` / `AwaitAgentWithPermit` / `CurrentJournalRevision` /
   `AwaitJournalChangeFrom` / `CancelAgent`。
 - permit 门：每次 await 前 `requirePermit()`；`RECOVERY_WAITING:` → `ForkError.TimedOut`（等 readiness
   信号后再一次 fresh permit check）；其它 permit 错误 → `ForkError.NotFound`（hard fail，不重试）。
