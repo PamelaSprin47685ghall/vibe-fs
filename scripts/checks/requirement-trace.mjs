@@ -14,7 +14,7 @@
 // in its title. Historic IDs, path-implicit ownership and comment prose do not
 // count. skip/todo may carry a tag but never prove a WHAT.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -38,10 +38,49 @@ const report = args.includes('--report')
 const explain = argValue('--explain')
 const packageFilter = argValue('--package')
 const strictPackages = new Set((argValue('--strict') ?? '').split(',').filter(Boolean))
+const generateBaseline = args.includes('--generate-baseline')
+const BASELINE_FILE = join(ROOT, 'scripts/checks/requirement-trace-migration.json')
+
+const rel = (p) => relative(ROOT, p).replace(/\\/g, '/')
 
 const graph = buildTraceGraph(REQUIREMENTS)
 
-const rel = (p) => relative(ROOT, p).replace(/\\/g, '/')
+// ── migration ratchet (TASK.md trace roadmap item 9) ─────────────────────────
+// Baseline shape: { "<pkg>": { orphans: ["file::line::title", ...], unproved: ["ID", ...] } }.
+// Rules: new orphan / new unproved = RED; claimed anchors leave the baseline and
+// may never re-enter (they would be RED as not-in-baseline). Strict packages are
+// checked in full and are never written to the baseline. When the last package
+// goes strict the baseline file is deleted in the same commit (hard cutover).
+
+const orphanKey = (t) => `${rel(t.file)}::${t.line}::${t.title}`
+let baseline = { packages: {} }
+if (!generateBaseline) {
+  try {
+    baseline = JSON.parse(readFileSync(BASELINE_FILE, 'utf8'))
+  } catch {
+    console.error(`requirement-trace: migration baseline missing — run --generate-baseline first: ${BASELINE_FILE}`)
+    process.exit(1)
+  }
+}
+
+const orphanHits = () => graph.tests.filter((t) => t.state === 'active' && t.whatIds.length === 0)
+const unprovedHits = () => graph.unproved.filter((w) => !w.deleted)
+
+if (generateBaseline) {
+  const out = { packages: {} }
+  for (const pkg of new Set([...orphanHits().map((t) => packageOf(t.file)), ...unprovedHits().map((w) => w.package)])) {
+    if (strictPackages.has(pkg)) continue
+    out.packages[pkg] = {
+      orphans: orphanHits().filter((t) => packageOf(t.file) === pkg).map(orphanKey),
+      unproved: unprovedHits().filter((w) => w.package === pkg).map((w) => w.id),
+    }
+  }
+  writeFileSync(BASELINE_FILE, JSON.stringify(out, null, 2) + '\n')
+  console.log(`requirement-trace: migration baseline written (${Object.keys(out.packages).length} packages)`)
+  process.exit(0)
+}
+
+const print = (msg) => console.log(msg)
 const byPackage = (nodes) => {
   const out = new Map()
   for (const n of nodes) {
@@ -52,8 +91,6 @@ const byPackage = (nodes) => {
   }
   return out
 }
-
-const print = (msg) => console.log(msg)
 
 if (explain) {
   const [filePart, linePart] = explain.split(':')
@@ -93,8 +130,13 @@ const activeTests = graph.tests.filter((t) => t.state === 'active')
 for (const t of graph.tests) {
   if (packageFilter && packageOf(t.file) !== packageFilter) continue
   if (t.whatIds.length === 0 && t.state === 'active') {
-    if (strictPackages.size === 0 || [...strictPackages].some((p) => t.file.includes(`/${p}/tests/`))) {
+    const pkg = packageOf(t.file)
+    const inStrict = [...strictPackages].some((p) => t.file.includes(`/${p}/tests/`))
+    const inBaseline = baseline.packages[pkg]?.orphans.includes(orphanKey(t)) ?? false
+    if (inStrict) {
       add(rel(t.file), t.line, 'TRACE_ORPHAN_TEST', `"${t.title}" has no WHAT[<ID>] owner`)
+    } else if (!inBaseline) {
+      add(rel(t.file), t.line, 'TRACE_ORPHAN_TEST', `"${t.title}" has no WHAT[<ID>] owner (new — not in migration baseline)`)
     }
   }
 }
@@ -120,7 +162,9 @@ for (const { test: t, whats } of graph.multiPrimary) {
 for (const w of graph.unproved) {
   if (w.deleted) continue
   if (packageFilter && w.package !== packageFilter) continue
-  if (strictPackages.size === 0 || strictPackages.has(w.package)) {
+  const inStrict = strictPackages.has(w.package)
+  const inBaseline = baseline.packages[w.package]?.unproved.includes(w.id) ?? false
+  if (inStrict || !inBaseline) {
     add(rel(w.file), w.line, 'TRACE_UNPROVED_WHAT', `${w.id} has zero active executable tests`)
   }
 }
