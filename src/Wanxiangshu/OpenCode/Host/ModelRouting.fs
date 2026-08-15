@@ -216,7 +216,10 @@ module ModelRouting =
             Ok(sessionId.Trim(), agent.Trim())
 
     let private normalizeSessionId sessionId =
-        if String.IsNullOrWhiteSpace sessionId then None else Some(sessionId.Trim())
+        if String.IsNullOrWhiteSpace sessionId then
+            None
+        else
+            Some(sessionId.Trim())
 
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
@@ -299,7 +302,8 @@ module ModelRouting =
             |> continueDrain
 
         and continueDrain progressed =
-            if progressed && pending.Count > 0 then drainDemands ()
+            if progressed && pending.Count > 0 then
+                drainDemands ()
 
         let acquireFreshDemand sessionId agent key =
             match scheduleOrPoison agent with
@@ -309,9 +313,7 @@ module ModelRouting =
                 Task.FromResult target
             | None ->
                 let completion =
-                    TaskCompletionSource<ModelRoutingTarget>(
-                        TaskCreationOptions.RunContinuationsAsynchronously
-                    )
+                    TaskCompletionSource<ModelRoutingTarget>(TaskCreationOptions.RunContinuationsAsynchronously)
 
                 let demand =
                     { SessionId = sessionId

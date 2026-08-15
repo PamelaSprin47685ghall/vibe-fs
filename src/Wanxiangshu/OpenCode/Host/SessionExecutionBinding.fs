@@ -308,8 +308,7 @@ module SessionExecutionBinding =
 
     let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         result {
-            let! baseAgent =
-                requireBaseAgent "PROMPT-006: user-facing session has no observed user binding" sessionId
+            let! baseAgent = requireBaseAgent "PROMPT-006: user-facing session has no observed user binding" sessionId
 
             return! normalizeForBaseAgent "user-facing session" sessionId baseAgent opts
         }

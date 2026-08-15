@@ -111,8 +111,7 @@ module SessionRecoveryWorkflow =
 
     let private claimRecoveryBlock sessionId (item: PromptRecovery.Reconciled) =
         match item.Outcome with
-        | PromptRecovery.ClaimOutcome.Unreadable reason ->
-            Some(RecoveryBlock.SnapshotUnreadable(sessionId, reason))
+        | PromptRecovery.ClaimOutcome.Unreadable reason -> Some(RecoveryBlock.SnapshotUnreadable(sessionId, reason))
         | PromptRecovery.ClaimOutcome.StillPending _ ->
             Some(RecoveryBlock.PendingClaimUnknown(sessionId, item.PromptKey))
         | PromptRecovery.ClaimOutcome.Proven _ -> None
@@ -130,9 +129,7 @@ module SessionRecoveryWorkflow =
         | None ->
             let keys = forSession |> List.choose provenClaimKey
 
-            SessionRecovery.SessionRecovery.Recovered(
-                RecoveryReceipt.create sessionId sequence None keys []
-            )
+            SessionRecovery.SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None keys [])
 
     /// Default RecoverPromptClaims using PromptRecovery.reconcile.
     let defaultRecoverPromptClaims

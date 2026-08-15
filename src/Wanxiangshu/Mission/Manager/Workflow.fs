@@ -135,8 +135,7 @@ module ManagerWorkflow =
         (turn: ReconciledTurn)
         : Task =
         match currentLife journal turn.SessionId with
-        | Some life ->
-            handleLaborContinuation sessionPort eventPort journal nudgeSent quiescence context life
+        | Some life -> handleLaborContinuation sessionPort eventPort journal nudgeSent quiescence context life
         | None -> AsyncSupport.completedTask ()
 
     let private handleCompletedManager
@@ -160,26 +159,12 @@ module ManagerWorkflow =
         else
             task {
                 let! settled =
-                    ManagerBackground.ensureSettled
-                        sessionPort
-                        eventPort
-                        journal
-                        joinGuardNudges
-                        hasLivePty
-                        turn
+                    ManagerBackground.ensureSettled sessionPort eventPort journal joinGuardNudges hasLivePty turn
 
                 match settled with
                 | ManagerBackground.BackgroundSettlement.Deferred -> return ()
                 | ManagerBackground.BackgroundSettlement.Settled ->
-                    let! _ =
-                        handleSettledManager
-                            sessionPort
-                            eventPort
-                            journal
-                            nudgeSent
-                            quiescence
-                            context
-                            turn
+                    let! _ = handleSettledManager sessionPort eventPort journal nudgeSent quiescence context turn
                     return ()
             }
             :> Task

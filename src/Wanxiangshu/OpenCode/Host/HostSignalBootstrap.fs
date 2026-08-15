@@ -93,7 +93,8 @@ module HostSignalBootstrap =
         value
         |> Option.map (fun agent -> agent.Trim())
         |> Option.filter (fun agent ->
-            not (String.IsNullOrWhiteSpace agent) && (ManagedAgent.requiredNames |> List.contains agent))
+            not (String.IsNullOrWhiteSpace agent)
+            && (ManagedAgent.requiredNames |> List.contains agent))
 
     let private outputSessionId (output: obj) =
         let message = if isNull output then null else output?message
@@ -101,38 +102,37 @@ module HostSignalBootstrap =
         if isNull message || isNull message?sessionID then
             None
         else
-            string message?sessionID |> fun value -> value.Trim() |> SessionId.create |> Some
+            string message?sessionID
+            |> fun value -> value.Trim() |> SessionId.create |> Some
 
     let private externalAdmission sessionId explicitAgent =
         match managedAgent explicitAgent with
         | Some agent -> ChatExecutionAdmission.ExternalManaged(sessionId, agent)
         | None -> ChatExecutionAdmission.NoRoute
 
+    let private agentManagedOfClaim (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) =
+        match managedAgent claim.EffectiveAgent with
+        | Some agent -> ChatExecutionAdmission.PluginManaged(runtime, claim, agent)
+        | None ->
+            ChatExecutionAdmission.Rejected(
+                sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value claim.PromptKey)
+            )
+
+    let private pendingAdmission durable sessionId promptKey =
+        let runtime = PromptDispatcher.forJournal durable
+
+        match runtime.PendingClaim(sessionId, promptKey) with
+        | None -> ChatExecutionAdmission.NoRoute
+        | Some claim -> agentManagedOfClaim runtime claim
+
     let private pluginAdmission journal sessionId promptKey =
-        result {
-            let! durable = journal |> Result.requireSome "PROMPT-006: plugin prompt has no durable authority journal"
-            let runtime = PromptDispatcher.forJournal durable
-
-            let! claim =
-                runtime.PendingClaim(sessionId, promptKey)
-                |> Result.requireSome (
-                    sprintf "PROMPT-006: PromptKey %s has no pending execution claim" (PromptKey.value promptKey)
-                )
-
-            let! agent =
-                managedAgent claim.EffectiveAgent
-                |> Result.requireSome (
-                    sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value promptKey)
-                )
-
-            return ChatExecutionAdmission.PluginManaged(runtime, claim, agent)
-        }
-        |> function
-            | Ok admission -> admission
-            | Error error -> ChatExecutionAdmission.Rejected error
+        match journal with
+        | None -> ChatExecutionAdmission.NoRoute
+        | Some durable -> pendingAdmission durable sessionId promptKey
 
     let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) output =
-        let sessionId = decoded.SessionId |> Option.orElseWith (fun () -> outputSessionId output)
+        let sessionId =
+            decoded.SessionId |> Option.orElseWith (fun () -> outputSessionId output)
 
         match decoded.IsHostCompaction, sessionId, decoded.PromptKey with
         | true, _, _ -> ChatExecutionAdmission.NoRoute
@@ -158,18 +158,27 @@ module HostSignalBootstrap =
                 return RoutedChatExecution.PluginManaged(runtime, claim, agent, ModelRouting.toOpenCodeModel target)
         }
 
-    let private routedModel = function
+    let private routedModel =
+        function
         | RoutedChatExecution.NoRoute -> None
         | RoutedChatExecution.ExternalManaged(_, _, model)
         | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
+
+    let private requireOutputMessage output =
+        let message = if isNull output then null else output?message
+
+        if isNull message then
+            invalidOp "EMR-009: managed chat.message routing has no mutable output.message"
+
+        message
 
     let private projectRoutedModel output routed =
         match routedModel routed with
         | None -> ()
         | Some model ->
-            let message = if isNull output then null else output?message
-            if isNull message then invalidOp "EMR-009: managed chat.message routing has no mutable output.message"
-            message?model <- box model
+            let message = requireOutputMessage output
+            let routed = model
+            message?model <- box routed
 
     let private acceptPluginExecution
         (runtime: PromptDispatcher.Runtime)
@@ -181,10 +190,13 @@ module HostSignalBootstrap =
             SessionExecutionBinding.acceptPromptExecution claim.SessionId claim.PromptKey agent model
         else
             invalidOp (
-                sprintf "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted" (PromptKey.value claim.PromptKey)
+                sprintf
+                    "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
+                    (PromptKey.value claim.PromptKey)
             )
 
-    let private commitExecutionCapability = function
+    let private commitExecutionCapability =
+        function
         | RoutedChatExecution.PluginManaged(runtime, claim, agent, model) ->
             acceptPluginExecution runtime claim agent model
         | RoutedChatExecution.NoRoute
@@ -392,14 +404,20 @@ module HostSignalBootstrap =
                         sessionId
                         (AgentJournal.snapshot durable).AgentProjections.Associations)
 
+            let profileIsEligible sessionId =
+                match HostSessionNudge.tryActiveProfile journal sessionId with
+                | Some profile -> isEligibleRole profile
+                | None -> false
+
             let isNeedHelpEligible sessionId =
-                if not (isOwned sessionId) then false
-                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then false
-                elif isCompanionSession sessionId then false
+                if not (isOwned sessionId) then
+                    false
+                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then
+                    false
+                elif isCompanionSession sessionId then
+                    false
                 else
-                    match HostSessionNudge.tryActiveProfile journal sessionId with
-                    | Some profile -> isEligibleRole profile
-                    | None -> false
+                    profileIsEligible sessionId
 
             let loopSensor =
                 LoopSensor(isOwned, (fun sessionId -> sessionPort.AbortSession sessionId))
@@ -514,8 +532,7 @@ module HostSignalBootstrap =
 
                 match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                 | None -> ()
-                | Some bloggerId ->
-                    BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
+                | Some bloggerId -> BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
 
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with

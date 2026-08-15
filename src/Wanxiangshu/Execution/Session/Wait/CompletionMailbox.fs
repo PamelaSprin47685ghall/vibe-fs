@@ -229,13 +229,17 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPor
 
     /// Drain agent wake tokens (no payload). Callers re-read Journal after wake.
     member _.DrainAgentWakes(maxCount: int) : AgentHandleId list =
-        if maxCount <= 0 then []
-        else lock gate (fun () -> drainQueue agentWakes maxCount)
+        if maxCount <= 0 then
+            []
+        else
+            lock gate (fun () -> drainQueue agentWakes maxCount)
 
     /// Bounded drain of queued PTY facts (EXEC-015).
     member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list =
-        if maxCount <= 0 then []
-        else lock gate (fun () -> drainQueue ptyCompletions maxCount)
+        if maxCount <= 0 then
+            []
+        else
+            lock gate (fun () -> drainQueue ptyCompletions maxCount)
 
     /// Compatibility: wait once, drain at most one PTY completion (or ForkError).
     /// Agent results never leave this mailbox — Journal is the agent fact source.

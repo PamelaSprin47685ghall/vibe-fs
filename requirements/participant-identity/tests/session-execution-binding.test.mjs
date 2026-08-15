@@ -43,6 +43,10 @@ const options = (agent, intent = preserve) => ({
 const modelKey = (model) => `${model.providerID}/${model.modelID}[${model.variant}]`
 
 const applyParams = (hook, sessionID, agent, model) => {
+  const sid = sessionId(sessionID)
+  const pk = { fields: [`pk-${agent}`] }
+  binding.acceptPromptExecution(sid, pk, agent, model)
+  binding.beginProviderAttempt(sid, pk)
   const next = hook({
     sessionID,
     agent,

@@ -156,8 +156,7 @@ module FetchTool =
             | ReplayResult.Fresh ->
                 do! CasebookLifecycle.touchAccess workspaceRoot sessionId
                 return fresh language case.A
-            | ReplayResult.Stale ->
-                return! handleStaleCase language workspaceRoot store sessionId case.A
+            | ReplayResult.Stale -> return! handleStaleCase language workspaceRoot store sessionId case.A
         }
 
     let private runFetch

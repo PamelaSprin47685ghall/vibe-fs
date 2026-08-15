@@ -9,11 +9,17 @@ open Wanxiangshu.Foundation.Identity
 /// lease and projected model+variant before the provider reaches this hook.
 module ChatParamsHook =
 
-    let private textField (value: obj) (name: string) =
-        if isNull value || isNull value?(name) then None
+    let private normalizeText text =
+        if String.IsNullOrWhiteSpace text then
+            None
         else
-            let text = string value?(name)
-            if String.IsNullOrWhiteSpace text then None else Some(text.Trim())
+            Some(text.Trim())
+
+    let private textField (value: obj) (name: string) =
+        if isNull value || isNull value?(name) then
+            None
+        else
+            normalizeText (string value?(name))
 
     let private extractModel (input: obj) =
         let rawModel: obj = input?model
@@ -50,30 +56,28 @@ module ChatParamsHook =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
         | Ok true -> ()
         | Ok false ->
-            invalidOp (
-                sprintf
-                    "PROMPT-006: managed provider run '%s' was not recognized as a bound session"
-                    agent
-            )
+            invalidOp (sprintf "PROMPT-006: managed provider run '%s' was not recognized as a bound session" agent)
         | Error error -> invalidOp error
 
     let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
         match currentModel input with
         | None ->
-            invalidOp (
-                sprintf
-                    "PROMPT-006: managed provider run '%s' has no observable provider/model binding"
-                    agent
-            )
+            invalidOp (sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent)
         | Some model -> checkObservedProvider sessionId agent model
 
+    let private validateSessionAndAgent sessionText agent =
+        if String.IsNullOrWhiteSpace sessionText || not (isManagedName agent) then
+            None
+        else
+            Some(SessionId.create (sessionText.Trim()), agent)
+
     let private trySessionAndAgent (input: obj) =
-        if isNull input || isNull input?sessionID || isNull input?agent then None
+        if isNull input || isNull input?sessionID || isNull input?agent then
+            None
         else
             let sessionText = string input?sessionID
             let agent = (string input?agent).Trim()
-            if String.IsNullOrWhiteSpace sessionText || not (isManagedName agent) then None
-            else Some(SessionId.create (sessionText.Trim()), agent)
+            validateSessionAndAgent sessionText agent
 
     let private handleInput (input: obj) =
         match trySessionAndAgent input with

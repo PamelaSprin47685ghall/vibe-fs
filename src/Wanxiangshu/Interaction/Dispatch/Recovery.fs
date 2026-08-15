@@ -94,7 +94,12 @@ module PromptRecovery =
             else
                 None)
 
-    let private acceptClaimOrigin (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId physical =
+    let private acceptClaimOrigin
+        (runtime: PromptDispatcher.Runtime)
+        (claim: PromptAuthority.PromptClaim)
+        sessionId
+        physical
+        =
         match claim.Origin with
         | PromptAuthority.PromptOrigin.AuthorityRoot _ ->
             runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical
@@ -105,7 +110,13 @@ module PromptRecovery =
             runtime.AcceptContinuation claim.PromptKey sessionId physical
             |> TaskValue.map (Result.map ignore)
 
-    let private reconcileWithPhysical (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId physical report =
+    let private reconcileWithPhysical
+        (runtime: PromptDispatcher.Runtime)
+        (claim: PromptAuthority.PromptClaim)
+        sessionId
+        physical
+        report
+        =
         task {
             let! accepted = acceptClaimOrigin runtime claim sessionId physical
 
@@ -114,7 +125,13 @@ module PromptRecovery =
             | Error reason -> return report (Unreadable reason)
         }
 
-    let private reconcileMessages (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) sessionId messages report =
+    let private reconcileMessages
+        (runtime: PromptDispatcher.Runtime)
+        (claim: PromptAuthority.PromptClaim)
+        sessionId
+        messages
+        report
+        =
         match findPhysical claim.PromptKey messages with
         | Some physical -> reconcileWithPhysical runtime claim sessionId physical report
         | None -> Task.FromResult(report (StillPending claim.Receipt.IsSome))

@@ -170,10 +170,7 @@ type InjectedSessionPort
     let sendAvailablePort sessionId text sendOptions =
         match underlyingPort with
         | Some port -> sendThroughPort port sessionId text sendOptions
-        | None ->
-            Task.FromResult(
-                Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
-            )
+        | None -> Task.FromResult(Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port")
 
     let sendRoutedPrompt sessionId text opts =
         task {
@@ -257,9 +254,7 @@ type InjectedSessionPort
                 // Fatal, not Retryable: the listener is registered by the caller
                 // before it sends, so this is a call-order defect. Retrying the
                 // same wrong order cannot fix it.
-                Task.FromResult(
-                    Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
-                )
+                Task.FromResult(Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt")
             else
                 sendRoutedPrompt sessionId text opts
 

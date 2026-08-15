@@ -205,11 +205,14 @@ type SyncDelegateRuntime
                 { StartInclusive = { Sequence = startCursor }
                   EndExclusive = { Sequence = endCursor } }
 
+    let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
+        if call.Role = SyncDelegateRole.Inspector then
+            noteInspectorAnswer (sessionKey turnSessionId) record
+
     let finishCompletedCall turnSessionId (call: SyncDelegateCall) workRecord =
         match workRecord with
         | Some record when not (String.IsNullOrWhiteSpace record) ->
-            if call.Role = SyncDelegateRole.Inspector then noteInspectorAnswer (sessionKey turnSessionId) record
-
+            noteInspectorIfRole call turnSessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
         | _ ->
@@ -331,8 +334,7 @@ type SyncDelegateRuntime
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
             match turn.Role, turn.Outcome with
-            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted ->
-                return! handleCompletedRoleTurn turn
+            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted -> return! handleCompletedRoleTurn turn
             | _ ->
                 // Transient failures (TurnFailed / TurnInProgress / TurnNeedsContinuation)
                 // remain child-local and allow ordinary fallback recovery to proceed.

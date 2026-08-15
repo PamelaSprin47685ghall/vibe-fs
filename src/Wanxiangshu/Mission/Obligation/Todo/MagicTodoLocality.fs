@@ -94,8 +94,10 @@ module MagicTodoLocality =
         let callId = ToolCallId.value toolCallId
 
         let rec loop index count =
-            if index >= parts.Length then 0
-            else stepCapturablePart callId parts.[index] index count loop
+            if index >= parts.Length then
+                0
+            else
+                stepCapturablePart callId parts.[index] index count loop
 
         loop 0 0
 
@@ -144,7 +146,11 @@ module MagicTodoLocality =
                 { Start = part.Cursor
                   EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
 
-    let private resolvePendingInMessage trace (located: SessionSnapshotPort.ToolCallLocation) (message: SessionMessage) =
+    let private resolvePendingInMessage
+        trace
+        (located: SessionSnapshotPort.ToolCallLocation)
+        (message: SessionMessage)
+        =
         let partMatches =
             message.ToolParts
             |> Array.mapi (fun index part -> index, part)
@@ -176,8 +182,7 @@ module MagicTodoLocality =
                   Range =
                     { Start = frontier
                       EndExclusive = { Sequence = frontier.Sequence + 1L } } }
-        | _ ->
-            Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolvePendingAssistantMessage trace messages (located: SessionSnapshotPort.ToolCallLocation) =
         let providerRunText = ProviderRunIdentity.value located.ProviderRun
@@ -188,10 +193,13 @@ module MagicTodoLocality =
 
         match messageMatches with
         | [ message ] -> resolvePendingInMessage trace located message
-        | _ ->
-            Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
-    let private resolvePendingToolCall trace (messages: SessionMessage list) (located: SessionSnapshotPort.ToolCallLocation) =
+    let private resolvePendingToolCall
+        trace
+        (messages: SessionMessage list)
+        (located: SessionSnapshotPort.ToolCallLocation)
+        =
         if located.State <> SnapshotToolPartState.Pending then
             Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
         else
@@ -208,8 +216,7 @@ module MagicTodoLocality =
         match matches with
         | [ part ] -> resolveCapturedToolCall trace located part
         | [] -> resolvePendingToolCall trace messages located
-        | _ ->
-            Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        | _ -> Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolveWithTrace messages (located: SessionSnapshotPort.ToolCallLocation) xTrace =
         match xTrace with
