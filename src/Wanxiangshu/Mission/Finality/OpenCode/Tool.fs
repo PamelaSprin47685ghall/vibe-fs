@@ -255,37 +255,6 @@ module FinalityTool =
                     match scope.Journal with
                     | None -> return refuse context Path.TryAgainLater
                     | Some journal ->
-                        let snapshot = AgentJournal.snapshot journal
-
-                        let lifecycle =
-                            AgentProjection.tryFind sid snapshot.AgentProjections
-                            |> Option.bind (fun session -> session.ManagerLife)
-                            |> Option.defaultValue ManagerLifecycleProjection.empty
-
-                        // GLORY-039: an AgentOwnerRoot Manager (Orchestrator
-                        // ManagerJob, GLORY-068) has no Life; migrate on its first
-                        // ending. A HumanRoot Manager without a Life is still
-                        // planning and must keep working.
-                        // DSL-MUTABLE: algorithm-scratch — effective life after optional migration ensure
-                        let mutable effectiveLife: LifeProjection option = lifecycle.CurrentLife
-
-                        if effectiveLife.IsNone then
-                            let authorityKind =
-                                AgentProjection.tryFind sid snapshot.AgentProjections
-                                |> Option.bind (fun session -> session.PromptAuthority)
-                                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                                |> Option.map (fun profile -> profile.AuthorityKind)
-
-                            match authorityKind with
-                            | Some kind when kind <> PromptAuthority.RootAuthorityKind.HumanRoot ->
-                                let! _ = ManagerLifeWorkflow.ensureMigrationLife journal sid
-
-                                effectiveLife <-
-                                    AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
-                                    |> Option.bind (fun session -> session.ManagerLife)
-                                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                            | _ -> ()
-
                         let renderOutcome outcome =
                             match outcome with
                             | FinalityOutcome.Rejected prompt
@@ -295,7 +264,9 @@ module FinalityTool =
                         let acceptSuicide (life: LifeProjection) =
                             task {
                                 let hasPlanCommitment =
-                                    MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo
+                                    MagicTodoProjection.tryLife
+                                        life.LifeId
+                                        (AgentJournal.snapshot journal).AgentProjections.MagicTodo
                                     |> Option.exists MagicTodoProjection.isPlanCommitted
 
                                 match ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment with
@@ -397,9 +368,10 @@ module FinalityTool =
                                                 return renderOutcome outcome
                             }
 
-                        match effectiveLife with
-                        | None -> return refuse context Path.ContinueWorking
-                        | Some life -> return! acceptSuicide life
+                        match! ManagerLifeWorkflow.ensureEndingLife journal sid with
+                        | Error _ -> return refuse context Path.TryAgainLater
+                        | Ok None -> return refuse context Path.ContinueWorking
+                        | Ok(Some life) -> return! acceptSuicide life
             | Some _ -> return refuse context Path.WrongRole
             | None -> return refuse context Path.TryAgainLater
         }

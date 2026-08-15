@@ -122,16 +122,8 @@ module ManagerNarrativeTransform =
                  |> List.truncate 1)
              |> List.distinct)
 
-    /// GLORY-012: only a HumanRoot-managed Manager opens Lives. An
-    /// AgentOwnerRoot Manager (an Orchestrator's forked ManagerJob) receives
-    /// assignments from the Host, not from a user, and must not be rewritten.
-    let private isHumanRootManager (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.PromptAuthority)
-        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-        |> Option.exists (fun profile ->
-            profile.CanonicalRole = Role.Manager
-            && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot)
+    let private activeProfile (journal: AgentJournal) (sessionId: SessionId) =
+        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
 
     /// PROMPT-009: a message the Dispatcher proved to be a continuation. Such a
     /// message never opens a Life (GLORY-012).
@@ -496,26 +488,6 @@ module ManagerNarrativeTransform =
                         messageIdValue
         }
 
-    type private HumanRootOpening =
-        | Skip
-        | PreserveCompleted
-        | OpenNew of messageIndex: int * messageId: string
-
-    let private decideHumanRootOpening
-        (durable: AgentJournal)
-        (sid: SessionId)
-        (rawMessages: obj list)
-        (traceState: XTraceProjectionState option)
-        =
-        match lastUserMessage rawMessages with
-        | None -> Skip
-        | Some(_, _, raw) when shouldSkipOpening raw -> Skip
-        | Some(messageIndex, messageId, _) when
-            shouldPreserveCompletedOpening durable sid messageId messageIndex rawMessages traceState
-            ->
-            PreserveCompleted
-        | Some(messageIndex, messageId, _) -> OpenNew(messageIndex, messageId)
-
     let private tryOpenHumanRootLife
         (durable: AgentJournal)
         (sid: SessionId)
@@ -524,24 +496,30 @@ module ManagerNarrativeTransform =
         (rawMessages: obj list)
         : Task<obj list option> =
         task {
-            match
-                isHumanRootManager durable sid, decideHumanRootOpening durable sid rawMessages traceState
-            with
-            | false, _ -> return None
-            | true, Skip -> return None
-            // A post-completion continuation must keep the completed
-            // Life's opening rewrite byte-stable (ARCH-004).
-            | true, PreserveCompleted -> return! rewriteCompletedOpening durable sid lifecycle rawMessages
-            | true, OpenNew(messageIndex, messageId) ->
-                return!
-                    openAfterMigrationCheck
-                        durable
-                        sid
-                        lifecycle
-                        traceState
-                        rawMessages
-                        messageIndex
-                        messageId
+            match activeProfile durable sid with
+            | None -> return None
+            | Some profile ->
+                let rootMessageId = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+
+                match findMessageIndex rawMessages rootMessageId with
+                | None -> return None
+                | Some messageIndex ->
+                    let physicalMessageId = PhysicalUserMessageId.create rootMessageId
+
+                    match ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) physicalMessageId with
+                    | None -> return None
+                    | Some evidence ->
+                        let admittedMessageId = HumanRootOpeningEvidence.messageId evidence
+
+                        return!
+                            openAfterMigrationCheck
+                                durable
+                                sid
+                                lifecycle
+                                traceState
+                                rawMessages
+                                messageIndex
+                                (PhysicalUserMessageId.value admittedMessageId)
         }
 
     let private transformWithJournal

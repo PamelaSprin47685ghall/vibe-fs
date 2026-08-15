@@ -127,6 +127,16 @@ module PromptDispatcher =
                    SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
             |> this.Persist profile.SessionId None
 
+        /// Release the active Logical Run after its durable terminal boundary.
+        /// The close fact is idempotent for the same run and never manufactures a
+        /// replacement root; only later external ingress may do that.
+        member this.CloseLogicalRun(profile: PromptAuthority.AuthorityExecutionProfile) : Task<Result<unit, string>> =
+            PromptFact.AuthorityLogicalRunClosed
+                {| SessionId = profile.SessionId
+                   LogicalRunId = profile.LogicalRunId
+                   AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId |}
+            |> this.Persist profile.SessionId None
+
         /// PROMPT-002: a human root must name a managed agent. There is no
         /// default, because inferring one is how a human prompt silently acquires
         /// an agent nobody chose.
