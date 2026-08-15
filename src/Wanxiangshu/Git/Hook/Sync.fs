@@ -2,6 +2,7 @@ namespace Wanxiangshu.Git.Hook
 
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
+open Wanxiangshu.Foundation
 open Wanxiangshu.Git
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -47,6 +48,13 @@ module HookSync =
     let private formatError remote error =
         sprintf "Wanxiang EventStore sync failed for remote '%s': %A" remote error
 
+    let private convergeUnderLock gitCommonDir raw run remote observed =
+        ProcessEventLog.withStoreLock gitCommonDir (fun () ->
+            GitGateway.converge raw gitCommonDir run MaxRetries remote observed
+            |> TaskValue.map (function
+                | Ok _ -> None
+                | Error error -> Some(formatError remote error)))
+
     let private converge remote observed =
         task {
             try
@@ -55,14 +63,7 @@ module HookSync =
                 let gitCommonDir = commonDir repo
                 let raw = ProcessGitRawStore.create repo
                 let run = GitGateway.createDefaultRunner repo
-
-                return!
-                    ProcessEventLog.withStoreLock gitCommonDir (fun () ->
-                        task {
-                            match! GitGateway.converge raw gitCommonDir run MaxRetries remote observed with
-                            | Ok _ -> return None
-                            | Error error -> return Some(formatError remote error)
-                        })
+                return! convergeUnderLock gitCommonDir raw run remote observed
             with ex ->
                 return Some(sprintf "Wanxiang EventStore sync failed: %s" ex.Message)
         }
@@ -84,9 +85,22 @@ module HookSync =
             let newOid = fields.[1]
             let refName = fields.[2]
 
-            match StoreRef.tryRemoteFromTracking refName with
-            | Some remote -> Some(remote, snapshot newOid)
-            | None -> None
+            StoreRef.tryRemoteFromTracking refName
+            |> Option.map (fun remote -> remote, snapshot newOid)
+
+    let rec private convergeRemaining remaining =
+        task {
+            match remaining with
+            | [] -> return None
+            | (remote, observed) :: tail -> return! stepRemoteConverge remote observed tail
+        }
+
+    and private stepRemoteConverge remote observed tail =
+        task {
+            match! converge remote observed with
+            | Some error -> return Some error
+            | None -> return! convergeRemaining tail
+        }
 
     /// reference-transaction `committed` is also FULL bidirectional convergence.
     /// The observed root only skips discovery of the first remote snapshot.
@@ -101,15 +115,5 @@ module HookSync =
                     |> Array.fold (fun acc (remote, observed) -> Map.add remote observed acc) Map.empty
                     |> Map.toList
 
-                let rec loop remaining =
-                    task {
-                        match remaining with
-                        | [] -> return None
-                        | (remote, observed) :: tail ->
-                            match! converge remote observed with
-                            | Some error -> return Some error
-                            | None -> return! loop tail
-                    }
-
-                return! loop updates
+                return! convergeRemaining updates
         }

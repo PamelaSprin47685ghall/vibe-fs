@@ -88,6 +88,23 @@ module ReviewBarrierWorkflow =
         | NeedsReview
         | RevisionRequired
 
+    let private classifyGuard tree value =
+        if ReviewProjection.satisfiesGuard tree value then
+            ReviewStatus.Confirmed
+        elif
+            ReviewWitness.isRevision value.Witness
+            && value.LastGitTreeHash = Some tree
+            && value.CurrentBarrierId.IsSome
+        then
+            ReviewStatus.RevisionRequired
+        elif
+            ReviewWitness.isPerfectPending value.Witness
+            && value.LastGitTreeHash = Some tree
+        then
+            ReviewStatus.PendingConfirmation
+        else
+            ReviewStatus.NeedsReview
+
     let private readStatus (journal: AgentJournal option) (reviewerSessionId: SessionId) (tree: GitTreeHash) =
         let guard =
             journal
@@ -97,22 +114,7 @@ module ReviewBarrierWorkflow =
 
         match guard with
         | None -> ReviewStatus.NeedsReview
-        | Some value ->
-            if ReviewProjection.satisfiesGuard tree value then
-                ReviewStatus.Confirmed
-            elif
-                ReviewWitness.isRevision value.Witness
-                && value.LastGitTreeHash = Some tree
-                && value.CurrentBarrierId.IsSome
-            then
-                ReviewStatus.RevisionRequired
-            elif
-                ReviewWitness.isPerfectPending value.Witness
-                && value.LastGitTreeHash = Some tree
-            then
-                ReviewStatus.PendingConfirmation
-            else
-                ReviewStatus.NeedsReview
+        | Some value -> classifyGuard tree value
 
     let private readOutcome
         (journal: AgentJournal option)
@@ -135,48 +137,50 @@ module ReviewBarrierWorkflow =
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
-        task {
-            match! host.ForkReviewer() with
-            | Error error -> return Error(ReviewBarrierFailure.CannotCreateReviewer error)
-            | Ok reviewerSessionId ->
-                match! ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
-                | Error error -> return Error(ReviewBarrierFailure.CannotOpenBarrier error)
-                | Ok() ->
-                    let rec awaitWitness () =
-                        task {
-                            let descriptor =
-                                DiagnosticWait.create
-                                    "reviewer-terminal"
-                                    (CausalOwner.create
-                                        "ReviewBarrierWorkflow"
-                                        [ "manager", SessionId.value managerSessionId
-                                          "barrier", ReviewBarrierId.value barrierId ])
-                                    [ "manager", SessionId.value managerSessionId
-                                      "reviewer", SessionId.value reviewerSessionId
-                                      "barrier", ReviewBarrierId.value barrierId ]
-                                    (WorkflowProducer(
-                                        CausalOwner.create
-                                            "ReviewerWorkflow"
-                                            [ "session", SessionId.value reviewerSessionId
-                                              "barrier", ReviewBarrierId.value barrierId ]
-                                    ))
-                                    [ WaitEscape.SessionLifetime
-                                      WaitEscape.CancelledBy(
-                                          CausalOwner.create
-                                              "ReviewBarrierWorkflow"
-                                              [ "manager", SessionId.value managerSessionId ]
-                                      ) ]
-                                    "ReviewBarrierWorkflow.awaitWitness"
+        let rec awaitWitness reviewerSessionId =
+            taskResult {
+                let descriptor =
+                    DiagnosticWait.create
+                        "reviewer-terminal"
+                        (CausalOwner.create
+                            "ReviewBarrierWorkflow"
+                            [ "manager", SessionId.value managerSessionId
+                              "barrier", ReviewBarrierId.value barrierId ])
+                        [ "manager", SessionId.value managerSessionId
+                          "reviewer", SessionId.value reviewerSessionId
+                          "barrier", ReviewBarrierId.value barrierId ]
+                        (WorkflowProducer(
+                            CausalOwner.create
+                                "ReviewerWorkflow"
+                                [ "session", SessionId.value reviewerSessionId
+                                  "barrier", ReviewBarrierId.value barrierId ]
+                        ))
+                        [ WaitEscape.SessionLifetime
+                          WaitEscape.CancelledBy(
+                              CausalOwner.create
+                                  "ReviewBarrierWorkflow"
+                                  [ "manager", SessionId.value managerSessionId ]
+                          ) ]
+                        "ReviewBarrierWorkflow.awaitWitness"
 
-                            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (host.AwaitReviewer()) with
-                            | Error error -> return Error(ReviewBarrierFailure.CannotAwaitReviewer error)
-                            | Ok() ->
-                                match readOutcome journal barrierId reviewerSessionId tree with
-                                | Ok outcome -> return Ok outcome
-                                | Error ReviewBarrierFailure.ReviewerProducedNoVerdict
-                                | Error ReviewBarrierFailure.ConfirmationUnproven -> return! awaitWitness ()
-                                | Error failure -> return Error failure
-                        }
+                do!
+                    CausalAwait.awaitTask CausalWaitHub.observer descriptor (host.AwaitReviewer())
+                    |> TaskResult.mapError ReviewBarrierFailure.CannotAwaitReviewer
 
-                    return! awaitWitness ()
+                match readOutcome journal barrierId reviewerSessionId tree with
+                | Ok outcome -> return outcome
+                | Error ReviewBarrierFailure.ReviewerProducedNoVerdict
+                | Error ReviewBarrierFailure.ConfirmationUnproven -> return! awaitWitness reviewerSessionId
+                | Error failure -> return! Error failure
+            }
+
+        taskResult {
+            let! reviewerSessionId =
+                host.ForkReviewer() |> TaskResult.mapError ReviewBarrierFailure.CannotCreateReviewer
+
+            do!
+                ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree
+                |> TaskResult.mapError ReviewBarrierFailure.CannotOpenBarrier
+
+            return! awaitWitness reviewerSessionId
         }

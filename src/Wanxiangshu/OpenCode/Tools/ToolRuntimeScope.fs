@@ -197,42 +197,80 @@ type ToolRuntimeScope
         |> Option.bind activeProfileFor
         |> Option.map (fun profile -> profile.CanonicalRole)
 
+    let acceptNamedHumanRoot
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (user: SessionMessage)
+        (agent: string)
+        : Task<Role option> =
+        task {
+            let runtime = PromptDispatcher.forJournal durable
+
+            match!
+                runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some agent)
+            with
+            | Ok profile -> return Some profile.CanonicalRole
+            | Error _ -> return None
+        }
+
+    let acceptHumanRootFromUser
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (user: SessionMessage)
+        : Task<Role option> =
+        match user.Agent with
+        | None -> Task.FromResult None
+        | Some agent -> acceptNamedHumanRoot durable sessionId user agent
+
+    let acceptUnkeyedParentUser
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (messages: SessionMessage list)
+        : Task<Role option> =
+        let providerRunId = ProviderRunIdentity.value providerRun
+
+        let parentUser =
+            messages
+            |> List.tryFind (fun message -> message.Id = providerRunId)
+            |> Option.bind (fun assistant -> assistant.ParentId)
+            |> Option.bind (fun parentId ->
+                messages
+                |> List.tryFind (fun message -> message.Id = parentId && message.Role = "user"))
+
+        match parentUser with
+        | Some user when user.PromptKey.IsNone -> acceptHumanRootFromUser durable sessionId user
+        | _ -> Task.FromResult None
+
+    let recoverFromSnapshotMessages
+        (durable: AgentJournal)
+        (snapshotPort: ISessionSnapshotPort)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : Task<Role option> =
+        task {
+            match! snapshotPort.GetMessages sessionId with
+            | Error _ -> return None
+            | Ok messages -> return! acceptUnkeyedParentUser durable sessionId providerRun messages
+        }
+
+    let recoverWithPorts
+        (durable: AgentJournal)
+        (snapshotPort: ISessionSnapshotPort)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : Task<Role option> =
+        task {
+            match activeProfileFor sessionId with
+            | Some profile -> return Some profile.CanonicalRole
+            | None -> return! recoverFromSnapshotMessages durable snapshotPort sessionId providerRun
+        }
+
     let recoverHumanRootFromSnapshot (ctx: HostToolContext) =
         task {
             match journal, snapshot, sessionIdOf ctx, ctx.ProviderRunId with
             | Some durable, Some snapshotPort, Some sessionId, Some providerRun ->
-                match activeProfileFor sessionId with
-                | Some profile -> return Some profile.CanonicalRole
-                | None ->
-                    match! snapshotPort.GetMessages sessionId with
-                    | Error _ -> return None
-                    | Ok messages ->
-                        let providerRunId = ProviderRunIdentity.value providerRun
-
-                        let parentUser =
-                            messages
-                            |> List.tryFind (fun message -> message.Id = providerRunId)
-                            |> Option.bind (fun assistant -> assistant.ParentId)
-                            |> Option.bind (fun parentId ->
-                                messages
-                                |> List.tryFind (fun message -> message.Id = parentId && message.Role = "user"))
-
-                        match parentUser with
-                        | Some user when user.PromptKey.IsNone ->
-                            match user.Agent with
-                            | Some agent ->
-                                let runtime = PromptDispatcher.forJournal durable
-
-                                match!
-                                    runtime.AcceptHumanRoot
-                                        sessionId
-                                        (PhysicalUserMessageId.create user.Id)
-                                        (Some agent)
-                                with
-                                | Ok profile -> return Some profile.CanonicalRole
-                                | Error _ -> return None
-                            | None -> return None
-                        | _ -> return None
+                return! recoverWithPorts durable snapshotPort sessionId providerRun
             | _ -> return None
         }
 
@@ -253,6 +291,11 @@ type ToolRuntimeScope
         sessionIdOf ctx
         |> Option.bind activeProfileFor
         |> Option.bind (fun profile -> ManagedAgent.tryParse profile.SelectedAgent)
+
+    let parseProcessHardLimit (value: string) =
+        match Double.TryParse value with
+        | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
+        | _ -> ProcessEstimate.DefaultHardLimit
 
     member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
     member _.Sessions = sessions
@@ -277,10 +320,7 @@ type ToolRuntimeScope
         match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
         | null
         | "" -> ProcessEstimate.DefaultHardLimit
-        | value ->
-            match Double.TryParse value with
-            | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
-            | _ -> ProcessEstimate.DefaultHardLimit
+        | value -> parseProcessHardLimit value
 
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId

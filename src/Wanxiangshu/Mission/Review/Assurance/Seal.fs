@@ -89,6 +89,16 @@ module ReviewSeal =
     /// `ParentId` a different branch matches, without the max-id rule two
     /// concurrent runs are indistinguishable, and without the compaction exclusion
     /// the Host's summariser is mistaken for a managed run.
+    let private confirmLatestRun single latest =
+        if latest.Id = single.Id then Ok single else Error NotLatestRun
+
+    let private decideSingleRun single (messages: SessionMessage list) =
+        let assistants = messages |> List.filter (fun message -> message.Role = "assistant")
+
+        match assistants with
+        | [] -> Error NoBindableRun
+        | _ -> confirmLatestRun single (assistants |> List.maxBy (fun message -> message.Id))
+
     let bindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
         let candidates =
             messages
@@ -100,18 +110,7 @@ module ReviewSeal =
 
         match candidates with
         | [] -> Error NoBindableRun
-        | [ single ] ->
-            let assistants = messages |> List.filter (fun message -> message.Role = "assistant")
-
-            match assistants with
-            | [] -> Error NoBindableRun
-            | _ ->
-                let latest = assistants |> List.maxBy (fun message -> message.Id)
-
-                if latest.Id = single.Id then
-                    Ok single
-                else
-                    Error NotLatestRun
+        | [ single ] -> decideSingleRun single messages
         // `MessageID.ascending` is monotonic, so the newest is the largest. Reported
         // rather than silently taking the max: the clause's premise is that exactly
         // one exists, and more than one means the premise no longer holds.
@@ -195,24 +194,16 @@ module ReviewSeal =
         (sessionId: SessionId)
         (transformed: ProviderProjection.ProviderWireProjection)
         =
-        match journal with
-        | None -> false
-        | Some durable ->
-            let projection = (AgentJournal.snapshot durable).AgentProjections
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.ReviewGuard)
+        |> Option.bind (fun guard -> guard.PendingChallenge)
+        |> Option.exists (fun challenge ->
+            let challengeDigest = SealDigest.value challenge.ChallengeContentDigest
 
-            match AgentProjection.tryFind sessionId projection with
-            | Some session ->
-                match session.ReviewGuard with
-                | Some guard ->
-                    match guard.PendingChallenge with
-                    | Some challenge ->
-                        let challengeDigest = SealDigest.value challenge.ChallengeContentDigest
-
-                        ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed
-                        |> List.exists (fun digest -> SealDigest.value digest = challengeDigest)
-                    | None -> false
-                | None -> false
-            | None -> false
+            ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed
+            |> List.exists (fun digest -> SealDigest.value digest = challengeDigest))
 
     /// REVIEW-013: the attempt scope frozen at transform time.
     ///

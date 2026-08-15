@@ -16,6 +16,7 @@ open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Replica
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 
 /// Direct-CE business sequencing for the obligation ledger.
 ///
@@ -46,27 +47,32 @@ module ObligationLedgerWorkflow =
         (currentPendingReview: unit -> 'reviewToken option)
         (awaitReview: 'reviewToken -> Task<Result<unit, 'reviewFailure>>)
         : Task<Result<'prepared, PreparationFailure<'attemptFailure, 'reviewFailure>>> =
-        task {
-            let! firstAttempt = admitNow ()
-
+        let rec settleFirstAttempt firstAttempt =
             match firstAttempt with
-            | PreparationAttempt.Prepared prepared -> return Ok prepared
-            | PreparationAttempt.Failed failure -> return Error(PreparationFailure.AttemptFailed failure)
-            | PreparationAttempt.AwaitPreviousReview ->
-                match currentPendingReview () with
-                | None -> return Error PreparationFailure.MissingPendingReview
-                | Some reviewToken ->
-                    let! waited = awaitReview reviewToken
+            | PreparationAttempt.Prepared prepared -> Task.FromResult(Ok prepared)
+            | PreparationAttempt.Failed failure ->
+                Task.FromResult(Error(PreparationFailure.AttemptFailed failure))
+            | PreparationAttempt.AwaitPreviousReview -> awaitThenRetry ()
 
-                    match waited with
-                    | Error failure -> return Error(PreparationFailure.ReviewWaitFailed failure)
-                    | Ok() ->
-                        let! secondAttempt = admitNow ()
+        and awaitThenRetry () =
+            match currentPendingReview () with
+            | None -> Task.FromResult(Error PreparationFailure.MissingPendingReview)
+            | Some reviewToken -> retryAfterReview reviewToken
 
-                        match secondAttempt with
-                        | PreparationAttempt.Prepared prepared -> return Ok prepared
-                        | PreparationAttempt.Failed failure -> return Error(PreparationFailure.AttemptFailed failure)
-                        | PreparationAttempt.AwaitPreviousReview -> return Error PreparationFailure.ReviewDidNotConverge
+        and retryAfterReview reviewToken =
+            taskResult {
+                do! awaitReview reviewToken |> TaskResult.mapError PreparationFailure.ReviewWaitFailed
+                let! secondAttempt = admitNow () |> TaskResultCE.ofTask
+
+                match secondAttempt with
+                | PreparationAttempt.Prepared prepared -> return prepared
+                | PreparationAttempt.Failed failure -> return! Error(PreparationFailure.AttemptFailed failure)
+                | PreparationAttempt.AwaitPreviousReview -> return! Error PreparationFailure.ReviewDidNotConverge
+            }
+
+        taskResult {
+            let! firstAttempt = admitNow () |> TaskResultCE.ofTask
+            return! settleFirstAttempt firstAttempt
         }
 
     [<RequireQualifiedAccess>]
@@ -81,16 +87,12 @@ module ObligationLedgerWorkflow =
         (shouldEnsureReview: 'accepted -> bool)
         (ensureReview: 'accepted -> Task<Result<unit, 'reviewFailure>>)
         : Task<Result<'accepted, AcceptanceFailure<'acceptFailure, 'reviewFailure>>> =
-        task {
-            let! acceptedResult = acceptDurably ()
+        taskResult {
+            let! accepted = acceptDurably () |> TaskResult.mapError AcceptanceFailure.AcceptFailed
 
-            match acceptedResult with
-            | Error failure -> return Error(AcceptanceFailure.AcceptFailed failure)
-            | Ok accepted when not (shouldEnsureReview accepted) -> return Ok accepted
-            | Ok accepted ->
-                let! reviewResult = ensureReview accepted
-
-                match reviewResult with
-                | Error failure -> return Error(AcceptanceFailure.ReviewFailed failure)
-                | Ok() -> return Ok accepted
+            if not (shouldEnsureReview accepted) then
+                return accepted
+            else
+                do! ensureReview accepted |> TaskResult.mapError AcceptanceFailure.ReviewFailed
+                return accepted
         }

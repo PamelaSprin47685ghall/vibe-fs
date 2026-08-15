@@ -63,6 +63,64 @@ module MagicTodoAdmission =
         | AwaitingConsumableReview of pendingTodoWriteId: string
         | Rejected of MagicTodoReject
 
+    let private decideReplay
+        (sha256: string -> string)
+        (lifeId: ManagerLifeId)
+        (settledCurrent: ObligationList)
+        (localized: LocalizedToolCall)
+        (existing: ExistingPrepared)
+        (writeId: TodoWriteId)
+        : AdmissionOutcome<ObligationPrepareSuccess> =
+        let observed =
+            { ManagerLifeId = lifeId
+              ProviderInputDigest = localized.ProviderInputDigest
+              BaseTodoDigest = MagicTodo.obligationListDigest sha256 settledCurrent
+              ToolPartOrdinal = localized.ToolPartOrdinal }
+
+        match MagicTodo.checkPreparedReplay existing.Identity observed with
+        | Error e -> AdmissionOutcome.Rejected e
+        | Ok() -> AdmissionOutcome.IdempotentReplay writeId
+
+    let private decideFresh
+        (sha256: string -> string)
+        (settledCurrent: ObligationList)
+        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
+        (localized: LocalizedToolCall)
+        (submitted: ObligationList)
+        (writeId: TodoWriteId)
+        : AdmissionOutcome<ObligationPrepareSuccess> =
+        match mayProceedPastLag1 |> Result.bind (fun () -> MagicTodo.validateObligations submitted) with
+        | Error(MagicTodoReject.AwaitingConsumableReview pending) ->
+            AdmissionOutcome.AwaitingConsumableReview pending
+        | Error e -> AdmissionOutcome.Rejected e
+        | Ok proposed ->
+            AdmissionOutcome.FreshPrepare
+                { TodoWriteId = writeId
+                  Proposed = proposed
+                  Base = settledCurrent
+                  BaseDigest = MagicTodo.obligationListDigest sha256 settledCurrent
+                  ProposedDigest = MagicTodo.obligationListDigest sha256 proposed
+                  ReviewFrontier = localized.ReviewFrontier
+                  ToolPartOrdinal = localized.ToolPartOrdinal
+                  ProviderInputDigest = localized.ProviderInputDigest }
+
+    let private admitAfterBatch
+        (sha256: string -> string)
+        (lifeId: ManagerLifeId)
+        (settledCurrent: ObligationList)
+        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
+        (existingPrepared: ExistingPrepared option)
+        (localized: LocalizedToolCall)
+        (submitted: ObligationList)
+        : AdmissionOutcome<ObligationPrepareSuccess> =
+        let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
+
+        match existingPrepared with
+        | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
+            decideReplay sha256 lifeId settledCurrent localized existing writeId
+        | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
+        | None -> decideFresh sha256 settledCurrent mayProceedPastLag1 localized submitted writeId
+
     /// GrandRewrite admission: same durable identity / lag-1 law, but no
     /// provider-visible item ids or status machine. Duplicate names fail closed.
     let admitObligations
@@ -77,35 +135,11 @@ module MagicTodoAdmission =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
         | Ok() ->
-            let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
-
-            match existingPrepared with
-            | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
-                let observed =
-                    { ManagerLifeId = lifeId
-                      ProviderInputDigest = localized.ProviderInputDigest
-                      BaseTodoDigest = MagicTodo.obligationListDigest sha256 settledCurrent
-                      ToolPartOrdinal = localized.ToolPartOrdinal }
-
-                match MagicTodo.checkPreparedReplay existing.Identity observed with
-                | Error e -> AdmissionOutcome.Rejected e
-                | Ok() -> AdmissionOutcome.IdempotentReplay writeId
-            | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
-            | None ->
-                match mayProceedPastLag1 with
-                | Error(MagicTodoReject.AwaitingConsumableReview pending) ->
-                    AdmissionOutcome.AwaitingConsumableReview pending
-                | Error e -> AdmissionOutcome.Rejected e
-                | Ok() ->
-                    match MagicTodo.validateObligations submitted with
-                    | Error e -> AdmissionOutcome.Rejected e
-                    | Ok proposed ->
-                        AdmissionOutcome.FreshPrepare
-                            { TodoWriteId = writeId
-                              Proposed = proposed
-                              Base = settledCurrent
-                              BaseDigest = MagicTodo.obligationListDigest sha256 settledCurrent
-                              ProposedDigest = MagicTodo.obligationListDigest sha256 proposed
-                              ReviewFrontier = localized.ReviewFrontier
-                              ToolPartOrdinal = localized.ToolPartOrdinal
-                              ProviderInputDigest = localized.ProviderInputDigest }
+            admitAfterBatch
+                sha256
+                lifeId
+                settledCurrent
+                mayProceedPastLag1
+                existingPrepared
+                localized
+                submitted

@@ -64,42 +64,58 @@ open Wanxiangshu.Persistence.EventStore
 /// Missing session port or transaction Error keeps the old Case.
 module CasebookBookkeeper =
 
+    let private refreshPresentCase
+        (store: IEventStore)
+        (root: string)
+        (sessionId: string)
+        (case: Case)
+        : Task<Result<bool, string>> =
+        taskResult {
+            let freeze = CasebookReplay.replayAll root case.Observations
+
+            let! q', a' =
+                BookkeeperRuntime.runTransaction
+                    BookkeeperRequest.CaseRefresh
+                    sessionId
+                    case.Q
+                    case.A
+                    freeze
+                    None
+
+            let verify = CasebookReplay.replayAll root case.Observations
+
+            match Observations.classifyReplay freeze verify with
+            | ReplayResult.Stale ->
+                return! Error "casebook synthesis unstable: worktree changed during bookkeeper transaction"
+            | ReplayResult.Fresh ->
+                do! CasebookWorkflow.refreshCase store sessionId q' a' freeze
+                CasebookIndex.invalidate ()
+                let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
+                return true
+        }
+
+    let private refreshIfCasePresent
+        (store: IEventStore)
+        (root: string)
+        (sessionId: string)
+        : Task<Result<bool, string>> =
+        taskResult {
+            let! caseOpt = CasebookWorkflow.fetchCase store 256 sessionId
+
+            match caseOpt with
+            | None -> return false
+            | Some case -> return! refreshPresentCase store root sessionId case
+        }
+
     /// Returns Ok true when a Refreshed event was published; Ok false when
     /// Fresh / no-case (nothing to do). Error on store, transaction, or
     /// stability-verify failure — the old Case is left intact.
     let refreshStale (store: IEventStore) (root: string) (sessionId: string) : Task<Result<bool, string>> =
-        task {
-            match! CasebookWorkflow.needsRefresh store 256 sessionId root with
-            | Error err -> return Error err
-            | Ok false -> return Ok false
-            | Ok true ->
-                match! CasebookWorkflow.fetchCase store 256 sessionId with
-                | Error err -> return Error err
-                | Ok None -> return Ok false
-                | Ok(Some case) ->
-                    let freeze = CasebookReplay.replayAll root case.Observations
+        taskResult {
+            let! needs = CasebookWorkflow.needsRefresh store 256 sessionId root
 
-                    match!
-                        BookkeeperRuntime.runTransaction
-                            BookkeeperRequest.CaseRefresh
-                            sessionId
-                            case.Q
-                            case.A
-                            freeze
-                            None
-                    with
-                    | Error err -> return Error err
-                    | Ok(q', a') ->
-                        let verify = CasebookReplay.replayAll root case.Observations
-
-                        match Observations.classifyReplay freeze verify with
-                        | ReplayResult.Stale ->
-                            return Error "casebook synthesis unstable: worktree changed during bookkeeper transaction"
-                        | ReplayResult.Fresh ->
-                            match! CasebookWorkflow.refreshCase store sessionId q' a' freeze with
-                            | Ok() ->
-                                CasebookIndex.invalidate ()
-                                let! _ = CasebookIndex.refresh store 256
-                                return Ok true
-                            | Error err -> return Error err
+            if not needs then
+                return false
+            else
+                return! refreshIfCasePresent store root sessionId
         }

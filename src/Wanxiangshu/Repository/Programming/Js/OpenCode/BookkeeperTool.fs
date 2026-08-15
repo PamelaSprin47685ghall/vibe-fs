@@ -23,6 +23,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -350,41 +351,44 @@ module JsBookkeeperTool =
         task {
             let language = lang context
 
-            match BookkeeperRuntime.tryTxId context.SessionId with
-            | None -> return failed language (prose language Path.NoTransaction)
-            | Some txId ->
-                match args.OptionalText "program" with
-                | None -> return failed language (prose language Path.ProgramRequired)
-                | Some program ->
-                    match BookkeeperStaging.snapshot txId with
-                    | Error reason -> return failed language reason
-                    | Ok(question, answer) ->
-                        let staged =
-                            { Question = None
-                              Answer = None
-                              QuestionWasSet = false
-                              AnswerWasSet = false }
+            let! outcome =
+                taskResult {
+                    let! txId =
+                        BookkeeperRuntime.tryTxId context.SessionId
+                        |> Result.requireSome (prose language Path.NoTransaction)
 
-                        let api = createApi language question answer staged
+                    let! program =
+                        args.OptionalText "program"
+                        |> Result.requireSome (prose language Path.ProgramRequired)
 
-                        let! sandboxResult =
-                            JsSandbox.runSurface
-                                runtimeBaseClass
-                                program
-                                api
-                                10000
-                                (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
-                                (1 <<< 20)
+                    let! question, answer = BookkeeperStaging.snapshot txId
 
-                        match sandboxResult with
-                        | Error failure -> return failed language (JsFailure.reason failure)
-                        | Ok json ->
-                            match JsToolsData.parse json with
-                            | Error failure -> return failed language (JsFailure.reason failure)
-                            | Ok value ->
-                                match BookkeeperStaging.apply txId staged.Question staged.Answer with
-                                | Error reason -> return failed language reason
-                                | Ok() -> return succeeded language value
+                    let staged =
+                        { Question = None
+                          Answer = None
+                          QuestionWasSet = false
+                          AnswerWasSet = false }
+
+                    let api = createApi language question answer staged
+
+                    let! json =
+                        JsSandbox.runSurface
+                            runtimeBaseClass
+                            program
+                            api
+                            10000
+                            (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
+                            (1 <<< 20)
+                        |> TaskResult.mapError JsFailure.reason
+
+                    let! value = JsToolsData.parse json |> Result.mapError JsFailure.reason
+                    do! BookkeeperStaging.apply txId staged.Question staged.Answer
+                    return value
+                }
+
+            match outcome with
+            | Error reason -> return failed language reason
+            | Ok value -> return succeeded language value
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =

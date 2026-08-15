@@ -51,45 +51,63 @@ open Wanxiangshu.Composition.Durable
 /// `<handle>` is now the local content-addressed PayloadRef. Git OIDs do not
 /// participate in runtime durability.
 type EventStoreBlobWriter private (store: IEventStore) =
+    let writePayload (content: string) =
+        let digest = BlobDigest.create (HostDigest.sha256Hex content)
+        let bytes = Encoding.UTF8.GetBytes content
+
+        task {
+            match! store.WritePayload bytes with
+            | Error error -> return Error error
+            | Ok payloadRef ->
+                return
+                    Ok
+                        { BlobRef = BlobRef.create ("blobs/" + PayloadRef.value payloadRef)
+                          BlobDigest = digest }
+        }
+
+    let handleOf (relative: string) =
+        let prefix = "blobs/"
+
+        if not (relative.StartsWith(prefix, StringComparison.Ordinal)) then
+            None
+        else
+            Some(relative.Substring(prefix.Length))
+
+    let decodeBlobHandle blobRef =
+        let relative = BlobRef.value blobRef
+
+        match handleOf relative with
+        | None -> Error(sprintf "invalid blob reference: %s" relative)
+        | Some handle when String.IsNullOrWhiteSpace handle || handle.Contains "/" ->
+            Error(sprintf "invalid blob reference: %s" relative)
+        | Some handle -> Ok handle
+
+    let decodeUtf8 (bytes: byte[]) =
+        try
+            Ok(Encoding.UTF8.GetString bytes)
+        with ex ->
+            Error(sprintf "event-store payload read failed: %s" ex.Message)
+
+    let readPayload handle =
+        task {
+            match! store.ReadPayload(PayloadRef.create handle) with
+            | Error error -> return Error error
+            | Ok None -> return Error(sprintf "event-store payload missing: %s" handle)
+            | Ok(Some bytes) -> return decodeUtf8 bytes
+        }
+
     member _.Write(content: string) : Task<Result<BlobWriteReceipt, string>> =
         task {
             try
-                let digest = BlobDigest.create (HostDigest.sha256Hex content)
-                let bytes = Encoding.UTF8.GetBytes content
-
-                match! store.WritePayload bytes with
-                | Error error -> return Error error
-                | Ok payloadRef ->
-                    return
-                        Ok
-                            { BlobRef = BlobRef.create ("blobs/" + PayloadRef.value payloadRef)
-                              BlobDigest = digest }
+                return! writePayload content
             with ex ->
                 return Error(sprintf "event-store payload write failed: %s" ex.Message)
         }
 
     member _.Read(blobRef: BlobRef) : Task<Result<string, string>> =
-        task {
-            let relative = BlobRef.value blobRef
-            let prefix = "blobs/"
-
-            if not (relative.StartsWith(prefix, StringComparison.Ordinal)) then
-                return Error(sprintf "invalid blob reference: %s" relative)
-            else
-                let handle = relative.Substring(prefix.Length)
-
-                if String.IsNullOrWhiteSpace handle || handle.Contains "/" then
-                    return Error(sprintf "invalid blob reference: %s" relative)
-                else
-                    match! store.ReadPayload(PayloadRef.create handle) with
-                    | Error error -> return Error error
-                    | Ok None -> return Error(sprintf "event-store payload missing: %s" handle)
-                    | Ok(Some bytes) ->
-                        try
-                            return Ok(Encoding.UTF8.GetString bytes)
-                        with ex ->
-                            return Error(sprintf "event-store payload read failed: %s" ex.Message)
-        }
+        match decodeBlobHandle blobRef with
+        | Error error -> Task.FromResult(Error error)
+        | Ok handle -> readPayload handle
 
     interface IBlobWriter with
         member this.Write(content) = this.Write content

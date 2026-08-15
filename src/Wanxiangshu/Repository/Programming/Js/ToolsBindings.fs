@@ -23,6 +23,7 @@ open Wanxiangshu.Strength.Persistence
 
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -88,6 +89,11 @@ module JsToolsBindings =
               "code" ==> JsFailure.code failure
               "reason" ==> JsFailure.reason failure ]
 
+    let private renderOutcome (outcome: Result<obj, JsFailure>) : obj =
+        match outcome with
+        | Error failure -> failureObj failure
+        | Ok value -> value
+
     /// Path boundary: a path is legal iff its resolved form stays inside root.
     /// Absolute paths are allowed when they resolve inside root; anything else
     /// is PATH_DENIED (JS-007 capability boundary).
@@ -109,13 +115,17 @@ module JsToolsBindings =
     let private anchorOf (find: obj) : Result<AnchorSpec, JsFailure> =
         if isString find then
             Ok(AnchorSpec.Exact(string find))
+        elif System.String.IsNullOrEmpty (string (find?source)) then
+            Error JsFailure.AnchorEmptyContent
         else
-            let source = string (find?source)
+            Ok(AnchorSpec.Regex(string (find?source)))
 
-            if System.String.IsNullOrEmpty source then
-                Error JsFailure.AnchorEmptyContent
-            else
-                Ok(AnchorSpec.Regex source)
+    /// Exact empty text is a domain guard, separate from anchor parsing.
+    let private requireNonEmptyExact (spec: AnchorSpec) : Result<unit, JsFailure> =
+        match spec with
+        | AnchorSpec.Exact text when System.String.IsNullOrEmpty text ->
+            Error JsFailure.AnchorEmptyContent
+        | _ -> Ok()
 
     /// Build the api object for one sandbox run. `staging` collects every
     /// mutation the program makes; the caller commits or discards it.
@@ -125,14 +135,15 @@ module JsToolsBindings =
               ==> createObj
                       [ "read"
                         ==> fun (path: string) ->
-                            match resolveInside root path with
-                            | Error failure -> failureObj failure
-                            | Ok full ->
-                                match JsUtf8Fs.readUtf8Classified full with
-                                | Ok text ->
+                            result {
+                                let! full = resolveInside root path
+                                let! text = JsUtf8Fs.readUtf8Classified full
+
+                                return
                                     createObj
                                         [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
-                                | Error failure -> failureObj failure
+                            }
+                            |> renderOutcome
                         "glob"
                         ==> fun (pattern: string) ->
                             match JsGlobFs.glob root pattern with
@@ -146,38 +157,34 @@ module JsToolsBindings =
                                 else
                                     pattern
 
-                            match anchorOf needle with
-                            | Error failure -> failureObj failure
-                            | Ok spec ->
-                                match spec with
-                                | AnchorSpec.Exact text when System.String.IsNullOrEmpty text ->
-                                    failureObj JsFailure.AnchorEmptyContent
-                                | _ ->
-                                    match JsAnchorFs.grep root spec globPattern with
-                                    | Error failure -> failureObj failure
-                                    | Ok listing ->
-                                        let matches =
-                                            listing.Matches
-                                            |> List.map (fun hit ->
-                                                createObj
-                                                    [ "path" ==> hit.Path
-                                                      "line" ==> hit.Line
-                                                      "column" ==> hit.Column
-                                                      "text" ==> hit.Text ])
+                            result {
+                                let! spec = anchorOf needle
+                                do! requireNonEmptyExact spec
+                                let! listing = JsAnchorFs.grep root spec globPattern
 
-                                        createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+                                let matches =
+                                    listing.Matches
+                                    |> List.map (fun hit ->
+                                        createObj
+                                            [ "path" ==> hit.Path
+                                              "line" ==> hit.Line
+                                              "column" ==> hit.Column
+                                              "text" ==> hit.Text ])
+
+                                return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+                            }
+                            |> renderOutcome
                         "edit"
                         ==> fun (path: string) (newText: obj) ->
                             let replacement = string newText
 
-                            match resolveInside root path with
-                            | Error failure -> failureObj failure
-                            | Ok full ->
-                                match JsUtf8Fs.readUtf8Classified full with
-                                | Error failure -> failureObj failure
-                                | Ok current ->
-                                    staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
-                                    createObj [ "ok" ==> true ]
+                            result {
+                                let! full = resolveInside root path
+                                let! current = JsUtf8Fs.readUtf8Classified full
+                                staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
+                                return createObj [ "ok" ==> true ]
+                            }
+                            |> renderOutcome
                         "write"
                         ==> fun (path: string) (text: string) ->
                             match resolveInside root path with
