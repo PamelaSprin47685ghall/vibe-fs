@@ -87,7 +87,7 @@
 
 ## REVIEW-ASSURANCE-008：VerdictKnown 与 ConsumableReview 两段式；禁止提前 Concluded
 
-**规范**：`VerdictKnown(k)` = Reviewer 域已有、针对 `TodoProcessReview(k)` 的 durable verdict（PERFECT|REVISE）→ 立即决定业务 outcome/settlement，**不携带 WorkRecordRef，不单独构成可消费报告，不进入 Finality dual-PERFECT witness**。`ConsumableReview(k) ≡ TodoReviewConcluded(k)` = VerdictKnown ∧ 该 verdict frontier 的 canonical ProcessReviewLWR 已 record-ready ∧ 同 snapshot 已 append Concluded。顺序冻结：VerdictKnown → await record-ready → append Concluded → T(k+1)/suicide 可消费。
+**规范**：`VerdictKnown(k)` = Reviewer 域已有、针对 `TodoProcessReview(k)` 的 durable verdict（PERFECT|REVISE）→ 立即决定业务 outcome/settlement，**不携带 WorkRecordRef，不单独构成可消费报告，不进入 Finality dual-PERFECT witness**。该 verdict 的 `ProviderRunIdentity + ToolCallId` 必须由唯一 Journal 积分器随 `ReviewVerdictRecorded` 一次 fold 为 bounded typed projection evidence；任何消费方禁止扫描/重放 Journal、解析 dedupe string、或从 XTrace `tool_call` 反推 verdict identity。`ConsumableReview(k) ≡ TodoReviewConcluded(k)` = VerdictKnown ∧ 该 verdict frontier 的 canonical ProcessReviewLWR 已 record-ready ∧ 同 snapshot 已 append Concluded。顺序冻结：VerdictKnown → await record-ready → append Concluded → T(k+1)/suicide 可消费。
 
 **含义/动机**：把「只有判断、尚无 report」挤进同一个 Concluded，恢复路径无法区分「已可 settle」与「已可展示报告」，并诱导提前 append 空壳。两段式让 verdict 先 settle 业务，report 就绪后才解锁消费。
 
@@ -97,7 +97,7 @@
 
 ## REVIEW-ASSURANCE-009：record-ready 同 snapshot、排他 frontier、事件驱动、无轮询、waiter 可恢复
 
-**规范**：record-ready 判定是「能否在**同一 Journal snapshot** 物化有效 canonical LWR」，不是 `coverage >= frontier.Sequence`（frontier 排他 = lastPart+1，真实 coverage 上限只达 lastPart，旧门禁会永远悬挂）。coverage 判定与 LWR materialization 不同 revision 即不成立。等待只经 `AgentJournal.awaitChangeFrom` 事件唤醒；禁止 timer/sleep/wall-clock 轮询。waiter 取消/dispose/崩溃不是 durable abandonment：从 durable assignment / VerdictKnown / 冻结 frontier 重建同一等待；`TodoReviewConcluded` 已在则直接消费。若 process verdict 已 durable，则当前 Host work-unit 的 `CompletedAwaitingJoin` / `Retired` 只说明 reviewer 已结束生成，不证明 record-ready producer 丢失；必须继续等待 XTrace/LWR 收敛。只有尚无 durable verdict 且 reviewer work-unit 已不可继续时才可 fail closed。
+**规范**：record-ready 判定是「能否在**同一 Journal snapshot** 物化有效 canonical LWR」，不是 `coverage >= frontier.Sequence`（frontier 排他 = lastPart+1，真实 coverage 上限只达 lastPart，旧门禁会永远悬挂）。coverage 判定与 LWR materialization 不同 revision 即不成立。等待只经 `AgentJournal.awaitChangeFrom` 事件唤醒；禁止 timer/sleep/wall-clock 轮询。Direct CE 必须先采样 revision，再执行 `tryConclude`/producer 判定，最后 `awaitChangeFrom sampledRevision`，形成 check→subscribe/recheck 等价握手，禁止在判定后才采 revision 造成 lost wakeup。waiter 取消/dispose/崩溃不是 durable abandonment：从 durable assignment / VerdictKnown / 冻结 frontier 重建同一等待；`TodoReviewConcluded` 已在则直接消费。若 process verdict 已 durable，则当前 Host work-unit 的 `CompletedAwaitingJoin` / `Retired` 只说明 reviewer 已结束生成，不证明 record-ready producer 丢失；必须继续等待 XTrace/LWR 收敛。只有尚无 durable verdict 且 reviewer work-unit 已不可继续时才可 fail closed。
 
 **含义/动机**：轮询把 Journal 因果等待退化成运气；用较晚 head 替换冻结 frontier 会改变原 REVISE 的记录目标。同 snapshot 保证「判定时就绪」与「物化同一份」不可分。
 

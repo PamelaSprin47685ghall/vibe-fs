@@ -96,11 +96,10 @@ type ReviewGuardProjection =
         PendingChallenge: PerfectChallenge option
         /// Seals observed recently, keyed by provider run. Bounded window.
         Seals: Map<ProviderRunIdentity, ProviderInputSeal>
-        /// REVIEW-004 dedupe: extra PERFECT calls inside one provider run neither
-        /// count nor journal. Replaces the old pair of "recent run ids" and
-        /// "recent tool call ids" lists, which could not express the conjunction
-        /// the clause requires.
-        ObservedAttemptKeys: string list
+        /// REVIEW-004 bounded typed verdict evidence, newest first. The unique
+        /// integrator records the exact attempt identity once; consumers never
+        /// reconstruct it from Journal bytes or semantic trace parts.
+        ObservedAttempts: ReviewAttemptIdentity list
     }
 
     member this.IsConfirmed = ReviewWitness.isConfirmed this.Witness
@@ -152,7 +151,7 @@ module ReviewProjection =
           TerminalFrontier = None
           PendingChallenge = None
           Seals = Map.empty
-          ObservedAttemptKeys = [] }
+          ObservedAttempts = [] }
 
     let private remember key keys =
         key :: (keys |> List.filter ((<>) key)) |> List.truncate AttemptWindow
@@ -195,7 +194,7 @@ module ReviewProjection =
                 LastGitTreeHash = Some gitTreeHash
                 TerminalFrontier = None
                 PendingChallenge = None
-                ObservedAttemptKeys = []
+                ObservedAttempts = []
                 Witness =
                     match current.Witness with
                     | ReviewWitness.Confirmed _ -> current.Witness
@@ -289,14 +288,12 @@ module ReviewProjection =
         (verdict: ReviewGuardVerdict)
         (current: ReviewGuardProjection)
         : Result<ReviewGuardProjection, VerdictRejection> =
-        let key = ReviewAttemptIdentity.dedupeKey attempt
-
-        if List.contains key current.ObservedAttemptKeys then
+        if List.contains attempt current.ObservedAttempts then
             Error DuplicateAttempt
         else
             let observed =
                 { current with
-                    ObservedAttemptKeys = remember key current.ObservedAttemptKeys
+                    ObservedAttempts = remember attempt current.ObservedAttempts
                     LastGitTreeHash = Some attempt.GitTreeHash }
 
             match verdict with
@@ -334,7 +331,10 @@ module ReviewProjection =
     /// written — and `Fold.verdictOutcome` turns one of its rejections into a
     /// journal write failure.
     let hasObservedAttempt (attempt: ReviewAttemptIdentity) (current: ReviewGuardProjection) =
-        List.contains (ReviewAttemptIdentity.dedupeKey attempt) current.ObservedAttemptKeys
+        List.contains attempt current.ObservedAttempts
+
+    let latestObservedAttempt (current: ReviewGuardProjection) =
+        List.tryHead current.ObservedAttempts
 
     /// REVIEW-007: the Guard asks only whether the CURRENT tree has a confirmed
     /// PERFECT. A witness for another barrier or tree is auditable but not sufficient.

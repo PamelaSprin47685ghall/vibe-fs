@@ -18,7 +18,7 @@
 ### 2. 投影与 fold（Journal）
 
 - `src/Wanxiangshu/Mission/Review/Barrier/Projection.fs`：
-  - `PerfectChallenge`（第一次 PERFECT 的 durable 证据）、`ProviderInputSeal`（`IncludedToolResultDigests` = 因果证据集）、`ReviewGuardProjection`（barrier/tree/witness/TerminalFrontier/PendingChallenge/Seals/ObservedAttemptKeys）。
+  - `PerfectChallenge`（第一次 PERFECT 的 durable 证据）、`ProviderInputSeal`（`IncludedToolResultDigests` = 因果证据集）、`ReviewGuardProjection`（barrier/tree/witness/TerminalFrontier/PendingChallenge/Seals/`ObservedAttempts: ReviewAttemptIdentity list`）。attempt 窗口是唯一积分器维护的 bounded typed evidence；业务层禁止从 Journal/XTrace 重建 verdict identity。
   - `startBarrier`：新 barrier 清 pending challenge 与 attempt 窗口，保留 confirmed witness 可审计（REVIEW-008）；同 barrier 重入幂等。
   - `applyChallengeIssued`：pending witness 由 challenge 构建，参数只有一个——防两者不一致（REVIEW-005）。
   - `applyVerdict`：REVISE 清 pending（REVIEW-002 条件 7 的机制）；**不**判因果、不构建 Confirmed——writer 证明、fold 应用（seal 窗口有界，重放不重证）。
@@ -43,9 +43,9 @@
 
 ### 5. record-ready 与消费（Application/Review/TodoProcessReviewProgram.fs）
 
-- `tryConclude`：**同一 snapshot** 读 checkpoint + reviewer guard；VerdictKnown（ObservedAttemptKeys 非空）后以冻结 range `[ReviewWorkStartCursor, ReviewerRecordFrontier)` 物化 canonical ProcessReviewLWR；非空 report + judge identity 存在 → writeBlob → append `TodoReviewConcluded`。任何不足 → `Pending`（等待信号，不是 provider 红字）。
+- `tryConclude`：**同一 snapshot** 读 checkpoint + reviewer guard；VerdictKnown 从 `ObservedAttempts` 最新 typed identity 读取，不解析 dedupe key、不查原始 Journal、不要求 XTrace 存在 `judge tool_call`。用同一 snapshot 的冻结 range `[ReviewWorkStartCursor, ReviewerRecordFrontier)` 物化 canonical ProcessReviewLWR；非空 report → writeBlob → 以该 typed `ProviderRun/ToolCallId` append `TodoReviewConcluded`。任何不足 → `Pending`（等待信号，不是 provider 红字）。
 - `producerPresence`：无 durable verdict 时，只有 reviewer work-unit 仍可继续（Active/CompletedAwaitingJoin）才允许等待；durable process verdict 已存在后，handle `CompletedAwaitingJoin`/`Retired` 不再代表 producer loss，剩余 producer 是 Journal/XTrace/LWR 的 record-ready 收敛。无 verdict 且 Abandoned/Retired 才 `Absent`。
-- `awaitConsumableReview`：事件驱动递归——`tryConclude` → Pending → producer 存在 → `awaitChangeFrom revision` → 重判；producer 缺失 → Error fail closed（REVIEW-017/018）。无 total-review deadline（活着的 reviewer 写多久等多久）。
+- `awaitConsumableReview`：Direct CE 有界递归——先采样 `revision` → `tryConclude` → Pending → producer 存在 → `awaitChangeFrom sampledRevision` → 重判；因此判定与订阅之间发生的 append 会令 await 立即完成，不丢 wakeup。producer 缺失 → Error fail closed（REVIEW-017/018）。无 stage/phase/program counter，无 total-review deadline。
 
 ### 6. 数据流
 

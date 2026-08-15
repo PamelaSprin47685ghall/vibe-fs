@@ -110,13 +110,12 @@ module ReviewerEvidence =
 
     /// Whether this reviewer has produced any verdict for the current barrier.
     ///
-    /// Asked of `ObservedAttemptKeys` rather than of the witness: REVIEW-004
-    /// records every counted attempt there, including a REVISE that later got
-    /// superseded, so it answers "did the reviewer use the tool at all" without a
-    /// second list to keep in step.
+    /// Asked of the integrated typed attempts rather than of the witness:
+    /// REVIEW-004 records every counted attempt there, including a REVISE that
+    /// later got superseded, so no consumer has to reconstruct verdict identity.
     let verdictSubmitted journal reviewerKey =
         guard journal reviewerKey
-        |> Option.exists (fun reviewGuard -> not (List.isEmpty reviewGuard.ObservedAttemptKeys))
+        |> Option.exists (fun reviewGuard -> not (List.isEmpty reviewGuard.ObservedAttempts))
 
     /// REVIEW-003: a first PERFECT landed and its challenge is outstanding.
     let confirmationPending journal reviewerKey =
@@ -159,7 +158,7 @@ module ReviewerEvidence =
 
         match processReviewEvidence, guard journal reviewerKey with
         | Some _, None -> Need.EnsureVerdictSubmitted
-        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttemptKeys -> Need.EnsureVerdictSubmitted
+        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
         | Some _, Some _ ->
             // REVIEW-013: process PERFECT/REVISE is terminal. No confirmation nudge.
             Need.CompleteRevision
@@ -171,5 +170,5 @@ module ReviewerEvidence =
                 match reviewGuard.Witness with
                 | witness when ReviewWitness.isPerfectPending witness && not reviewGuard.IsConfirmed ->
                     Need.EnsurePerfectConfirmed
-                | _ when List.isEmpty reviewGuard.ObservedAttemptKeys -> Need.EnsureVerdictSubmitted
+                | _ when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
                 | _ -> Need.CompleteRevision

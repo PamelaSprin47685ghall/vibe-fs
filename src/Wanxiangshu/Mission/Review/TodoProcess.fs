@@ -75,21 +75,16 @@ module TodoProcessReviewProgram =
         |> Option.bind (fun session -> session.XTrace)
         |> Option.defaultValue XTraceProjection.empty
 
-    let private processVerdict (guard: ReviewGuardProjection) : ProcessReviewVerdict option =
-        if List.isEmpty guard.ObservedAttemptKeys then
-            None
-        elif ReviewWitness.isRevision guard.Witness then
-            Some ProcessReviewVerdict.Revise
-        else
-            Some ProcessReviewVerdict.Perfect
+    let private processVerdict (guard: ReviewGuardProjection) : (ProcessReviewVerdict * ReviewAttemptIdentity) option =
+        ReviewProjection.latestObservedAttempt guard
+        |> Option.map (fun attempt ->
+            let verdict =
+                if ReviewWitness.isRevision guard.Witness then
+                    ProcessReviewVerdict.Revise
+                else
+                    ProcessReviewVerdict.Perfect
 
-    let private judgeIdentity (trace: XTraceProjectionState) =
-        XTraceProjection.parts trace
-        |> List.tryFindBack (fun part -> part.Kind = "tool_call" && part.ToolName = Some "judge")
-        |> Option.bind (fun part ->
-            match part.ProviderRun, part.ToolCallId with
-            | Some run, Some call -> Some(run, call)
-            | _ -> None)
+            verdict, attempt)
 
     /// Append TodoReviewConcluded when VerdictKnown ∧ ProcessReviewLWR record-ready
     /// share this snapshot. Pending is a wait signal, not a provider-visible reject.
@@ -111,7 +106,7 @@ module TodoProcessReviewProgram =
 
                     match guard |> Option.bind processVerdict with
                     | None -> return ConcludeOutcome.Pending "verdict unknown"
-                    | Some verdict ->
+                    | Some(verdict, attempt) ->
                         let trace = reviewerTrace snapshot assignment.ReviewerSessionId
                         let endExclusive = { Sequence = XTraceProjection.head trace }
 
@@ -123,13 +118,14 @@ module TodoProcessReviewProgram =
                                   MagicTodoLwr.BoundedRange.EndExclusive = endExclusive }
 
                             let! report =
-                                LifecycleWorkRecordProjection.lifecycleWorkRecordBounded
-                                    (Some journal)
+                                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                                    journal
+                                    snapshot
                                     assignment.ReviewerSessionId
                                     range
 
-                            match report, judgeIdentity trace with
-                            | Some report, Some(providerRun, toolCallId) when not (String.IsNullOrWhiteSpace report) ->
+                            match report with
+                            | Some report when not (String.IsNullOrWhiteSpace report) ->
                                 match! writeBlob journal report with
                                 | Error reason -> return ConcludeOutcome.Failed reason
                                 | Ok workRecord ->
@@ -147,13 +143,13 @@ module TodoProcessReviewProgram =
                                           SettledTodoRef = cp.ProposedTodoRef
                                           SettledTodoDigest = cp.ProposedTodoDigest
                                           ReviewerRecordFrontier = endExclusive
-                                          ProviderRunId = providerRun
-                                          ToolCallId = toolCallId }
+                                          ProviderRunId = attempt.ProviderRun
+                                          ToolCallId = attempt.ToolCallId }
 
                                     match!
                                         AgentJournal.appendMagicTodo
                                             (StreamId.Session assignment.ReviewerSessionId)
-                                            (Some providerRun)
+                                            (Some attempt.ProviderRun)
                                             (MagicTodoFact.TodoReviewConcluded concluded)
                                             journal
                                     with
@@ -212,6 +208,8 @@ module TodoProcessReviewProgram =
         (writeId: TodoWriteId)
         : Task<Result<unit, string>> =
         task {
+            let revision = AgentJournal.revision journal
+
             match! tryConclude journal lifeId writeId with
             | ConcludeOutcome.Concluded -> return Ok()
             | ConcludeOutcome.Failed reason -> return Error reason
@@ -219,7 +217,6 @@ module TodoProcessReviewProgram =
                 match producerPresence journal lifeId writeId with
                 | ProducerPresence.Absent detail -> return Error("process review cannot progress: " + detail)
                 | ProducerPresence.Present ->
-                    let revision = AgentJournal.revision journal
                     let! _ = AgentJournal.awaitChangeFrom revision journal
                     return! awaitConsumableReview journal lifeId writeId
         }

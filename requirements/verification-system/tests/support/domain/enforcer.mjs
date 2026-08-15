@@ -192,7 +192,7 @@ export const reviewProjection = (() => {
       witness: caseOf(current.Witness),
       hasPendingChallenge: isSome(current.PendingChallenge),
       seals: mapCount(current.Seals),
-      observedAttempts: listItems(current.ObservedAttemptKeys).length,
+      observedAttempts: listItems(current.ObservedAttempts).length,
     }),
   }
 })()

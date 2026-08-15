@@ -30,6 +30,7 @@ import {
   handleId,
   idValue,
   logicalRunId,
+  listItems,
   magicTodo,
   magicTodoJournal,
   managerLifeId,
@@ -45,6 +46,7 @@ import {
   toolCallId,
   verdict,
   verdictWitness,
+  xTraceCapture,
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { tryConclude, producerPresence, awaitConsumableReview } = await import(
@@ -265,6 +267,103 @@ test('REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection
   // The reviewer guard is the only place the process verdict lives: the Magic
   // Todo projection still shows an unconsumed, unconcluded checkpoint.
   assert.equal(checkpoint(checkpointState()).Concluded == null, true)
+})
+
+test('REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_not_a_judge_tool_call_trace', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-consumable-projection-verdict-'))
+  const created = await agentJournal.create({ directory, runtime: 'rt_consumable_projection_verdict' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  try {
+    const journal = created.journal
+    const barrier = reviewBarrierId(review.fields[0])
+
+    const appendMagic = async (caseName, payload) => {
+      const appended = await agentJournal.appendMagicTodo(
+        stream.session(managerSession),
+        undefined,
+        magicFact(caseName, payload),
+        journal,
+      )
+      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+      return appended.value.EventId
+    }
+
+    const preparedRef = await appendMagic('TodoWritePrepared', prepared)
+    await appendMagic('TodoWriteAccepted', new magicTodoJournal.TodoWriteAccepted(
+      life,
+      write,
+      call,
+      preparedRef,
+      'provider-input-digest',
+      'output-digest',
+      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+      'magic-v1',
+    ))
+    await appendMagic('DedicatedTodoReviewerEnlisted', enlisted)
+    await appendMagic('TodoProcessReviewAssigned', assigned)
+
+    await xTraceCapture.captureOpening(journal, reviewerSession, 'Review this checkpoint.', [])
+    await xTraceCapture.captureProjection(
+      journal,
+      reviewerSession,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('Review this checkpoint.')] },
+          { role: 'assistant', parts: [xTraceCapture.reasoning('Checked the planning account.')] },
+          { role: 'assistant', parts: [xTraceCapture.text('No material issue.')] },
+          { role: 'assistant', parts: [xTraceCapture.text('Ready to conclude.')] },
+          { role: 'assistant', parts: [xTraceCapture.toolResult('judge-call', 'PERFECT')] },
+        ],
+      }),
+    )
+
+    await agentJournal.appendAgent(
+      stream.session(reviewerSession),
+      undefined,
+      agentFact('ReviewBarrierStarted', {
+        ReviewerSessionId: reviewerSession,
+        ManagerSessionId: managerSession,
+        BarrierId: barrier,
+        GitTreeHash: gitTreeHash('tree_projection_verdict'),
+      }),
+      journal,
+    )
+    await agentJournal.appendAgent(
+      stream.session(reviewerSession),
+      providerRun('reviewer-provider-run'),
+      agentFact('ReviewVerdictRecorded', {
+        ReviewerSessionId: reviewerSession,
+        ManagerSessionId: managerSession,
+        BarrierId: barrier,
+        GitTreeHash: gitTreeHash('tree_projection_verdict'),
+        ProviderRun: providerRun('reviewer-provider-run'),
+        ToolCallId: toolCallId('reviewer-call'),
+        Verdict: verdict.perfect,
+      }),
+      journal,
+    )
+
+    const before = agentJournal.snapshot(journal)
+    const reviewerTrace = fold.sessions(before)[idValue.session(reviewerSession)].XTrace
+    assert.equal(
+      listItems(reviewerTrace.Parts).some((part) => part.Kind === 'tool_call'),
+      false,
+      'regression premise: Host projection has no judge tool_call XTrace part',
+    )
+
+    const conclude = await tryConclude(journal, life, write)
+    assert.equal(caseOf(conclude), 'Concluded')
+
+    const after = agentJournal.snapshot(journal)
+    const lifeState = after.AgentProjections.MagicTodo.ByLife.get(idValue.managerLife(life))
+    const cp = mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
+    assert.equal(cp.Concluded.ProviderRunId.fields[0], providerRun('reviewer-provider-run').fields[0])
+    assert.equal(cp.Concluded.ToolCallId.fields[0], toolCallId('reviewer-call').fields[0])
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 // ── REVIEW-017/018: record-ready wait is event-driven and fails closed ───────
