@@ -74,6 +74,43 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
 
+    let private eventString (value: obj) =
+        if isNull value then None
+        else
+            let text = string value
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private observeRoleOfTool (runtime: SyncDelegateRuntime) owner messageId callId toolName =
+        SyncDelegate.tryRoleOfToolName toolName
+        |> Option.iter (fun role ->
+            runtime.ObserveProviderToolCall(
+                owner,
+                ProviderRunIdentity.create messageId,
+                role,
+                ToolCallId.create callId
+            ))
+
+    let private observeToolCallIdentity (runtime: SyncDelegateRuntime) owner (part: obj) =
+        match eventString part?messageID, eventString part?callID, eventString part?tool with
+        | Some messageId, Some callId, Some toolName -> observeRoleOfTool runtime owner messageId callId toolName
+        | _ -> ()
+
+    let private observeToolPart (runtime: SyncDelegateRuntime) owner raw =
+        let properties = raw?properties
+        let part = if isNull properties then null else properties?part
+
+        if not (isNull part) && eventString part?``type`` = Some "tool" then
+            observeToolCallIdentity runtime owner part
+
+    let private observeSyncDelegateEvent (runtime: SyncDelegateRuntime) (raw: obj) =
+        match HostEventCodec.eventTypeOf raw, HostEventCodec.trySessionId raw with
+        | "message.part.updated", Some owner -> observeToolPart runtime owner raw
+        | _ -> ()
+
+    let private observeSyncDelegateBatch (scope: PluginRuntimeScope) (rawInput: obj) =
+        scope.SyncDelegateRuntime
+        |> Option.iter (fun runtime -> observeSyncDelegateEvent runtime (HostEventCodec.unwrap rawInput))
+
     /// What the composition root needs back from `wire`.
     ///
     /// Exactly the members `SpikePlugin` calls. Six more used to hang here —
@@ -425,6 +462,9 @@ module HostSignalBootstrap =
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                         |> Option.map PhysicalUserMessageId.value)
                   ChatMessageHook = chatMessageHook
-                  ObserveEvent = signalRouter.ObserveLocal
+                  ObserveEvent =
+                    (fun raw ->
+                        observeSyncDelegateBatch scope raw
+                        signalRouter.ObserveLocal raw)
                   PendingReviewSeals = SharedState.PendingReviewSeals }
         }

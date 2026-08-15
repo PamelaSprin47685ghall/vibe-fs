@@ -212,7 +212,7 @@ module CoderTool =
                                 | Error _ -> return charge
                             }
 
-                        let! batch = SyncDelegateBatching.resolve scope SyncDelegateRole.Coder context
+                        let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Coder context
 
                         let! result =
                             match batch with

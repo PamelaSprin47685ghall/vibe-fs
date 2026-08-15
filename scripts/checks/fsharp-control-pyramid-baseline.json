@@ -77,7 +77,7 @@
     "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs": 1,
     "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs": 18,
     "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs": 2,
-    "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs": 4,
+    "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs": 1,
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs": 6,
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs": 18,
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs": 13,

@@ -28,6 +28,7 @@ const syncDelegateRuntimeModule = await import('../../../dist/Execution/Delegati
 const { SyncDelegateRuntime, SyncDelegateRuntime__Dispose: disposeRuntime } = syncDelegateRuntimeModule
 const handleTurn = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__HandleTurn_'))?.[1]
 const invokePrepared = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__InvokePrepared_'))?.[1]
+const observeProviderToolCall = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__ObserveProviderToolCall_'))?.[1]
 const tryFind = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__TryFind_'))?.[1]
 import {
   agentJournal,
@@ -169,8 +170,8 @@ const failedTurn = (delegateKey, role, error = '503 Service Unavailable', runId 
     undefined,
   )
 
-const captureLastAssistant = (journal, delegateKey, answer) => {
-  xTraceCapture.captureProjection(
+const captureLastAssistant = async (journal, delegateKey, answer) => {
+  await xTraceCapture.captureProjection(
     journal,
     sessionId(delegateKey),
     xTraceCapture.semantic({
@@ -180,14 +181,14 @@ const captureLastAssistant = (journal, delegateKey, answer) => {
 }
 
 const settlePendingInvoke = async (runtime, journal, delegateKey, role, answer, runId = 'asst_complete') => {
-  captureLastAssistant(journal, delegateKey, answer)
+  await captureLastAssistant(journal, delegateKey, answer)
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
 
 let harnessSequence = 0
 
-const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
+const withHarness = async (fn, { tier = 'Fast', snapshotMessages, snapshotGetMessages } = {}) => {
   SessionPersona_clearAllForTests()
   harnessSequence += 1
   const harnessId = harnessSequence
@@ -261,9 +262,11 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
-  const snapshot = snapshotMessages
-    ? { GetMessages: async () => okResult(toList(snapshotMessages)) }
-    : undefined
+  const snapshot = snapshotGetMessages
+    ? { GetMessages: snapshotGetMessages }
+    : snapshotMessages
+      ? { GetMessages: async () => okResult(toList(snapshotMessages)) }
+      : undefined
 
   const scope = new ToolRuntimeScope(
     sessions,
@@ -460,6 +463,68 @@ test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', asy
     assert.doesNotMatch(secondText, /batched inspector answer/)
     assert.match(secondText, /inspect_call_1/)
   }, { snapshotMessages: [message] })
+})
+
+test('DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch', async () => {
+  const runId = 'asst_inspect_batch_late_snapshot'
+  const firstCall = toolCallId('inspect_late_1')
+  const secondCall = toolCallId('inspect_late_2')
+  const thirdCall = toolCallId('inspect_late_3')
+  const partial = batchMessage(runId, [{ id: firstCall, tool: 'inspect' }])
+  const complete = batchMessage(runId, [
+    { id: firstCall, tool: 'inspect' },
+    { id: secondCall, tool: 'inspect' },
+    { id: thirdCall, tool: 'inspect' },
+  ])
+  let snapshotReads = 0
+
+  await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
+    const owner = 'ses_owner_inspect_late_snapshot'
+    const tool = inspectSpec(factory, scope, runtime)
+
+    observeProviderToolCall(runtime, sessionId(owner), providerRun(runId), SyncDelegateRole.Inspector, firstCall)
+    observeProviderToolCall(runtime, sessionId(owner), providerRun(runId), SyncDelegateRole.Inspector, secondCall)
+    observeProviderToolCall(runtime, sessionId(owner), providerRun(runId), SyncDelegateRole.Inspector, thirdCall)
+    const first = tool.Execute(
+      makeArgs({ charge: 'inspect first late snapshot' }),
+      context(owner, providerRun(runId), firstCall),
+    )
+
+    await waitFor(() => snapshotReads === 1, 'first inspect did not observe the deliberately stale snapshot')
+    assert.equal(prompts.length, 0, 'complete Host event projection must not dispatch before all sibling invokes arrive')
+
+    const second = tool.Execute(
+      makeArgs({ charge: 'inspect second late snapshot' }),
+      context(owner, providerRun(runId), secondCall),
+    )
+    const third = tool.Execute(
+      makeArgs({ charge: 'inspect third late snapshot' }),
+      context(owner, providerRun(runId), thirdCall),
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'complete three-call inspect batch did not send once')
+    assert.equal(
+      prompts[0].text,
+      'inspect first late snapshot\n\ninspect second late snapshot\n\ninspect third late snapshot',
+    )
+
+    await settlePendingInvoke(runtime, journal, createCalls[0].child, roles.of('Inspector'), 'late snapshot combined answer')
+    const firstText = await first
+    const secondText = await second
+    const thirdText = await third
+
+    assert.match(firstText, /late snapshot combined answer/)
+    assert.match(secondText, /inspect_late_1/)
+    assert.match(thirdText, /inspect_late_1/)
+    assert.doesNotMatch(secondText, /could not complete|未能完成/i)
+    assert.doesNotMatch(thirdText, /could not complete|未能完成/i)
+    assert.equal(snapshotReads, 3, 'each sibling reconciles the independent Host event + snapshot views')
+  }, {
+    snapshotGetMessages: async () => {
+      snapshotReads += 1
+      return okResult(toList([snapshotReads === 1 ? partial : complete]))
+    },
+  })
 })
 
 test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {

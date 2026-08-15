@@ -47,6 +47,13 @@ module DedicatedDelegateKey =
 
 module SyncDelegate =
 
+    let tryRoleOfToolName (name: string) =
+        match name.Trim().ToLowerInvariant() with
+        | "inspect" -> Some SyncDelegateRole.Inspector
+        | "establish-behavior"
+        | "repair-behavior" -> Some SyncDelegateRole.Coder
+        | _ -> None
+
     /// EXEC-026: canonical wire role label for a dedicated SyncDelegate
     /// (`inspector` / `coder`). Sole definition — Session/ layer references this.
     let roleLabel (role: SyncDelegateRole) : string =

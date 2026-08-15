@@ -23,12 +23,15 @@ const syncDelegateRuntimeModule = await import('../../../dist/Execution/Delegati
 const { SyncDelegateRuntime, SyncDelegateRuntime__Dispose: disposeRuntime } = syncDelegateRuntimeModule
 const invoke = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__Invoke_'))?.[1]
 const invokeBatchPrepared = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__InvokeBatchPrepared_'))?.[1]
+const observeProviderToolCall = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__ObserveProviderToolCall_'))?.[1]
+const tryObservedBatch = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__TryObservedBatch_'))?.[1]
 const handleTurn = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__HandleTurn_'))?.[1]
 import {
   agentJournal,
   authorityRoot,
   idValue,
   lifecycleWorkRecordProjection,
+  listItems,
   okResult,
   physicalUser,
   promptDispatcher,
@@ -201,6 +204,30 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
+
+test('DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order', async () => {
+  await withHarness(async ({ runtime }) => {
+    const owner = sessionId('ses_owner_observed_batch')
+    const run = providerRun('asst_observed_batch')
+    const firstCall = toolCallId('call_observed_first')
+    const secondCall = toolCallId('call_observed_second')
+    const thirdCall = toolCallId('call_observed_third')
+
+    observeProviderToolCall(runtime, owner, run, SyncDelegateRole.Inspector, firstCall)
+    observeProviderToolCall(runtime, owner, run, SyncDelegateRole.Inspector, firstCall)
+    observeProviderToolCall(runtime, owner, run, SyncDelegateRole.Inspector, secondCall)
+    observeProviderToolCall(runtime, owner, run, SyncDelegateRole.Inspector, thirdCall)
+
+    const batch = tryObservedBatch(runtime, owner, run, SyncDelegateRole.Inspector, firstCall)
+    assert.ok(batch, 'Host-observed ProviderRun must resolve the semantic batch before snapshot fallback')
+    assert.deepEqual(
+      listItems(batch.CallOrder).map(idValue.toolCall),
+      ['call_observed_first', 'call_observed_second', 'call_observed_third'],
+      'duplicate part updates must de-duplicate without changing Host order',
+    )
+    assert.equal(idValue.toolCall(batch.CurrentCall), 'call_observed_first')
+  })
+})
 
 test('EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {

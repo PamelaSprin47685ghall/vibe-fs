@@ -98,11 +98,12 @@ REUSE `requirements/delegation/tests/fork-tool.test.mjs`（`FORK_existing_person
 
 同一 assistant `ProviderRunIdentity` 中、指向同一 `SyncDelegateRole` 的全部 sync calls 构成一个语义
 batch；成员与顺序 = 该 assistant message 的 Host tool-call 列表（EXEC-026/031）。禁止用 microtask /
-scheduler 到达时序猜批次边界；batch 的 charges / provider prompts 按 tool-call 顺序分别拼接后**只发送一次**。
+scheduler 到达时序猜批次边界；Host 的不同观察面若暂时只暴露该列表的不同前缀，不得把较短前缀当作
+完整 batch。batch 的 charges / provider prompts 按 tool-call 顺序分别拼接后**只发送一次**。
 
-含义/动机：批次边界是「Host 已完成的 assistant message」这一语义事实，不是调度竞态。
+含义/动机：批次边界是 Host tool-call 集合这一语义事实，不是某个观察面的到达竞态。
 
-证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`）。
+证据：`requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order`、`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`）；`requirements/delegation/tests/sync-delegate-tools.test.mjs`（`DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch`）；唯一 Long Stroke 的 G2 simultaneous Inspector canary 交叉证明真实 Host 边界。
 
 ## DELEG-009：serialization key = immediate caller ReuseScope；同 key 至多一个 active batch
 

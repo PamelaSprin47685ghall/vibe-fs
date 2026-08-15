@@ -157,7 +157,7 @@ module InspectorTool =
                                 | Error _ -> return charge
                             }
 
-                        let! batch = SyncDelegateBatching.resolve scope SyncDelegateRole.Inspector context
+                        let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Inspector context
 
                         let! result =
                             match batch with

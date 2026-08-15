@@ -698,6 +698,12 @@ export const G2_Q3 = 'G2Q3: when does CaseFinalize run?';
 export const G2_A1 = 'G2A1: Host owns PromptAuthority.';
 export const G2_A2 = 'G2A2: Owner session scope for one Inspector.';
 export const G2_A3 = 'G2A3: On owner ReuseScope close.';
+export const G2_BATCH_CANARY_PROMPT =
+  'G2_INSPECTOR_BATCH_CANARY: issue three Inspector charges in one provider response.';
+export const G2_BATCH_Q1 = 'G2B1: establish the first repository fact.';
+export const G2_BATCH_Q2 = 'G2B2: establish the second repository fact.';
+export const G2_BATCH_Q3 = 'G2B3: establish the third repository fact.';
+export const G2_BATCH_A = 'G2B: all three repository facts were established together.';
 export const G6_CANONICAL_Q = 'What is the Inspector reuse contract?';
 export const G6_CANONICAL_A = 'One Inspector child, serial Q/A, finalize on owner close.';
 export const G6_FETCH_CANARY_PROMPT = 'G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case.';
@@ -743,6 +749,30 @@ export function extractInspectorIdFromOwnerRequests(requests) {
  * G2 PREFIX LAW on the reused Inspector child (mock LLM + real OpenCode).
  * Uses Domain isAppendOnlyPrefix via provider-wire.js — not a second helper.
  */
+export function assertG2InspectorBatchCoalescing(scenario, expectedInspectorSessionId) {
+  const requests = chatRequests(scenario.provider.requests);
+  const batches = requests.filter((body) => {
+    if (body?.sessionID !== expectedInspectorSessionId) return false;
+    const text = lastUserText(body);
+    return [G2_BATCH_Q1, G2_BATCH_Q2, G2_BATCH_Q3].every((question) => text.includes(question));
+  });
+  assert.equal(batches.length, 1, 'G2 batch: three simultaneous inspect calls must become one Inspector provider request');
+  assert.equal(
+    batches[0].sessionID,
+    expectedInspectorSessionId,
+    'G2 batch: simultaneous inspect batch must reuse the dedicated Inspector session',
+  );
+  assert.equal(
+    scenario.provider.matchCount('g2-inspector-batch.0'),
+    1,
+    'G2 batch: combined Inspector provider request must be delivered exactly once',
+  );
+
+  const failures = publicToolResults(scenario.provider.requests, 'inspect')
+    .filter((text) => /could not complete|未能完成/i.test(String(text)));
+  assert.deepEqual(failures, [], 'G2 batch: sibling inspect calls must not fail while the canonical call remains in flight');
+}
+
 export function assertG2InspectorPrefixLaw(scenario) {
   const requests = chatRequests(scenario.provider.requests);
   const q1 = requests.filter((body) => lastUserText(body).startsWith(G2_Q1));

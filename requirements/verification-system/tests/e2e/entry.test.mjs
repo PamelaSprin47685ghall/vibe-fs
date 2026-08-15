@@ -38,11 +38,13 @@ import {
   ADVERSITY_ORACLES,
   ADVERSITY_CHECKLIST,
   G2_INSPECTOR_CANARY_PROMPT,
+  G2_BATCH_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
   NEEDHELP_CANARY_PROMPT,
   armNeedHelpCausalHolds,
   assertNeedHelpAssistance,
+  assertG2InspectorBatchCoalescing,
   assertG2InspectorPrefixLaw,
   assertG6BookkeeperFinalize,
   extractInspectorIdFromOwnerRequests,
@@ -185,6 +187,14 @@ const preFlowCanaries = async (scenario) => {
 
   const g2 = assertG2InspectorPrefixLaw(scenario);
   scenario.g6InspectorSessionId = g2.inspectorSessionId;
+
+  const batchTurn = scenario.turn.start(inspectorOwnerId);
+  const batchPrompt = await scenario.client.request('POST', `/session/${inspectorOwnerId}/prompt_async`, {
+    body: { parts: [{ type: 'text', text: G2_BATCH_CANARY_PROMPT }], agent: 'fast-coder' },
+  });
+  assert.ok(batchPrompt.ok, `g2 inspector batch prompt failed: ${JSON.stringify(batchPrompt.data)}`);
+  await batchTurn.awaitTerminal();
+  assertG2InspectorBatchCoalescing(scenario, g2.inspectorSessionId);
 
   const deleted = await scenario.client.deleteSession(inspectorOwnerId);
   assert.ok(deleted.ok, `G6 owner session.deleted failed: ${JSON.stringify(deleted.data)}`);

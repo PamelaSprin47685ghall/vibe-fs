@@ -40,7 +40,9 @@ append replace fact。SyncDelegate semantic batch 对全部显式值求和；无
 
 - `SyncDelegateRole = Inspector | Coder`；`DedicatedDelegateKey = { Scope: ReuseScopeId; Role }`。
 - `SyncDelegateBatch = { ProviderRun; CallOrder: ToolCallId list; CurrentCall }`——同一 ProviderRun 的
-  同 role calls 按 Host tool-call 顺序构成一个语义 batch（DELEG-008）。
+  同 role calls 按 Host tool-call 顺序构成一个语义 batch（DELEG-008）。OpenCode 边界同时保留两份
+  Host 观察：`message.part.updated` 的本地 ordered projection 与 `ISessionSnapshotPort` 的 message snapshot；
+  两者都是同一 call list 的暂时前缀，按前缀兼容关系选择更完整者，禁止把任一滞后的单源前缀直接封口。
 - `SyncDelegateInvocationResult = WorkRecord of string | MergedInto of ToolCallId`——canonical 得正文、
   siblings 得引用（DELEG-012）。
 - `tierForOwner = identity`（fast→fast、deep→deep）；`agentNameFor role tier` 生成 `fast-inspector` 等
@@ -51,7 +53,9 @@ append replace fact。SyncDelegate semantic batch 对全部显式值求和；无
 ### 同步委托 CE 单栈（历史 how/execution EXEC-026/031）
 
 ```text
-expected = syncCallsInHostMessage(providerRun, role)   // ordered ToolCallIds
+eventPrefix = observedHostToolParts(providerRun, role) // ordered, ToolCallId de-duped
+snapshotPrefix = syncCallsInHostMessage(providerRun, role)
+expected = longerCompatiblePrefix(eventPrefix, snapshotPrefix)
 admit current invocation against expected
 when all expected members present:
   reserve (immediateCallerReuseScope, role)
@@ -63,6 +67,9 @@ when all expected members present:
   workRecord = materializeBoundedWorkRecord(InvocationStart..InvocationEnd, includeOpening=false)
   canonical = expected[0] → workRecord；siblings → merged-reference
 ```
+
+`message.updated finish` 不参与 batch 封口：真实 Host 在 tool execute 返回后才发布该 finish；等待它会让
+sync tool 自己阻塞自己的完成。Long Stroke 的 streamed 3×`inspect` 回归固定此边界。
 
 ### Charge / ProviderPrompt 分离
 

@@ -52,6 +52,9 @@ async function respondStream(res, chunks, exp) {
       await Promise.race([exp.respond.waitAfterFirstTokenUntil, awaitResponseClose(res)]);
       if (res.destroyed || res.writableEnded) return;
     }
+    if (exp.respond.yieldBetweenChunks && index < chunks.length - 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
   }
 
   if (exp.respond.neverEnd) return;
@@ -98,7 +101,30 @@ function multiToolCallChunks(id, exp, parsed, strict, promptTokens, state) {
     const callExp = { ...exp, respond: { ...exp.respond, ...call, type: 'tool-call' } };
     return { name: call.tool, argsStr: JSON.stringify(toolArgs(callExp, parsed, strict, state)) };
   });
-  return buildToolCallsChunks(id, calls, promptTokens);
+  if (!exp.respond.streamCalls) return buildToolCallsChunks(id, calls, promptTokens);
+
+  return [
+    { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
+    ...calls.map((call, index) => ({
+      id,
+      object: 'chat.completion.chunk',
+      created: 1,
+      model: MOCK_MODEL,
+      choices: [{
+        index: 0,
+        delta: {
+          tool_calls: [{
+            index,
+            id: `${id}_${index + 1}`,
+            type: 'function',
+            function: { name: call.name, arguments: call.argsStr },
+          }],
+        },
+        finish_reason: null,
+      }],
+    })),
+    finishedToolCallChunk(id, promptTokens),
+  ];
 }
 
 function fragmentedToolCallChunks(id, exp, argsText, promptTokens) {

@@ -57,6 +57,10 @@ type private PendingBatch =
       CallOrder: ToolCallId list
       Items: Dictionary<string, SyncDelegateInvocation> }
 
+type private ObservedProviderRun =
+    { Calls: ResizeArray<SyncDelegateRole * ToolCallId>
+      Seen: HashSet<string> }
+
 [<RequireQualifiedAccess>]
 type internal SyncDelegateAdmission =
     | Waiting
@@ -75,6 +79,9 @@ type internal SyncDelegateCallStore() as this =
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
     // DSL-MUTABLE: mailbox — incomplete semantic batches by (scope, role)
     let pendingBatches = Dictionary<string * SyncDelegateRole, PendingBatch>()
+    // Host event projection: provider tool parts accumulate in Host order and
+    // complement the independently lagging session snapshot view.
+    let observedProviderRuns = Dictionary<string * string, ObservedProviderRun>()
     // DSL-MUTABLE: reservation — complete/admitted batch through ordinary completion
     let activeBatches =
         Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>()
@@ -83,12 +90,54 @@ type internal SyncDelegateCallStore() as this =
     let scopeKey (scope: ReuseScopeId) = ReuseScopeId.value scope
     let keyOf (scope: ReuseScopeId) role = scopeKey scope, role
     let callKey (callId: ToolCallId) = ToolCallId.value callId
+    let providerRunKey (providerRun: ProviderRunIdentity) = ProviderRunIdentity.value providerRun
+    let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) = sessionKey owner, providerRunKey providerRun
 
     let sameCallOrder left right =
         List.map callKey left = List.map callKey right
 
     let failInvocation (invocation: SyncDelegateInvocation) error =
         AsyncSupport.trySetResult invocation.Completion (Error error) |> ignore
+
+    let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
+        let callOrder =
+            observed.Calls
+            |> Seq.choose (fun (observedRole, callId) -> if observedRole = role then Some callId else None)
+            |> Seq.toList
+
+        if List.contains currentCall callOrder then
+            Some
+                { ProviderRun = providerRun
+                  CallOrder = callOrder
+                  CurrentCall = currentCall }
+        else
+            None
+
+    member _.ObserveProviderToolCall
+        (owner: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, callId: ToolCallId)
+        =
+        lock gate (fun () ->
+            let key = observedKey owner providerRun
+            let observed =
+                match observedProviderRuns.TryGetValue key with
+                | true, current -> current
+                | false, _ ->
+                    let created =
+                        { Calls = ResizeArray<SyncDelegateRole * ToolCallId>()
+                          Seen = HashSet<string>() }
+                    observedProviderRuns.[key] <- created
+                    created
+
+            if observed.Seen.Add(callKey callId) then
+                observed.Calls.Add(role, callId))
+
+    member _.TryObservedBatch
+        (owner: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, currentCall: ToolCallId)
+        : SyncDelegateBatch option =
+        lock gate (fun () ->
+            match observedProviderRuns.TryGetValue(observedKey owner providerRun) with
+            | false, _ -> None
+            | true, observed -> batchOfObservedRun providerRun role currentCall observed)
 
     member _.TryPeekCallByDelegate(delegateSession: SessionId) : SyncDelegateCall option =
         lock gate (fun () ->
@@ -206,6 +255,12 @@ type internal SyncDelegateCallStore() as this =
                     failInvocation invocation "Sync delegate call was cancelled"
 
                 activeBatches.Remove key |> ignore
+
+            let observedKeys =
+                observedProviderRuns.Keys |> Seq.filter (fun (owner, _) -> owner = sKey) |> Seq.toList
+
+            for key in observedKeys do
+                observedProviderRuns.Remove key |> ignore
 
             match callsByOwnerScope.TryGetValue sKey with
             | true, list ->
@@ -346,6 +401,7 @@ type internal SyncDelegateCallStore() as this =
 
             pendingBatches.Clear()
             activeBatches.Clear()
+            observedProviderRuns.Clear()
             callsByOwnerScope.Clear()
             callsByDelegate.Clear()
             deletedInspectorsByOwnerScope.Clear()
