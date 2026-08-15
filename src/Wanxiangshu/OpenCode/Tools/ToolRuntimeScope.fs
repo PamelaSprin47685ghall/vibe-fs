@@ -136,6 +136,32 @@ type ToolRuntimeScope
                             GitTreeHash.create "NO_HEAD_TREE"))
         )
 
+    let getOrCreateRuntime ownerKey =
+        lock gate (fun () ->
+            match disposed, runtimes.TryGetValue ownerKey with
+            | true, _ -> Error "Tool runtime scope is disposed"
+            | false, (true, runtime) when not runtime.IsCancelled -> Ok runtime
+            | false, _ ->
+                let runtime = createRuntime ownerKey
+                runtimes.[ownerKey] <- runtime
+                Ok runtime)
+
+    let resumableAgentId (record: HandleRecord) =
+        match record.Ownership, HandleId.tryAgent record.Handle with
+        | Fact.HandleOwnership.HostOwnedHidden, _ -> Error "host-owned hidden child is not resumable by the user session"
+        | Fact.HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
+        | Fact.HandleOwnership.DurableParentHandle, Some handleId -> Ok(AgentHandleId.value handleId)
+
+    let adoptExistingIntoRuntime (parentSessionId: SessionId) (record: HandleRecord) agentId =
+        getOrCreateRuntime (SessionId.value parentSessionId)
+        |> Result.map (fun runtime ->
+            runtime.AdoptExisting(
+                agentId,
+                record.ChildSessionId,
+                AgentRoleIdentity.ofRole record.CanonicalRole,
+                record.TargetAgent
+            ))
+
     let sessionIdOf (ctx: HostToolContext) =
         if String.IsNullOrWhiteSpace ctx.SessionId then
             None
@@ -299,49 +325,14 @@ type ToolRuntimeScope
         if String.IsNullOrWhiteSpace ctx.SessionId then
             Error "Missing sessionID"
         else
-            let ownerKey = SessionId.create ctx.SessionId |> logicalOwnerFor |> SessionId.value
-
-            lock gate (fun () ->
-                if disposed then
-                    Error "Tool runtime scope is disposed"
-                else
-                    match runtimes.TryGetValue ownerKey with
-                    | true, runtime when not runtime.IsCancelled -> Ok runtime
-                    | _ ->
-                        let runtime = createRuntime ownerKey
-                        runtimes.[ownerKey] <- runtime
-                        Ok runtime)
+            SessionId.create ctx.SessionId |> logicalOwnerFor |> SessionId.value |> getOrCreateRuntime
 
     /// CRASH-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
     /// fork reuse is the first action allowed to reopen it durably.
     member _.AdoptExistingChild(parentSessionId: SessionId, record: HandleRecord) : Result<unit, string> =
-        match record.Ownership, HandleId.tryAgent record.Handle with
-        | Fact.HandleOwnership.HostOwnedHidden, _ -> Error "host-owned hidden child is not resumable by the user session"
-        | Fact.HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
-        | Fact.HandleOwnership.DurableParentHandle, Some handleId ->
-            let ownerKey = SessionId.value parentSessionId
-
-            lock gate (fun () ->
-                if disposed then
-                    Error "Tool runtime scope is disposed"
-                else
-                    let runtime =
-                        match runtimes.TryGetValue ownerKey with
-                        | true, existing when not existing.IsCancelled -> existing
-                        | _ ->
-                            let created = createRuntime ownerKey
-                            runtimes.[ownerKey] <- created
-                            created
-
-                    runtime.AdoptExisting(
-                        AgentHandleId.value handleId,
-                        record.ChildSessionId,
-                        AgentRoleIdentity.ofRole record.CanonicalRole,
-                        record.TargetAgent
-                    )
-
-                    Ok())
+        resumableAgentId record
+        |> Result.bind (adoptExistingIntoRuntime parentSessionId record)
 
     member _.ExecutorRuntimeFor(ctx: HostToolContext) =
         lock gate (fun () ->

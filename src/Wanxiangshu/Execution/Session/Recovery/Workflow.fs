@@ -143,8 +143,7 @@ module SessionRecoveryWorkflow =
                                 Some(RecoveryBlock.SnapshotUnreadable(sessionId, reason))
                             | PromptRecovery.ClaimOutcome.StillPending _ ->
                                 Some(RecoveryBlock.PendingClaimUnknown(sessionId, item.PromptKey))
-                            | PromptRecovery.ClaimOutcome.Proven _
-                            | PromptRecovery.ClaimOutcome.GaveUp -> None)
+                            | PromptRecovery.ClaimOutcome.Proven _ -> None)
 
                     match NonEmpty.ofList unreadable with
                     | Some blocks -> return SessionRecovery.SessionRecovery.Blocked blocks

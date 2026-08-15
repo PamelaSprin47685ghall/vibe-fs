@@ -179,15 +179,9 @@ module PromptAuthority =
             /// a receipt) both stay pending, but they are different diagnoses for an
             /// operator — one means the Host accepted something we cannot locate.
             Receipt: TransportReceipt option
-            /// PROMPT-011 `RecoveryAttemptBudget`: the workspace `RuntimeStartCount`
-            /// observed when this claim was registered.
-            ///
-            /// Attempts are `current RuntimeStartCount - ClaimedAtRuntimeStartCount`,
-            /// so a plugin start advances one counter instead of rewriting claims.
-            /// Counted by folding `RuntimeStarted`, not stored by a writer. A fact
-            /// saying "I tried to recover this" would itself have to be written
-            /// during recovery, so a crash before writing it would lose the attempt
-            /// and the budget could never expire.
+            /// Historical workspace `RuntimeStartCount` observed when this claim
+            /// was registered. Retained in the durable shape for audit and exact
+            /// replay only; restart count no longer authorizes recovery or abandon.
             ClaimedAtRuntimeStartCount: int
         }
 
@@ -399,22 +393,6 @@ module PromptAuthority =
     /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
     /// leaving the clause value unassertable from a layer 1 test.
     let RecoveryTailWindow = 50
-
-    /// After this many plugin starts an unresolved claim is abandoned rather than
-    /// carried forever.
-    let RecoveryAttemptBudget = 3
-
-    /// PROMPT-011: how many plugin starts this pending claim has survived.
-    ///
-    /// Derived from the workspace `RuntimeStartCount` watermark. A plugin start
-    /// is O(1) because it only advances that counter; it does not rewrite claims.
-    let recoveryAttempts (runtimeStartCount: int) (claim: PromptClaim) =
-        runtimeStartCount - claim.ClaimedAtRuntimeStartCount
-
-    /// PROMPT-011: this claim has spent its recovery budget and must be abandoned
-    /// with `UnresolvedAfterRecovery`.
-    let recoveryBudgetSpent (runtimeStartCount: int) (claim: PromptClaim) =
-        recoveryAttempts runtimeStartCount claim >= RecoveryAttemptBudget
 
     /// The scope a ClaimSequence counts within.
     ///

@@ -13,7 +13,7 @@
 | `src/Wanxiangshu/Session/HandleController.fs` | completion 单一 owner（recordCompletion/recordAbandon/retire/consume） | CRASH-009/012 |
 | `src/Wanxiangshu/Composition/Turn/ReconcilePass.fs` / `Reconciler.fs` / `ReconciledTurn.fs` | snapshot 观测 → wake evidence → publish；TurnUnknown 私有观测 | CRASH-003/007/008 |
 | `src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs` / `BloggerRecoveryProbe.fs` | Blogger 崩溃窗口分类与恢复探针 | CRASH-002/016 |
-| `src/Wanxiangshu/Interaction/Dispatch/Recovery.fs` | Prompt claim 恢复（Proven / StillPending / GaveUp） | CRASH-005 |
+| `src/Wanxiangshu/Interaction/Dispatch/Recovery.fs` | detached Prompt claim 物理证据核对（Proven / StillPending / Unreadable） | CRASH-005；普通 lifecycle 不接线 |
 | `src/Wanxiangshu/Session/HostForkRestart.fs` / `HostForkRunLifecycle.fs` / `ForkRecovery.fs` | restart 恢复 walk：restoreLinkedChildren、HostForkRestart 的证明结构（p0-recovery-join 正向模式） | CRASH-002/009/012 |
 | `src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs` | 从 durable 关联发现 closure（child-first 序） | CRASH-002/014 |
 | `src/Wanxiangshu/Session/FamilyRecoveryCoordinator.fs` | 物理 single-flight runOnce（Session 层，非 Application） | CRASH-006 |

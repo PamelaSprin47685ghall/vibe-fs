@@ -2,7 +2,7 @@
 //
 // 崩溃后靠 PromptKey 在 Host 尾部定位真实物理落地：找到 → 补写 PhysicalAccepted
 // （Proven）；未找到 → 保持 Pending 且绝不重发（StillPending）；预算耗尽 →
-// Abandoned(UnresolvedAfterRecovery)（GaveUp）。恢复只证明或放弃，从不 resend。
+// Restart reconciliation only proves physical acceptance or leaves the old claim pending. It never resends or auto-abandons a broken tool.
 //
 // 日期约定：create 用远过去的 startedAt；后续 createFromBoot 用远未来的
 // startedAt（2099）。store 的 envelope 按 ObservedAt 排序重放，claim 的
@@ -139,7 +139,7 @@ test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message'
   }
 })
 
-test('DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending', async () => {
+test('DP_011_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
     const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2020-01-01T00:00:00Z' })
@@ -155,8 +155,8 @@ test('DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending', a
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.equal(captured.length, 1)
 
-      // 重启 2、3：attempts = RuntimeStartCount - stamp 仍 < RecoveryAttemptBudget=3，
-      // 未找到物理消息 → StillPending，claim 保持。
+      // Repeated process restarts are not recovery authority. No physical message
+      // means StillPending forever unless an explicit later workflow proves it.
       for (let start = 2; start <= 3; start += 1) {
         const reopened = await agentJournal.createFromBoot({
           directory: base,
@@ -171,8 +171,7 @@ test('DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending', a
         reopened.dispose()
       }
 
-      // 重启 4：attempts = 4-1 = 3 ≥ RecoveryAttemptBudget=3 → GaveUp
-      // （Abandoned(UnresolvedAfterRecovery)）。
+      // Even a fourth restart cannot manufacture Abandoned/GaveUp.
       const fourth = await agentJournal.createFromBoot({
         directory: base,
         runtime: 'rt_4',
@@ -181,13 +180,13 @@ test('DP_011_budget_exhausted_abandons_unresolved_claim_instead_of_resending', a
       assert.equal(fourth.ok, true, fourth.ok ? '' : JSON.stringify(fourth.error))
       try {
         const fourthRuntime = promptDispatcher.forJournal(fourth.journal)
-        const gaveUp = listItems(await reconcile(fourth.journal, snapshotPort([])))
-        assert.equal(gaveUp.length, 1)
-        assert.equal(caseOf(gaveUp[0].Outcome), 'GaveUp')
+        const unresolved = listItems(await reconcile(fourth.journal, snapshotPort([])))
+        assert.equal(unresolved.length, 1)
+        assert.equal(caseOf(unresolved[0].Outcome), 'StillPending')
         assert.equal(
           promptDispatcher.pendingClaimCount(fourthRuntime, 'ses_011b'),
-          0,
-          '预算耗尽 → Abandoned，claim 从 Pending 移除',
+          1,
+          'restart does not rewrite the broken tool into an abandonment terminal',
         )
         assert.equal(captured.length, 1, '全程一次发送：unknown outcome 永不复制逻辑效果')
       } finally {

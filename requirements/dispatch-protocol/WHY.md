@@ -24,13 +24,12 @@ DOES NOT OWN：generic effect-accounting law）。`durable-events` 提供事件 
    - admission 与真实 `msg_*`（历史 shape/prompt 四阶段表）。
 2. **崩溃后重发 = 第二次逻辑效果**：Host 可能已接受消息并开始 provider run。恢复协议选
    - at-most-once 而非重发（历史 why/prompt 备选与被拒：拒 exactly-once、拒重发）。
-   未证明物理落地就保持 Pending；只有预算耗尽才 Abandoned。
+   未证明物理落地就保持 Pending；进程重启次数不再自动制造 Abandoned。
 3. **时间窗口/随机身份**：用时间窗口找落地跨崩溃不可靠，且无法区分「同一 Guard 连发两次」。
    选 `ClaimSequence` 单调序号，使同 payload 重发成为两个 key。
 4. **fire-and-forget 旁路**：独立 `postPromptFireAndForget` 会绕过 claim/持久化/幂等/错误记录。
    统一为 `AwaitMode.Detached`——只改调用方等待，不改发送链（PROMPT-007）。
-5. **recovery 在插件构造函数里跑**：与 Host 启动抢事件循环，8-way 并发下 reviewer-restart 红。
-   改为 post-init 单飞门（`PromptRecovery.RecoveryGate`）——机制归 HOW，语义不变。
+5. **recovery 在插件构造函数/post-init 自动跑**：与 Host 启动抢事件循环，而且把旧 broken tool 的语义劫持到新进程。当前裁决是完全脱离普通 lifecycle；显式 resume 归 `/continue`。
 
 ## 独立变化测试（INDEPENDENT CHANGE）
 
@@ -44,4 +43,4 @@ interaction-authority（谁有资格）与 effect-accounting（分型律）WHAT 
 | interaction 是否有 authority（Root/Continuation/UnknownOrigin） | `interaction-authority` |
 | generic effect-accounting law（Requested/Accepted 分型） | `effect-accounting` |
 | provider representation、attempt recovery | `provider-projection` / `provider-attempt-recovery` |
-| `RecoveryTailWindow=50` / `RecoveryAttemptBudget=3` 精确常数 | HOW（WHAT 只要求 bounded + no blind resend） |
+| `RecoveryTailWindow=50` 精确常数 | HOW（WHAT 只要求 bounded evidence read + no blind resend）；restart budget 已退役 |

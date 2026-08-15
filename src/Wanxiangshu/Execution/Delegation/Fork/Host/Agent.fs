@@ -431,14 +431,7 @@ module HostForkAgent =
                         let handle = HandleController.agentHandle agentId
                         HandleProjection.isAbandoned handle projection)
 
-                let existing =
-                    lock this.Gate (fun () ->
-                        match this.Children.TryGetValue agentId with
-                        | true, childId -> Some(childId, false)
-                        | false, _ ->
-                            match this.DormantChildren.TryGetValue agentId with
-                            | true, childId -> Some(childId, true)
-                            | false, _ -> None)
+                let existing = this.TryReusableChild agentId
 
                 match abandoned, existing with
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
@@ -508,8 +501,7 @@ module HostForkAgent =
                                 with
                                 | Error linkError -> return Error linkError
                                 | Ok() ->
-                                    if wasDormant then
-                                        this.ActivateDormantChild(agentId, childId, role)
+                                    this.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
 
                                     let! enriched =
                                         match renderedPrompt with

@@ -383,11 +383,12 @@ type HostForkRuntime
         runtime.Restore(agentId, role, agent)
         runtime.BindChildSession(agentId, childId)
 
-    member internal _.TryDormantChild(agentId: string) : SessionId option =
+    member internal _.TryReusableChild(agentId: string) : (SessionId * bool) option =
         lock gate (fun () ->
-            match dormantChildren.TryGetValue agentId with
-            | true, childId -> Some childId
-            | false, _ -> None)
+            match children.TryGetValue agentId, dormantChildren.TryGetValue agentId with
+            | (true, childId), _ -> Some(childId, false)
+            | _, (true, childId) -> Some(childId, true)
+            | _ -> None)
 
     member internal _.ActivateDormantChild(agentId: string, childId: SessionId, role: Role) : unit =
         lock gate (fun () ->
@@ -396,6 +397,10 @@ type HostForkRuntime
             processOwnedAgents.Add agentId |> ignore)
 
         childCreated agentId role childId
+
+    member internal this.ActivateDormantChildIfNeeded(wasDormant: bool, agentId: string, childId: SessionId, role: Role) =
+        if wasDormant then
+            this.ActivateDormantChild(agentId, childId, role)
 
     /// The Host child session a forked agent id drives.
     ///

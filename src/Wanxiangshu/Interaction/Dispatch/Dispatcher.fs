@@ -155,12 +155,9 @@ module PromptDispatcher =
                         | Ok() -> return Ok profile
                     }
 
-        /// PROMPT-005 `Abandoned`.
-        ///
-        /// Public because PROMPT-011's recovery is the second legitimate caller: a
-        /// claim whose budget expired must be abandoned with
-        /// `UnresolvedAfterRecovery`, and that happens at startup rather than inside
-        /// a send. The send path's own abandon (`SendFailed`) stays private to it.
+        /// PROMPT-005 `Abandoned` for an explicit current-process send failure.
+        /// Restart reconciliation no longer calls this: process death is not authority
+        /// to manufacture an abandonment terminal for the old tool.
         member this.Abandon
             (key: PromptKey)
             (sessionId: SessionId)

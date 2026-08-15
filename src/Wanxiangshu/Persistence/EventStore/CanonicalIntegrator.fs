@@ -191,6 +191,11 @@ module CanonicalIntegrator =
         { State: IntegratorState
           FailedRules: (string * string) list }
 
+    type private BusinessRuleDecision =
+        | RuleSkipped
+        | RuleAdvanced of obj
+        | RuleFailed of string
+
     type private CutPayload =
         { Rule: string
           FailedEventId: EventId
@@ -246,50 +251,95 @@ module CanonicalIntegrator =
                 Currents = Map.add structuralRule.Name next state.Currents }
         | Error _ -> state
 
-    let private applyCut (state: IntegratorState) (payload: CutPayload) =
-        match tryRule payload.Rule with
-        | None -> state
-        | Some rule ->
-            let current = state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+    let private applyCutForRule (state: IntegratorState) (payload: CutPayload) (rule: IntegrationRule) =
+        let current = state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
-            match rule.ApplyCut current payload.ResetJson with
-            | Error _ -> state
-            | Ok reset ->
-                { state with
-                    Currents = Map.add rule.Name reset state.Currents
-                    Faults = Map.remove rule.Name state.Faults }
+        match rule.ApplyCut current payload.ResetJson with
+        | Error _ -> state
+        | Ok reset ->
+            { state with
+                Currents = Map.add rule.Name reset state.Currents
+                Faults = Map.remove rule.Name state.Faults }
+
+    let private applyCut (state: IntegratorState) (payload: CutPayload) =
+        tryRule payload.Rule
+        |> Option.map (applyCutForRule state payload)
+        |> Option.defaultValue state
+
+    let private evaluateBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
+        let prior = state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+
+        match rule.Integrate prior normalized with
+        | Ok next -> RuleAdvanced next
+        | Error reason -> RuleFailed reason
+
+    let private decideBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
+        if Map.containsKey rule.Name state.Faults then
+            RuleSkipped
+        else
+            evaluateBusinessRule state normalized rule
+
+    let private applyBusinessDecision
+        (normalized: EventEnvelope)
+        (rule: IntegrationRule)
+        ((state: IntegratorState), (failures: (string * string) list))
+        (decision: BusinessRuleDecision)
+        =
+        match decision with
+        | RuleSkipped -> state, failures
+        | RuleAdvanced next ->
+            { state with
+                Currents = Map.add rule.Name next state.Currents },
+            failures
+        | RuleFailed reason ->
+            let fault =
+                { FailedEventId = normalized.EventId
+                  Reason = reason }
+
+            { state with
+                Faults = Map.add rule.Name fault state.Faults },
+            (rule.Name, reason) :: failures
+
+    let private applyBusinessRule
+        (normalized: EventEnvelope)
+        ((state: IntegratorState), (failures: (string * string) list))
+        (rule: IntegrationRule)
+        =
+        decideBusinessRule state normalized rule
+        |> applyBusinessDecision normalized rule (state, failures)
 
     let private integrateBusiness (state: IntegratorState) (normalized: EventEnvelope) =
-        let rec loop (current: IntegratorState) failures (remaining: IntegrationRule list) =
-            match remaining with
-            | [] ->
-                { State = current
-                  FailedRules = List.rev failures }
-            | rule :: tail ->
-                if Map.containsKey rule.Name current.Faults then
-                    loop current failures tail
-                else
-                    let prior = current.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+        let next, failures =
+            matchingBusinessRules normalized
+            |> List.fold (applyBusinessRule normalized) (state, [])
 
-                    match rule.Integrate prior normalized with
-                    | Ok next ->
-                        loop
-                            { current with
-                                Currents = Map.add rule.Name next current.Currents }
-                            failures
-                            tail
-                    | Error reason ->
-                        let fault =
-                            { FailedEventId = normalized.EventId
-                              Reason = reason }
+        { State = next
+          FailedRules = List.rev failures }
 
-                        loop
-                            { current with
-                                Faults = Map.add rule.Name fault current.Faults }
-                            ((rule.Name, reason) :: failures)
-                            tail
+    let private semanticStep state normalized =
+        match tryDecodeCutPayload normalized with
+        | Some payload ->
+            { State = applyCut state payload
+              FailedRules = [] }
+        | None -> integrateBusiness state normalized
 
-        loop state [] (matchingBusinessRules normalized)
+    let private addIntegratedEvent key normalized (semantic: IntegrationStep) =
+        { semantic with
+            State =
+                { semantic.State with
+                    Events = Map.add key normalized semantic.State.Events } }
+
+    let private integrateNew (state: IntegratorState) (normalized: EventEnvelope) key =
+        let missingParent =
+            normalized.Parents
+            |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
+
+        match missingParent with
+        | Some parent -> Error(sprintf "missing parent during integration: %s" (EventId.value parent))
+        | None ->
+            semanticStep (structuralStep state normalized) normalized
+            |> addIntegratedEvent key normalized
+            |> Ok
 
     /// The only single-event integration primitive. Replay preserves timeline
     /// order exactly: a semantic failure leaves last-good Current in place and
@@ -306,28 +356,7 @@ module CanonicalIntegrator =
             |> Result.map (fun () ->
                 { State = state
                   FailedRules = [] })
-        | None ->
-            let missingParent =
-                normalized.Parents
-                |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
-
-            match missingParent with
-            | Some parent -> Error(sprintf "missing parent during integration: %s" (EventId.value parent))
-            | None ->
-                let withStructure = structuralStep state normalized
-
-                let semantic =
-                    match tryDecodeCutPayload normalized with
-                    | Some payload ->
-                        { State = applyCut withStructure payload
-                          FailedRules = [] }
-                    | None -> integrateBusiness withStructure normalized
-
-                Ok
-                    { semantic with
-                        State =
-                            { semantic.State with
-                                Events = Map.add key normalized semantic.State.Events } }
+        | None -> integrateNew state normalized key
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
     /// Business semantic failures never abort replay; they cut only that rule's
@@ -390,6 +419,51 @@ module CanonicalIntegrator =
         let currentForRule (rule: IntegrationRule) (currentState: IntegratorState) =
             currentState.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
+        let validateCutPlan (rule: IntegrationRule) current (plan: SemanticCutPlan) =
+            rule.ApplyCut current plan.ResetJson |> Result.map (fun _ -> plan)
+
+        let inferCutPlan
+            (rule: IntegrationRule)
+            current
+            (failed: EventEnvelope)
+            (fault: RuleFault)
+            afterFullReplay
+            =
+            rule.PlanCut current failed fault.Reason afterFullReplay
+            |> Result.bind (validateCutPlan rule current)
+
+        let retryCutPlanAfterFullReplay
+            (rule: IntegrationRule)
+            (failed: EventEnvelope)
+            (fault: RuleFault)
+            firstReason
+            =
+            match loadedCommonDir with
+            | Some commonDir when trySpendFullReplayBudget () ->
+                result {
+                    let! streams =
+                        ProcessEventLog.readStreams commonDir
+                        |> Result.mapError (sprintf "cut-tail full replay read failed: %A")
+
+                    do! validateLocalHistory commonDir streams
+                    let! replayed = replay streams
+                    let replayCurrent = currentForRule rule replayed
+
+                    return!
+                        inferCutPlan rule replayCurrent failed fault true
+                        |> Result.mapError (fun secondReason ->
+                            sprintf
+                                "cut-tail inference failed before and after the one full replay: %s; %s"
+                                firstReason
+                                secondReason)
+                }
+            | _ -> Error("cut-tail inference failed and full replay budget is unavailable: " + firstReason)
+
+        let chooseCutPlan firstAttempt retry =
+            match firstAttempt with
+            | Ok plan -> Ok plan
+            | Error firstReason -> retry firstReason
+
         let planCut (currentState: IntegratorState) (rule: IntegrationRule) (fault: RuleFault) =
             result {
                 let! failed =
@@ -400,36 +474,10 @@ module CanonicalIntegrator =
 
                 let liveCurrent = currentForRule rule currentState
 
-                let validatePlan (plan: SemanticCutPlan) =
-                    rule.ApplyCut liveCurrent plan.ResetJson
-                    |> Result.map (fun _ -> plan)
-
-                match rule.PlanCut liveCurrent failed fault.Reason false |> Result.bind validatePlan with
-                | Ok plan -> return plan
-                | Error firstReason ->
-                    match loadedCommonDir with
-                    | Some commonDir when trySpendFullReplayBudget () ->
-                        let! streams =
-                            ProcessEventLog.readStreams commonDir
-                            |> Result.mapError (sprintf "cut-tail full replay read failed: %A")
-
-                        do! validateLocalHistory commonDir streams
-                        let! replayed = replay streams
-                        let replayCurrent = currentForRule rule replayed
-
-                        return!
-                            rule.PlanCut replayCurrent failed fault.Reason true
-                            |> Result.bind validatePlan
-                            |> Result.mapError (fun secondReason ->
-                                sprintf
-                                    "cut-tail inference failed before and after the one full replay: %s; %s"
-                                    firstReason
-                                    secondReason)
-                    | _ ->
-                        return!
-                            Error(
-                                "cut-tail inference failed and full replay budget is unavailable: " + firstReason
-                            )
+                return!
+                    chooseCutPlan
+                        (inferCutPlan rule liveCurrent failed fault false)
+                        (retryCutPlanAfterFullReplay rule failed fault)
             }
 
         let cutEnvelope (currentState: IntegratorState) (rule: IntegrationRule) (fault: RuleFault) (plan: SemanticCutPlan) =
@@ -484,20 +532,22 @@ module CanonicalIntegrator =
 
             loop currentState [] [] (matchingBusinessRules envelope)
 
-        let prepareLive (startState: IntegratorState) (events: EventEnvelope list) =
-            let rec closeFailures state addedEvents addedCuts failures =
+        let closeFailure (state, addedEvents, addedCuts) (ruleName, _) =
+            match tryRule ruleName with
+            | None -> Ok(state, addedEvents, addedCuts)
+            | Some rule ->
                 result {
-                    match failures with
-                    | [] -> return state, addedEvents, addedCuts
-                    | (ruleName, _) :: rest ->
-                        match tryRule ruleName with
-                        | None -> return! closeFailures state addedEvents addedCuts rest
-                        | Some rule ->
-                            let! next, eventCuts, receipts = ensureRuleReset state rule
-                            return!
-                                closeFailures next (addedEvents @ eventCuts) (addedCuts @ receipts) rest
+                    let! next, eventCuts, receipts = ensureRuleReset state rule
+                    return next, addedEvents @ eventCuts, addedCuts @ receipts
                 }
 
+        let closeFailures state failures =
+            failures
+            |> List.fold
+                (fun aggregate failure -> aggregate |> Result.bind (fun current -> closeFailure current failure))
+                (Ok(state, [], []))
+
+        let prepareLive (startState: IntegratorState) (events: EventEnvelope list) =
             let rec loop current durable cuts remaining =
                 result {
                     match remaining with
@@ -506,7 +556,7 @@ module CanonicalIntegrator =
                         let normalized = EventEnvelope.normalize raw
                         let! before, resetEvents, resetCuts = ensureMatchingResets current normalized
                         let! step = integrateOne before normalized
-                        let! after, postCutEvents, postCuts = closeFailures step.State [] [] step.FailedRules
+                        let! after, postCutEvents, postCuts = closeFailures step.State step.FailedRules
 
                         return!
                             loop

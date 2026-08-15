@@ -186,11 +186,8 @@ export const authority = {
 
   allowsTool: (permission, profile) => Authority.allowsTool(permission, profile),
 
-  /** PROMPT-011 bounds. */
+  /** PROMPT-011 physical evidence window; restart-count abandonment is retired. */
   recoveryTailWindow: Authority.RecoveryTailWindow,
-  recoveryAttemptBudget: Authority.RecoveryAttemptBudget,
-  recoveryAttempts: (runtimeStartCount, claim) => Authority.recoveryAttempts(runtimeStartCount, claim),
-  recoveryBudgetSpent: (runtimeStartCount, claim) => Authority.recoveryBudgetSpent(runtimeStartCount, claim),
 }
 
 export const authorityRun = {

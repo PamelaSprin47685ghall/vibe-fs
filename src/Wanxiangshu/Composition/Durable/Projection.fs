@@ -122,9 +122,8 @@ type AgentProjectionSet =
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
 
-        /// PROMPT-011: how many `RuntimeStarted` envelopes have been folded.
-        /// Pending-claim recovery attempts are `this - ClaimedAtRuntimeStartCount`,
-        /// so a plugin start does not rewrite the session map (PERSIST-008).
+        /// Historical count of folded `RuntimeStarted` envelopes. Retained for
+        /// audit/backward-compatible projections; it no longer drives recovery.
         RuntimeStartCount: int
     }
 

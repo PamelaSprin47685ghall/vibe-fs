@@ -81,18 +81,9 @@ module Fold =
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
         | Runtime(RuntimeStarted runtime) ->
-            // PROMPT-011 `RecoveryAttemptBudget`: a plugin start means every claim
-            // still pending at this point has survived one more recovery attempt.
-            //
-            // Counted here rather than written by the recovery routine. A fact saying
-            // "I attempted recovery" would itself be written during recovery, so a
-            // crash before that write would lose the attempt and the budget could
-            // never expire — which is the unbounded-pending state the clause bounds.
-            //
-            // Replay is exact: envelopes fold in order, so a claim is only counted by
-            // the starts that came after it. The claim records the watermark at
-            // registration (`ClaimedAtRuntimeStartCount`); this arm only advances
-            // the workspace counter — O(1) in the session map, not O(sessions).
+            // Historical workspace runtime watermark. Prompt claims retain the
+            // watermark at registration for audit/backward-compatible replay, but
+            // restart count no longer drives recovery or automatic abandonment.
             Ok
                 { projection with
                     RuntimeId = Some runtime.RuntimeId

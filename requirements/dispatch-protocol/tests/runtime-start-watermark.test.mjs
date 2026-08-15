@@ -74,16 +74,7 @@ test('PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session
   assert.equal(earlyB.ClaimedAtRuntimeStartCount, 0)
   assert.equal(lateA.ClaimedAtRuntimeStartCount, 2)
 
-  assert.deepEqual(
-    [authority.recoveryAttempts(3, earlyA), authority.recoveryBudgetSpent(3, earlyA)],
-    [3, true],
-  )
-  assert.deepEqual(
-    [authority.recoveryAttempts(3, earlyB), authority.recoveryBudgetSpent(3, earlyB)],
-    [3, true],
-  )
-  assert.deepEqual(
-    [authority.recoveryAttempts(3, lateA), authority.recoveryBudgetSpent(3, lateA)],
-    [1, false],
-  )
+  assert.equal('recoveryAttempts' in authority, false)
+  assert.equal('recoveryBudgetSpent' in authority, false)
+  assert.equal('recoveryAttemptBudget' in authority, false)
 })

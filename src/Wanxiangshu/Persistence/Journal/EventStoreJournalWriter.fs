@@ -262,21 +262,59 @@ type EventStoreJournalWriter
                 return Ok(writer :> IJournalWriter, init, projection)
         }
 
-    member private _.EnsureRuntimeStartedLocked() : Task<Result<unit, string>> =
+    member private _.CommitRuntimeStartedLocked() : Task<Result<unit, string>> =
         task {
-            if runtimeStartedCommitted then
+            match! EventStoreJournalWriter.commitEnvelope store init with
+            | Ok receipt when AppendReceipt.cutFor init.EventId receipt |> Option.isSome ->
+                let cut = AppendReceipt.cutFor init.EventId receipt |> Option.get
+                return Error("RuntimeStarted semantic cut: " + cut.Reason)
+            | Ok _ ->
+                runtimeStartedCommitted <- true
                 return Ok()
-            else
-                match! EventStoreJournalWriter.commitEnvelope store init with
-                | Ok receipt when AppendReceipt.cutFor init.EventId receipt |> Option.isSome ->
-                    let cut = AppendReceipt.cutFor init.EventId receipt |> Option.get
-                    return Error("RuntimeStarted semantic cut: " + cut.Reason)
-                | Ok _ ->
-                    runtimeStartedCommitted <- true
-                    return Ok()
-                | Error error ->
-                    poisoned <- true
-                    return Error(EventStoreJournalWriter.formatAppendError error)
+            | Error error ->
+                poisoned <- true
+                return Error(EventStoreJournalWriter.formatAppendError error)
+        }
+
+    member private this.EnsureRuntimeStartedLocked() : Task<Result<unit, string>> =
+        if runtimeStartedCommitted then Task.FromResult(Ok()) else this.CommitRuntimeStartedLocked()
+
+    static member private businessCommitResult (eventId: EventId) (envelope: Envelope) (receipt: AppendReceipt) =
+        match AppendReceipt.cutFor envelope.EventId receipt with
+        | Some cut -> Rejected(eventId, cut.Reason)
+        | None -> Committed envelope
+
+    member private _.CommitBusinessEnvelopeLocked(eventId: EventId, envelope: Envelope) : Task<CommitResult<Envelope>> =
+        task {
+            match! EventStoreJournalWriter.commitEnvelope store envelope with
+            | Ok receipt ->
+                currentSeq <- currentSeq + 1L
+                return EventStoreJournalWriter.businessCommitResult eventId envelope receipt
+            | Error error ->
+                poisoned <- true
+                return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError error))
+        }
+
+    member private this.AppendHealthyLocked
+        (eventId: EventId)
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: Fact)
+        : Task<CommitResult<Envelope>> =
+        task {
+            match! this.EnsureRuntimeStartedLocked() with
+            | Error error -> return CommitUnknown(eventId, WriteFailed("RuntimeStarted append failed: " + error))
+            | Ok() ->
+                let envelope: Envelope =
+                    { RuntimeId = runtimeId
+                      LocalSeq = LocalSeq.create currentSeq
+                      ObservedAt = DateTimeOffset.UtcNow
+                      EventId = eventId
+                      Stream = stream
+                      ProviderRun = providerRun
+                      Fact = fact }
+
+                return! this.CommitBusinessEnvelopeLocked(eventId, envelope)
         }
 
     member private this.AppendLocked
@@ -284,35 +322,12 @@ type EventStoreJournalWriter
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
         : Task<CommitResult<Envelope>> =
-        task {
-            let eventId = EventId.create (Guid.NewGuid().ToString("N"))
+        let eventId = EventId.create (Guid.NewGuid().ToString("N"))
 
-            if poisoned || disposed then
-                return CommitUnknown(eventId, WriteFailed "Writer is poisoned or disposed")
-            else
-                match! this.EnsureRuntimeStartedLocked() with
-                | Error error -> return CommitUnknown(eventId, WriteFailed("RuntimeStarted append failed: " + error))
-                | Ok() ->
-                    let envelope: Envelope =
-                        { RuntimeId = runtimeId
-                          LocalSeq = LocalSeq.create currentSeq
-                          ObservedAt = DateTimeOffset.UtcNow
-                          EventId = eventId
-                          Stream = stream
-                          ProviderRun = providerRun
-                          Fact = fact }
-
-                    match! EventStoreJournalWriter.commitEnvelope store envelope with
-                    | Ok receipt ->
-                        currentSeq <- currentSeq + 1L
-
-                        match AppendReceipt.cutFor envelope.EventId receipt with
-                        | Some cut -> return Rejected(eventId, cut.Reason)
-                        | None -> return Committed envelope
-                    | Error error ->
-                        poisoned <- true
-                        return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError error))
-        }
+        if poisoned || disposed then
+            Task.FromResult(CommitUnknown(eventId, WriteFailed "Writer is poisoned or disposed"))
+        else
+            this.AppendHealthyLocked eventId stream providerRun fact
 
     member private _.Enqueue(work: unit -> Task<'T>) : Task<'T> =
         lock gate (fun () ->

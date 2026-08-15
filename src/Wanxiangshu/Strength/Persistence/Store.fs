@@ -289,6 +289,11 @@ module StrengthStore =
             | _ -> return Error "Strength Prepared has ambiguous frame payload closure"
         }
 
+    let private appendReceiptResult eventId (receipt: AppendReceipt) =
+        match AppendReceipt.cutFor eventId receipt with
+        | Some cut -> Error(AppendError.SemanticCut cut)
+        | None -> Ok()
+
     let append
         (store: IEventStore)
         (sha256: string -> string)
@@ -298,12 +303,14 @@ module StrengthStore =
             let envelope = toEnvelope sha256 event
 
             match! store.Append [ envelope ] with
-            | Ok receipt ->
-                match AppendReceipt.cutFor envelope.EventId receipt with
-                | Some cut -> return Error(AppendError.SemanticCut cut)
-                | None -> return Ok()
+            | Ok receipt -> return appendReceiptResult envelope.EventId receipt
             | Error error -> return Error error
         }
+
+    let private publishReceiptResult event eventId (receipt: AppendReceipt) =
+        match AppendReceipt.cutFor eventId receipt with
+        | Some cut -> Error(PublishError.SemanticCut cut)
+        | None -> Ok event
 
     /// STRENGTH-006: payload bytes become local content-addressed PayloadRefs
     /// before the Prepared event is appended. Git object identity is absent from
@@ -332,10 +339,7 @@ module StrengthStore =
                 let envelope = toEnvelope sha256 event
 
                 match! store.Append [ envelope ] with
-                | Ok receipt ->
-                    match AppendReceipt.cutFor envelope.EventId receipt with
-                    | Some cut -> return Error(PublishError.SemanticCut cut)
-                    | None -> return Ok event
+                | Ok receipt -> return publishReceiptResult event envelope.EventId receipt
                 | Error(AppendError.StorageInvalid error) -> return Error(PublishError.StorageInvalid error)
                 | Error(AppendError.SemanticCut cut) -> return Error(PublishError.SemanticCut cut)
                 | Error(AppendError.AppendFailed reason) -> return Error(PublishError.PublishFailed reason)

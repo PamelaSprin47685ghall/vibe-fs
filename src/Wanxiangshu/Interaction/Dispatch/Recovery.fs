@@ -47,11 +47,9 @@ open Wanxiangshu.Persistence.Journal
 /// PROMPT-011: reconcile prompts the Host may have accepted before the plugin
 /// crashed.
 ///
-/// The contract is `at-most-one logical effect + fail-closed unknown outcome`. This
-/// module therefore only ever PROVES acceptance or ABANDONS the claim. It never
-/// resends: the Host may have accepted a message that fell outside the tail window,
-/// or already started a provider run, and a resend would produce a second logical
-/// effect.
+/// The contract is `at-most-one logical effect + visible unknown outcome`. This
+/// detached library only PROVES acceptance when physical evidence exists; otherwise
+/// it leaves the old claim pending. It never resends or invents a crash terminal.
 module PromptRecovery =
 
     /// What one pending claim resolved to.
@@ -66,10 +64,7 @@ module PromptRecovery =
         | Proven of PhysicalUserMessageId
         /// Steps 4 and 5.
         | StillPending of hasReceipt: bool
-        /// Budget expired. `Abandoned(UnresolvedAfterRecovery)` was written.
-        | GaveUp
-        /// The session snapshot could not be read, so nothing is known. Fail closed:
-        /// the claim keeps its budget and is retried on the next start.
+        /// The session snapshot could not be read, so nothing is known.
         | Unreadable of reason: string
 
     type Reconciled =
@@ -107,7 +102,6 @@ module PromptRecovery =
     let private reconcileClaim
         (runtime: PromptDispatcher.Runtime)
         (snapshot: ISessionSnapshotPort)
-        (runtimeStartCount: int)
         (sessionId: SessionId)
         (claim: PromptAuthority.PromptClaim)
         : Task<Reconciled> =
@@ -146,20 +140,12 @@ module PromptRecovery =
                     | Ok() -> return report (Proven physical)
                     | Error reason -> return report (Unreadable reason)
 
-                | None when PromptAuthority.recoveryBudgetSpent runtimeStartCount claim ->
-                    match! runtime.Abandon claim.PromptKey sessionId PromptAbandonReason.UnresolvedAfterRecovery with
-                    | Ok() -> return report GaveUp
-                    | Error reason -> return report (Unreadable reason)
-
                 | None -> return report (StillPending claim.Receipt.IsSome)
         }
 
-    /// Reconcile every pending claim once, at plugin start.
-    ///
-    /// Enumerating sessions is legitimate here and only here: PERSIST-008 bounds
-    /// per-query lookups, and this is a single startup pass over sessions that hold
-    /// state. Every claim it finds is either resolved or abandoned within
-    /// `RecoveryAttemptBudget` starts, so the set it walks cannot grow without bound.
+    /// Detached reconciliation library: prove a pending claim from physical Host
+    /// evidence, or leave it pending. Ordinary plugin lifecycle never calls this.
+    /// A process restart is not authority to abandon an unresolved old tool.
     let reconcile (journal: AgentJournal option) (snapshotOpt: ISessionSnapshotPort option) : Task<Reconciled list> =
         task {
             match journal, snapshotOpt with
@@ -171,7 +157,6 @@ module PromptRecovery =
             | Some durable, Some snapshot ->
                 let runtime = PromptDispatcher.forJournal durable
                 let projections = (AgentJournal.snapshot durable).AgentProjections
-                let runtimeStartCount = projections.RuntimeStartCount
 
                 let pending =
                     projections.Sessions
@@ -187,51 +172,8 @@ module PromptRecovery =
                 let results = ResizeArray<Reconciled>()
 
                 for sessionId, claim in pending do
-                    let! outcome = reconcileClaim runtime snapshot runtimeStartCount sessionId claim
+                    let! outcome = reconcileClaim runtime snapshot sessionId claim
                     results.Add outcome
 
                 return results |> Seq.toList
         }
-
-    /// PROMPT-011 post-init gate: the recovery pass must not run inside the
-    /// plugin constructor.
-    ///
-    /// The plugin constructor is awaited by the Host before its project instance
-    /// is fully ready (`plugin/index.ts:112-123,222-224`), and `reconcile` reads
-    /// `session.messages` through the SDK — an in-process fetch that competes
-    /// with the Host's own startup for the same event loop. Under parallel
-    /// canary load that read can exceed the silence window, parking the
-    /// constructor and with it every hook dispatch: a restarted session then
-    /// never sends its next prompt (`reviewer-restart` red under 8-way
-    /// concurrency, green solo).
-    ///
-    /// So the pass is deferred to the first real Host event, when the instance
-    /// is ready, and made single-flight so every later caller awaits the same
-    /// pass. The latch is a task, not a stage: `Task.IsCompleted` is the whole
-    /// state, and there is no Stage/Phase counter to drift (ARCH-001).
-    type RecoveryGate(journal: AgentJournal option, snapshotOpt: ISessionSnapshotPort option) =
-
-        let gate = obj ()
-        // DSL-MUTABLE: single-flight — memoized reconcile task (latch, not a stage)
-        let mutable pass: Task<Reconciled list> option = None
-
-        /// First caller starts the single pass; every later caller awaits the
-        /// same task. A completed (or even faulted) task is returned as-is —
-        /// there is no re-run, because PROMPT-011's budget makes a retried
-        /// reconcile a different logical act (each failed claim keeps its budget
-        /// until the next start).
-        member _.EnsureDone() : Task =
-            let active =
-                lock gate (fun () ->
-                    match pass with
-                    | Some t -> t
-                    | None ->
-                        let t = reconcile journal snapshotOpt
-                        pass <- Some t
-                        t)
-
-            task {
-                let! _ = active
-                ()
-            }
-            :> Task

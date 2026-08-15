@@ -198,9 +198,9 @@ test('DP_006_claim_sequence_advances_on_registration_not_on_resolution', () => {
   assert.equal(authority.nextClaimSequence(scope, projection), 3)
 })
 
-// ── DISPATCH-PROTOCOL-007：recovery budget 由 plugin start 派生，不写入 ────
+// ── DISPATCH-PROTOCOL-007：runtime-start stamp 只作历史审计，不是 recovery budget ────
 
-test('DP_007_recovery_budget_is_folded_from_plugin_starts_not_written', () => {
+test('DP_007_runtime_start_stamp_is_audit_only_not_restart_recovery_authority', () => {
   const root = profileOf()
   const key = promptKey('pk_r')
   const projection = authorityRun.registerClaim(
@@ -209,24 +209,10 @@ test('DP_007_recovery_budget_is_folded_from_plugin_starts_not_written', () => {
   )
   const claim = mapTryFind(key, projection.PendingClaims)
 
-  assert.equal(authority.recoveryAttemptBudget, 3)
   assert.equal(claim.ClaimedAtRuntimeStartCount, 0)
-
-  const spentAfter = []
-  for (let start = 1; start <= 4; start += 1) {
-    spentAfter.push({
-      starts: start,
-      attempts: authority.recoveryAttempts(start, claim),
-      spent: authority.recoveryBudgetSpent(start, claim),
-    })
-  }
-
-  assert.deepEqual(spentAfter, [
-    { starts: 1, attempts: 1, spent: false },
-    { starts: 2, attempts: 2, spent: false },
-    { starts: 3, attempts: 3, spent: true },
-    { starts: 4, attempts: 4, spent: true },
-  ])
+  assert.equal('recoveryAttemptBudget' in authority, false)
+  assert.equal('recoveryAttempts' in authority, false)
+  assert.equal('recoveryBudgetSpent' in authority, false)
 })
 
 // ── DISPATCH-PROTOCOL-010：root profile 无 model 字段（Model=None 不可表达）─

@@ -79,11 +79,10 @@ PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
 
 ## DISPATCH-PROTOCOL-007 — uncertain physical outcome 不自动重发
 
-恢复时未找到物理落地 → 保持 Pending（`StillPending`），**绝不自动重发**；只有
-`RecoveryAttemptBudget` 次启动仍无法证明 → `Abandoned(UnresolvedAfterRecovery)`（PROMPT-011）。
+显式证据核对时未找到物理落地 → 保持 Pending（`StillPending`），**绝不自动重发，也不因进程重启次数自动 abandon**。进程重启不是替旧 tool 写 terminal 的授权；旧 claim 保持为可审计的中断/未知事实，未来只能由显式 `/continue` 或其它新用户意图决定是否继续。
 
-- 含义：Host 可能已接受消息并开始 provider run；重发会在已落地的消息之外制造第二次逻辑效果。
-- 边界：budget 精确数值 = HOW；「有界 + no blind resend」是 WHAT。
+- 含义：Host 可能已接受消息并开始 provider run；重发会在已落地的消息之外制造第二次逻辑效果；自动 abandon 又会把未知结果伪装成已收尾。
+- 边界：物理证据窗口仍可有界；restart-count recovery budget 已退役。
 - 证据：→ PROOF.md R3、R4。
 
 ## DISPATCH-PROTOCOL-008 — at-most-one logical effect，不虚构 exactly-once

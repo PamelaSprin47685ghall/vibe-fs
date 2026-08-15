@@ -45,4 +45,4 @@ PromptKey 幂等身份、unknown outcome 不自动重发、fire-and-forget 只�
 - interaction 是否有 authority
 - generic effect-accounting law（Requested/Accepted 分型）
 - provider representation、attempt recovery
-- `RecoveryTailWindow=50` / `RecoveryAttemptBudget=3` 精确常数（HOW）
+- `RecoveryTailWindow=50` 精确物理证据窗口（HOW）；restart-count recovery budget 已退役
