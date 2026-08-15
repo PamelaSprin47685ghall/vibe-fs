@@ -16,7 +16,7 @@
 | ENF-007 | `requirements/capability-enforcement/tests/stealth-browser-mcp-wildcard.test.mjs` `AGENT_026_browser_only_wildcard_permission` + `requirements/capability-enforcement/tests/sphinx-mcp-wildcard.test.mjs` `AGENT_030_inquiry_only_wildcard_permission` | REUSE（SPLIT：文件含 host-boundary 注入断言；wildcard 断言归本包） | 分别 `node --test` |
 | ENF-008 | `tests/capability-isomorphism-gate.test.mjs` 全部（含 `capability_iso_repo_scan_is_green`）+ `scripts/checks/capability-isomorphism-gate.mjs` | MOVE + KEEP(gate) | `node --test requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` |
 | ENF-009 | `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs` `gate_a_*` + `scripts/checks/tool-referential-integrity.mjs` | REUSE（SPLIT@cutover：Gate A = action-affordance 语义合同 + capability-enforcement 名称/结构） | `node --test requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs` |
-| ENF-010 | `tests/agent-permission-gate.test.mjs` `AGENT_007_bash_stays_denied_even_when_the_gate_fails` + `AGENT_007_validation_error_is_still_reported` + `requirements/capability-enforcement/tests/inquiry-permissions.test.mjs` `Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap` + `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs` `AGENT_007_unresolved_role_denies_all_tools` | MOVE + REUSE（×2） | 分别 `node --test` |
+| ENF-010 | `tests/agent-permission-gate.test.mjs` `AGENT_007_bash_stays_denied_even_when_the_gate_fails` + `AGENT_007_validation_error_is_still_reported` + `tests/managed-agent-config.test.mjs` `MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fields_land` + `requirements/capability-enforcement/tests/inquiry-permissions.test.mjs` `Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap` + `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs` `AGENT_007_unresolved_role_denies_all_tools` | MOVE + REUSE（×2） | 分别 `node --test` |
 | ENF-011 | `tests/agent-permission-gate.test.mjs` `AGENT_019_external_directory_overrides_host_default_ask` + `tests/managed-agent-config.test.mjs` `MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model` | MOVE | `node --test requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` |
 | ENF-012 | `tests/capability-isomorphism-gate.test.mjs` `capability_iso_tool_registry_requires_generator` + `scripts/checks/js-surface-gate.mjs` | MOVE + REUSE（KEEP repository-programming 应用） | 分别 `node --test` / `node scripts/checks/js-surface-gate.mjs` |
 
@@ -25,7 +25,7 @@
 | 源 | 目标 | 结果 |
 |----|------|------|
 | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` | 7 pass / 0 fail |
-| `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | 15 pass / 0 fail |
+| `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` | 16 pass / 0 fail |
 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` | 9 pass / 0 fail |
 
 ## 计数

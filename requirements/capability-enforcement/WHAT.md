@@ -152,17 +152,21 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 - Role 或 profile 无法确定 → 模型可见插件工具集为空；ToolRegistry `gateExecute` 对 unresolved role
   返回 deny（`Path.DeniedUnestablished`），禁止「role 未定时暂时允许 Inspector」类放行
   （历史 shape/agent 条款 AGENT-007）。
-- Host `config` hook 校验失败（如重复 fast/deep model）仍必须写入 owned `mode`/`permission`/`prompt`，
-  使 managed agent 不回落 Host 默认（`"*": "allow"` 会把 bash 开放给每个角色）。
+- Host `config` hook 校验失败（如重复 fast/deep model）仍必须先写入 owned `mode`/`permission`/`prompt`，
+  使 managed agent 不回落 Host 默认（`"*": "allow"` 会把 bash 开放给每个角色）；随后必须
+  `Diagnostic.fatal` 终止整个 OpenCode 进程。配置 gate 的 Error 不得降格为可被 Host 捕获后继续运行的异常。
 
-含义/动机：真实回归——校验失败 short-circuit 导致权限写失败，bash 对所有 managed role 开放
-（`tests/agent-permission-gate.test.mjs` 头注释记录该事故）。
+含义/动机：真实回归有两层：校验失败 short-circuit 曾导致权限写失败，bash 对所有 managed role 开放；
+后续仅抛可捕获异常又允许 Host 继续，使缺失可信 inventory 延迟表现为无关的 PROMPT-006 binding failure。
+配置非法时唯一合法状态是「deny 已落地 + 进程死亡」。
 
 边界：bash 本身是 Host 内置工具（`host-boundary`）；本包拥有「managed 面 fail-closed 不回落默认」。
 `bash-honeypot` 仅 Coder 且不执行 shell（AGENT-023）是同一律的 Coder 面。
 
 证据：`tests/agent-permission-gate.test.mjs` `AGENT_007_bash_stays_denied_even_when_the_gate_fails` +
-`AGENT_007_validation_error_is_still_reported`（MOVE）+ `requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`
+`AGENT_007_validation_error_is_still_reported`（MOVE）+ `tests/managed-agent-config.test.mjs`
+`MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fields_land`（MOVE）+
+`requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`
 `Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap`（REUSE）+ `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs`
 `AGENT_007_unresolved_role_denies_all_tools`（REUSE）。
 

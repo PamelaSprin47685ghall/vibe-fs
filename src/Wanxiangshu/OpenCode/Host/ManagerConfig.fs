@@ -14,5 +14,5 @@ module ManagerConfig =
         match ManagedAgentConfig.configureFromHostConfig config with
         | Ok inventory -> inventory
         | Error err ->
-            // Fail closed at config time so Host surfaces the gate error.
-            raise (System.InvalidOperationException err)
+            Diagnostic.fatal "managed-agent-config-invalid" [ "result", err ]
+            failwith ("unreachable after Diagnostic.fatal: " + err)

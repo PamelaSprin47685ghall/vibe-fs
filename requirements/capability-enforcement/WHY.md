@@ -26,6 +26,7 @@ entitlement。
 - 某 execution tier（fast/deep/replica/leaf）获得比同 office 其它档更多的 authority。
 - internal-only participant/action（Blogger/Distiller/Bookkeeper）能被无资格 participant 合成/执行。
 - Host 配置异常时权限写失败，managed agent 回落到 Host 默认（如 `bash` 开放）。
+- Host 配置 gate 已判定非法却只抛可捕获异常，Host 继续运行；后续 managed child 因缺失可信 inventory 才以无关的 binding 错误爆炸。
 - 手写第二份 role→工具矩阵；`js-*` 表面四层不同构（description 有、runtime 拒绝）。
 
 ## 为什么不并进相邻包

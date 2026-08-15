@@ -115,6 +115,46 @@ module MagicTodoFactCodec =
                 )
             | other -> failwith ("unknown PrefixEvidenceKind: " + other))
 
+    /// PayloadRef a BlobRef names: the local content-address under the "blobs/" prefix.
+    let payloadRefOfBlobRef (ref: BlobRef) : PayloadRef =
+        let value = BlobRef.value ref
+        let prefix = "blobs/"
+
+        if value.StartsWith(prefix, System.StringComparison.Ordinal) then
+            PayloadRef.create (value.Substring(prefix.Length))
+        else
+            PayloadRef.create value
+
+    /// PayloadRef a BlobDigest names: sha256 of the payload bytes == store filename.
+    let payloadRefOfBlobDigest (digest: BlobDigest) : PayloadRef =
+        PayloadRef.create (BlobDigest.value digest)
+
+    /// Unified payload closure of one MagicTodo fact: every EventStore payload it
+    /// references, so the envelope `payload_refs` field is authoritative rather
+    /// than always-empty. Caller canonicalizes the combined list.
+    let payloadRefs (fact: MagicTodoFact) : PayloadRef list =
+        match fact with
+        | MagicTodoFact.TodoWritePrepared p ->
+            [ payloadRefOfBlobRef p.BaseTodoRef
+              payloadRefOfBlobDigest p.BaseTodoDigest
+              payloadRefOfBlobRef p.ProposedTodoRef
+              payloadRefOfBlobDigest p.ProposedTodoDigest ]
+        | MagicTodoFact.TodoReviewConcluded p ->
+            [ payloadRefOfBlobRef p.WorkRecordRef
+              payloadRefOfBlobDigest p.WorkRecordDigest
+              payloadRefOfBlobRef p.SettledTodoRef
+              payloadRefOfBlobDigest p.SettledTodoDigest ]
+        | MagicTodoFact.DedicatedTodoReviewerReplaced p -> [ payloadRefOfBlobRef p.EvidenceRef ]
+        | MagicTodoFact.LegacyTodoSeedAdopted p ->
+            [ payloadRefOfBlobRef p.SeedTodoRef
+              payloadRefOfBlobDigest p.SeedTodoDigest ]
+        | MagicTodoFact.PrefixRebaseCommittedV2 p ->
+            [ payloadRefOfBlobRef p.FrozenRecordPrefixRef
+              payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
+            @ (p.YBundleRef |> Option.toList |> List.map payloadRefOfBlobRef)
+            @ (p.YBundleDigest |> Option.toList |> List.map payloadRefOfBlobDigest)
+        | _ -> []
+
     /// Encode one Magic Todo fact as a tagged JSON object (case name + fields).
     let encode (fact: MagicTodoFact) : string =
         let body =

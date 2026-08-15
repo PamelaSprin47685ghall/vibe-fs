@@ -18,6 +18,9 @@ runtimeResources.installFromPackage()
 const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel, tryBoundModel } = await import(
   join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js')
 )
+const { configureManager } = await import(
+  join(here, '../../../dist/OpenCode/Host/ManagerConfig.js')
+)
 const { OpencodeModel } = await import(
   join(here, '../../../dist/OpenCode/Codec/OpencodeTypes.js')
 )
@@ -162,6 +165,34 @@ test('MACFG_configureFromHostConfig_error_path_still_writes_role_fields', () => 
   assert.match(err, /resolves to the same model/)
   assert.equal(cfg.compaction.auto, false, 'fail-closed: owned fields still applied')
   assert.ok(cfg.agent['fast-manager'].mode !== undefined)
+})
+
+test('MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fields_land', () => {
+  const cfg = fullConfig()
+  cfg.agent['fast-manager'] = { model: 'same' }
+  cfg.agent['deep-manager'] = { model: 'same' }
+  const previousNoFatalExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
+  const previousConsoleError = console.error
+  const errors = []
+  process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+  console.error = (message) => errors.push(String(message))
+
+  try {
+    assert.throws(
+      () => configureManager(cfg),
+      /unreachable after Diagnostic\.fatal: Managed agent pair fast-manager\/deep-manager resolves to the same model/,
+    )
+    assert.equal(cfg.compaction.auto, false, 'deny settings must land before fatal')
+    assert.equal(cfg.agent['fast-manager'].permission['*'], 'deny')
+    assert.equal(errors.length, 1, 'fatal emits exactly one process-level diagnostic')
+    const fatal = JSON.parse(errors[0])
+    assert.equal(fatal.operation, 'managed-agent-config-invalid')
+    assert.match(fatal.result, /fast-manager\/deep-manager/)
+  } finally {
+    console.error = previousConsoleError
+    if (previousNoFatalExit === undefined) delete process.env.WANXIANGSHU_NO_FATAL_EXIT
+    else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousNoFatalExit
+  }
 })
 
 test('MACFG_tryOpencodeModel_parses_provider_slash_model_and_refuses_to_invent_fast', () => {

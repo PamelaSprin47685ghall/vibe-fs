@@ -98,6 +98,104 @@ type EventStoreBlobWriter private (store: IEventStore) =
     static member Create(store: IEventStore) : IBlobWriter =
         EventStoreBlobWriter(store) :> IBlobWriter
 
+/// Unified payload closure for one Journal fact (DURABLE-EVENTS-012): every
+/// EventStore payload the fact references. This is the single mapping that makes
+/// `EventEnvelope.PayloadRefs` authoritative instead of always empty. Journal
+/// facts carry blob handles inline in the domain payload, so the closure is
+/// derived at the append boundary rather than tracked twice.
+[<RequireQualifiedAccess>]
+module JournalPayloadClosure =
+
+    let ofFact (fact: Fact) : PayloadRef list =
+        let refs =
+            match fact with
+            | Fact.Runtime _ -> []
+            | Fact.MagicTodo payload ->
+                match MagicTodoFactCodec.tryDecode payload with
+                | Ok magic -> MagicTodoFactCodec.payloadRefs magic
+                | Error _ -> []
+            | Fact.Agent agent ->
+                match agent with
+                | AgentFact.Execution execution ->
+                    match execution with
+                    | ExecutionFactCases.HandleCompleted p ->
+                        (p.CompletionRef |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobRef)
+                        @ (p.CompletionDigest |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobDigest)
+                    | ExecutionFactCases.HandleFalseCompletionRejected p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.ExpectedCompletionRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.ExpectedCompletionDigest ]
+                    | ExecutionFactCases.HandleFalseTerminalReported p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.BadCompletionRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
+                    | ExecutionFactCases.ParentJoinCorrectionRequested p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
+                    | _ -> []
+                | AgentFact.Companion companion ->
+                    match companion with
+                    | CompanionFactCases.XTracePartAppended p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                    | CompanionFactCases.TerminalOutputCaptured p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                    | _ -> []
+                | AgentFact.Context context ->
+                    match context with
+                    | ContextFactCases.BlogObservationCommitted p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                        @ (p.EvidenceRef |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobRef)
+                    | ContextFactCases.BlogObservationsSquashed p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                    | ContextFactCases.BloggerRequestMaterialized p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.ContextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.ContextDigest ]
+                        @ (p.SelectedFrameDigests |> List.map MagicTodoFactCodec.payloadRefOfBlobDigest)
+                    | ContextFactCases.PrefixRebaseCommitted p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.FrozenRecordPrefixRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
+                    | _ -> []
+                | AgentFact.Fission fission ->
+                    match fission with
+                    | FissionFactCases.FissionAdmitted p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.OwnerWorkRecordRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.OwnerWorkRecordDigest ]
+                    | FissionFactCases.FissionLaneMaterialized p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                    | FissionFactCases.FissionCompletionCaptured p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.PayloadRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.PayloadDigest ]
+                    | FissionFactCases.FissionConverged p ->
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.AggregateWorkRecordRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.AggregateWorkRecordDigest ]
+                    | _ -> []
+                | _ -> []
+            | Fact.ManagerLifecycle lifecycle ->
+                match lifecycle with
+                | ManagerLifecycleFact.LifeOpened p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.OpeningTextRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.OpeningTextDigest ]
+                | ManagerLifecycleFact.FinalityRequested p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.LastWordsRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.LastWordsDigest ]
+                | ManagerLifecycleFact.FinalityRejected p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                | ManagerLifecycleFact.FinalitySiblingSteered p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                | ManagerLifecycleFact.FinalityBlessed p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordBundleRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordBundleDigest ]
+                | ManagerLifecycleFact.LifeCompleted p ->
+                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.TerminalRef
+                      MagicTodoFactCodec.payloadRefOfBlobDigest p.TerminalDigest ]
+                | _ -> []
+
+        PayloadRefs.canonicalize refs
+
 /// Journal writer backed by the local process EventStore.
 /// It never enumerates history and never folds facts itself. CanonicalIntegrator
 /// owns both boot replay and live integration; this type only assigns journal
@@ -137,7 +235,7 @@ type EventStoreJournalWriter
                 if List.isEmpty heads then [] else heads
             | _ -> store.TryHead streamId |> Option.toList
 
-        let encoded = EventStoreJournalCodec.encode parents [] envelope
+        let encoded = EventStoreJournalCodec.encode parents (JournalPayloadClosure.ofFact envelope.Fact) envelope
         store.Append [ encoded ]
 
     static member private currentJournalProjection(store: IEventStore) : Result<ProjectionSet, FoldRejection> =
