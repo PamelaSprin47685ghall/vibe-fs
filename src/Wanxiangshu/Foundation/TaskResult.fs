@@ -75,10 +75,14 @@ type TaskResultBuilder() =
         loop ()
 
     member this.For(items: seq<'item>, body: 'item -> Task<Result<unit, 'error>>) : Task<Result<unit, 'error>> =
-        this.Using(
-            items.GetEnumerator(),
-            fun enumerator -> this.While(enumerator.MoveNext, (fun () -> body enumerator.Current))
-        )
+        let list = Seq.toList items
+
+        let rec loop remaining =
+            match remaining with
+            | [] -> this.Zero()
+            | head :: tail -> this.Bind(body head, (fun () -> loop tail))
+
+        loop list
 
 [<AutoOpen>]
 module TaskResultCE =

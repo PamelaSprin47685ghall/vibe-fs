@@ -362,6 +362,7 @@ unresolved when something truly remains.
 
 Do not omit an important fact because no field asks for it.
 Do not invent a field merely because another office once used one.
+Unless the task itself calls for it, avoid ASCII art where possible.
 
 Constrain the honesty of the content.
 Do not constrain every account to one skeleton.

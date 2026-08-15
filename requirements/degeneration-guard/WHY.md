@@ -10,7 +10,7 @@ transcript 尾部并推迟进入正常 recovery。本包在污染扩大前把该
 
 「输出已经退化成循环」是一个**流式过程中的病理**，不是一次失败（`provider-attempt-recovery`），
 也不是崩溃（`crash-reconciliation`）：attempt 还在跑，物理请求还没结束，但继续跑只会浪费时间、
-污染历史、延迟恢复。需要在 attempt 内部、字符流边上放一个**纯传感器**——它只读取窄字符流特征，
+污染历史、延迟恢复。需要在 attempt 内部、文本流边上放一个**纯传感器**——它只读取窄 token 多样性特征，
 不把 stream delta 积分成业务事实，不成为第二套 retry controller，命中时只做一件事：停止当前
 物理 attempt，然后交回标准 recovery。
 
@@ -37,5 +37,5 @@ transcript 尾部并推迟进入正常 recovery。本包在污染扩大前把该
 
 ## 本包不拥有的（DOES NOT OWN）
 
-retry cursor/budget（`provider-attempt-recovery`）、transcript semantic truth、当前
-4-gram/指数核算法必须永久存在（HOW）、arbitrary quality judgement（不是「质量评分器」）。
+retry cursor/budget（`provider-attempt-recovery`）、transcript semantic truth、任何特定 detector 算法必须永久存在、
+arbitrary quality judgement（不是「质量评分器」）。

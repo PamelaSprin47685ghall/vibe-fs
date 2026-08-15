@@ -4,7 +4,7 @@
 
 ## 一句话 WHY
 
-LLM 流式输出偶发退化（单字符/短句循环）；继续跑只污染 transcript 并推迟有效恢复槽。本包在
+LLM 流式输出偶发退化（单 token/短句循环）；继续跑只污染 transcript 并推迟有效恢复槽。本包在
 attempt 内放一个 bounded、非权威的纯传感器，命中时只停止当前物理 attempt，然后桥接标准
 `provider-attempt-recovery`。（详见 `WHY.md`）
 
@@ -12,8 +12,8 @@ attempt 内放一个 bounded、非权威的纯传感器，命中时只停止当�
 
 唯一 normative 合同在 `WHAT.md`（12 条命题，`DG-001`..`DG-012`）：
 - 问题与非目标（DG-001）；传感器是 ARCH-002 定点例外（DG-002）
-- 判定指标：过滤空白 + 4-gram + 指数核 + N_eff 阈值（DG-003）
-- 固定参数、O(1) 递推固定内存、生命周期绑定单次 ProviderRun（DG-004/005/006）
+- 判定指标：o200k token + 指数衰减 weighted-distinct token count（DG-003）
+- 仓库全文滴定固定参数、O(1) 更新有界内存、生命周期绑定单次 ProviderRun（DG-004/005/006）
 - 命中只停止当前物理 attempt、LoopKillArmed 进程内局部（DG-007/008）
 - 强杀桥接标准 recovery，不造第二状态机（DG-009）
 - 作用域与豁免、continuation 独立叶子、detector 不是业务 truth（DG-010/011/012）
@@ -28,7 +28,7 @@ attempt 内放一个 bounded、非权威的纯传感器，命中时只停止当�
 
 `PROOF.md` 给出每条命题的测试落点：
 - MOVE（2 文件，20 断言）：`tests/loop-detector.test.mjs`（9）、`tests/loop-sensor.test.mjs`（11）
-- NEW：`tests/loop-detector-memory.test.mjs`（4 断言：固定内存 / 无迟滞 / 无连续命中 / attempt 独立）
+- NEW：`tests/loop-calibration.test.mjs`（仓库全部可读文字滴定）+ `tests/loop-detector-memory.test.mjs`（有界内存 / 无迟滞 / 无连续命中 / attempt 独立）
 - REUSE：`tests/unit/verify/p0-recovery-join-gate.test.mjs`（桥接静态形状）
 
 ## 阅读顺序

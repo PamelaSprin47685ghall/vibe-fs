@@ -80,6 +80,14 @@ test('PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   }
 })
 
+test('PROMPT_common_law_discourages_ascii_art_in_both_languages', () => {
+  const en = promptResources.loadForLanguage(providerLanguage.english)
+  const zh = promptResources.loadForLanguage(providerLanguage.simplifiedChinese)
+
+  for (const text of Object.values(en)) assert.match(text, /avoid ASCII art where possible/)
+  for (const text of Object.values(zh)) assert.match(text, /输出尽量不要使用 ASCII art/)
+})
+
 test('PROMPT_role_laws_are_identity_not_tool_inventory', () => {
   for (const path of ROLE_PATHS) {
     const law = providerResources.readText(providerLanguage.english, path)
