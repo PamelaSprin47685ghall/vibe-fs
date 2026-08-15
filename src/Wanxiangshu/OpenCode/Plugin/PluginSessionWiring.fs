@@ -163,7 +163,10 @@ module PluginSessionWiring =
                     scope.Strength.StrengthRuntime,
                     registerStrengthReplica,
                     ?workspaceDirectory = workspaceDirectory,
-                    ?tryAcquireModel = Some(fun sessionId agent -> ModelRouting.tryAcquireManaged sessionId agent |> Option.map ModelRouting.toOpenCodeModel),
+                    ?tryAcquireModel =
+                        Some(fun sessionId agent ->
+                            ModelRouting.tryAcquireManaged sessionId agent
+                            |> Option.map ModelRouting.toOpenCodeModel),
                     ?releaseModel = Some(fun sessionId -> ModelRouting.releaseSession sessionId)
                 )
 

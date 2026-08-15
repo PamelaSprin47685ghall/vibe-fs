@@ -35,16 +35,20 @@ module LoopEventCodec =
                 None
 
     let private trySessionId (raw: obj) : SessionId option =
-        HostEventCodec.trySessionId raw |> Option.orElse (trySessionIdFromProperties raw)
+        HostEventCodec.trySessionId raw
+        |> Option.orElse (trySessionIdFromProperties raw)
 
     let private stringField (value: obj) : string option =
-        if isNull value || String.IsNullOrEmpty (string value) then
+        if isNull value || String.IsNullOrEmpty(string value) then
             None
         else
             Some(string value)
 
     let private textDeltaField (properties: obj) =
-        if isNull properties?field then Some "text" else stringField properties?field
+        if isNull properties?field then
+            Some "text"
+        else
+            stringField properties?field
 
     let private decodeTextDeltaProperties (sessionId: SessionId) (properties: obj) : TextDelta option =
         match textDeltaField properties, stringField properties?delta with

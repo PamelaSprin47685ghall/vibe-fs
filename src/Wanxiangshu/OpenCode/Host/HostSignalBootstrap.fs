@@ -476,13 +476,17 @@ module HostSignalBootstrap =
                         // AcceptHumanRoot. physical id + no PromptKey + not compaction
                         // → join wake.
                         match
-                            decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction
+                            decoded.SessionId,
+                            decoded.PhysicalUserMessageId,
+                            decoded.PromptKey,
+                            decoded.IsHostCompaction
                         with
                         // An external user message interrupts ONLY the current active
                         // join attempts; with none active it is dropped as a join wake
                         // (the message itself stays in the normal Host queue). No future
                         // join is latched or woken by this older message (EXEC-017).
-                        | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
+                        | Some sessionId, Some _, None, false ->
+                            scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
                         | _ -> ()
 
                         do! promptIngressHook input output

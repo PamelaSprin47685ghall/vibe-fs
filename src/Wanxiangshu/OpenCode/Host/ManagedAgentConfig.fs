@@ -98,7 +98,11 @@ module ManagedAgentConfig =
                 ManagedAgent.tryParse name
                 |> Result.requireSome (InvalidManagedAgent(name, "failed to parse required name"))
 
-            do! agentEntry agents name |> Result.requireSome (MissingManagedAgent name) |> Result.map ignore
+            do!
+                agentEntry agents name
+                |> Result.requireSome (MissingManagedAgent name)
+                |> Result.map ignore
+
             return name, { Agent = managed }
         }
 

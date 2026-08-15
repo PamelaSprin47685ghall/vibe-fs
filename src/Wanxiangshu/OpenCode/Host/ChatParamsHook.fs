@@ -19,7 +19,11 @@ module ChatParamsHook =
                 None
             else
                 let text = string field
-                if String.IsNullOrWhiteSpace text then None else Some(text.Trim())
+
+                if String.IsNullOrWhiteSpace text then
+                    None
+                else
+                    Some(text.Trim())
 
     let private currentModel (input: obj) =
         if isNull input then
@@ -29,9 +33,17 @@ module ChatParamsHook =
             let message: obj = input?message
             let messageModel: obj = if isNull message then null else message?model
 
-            let provider = textField rawModel "providerID" |> Option.orElseWith (fun () -> textField messageModel "providerID")
-            let modelId = textField rawModel "modelID" |> Option.orElseWith (fun () -> textField messageModel "modelID")
-            let variant = textField messageModel "variant" |> Option.orElseWith (fun () -> textField rawModel "variant")
+            let provider =
+                textField rawModel "providerID"
+                |> Option.orElseWith (fun () -> textField messageModel "providerID")
+
+            let modelId =
+                textField rawModel "modelID"
+                |> Option.orElseWith (fun () -> textField messageModel "modelID")
+
+            let variant =
+                textField messageModel "variant"
+                |> Option.orElseWith (fun () -> textField rawModel "variant")
 
             match provider, modelId with
             | Some providerID, Some modelID ->
@@ -56,13 +68,17 @@ module ChatParamsHook =
                     match currentModel input with
                     | None ->
                         invalidOp (
-                            sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent
+                            sprintf
+                                "PROMPT-006: managed provider run '%s' has no observable provider/model binding"
+                                agent
                         )
                     | Some model ->
                         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
                         | Ok true -> ()
                         | Ok false ->
                             invalidOp (
-                                sprintf "PROMPT-006: managed provider run '%s' was not recognized as a bound session" agent
+                                sprintf
+                                    "PROMPT-006: managed provider run '%s' was not recognized as a bound session"
+                                    agent
                             )
                         | Error error -> invalidOp error)

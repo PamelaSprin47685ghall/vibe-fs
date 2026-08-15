@@ -256,8 +256,7 @@ module MagicTodoFactCodec =
                 Encode.object
                     [ "case", Encode.string "PrefixRebaseCommittedV2"
                       "SessionId", Encode.string (SessionId.value p.SessionId)
-                      "ManagerLifeId",
-                      encodeOptional (ManagerLifeId.value >> Encode.string) p.ManagerLifeId
+                      "ManagerLifeId", encodeOptional (ManagerLifeId.value >> Encode.string) p.ManagerLifeId
                       "PreviousEpochId", Encode.int64 (PrefixEpochId.value p.PreviousEpochId)
                       "NextEpochId", Encode.int64 (PrefixEpochId.value p.NextEpochId)
                       "EvidenceKind", evidenceKindEncoder p.EvidenceKind

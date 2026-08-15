@@ -166,10 +166,8 @@ module ReconcileProgram =
         match evidence with
         | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | ReconcileEvidence.SnapshotError _
-        | ReconcileEvidence.NoTurn ->
-            decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
-        | ReconcileEvidence.Provisional _ ->
-            decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
+        | ReconcileEvidence.NoTurn -> decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
+        | ReconcileEvidence.Provisional _ -> decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
         | ReconcileEvidence.Unknown _ -> decideExhaustedUnknown wake rereadsRemaining
         | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
 

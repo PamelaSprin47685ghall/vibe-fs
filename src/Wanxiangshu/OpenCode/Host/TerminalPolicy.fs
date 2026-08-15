@@ -93,8 +93,13 @@ module TerminalPolicy =
         | None -> false
         | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
-    let private unlinkedTopLevel (sessionParents: Dictionary<string, string>) (journal: AgentJournal option) (sessionKey: string) =
-        not (sessionParents.ContainsKey sessionKey) && not (isLinkedChild journal sessionKey)
+    let private unlinkedTopLevel
+        (sessionParents: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (sessionKey: string)
+        =
+        not (sessionParents.ContainsKey sessionKey)
+        && not (isLinkedChild journal sessionKey)
 
     let private managerOwnsTopLevel
         (sessionParents: Dictionary<string, string>)
@@ -143,8 +148,7 @@ module TerminalPolicy =
         =
         match journal with
         | None -> not (sessionParents.ContainsKey sessionKey)
-        | Some j ->
-            sessionIsTopLevelManager sessionParents journal sessionKey (AgentJournal.snapshot j)
+        | Some j -> sessionIsTopLevelManager sessionParents journal sessionKey (AgentJournal.snapshot j)
 
     let private hasListableHandles (journal: AgentJournal option) (sessionId: SessionId) =
         match journal with
@@ -175,7 +179,6 @@ module TerminalPolicy =
         : bool =
         match role with
         | Some Role.Manager -> hasListableHandles journal sessionId
-        | Some Role.DevOps ->
-            hasListableHandles journal sessionId || hasLivePty (SessionId.value sessionId)
+        | Some Role.DevOps -> hasListableHandles journal sessionId || hasLivePty (SessionId.value sessionId)
         | Some Role.Orchestrator -> hasActiveOrchestratorJobs journal
         | _ -> false

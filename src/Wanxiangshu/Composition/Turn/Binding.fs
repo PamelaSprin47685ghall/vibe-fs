@@ -82,10 +82,7 @@ module TurnBinding =
     ///
     /// Physical stays `None` when nothing is bound. It is not backfilled from the
     /// root, because PROMPT-002 makes promotion one-way and there is deliberately
-    let private tryBoundPhysical
-        (userBindings: Dictionary<string, PhysicalUserMessageId>)
-        (sessionId: SessionId)
-        =
+    let private tryBoundPhysical (userBindings: Dictionary<string, PhysicalUserMessageId>) (sessionId: SessionId) =
         match userBindings.TryGetValue(SessionId.value sessionId) with
         | true, bound -> Some bound
         | false, _ -> None
@@ -210,7 +207,8 @@ module TurnBinding =
                 let projectedBinding (proj: AgentProjectionSet) =
                     Map.tryFind sessionId proj.Sessions
                     |> Option.bind (fun session -> session.PromptAuthority)
-                    |> Option.bind (fun authority -> fromProjection sessionId authority userMessageBindings continuations)
+                    |> Option.bind (fun authority ->
+                        fromProjection sessionId authority userMessageBindings continuations)
 
                 let mergeBindings (explicitBinding: ActiveRunBinding option) (projected: ActiveRunBinding option) =
                     match explicitBinding, projected with

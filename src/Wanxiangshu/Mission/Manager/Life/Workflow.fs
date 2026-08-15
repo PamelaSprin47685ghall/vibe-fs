@@ -168,6 +168,7 @@ module ManagerLifeWorkflow =
         : Task<Result<LifeProjection option, string>> =
         taskResult {
             let xTrace = InitialAgentOwnerMigrationEvidence.xTrace evidence
+
             let opening =
                 match xTrace.Opening with
                 | Some value -> Ok value
@@ -208,17 +209,18 @@ module ManagerLifeWorkflow =
     /// FINALITY-022 admission owner for ending-time Life lookup.
     /// Existing Life wins; an AgentOwnerRoot may materialize exactly one migration
     /// Life before any completed-Life history exists; otherwise no Life is admitted.
-    let ensureEndingLife
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        : Task<Result<LifeProjection option, string>> =
+    let ensureEndingLife (journal: AgentJournal) (sessionId: SessionId) : Task<Result<LifeProjection option, string>> =
         let snapshot = AgentJournal.snapshot journal
         let session = AgentProjection.tryFind sessionId snapshot.AgentProjections
+
         let lifecycle =
             session
             |> Option.bind (fun value -> value.ManagerLife)
             |> Option.defaultValue ManagerLifecycleProjection.empty
-        let profile = PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+
+        let profile =
+            PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+
         let xTrace = session |> Option.bind (fun value -> value.XTrace)
 
         match ManagerLifeAdmission.ending lifecycle profile xTrace with

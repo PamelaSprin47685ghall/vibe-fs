@@ -360,7 +360,8 @@ module ManagerNarrativeTransform =
         (rawMessages: obj list)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         =
-        let rootMessageId = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+        let rootMessageId =
+            AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
 
         match findMessageIndex rawMessages rootMessageId with
         | None -> Task.FromResult None

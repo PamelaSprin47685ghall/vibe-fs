@@ -130,11 +130,7 @@ module NodeProcessWait =
             | Cancelled -> return WaitCancelled
         }
 
-    let private awaitUntilDeadline
-        (child: NodeProcessHost.ChildProcess)
-        (deadline: Deadline)
-        (ct: CancellationToken)
-        =
+    let private awaitUntilDeadline (child: NodeProcessHost.ChildProcess) (deadline: Deadline) (ct: CancellationToken) =
         task {
             let clock = fun () -> DateTimeOffset.UtcNow
 

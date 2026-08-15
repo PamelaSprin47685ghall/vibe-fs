@@ -142,9 +142,7 @@ module OrdinaryTurnWorkflow =
         (turn: ReconciledTurn)
         =
         task {
-            match!
-                HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
-            with
+            match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
             | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
                 |> ignore

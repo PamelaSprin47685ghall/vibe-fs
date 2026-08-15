@@ -156,6 +156,7 @@ module BloggerDelta =
 
         while low <= highBound do
             let mid = low + (highBound - low) / 2
+
             let nextLow, nextHigh, nextBest =
                 adjustPrefixSearch budget documentBytes mid low highBound bestLength
 

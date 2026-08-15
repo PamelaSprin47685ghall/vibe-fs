@@ -215,10 +215,7 @@ module EnforcerTipGuidance =
             | Some rule -> return! guidanceForRule journal mainSessionId lang field rule
         }
 
-    let private guidanceForOwner
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        : Task<TipGuidance option> =
+    let private guidanceForOwner (journal: AgentJournal) (mainSessionId: SessionId) : Task<TipGuidance option> =
         task {
             match latestOwnerTipField journal mainSessionId with
             | None -> return None

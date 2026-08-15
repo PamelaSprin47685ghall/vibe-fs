@@ -31,11 +31,7 @@ module RecoveryClosureProjection =
         |> Option.bind (fun session -> session.Handles)
         |> Option.defaultValue HandleProjection.empty
 
-    let private addBloggerPair
-        (add: RecoveryNode -> unit)
-        (owner: SessionId)
-        (projection: AgentProjectionSet)
-        =
+    let private addBloggerPair (add: RecoveryNode -> unit) (owner: SessionId) (projection: AgentProjectionSet) =
         match SessionAssociationProjection.tryBloggerOf owner projection.Associations with
         | Some blogger ->
             add (RecoveryNode.Companion(owner, blogger))

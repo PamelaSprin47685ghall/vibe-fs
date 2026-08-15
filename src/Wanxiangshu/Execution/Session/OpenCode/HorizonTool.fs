@@ -168,14 +168,7 @@ module HorizonTool =
     let private unavailable language path =
         ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render language path Map.empty ] []
 
-    let private appendHandleLines
-        language
-        journal
-        snapshot
-        runtimeByAgentId
-        (agentLines: ResizeArray<string>)
-        handle
-        =
+    let private appendHandleLines language journal snapshot runtimeByAgentId (agentLines: ResizeArray<string>) handle =
         task {
             match HandleId.tryAgent handle.Handle with
             | None -> ()

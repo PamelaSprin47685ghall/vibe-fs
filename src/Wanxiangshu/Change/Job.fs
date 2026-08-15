@@ -173,11 +173,7 @@ type VerdictMailbox() =
             else
                 waiters.Enqueue waiter)
 
-    member private this.resolveEmptyDrain
-        (waiter: TaskCompletionSource<unit>)
-        (kind: int)
-        (winner: obj)
-        =
+    member private this.resolveEmptyDrain (waiter: TaskCompletionSource<unit>) (kind: int) (winner: obj) =
         if kind = 0 then
             // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
             ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
@@ -186,11 +182,7 @@ type VerdictMailbox() =
             let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
             Interrupted reason
 
-    member private this.resolveAfterDrain
-        (waiter: TaskCompletionSource<unit>)
-        (cap: int)
-        (winner: obj)
-        =
+    member private this.resolveAfterDrain (waiter: TaskCompletionSource<unit>) (cap: int) (winner: obj) =
         let after = this.DrainAvailable cap
 
         match NonEmptyBatch.tryOfList after with

@@ -9,9 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources
 
-type ModelRoutingTarget =
-    { Model: string
-      Reasoning: string }
+type ModelRoutingTarget = { Model: string; Reasoning: string }
 
 type private PendingDemand =
     { SessionId: string
@@ -84,14 +82,19 @@ module ModelRouting =
     let private targetObject (target: ModelRoutingTarget) =
         createObj [ "model" ==> target.Model; "reasoning" ==> target.Reasoning ]
 
-    let invokeScheduler (scheduler: obj) (role: string) (running: ModelRoutingTarget array) : ModelRoutingTarget option =
+    let invokeScheduler
+        (scheduler: obj)
+        (role: string)
+        (running: ModelRoutingTarget array)
+        : ModelRoutingTarget option =
         if not (isFunction scheduler) then
             invalidOp "execution-model-routing: scheduler default export must be a function"
 
         if String.IsNullOrWhiteSpace role then
             invalidOp "execution-model-routing: scheduler role must be non-empty"
 
-        let result = callScheduler scheduler (role.Trim()) (running |> Array.map targetObject)
+        let result =
+            callScheduler scheduler (role.Trim()) (running |> Array.map targetObject)
 
         if isThenable result then
             invalidOp "execution-model-routing: scheduler must be synchronous and must not return a Promise"
@@ -105,10 +108,7 @@ module ModelRouting =
     let private errorCode (error: exn) =
         let value = box error
 
-        if isNull value?code then
-            None
-        else
-            Some(string value?code)
+        if isNull value?code then None else Some(string value?code)
 
     let bootstrapAndLoadAt (path: string) (template: string) : Task<obj> =
         task {
@@ -124,11 +124,7 @@ module ModelRouting =
             let tempPath = path + ".tmp-" + randomUuid ()
 
             try
-                writeFileSync (
-                    tempPath,
-                    template,
-                    createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ]
-                )
+                writeFileSync (tempPath, template, createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
 
                 try
                     linkSync (tempPath, path)
@@ -152,9 +148,11 @@ module ModelRouting =
             return scheduler
         }
 
-    let private recommendedTemplate () = PackageResources.readText "wanxiangshu.mjs"
+    let private recommendedTemplate () =
+        PackageResources.readText "wanxiangshu.mjs"
 
-    let bootstrapDefault () = bootstrapAndLoadAt (configPath ()) (recommendedTemplate ())
+    let bootstrapDefault () =
+        bootstrapAndLoadAt (configPath ()) (recommendedTemplate ())
 
     let toOpenCodeModel (target: ModelRoutingTarget) : OpencodeModel =
         let slash = target.Model.IndexOf '/'
@@ -187,7 +185,9 @@ module ModelRouting =
     let leaseKey (sessionId: string) (agent: string) = sessionId + "\u001f" + agent
 
     let private failedTask<'T> (error: exn) : Task<'T> =
-        let completion = TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously)
+        let completion =
+            TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously)
+
         completion.SetException(error)
         completion.Task
 
@@ -201,8 +201,7 @@ module ModelRouting =
 
         let running () = managed.Values |> Seq.toArray
 
-        let ensureHealthy () =
-            fatalError |> Option.iter raise
+        let ensureHealthy () = fatalError |> Option.iter raise
 
         let rememberManaged sessionId key target =
             managed.[key] <- target
@@ -233,7 +232,8 @@ module ModelRouting =
                 with _ ->
                     ()
 
-        let trySchedule role = invokeScheduler scheduler role (running ())
+        let trySchedule role =
+            invokeScheduler scheduler role (running ())
 
         let scheduleOrPoison role =
             try
@@ -281,7 +281,9 @@ module ModelRouting =
                             Task.FromResult target
                         | None ->
                             let completion =
-                                TaskCompletionSource<ModelRoutingTarget>(TaskCreationOptions.RunContinuationsAsynchronously)
+                                TaskCompletionSource<ModelRoutingTarget>(
+                                    TaskCreationOptions.RunContinuationsAsynchronously
+                                )
 
                             let demand =
                                 { SessionId = sessionId
@@ -357,7 +359,8 @@ module ModelRouting =
                         removePending demand
                         AsyncSupport.trySetCanceled demand.Completion |> ignore
 
-                    if changed && fatalError.IsNone then drainPending ())
+                    if changed && fatalError.IsNone then
+                        drainPending ())
 
         member _.CancelPendingSession(sessionId: string) =
             if not (String.IsNullOrWhiteSpace sessionId) then
@@ -416,6 +419,8 @@ module ModelRouting =
     let tryLease (sessionId: SessionId) (agent: string) =
         current().TryLease(SessionId.value sessionId, agent)
 
-    let releaseSession (sessionId: SessionId) = current().ReleaseSession(SessionId.value sessionId)
+    let releaseSession (sessionId: SessionId) =
+        current().ReleaseSession(SessionId.value sessionId)
 
-    let cancelPendingSession (sessionId: SessionId) = current().CancelPendingSession(SessionId.value sessionId)
+    let cancelPendingSession (sessionId: SessionId) =
+        current().CancelPendingSession(SessionId.value sessionId)

@@ -16,9 +16,7 @@ module HumanRootOpeningEvidence =
 
 /// Evidence that an AgentOwnerRoot Manager has never owned a Life before and may
 /// materialize its one migration Life from the current XTrace on first ending.
-type InitialAgentOwnerMigrationEvidence =
-    private
-    | InitialAgentOwnerMigrationEvidence of XTraceProjectionState
+type InitialAgentOwnerMigrationEvidence = private InitialAgentOwnerMigrationEvidence of XTraceProjectionState
 
 module InitialAgentOwnerMigrationEvidence =
     let xTrace (InitialAgentOwnerMigrationEvidence xTrace) = xTrace

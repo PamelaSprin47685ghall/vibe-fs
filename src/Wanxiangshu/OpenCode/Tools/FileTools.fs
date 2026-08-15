@@ -140,6 +140,5 @@ module FileTools =
                         return
                             { Result = sprintf "Invalid edit payload: %s" input.Payload
                               Truncated = false }
-                    | Some(filePath, oldString, newString) ->
-                        return applyEdit filePath oldString newString
+                    | Some(filePath, oldString, newString) -> return applyEdit filePath oldString newString
                 } }

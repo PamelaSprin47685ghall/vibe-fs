@@ -55,10 +55,7 @@ module OrchestratorSweep =
             | Error error ->
                 return
                     Error(
-                        sprintf
-                            "stale manager branch cleanup failed for %s: %s"
-                            (WorktreeIdentity.value identity)
-                            error
+                        sprintf "stale manager branch cleanup failed for %s: %s" (WorktreeIdentity.value identity) error
                     )
         }
 
@@ -89,10 +86,7 @@ module OrchestratorSweep =
         else
             identity
 
-    let private afterRemoveWorktrees
-        (git: GitPort)
-        (isStale: WorktreeIdentity -> bool)
-        : Task<Result<unit, string>> =
+    let private afterRemoveWorktrees (git: GitPort) (isStale: WorktreeIdentity -> bool) : Task<Result<unit, string>> =
         task {
             match! git.ListManagerBranches() with
             | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)

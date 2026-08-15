@@ -25,7 +25,10 @@ module SessionExecutionBinding =
     let private providerAttemptBindings = Dictionary<string, ExpectedBinding>()
 
     let private nonEmpty (value: string) =
-        if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(value.Trim())
 
     let private promptBindingKey (sessionId: SessionId) (promptKey: PromptKey) =
         SessionId.value sessionId + "\u001f" + PromptKey.value promptKey
@@ -187,12 +190,16 @@ module SessionExecutionBinding =
 
         ModelRouting.releaseSession sessionId
 
-    let cancelPending (sessionId: SessionId) = ModelRouting.cancelPendingSession sessionId
+    let cancelPending (sessionId: SessionId) =
+        ModelRouting.cancelPendingSession sessionId
 
     let requiresProviderBindingProof (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-            internalBindings.ContainsKey key || parents.ContainsKey key || agents.ContainsKey key)
+
+            internalBindings.ContainsKey key
+            || parents.ContainsKey key
+            || agents.ContainsKey key)
 
     let private validateLease (sessionId: SessionId) (agent: string) (model: OpencodeModel) =
         match ModelRouting.tryLease sessionId agent with
@@ -278,8 +285,7 @@ module SessionExecutionBinding =
             | SessionBindingIntent.Preserve when agent <> baseAgent ->
                 Error(sprintf "PROMPT-006: %s agent drift (%s -> %s)" label baseAgent agent)
             | SessionBindingIntent.ExplicitExecutionOverride when
-                agent <> baseAgent
-                && not (tryPeerName baseAgent |> Option.exists ((=) agent))
+                agent <> baseAgent && not (tryPeerName baseAgent |> Option.exists ((=) agent))
                 ->
                 Error(sprintf "PROMPT-006: execution override is not the peer of '%s': %s" baseAgent agent)
             | _ -> requireRoutedModel sessionId agent opts

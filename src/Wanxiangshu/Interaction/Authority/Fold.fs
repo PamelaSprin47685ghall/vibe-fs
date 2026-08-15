@@ -79,9 +79,7 @@ module PromptFactFold =
                             )
                         Fallback =
                             Some(
-                                FallbackProjection.forAuthority
-                                    payload.LogicalRunId
-                                    payload.AuthorityRootUserMessageId
+                                FallbackProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
                             ) })
                 projection
 

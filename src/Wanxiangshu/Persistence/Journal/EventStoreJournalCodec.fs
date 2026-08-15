@@ -147,5 +147,4 @@ module EventStoreJournalCodec =
         if event.EventType <> JournalEnvelopeEventType then
             Error(sprintf "expected EventType %s, got %s" JournalEnvelopeEventType event.EventType)
         else
-            envelopeFromPayload event.Payload
-            |> Result.bind (validateDecoded event)
+            envelopeFromPayload event.Payload |> Result.bind (validateDecoded event)

@@ -85,8 +85,7 @@ module OrchestratorGit =
         (worktree: string)
         : Task<Result<unit, string>> =
         task {
-            let! contCode, _, contErr =
-                runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+            let! contCode, _, contErr = runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
             if contCode = 0 then
                 return Ok()

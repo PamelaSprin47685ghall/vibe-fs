@@ -219,11 +219,7 @@ module StrengthFrame =
             match Map.tryFind (ToolCallId.value ownerId) idMap with
             | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
             | Some replicaId ->
-                localizeParts
-                    tail
-                    nextOrdinal
-                    idMap
-                    (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+                localizeParts tail nextOrdinal idMap (ProviderProjection.WireToolResult(replicaId, result) :: localized)
 
         let rec localizeMessages
             (remaining: ProviderProjection.WireMessage list)
@@ -239,6 +235,7 @@ module StrengthFrame =
                     localizeMessages tail next nextMap ({ message with Parts = parts } :: localized))
 
         localizeMessages messages 1 Map.empty []
+
     /// Host-only synthetic message identity for one rendered half of a provider
     /// request batch. This identity is stable across replay/restart and is used by
     /// XTrace provenance to recover the exact Traced cursor range. It never enters
