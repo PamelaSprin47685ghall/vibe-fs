@@ -53,8 +53,8 @@ resolveOrigin（journal 已知 provenance）
 - **legacy agent 名单与精确错误文案**（`ManagedAgentCatalog.legacyAgentNames`、
   `formatLegacyNameNotSupported`）：COVERAGE 判 AGENT-004 为 GARBAGE（migration ratchet）。
   本包保留 WHAT「HumanRoot 必须显式 managed agent + 拒绝是 typed 的」（AGENT-005），精确名单与
-  文案只在 HOW 记录，不升格为命题。`student-teacher-absence.mjs` 等 absence ratchet 在新世界
-  基线稳定后删除（PROOF-MAP DELETE 清单）。
+  文案只在 HOW 记录，不升格为命题。`student-teacher-absence.mjs` 等 absence ratchet 已随新世界
+  基线稳定删除（CLN-Z；PROOF-MAP DELETE 清单）。
 - **`PromptAuthority.fromString` / ManagerGuard 历史 journal 解析**：COVERAGE 判 HOW——仅用于
   解析历史 journal 行，生产不再发送 ManagerGuard continuation（GLORY-070）。ManagerGuard 仍是
   `ContinuationKind` 成员（可解析），但不再作为新发送的 origin。

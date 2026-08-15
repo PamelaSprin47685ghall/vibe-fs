@@ -127,7 +127,7 @@ plugin tool 名 todowrite 覆盖 builtin                   → O 红
    归 interaction-authority；consultation child 归 delegation。cutover 时拆分。
 5. `requirements/capability-enforcement/tests/managed-agent-config.test.mjs`：owned-fields / external_directory 边界归
    本包；inventory/model 校验归 capability-enforcement。cutover 时拆分。
-6. `requirements/crash-reconciliation/tests/session-quiescence-gate.test.mjs`：整体归 causal-wait（QuiescencePermit）。
+6. `requirements/crash-reconciliation/tests/quiescence-surface.test.mjs`：整体归 causal-wait（QuiescencePermit）。
 7. `tests/unit/host/pair-thought-*.test.mjs`：归 prefix-stability / provider-projection（HOST-013）。
 8. `requirements/review-assurance/tests/review-guard.test.mjs`：归 review-assurance。
 9. `tests/unit/verify/` 目录：host001-fragment-events / host012-tool-part 已 MOVE；其余 verify

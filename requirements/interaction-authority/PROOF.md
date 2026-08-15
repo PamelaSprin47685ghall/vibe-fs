@@ -77,5 +77,4 @@ node --test requirements/interaction-authority/tests/continuation-origin.test.mj
   `join-guard.test.mjs`（host+execution）、`idle-continuation-authority.test.mjs`、
   `completed-turn-classifier.test.mjs`、`join-v2-mailbox.test.mjs` 的跨 owner 断言在文件级拆分时
   收敛到各自 owner（见各 REUSE 行的边界注记）。
-- 迁移 ratchet 退休：`student-teacher-absence.mjs`、legacy 名单级断言（AGENT-004）在新世界基线
-  稳定后删除（PROOF-MAP DELETE 清单）。
+- 迁移 ratchet 退休：`student-teacher-absence.mjs`、legacy 名单级断言（AGENT-004）已随新世界基线稳定删除（CLN-Z；PROOF-MAP DELETE 清单）。

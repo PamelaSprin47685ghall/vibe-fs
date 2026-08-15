@@ -87,8 +87,8 @@ journal 关联优先做 durable keyed lookup。
 - **复用 Teacher 调用代数，不复用 Teacher 分类**（universal.md §13.6）：SyncDelegate 的
   `send → await → completion` 协议被保留并归 `delegation`；Teacher 的 leaf/no-Companion 拓扑删除。
 - **G3 clean-break**：Student/Teacher（`ce-student-teacher-collapse.md`、`universal.md`）——
-  已删领域；absence ratchet 由 `student-teacher-absence.mjs`（migration-only，cutover 后删）
-  与 session-ownership-ratchet 的 `unexpected-kind` 拒绝共同证明（SESSION-ONTOLOGY-014）。
+  已删领域；absence ratchet（`student-teacher-absence.mjs`，migration-only）已随 CLN-Z 退役，
+  `unexpected-kind` 拒绝与角色枚举共同证明（SESSION-ONTOLOGY-014）。
 - **Companion 不是永久 ontology**（HANDOFF §11.1）：`companion.md` 的 15 条 COMPANION 中，
   topology（001/002）归本包；frame/squash 归 context-compression；XTrace 归 semantic-trace；
   WorkRecord 归 work-record；prefix 归 prefix-stability。未来 deterministic in-process summarizer

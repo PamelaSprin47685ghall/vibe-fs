@@ -188,7 +188,7 @@ label 稳定性」这一可观察面。
 ## GARBAGE / 弃权（不进入 WHAT）
 
 - `HOST-014` Student/Teacher Host 行为、QA bootstrap、`teacher` 双 await、Learn/Compile nudge
-  全条 → GARBAGE（migration absence ratchet；`student-teacher-absence.mjs` 基线稳定后删）。
+  全条 → GARBAGE（migration absence ratchet；`student-teacher-absence.mjs` 已随 CLN-Z 退役）。
 - `AGENT-002` exact catalog（22 agent 名等）→ GARBAGE（machine vocabulary）。
 - `AGENT-020/021/022` Student absence 细节 → GARBAGE（与 SESSION-ONTOLOGY-014 同源，收敛到 absence）。
 - 历史 `SatelliteKind = { Companion, Teacher }` 中的 Teacher 案例 → GARBAGE（G3 删除）。

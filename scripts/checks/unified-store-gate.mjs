@@ -166,7 +166,8 @@ const REMOTE_TRACKING_STORE_REF_RE = /^refs\/wanxiang\/remotes\/[^/]+\/store$/
 
 /**
  * Student QA storage revival under src/ (Amendment G3.5-A / G3 clean-break).
- * Complementary to student-teacher-absence.mjs (do not weaken that gate).
+ * The student-teacher-absence ratchet was retired 2026-08-14; this scanner is
+ * the sole fail-closed guard on Student QA storage revival.
  */
 const STUDENT_QA_REVIVAL_RES = [
   { re: /\bStudentQaStore\b/, token: 'StudentQaStore' },
@@ -366,7 +367,7 @@ export const scanStudentQaRevival = (text, file = '<synthetic>') => {
           id: 'student-qa-revival',
           file,
           line: i + 1,
-          label: `Student QA storage revival token '${token}' is forbidden under src/ (G3 / G3.5-A clean-break; see also student-teacher-absence.mjs)`,
+          label: `Student QA storage revival token '${token}' is forbidden under src/ (G3 / G3.5-A clean-break)`,
           text: raw.trim(),
         })
         break
