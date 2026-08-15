@@ -63,6 +63,12 @@ subscriber sticky replay、listener disposal。
 - `Tools/ToolContext.fs`：`{ SessionId; Workspace; Cancellation }`（execute 双半边身份经
   `ToolHostCodec` 组装；before/after 只见 sessionID+callID）。
 
+## Plugin Load / Activation 分界（HOST-BOUNDARY-021）
+
+`server(input)` 返回 hooks 之前只组装 capability。该路径不得访问 Host session API，不做 durable semantic recovery，不修改 workspace/Git，不产生业务 durable fact。
+
+Load Phase 可以检查模块、静态资源、配置与 durable bytes 的结构可读性；结构合法但业务语义无法解释时，最多让对应 capability 在使用时失败。普通 hook/tool 也不得承担“上一进程工具恢复”：Fission/Assistance/js-* 等未完成执行保持坏记录。未来 session resume 必须由显式 `/continue` 进入并把 restart/broken-tool 事实公开给 LLM。
+
 ## 历史与弃权
 
 - **碎片积分被拒**（why/host.md §4）：流式碎片顺序/形状随 Host 版本漂移 → 选「粗粒度唤醒 +

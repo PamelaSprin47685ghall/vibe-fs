@@ -69,7 +69,7 @@ type IJsTransactionPersistence =
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
 /// / feature store). A transaction is Prepared before any filesystem effect
-/// and Committed after; recovery consumes canonical Integrator Current.
+/// and Committed after; an uncommitted Prepared remains interrupted-tool evidence.
 module JsToolsTransactionStore =
 
     /// Single linear stream for transaction facts.
@@ -150,7 +150,10 @@ module JsToolsTransactionStore =
                       PayloadRefs = [] }
 
             match! store.Append [ envelope ] with
-            | Ok() -> return Ok eventId
+            | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
+                let cut = AppendReceipt.cutFor eventId receipt |> Option.get
+                return Error("JsTransactionPrepared semantic cut: " + cut.Reason)
+            | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionPrepared append failed: %A" err)
         }
 
@@ -170,7 +173,10 @@ module JsToolsTransactionStore =
                       PayloadRefs = [] }
 
             match! store.Append [ envelope ] with
-            | Ok() -> return Ok eventId
+            | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
+                let cut = AppendReceipt.cutFor eventId receipt |> Option.get
+                return Error("JsTransactionCommitted semantic cut: " + cut.Reason)
+            | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionCommitted append failed: %A" err)
         }
 
@@ -178,19 +184,3 @@ module JsToolsTransactionStore =
         { new IJsTransactionPersistence with
             member _.AppendPrepared(prepared) = appendPrepared store prepared
             member _.AppendCommitted(transactionId) = appendCommitted store transactionId }
-
-    /// JS-015: crash recovery consumes only the canonical Integrator Current.
-    /// No transaction code is allowed to enumerate durable history itself.
-    let recoverCurrent (store: IEventStore) : unit =
-        match store.TryCurrent "JsTransaction" with
-        | None -> ()
-        | Some current ->
-            let projection = unbox<JsTransactionProjection> current
-
-            for prepared in JsTransactionProjection.pending projection do
-                for mutation in prepared.Mutations do
-                    JsMutationFs.undoIfMatches
-                        prepared.WorkspaceRoot
-                        mutation.Path
-                        mutation.NewText
-                        mutation.OriginalText

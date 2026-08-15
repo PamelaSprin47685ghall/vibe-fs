@@ -200,7 +200,10 @@ module CasebookStore =
                       PayloadRefs = [] }
 
             match! store.Append [ envelope ] with
-            | Ok() -> return Ok eventId
+            | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
+                let cut = AppendReceipt.cutFor eventId receipt |> Option.get
+                return Error(sprintf "%s semantic cut: %s" eventType cut.Reason)
+            | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "%s append failed: %A" eventType err)
         }
 

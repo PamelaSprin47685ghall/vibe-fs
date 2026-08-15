@@ -14,7 +14,15 @@ ProcessEventLog(commonDir, WriterId)         // Infrastructure/Persist/ProcessEv
   → IJournalEventStoreBoot.ResumeOrCreate / EventStoreJournalWriter
   → AgentJournal.createFromEventStore | createFromProjection
 
-Wanxiangshu/OpenCode startup
+Wanxiangshu/OpenCode Load Phase
+  → parse module/resources/config + validate/read durable bytes
+  → best-effort fold may populate Current, but semantic rejection cannot escape load
+  → no HookDispatcher.ensure / recovery / Host re-entry / durable business write
+  → return hooks/tools
+
+first durable capability activation
+  → open/fold Current as demanded
+  → append RuntimeStarted lazily before first durable business fact
   → HookDispatcher.ensure：install/refresh reference-transaction + pre-push
   → ensure each remote fetches refs/wanxiang/store into remote-tracking ref
   → stop（产品进程不主动 fetch/pull/push）
@@ -28,8 +36,7 @@ later, user Git process (Wanxiangshu may be absent)
   → replace local truth + publish remote EventStore snapshot
 ```
 
-运行时 append/replay 不调用 Git object API。`HookDispatcher` 只在 startup ensure hook/refspec；
-`HookSync` 才是独立 Git hook 子进程的同步入口，并以 `WANXIANG_GIT_SYNC_ACTIVE` 防递归。
+运行时 append/replay 不调用 Git object API。`HookDispatcher` 只在 durable activation ensure hook/refspec，绝不进入 plugin Load Phase；`HookSync` 才是独立 Git hook 子进程的同步入口，并以 `WANXIANG_GIT_SYNC_ACTIVE` 防递归。
 
 ## 分层与所有权（shape/persist.md PERSIST-006 / storage.md §45）
 
@@ -37,7 +44,7 @@ later, user Git process (Wanxiangshu may be absent)
 |---|---|---|
 | Domain | `EventEnvelope` / `PayloadRef` / 因果与业务语义 | `GitObjectId` / `RootOid` / `StoreSnapshot` / Git 操作 |
 | Persist | canonical JSON、本地 process NDJSON、payload closure、k-way input、唯一 `CanonicalIntegrator` CE、sync materialization | 领域业务判断、feature-owned history reader、按 domain 拆 backend |
-| HookDispatcher / HookSync / GitGateway | startup hook/refspec ensure；独立 Git-hook 进程 transport、writer-file blobification、remote snapshot replace | 产品进程主动 fetch/pull/push、Domain reducer、后台同步状态机、第二套业务积分器 |
+| HookDispatcher / HookSync / GitGateway | activation-time hook/refspec ensure；独立 Git-hook 进程 transport、writer-file blobification、remote snapshot replace | plugin Load Phase mutation、产品进程主动 fetch/pull/push、Domain reducer、后台同步状态机、第二套业务积分器 |
 | AgentJournal / Strength / Casebook / JsTransaction | EventEnvelope producer + 向 Integrator 注册单-event rule + 读取 Current | 历史枚举、独立 replay/fold/project loop、physical journal/backend |
 
 红线：`src/Wanxiangshu/Domain/EventStore.fs` 不引用 `Infrastructure`；Git object identity 只存在于
@@ -75,8 +82,11 @@ createLocal：生成 fresh WriterId；打开 .git/wanxiang/events/<WriterId>.ndj
 boot：CanonicalIntegrator 独占读取 .git/wanxiang/events/*.ndjson → k-way merge → Current
 validateAppendSet：只向 Integrator 查询 Current/indexed identity/parents；不自行扫描历史
 append：acquire cross-process `.git/wanxiang` physical gate
-        → canonical encode 新 events → append complete JSON+LF lines → durability barrier
-        → 同一批 events 交给 CanonicalIntegrator.integrateLive → 更新 Current/frontier → release gate
+        → structural validate → CanonicalIntegrator.prepareLive
+        → rule success: event 正常推进 Current
+        → rule semantic error: bad event 保留 + rule-owned reset patch → 追加 ProjectionCutTail
+        → bad event / cut reset / 其余 events 按原时序 append complete JSON+LF → durability barrier
+        → commit 已准备好的 Current/frontier；返回 AppendReceipt.Cuts → release gate
 publish：先在同一 physical gate 下把新增 payload bytes 写 .git/wanxiang/payloads/<PayloadRef>；
         event append 再独立取得 gate、验证 closure 后提交
 ```
@@ -116,14 +126,15 @@ integrator {
     register ...future business rules
 }
 
-boot:  history streams → k-way merge → Integrator CE → Current
-live:  newly committed EventEnvelope     → same Integrator CE → Current'
+boot:  history streams → k-way merge → integrateOne in canonical order → Current
+live:  new EventEnvelope → same integrateOne; semantic failure may synthesize immediate durable cut reset
 ```
 
 Integrator 拥有：history reader、k-way frontier、identity dedupe、parent/vocabulary structural validation、
-Current。注册 rule 只接受“当前槽位 + 单个 EventEnvelope”，返回更新后的槽位/拒绝；rule 不得读取文件、
-不得枚举历史、不得自己建立 replay loop。`Composition/Durable/Fold.fs` 的各 domain fold 变成 Journal rule 内部的
-单-event integration primitives，而不是另一个 history owner。
+Current、faulted-rule tail 与 process-wide one-shot full-replay budget。注册 rule 接受“当前槽位 + 单个 EventEnvelope”；
+正常返回新槽位，语义拒绝时由 rule 的 `PlanCut` 推断最小 reset 参数，由 `ApplyCut` 解释该参数。Integrator 不保存 old-state snapshot；失败 event 不改 last-good Current，直到 timeline 中的 `ProjectionCutTail` 到达才 reset/clear fault。rule 不得读取文件、枚举历史、不得自己建立 replay loop。
+
+`ProjectionCutTail` 是 authoritative EventEnvelope，不是日志：payload 至少含 `rule / failed_event_id / reason / reset_json`，和其它 writer fact 一起 sync。live 发现新 semantic failure 时 bad fact 与 cut fact 同批持久化；replay 从不预扫 cut index，严格经历“bad → faulted tail → cut reset → continue”。如果 `PlanCut` 无法 O(1) 推断，Integrator 最多允许全进程一次 full-log replay 后重试推断。
 
 ### 6. Local files 与 remote Git 编码
 
@@ -146,7 +157,7 @@ Git pack/delta 是 Git 内部优化；sync 每次可以为增长后的 writer fi
 EventStoreJournalWriter：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
                          boot projection 直接读取 CanonicalIntegrator.Current.Journal
 Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.rule、读取自己的 Current 槽位
-AgentJournal.AppendEnvelope：local commit → Integrator live integration；不额外 fold history
+AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则本次返回 `FactRejected`，但 journal 不 poison、后续 append 继续可用
 ```
 
 Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`（EventStoreJournalWriter.fs）
@@ -157,12 +168,9 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
 
 任何 `loadEvents(raw,snapshot)` / `EventStoreMergeSpec.merge(...history...)` 出现在业务模块都属于结构性 RED。
 
-## 恢复 fold 不变量（PERSIST-010）的实现落点
+## Business fold 不变量与 cut-tail（PERSIST-010）
 
-不变量权威定义在历史 what/persist PERSIST-010（迁移后由本包 WHAT 015 承接）；
-逐 fact 校验在 `Composition/Durable/Fold.fs` 恢复事实分支 + 各 domain fold（`CompanionFactFold`/
-`ContextFactFold`/`BlogProjection`/`PrefixEpochProjection`/`XTraceProjection` 等）。
-物理 event 形状见 WHAT 002/004；Journal 行经 codec 进入 EventStore。
+不变量权威由 WHAT 015/021 承接；逐 fact 校验仍在 `Composition/Durable/Fold.fs` + 各 domain fold。区别是拒绝不再把整个 journal 变成 unfoldable：functional reducer 在错误前没有修改 Current，Integrator 记录该 rule faulted，并由业务 rule 生成最小 reset 参数持久化 `ProjectionCutTail`。当前调用看到 cut receipt 失败，future invocation 不继承 poison。
 
 ## 已知边界与相关实现
 
@@ -171,7 +179,7 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
   `effect-accounting`。
 - merge 的并发/收敛面（k-way merge 代数、DomainConflict 表达、dumb remote）归
   `durable-convergence`；本文件只描述单一 store 内的 append/CAS/fold。
-- 崩溃后从 durable facts 重入普通程序归 `crash-reconciliation`（`ResumeOrCreate` 是它消费的入口）。
+- 崩溃中的 tool 不自动重入；未完成 facts 保持坏历史。未来只有显式 `/continue` 可建立 session resume workflow，归 `crash-reconciliation`。
 
 ## 历史与弃权
 

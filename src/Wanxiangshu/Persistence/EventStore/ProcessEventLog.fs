@@ -182,12 +182,7 @@ module ProcessEventLog =
             invalidArg "commonDir" "git common-dir is required"
 
         let writer = safeWriterId writerId
-        let directory = eventsDirectory commonDir
-        ensureDirectory directory
-        let path = join2 directory (writer + ".ndjson")
-
-        if not (existsSync path) then
-            writeTextFileSync path "" "utf8"
+        let path = join2 (eventsDirectory commonDir) (writer + ".ndjson")
 
         { CommonDir = commonDir
           WriterId = writer
@@ -214,6 +209,7 @@ module ProcessEventLog =
             |> String.concat ""
 
         if text.Length > 0 then
+            ensureDirectory (eventsDirectory log.CommonDir)
             AppendAllText log.FilePath text "utf8"
             durabilityBarrier log.FilePath
 
@@ -245,12 +241,14 @@ module ProcessEventLog =
 
     let private writerFileNames commonDir =
         let directory = eventsDirectory commonDir
-        ensureDirectory directory
 
-        readdirSync directory
-        |> Array.filter (fun name -> name.EndsWith(".ndjson", StringComparison.Ordinal))
-        |> Array.sort
-        |> Array.toList
+        if not (existsSync directory) then
+            []
+        else
+            readdirSync directory
+            |> Array.filter (fun name -> name.EndsWith(".ndjson", StringComparison.Ordinal))
+            |> Array.sort
+            |> Array.toList
 
     /// Frozen writer files as exact UTF-8 text. Sync owns bytes, not event meaning.
     let readWriterTexts (commonDir: string) : (string * string) list =

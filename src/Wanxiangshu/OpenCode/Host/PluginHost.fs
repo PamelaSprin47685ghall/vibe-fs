@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
@@ -47,13 +48,9 @@ module PluginHost =
             else
                 Some directory
 
-    /// PERSIST-004/005: a rejected boot is a startup failure, not an absent journal.
-    ///
-    /// `None` means "no workspace, so no runtime directory to own" — a legitimate
-    /// state. A `FoldRejection` means the on-disk history could not be folded
-    /// (mid-file corruption, pre-0.5.0 schema), and PERSIST-005 forbids guessing:
-    /// swallowing it into `None` would start the plugin with an empty projection and
-    /// then append new facts on top of a history it never read.
+    /// Load may read durable bytes, but it never repairs semantic state. Physical
+    /// corruption is a load error; a domain fold/replay rejection only disables the
+    /// journal capability for this plugin instance.
     let createJournal (input: obj) : Task<Result<AgentJournal option, string>> =
         task {
             match workspaceDirectory input with
@@ -61,54 +58,48 @@ module PluginHost =
             | Some workspace ->
                 let commonDir = RuntimePath.gitCommonDir workspace
                 let runtimeDir = RuntimePath.forWorkspace workspace
-                let port = WorkspaceEventStore.bootPort commonDir
 
-                let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
-                    task {
-                        match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
-                        | Error err -> return Error err
-                        | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
-                    }
+                match ProcessEventLog.readStreams commonDir with
+                | Error error -> return Error(sprintf "durable bytes unreadable at %s: %A" runtimeDir error)
+                | Ok streams ->
+                    let missingPayload =
+                        streams
+                        |> List.collect snd
+                        |> List.collect (fun envelope -> envelope.PayloadRefs)
+                        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
 
-                match! SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
-                | Ok journal -> return Ok(Some journal)
-                | Error rejection ->
-                    return
-                        Error(sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact)
+                    match missingPayload with
+                    | Some payloadRef ->
+                        return
+                            Error(
+                                sprintf
+                                    "durable payload unreadable at %s: %s"
+                                    runtimeDir
+                                    (PayloadRef.value payloadRef)
+                            )
+                    | None ->
+                        try
+                            let port = WorkspaceEventStore.bootPort commonDir
+
+                            let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
+                                task {
+                                    match! port.ResumeOrCreate(runtimeId, processId, startedAt) with
+                                    | Error err -> return Error err
+                                    | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
+                                }
+
+                            match! SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
+                            | Ok journal -> return Ok(Some journal)
+                            | Error rejection ->
+                                Diagnostic.emit
+                                    "journal-semantic-unavailable"
+                                    [ "result", sprintf "%s (%s)" rejection.Reason rejection.Fact ]
+
+                                return Ok None
+                        with ex ->
+                            Diagnostic.emit "journal-semantic-unavailable" [ "result", ex.Message ]
+                            return Ok None
         }
-
-    let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =
-        match journal with
-        | None -> ()
-        | Some journal ->
-            let snapshot = AgentJournal.snapshot journal
-
-            for KeyValue(parentId, session) in snapshot.AgentProjections.Sessions do
-                match session.Handles with
-                | Some handles ->
-                    // Retired handles included: the parent relationship outlives the
-                    // run (EXEC-009 tombstone), and dropping it here would orphan a
-                    // finished child from its Manager.
-                    for record in HandleProjection.linkedChildren handles do
-                        let childKey = SessionId.value record.ChildSessionId
-                        sessionParents.[childKey] <- SessionId.value parentId
-                        SessionExecutionBinding.restore parentId record.ChildSessionId (Some record.TargetAgent)
-                | None -> ()
-
-            for KeyValue(sessionId, association) in snapshot.AgentProjections.Associations do
-                match association.ParentSessionId with
-                | Some parentId ->
-                    let sessionKey = SessionId.value sessionId
-                    sessionParents.[sessionKey] <- SessionId.value parentId
-
-                    let agent =
-                        PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
-                        |> Option.orElseWith (fun () ->
-                            PromptAuthorityLedger.lastAuthorityProfile sessionId snapshot.AgentProjections)
-                        |> Option.map (fun profile -> profile.SelectedAgent)
-
-                    SessionExecutionBinding.restore parentId sessionId agent
-                | None -> ()
 
     let gitTreePortFromInput (input: obj) : GitTreePort option =
         if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then

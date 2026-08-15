@@ -127,6 +127,22 @@ agent/title 冲突、多个匹配或查询失败 → fail closed。登记顺序�
 in-flight），只从 durable 与 Host snapshot 判据得出 `WindowOutcome`；snapshot 不可读 →
 `Unreadable` → `SessionRecovery.Blocked`。恢复机会经 `HostTurnObserver` 观察，不自行发消息。
 
+## CRASH-017：工具中断不恢复；未来 session 续传必须显式
+
+plugin load、workspace open、EventStore acquire、Host signal subscription 都不是 recovery trigger。更进一步：tool call 本身没有 crash recovery owner。进程死亡时正在执行的 Fission、NEEDHELP consultation、js-* transaction、fork/join/tool workflow 等均按“该次工具执行已中断/失败”处理；不得在新进程中自动 abort/send/rollback/replay/补 terminal，也不得由下一次普通 tool invocation 偷偷替上一工具善后。
+
+未完成 durable facts 只保留为可审计历史证据。旧 session 若未来支持断点续传，只能由用户显式 `/continue`（或等价显式命令）触发：恢复入口必须先把“进程已重启、上一条工具执行中断、历史可能含未完成 sub session”作为可见上下文交给 LLM，再由 LLM 基于公开历史选择复用哪些 sub session。禁止透明续跑、隐藏断点、伪造上一 tool 成功或把坏 tool 从 transcript 抹掉。
+
+一个 feature 的旧未完成状态不得阻断 OpenCode plugin load；普通新 session 也不得因旧 tool 残留被自动恢复逻辑劫持。
+
+## CRASH-018：`/continue` 是唯一显式 session resume；重启断点必须暴露给 LLM
+
+用户在已有 session 中显式执行 `/continue` 时，Wanxiangshu 才可查询该 session 的 durable child linkage 与 Host physical session snapshot，并把仍可访问的 sub session **仅重新登记到当前进程 runtime** 供后续显式复用。`/continue` 自身不得补写旧 tool terminal、不得把 Active/Completed/Retired handle 偷偷改成成功、不得发送新 charge、不得自动 join/abort/replay；真正的新业务 effect 必须来自 LLM 在看到 resume briefing 后作出的后续 tool call。
+
+`/continue` 交给 LLM 的正文必须明确写出：① OpenCode/Wanxiangshu 进程刚刚重启；② 重启前最后一个 tool call 可能中断，保持 transcript 中的坏/未完成状态，不能假定成功；③ 哪些 sub session 仍物理可访问（至少 byname、session id、role/agent、durable lifecycle）；④ 哪些 durable child 已不可访问；⑤ 若要继续，LLM 可用正常 `fork(name=已有 byname, charge=...)`/等价已有复用面选择性复用。禁止把 restart disclosure 放在隐藏日志、system-only side channel 或仅诊断字段里。
+
+`/continue` 重复调用必须幂等：重复发现/登记同一 surviving child 不产生 durable fact，不重复发送 prompt，不改变 child transcript。没有 durable journal、没有 snapshot port、某 child snapshot 查询失败都只影响本次 briefing 的对应条目；command 本身仍返回可见说明，不熔断 future `/continue` 或其它功能。
+
 ## 反向覆盖说明
 
 `p0-recovery-join` gate（`scripts/checks/p0-recovery-join.mjs`）是共享 checker

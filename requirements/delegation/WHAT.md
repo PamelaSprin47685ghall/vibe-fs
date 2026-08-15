@@ -226,7 +226,7 @@ consultation 不继承 owner Persona、不得递归 NEEDHELP；owner single-flig
 consultation）；每 LogicalRun 次数有限、额度不向 provider 暴露；取消/终结时 physical child abort 立即发出，
 且 owner deletion 的返回 Task 必须等待 durable `HandleAbandoned` 落地后才能继续释放 Journal/store；不得把
 该 durable cleanup 作为 detached task 丢弃。取消/终结后迟到 advice 不得复活 owner；sentinel 在 XTrace
-capture 前剥离，不写入 WorkRecord/Chronicle（AGENT-031、HOST-027）。
+capture 前剥离，不写入 WorkRecord/Chronicle（AGENT-031、HOST-027）。crash 后未完成 consultation 就是上一工具链的中断事实：plugin init 与普通后续 hook/tool 均不得扫描 consultation、重发 opening/advice、主动 abort child 或补 durable terminal。未来显式 session `/continue` 只能把 surviving child/session 与坏 tool 事实公开给 LLM，由新意图选择是否复用。
 
 含义/动机：求助是真实依赖（请求方等待 advice 才继续），不是假 completion / hidden prose injection；
 owner 生命周期约束保证咨询不脱管。

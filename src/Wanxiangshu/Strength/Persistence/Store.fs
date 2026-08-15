@@ -294,7 +294,16 @@ module StrengthStore =
         (sha256: string -> string)
         (event: StrengthEvent)
         : Task<Result<unit, AppendError>> =
-        store.Append [ toEnvelope sha256 event ]
+        task {
+            let envelope = toEnvelope sha256 event
+
+            match! store.Append [ envelope ] with
+            | Ok receipt ->
+                match AppendReceipt.cutFor envelope.EventId receipt with
+                | Some cut -> return Error(AppendError.SemanticCut cut)
+                | None -> return Ok()
+            | Error error -> return Error error
+        }
 
     /// STRENGTH-006: payload bytes become local content-addressed PayloadRefs
     /// before the Prepared event is appended. Git object identity is absent from
@@ -320,10 +329,15 @@ module StrengthStore =
             | Error error -> return Error error
             | Ok payloadRefs ->
                 let event = buildEvent payloadRefs
+                let envelope = toEnvelope sha256 event
 
-                match! store.Append [ toEnvelope sha256 event ] with
-                | Ok() -> return Ok event
+                match! store.Append [ envelope ] with
+                | Ok receipt ->
+                    match AppendReceipt.cutFor envelope.EventId receipt with
+                    | Some cut -> return Error(PublishError.SemanticCut cut)
+                    | None -> return Ok event
                 | Error(AppendError.StorageInvalid error) -> return Error(PublishError.StorageInvalid error)
+                | Error(AppendError.SemanticCut cut) -> return Error(PublishError.SemanticCut cut)
                 | Error(AppendError.AppendFailed reason) -> return Error(PublishError.PublishFailed reason)
         }
 

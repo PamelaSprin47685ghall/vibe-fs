@@ -99,9 +99,7 @@ module FissionStartup =
 
 module FissionAdmission =
 
-    // One process-wide single-flight resource. Durable FissionProjection is the
-    // restart authority; this lock prevents two live plugin instances from both
-    // admitting the same logical owner before either durable append is visible.
+    // One process-wide single-flight resource for live admissions only.
     let private gate = obj ()
     let private activeOwners = HashSet<string>()
 
@@ -121,9 +119,6 @@ module FissionAdmission =
 
     let releaseOwner (ownerSessionId: SessionId) =
         lock gate (fun () -> activeOwners.Remove(SessionId.value ownerSessionId) |> ignore)
-
-    let restoreActiveOwner (ownerSessionId: SessionId) =
-        lock gate (fun () -> activeOwners.Add(SessionId.value ownerSessionId) |> ignore)
 
     let private reserve (_runtime: FissionAdmissionRuntime) (ownerSessionId: SessionId) =
         lock gate (fun () -> activeOwners.Add(SessionId.value ownerSessionId))

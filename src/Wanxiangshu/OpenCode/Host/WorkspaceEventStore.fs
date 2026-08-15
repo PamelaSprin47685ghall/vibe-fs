@@ -57,7 +57,6 @@ module WorkspaceEventStore =
                 let writerId = Guid.NewGuid().ToString("N")
                 let integrator = CanonicalIntegrator.create ()
                 let store = EventStore.createLocal commonDir writerId integrator
-                JsToolsTransactionStore.recoverCurrent store
 
                 shared.[commonDir] <- { Store = store; RefCount = 1 }
 

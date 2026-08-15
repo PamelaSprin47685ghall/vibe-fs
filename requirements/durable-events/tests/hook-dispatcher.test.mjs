@@ -19,7 +19,7 @@ const sandboxHooks = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
+test('HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
   const source = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   assert.match(source, /HookKind\.ReferenceTransaction/)
   assert.match(source, /HookKind\.PrePush/)
@@ -27,7 +27,7 @@ test('HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_r
   assert.match(source, /StoreRef\.remoteTracking/)
   assert.match(source, /let ensure .*Result<unit, string>/s)
   assert.doesNotMatch(source, /WriterStreamSync|GitGateway\.converge|member _\.(Fetch|Pull|Push)/,
-    'startup ensure must install the membrane, not perform synchronization')
+    'activation ensure must install the membrane, not perform synchronization')
 })
 
 test('HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () => {

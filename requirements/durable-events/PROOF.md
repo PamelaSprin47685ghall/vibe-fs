@@ -26,7 +26,7 @@ node --test requirements/durable-events/tests/integration/persist/leave-unread.t
 | DURABLE-EVENTS-003 | `event-store-identity-collision.test.mjs` + `event-store-merge.test.mjs::{same_EventId_same_bytes_dedupes,same_EventId_different_bytes_fail_closed}` | REUSE + NEW/FROZEN |
 | DURABLE-EVENTS-004 | `local-process-event-log.test.mjs::DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments` + `append-only-laws.test.mjs` | NEW/FROZEN |
 | DURABLE-EVENTS-005 | `local-process-event-log.test.mjs::{DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments,DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_file_without_machine_identity}` | NEW/FROZEN |
-| DURABLE-EVENTS-006 | `event-store-journal-writer.test.mjs::{create_appends_RuntimeStarted_to_the_process_writer_file_not_a_Git_ref,append_adds_one_local_line_and_Current_is_already_integrated}` | NEW/FROZEN |
+| DURABLE-EVENTS-006 | `event-store-journal-writer.test.mjs::{create_is_read_only_until_the_first_business_append,append_adds_one_local_line_and_Current_is_already_integrated}` | NEW |
 | DURABLE-EVENTS-007 | `event-store-append.test.mjs::{append_rejects_missing_parent_without_writing_bytes,append_rejects_cycle_in_one_batch_before_durability,append_rejects_unknown_event_type_fail_closed}` + `event-store-merge.test.mjs::same_EventId_different_bytes_fail_closed` | NEW/FROZEN |
 | DURABLE-EVENTS-008 | `requirements/durable-convergence/tests/replica-merge-laws.test.mjs::concurrent_heads_are_preserved_as_structural_DomainConflict_frontier`（合法 fork 保留，不是 StorageInvalid） | CROSS/FROZEN |
 | DURABLE-EVENTS-009 | `integration/persist/leave-unread.test.mjs::{local_EventStore_never_reads_or_rewrites_any_legacy_layout,shock_cut_source_has_no_legacy_shape_detection_migration_or_reset}` + `unified-store-gate.test.mjs` no-migrator gate | NEW/FROZEN + REUSE |
@@ -38,8 +38,10 @@ node --test requirements/durable-events/tests/integration/persist/leave-unread.t
 | DURABLE-EVENTS-015 | `fold-context-recovery.test.mjs` + Journal one-event fold suites (`host-turn-observed.test.mjs`, domain fact fold tests)；history iteration 已从 `Composition/Durable/Fold.fs` 移除 | REUSE |
 | DURABLE-EVENTS-016 | `unified-store-gate.test.mjs`（Domain 禁 Git physical types；feature backend/history-reader gate） | REUSE |
 | DURABLE-EVENTS-017 | `local-process-event-log.test.mjs::DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies` + `event-store-append.test.mjs::append_cost_contract_is_independent_of_history_and_EventId_distribution` | NEW/FROZEN |
-| DURABLE-EVENTS-018 | `hook-dispatcher.test.mjs::{HOOK_startup_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync,HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime}` + `requirements/durable-convergence/tests/writer-stream-sync.test.mjs` | NEW/FROZEN |
+| DURABLE-EVENTS-018 | `hook-dispatcher.test.mjs::{HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync,HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime}` + `requirements/durable-convergence/tests/writer-stream-sync.test.mjs` | NEW/FROZEN |
 | DURABLE-EVENTS-019 | `canonical-integrator.test.mjs::{DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_business_rules,DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_loops,DURABLE_EVENTS_019_only_CanonicalIntegrator_may_derive_Current_from_event_history}` | NEW/FROZEN |
+| DURABLE-EVENTS-020 | `event-store-journal-boot.test.mjs::empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation`；`event-store-journal-writer.test.mjs::create_is_read_only_until_the_first_business_append` + first business append 两行顺序；REUSE `requirements/host-boundary/tests/plugin-load-purity.test.mjs` | NEW + CROSS |
+| DURABLE-EVENTS-021 | `event-store-append.test.mjs::semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next`（bad fact + ProjectionCutTail 同批 durable；typed cut receipt；same feature next success；reopen replay）；`canonical-integrator.test.mjs` source gate（PlanCut/ApplyCut + one full replay budget） | NEW |
 
 ## GAP
 
@@ -48,5 +50,5 @@ node --test requirements/durable-events/tests/integration/persist/leave-unread.t
 
 ## 统计
 
-- WHAT 命题：19；PROOF 行：19。
+- WHAT 命题：21；PROOF 行：21。
 - 本包 GAP：0（GAP-013 / GAP-014 已关闭；测试仍按用户要求冻结，未执行）。

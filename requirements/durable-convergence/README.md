@@ -65,7 +65,7 @@ OpenCode/Wanxiangshu 可以完全不在运行。hook runtime 不依赖 `Workspac
 | one writer file ↔ one blob encoding | `Infrastructure/Persist/WriterStreamSync.fs` |
 | hook-process Git transport / lease retry | `Infrastructure/Git/GitGateway.fs` |
 | independent sync entry | `Infrastructure/Git/HookSync.fs` |
-| startup hook/refspec ensure | `Infrastructure/Git/HookDispatcher.fs` |
+| durability-activation hook/refspec ensure | `Infrastructure/Git/HookDispatcher.fs` |
 | packaged runner | `resources/git/wanxiang-hook.mjs` |
 
 ## 文档 / proof

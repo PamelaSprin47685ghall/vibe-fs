@@ -42,6 +42,12 @@ type StrengthPreparedPublish =
     | Rejected of reason: string
     | StorageInvalid of reason: string
 
+[<RequireQualifiedAccess>]
+type StrengthDurableAppend =
+    | Applied
+    | SemanticRejected of reason: string
+    | StorageFailed of reason: string
+
 type StrengthPreparedRequest =
     { OwnerSessionId: SessionId
       DecisionId: StrengthDecisionId
@@ -58,4 +64,4 @@ type StrengthDurabilityPort =
     { LoadProjection: unit -> Task<Result<StrengthProjection, string>>
       LoadFrameBundle: StrengthCandidatePrepared -> Task<Result<StrengthFrameBundle, string>>
       PublishPrepared: StrengthPreparedRequest -> Task<StrengthPreparedPublish>
-      Append: StrengthEvent -> Task<Result<unit, string>> }
+      Append: StrengthEvent -> Task<StrengthDurableAppend> }

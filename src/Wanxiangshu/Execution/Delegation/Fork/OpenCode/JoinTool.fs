@@ -220,16 +220,12 @@ module JoinTool =
                                       WaitEscape.SessionLifetime ]
                                     "JoinTool.joinAvailable"
 
+                            // Only process-local Fission bindings are active. A durable
+                            // Open group from a previous process is a broken tool record,
+                            // not an implicit lane to resume.
                             let fissionMembership =
                                 FissionRuntime.tryLane sessionId
                                 |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
-                                |> Option.orElseWith (fun () ->
-                                    scope.Journal
-                                    |> Option.bind (fun durable ->
-                                        FissionProjection.tryMembershipOfLane
-                                            sessionId
-                                            (AgentJournal.snapshot durable).AgentProjections.Fission
-                                        |> Option.map (fun (group, laneIndex) -> group.GroupId, laneIndex)))
 
                             let joinTask =
                                 match fissionMembership with

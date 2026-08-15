@@ -167,9 +167,13 @@ module HostTurnObserver =
                         | None -> ()
                         | Some event ->
                             match! durability.Append event with
-                            | Ok() -> ()
-                            | Error error ->
-                                let reason = "Strength promotion commit failed closed: " + error
+                            | StrengthDurableAppend.Applied -> ()
+                            | StrengthDurableAppend.SemanticRejected error ->
+                                // Durable cut-tail already isolated this one event. Do not
+                                // fuse Strength or poison future attempts.
+                                Diagnostic.emit "strength-semantic-cut" [ "result", error ]
+                            | StrengthDurableAppend.StorageFailed error ->
+                                let reason = "Strength promotion commit storage failure: " + error
                                 scope.Strength.TripStrengthFuse reason
                                 raise (InvalidOperationException reason)
 

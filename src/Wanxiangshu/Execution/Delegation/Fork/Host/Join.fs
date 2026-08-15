@@ -68,6 +68,12 @@ open Wanxiangshu.Participant.Persona.AgentRoleIdentity
 /// reference plumbing changed (this.X → function arg, private state → accessors).
 module HostForkJoin =
 
+    let private currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
+        match HandleId.tryAgent record.Handle with
+        | None -> false
+        | Some handleId ->
+            runtime.TryFindAgent(AgentHandleId.value handleId) |> Option.isSome
+
     /// EXEC-009 + EXEC-018 + GREEN-5: agent facts from Journal; PTY from mailbox as PtyJoinItem.
     /// journal=None: agent join fail-closed; pure PTY drain still allowed.
     /// Abandoned items join the same ResultsAvailable batch — never withhold
@@ -109,7 +115,14 @@ module HostForkJoin =
                         | Some batch -> return Some(Ok(ResultsAvailable batch))
                         | None -> return None
                 | Some durable ->
-                    match! JoinDrain.drainFromJournal durable runtime.ParentId cap (runtime.Clock.UtcNow()) with
+                    match!
+                        JoinDrain.drainFromJournalWhere
+                            durable
+                            runtime.ParentId
+                            cap
+                            (runtime.Clock.UtcNow())
+                            (currentProcessHandle runtime)
+                    with
                     | Error e -> return Some(Error e)
                     | Ok durableBatch ->
                         let remaining = cap - List.length durableBatch
@@ -204,9 +217,12 @@ module HostForkJoin =
                | Some durable ->
                    let p = AgentJournal.handleProjection durable runtime.ParentId
 
-                   not (List.isEmpty (HandleProjection.joinable p))
-                   || not (List.isEmpty (HandleProjection.reportableAbandoned p))
-                   || not (List.isEmpty (HandleProjection.activeHandles p))
+                   p.Handles
+                   |> Map.exists (fun _ record ->
+                       currentProcessHandle runtime record
+                       && match record.Lifecycle with
+                          | HandleLifecycle.Retired -> false
+                          | _ -> true)
 
         /// Outer race arms: mailbox wake | journal change | local interrupt.
         /// PulseWake after race so a losing WaitForWake waiter never piles up.
@@ -314,16 +330,17 @@ module HostForkJoin =
         | None -> Task.FromResult(Error(ForkError.NotFound "Fission lane join requires durable journal"))
         | Some durable ->
             let allowed (record: HandleRecord) =
-                match HandleId.tryAgent record.Handle with
-                | None -> false
-                | Some handleId ->
-                    let externalId = FissionExternalId.agent (AgentHandleId.value handleId)
-
-                    match
-                        FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
-                    with
-                    | Some group -> Map.tryFind externalId group.ExternalAffinities = Some laneIndex
+                currentProcessHandle runtime record
+                && (match HandleId.tryAgent record.Handle with
                     | None -> false
+                    | Some handleId ->
+                        let externalId = FissionExternalId.agent (AgentHandleId.value handleId)
+
+                        match
+                            FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
+                        with
+                        | Some group -> Map.tryFind externalId group.ExternalAffinities = Some laneIndex
+                        | None -> false)
 
             let hasWork () =
                 AgentJournal.handleProjection durable runtime.ParentId

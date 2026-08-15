@@ -1,5 +1,4 @@
-// FROZEN — 2026-08-14. Journal is a semantic adapter over local process NDJSON.
-// Intentionally NOT executed before implementation.
+// Journal is a semantic adapter over local process NDJSON.
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
@@ -18,15 +17,14 @@ const mustOk = (result) => {
   return payloadOf(result)
 }
 
-test('create_appends_RuntimeStarted_to_the_process_writer_file_not_a_Git_ref', async () => {
+test('create_is_read_only_until_the_first_business_append', async () => {
   const local = createLocalEventStore({ writerId: 'journal-writer-proof' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_es'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
     assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
     assert.equal(caseOf(init.Stream), 'Workspace')
     const file = join(local.commonDir, 'wanxiang', 'events', 'journal-writer-proof.ndjson')
-    assert.equal(existsSync(file), true)
-    assert.equal(readFileSync(file, 'utf8').trim().split('\n').length, 1)
+    assert.equal(existsSync(file), false)
     assert.equal(EsWriter.EventStoreJournalWriter__get_IsPoisoned(writer), false)
     writer.Release?.()
   } finally {
@@ -39,12 +37,12 @@ test('append_adds_one_local_line_and_Current_is_already_integrated', async () =>
   try {
     const [writer, init] = await createFn(runtimeId('rt_es_append'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
     const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
-    const before = readFileSync(join(local.commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson'), 'utf8')
+    const file = join(local.commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson')
+    assert.equal(existsSync(file), false)
     const appended = await AgentJournal.AgentJournalModule_appendAgent(stream.session(sessionId('ses_es_writer')), undefined, CLOSED_AGENT, journal)
     assert.equal(caseOf(appended), 'Ok')
-    const after = readFileSync(join(local.commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson'), 'utf8')
-    assert.equal(after.startsWith(before), true)
-    assert.equal(after.trim().split('\n').length, 2)
+    const after = readFileSync(file, 'utf8')
+    assert.equal(after.trim().split('\n').length, 2, 'first business append writes RuntimeStarted then the business fact')
     assert.ok(local.store.TryCurrent('Journal'))
     journal.Dispose?.()
   } finally {

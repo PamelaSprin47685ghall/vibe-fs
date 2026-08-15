@@ -174,10 +174,12 @@ module JournalPayloadClosure =
 /// owns both boot replay and live integration; this type only assigns journal
 /// envelope identity/sequence and appends one universal EventEnvelope.
 type EventStoreJournalWriter
-    private (runtimeId: RuntimeId, blobWriter: IBlobWriter, store: IEventStore, initialCurrentSeq: int64) =
+    private (runtimeId: RuntimeId, init: Envelope, blobWriter: IBlobWriter, store: IEventStore) =
     let gate = obj ()
-    // DSL-MUTABLE: resource — next LocalSeq for this fresh RuntimeId only.
-    let mutable currentSeq = initialCurrentSeq
+    // DSL-MUTABLE: resource — RuntimeStarted is lazy; load alone writes nothing.
+    let mutable runtimeStartedCommitted = false
+    // DSL-MUTABLE: resource — business facts start at LocalSeq 2 after lazy RuntimeStarted.
+    let mutable currentSeq = 2L
     // DSL-MUTABLE: resource — local append poison latch.
     let mutable poisoned = false
     // DSL-MUTABLE: resource — dispose latch.
@@ -189,16 +191,17 @@ type EventStoreJournalWriter
     member _.BlobWriter = blobWriter
     member _.FilePath = ""
     member _.LocalSeq = lock gate (fun () -> currentSeq)
-    member _.LastCommittedLocalSeq = lock gate (fun () -> currentSeq - 1L)
+    member _.LastCommittedLocalSeq = lock gate (fun () -> if runtimeStartedCommitted then currentSeq - 1L else 0L)
     member _.IsPoisoned = lock gate (fun () -> poisoned)
     member _.TryCurrent(key: string) = store.TryCurrent key
 
     static member private formatAppendError(error: AppendError) : string =
         match error with
         | AppendError.StorageInvalid detail -> sprintf "storage invalid: %A" detail
+        | AppendError.SemanticCut cut -> sprintf "semantic cut %s: %s" cut.Rule cut.Reason
         | AppendError.AppendFailed reason -> "append failed: " + reason
 
-    static member private commitEnvelope (store: IEventStore) (envelope: Envelope) : Task<Result<unit, AppendError>> =
+    static member private commitEnvelope (store: IEventStore) (envelope: Envelope) : Task<Result<AppendReceipt, AppendError>> =
         let streamId = EventStoreJournalCodec.encodeStreamId envelope.Stream
 
         let parents =
@@ -233,56 +236,50 @@ type EventStoreJournalWriter
                        StartedAt = startedAt |}
             ) }
 
-    /// Fresh runtime: every process receives a fresh RuntimeId and therefore
-    /// LocalSeq starts at 1. Prior history is already in CanonicalIntegrator.Current.
+    /// Fresh runtime allocation is read-only. RuntimeStarted is appended lazily
+    /// immediately before the first business fact.
     static member create
         (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore)
         : Task<IJournalWriter * Envelope> =
         task {
             let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
-
-            match! EventStoreJournalWriter.commitEnvelope store init with
-            | Error error ->
-                return
-                    failwith (
-                        sprintf
-                            "EventStore journal create failed to append RuntimeStarted: %s"
-                            (EventStoreJournalWriter.formatAppendError error)
-                    )
-            | Ok() ->
-                let writer =
-                    EventStoreJournalWriter(runtimeId, EventStoreBlobWriter.Create store, store, 2L)
-
-                return writer :> IJournalWriter, init
+            let writer = EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+            return writer :> IJournalWriter, init
         }
 
-    /// Boot never reads history here. WorkspaceEventStore already replayed every
-    /// process writer stream through CanonicalIntegrator before this call.
+    /// Opening an existing workspace is read-only. Current may be observed, but
+    /// merely loading the plugin never appends a runtime watermark.
     static member resumeOrCreate
         (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore)
         : Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>> =
         task {
             let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
 
-            match! EventStoreJournalWriter.commitEnvelope store init with
-            | Error error ->
-                return
-                    failwith (
-                        sprintf
-                            "EventStore journal resumeOrCreate failed to append RuntimeStarted: %s"
-                            (EventStoreJournalWriter.formatAppendError error)
-                    )
-            | Ok() ->
-                match EventStoreJournalWriter.currentJournalProjection store with
-                | Error rejection -> return Error rejection
-                | Ok projection ->
-                    let writer =
-                        EventStoreJournalWriter(runtimeId, EventStoreBlobWriter.Create store, store, 2L)
-
-                    return Ok(writer :> IJournalWriter, init, projection)
+            match EventStoreJournalWriter.currentJournalProjection store with
+            | Error rejection -> return Error rejection
+            | Ok projection ->
+                let writer = EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
+                return Ok(writer :> IJournalWriter, init, projection)
         }
 
-    member private _.AppendLocked
+    member private _.EnsureRuntimeStartedLocked() : Task<Result<unit, string>> =
+        task {
+            if runtimeStartedCommitted then
+                return Ok()
+            else
+                match! EventStoreJournalWriter.commitEnvelope store init with
+                | Ok receipt when AppendReceipt.cutFor init.EventId receipt |> Option.isSome ->
+                    let cut = AppendReceipt.cutFor init.EventId receipt |> Option.get
+                    return Error("RuntimeStarted semantic cut: " + cut.Reason)
+                | Ok _ ->
+                    runtimeStartedCommitted <- true
+                    return Ok()
+                | Error error ->
+                    poisoned <- true
+                    return Error(EventStoreJournalWriter.formatAppendError error)
+        }
+
+    member private this.AppendLocked
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
@@ -293,22 +290,28 @@ type EventStoreJournalWriter
             if poisoned || disposed then
                 return CommitUnknown(eventId, WriteFailed "Writer is poisoned or disposed")
             else
-                let envelope: Envelope =
-                    { RuntimeId = runtimeId
-                      LocalSeq = LocalSeq.create currentSeq
-                      ObservedAt = DateTimeOffset.UtcNow
-                      EventId = eventId
-                      Stream = stream
-                      ProviderRun = providerRun
-                      Fact = fact }
-
-                match! EventStoreJournalWriter.commitEnvelope store envelope with
+                match! this.EnsureRuntimeStartedLocked() with
+                | Error error -> return CommitUnknown(eventId, WriteFailed("RuntimeStarted append failed: " + error))
                 | Ok() ->
-                    currentSeq <- currentSeq + 1L
-                    return Committed envelope
-                | Error error ->
-                    poisoned <- true
-                    return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError error))
+                    let envelope: Envelope =
+                        { RuntimeId = runtimeId
+                          LocalSeq = LocalSeq.create currentSeq
+                          ObservedAt = DateTimeOffset.UtcNow
+                          EventId = eventId
+                          Stream = stream
+                          ProviderRun = providerRun
+                          Fact = fact }
+
+                    match! EventStoreJournalWriter.commitEnvelope store envelope with
+                    | Ok receipt ->
+                        currentSeq <- currentSeq + 1L
+
+                        match AppendReceipt.cutFor envelope.EventId receipt with
+                        | Some cut -> return Rejected(eventId, cut.Reason)
+                        | None -> return Committed envelope
+                    | Error error ->
+                        poisoned <- true
+                        return CommitUnknown(eventId, WriteFailed(EventStoreJournalWriter.formatAppendError error))
         }
 
     member private _.Enqueue(work: unit -> Task<'T>) : Task<'T> =

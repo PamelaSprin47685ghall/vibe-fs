@@ -151,14 +151,31 @@ type StorageInvalid =
 [<RequireQualifiedAccess>]
 type DomainConflict = ConcurrentHeads of streamId: EventStreamId * heads: EventId list
 
+type SemanticCut =
+    { Rule: string
+      FailedEventId: EventId
+      Reason: string
+      CutEventId: EventId }
+
+type AppendReceipt = { Cuts: SemanticCut list }
+
+[<RequireQualifiedAccess>]
+module AppendReceipt =
+    let empty = { Cuts = [] }
+
+    let cutFor (eventId: EventId) (receipt: AppendReceipt) =
+        receipt.Cuts |> List.tryFind (fun cut -> cut.FailedEventId = eventId)
+
 [<RequireQualifiedAccess>]
 type AppendError =
     | StorageInvalid of StorageInvalid
+    | SemanticCut of SemanticCut
     | AppendFailed of reason: string
 
 [<RequireQualifiedAccess>]
 type PublishError =
     | StorageInvalid of StorageInvalid
+    | SemanticCut of SemanticCut
     | PublishFailed of reason: string
     | IncompletePayloadClosure
 

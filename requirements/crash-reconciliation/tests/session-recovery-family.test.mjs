@@ -33,10 +33,9 @@ test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
   assert.doesNotMatch(code, /do!\s*this\.AwaitRecovery/)
 })
 
-test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
-  // Family recovery ports are wired in PluginRecoveryWiring (Wave 3).
-  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
-  // Family recovery + attempt planning live in PluginRecoveryScope (Wave 2).
+test('RECOVERY_FAMILY_library_is_detached_from_ordinary_plugin_and_join_uses_current_process_permit', () => {
+  const wiring = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
+  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
   const scope = readFileSync(
     join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs'),
     'utf8',
@@ -45,22 +44,16 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
     join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
     'utf8',
   )
-  assert.match(spike, /AttachFamilyRecoveryPorts/)
-  assert.doesNotMatch(spike, /AttachRecoveryGate|AttachBloggerRecoveryGate/)
-  // GREEN-4: real RestoreHandles/RecoverJobs; no option ports collapsing to NoRecoveryRequired.
-  assert.doesNotMatch(spike, /RestoreHandles\s*=\s*None/)
-  assert.doesNotMatch(spike, /RecoverJob\s*=\s*None/)
-  assert.match(spike, /RestoreHandles\s*=\s*restoreHandles/)
-  assert.match(spike, /RecoverJobs\s*=\s*recoverJobs/)
+
+  assert.doesNotMatch(spike, /PluginRecoveryWiring\.attach|AttachFamilyRecoveryPorts/)
+  assert.doesNotMatch(wiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
+  assert.match(scope, /FamilyRecoveryPermit\.currentProcess/)
+  assert.doesNotMatch(scope, /FamilyRecoveryCoordinator\.runOnce|recoverFamilyDirect/)
+
+  // Recovery algorithms remain a detached library for a future explicit /continue path.
   assert.match(ports, /type SessionRecoveryPorts/)
   assert.match(ports, /RestoreHandles:\s*SessionId\s*->\s*Task<HandleFamilyRecovery>/)
-  assert.match(scope, /RequireFamilyRecovery/)
-  assert.doesNotMatch(scope, /bloggerRecoveryGate|PromptRecovery\.RecoveryGate/)
-  // rabbit §14.3: physical single-flight lives in Session, not Application.
-  assert.doesNotMatch(ports, /module Coordinator/)
-  assert.doesNotMatch(ports, /mergeOutcomes/)
-  assert.match(scope, /FamilyRecoveryCoordinator\.runOnce/)
-  assert.match(scope, /SessionRecoveryWorkflow\.recoverFamilyDirect/)
+  assert.match(ports, /recoverFamilyDirect/)
 })
 
 test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {

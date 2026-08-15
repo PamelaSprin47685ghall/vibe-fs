@@ -46,7 +46,7 @@ open Wanxiangshu.Foundation.Identity
 /// append to the process writer file followed by commit of the already-validated
 /// canonical Integrator transition. Git transport/object identity is absent here.
 type IEventStore =
-    abstract Append: events: EventEnvelope list -> Task<Result<unit, AppendError>>
+    abstract Append: events: EventEnvelope list -> Task<Result<AppendReceipt, AppendError>>
     abstract WritePayload: content: byte[] -> Task<Result<PayloadRef, string>>
     abstract ReadPayload: payloadRef: PayloadRef -> Task<Result<byte[] option, string>>
     abstract TryCurrent: key: string -> obj option
@@ -222,18 +222,18 @@ module EventStore =
                                 try
                                     match validateForAppend commonDir integrator events with
                                     | Error error -> Error(asAppendStorage error)
-                                    | Ok [] -> Ok()
+                                    | Ok [] -> Ok AppendReceipt.empty
                                     | Ok fresh ->
                                         match integrator.PrepareLive fresh with
                                         | Error reason ->
-                                            Error(AppendError.AppendFailed("integration rejected: " + reason))
-                                        | Ok commit ->
-                                            // Cross-process store lock + process-local gate make the
-                                            // append linear with standalone Git-hook snapshots while
-                                            // keeping all business meaning in the Integrator.
-                                            ProcessEventLog.append log fresh
-                                            commit ()
-                                            Ok()
+                                            Error(AppendError.AppendFailed("integration preparation failed: " + reason))
+                                        | Ok prepared ->
+                                            // Semantic cut/reset facts are part of the same physical append.
+                                            // The caller receives which input events were cut so only that
+                                            // invocation fails; the writer/runtime remains usable.
+                                            ProcessEventLog.append log prepared.DurableEvents
+                                            prepared.Commit ()
+                                            Ok { Cuts = prepared.Cuts }
                                 with ex ->
                                     Error(AppendError.AppendFailed ex.Message))
                     })

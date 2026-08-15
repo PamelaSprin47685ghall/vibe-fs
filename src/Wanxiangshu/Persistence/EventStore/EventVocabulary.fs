@@ -41,6 +41,13 @@ open Wanxiangshu.Strength.Replica
 /// Additive authoritative event vocabulary. Unknown durable facts fail closed
 /// before they reach the canonical Integrator.
 [<RequireQualifiedAccess>]
+module ProjectionCutTailEvent =
+    [<Literal>]
+    let EventType = "ProjectionCutTail"
+
+    let streamId rule = EventStreamId.create ("integrator/cut-tail/" + rule)
+
+[<RequireQualifiedAccess>]
 module AuthoritativeEventTypes =
     let private builtins =
         set
@@ -55,6 +62,7 @@ module AuthoritativeEventTypes =
               "InspectorCaseRefreshed"
               "InspectorCaseAccessed"
               "InspectorCaseEvicted"
+              ProjectionCutTailEvent.EventType
               StrengthEventTypes.CandidatePrepared
               StrengthEventTypes.CandidatePromoted
               StrengthEventTypes.FramesTraced

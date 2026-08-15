@@ -31,12 +31,8 @@ type JournalAppendFailure =
     /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
     /// landed is unknown, so the runtime must fail closed and reconcile.
     | WriteUnknown of EventId * JournalFailure
-    /// The line was written but the fold refuses it.
-    ///
-    /// This is not a data problem — it means a writer produced a fact the domain
-    /// forbids (FALLBACK-007's modulo-4 check, REVIEW-003's causal proof). The
-    /// journal is now unfoldable, so it is poisoned deliberately rather than
-    /// left to fail on the next boot.
+    /// The fact and its ProjectionCutTail reset are both durable. This invocation
+    /// failed semantically, but the journal remains usable for later work.
     | FactRejected of EventId * FoldRejection
 
 module JournalAppendFailure =
@@ -50,9 +46,8 @@ module JournalAppendFailure =
     /// it renders whatever the emitted shape happens to be, so the operator-facing
     /// text would drift with the compiler rather than with the domain.
     ///
-    /// The two cases read differently on purpose. `WriteUnknown` means the runtime
-    /// must reconcile (PERSIST-002/003); `FactRejected` means a writer produced a
-    /// fact the domain forbids and the journal is now poisoned.
+    /// The two cases read differently on purpose. `WriteUnknown` is a physical
+    /// uncertainty; `FactRejected` is a durable, self-limited semantic cut.
     let describe (failure: JournalAppendFailure) : string =
         match failure with
         | WriteUnknown(eventId, WriteFailed reason) ->
@@ -61,7 +56,7 @@ module JournalAppendFailure =
             sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
         | FactRejected(eventId, rejection) ->
             sprintf
-                "journal poisoned at %s: fact '%s' rejected: %s"
+                "journal semantic cut at %s: fact '%s' rejected: %s"
                 (EventId.value eventId)
                 rejection.Fact
                 rejection.Reason
@@ -79,9 +74,6 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     // DSL-MUTABLE: resource — non-durable derived fallback-success overlay only.
     // Durable EventEnvelope integration belongs exclusively to CanonicalIntegrator.
     let mutable derivedFallbackSuccesses = Set.empty<SessionId>
-    // DSL-MUTABLE: resource — retained compatibility latch; canonical integration
-    // rejection occurs before local append, so AgentJournal never folds/rejects facts itself.
-    let mutable rejected: (EventId * FoldRejection) option = None
     // DSL-MUTABLE: resource — journal revision cursor
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
     // DSL-MUTABLE: resource — last journal change notification payload
@@ -92,9 +84,8 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member _.RuntimeId = writer.RuntimeId
     member _.WriteBlob(content: string) : Task<Result<BlobWriteReceipt, string>> = writer.BlobWriter.Write content
 
-    /// PERSIST-003: a poisoned writer or a rejected fact both mean this journal
-    /// may no longer be appended to.
-    member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned || Option.isSome rejected)
+    /// Physical write uncertainty may poison the process writer. Semantic cuts do not.
+    member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned)
 
     member private _.CanonicalProjection: ProjectionSet =
         match writer.TryCurrent "Journal" with
@@ -222,14 +213,20 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         task {
             let! result, notify =
                 task {
-                    match lock gate (fun () -> rejected) with
-                    | Some(eventId, rejection) -> return Error(FactRejected(eventId, rejection)), []
-                    | None ->
-                        match! writer.Append stream providerRun fact with
-                        | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure)), []
-                        | Committed envelope ->
-                            return
-                                lock gate (fun () ->
+                    match! writer.Append stream providerRun fact with
+                    | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure)), []
+                    | Rejected(eventId, reason) ->
+                        return
+                            Error(
+                                FactRejected(
+                                    eventId,
+                                    { Fact = "semantic-cut"
+                                      Reason = reason }
+                                )
+                            ), []
+                    | Committed envelope ->
+                        return
+                            lock gate (fun () ->
                                     // The EventStore append already validated and committed the
                                     // canonical Integrator transition. AgentJournal only observes
                                     // Current and publishes its process-local revision wake.

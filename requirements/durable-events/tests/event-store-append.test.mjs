@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
-import { eventId, idValue, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { eventId, idValue, listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
 const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
@@ -31,14 +31,49 @@ test('append_commits_complete_canonical_line_then_updates_Current', async () => 
   }
 })
 
+test('semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
+  const local = createLocalEventStore({ writerId: 'semantic-cut-proof' })
+  try {
+    const bad = event(10, [], 'InspectorCaseCaptured', {})
+    const first = resultOf(await local.store.Append(toList([bad])))
+    assert.equal(first.ok, true, 'semantic failure is durable, not a storage append failure')
+    const cuts = listItems(first.value.Cuts)
+    assert.equal(cuts.length, 1)
+    assert.equal(idValue.event(cuts[0].FailedEventId), id(10))
+    assert.equal(cuts[0].Rule, 'Casebook')
+
+    const file = path.join(local.commonDir, 'wanxiang', 'events', 'semantic-cut-proof.ndjson')
+    const afterBad = (await readFile(file, 'utf8')).trim().split('\n').map(JSON.parse)
+    assert.equal(afterBad.length, 2, 'bad fact and reset fact are one durable append')
+    assert.equal(afterBad[0].event_type, 'InspectorCaseCaptured')
+    assert.equal(afterBad[1].event_type, 'ProjectionCutTail')
+    assert.equal(afterBad[1].payload.failed_event_id, id(10))
+    assert.equal(afterBad[1].payload.rule, 'Casebook')
+
+    const good = event(11, [10], 'InspectorCaseAccessed', { session_id: 'case-after-cut' })
+    const second = resultOf(await local.store.Append(toList([good])))
+    assert.equal(second.ok, true)
+    assert.equal(listItems(second.value.Cuts).length, 0, 'cut is self-limited; future feature use retries normally')
+
+    const reopened = createLocalEventStore({ commonDir: local.commonDir, writerId: 'semantic-cut-reopen' })
+    try {
+      assert.equal(idValue.event(reopened.store.TryEvent(good.EventId).EventId), id(11), 'replay preserves bad → reset → good timeline')
+    } finally {
+      reopened.close()
+    }
+  } finally {
+    local.close()
+  }
+})
+
 test('append_rejects_missing_parent_without_writing_bytes', async () => {
   const local = createLocalEventStore({ writerId: 'missing-parent-proof' })
   try {
     const file = path.join(local.commonDir, 'wanxiang', 'events', 'missing-parent-proof.ndjson')
-    const before = await readFile(file, 'utf8')
+    assert.equal(existsSync(file), false)
     const r = resultOf(await local.store.Append(toList([event(2, [99])])))
     assert.equal(r.ok, false)
-    assert.equal(await readFile(file, 'utf8'), before)
+    assert.equal(existsSync(file), false, 'rejected structural append creates no writer file')
   } finally {
     local.close()
   }
@@ -52,7 +87,7 @@ test('append_rejects_cycle_in_one_batch_before_durability', async () => {
     const r = resultOf(await local.store.Append(toList([a, b])))
     assert.equal(r.ok, false)
     const file = path.join(local.commonDir, 'wanxiang', 'events', 'cycle-proof.ndjson')
-    assert.equal(await readFile(file, 'utf8'), '')
+    assert.equal(existsSync(file), false, 'rejected structural append creates no writer file')
   } finally {
     local.close()
   }

@@ -78,7 +78,7 @@ WANXIANG_GIT_SYNC_ACTIVE prevents Git operations performed by the hook from recu
 remote = 普通 bare Git repo：objects / refs / fetch / push / lease(CAS) / auth
 HookDispatcher：reference-transaction（observed store root → full bidirectional converge）+
                 pre-push shim（discover/fetch store root → full bidirectional converge → 继续原 push）
-startup ensure：Wanxiangshu 启动时确保 hook + refspec；同步执行本身不要求 Wanxiangshu 正在运行
+durability activation ensure：plugin Load Phase 零 Git mutation；首个真实 workspace 业务交互才确保 hook + refspec；同步执行本身不要求 Wanxiangshu 正在运行
 hook shim：`exec /usr/bin/env node <package>/resources/git/wanxiang-hook.mjs ...`；
           禁止把安装时 `process.execPath`（可能是 opencode.exe/Bun host）固化进 hook，也不要求 runner 文件可执行
 安装规则：不覆盖/不删除用户 hook、不改写无法证明 ownership 的 hook、安全 chain/dispatcher、

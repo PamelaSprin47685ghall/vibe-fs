@@ -275,8 +275,10 @@ module StrengthReplay =
                                         traced.EndExclusive
                                 )
                             with
-                            | Ok() -> ()
-                            | Error error -> strengthFailClosed ("Strength Traced commit failed closed: " + error)
+                            | StrengthDurableAppend.Applied -> ()
+                            | StrengthDurableAppend.SemanticRejected _ -> ()
+                            | StrengthDurableAppend.StorageFailed error ->
+                                strengthFailClosed ("Strength Traced commit storage failure: " + error)
 
             | _ -> ()
         }

@@ -39,13 +39,19 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation.Identity
 
+type SemanticCutPlan = { ResetJson: string }
+
 /// One registered business integration oracle. It receives exactly one durable
 /// EventEnvelope and its own current slot; it never receives a history reader.
+/// A rule owns the meaning of its cut/reset payload. The Integrator only persists
+/// and replays that payload in timeline order.
 type IntegrationRule =
     { Name: string
       Initial: obj
       Accepts: EventEnvelope -> bool
-      Integrate: obj -> EventEnvelope -> Result<obj, string> }
+      Integrate: obj -> EventEnvelope -> Result<obj, string>
+      PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
+      ApplyCut: obj -> string -> Result<obj, string> }
 
 /// Structural event-graph Current is one registered Integrator slot, not a
 /// second history fold. It preserves every stream frontier so conflict remains
@@ -81,6 +87,11 @@ module StructuralProjection =
         { projection with
             Heads = Map.add key next projection.Heads }
 
+type PreparedIntegration =
+    { DurableEvents: EventEnvelope list
+      Cuts: SemanticCut list
+      Commit: unit -> unit }
+
 /// Read-only view exposed by the unique canonical Integrator.
 type ICanonicalIntegrator =
     /// Boot/reload ownership: only the canonical Integrator opens local event
@@ -88,7 +99,7 @@ type ICanonicalIntegrator =
     abstract ReloadLocal: commonDir: string -> Result<unit, string>
     /// Validate a live batch against Current and return the commit closure.
     /// EventStore invokes the closure only after the complete canonical lines are durable.
-    abstract PrepareLive: events: EventEnvelope list -> Result<(unit -> unit), string>
+    abstract PrepareLive: events: EventEnvelope list -> Result<PreparedIntegration, string>
     abstract TryCurrent: key: string -> obj option
     abstract TryEvent: eventId: EventId -> EventEnvelope option
     abstract TryHeads: streamId: EventStreamId -> EventId list

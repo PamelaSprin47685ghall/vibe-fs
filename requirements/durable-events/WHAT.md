@@ -175,9 +175,9 @@ bytes fail closed。业务模块不得自行重排历史。
 **边界**：k-way merge 的代数/transport 收敛归 `durable-convergence`；业务积分只消费其输出。
 **证据**：→ PROOF.md 014。
 
-## DURABLE-EVENTS-015 —— 恢复 fold 不变量 owner（PERSIST-010）
+## DURABLE-EVENTS-015 —— business fold 不变量 owner（PERSIST-010）
 
-**规范陈述**：恢复 fold 对以下事实的不变量**不满足任一条 → 拒绝 envelope，fail closed**：
+**规范陈述**：business fold 对以下事实的不变量**不满足任一条 → 当前 fact semantic reject + durable cut-tail reset**：
 `OpeningPromptCaptured`（每 lifecycle 幂等、不可覆盖）、`XTracePartAppended`（严格顺序
 append-only、Cursor 单调）、`BlogEntryCommitted`（PreviousIngestCursor=当前、Next>Previous、
 CoverableTurnCutoff 单调、TextDigest=blob、attempt Completed 且 terminal valid）、
@@ -185,8 +185,7 @@ CoverableTurnCutoff 单调、TextDigest=blob、attempt Completed 且 terminal va
 Ingest/Coverage）、`PrefixRebaseCommitted`（Epoch+1、candidate digest 再验证、Y bundle
 PrefixCoverage-complete-turn）、`ContextReanchored`（Epoch+1、同一消息 id 只接受一次）。
 
-**含义/动机**：本命题是 fold 的**完整性机制** owner：任何恢复事实不满足其不变量时，
-fold 拒绝、writer 中毒、fail closed——不产生任何 writer 不可能产生的部分重放状态。
+**含义/动机**：本命题是 fold 的**完整性机制** owner：任何事实不满足其不变量时，该次调用失败；Integrator 保留该 rule 的 last-good Current，立即持久化 `ProjectionCutTail` reset，writer/runtime 不被 poison，后续同一功能可重新尝试。不产生任何 writer 不可能产生的部分重放状态，也不隐藏坏 fact。
 **边界**：各 fact 的业务语义（XTrace/coverage/epoch 的意义）归
 `semantic-trace`/`work-record`/`context-compression`/`prefix-stability`/`obligation-ledger`
 等 domain owner；本包只拥有「不满足即拒绝」这一条红线。
@@ -216,7 +215,8 @@ EventId 分布、历史 event 数、writer 文件当前大小都不得改变 app
 ## DURABLE-EVENTS-018 —— remote 操作才同步；同步替换 local + remote truth snapshot
 
 **规范陈述**：Wanxiangshu 不运行 timer/background uploader/event-count sync，也不从产品进程主动调用
-fetch/pull/push。Wanxiangshu 启动时只负责 **ensure Git hook + remote store refspec 正确安装**；之后只有用户自己的
+fetch/pull/push。Git hook + remote store refspec 的 install/refresh 属于 **durability activation**，不得发生在 OpenCode
+等待 plugin init 返回的 Load Phase；第一次真正启用该 workspace 的 durable capability 时才按需 ensure。之后只有用户自己的
 Git remote 操作触发独立 hook 进程同步 EventStore。hook 必须在 OpenCode/Wanxiangshu 完全未运行时仍可独立读取
 本地 writer files 与远端 writer blobs，按 `durable-convergence` 的 k-way merge/identity law 得到统一 history，
 直接 materialize/replace 本地 writer truth 与 remote snapshot；不设计 delta/chunk/增量 object protocol。
@@ -240,3 +240,25 @@ CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物�
 **边界**：业务 rule 内部可维护自己被分配的 Current 槽位，但 orchestration/registration/history iteration
 只属于 Integrator；实现必须使用 F# CE DSL，不引入事件状态机。
 **证据**：→ PROOF.md 019。
+
+## DURABLE-EVENTS-020 —— plugin load 只验证物理可读性；业务 replay/RuntimeStarted 延迟到 activation
+
+**规范陈述**：OpenCode plugin Load Phase 不得因为 EventStore 中某个业务 projection 无法解释而执行恢复、修复或写入新事实。Load Phase 最多验证 writer/payload 的物理结构可读性；canonical business integration、Journal projection acquisition 与 `RuntimeStarted` watermark 只能在第一次实际需要 durable semantics 时激活。未发生任何业务消费的 plugin 实例退出时，不得仅因“被加载过”而新增 RuntimeStarted 或其它业务事实。
+
+**含义/动机**：durable history 是业务输入，不是 plugin constructor 的控制流。把 replay/RuntimeStarted 放在 constructor 会让历史语义问题升级为 Host 启动故障，也会让失败启动消耗 recovery budget。
+
+**边界**：结构损坏（无法解析 canonical envelope、缺失必需 payload）属于物理 store unreadable，可拒绝该 workspace durable capability；业务规则冲突/unknown domain state 不得升级成 plugin-load failure，由 021 的 self-limited cut-tail 语义承接。
+
+**证据**：→ PROOF.md 020。
+
+## DURABLE-EVENTS-021 —— semantic failure 是 durable cut-tail reset；错误 self-limited
+
+**规范陈述**：registered business integration rule 对某个 EventEnvelope 返回语义错误时，Storage 不得拒绝已结构合法的 fact，也不得 poison 整个 Integrator/journal/feature。Integrator 必须按原时序：① durable 保留坏 fact；② 该 rule 进入 faulted tail，Current 保持 last-good；③ 由该业务 rule 根据当前事实推断最小 reset patch；④ 在同一次 live append 中紧随坏 fact 写入 first-class `ProjectionCutTail(rule, failed_event_id, reason, reset)`；⑤ replay 严格按 canonical 顺序先看到坏 fact，再看到 cut/reset，再继续后续 fact。`ProjectionCutTail` 与普通 writer fact 一样参与 remote sync。
+
+当前调用必须收到“自己的 EventId 被 cut”的 typed receipt 并失败；该错误只限这一次调用/identity，不得熔断 feature、不得让未来同一功能持续失败。下一次同一 rule 的正常 event 直接从 reset 后 Current 继续，正常路径 O(1)。如果业务 rule 无法现场推断 reset patch，允许调用 canonical Integrator 做一次 full-log replay 后再次推断；**整个进程全局最多一次**，仍不得自动恢复/重跑旧 tool。
+
+**含义/动机**：坏语义是历史事实，不是 storage corruption。cut/reset 也必须成为事实，否则不同进程/版本会对同一历史产生不同“我跳过了什么”的隐式状态。reset 参数由业务 rule 拥有；Integrator 只保证顺序、durability、single replay budget 与 typed cut receipt，不维护 per-rule old-state snapshot。
+
+**边界**：malformed canonical bytes、identity collision、missing parent/payload、unknown authoritative event type 仍属 DURABLE-EVENTS-007 的 StorageInvalid；这些不是 semantic cut。
+
+**证据**：→ PROOF.md 021。

@@ -60,39 +60,29 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Persistence.Journal
 
 /// Family recovery coordination (PROMPT-011 + C5 + RECOVERY-FAMILY) and
 /// attempt planning state for one plugin instance: recovery ports attachment,
 /// per-session arming and per-provider-run attempt plans.
-type PluginRecoveryScope() =
-    /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
-    ///
-    /// Attached after `createHost`. First business entry point runs
-    /// SessionRecoveryWorkflow.recoverFamilyDirect under FamilyRecoveryCoordinator
-    /// single-flight; later callers await the same task.
-    // DSL-MUTABLE: resource — family recovery ports attachment slot
-    let mutable familyRecoveryPorts: SessionRecoveryWorkflow.Ports option = None
-    let recoveryGateLock = obj ()
+type PluginRecoveryScope(journal: AgentJournal option) =
 
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
 
-    member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryWorkflow.Ports) =
-        lock recoveryGateLock (fun () -> familyRecoveryPorts <- Some ports)
+    /// Ordinary business entry never performs cross-process recovery. The permit
+    /// only certifies this process's join attempt and intentionally carries no old
+    /// durable closure members. Explicit session /continue owns future resume.
+    member _.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
+        let sequence =
+            journal
+            |> Option.map (AgentJournal.revision >> JournalRevision.value)
+            |> Option.defaultValue 0L
 
-    /// RECOVERY-FAMILY: obtain FamilyRecovery for a parent before business work.
-    /// Missing ports → FamilyBlocked (fail closed). Never synthetic FamilyReady.
-    member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
-        task {
-            match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
-            | None ->
-                return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
-            | Some ports ->
-                return! FamilyRecoveryCoordinator.runOnce (SessionRecoveryWorkflow.recoverFamilyDirect ports) root
-        }
+        Task.FromResult(
+            FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root sequence)
+        )
 
-    /// Await family recovery before business effects. Returns FamilyRecovery so
-    /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
     member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = this.RequireFamilyRecovery root
 
     member this.ArmRecovery(sessionId: SessionId) =

@@ -129,6 +129,11 @@ module SessionRecovery =
         let journalSequence (FamilyRecoveryPermit(_, sequence, _)) = sequence
         let closureMembers (FamilyRecoveryPermit(_, _, members)) = members
 
+        /// Current-process admission has no cross-process recovery claim. Empty
+        /// closure means old durable members are not certified/resumed implicitly.
+        let currentProcess (root: SessionId) (journalSequence: int64) =
+            FamilyRecoveryPermit(root, journalSequence, Set.empty)
+
         /// Stable rendering for diagnostics. Sorted, so two permits over the same closure read the
         /// same regardless of discovery order.
         let describeClosure (permit: FamilyRecoveryPermit) =

@@ -24,12 +24,12 @@ node --test requirements/durable-convergence/tests/integration/persist/dumb-serv
 | DURABLE-CONVERGENCE-005 | `replica-merge-laws.test.mjs::resolution_with_all_competing_heads_collapses_structural_frontier` | NEW/FROZEN |
 | DURABLE-CONVERGENCE-006 | `replica-merge-laws.test.mjs::convergence_is_a_function_of_event_truth_not_arrival_wall_clock` + `event-store-merge.test.mjs::DURABLE_CONVERGENCE_003_identity_collision_is_fail_closed_not_LWW` | NEW/FROZEN |
 | DURABLE-CONVERGENCE-007 | `writer-stream-sync.test.mjs::DURABLE_CONVERGENCE_007_sync_does_not_integrate_business_history` + `requirements/durable-events/tests/canonical-integrator.test.mjs` | NEW/FROZEN + CROSS/FROZEN |
-| DURABLE-CONVERGENCE-008 | `event-store-converge.test.mjs::{reference_transaction_and_pre_push_both_call_the_same_full_bidirectional_converge,product_process_has_no_fetch_pull_push_remote_api}` + `writer-stream-sync.test.mjs::DURABLE_CONVERGENCE_008_startup_only_ensures_hooks_and_user_Git_process_runs_full_sync` + `requirements/durable-events/tests/hook-dispatcher.test.mjs` | NEW/FROZEN |
+| DURABLE-CONVERGENCE-008 | `event-store-converge.test.mjs::{reference_transaction_and_pre_push_both_call_the_same_full_bidirectional_converge,product_process_has_no_fetch_pull_push_remote_api}` + `writer-stream-sync.test.mjs::DURABLE_CONVERGENCE_008_activation_only_ensures_hooks_and_user_Git_process_runs_full_sync` + `requirements/durable-events/tests/hook-dispatcher.test.mjs::HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync` | NEW/FROZEN |
 | DURABLE-CONVERGENCE-009 | `integration/persist/dumb-server.test.mjs::{dumb_remote_helper_has_no_Wanxiang_domain_or_projection_logic,pre_push_hook_process_uploads_one_local_writer_file_to_bare_remote_store_ref,second_machine_hook_imports_remote_writer_truth_without_any_running_Wanxiang_process,two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempotent}` | NEW/FROZEN |
 
 ## 统计
 
 - WHAT 命题：9；PROOF 行：9。
 - 统一 k-way primitive：`Infrastructure/Persist/EventKWayMerge.fs`，由 `CanonicalIntegrator` 与 `WriterStreamSync` 共同调用。
-- remote sync trigger：startup 只 `HookDispatcher.ensure`；实际执行由 `resources/git/wanxiang-hook.mjs` → `HookSync` 独立进程完成。
+- remote sync trigger：plugin Load Phase 零 Git mutation；durability activation 才 `HookDispatcher.ensure`；实际执行由 `resources/git/wanxiang-hook.mjs` → `HookSync` 独立进程完成。
 - GAP：0。

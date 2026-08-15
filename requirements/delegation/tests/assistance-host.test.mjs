@@ -84,7 +84,6 @@ const handleTurn = async (host, turn) => {
   const permit = observeIdle(gate, turn.SessionId)
   return rawHandleTurn(host, new ReconciledTurnContext(turn, permit, ReconciledTurnDelivery.IdleRevisit))
 }
-const recover = assistanceMethod('Recover')
 const dropSession = assistanceMethod('DropSession')
 
 const outcomeName = (value) => value.cases()[value.tag]
@@ -272,9 +271,11 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.equal(sends.length, 2, 'same consultation completion must not deliver advice twice')
     assert.equal(creates.length, 1, 'same help occasion must never create a second consultation')
 
-    await recover(host)
-    assert.equal(sends.length, 2, 'restart recovery must not redeliver accepted advice')
-    assert.equal(creates.length, 1)
+    assert.equal(
+      Object.keys(AssistanceHostModule).some((entry) => entry.startsWith('AssistanceHost__Recover')),
+      false,
+      'consultation recovery is not an ordinary AssistanceHost capability; broken old tools stay broken',
+    )
 
     const secondHelp = 'asst_deep_help_again'
     bindRun(secondHelp, 'deep-coder')

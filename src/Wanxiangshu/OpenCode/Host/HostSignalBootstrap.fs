@@ -42,6 +42,7 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git.Hook
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session
@@ -335,7 +336,6 @@ module HostSignalBootstrap =
                             member _.Dispose() = s.Dispose() })
 
             do scope.TrackSubscription subscription
-            do! assistance.Recover()
 
             let registerOwned (sessionId: string) =
                 if not (String.IsNullOrWhiteSpace sessionId) then
@@ -396,18 +396,6 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
-            match journal with
-            | None -> ()
-            | Some durable ->
-                do!
-                    FissionHost.recoverGroups
-                        sessionPort
-                        eventPort
-                        durable
-                        (fun sessionId -> registerOwned (SessionId.value sessionId))
-                        bindActiveRun
-                        (fun _ -> workspaceDirectory)
-
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with
                 | None -> ()
@@ -427,8 +415,18 @@ module HostSignalBootstrap =
                     registerOwned
                     (Some onAuthorityRoot)
 
+            let durabilityActivation =
+                lazy
+                    (match workspaceDirectory with
+                     | None -> Ok()
+                     | Some workspace -> HookDispatcher.ensure workspace)
+
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
+                    match durabilityActivation.Value with
+                    | Ok() -> ()
+                    | Error error -> Diagnostic.emit "durability-activation-failed" [ "result", error ]
+
                     // Decode once for join wake; authority path re-decodes inside
                     // createHook (PROMPT-004 fail-closed unchanged). Signal even when
                     // mid-run UnknownOrigin — not only after AcceptHumanRoot.

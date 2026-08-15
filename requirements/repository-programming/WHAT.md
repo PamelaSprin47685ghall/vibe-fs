@@ -143,13 +143,13 @@
 
 **证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-014 行。
 
-## REPOSITORY-PROGRAMMING-015 — rollback 与 crash recovery
+## REPOSITORY-PROGRAMMING-015 — normal rollback；crash 后不自动恢复工具
 
-**规范陈述**：normal 失败路径回滚全部 staged 效果：Rewrite 恢复 `Replacement → Original`，Create 恢复 `Replacement → Missing`。rollback 必须 CAS-style：若当前文件已不是本事务写入的 replacement，不得覆盖第三方内容，进入 `TRANSACTION_RECOVERY_REQUIRED` 并在同一 EventStore 保留 durable evidence。crash recovery 只从 EventStore facts/payloads 重建：最小 transaction state 是 `Prepared / Committed / RolledBack / RecoveryRequired`（不是程序计数器）；未 commit 的 prepare 不产生磁盘效果；已 commit 的 facts 重放后与磁盘一致；unfinished transaction 第一版策略优先恢复调用前状态；无法证明安全恢复 → fail closed + retain EventStore evidence + report blocker。禁止打开 `js-transaction.db` 或扫描 feature manifest 目录作为权威。
+**规范陈述**：同一进程内可观察到的 normal 失败路径回滚本次已写效果：Rewrite 恢复 `Replacement → Original`，Create 恢复 `Replacement → Missing`；rollback 必须 CAS-style，当前文件已不是本事务 replacement 时不得覆盖第三方内容。进程 crash 是另一条边界：若 crash 发生在 durable `Prepared` 之后、`Committed` 之前，下一进程**不得自动 undo、redo、rollback、重跑 model program 或补 commit**。`Prepared` 与磁盘现状只作为“上一 js-* tool 已中断”的审计证据；该 tool 保持失败/不完整。禁止 plugin startup、EventStore open 或下一次普通 js-* 调用偷偷替它善后。
 
-**含义/动机**：恢复的权威必须与正常提交的权威是同一个（统一 EventStore）。程序计数器式几十个领域状态不可恢复；只有事实能重放。
+**含义/动机**：跨进程自动 rollback 看似修复，实际是在没有用户/LLM 新意图时修改 workspace，并把坏 tool 伪装成从未发生。KISS 边界是：进程内事务负责正常失败原子性；进程死亡打断工具，断点必须可见。
 
-**边界**：恢复的具体策略细节（first-version 优先恢复调用前状态）是 HOW 可演进项；「只从 EventStore facts 重建 + 禁 feature store + fail closed」才是合同。
+**边界**：未来若 session `/continue` 需要处理中断 transaction，只能把 `Prepared` + 当前文件事实公开给 LLM/显式恢复 workflow，由新意图决定修复；仍禁止 feature store、隐式 replay 与 constructor recovery。
 
 **证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-015 行。
 

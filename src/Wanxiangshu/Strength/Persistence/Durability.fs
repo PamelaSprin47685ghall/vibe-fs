@@ -47,8 +47,10 @@ module StrengthDurability =
         let append event =
             task {
                 match! StrengthStore.append store HostDigest.sha256Hex event with
-                | Ok _ -> return Ok()
-                | Error err -> return Error(sprintf "%A" err)
+                | Ok _ -> return StrengthDurableAppend.Applied
+                | Error(AppendError.SemanticCut cut) ->
+                    return StrengthDurableAppend.SemanticRejected cut.Reason
+                | Error err -> return StrengthDurableAppend.StorageFailed(sprintf "%A" err)
             }
 
         { LoadProjection = loadProjection

@@ -264,6 +264,21 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 **证据**：`session-snapshot-locality`（`Ambiguous`）、`needhelp-sensor`（armed 唯一）、
 `host001-fragment-events`（codec 丢弃）；→ PROOF.md `HOST-BOUNDARY-020`。
 
+## HOST-BOUNDARY-021：plugin load/init 不得执行业务语义或反向调用 Host
+
+**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools。禁止在此阶段：
+
+- 调用 `client.session.*`、prompt/abort/create/list 等任何会进入 Host 业务路径的 API；
+- 执行 crash/business recovery、全局 recovery sweep、恢复 session/fission/assistance runtime cache；
+- 修改 workspace/Git 配置/hooks/refspec、回滚 transaction、发 prompt、abort session；
+- 追加会改变业务 projection 的 durable fact（包括仅用于 recovery budget 的 runtime watermark）。
+
+业务 projection 的解释进入 **Activation Phase**，但普通 tool/hook 入口不得自动恢复上一进程的未完成 tool。tool crash 只产生“上一执行已中断”的历史事实；任何 abort/send/rollback/replay/补 terminal 都必须有新的显式业务意图。未来若存在 session `/continue`，它是独立、用户显式的 resume 入口，不属于 plugin load，也不得隐藏重启断点。持久化字节若结构不可读可拒绝对应 workspace capability；已有 durable fact 的业务语义冲突不得把 OpenCode 本体卡在 plugin init。
+
+**含义/动机**：Host 在等待 plugin init 时，plugin 反调同一 Host 会形成自举环；把 recovery 藏进 constructor 还会让一个 feature 的历史状态劫持整个 Host 启动。Load/Activation 分界把「能加载」与「某项业务能恢复」彻底解耦。
+
+**证据**：`OpenCode/Plugin/PluginBoot.fs`、`HostSignalBootstrap.fs`、`WorkspaceEventStore.fs` 的 load-purity gate；→ PROOF.md `HOST-BOUNDARY-021`。
+
 ## GARBAGE / 弃权（不进入 WHAT）
 
 - `HOST-013` Pair Hint 全链（durable anchored pair、Cursor NUL+BOM、parallel wave、tip nudge、

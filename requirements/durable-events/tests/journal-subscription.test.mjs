@@ -43,13 +43,13 @@ const appendHandleLinked = async (journal, parent = 'ses_p', child = 'ses_c', ag
 test('EXEC_journal_revision_advances_only_on_successful_fold', async () => {
   await withJournal(async (journal) => {
     const before = journalRevision.value(agentJournal.revision(journal))
-    assert.ok(before >= 1, 'create folds RuntimeStarted → revision ≥ 1')
+    assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
 
     const linked = await appendHandleLinked(journal)
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const after = journalRevision.value(agentJournal.revision(journal))
-    assert.equal(after, before + 1, 'one successful append advances revision by LocalSeq step')
+    assert.equal(after, 2, 'first business append lazily writes RuntimeStarted#1 then publishes business#2')
   })
 })
 

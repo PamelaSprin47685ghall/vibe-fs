@@ -40,9 +40,8 @@ open Wanxiangshu.Process
 
 module PluginBoot =
 
-    /// Boot-time facts captured once from the raw plugin input, before any host
-    /// wiring. Global initialization order stays authoritative here (Wave 3):
-    /// resource install → port → journal → scope → parent restore → workspace.
+    /// Load-time capabilities captured from raw plugin input. This phase may read
+    /// durable state but never repairs old work, mutates the workspace, or calls Host sessions.
     type Boot =
         { Input: obj
           PortOpt: IOpenCodePort option
@@ -75,8 +74,6 @@ module PluginBoot =
                 scope.Strength.TripStrengthFuse reason
                 raise (InvalidOperationException reason)
 
-            PluginHost.restoreSessionParents journal scope.Sessions.SessionParents
-
             let familyParent (sessionId: SessionId) =
                 match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
                 | true, parentId -> Some(SessionId.create parentId)
@@ -88,16 +85,6 @@ module PluginBoot =
             // worktree release at publish. First boot wins: the main workspace
             // instance starts before the manager worktree instances.
             let workspaceDirectory = PluginHost.workspaceDirectory input
-
-            // DURABLE-CONVERGENCE-008: startup only ensures the external Git-hook
-            // membrane. Actual sync runs later in the user's Git hook process and
-            // must not depend on this OpenCode/Wanxiangshu process remaining alive.
-            match workspaceDirectory with
-            | None -> ()
-            | Some workspace ->
-                match HookDispatcher.ensure workspace with
-                | Ok() -> ()
-                | Error error -> raise (InvalidOperationException error)
 
             let gitTreePort =
                 match PluginHost.gitTreePortFromInput input with

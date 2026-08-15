@@ -772,49 +772,6 @@ type AssistanceHost
                 | _ -> return AssistanceTurnDisposition.NotAssistance
         }
 
-    /// Bootstrap recovery: re-register hidden consultation children; never mint
-    /// a replacement. Completed cells may finish advice delivery, while an active
-    /// child with no Authority Root replays the same deterministic opening send.
-    member _.Recover() : Task =
-        task {
-            match currentProjection () with
-            | None -> ()
-            | Some snapshot ->
-                for KeyValue(childId, record) in snapshot.AgentProjections.HandleByChildSession do
-                    match tryDecodeRecord record with
-                    | None -> ()
-                    | Some(agentId, owner, logicalRun, requester) ->
-                        trackChildOwned childId
-
-                        match ownerStillOnRun owner logicalRun, record.Lifecycle with
-                        | None, _ -> ()
-                        | Some _, HandleLifecycle.Retired
-                        | Some _, HandleLifecycle.Abandoned _ -> ()
-                        | Some _, HandleLifecycle.CompletedAwaitingJoin _ ->
-                            match! childRecordText childId with
-                            | Some childWorkRecord when not (String.IsNullOrWhiteSpace childWorkRecord) ->
-                                let! _ =
-                                    deliverAdvice
-                                        owner
-                                        logicalRun
-                                        requester
-                                        childId
-                                        record
-                                        (advicePrompt owner childWorkRecord)
-                                        None
-
-                                ()
-                            | _ -> ()
-                        | Some _, HandleLifecycle.Active ->
-                            if
-                                not (hasAdviceClaim owner logicalRun)
-                                && not (childHasRootClaimOrProfile childId)
-                            then
-                                let! _ = sendConsultationRoot owner logicalRun requester childId None
-                                ()
-        }
-        :> Task
-
     /// Synchronous signal-plane teardown. Parent cancellation uses this before its
     /// own durable handle cancellation CE; no durable work is started here.
     member _.DropSignals(sessionId: SessionId) =

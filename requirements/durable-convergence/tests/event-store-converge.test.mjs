@@ -37,9 +37,11 @@ test('lease_race_refetches_and_repeats_the_same_k_way_sync_boundedly', async () 
 test('product_process_has_no_fetch_pull_push_remote_api', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
+  const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   assert.doesNotMatch(gateway, /type IGitGateway|member _\.(Fetch|Pull|Push)\(/)
-  assert.match(boot, /HookDispatcher\.ensure/)
-  assert.doesNotMatch(boot, /GitGateway\.converge|fetch|pull|push/i)
+  assert.doesNotMatch(boot, /HookDispatcher\.ensure/, 'plugin load must not mutate Git')
+  assert.match(activation, /lazy[\s\S]*HookDispatcher\.ensure/)
+  assert.doesNotMatch(activation, /GitGateway\.converge|\.(Fetch|Pull|Push)\(/i)
 })
 
 test('hook_internal_Git_commands_are_recursion_guarded_and_pre_push_is_not_reentered', async () => {

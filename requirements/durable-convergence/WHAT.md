@@ -89,11 +89,11 @@ Current；唯一 Integrator 与注册规则由 `durable-events` 014/019 保证�
 **边界**：业务 integration rule 的语义归各 domain owner。
 **证据**：→ PROOF.md 007。
 
-## DURABLE-CONVERGENCE-008 —— startup ensure hooks；用户 Git 进程独立触发双向 sync
+## DURABLE-CONVERGENCE-008 —— durability activation ensure hooks；用户 Git 进程独立触发双向 sync
 
 **规范陈述**：Wanxiangshu 不提供 timer/background/event-count 同步器，也不从 OpenCode/Wanxiangshu 产品进程
-主动调用 fetch/pull/push。Wanxiangshu 启动时必须 ensure `reference-transaction` / `pre-push` hook 以及各已知
-remote 的 Wanxiang store fetch-refspec 正确安装；无法安全安装时 fail fast/明确诊断，不得静默降级。之后同步由
+主动调用 fetch/pull/push。OpenCode 等待 plugin init 返回的 Load Phase 不得修改 Git；第一次真实 workspace 业务交互进入 durability activation 时才 ensure `reference-transaction` / `pre-push` hook 以及各已知
+remote 的 Wanxiang store fetch-refspec 正确安装；安装失败明确诊断，但不得反向让 plugin load 卡死。之后同步由
 **用户自己的 Git 进程启动的 hook 子进程**执行，即使 OpenCode/Wanxiangshu 已退出也必须可工作。hook shim
 不得固化安装时宿主的 `process.execPath`（OpenCode/Bun/其它 host binary 都不是 Node runtime）；它必须通过
 `/usr/bin/env node <package>/resources/git/wanxiang-hook.mjs` 调起随包 runner，由 package 的 Node `>=20` runtime 独立解释，

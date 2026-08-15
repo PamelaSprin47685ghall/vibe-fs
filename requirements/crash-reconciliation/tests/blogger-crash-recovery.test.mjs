@@ -1,7 +1,7 @@
 // Split from tests/unit/enforcer/blogger-crash-recovery.test.mjs (cutover Wave 2a); owner: crash-reconciliation.
 //
 // C5 item 20 (CRASH-016): pure decision table for Blogger crash windows A/B/C/D.
-// Family recovery interpreter owns startup timing; classify stays pure.
+// The classifier stays pure; ordinary plugin lifecycle must not invoke it.
 // The ENFORCER-153 rejudge half moved to behavior-diagnosis
 // (enforcer-153-rejudge.test.mjs).
 import test from 'node:test'
@@ -57,12 +57,10 @@ test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(probeModuleSrc, /blogger-missing-tool/)
 })
 
-test('C5_crash_recovery_wired_through_family_ports', () => {
-  assert.match(spikeSrc, /AttachFamilyRecoveryPorts/)
-  assert.match(scopeSrc, /RequireFamilyRecovery/)
-  assert.match(interpreterSrc, /BloggerCrashRecovery\.reconcile/)
-  assert.doesNotMatch(spikeSrc, /AttachBloggerRecoveryGate/)
-  assert.doesNotMatch(scopeSrc, /bloggerRecoveryGate/)
+test('C5_crash_recovery_library_is_not_wired_into_ordinary_plugin_lifecycle', () => {
+  assert.doesNotMatch(spikeSrc, /AttachFamilyRecoveryPorts|BloggerCrashRecovery|recoverFamilyDirect/)
+  assert.match(scopeSrc, /Current-process join admission only/)
+  assert.match(interpreterSrc, /BloggerCrashRecovery\.reconcile/, 'recovery library may remain for future explicit /continue')
 })
 
 test('C5_classify_open_request_window_A_unsent', async () => {

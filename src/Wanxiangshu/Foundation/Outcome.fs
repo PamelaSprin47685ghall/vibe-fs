@@ -88,4 +88,7 @@ module Outcome =
     /// so there is no third case to represent one.
     type CommitResult<'e> =
         | Committed of 'e
+        /// Bytes are durable, but the business rule cut this event and immediately
+        /// wrote a durable reset fact. This invocation failed; the writer remains usable.
+        | Rejected of EventId * reason: string
         | CommitUnknown of EventId * JournalFailure

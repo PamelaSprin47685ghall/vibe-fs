@@ -18,7 +18,11 @@ runtime process
 large material
   → .git/wanxiang/payloads/<PayloadRef>
 
-Wanxiangshu/OpenCode startup
+Wanxiangshu/OpenCode Load Phase
+  → parse/validate static structure; return hooks; no durable semantic side effect
+
+first durable capability activation
+  → best-effort Current + lazy RuntimeStarted；semantic reject → durable ProjectionCutTail reset
   → HookDispatcher.ensure(reference-transaction, pre-push, remote store fetch-refspec)
   → stop; product process never owns fetch/pull/push
 
@@ -41,7 +45,7 @@ Git ODB 是 remote-sync 编码/transport，不是在线数据库。Git 自己内
 
 ```text
 WHY.md    动机与被拒方案
-WHAT.md   normative：DURABLE-EVENTS-001..019
+WHAT.md   normative：DURABLE-EVENTS-001..021
 HOW.md    当前实现模型
 PROOF.md  命题 → executable oracle；本轮新增/改写测试 FROZEN 未执行
 ```
@@ -61,7 +65,7 @@ PROOF.md  命题 → executable oracle；本轮新增/改写测试 FROZEN 未执
 | Git sync encoding | `Infrastructure/Persist/WriterStreamSync.fs` |
 | hook-process Git transport | `Infrastructure/Git/GitGateway.fs` |
 | standalone hook entry | `Infrastructure/Git/HookSync.fs` + `resources/git/wanxiang-hook.mjs` |
-| startup ensure | `Infrastructure/Git/HookDispatcher.fs` / `OpenCode/Plugin/PluginBoot.fs` |
+| activation-time ensure | `Infrastructure/Git/HookDispatcher.fs` / durable activation owner |
 | Journal adapter | `Persistence/Journal/EventStoreJournalWriter.fs` / `Persistence/Journal/AgentJournal.fs` |
 
 ## 关键红线
@@ -70,7 +74,7 @@ PROOF.md  命题 → executable oracle；本轮新增/改写测试 FROZEN 未执
 - boot replay 与 live append 都进入同一个 `integrateOne` program。
 - structural frontier/DomainConflict 也是 Integrator 的 registered Current，不另造 projector/state machine。
 - local append 成功与 remote 是否在线无关。
-- startup 只 ensure hooks/refspec；同步必须能在 OpenCode/Wanxiangshu 不运行时由用户 Git hook 独立完成。
+- plugin Load Phase 不 ensure hooks/refspec、不写 RuntimeStarted、不恢复业务；durable activation 才按需 ensure。
 - `reference-transaction` 与 `pre-push` 都是 full bidirectional convergence；区别只在 initial remote root discovery。
 
 ## Proof（解冻后）

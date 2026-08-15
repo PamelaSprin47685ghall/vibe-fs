@@ -20,25 +20,17 @@
 | `src/Wanxiangshu/Session/CompletionMailbox.fs` / `JoinDrain.fs` / `Execution/Delegation/Join.fs` | agent Pulse vs PTY Publish 双通道；join 消费 v2 terminal | CRASH-011/012 |
 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs` / `PluginRecoveryScope.fs` | RequireFamilyRecovery 端口接线 | CRASH-006 |
 
-## 一次 family 恢复的主路径（代码时序）
+## 当前进程内 family 校验路径
 
 ```text
-plugin start / session idle 触发
-→ RecoveryClosureProjection.discover(parentSession, projections, sequence)   // durable 关联
+当前进程创建的 family 在 join / await 前
+→ RecoveryClosureProjection.discover(parentSession, projections, sequence)
 → validateClosurePure（重复 session → RecoveryCycle block）
-→ recoverNodes（child-first，按节点类型跑各端口）：
-     RecoverPromptClaims（PromptRecovery）
-     RecoverBlogger（BloggerCrashRecovery）
-     RestoreHandles（HandleFamilyRecovery）
-     RecoverJobs（JobFamilyRecovery）
-   → 每端口 SessionRecovery → combine（Blocked > Waiting > Recovered）
-→ authorizeFamilyResume：
-     any Blocked → FamilyBlocked
-     else any Waiting → FamilyWaiting
-     else FamilyReady(FamilyRecoveryPermit(root, sequence, members))
-→ 消费方（join / AwaitAgentWithPermit）持 permit 入场；join 边界校验
-   missingFrom(current, permit) == []（丢失成员拒绝，增长合法）
+→ 对当前进程仍可观察的 child 做证据校验
+→ authorizeFamilyResume → permit → join
 ```
+
+该路径不是跨进程 tool recovery。进程重启后，不自动 restore 上一进程的 tool/family，不扫描旧未完成 handle 去补完成。未来若要恢复旧 session，只能由显式 `/continue` 建立新的、可见的 resume workflow；旧坏 tool 仍保留在 transcript。
 
 ## child 恢复的 resolve 顺序（纯决策）
 
@@ -90,9 +82,8 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
 
 ## GARBAGE / 弃权裁决
 
-- **恢复的具体编排时机**（startup sweep vs lazy on-demand）：HOW。boundary card
-  INDEPENDENT CHANGE 明确「把 startup sweep 改成 lazy on-demand reconciliation 而 durable/
-  domain contracts 不变」是本包可独立变化点。
+- **startup sweep / lazy tool recovery**：均已裁决为非法。CRASH-017 不允许把自动恢复从 startup 挪到普通 tool/hook；旧 tool crash 保持失败。
+- **显式 `/continue`（CRASH-018）**：config 注册 command；`command.execute.before` 只在 command=`continue` 时读取 parent 的 durable handles，逐 child 用 `ISessionSnapshotPort.GetMessages` 判 physical 可访问；可访问 child 只调用 process-local adopt（Restore + BindChildSession + parent map），不 append fact、不 send prompt。hook 把 restart/broken-tool disclosure + surviving/unavailable child 清单作为 visible text part 交给 LLM。真正 reopen handle/发送 charge 留给后续普通 fork reuse，因此 resume discovery 与业务 effect 分离。
 - **各 domain 的恢复规则**（ORCH-007、magic-todo settle、managed-session replacement、
   publish reconcile）：归各 domain owner，本包只引用为本地应用示例。
 - **recoveryAction 的领域语义**（`requirements/change-integration/tests/job.test.mjs`）：归

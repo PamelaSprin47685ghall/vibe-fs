@@ -1,17 +1,15 @@
-// FROZEN — 2026-08-14. Rewritten for canonical-Integrator Current.
-// Intentionally NOT executed before implementation.
 // JS-012/015: transaction modules never enumerate EventStore history.
+// A crash leaves Prepared as audit evidence; the next process never mutates files to hide the broken tool.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
   JsToolsTransactionStore_appendPrepared as appendPrepared,
   JsToolsTransactionStore_appendCommitted as appendCommitted,
-  JsToolsTransactionStore_recoverCurrent as recoverCurrent,
 } from '../../../dist/Repository/Programming/Js/TransactionStore.js'
 import {
   JsTransactionIdModule_create as txId,
@@ -59,7 +57,7 @@ test('JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
   }
 })
 
-test('JS015_prepared_without_committed_is_recovery_Current', async () => {
+test('JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
   const local = createLocalEventStore()
   try {
     const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
@@ -73,29 +71,27 @@ test('JS015_prepared_without_committed_is_recovery_Current', async () => {
   }
 })
 
-test('JS015_recoverCurrent_undoes_only_what_the_integrator_says_is_pending', async () => {
+test('JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
   const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+  const common = mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
   try {
     writeFileSync(join(dir, 'a.txt'), 'new', 'utf8')
-    writeFileSync(join(dir, 'b.txt'), 'theirs', 'utf8')
-    writeFileSync(join(dir, 'c.txt'), 'created', 'utf8')
+    const first = createLocalEventStore({ commonDir: common, writerId: 'before-crash' })
+    try {
+      unwrap(await appendPrepared(first.store, prepared('tx-3', dir, [mutation('a.txt', 'old', 'new')])))
+    } finally {
+      first.close()
+    }
 
-    const p = prepared('tx-3', dir, [
-      mutation('a.txt', 'old', 'new'),
-      mutation('b.txt', 'original', 'fresh'),
-      mutation('c.txt', null, 'created'),
-      mutation('d.txt', null, 'vanished'),
-    ])
-    unwrap(await appendPrepared(local.store, p))
-    recoverCurrent(local.store)
-
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
-    assert.equal(readFileSync(join(dir, 'b.txt'), 'utf8'), 'theirs')
-    assert.equal(existsSync(join(dir, 'c.txt')), false)
-    assert.equal(existsSync(join(dir, 'd.txt')), false)
+    const reopened = createLocalEventStore({ commonDir: common, writerId: 'after-crash' })
+    try {
+      assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new')
+      assert.equal(listItems(pending(current(reopened.store))).length, 1)
+    } finally {
+      reopened.close()
+    }
   } finally {
-    local.close()
+    rmSync(common, { recursive: true, force: true })
     cleanup()
   }
 })
@@ -103,5 +99,5 @@ test('JS015_recoverCurrent_undoes_only_what_the_integrator_says_is_pending', asy
 test('JS015_store_source_has_no_manual_history_reader', async () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|scanUncommitted|OpenSnapshot|readStreams/)
-  assert.match(source, /TryCurrent "JsTransaction"/)
+  assert.doesNotMatch(source, /recoverCurrent|undoIfMatches/)
 })

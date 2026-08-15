@@ -40,7 +40,7 @@ Fission admission 后由 lane `k` 新发起的 subagent run/PTY completion 绑�
 
 ## INTRA-PARTICIPANT-PARALLELISM-010：durable replay，不猜 lane
 
-一旦 Fission 已造成真实 lane/effect，active group identity、lane membership、replacement relation、work/broadcast delivery 与 convergence terminal 必须有足以跨 crash 重建因果的 durable facts。restart 只能从 durable facts + 可信物理 observation 恢复；不得扫描相似 sessions 猜“哪些可能是 twins”。
+一旦 Fission 已造成真实 lane/effect，active group identity、lane membership、replacement relation、work/broadcast delivery 与 convergence terminal 必须有足以审计 crash 前因果的 durable facts；不得扫描相似 sessions 猜“哪些可能是 twins”。**Fission tool crash 后不自动恢复**：plugin init 与普通后续 tool/hook 都不得重建 lane runtime、重新 abort old owner、补 convergence 或替旧 tool 收尾。旧 Open group 表示上一 Fission 执行中断；未来仅显式 session `/continue` 可把该事实公开给 LLM，由新意图决定是否复用 surviving lane sessions。
 
 ## INTRA-PARTICIPANT-PARALLELISM-011：V1 单 active group
 

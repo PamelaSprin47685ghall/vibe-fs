@@ -27,7 +27,8 @@ test('DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_bu
     assert.equal(source.includes(registration), true, `canonical program must register ${registration}`)
   }
 
-  assert.match(source, /integrateRules/, 'one event may feed structural + business registered oracles')
+  assert.match(source, /integrateBusiness/, 'one event may feed structural + business registered oracles')
+  assert.match(source, /ProjectionCutTail/, 'business rule failures are reset by durable cut-tail facts')
   assert.doesNotMatch(source, /multiple integration rules accepted one event/)
   assert.doesNotMatch(source, /type\s+\w*(StateMachine|LifecycleState)\b/)
 })
@@ -62,11 +63,11 @@ test('DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_p
 
   assert.match(source, /integrateOne/)
   assert.match(source, /replay/)
-  assert.match(source, /integrateLive/)
+  assert.match(source, /prepareLive/)
 
   // Both entry points must delegate to the same single-event primitive rather than maintaining two folds.
   const calls = source.match(/integrateOne/g) ?? []
-  assert.ok(calls.length >= 3, 'definition + replay + live should all reference integrateOne')
+  assert.ok(calls.length >= 3, 'definition + replay + live preparation should all reference integrateOne')
   assert.doesNotMatch(source, /replayFold|liveFold|replayReducer|liveReducer/)
 })
 

@@ -36,13 +36,15 @@ test('DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_with
   assert.doesNotMatch(source, /split|rotate/i)
 })
 
-test('DURABLE_CONVERGENCE_008_startup_only_ensures_hooks_and_user_Git_process_runs_full_sync', async () => {
+test('DURABLE_CONVERGENCE_008_activation_only_ensures_hooks_and_user_Git_process_runs_full_sync', async () => {
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
+  const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const hook = await read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   const runner = await read('resources/git/wanxiang-hook.mjs')
   const hookSync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
 
-  assert.match(boot, /ensure.*hook|HookDispatcher.*ensure/is)
+  assert.doesNotMatch(boot, /HookDispatcher\.ensure/)
+  assert.match(activation, /lazy[\s\S]*HookDispatcher\.ensure/)
   assert.match(hook, /ReferenceTransaction/)
   assert.match(hook, /PrePush/)
   assert.match(hook, /full.*converge|ConvergeFull/is, 'both hook kinds must run full bidirectional convergence')

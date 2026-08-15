@@ -87,7 +87,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let strength = PluginStrengthScope()
     let blogger = PluginBloggerScope()
     let sessions = PluginSessionScope()
-    let recovery = PluginRecoveryScope()
+    let recovery = PluginRecoveryScope(journal)
 
     let toolRuntimeGate = obj ()
     // DSL-MUTABLE: resource — session tool runtime owner handle
@@ -216,11 +216,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             loopSensor <- Some empty
             empty
 
-    member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryWorkflow.Ports) =
-        recovery.AttachFamilyRecoveryPorts ports
-
-    /// RECOVERY-FAMILY: obtain FamilyRecovery for a parent before business work.
-    /// Missing ports → FamilyBlocked (fail closed). Never synthetic FamilyReady.
+    /// Current-process join admission only; no cross-process tool recovery.
     member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> = recovery.RequireFamilyRecovery root
 
     /// Await family recovery before business effects. Returns FamilyRecovery so
