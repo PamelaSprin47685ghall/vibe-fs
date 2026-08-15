@@ -149,6 +149,64 @@ module FactCodec =
     let serializeFact (fact: Fact) : string =
         Encode.Auto.toString (0, pinToUtc fact, extra = extra)
 
+    /// Evidence → Decision: one JSON string step after an opening quote.
+    let private skipJsonString (json: string) (startAfterQuote: int) : int =
+        let rec skipString j =
+            if j >= json.Length then j
+            elif json.[j] = '\\' then skipString (j + 2)
+            elif json.[j] = '"' then j + 1
+            else skipString (j + 1)
+
+        skipString startAfterQuote
+
+    type private ObjectScanStep =
+        | Exhausted
+        | Found of closeIndex: int
+        | Advance of nextIndex: int * nextDepth: int
+
+    /// Evidence → Decision: one brace-depth step inside an auto-encoded payload object.
+    let private stepJsonObjectScan (json: string) (i: int) (depth: int) : ObjectScanStep =
+        if i >= json.Length then Exhausted
+        elif json.[i] = '{' then Advance(i + 1, depth + 1)
+        elif json.[i] = '}' && depth = 1 then Found i
+        elif json.[i] = '}' then Advance(i + 1, depth - 1)
+        elif json.[i] = '"' then Advance(skipJsonString json (i + 1), depth)
+        else Advance(i + 1, depth)
+
+    let private findMatchingObjectClose (json: string) (openBrace: int) : int option =
+        let rec loop i depth =
+            match stepJsonObjectScan json i depth with
+            | Exhausted -> None
+            | Found close -> Some close
+            | Advance(nextIndex, nextDepth) -> loop nextIndex nextDepth
+
+        loop (openBrace + 1) 1
+
+    /// Locate the first object after a DU case marker; None when marker/brace/close missing.
+    let private tryObjectCloseAfterMarker (json: string) (caseMarker: string) : int option =
+        let start = json.IndexOf(caseMarker, StringComparison.Ordinal)
+
+        if start < 0 then None
+        elif json.IndexOf('{', start) < 0 then None
+        else findMatchingObjectClose json (json.IndexOf('{', start))
+
+    /// Insert auto-encoded optional fields before the payload object's closing brace.
+    let private insertFieldsBeforeObjectClose (json: string) (caseMarker: string) (fields: string) : string =
+        match tryObjectCloseAfterMarker json caseMarker with
+        | None -> json
+        | Some close ->
+            let before = json.Substring(0, close)
+            let after = json.Substring(close)
+            let trimmed = before.TrimEnd()
+
+            let needsComma =
+                trimmed.Length > 0
+                && trimmed.[trimmed.Length - 1] <> '{'
+                && trimmed.[trimmed.Length - 1] <> ','
+
+            let piece = if needsComma then "," + fields else fields
+            before + piece + after
+
     /// 0.5.1 → 0.5.2: `HandleCompleted` gained `CompletionRef` / `CompletionDigest`.
     /// Old lines lack both keys; inject null so Decode maps them to `None`.
     let private migrateHandleCompleted (json: string) : string =
@@ -161,51 +219,10 @@ module FactCodec =
             // two optional fields before its closing brace of that object. A single
             // first-object close is enough: HandleCompleted's payload has no nested
             // objects that open before the outer close in the auto-encoded shape.
-            let marker = "\"HandleCompleted\""
-            let start = json.IndexOf(marker, StringComparison.Ordinal)
-
-            if start < 0 then
+            insertFieldsBeforeObjectClose
                 json
-            else
-                let brace = json.IndexOf('{', start)
-
-                if brace < 0 then
-                    json
-                else
-                    let rec findClose (i: int) (depth: int) =
-                        if i >= json.Length then
-                            -1
-                        else
-                            match json.[i] with
-                            | '{' -> findClose (i + 1) (depth + 1)
-                            | '}' when depth = 1 -> i
-                            | '}' -> findClose (i + 1) (depth - 1)
-                            | '"' ->
-                                let rec skipString j =
-                                    if j >= json.Length then j
-                                    elif json.[j] = '\\' then skipString (j + 2)
-                                    elif json.[j] = '"' then j + 1
-                                    else skipString (j + 1)
-
-                                findClose (skipString (i + 1)) depth
-                            | _ -> findClose (i + 1) depth
-
-                    match findClose (brace + 1) 1 with
-                    | -1 -> json
-                    | close ->
-                        let insert = "\"CompletionRef\":null,\"CompletionDigest\":null"
-                        let before = json.Substring(0, close)
-                        let after = json.Substring(close)
-                        // Keep valid JSON whether the payload already has fields.
-                        let needsComma =
-                            let trimmed = before.TrimEnd()
-
-                            trimmed.Length > 0
-                            && trimmed.[trimmed.Length - 1] <> '{'
-                            && trimmed.[trimmed.Length - 1] <> ','
-
-                        let piece = if needsComma then "," + insert else insert
-                        before + piece + after
+                "\"HandleCompleted\""
+                "\"CompletionRef\":null,\"CompletionDigest\":null"
 
     /// GLORY-002 / SURFACE-006: `HandleLinked` gained `Ownership`. Old lines
     /// lack the key; inject `DurableParentHandle` so replay keeps the pre-change
@@ -216,51 +233,7 @@ module FactCodec =
         elif json.IndexOf("\"Ownership\"", StringComparison.Ordinal) >= 0 then
             json
         else
-            let marker = "\"HandleLinked\""
-            let start = json.IndexOf(marker, StringComparison.Ordinal)
-
-            if start < 0 then
-                json
-            else
-                let brace = json.IndexOf('{', start)
-
-                if brace < 0 then
-                    json
-                else
-                    let rec findClose (i: int) (depth: int) =
-                        if i >= json.Length then
-                            -1
-                        else
-                            match json.[i] with
-                            | '{' -> findClose (i + 1) (depth + 1)
-                            | '}' when depth = 1 -> i
-                            | '}' -> findClose (i + 1) (depth - 1)
-                            | '"' ->
-                                let rec skipString j =
-                                    if j >= json.Length then j
-                                    elif json.[j] = '\\' then skipString (j + 2)
-                                    elif json.[j] = '"' then j + 1
-                                    else skipString (j + 1)
-
-                                findClose (skipString (i + 1)) depth
-                            | _ -> findClose (i + 1) depth
-
-                    match findClose (brace + 1) 1 with
-                    | -1 -> json
-                    | close ->
-                        let insert = "\"Ownership\":\"DurableParentHandle\""
-                        let before = json.Substring(0, close)
-                        let after = json.Substring(close)
-
-                        let needsComma =
-                            let trimmed = before.TrimEnd()
-
-                            trimmed.Length > 0
-                            && trimmed.[trimmed.Length - 1] <> '{'
-                            && trimmed.[trimmed.Length - 1] <> ','
-
-                        let piece = if needsComma then "," + insert else insert
-                        before + piece + after
+            insertFieldsBeforeObjectClose json "\"HandleLinked\"" "\"Ownership\":\"DurableParentHandle\""
 
     /// EXEC-002: `HandleLinked` gained a provider presentation identity (`Byname`)
     /// distinct from the Host machine binding (`TargetAgent`). Historical facts
@@ -272,51 +245,7 @@ module FactCodec =
         elif json.IndexOf("\"Byname\"", StringComparison.Ordinal) >= 0 then
             json
         else
-            let marker = "\"HandleLinked\""
-            let start = json.IndexOf(marker, StringComparison.Ordinal)
-
-            if start < 0 then
-                json
-            else
-                let brace = json.IndexOf('{', start)
-
-                if brace < 0 then
-                    json
-                else
-                    let rec findClose (i: int) (depth: int) =
-                        if i >= json.Length then
-                            -1
-                        else
-                            match json.[i] with
-                            | '{' -> findClose (i + 1) (depth + 1)
-                            | '}' when depth = 1 -> i
-                            | '}' -> findClose (i + 1) (depth - 1)
-                            | '"' ->
-                                let rec skipString j =
-                                    if j >= json.Length then j
-                                    elif json.[j] = '\\' then skipString (j + 2)
-                                    elif json.[j] = '"' then j + 1
-                                    else skipString (j + 1)
-
-                                findClose (skipString (i + 1)) depth
-                            | _ -> findClose (i + 1) depth
-
-                    match findClose (brace + 1) 1 with
-                    | -1 -> json
-                    | close ->
-                        let insert = "\"Byname\":\"\""
-                        let before = json.Substring(0, close)
-                        let after = json.Substring(close)
-
-                        let needsComma =
-                            let trimmed = before.TrimEnd()
-
-                            trimmed.Length > 0
-                            && trimmed.[trimmed.Length - 1] <> '{'
-                            && trimmed.[trimmed.Length - 1] <> ','
-
-                        let piece = if needsComma then "," + insert else insert
-                        before + piece + after
+            insertFieldsBeforeObjectClose json "\"HandleLinked\"" "\"Byname\":\"\""
 
     /// EXEC-029: historical ManagerJobCreated facts predate provider road names.
     /// Empty Byname keeps replay compatible; the projection falls back to the
@@ -327,51 +256,7 @@ module FactCodec =
         elif json.IndexOf("\"Byname\"", StringComparison.Ordinal) >= 0 then
             json
         else
-            let marker = "\"ManagerJobCreated\""
-            let start = json.IndexOf(marker, StringComparison.Ordinal)
-
-            if start < 0 then
-                json
-            else
-                let brace = json.IndexOf('{', start)
-
-                if brace < 0 then
-                    json
-                else
-                    let rec findClose (i: int) (depth: int) =
-                        if i >= json.Length then
-                            -1
-                        else
-                            match json.[i] with
-                            | '{' -> findClose (i + 1) (depth + 1)
-                            | '}' when depth = 1 -> i
-                            | '}' -> findClose (i + 1) (depth - 1)
-                            | '"' ->
-                                let rec skipString j =
-                                    if j >= json.Length then j
-                                    elif json.[j] = '\\' then skipString (j + 2)
-                                    elif json.[j] = '"' then j + 1
-                                    else skipString (j + 1)
-
-                                findClose (skipString (i + 1)) depth
-                            | _ -> findClose (i + 1) depth
-
-                    match findClose (brace + 1) 1 with
-                    | -1 -> json
-                    | close ->
-                        let insert = "\"Byname\":\"\""
-                        let before = json.Substring(0, close)
-                        let after = json.Substring(close)
-
-                        let needsComma =
-                            let trimmed = before.TrimEnd()
-
-                            trimmed.Length > 0
-                            && trimmed.[trimmed.Length - 1] <> '{'
-                            && trimmed.[trimmed.Length - 1] <> ','
-
-                        let piece = if needsComma then "," + insert else insert
-                        before + piece + after
+            insertFieldsBeforeObjectClose json "\"ManagerJobCreated\"" "\"Byname\":\"\""
 
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then

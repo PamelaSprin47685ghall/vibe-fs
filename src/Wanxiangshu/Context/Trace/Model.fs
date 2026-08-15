@@ -112,16 +112,18 @@ module XTrace =
         | "assistant" -> "assistant"
         | other -> other
 
+    let private renderMedia mediaType =
+        match mediaType with
+        | Some mediaValue -> sprintf "[media omitted: %s]" mediaValue
+        | None -> "[media omitted]"
+
     let private renderPart (part: SemanticPart) : string =
         match part with
         | SemanticText text -> text
         | SemanticReasoning text -> text
         | SemanticToolCall(name, args) -> sprintf "[tool call] %s %s" name args
         | SemanticToolResult result -> sprintf "[tool result] %s" result
-        | SemanticMedia(mediaType, _digest) ->
-            match mediaType with
-            | Some mediaValue -> sprintf "[media omitted: %s]" mediaValue
-            | None -> "[media omitted]"
+        | SemanticMedia(mediaType, _digest) -> renderMedia mediaType
 
     /// 一个 item 的单行文本（role 只对 prompt 有意义；assistant 正文不带
     /// role 前缀，避免 LWR 中每行重复身份）。

@@ -74,83 +74,103 @@ module ChildRecoveryWorkflow =
             not (String.IsNullOrWhiteSpace(textOfParts assistant.Parts))
         | _ -> false
 
-    let private readDurableEvidence (ports: Ports) : Task<DurableHandleEvidence> =
+    let private evidenceFromDecodedBody (ports: Ports) (body: string) : DurableHandleEvidence =
+        match HandleCompletionCodec.decodeBody body with
+        | Current decoded ->
+            let proof =
+                JoinableCompletion.fromDecoded
+                    ports.AgentId
+                    ports.Handle
+                    ports.ChildSession
+                    decoded
+                    body
+
+            DurableHandleEvidence.CompletedAwaitingJoin proof
+        | LegacyFalseAbort _ -> DurableHandleEvidence.Active
+        | Invalid _ -> DurableHandleEvidence.Unknown
+
+    let private evidenceFromAwaitingJoin
+        (ports: Ports)
+        (journal: AgentJournal)
+        (record: HandleRecord)
+        : Task<DurableHandleEvidence> =
         task {
-            match ports.Journal with
-            | None -> return DurableHandleEvidence.Unknown
-            | Some journal ->
-                let projection = AgentJournal.handleProjection journal ports.ParentId
+            match! HandleCompletionCodec.tryReadBody journal record with
+            | Ok(Some body, _, _) -> return evidenceFromDecodedBody ports body
+            | Ok(None, _, _) -> return DurableHandleEvidence.Active
+            | Error _ -> return DurableHandleEvidence.Unknown
+        }
 
-                match HandleProjection.tryFind ports.Handle projection with
-                | None -> return DurableHandleEvidence.Unknown
-                | Some record ->
-                    match record.Lifecycle with
-                    | HandleLifecycle.Active -> return DurableHandleEvidence.Active
-                    | HandleLifecycle.Retired -> return DurableHandleEvidence.Retired
-                    | HandleLifecycle.Abandoned reason -> return DurableHandleEvidence.Abandoned reason
-                    | HandleLifecycle.CompletedAwaitingJoin cell ->
-                        match! HandleCompletionCodec.tryReadBody journal record with
-                        | Ok(Some body, _, _) ->
-                            match HandleCompletionCodec.decodeBody body with
-                            | Current decoded ->
-                                let proof =
-                                    JoinableCompletion.fromDecoded
-                                        ports.AgentId
-                                        ports.Handle
-                                        ports.ChildSession
-                                        decoded
-                                        body
+    let private evidenceFromLifecycle
+        (ports: Ports)
+        (journal: AgentJournal)
+        (record: HandleRecord)
+        : Task<DurableHandleEvidence> =
+        match record.Lifecycle with
+        | HandleLifecycle.Active -> Task.FromResult DurableHandleEvidence.Active
+        | HandleLifecycle.Retired -> Task.FromResult DurableHandleEvidence.Retired
+        | HandleLifecycle.Abandoned reason -> Task.FromResult(DurableHandleEvidence.Abandoned reason)
+        | HandleLifecycle.CompletedAwaitingJoin _ -> evidenceFromAwaitingJoin ports journal record
 
-                                return DurableHandleEvidence.CompletedAwaitingJoin proof
-                            | LegacyFalseAbort _ -> return DurableHandleEvidence.Active
-                            | Invalid _ -> return DurableHandleEvidence.Unknown
-                        | Ok(None, _, _) ->
-                            match cell.Kind with
-                            | HandleCompletionKind.Cancelled -> return DurableHandleEvidence.Active
-                            | HandleCompletionKind.Terminal
-                            | HandleCompletionKind.SendFailure -> return DurableHandleEvidence.Active
-                        | Error _ -> return DurableHandleEvidence.Unknown
+    let private readDurableFromJournal (ports: Ports) (journal: AgentJournal) : Task<DurableHandleEvidence> =
+        let projection = AgentJournal.handleProjection journal ports.ParentId
+
+        match HandleProjection.tryFind ports.Handle projection with
+        | None -> Task.FromResult DurableHandleEvidence.Unknown
+        | Some record -> evidenceFromLifecycle ports journal record
+
+    let private readDurableEvidence (ports: Ports) : Task<DurableHandleEvidence> =
+        match ports.Journal with
+        | None -> Task.FromResult DurableHandleEvidence.Unknown
+        | Some journal -> readDurableFromJournal ports journal
+
+    let private terminalFromMessages
+        (ports: Ports)
+        (messages: SessionMessage list)
+        (assistant: SessionMessage)
+        : ChildSnapshotEvidence =
+        match lastByRole messages "user" with
+        | None -> ChildSnapshotEvidence.Unreadable "host restart: terminal child has no user message"
+        | Some user ->
+            let runId = "run-restored-" + ports.AgentId
+            let workRecord = textOfParts assistant.Parts
+
+            let agentOutcome =
+                AgentCompletion.completed
+                    ports.AgentId
+                    ports.ChildSession
+                    runId
+                    ports.Role
+                    (AuthorityRootUserMessageId.create user.Id)
+                    (ProviderRunIdentity.create assistant.Id)
+                    workRecord
+                    None
+
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+            ChildSnapshotEvidence.Terminal(
+                TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
+            )
+
+    let private snapshotFromMessages (ports: Ports) (messages: SessionMessage list) : ChildSnapshotEvidence =
+        match lastByRole messages "assistant" with
+        | None -> ChildSnapshotEvidence.Active
+        | Some assistant when isTerminalCompleted assistant -> terminalFromMessages ports messages assistant
+        | Some _assistant ->
+            // Mid-turn / non-terminal assistant: stream readable → still running.
+            ChildSnapshotEvidence.Active
+
+    let private readSnapshotFromPort (ports: Ports) (port: ISessionSnapshotPort) : Task<ChildSnapshotEvidence> =
+        task {
+            match! port.GetMessages ports.ChildSession with
+            | Error reason -> return ChildSnapshotEvidence.Unreadable reason
+            | Ok messages -> return snapshotFromMessages ports messages
         }
 
     let private readSnapshotEvidence (ports: Ports) : Task<ChildSnapshotEvidence> =
-        task {
-            match ports.Snapshot with
-            | None -> return ChildSnapshotEvidence.Missing
-            | Some port ->
-                match! port.GetMessages ports.ChildSession with
-                | Error reason -> return ChildSnapshotEvidence.Unreadable reason
-                | Ok messages ->
-                    match lastByRole messages "assistant" with
-                    | None -> return ChildSnapshotEvidence.Active
-                    | Some assistant when isTerminalCompleted assistant ->
-                        match lastByRole messages "user" with
-                        | None ->
-                            return ChildSnapshotEvidence.Unreadable "host restart: terminal child has no user message"
-                        | Some user ->
-                            let runId = "run-restored-" + ports.AgentId
-                            let workRecord = textOfParts assistant.Parts
-
-                            let agentOutcome =
-                                AgentCompletion.completed
-                                    ports.AgentId
-                                    ports.ChildSession
-                                    runId
-                                    ports.Role
-                                    (AuthorityRootUserMessageId.create user.Id)
-                                    (ProviderRunIdentity.create assistant.Id)
-                                    workRecord
-                                    None
-
-                            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-                            return
-                                ChildSnapshotEvidence.Terminal(
-                                    TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
-                                )
-                    | Some _assistant ->
-                        // Mid-turn / non-terminal assistant: stream readable → still running.
-                        return ChildSnapshotEvidence.Active
-        }
+        match ports.Snapshot with
+        | None -> Task.FromResult ChildSnapshotEvidence.Missing
+        | Some port -> readSnapshotFromPort ports port
 
     let private pulseAfterCommit (ports: Ports) : unit =
         match ports.Pulse with
@@ -180,42 +200,33 @@ module ChildRecoveryWorkflow =
     /// Resolve one child and commit through the single write entry.
     /// GREEN-4: ChildRecoveryResult (RecoveredActive ≠ RecoveryIncomplete).
     let resolveAndCommit (ports: Ports) : Task<Result<ChildRecoveryResult, string>> =
-        task {
-            let! durable = readDurableEvidence ports
-            let! snapshot = readSnapshotEvidence ports
+        taskResult {
+            let! durable = readDurableEvidence ports |> TaskResultCE.ofTask
+            let! snapshot = readSnapshotEvidence ports |> TaskResultCE.ofTask
             let resolution = resolveChild durable snapshot ports.Observations
 
             match resolution with
             | ChildResolution.RecoveredTerminal proof ->
-                match! commitJoinable ports.Journal ports.ParentId proof with
-                | Error reason -> return Error reason
-                | Ok() ->
-                    pulseAfterCommit ports
-                    return Ok(ChildRecoveryResult.RecoveredTerminal proof)
+                do! commitJoinable ports.Journal ports.ParentId proof
+                pulseAfterCommit ports
+                return ChildRecoveryResult.RecoveredTerminal proof
             | ChildResolution.RecoveredAbandoned reason ->
-                match! commitAbandon ports ports.Handle reason with
-                | Error err -> return Error err
-                | Ok() ->
-                    return
-                        Ok(
-                            ChildRecoveryResult.RecoveredAbandoned
-                                { Handle = ports.Handle
-                                  Reason = reason }
-                        )
+                do! commitAbandon ports ports.Handle reason
+
+                return
+                    ChildRecoveryResult.RecoveredAbandoned
+                        { Handle = ports.Handle
+                          Reason = reason }
             | ChildResolution.RecoveredActive ->
                 return
-                    Ok(
-                        ChildRecoveryResult.RecoveredActive
-                            { Handle = ports.Handle
-                              ChildSession = ports.ChildSession }
-                    )
+                    ChildRecoveryResult.RecoveredActive
+                        { Handle = ports.Handle
+                          ChildSession = ports.ChildSession }
             | ChildResolution.RecoveryIncomplete ->
                 return
-                    Ok(
-                        ChildRecoveryResult.RecoveryIncomplete(
-                            RecoveryDependency.AwaitingTerminalEvidence(ports.Handle, ports.ChildSession)
-                        )
+                    ChildRecoveryResult.RecoveryIncomplete(
+                        RecoveryDependency.AwaitingTerminalEvidence(ports.Handle, ports.ChildSession)
                     )
             | ChildResolution.RecoveryBlocked reason ->
-                return Ok(ChildRecoveryResult.RecoveryBlocked(NonEmpty.one (ChildRecoveryBlock.Reason reason)))
+                return ChildRecoveryResult.RecoveryBlocked(NonEmpty.one (ChildRecoveryBlock.Reason reason))
         }

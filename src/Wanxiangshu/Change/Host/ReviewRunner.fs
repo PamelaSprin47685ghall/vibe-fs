@@ -77,6 +77,14 @@ module OrchestratorHostReview =
     /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
     ///
     /// `forkReviewer` returns the reviewer's Host session id; `awaitReviewer` waits for
+    let private describeBarrierFailure =
+        function
+        | ReviewBarrierFailure.CannotCreateReviewer reason -> sprintf "Cannot create reviewer: %s" reason
+        | ReviewBarrierFailure.CannotOpenBarrier reason -> sprintf "Cannot open review barrier: %s" reason
+        | ReviewBarrierFailure.CannotAwaitReviewer reason -> sprintf "Cannot await reviewer: %s" reason
+        | ReviewBarrierFailure.ReviewerProducedNoVerdict -> "Reviewer produced no verdict"
+        | ReviewBarrierFailure.ConfirmationUnproven -> "Reviewer produced no confirmed verdict"
+
     /// that run to reach terminal. They are separate because the barrier fact must be
     /// written between them — after the session exists, before any verdict arrives.
     let reverify
@@ -104,14 +112,5 @@ module OrchestratorHostReview =
             match outcome with
             | Ok(ReviewBarrierOutcome.Confirmed _) -> return Ok()
             | Ok(ReviewBarrierOutcome.RevisionRequired _) -> return Error "Reviewer requested revision"
-            | Error failure ->
-                let message =
-                    match failure with
-                    | ReviewBarrierFailure.CannotCreateReviewer reason -> sprintf "Cannot create reviewer: %s" reason
-                    | ReviewBarrierFailure.CannotOpenBarrier reason -> sprintf "Cannot open review barrier: %s" reason
-                    | ReviewBarrierFailure.CannotAwaitReviewer reason -> sprintf "Cannot await reviewer: %s" reason
-                    | ReviewBarrierFailure.ReviewerProducedNoVerdict -> "Reviewer produced no verdict"
-                    | ReviewBarrierFailure.ConfirmationUnproven -> "Reviewer produced no confirmed verdict"
-
-                return Error message
+            | Error failure -> return Error(describeBarrierFailure failure)
         }

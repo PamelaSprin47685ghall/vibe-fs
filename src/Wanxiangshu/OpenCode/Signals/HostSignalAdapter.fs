@@ -47,6 +47,11 @@ type HostSignalRouter
     let isOwned (sessionId: SessionId) =
         ownedSessions.Contains(SessionId.value sessionId)
 
+    let emitAdaptedSignal raw =
+        match HostSignalAdapter.tryAdapt isOwned raw with
+        | Some signal -> onSignal signal
+        | None -> ()
+
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
 
@@ -65,9 +70,6 @@ type HostSignalRouter
 
         match onLoopEvent with
         | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
-        | _ ->
-            match HostSignalAdapter.tryAdapt isOwned raw with
-            | Some signal -> onSignal signal
-            | None -> ()
+        | _ -> emitAdaptedSignal raw
 
     member this.ObserveLocal(raw: obj) = this.Observe raw

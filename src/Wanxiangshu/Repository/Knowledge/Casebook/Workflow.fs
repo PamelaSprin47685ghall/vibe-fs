@@ -113,22 +113,10 @@ module CasebookWorkflow =
     let checkFreshness (stored: Case) (replayed: Observation list) : ReplayResult =
         Observations.classifyReplay stored.Observations replayed
 
-    /// CASE-006: publish a Bookkeeper revision as InspectorCaseRefreshed
-    /// (linear parent). The caller (Bookkeeper orchestration) supplies the
-    /// revised Q/A and the re-stabilized observations; failure keeps the old
-    /// Case intact — maintenance failure is never a fetch failure.
-    let refreshCase
-        (store: IEventStore)
-        (sessionId: string)
-        (q: string)
-        (a: string)
-        (observations: Observation list)
-        : Task<Result<unit, string>> =
-        task {
-            match! CasebookStore.appendRefreshed store sessionId q a observations with
-            | Ok _ -> return Ok()
-            | Error err -> return Error err
-        }
+    let private staleNeedsRefresh (case: Case) (root: string) =
+        match checkFreshness case (CasebookReplay.replayAll root case.Observations) with
+        | ReplayResult.Fresh -> false
+        | ReplayResult.Stale -> true
 
     /// CASE-006: the full refresh decision — fetch the Case, replay against
     /// the current worktree, and report whether a Bookkeeper revision is
@@ -139,16 +127,24 @@ module CasebookWorkflow =
         (sessionId: string)
         (root: string)
         : Task<Result<bool, string>> =
-        task {
-            match! fetchCase store capacity sessionId with
-            | Error err -> return Error err
-            | Ok None -> return Ok false
-            | Ok(Some case) ->
-                let replayed = CasebookReplay.replayAll root case.Observations
+        taskResult {
+            let! caseOpt = fetchCase store capacity sessionId
 
-                match checkFreshness case replayed with
-                | ReplayResult.Fresh -> return Ok false
-                | ReplayResult.Stale -> return Ok true
+            match caseOpt with
+            | None -> return false
+            | Some case -> return staleNeedsRefresh case root
+        }
+
+    let refreshCase
+        (store: IEventStore)
+        (sessionId: string)
+        (q: string)
+        (a: string)
+        (observations: Observation list)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let! _ = CasebookStore.appendRefreshed store sessionId q a observations
+            return ()
         }
 
     /// ponytail: drain+archive wiring — single helper for Inspector terminal; full SessionDeleted wiring if throughput matters

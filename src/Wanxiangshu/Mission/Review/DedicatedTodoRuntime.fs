@@ -6,6 +6,7 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -106,12 +107,13 @@ module DedicatedTodoReviewerRuntime =
         (blobRef: BlobRef)
         (expected: BlobDigest)
         : Task<Result<ObligationList, string>> =
-        task {
-            match! journal.Writer.BlobWriter.Read blobRef with
-            | Error reason -> return Error reason
-            | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expected ->
-                return Error "obligation blob digest mismatch"
-            | Ok body -> return MagicTodoObligationCodec.tryDecode body
+        taskResult {
+            let! body = journal.Writer.BlobWriter.Read blobRef
+
+            if HostDigest.sha256Hex body <> BlobDigest.value expected then
+                return! Error "obligation blob digest mismatch"
+            else
+                return! MagicTodoObligationCodec.tryDecode body
         }
 
     let private openingRaw (journal: AgentJournal) (life: LifeProjection) : Task<string> =
@@ -151,6 +153,19 @@ module DedicatedTodoReviewerRuntime =
             return record |> Option.defaultValue ""
         }
 
+    let private capturePortMessages
+        (port: ISessionSnapshotPort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let! messages =
+                port.GetMessages managerSessionId
+                |> Task.map (Result.mapError (fun reason -> "snapshot unavailable: " + reason))
+
+            return! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
+        }
+
     let private captureManagerSnapshot
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal)
@@ -158,12 +173,19 @@ module DedicatedTodoReviewerRuntime =
         : Task<Result<unit, string>> =
         match snapshot with
         | None -> Task.FromResult(Ok())
-        | Some port ->
-            task {
-                match! port.GetMessages managerSessionId with
-                | Error reason -> return Error("snapshot unavailable: " + reason)
-                | Ok messages -> return! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
-            }
+        | Some port -> capturePortMessages port journal managerSessionId
+
+    let private treeHashFromRaw (raw: string) (fallback: GitTreeHash) =
+        if String.IsNullOrWhiteSpace raw then
+            fallback
+        else
+            GitTreeHash.create raw
+
+    let private tryReadTreeHash (port: GitTreePort) (fallback: GitTreeHash) =
+        try
+            treeHashFromRaw (port.GetTreeHash().Trim()) fallback
+        with _ex ->
+            fallback
 
     let private treeHash (gitTree: GitTreePort option) (reviewId: TodoReviewId) =
         let fallback =
@@ -171,16 +193,7 @@ module DedicatedTodoReviewerRuntime =
 
         match gitTree with
         | None -> fallback
-        | Some port ->
-            try
-                let value = port.GetTreeHash().Trim()
-
-                if String.IsNullOrWhiteSpace value then
-                    fallback
-                else
-                    GitTreeHash.create value
-            with _ex ->
-                fallback
+        | Some port -> tryReadTreeHash port fallback
 
     let private reviewerAgentName (journal: AgentJournal) (managerSessionId: SessionId) =
         PromptAuthorityLedger.activeProfile managerSessionId (AgentJournal.snapshot journal).AgentProjections
@@ -216,6 +229,59 @@ module DedicatedTodoReviewerRuntime =
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
+    type private ReusableWorkUnitDecision =
+        | AlreadyActive
+        | Abandoned
+        | Relink of targetAgent: string * byname: string
+        | LinkFresh of agentName: string
+
+    let private lifecycleReusableDecision (record: HandleRecord) : ReusableWorkUnitDecision =
+        match record.Lifecycle with
+        | HandleLifecycle.Active -> AlreadyActive
+        | HandleLifecycle.Abandoned _ -> Abandoned
+        | HandleLifecycle.CompletedAwaitingJoin _
+        | HandleLifecycle.Retired -> Relink(record.TargetAgent, record.Byname)
+
+    let private reusableWorkUnitDecision
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (fallbackAgentName: string)
+        : ReusableWorkUnitDecision =
+        match Map.tryFind reviewerSessionId snapshot.AgentProjections.HandleByChildSession with
+        | None -> LinkFresh fallbackAgentName
+        | Some record -> lifecycleReusableDecision record
+
+    let private applyReusableWorkUnitDecision
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (agentId: string)
+        (reviewerSessionId: SessionId)
+        (decision: ReusableWorkUnitDecision)
+        : Task<Result<unit, string>> =
+        match decision with
+        | AlreadyActive -> Task.FromResult(Ok())
+        | Abandoned -> Task.FromResult(Error "dedicated reviewer work-unit is abandoned")
+        | Relink(targetAgent, byname) ->
+            HandleController.linkNamed
+                (Some journal)
+                managerSessionId
+                agentId
+                reviewerSessionId
+                targetAgent
+                byname
+                Role.Reviewer
+                HandleOwnership.HostOwnedHidden
+        | LinkFresh agentName ->
+            HandleController.linkNamed
+                (Some journal)
+                managerSessionId
+                agentId
+                reviewerSessionId
+                agentName
+                agentName
+                Role.Reviewer
+                HandleOwnership.HostOwnedHidden
+
     /// A dedicated reviewer session spans checkpoints, but its Host-owned work-unit
     /// handle may legitimately finish after each assignment. New assignments reuse
     /// the logical/physical reviewer by durably writing a fresh HandleLinked edge;
@@ -228,38 +294,13 @@ module DedicatedTodoReviewerRuntime =
         (fallbackAgentName: string)
         (allowRelink: bool)
         : Task<Result<unit, string>> =
-        let snapshot = AgentJournal.snapshot journal
-
         if not allowRelink then
             Task.FromResult(Ok())
         else
-            match Map.tryFind reviewerSessionId snapshot.AgentProjections.HandleByChildSession with
-            | Some record ->
-                match record.Lifecycle with
-                | HandleLifecycle.Active -> Task.FromResult(Ok())
-                | HandleLifecycle.Abandoned _ -> Task.FromResult(Error "dedicated reviewer work-unit is abandoned")
-                | HandleLifecycle.CompletedAwaitingJoin _
-                | HandleLifecycle.Retired ->
-                    // HandleController.linkNamed is the sole HandleLinked writer.
-                    HandleController.linkNamed
-                        (Some journal)
-                        managerSessionId
-                        agentId
-                        reviewerSessionId
-                        record.TargetAgent
-                        record.Byname
-                        Role.Reviewer
-                        HandleOwnership.HostOwnedHidden
-            | None ->
-                HandleController.linkNamed
-                    (Some journal)
-                    managerSessionId
-                    agentId
-                    reviewerSessionId
-                    fallbackAgentName
-                    fallbackAgentName
-                    Role.Reviewer
-                    HandleOwnership.HostOwnedHidden
+            let snapshot = AgentJournal.snapshot journal
+
+            reusableWorkUnitDecision snapshot reviewerSessionId fallbackAgentName
+            |> applyReusableWorkUnitDecision journal managerSessionId agentId reviewerSessionId
 
     let private appendAssigned
         (journal: AgentJournal)
@@ -268,26 +309,202 @@ module DedicatedTodoReviewerRuntime =
         (enlisted: DedicatedTodoReviewerEnlisted)
         (reviewWorkStart: XTraceCursor)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             let assigned =
                 MagicTodoAfter.planEnsureReview HostDigest.sha256Hex prepared enlisted reviewWorkStart
 
-            match!
+            let! _ =
                 AgentJournal.appendMagicTodo
                     (StreamId.Session managerSessionId)
                     None
                     (MagicTodoFact.TodoProcessReviewAssigned assigned)
                     journal
-            with
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
-            | Ok _ -> return Ok()
+                |> Task.map (Result.mapError JournalAppendFailure.describe)
+
+            return ()
         }
 
+    let private concludeFromOutcome (outcome: TodoProcessReviewProgram.ConcludeOutcome) =
+        match outcome with
+        | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> Error reason
+        | _ -> Ok()
+
     let private concludeReview (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) =
-        task {
-            match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
-            | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
-            | _ -> return Ok()
+        taskResult {
+            let! outcome = TodoProcessReviewProgram.tryConclude journal lifeId writeId |> TaskResultCE.ofTask
+            return! concludeFromOutcome outcome
+        }
+
+    let private openBarrierIfUnassigned
+        (gitTree: GitTreePort option)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (checkpoint: MagicTodoProjection.CheckpointRecord)
+        (enlisted: DedicatedTodoReviewerEnlisted)
+        (reviewId: TodoReviewId)
+        : Task<Result<unit, string>> =
+        match checkpoint.Assignment with
+        | Some _ -> Task.FromResult(Ok())
+        | None ->
+            ReviewBarrier.openBarrier
+                (Some journal)
+                managerSessionId
+                enlisted.ReviewerSessionId
+                (ReviewBarrierId.create (TodoReviewId.value reviewId))
+                (treeHash gitTree reviewId)
+
+    let private appendAssignedIfNeeded
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (checkpoint: MagicTodoProjection.CheckpointRecord)
+        (prepared: TodoWritePrepared)
+        (enlisted: DedicatedTodoReviewerEnlisted)
+        : Task<Result<unit, string>> =
+        match checkpoint.Assignment with
+        | Some _ -> Task.FromResult(Ok())
+        | None ->
+            appendAssigned
+                journal
+                managerSessionId
+                prepared
+                enlisted
+                { Sequence = reviewerHead journal enlisted.ReviewerSessionId }
+
+    let private sendOwnerRootAssignment
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal)
+        (runtime: HostForkRuntime)
+        (handleId: string)
+        (reviewerSessionId: SessionId)
+        (sendAgent: string)
+        (assignmentDirectory: string option)
+        (assignmentText: string)
+        : Task<Result<unit, string>> =
+        runtime.DiscardDeferredFirstPrompt handleId
+
+        taskResult {
+            let! _ =
+                HostForkAgentOwner.sendFirstPrompt
+                    sessions
+                    (Some journal)
+                    reviewerSessionId
+                    sendAgent
+                    assignmentDirectory
+                    assignmentText
+
+            return ()
+        }
+
+    let private sendContinuationAssignment
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (assignmentDirectory: string option)
+        (assignmentText: string)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let! _ =
+                HostSessionNudge.sendContinuation
+                    sessions
+                    reviewerSessionId
+                    assignmentText
+                    PromptAuthority.ContinuationKind.ReviewerGuard
+                    assignmentDirectory
+                    (Some journal)
+
+            return ()
+        }
+
+    let private sendAssignmentDelivery
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal)
+        (runtime: HostForkRuntime)
+        (handleId: string)
+        (enlisted: DedicatedTodoReviewerEnlisted)
+        (agentName: string)
+        (delivery: MagicTodoAfter.AssignmentDelivery)
+        (assignmentText: string)
+        : Task<Result<unit, string>> =
+        let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
+
+        let sendAgent =
+            runtime.BoundManagedAgent(handleId, enlisted.ReviewerSessionId)
+            |> Option.defaultValue agentName
+
+        match delivery with
+        | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
+            sendOwnerRootAssignment
+                sessions
+                journal
+                runtime
+                handleId
+                enlisted.ReviewerSessionId
+                sendAgent
+                assignmentDirectory
+                assignmentText
+        | MagicTodoAfter.AssignmentDelivery.Continuation ->
+            sendContinuationAssignment
+                sessions
+                journal
+                enlisted.ReviewerSessionId
+                assignmentDirectory
+                assignmentText
+
+    type private AssignmentDispatchDecision =
+        | AlreadyAcceptedOrPending
+        | NeedsDispatch of MagicTodoAfter.AssignmentDelivery
+
+    let private assignmentDispatchDecision
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (payloadDigest: string)
+        : AssignmentDispatchDecision =
+        match
+            PromptAuthorityLedger.dispatchStatusFor
+                reviewerSessionId
+                payloadDigest
+                (AgentJournal.snapshot journal).AgentProjections
+        with
+        | PromptAuthorityLedger.DispatchStatus.Accepted _
+        | PromptAuthorityLedger.DispatchStatus.Pending -> AlreadyAcceptedOrPending
+        | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
+            let hasActiveProfile =
+                PromptAuthorityLedger.activeProfile
+                    reviewerSessionId
+                    (AgentJournal.snapshot journal).AgentProjections
+                |> Option.isSome
+
+            NeedsDispatch(MagicTodoAfter.assignmentDelivery hasActiveProfile)
+
+    let private deliverOrConclude
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        (enlisted: DedicatedTodoReviewerEnlisted)
+        (handleId: string)
+        (agentName: string)
+        (runtime: HostForkRuntime)
+        (assignmentText: string)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let payloadDigest = HostDigest.sha256Hex assignmentText
+
+            match assignmentDispatchDecision journal enlisted.ReviewerSessionId payloadDigest with
+            | AlreadyAcceptedOrPending -> return! concludeReview journal lifeId writeId
+            | NeedsDispatch delivery ->
+                do!
+                    sendAssignmentDelivery
+                        sessions
+                        journal
+                        runtime
+                        handleId
+                        enlisted
+                        agentName
+                        delivery
+                        assignmentText
+
+                return! concludeReview journal lifeId writeId
         }
 
     /// Assignment + delivery for one unresolved checkpoint (HOST-021).
@@ -314,146 +531,220 @@ module DedicatedTodoReviewerRuntime =
         (agentName: string)
         (runtime: HostForkRuntime)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             let reviewId = MagicTodo.todoReviewId HostDigest.sha256Hex lifeId writeId
 
             // The barrier opens exactly once per assignment; reentry with the
             // assignment already durable finds it open (startBarrier no-ops on
             // the same id).
-            let! barrierResult =
-                match checkpoint.Assignment with
-                | Some _ -> Task.FromResult(Ok())
-                | None ->
-                    ReviewBarrier.openBarrier
-                        (Some journal)
-                        managerSessionId
-                        enlisted.ReviewerSessionId
-                        (ReviewBarrierId.create (TodoReviewId.value reviewId))
-                        (treeHash gitTree reviewId)
+            do! openBarrierIfUnassigned gitTree journal managerSessionId checkpoint enlisted reviewId
 
-            match barrierResult with
-            | Error reason -> return Error reason
-            | Ok() ->
-                let! oldItemsResult = readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
+            let! oldItems = readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
+            let! proposed = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+            do! captureManagerSnapshot snapshot journal managerSessionId
+            let! opening = openingRaw journal managerLife |> TaskResultCE.ofTask
 
-                let! proposedResult = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+            let! checkpointLwr =
+                managerCheckpointLwr journal managerSessionId managerLife checkpoint.ReviewFrontier
+                |> TaskResultCE.ofTask
 
-                match oldItemsResult, proposedResult with
-                | Error reason, _
-                | _, Error reason -> return Error reason
-                | Ok oldItems, Ok proposed ->
-                    match! captureManagerSnapshot snapshot journal managerSessionId with
-                    | Error reason -> return Error reason
-                    | Ok() ->
-                        let! opening = openingRaw journal managerLife
+            let request: ProcessReviewRequest =
+                { TodoReviewId = reviewId
+                  TodoWriteId = writeId
+                  ManagerLifeId = lifeId
+                  OpeningRaw = opening
+                  ManagerCheckpointLwr = checkpointLwr
+                  EffectivePlanComplete = MagicTodoProjection.isPlanCommitted life
+                  OldTodo = oldItems
+                  ProposedTodo = proposed }
 
-                        let! checkpointLwr =
-                            managerCheckpointLwr journal managerSessionId managerLife checkpoint.ReviewFrontier
+            let preamble =
+                ProviderProse.render
+                    (ProviderProse.languageOf managerSessionId)
+                    MagicTodoSurface.Path.ProcessReviewerPreamble
+                    Map.empty
 
-                        let request: ProcessReviewRequest =
-                            { TodoReviewId = reviewId
-                              TodoWriteId = writeId
-                              ManagerLifeId = lifeId
-                              OpeningRaw = opening
-                              ManagerCheckpointLwr = checkpointLwr
-                              EffectivePlanComplete = MagicTodoProjection.isPlanCommitted life
-                              OldTodo = oldItems
-                              ProposedTodo = proposed }
+            let assignmentText =
+                MagicTodoProcessReview.renderAssignmentUserMessage preamble request
 
-                        let preamble =
-                            ProviderProse.render
-                                (ProviderProse.languageOf managerSessionId)
-                                MagicTodoSurface.Path.ProcessReviewerPreamble
-                                Map.empty
+            // The assignment is durable BEFORE the physical send,
+            // freezing the reviewer frontier as it was before this
+            // dispatch: the LWR request range then covers everything
+            // the reviewer produces for this checkpoint, including
+            // the assignment prompt itself (REVIEW-016).
+            do! appendAssignedIfNeeded journal managerSessionId checkpoint prepared enlisted
 
-                        let assignmentText =
-                            MagicTodoProcessReview.renderAssignmentUserMessage preamble request
+            // Send admission from durable dispatch evidence:
+            // Accepted = the payload landed; Pending = outcome
+            // undetermined, recovery owns it; Dispatchable = a
+            // new claim is allowed.
+            return!
+                deliverOrConclude
+                    sessions
+                    journal
+                    lifeId
+                    writeId
+                    enlisted
+                    handleId
+                    agentName
+                    runtime
+                    assignmentText
+        }
 
-                        // The assignment is durable BEFORE the physical send,
-                        // freezing the reviewer frontier as it was before this
-                        // dispatch: the LWR request range then covers everything
-                        // the reviewer produces for this checkpoint, including
-                        // the assignment prompt itself (REVIEW-016).
-                        let! assignmentDurable =
-                            match checkpoint.Assignment with
-                            | Some _ -> Task.FromResult(Ok())
-                            | None ->
-                                appendAssigned
-                                    journal
-                                    managerSessionId
-                                    prepared
-                                    enlisted
-                                    { Sequence = reviewerHead journal enlisted.ReviewerSessionId }
+    type private CheckpointAdmission =
+        | CheckpointMissing
+        | AlreadyConcluded
+        | NotAccepted
+        | Ready of MagicTodoProjection.CheckpointRecord
 
-                        match assignmentDurable with
-                        | Error reason -> return Error reason
-                        | Ok() ->
-                            // Send admission from durable dispatch evidence:
-                            // Accepted = the payload landed; Pending = outcome
-                            // undetermined, recovery owns it; Dispatchable = a
-                            // new claim is allowed.
-                            let payloadDigest = HostDigest.sha256Hex assignmentText
+    let private admitCheckpoint
+        (life: MagicTodoProjection.LifeMagicTodoState)
+        (writeId: TodoWriteId)
+        : CheckpointAdmission =
+        match Map.tryFind (writeKey writeId) life.Checkpoints with
+        | None -> CheckpointMissing
+        | Some { Concluded = Some _ } -> AlreadyConcluded
+        | Some checkpoint when not checkpoint.Accepted -> NotAccepted
+        | Some checkpoint -> Ready checkpoint
 
-                            match
-                                PromptAuthorityLedger.dispatchStatusFor
-                                    enlisted.ReviewerSessionId
-                                    payloadDigest
-                                    (AgentJournal.snapshot journal).AgentProjections
-                            with
-                            | PromptAuthorityLedger.DispatchStatus.Accepted _
-                            | PromptAuthorityLedger.DispatchStatus.Pending ->
-                                return! concludeReview journal lifeId writeId
-                            | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
-                                let hasActiveProfile =
-                                    PromptAuthorityLedger.activeProfile
-                                        enlisted.ReviewerSessionId
-                                        (AgentJournal.snapshot journal).AgentProjections
-                                    |> Option.isSome
+    let private admitManagerLife
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        : Result<LifeProjection, string> =
+        match currentLife journal managerSessionId with
+        | None -> Error "open Manager Life is missing"
+        | Some managerLife when managerLife.LifeId <> lifeId -> Error "Manager Life does not match TodoWrite"
+        | Some managerLife -> Ok managerLife
 
-                                let delivery = MagicTodoAfter.assignmentDelivery hasActiveProfile
+    let private forkAndEnlistDedicated
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (dedicatedId: DedicatedReviewerId)
+        (handleId: string)
+        (agentName: string)
+        (runtime: HostForkRuntime)
+        : Task<Result<DedicatedTodoReviewerEnlisted, string>> =
+        taskResult {
+            let! _ =
+                runtime.Fork(
+                    handleId,
+                    Role.Reviewer,
+                    agentName,
+                    ProviderProse.render
+                        (ProviderProse.languageOf managerSessionId)
+                        MagicTodoSurface.Path.ProcessReviewerPreamble
+                        Map.empty,
+                    None,
+                    firstPrompt = true,
+                    ownership = HandleOwnership.HostOwnedHidden,
+                    deferSend = true
+                )
 
-                                let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
+            let! childId =
+                runtime.TryChildSession handleId
+                |> Result.requireSome "dedicated process reviewer session was not created"
 
-                                let sendAgent =
-                                    runtime.BoundManagedAgent(handleId, enlisted.ReviewerSessionId)
-                                    |> Option.defaultValue agentName
+            let enlisted =
+                { ManagerLifeId = lifeId
+                  DedicatedReviewerId = dedicatedId
+                  ReviewerSessionId = childId }
 
-                                let! sent =
-                                    match delivery with
-                                    | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
-                                        runtime.DiscardDeferredFirstPrompt handleId
+            let! _ =
+                AgentJournal.appendMagicTodo
+                    (StreamId.Session managerSessionId)
+                    None
+                    (MagicTodoFact.DedicatedTodoReviewerEnlisted enlisted)
+                    journal
+                |> Task.map (Result.mapError JournalAppendFailure.describe)
 
-                                        task {
-                                            match!
-                                                HostForkAgentOwner.sendFirstPrompt
-                                                    sessions
-                                                    (Some journal)
-                                                    enlisted.ReviewerSessionId
-                                                    sendAgent
-                                                    assignmentDirectory
-                                                    assignmentText
-                                            with
-                                            | Ok _ -> return Ok()
-                                            | Error reason -> return Error reason
-                                        }
-                                    | MagicTodoAfter.AssignmentDelivery.Continuation ->
-                                        task {
-                                            match!
-                                                HostSessionNudge.sendContinuation
-                                                    sessions
-                                                    enlisted.ReviewerSessionId
-                                                    assignmentText
-                                                    PromptAuthority.ContinuationKind.ReviewerGuard
-                                                    assignmentDirectory
-                                                    (Some journal)
-                                            with
-                                            | Ok _ -> return Ok()
-                                            | Error reason -> return Error reason
-                                        }
+            return enlisted
+        }
 
-                                match sent with
-                                | Error reason -> return Error reason
-                                | Ok() -> return! concludeReview journal lifeId writeId
+    let private enlistDedicatedReviewer
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (life: MagicTodoProjection.LifeMagicTodoState)
+        (dedicatedId: DedicatedReviewerId)
+        (handleId: string)
+        (agentName: string)
+        (runtime: HostForkRuntime)
+        : Task<Result<DedicatedTodoReviewerEnlisted, string>> =
+        match life.Dedicated with
+        | Some dedicated ->
+            runtime.AdoptChild(handleId, dedicated.ReviewerSessionId)
+
+            Task.FromResult(
+                Ok
+                    { ManagerLifeId = lifeId
+                      DedicatedReviewerId = dedicated.DedicatedReviewerId
+                      ReviewerSessionId = dedicated.ReviewerSessionId }
+            )
+        | None ->
+            forkAndEnlistDedicated journal managerSessionId lifeId dedicatedId handleId agentName runtime
+
+    let private ensureReviewForCheckpoint
+        (sessions: ISessionHostPort)
+        (snapshot: ISessionSnapshotPort option)
+        (gitTree: GitTreePort option)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        (life: MagicTodoProjection.LifeMagicTodoState)
+        (managerLife: LifeProjection)
+        (checkpoint: MagicTodoProjection.CheckpointRecord)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let dedicatedId = MagicTodo.dedicatedReviewerId HostDigest.sha256Hex lifeId
+            let handleId = agentIdOf dedicatedId
+            let runtime = forkRuntime sessions snapshot journal managerSessionId
+            let agentName = reviewerAgentName journal managerSessionId
+            let! enlisted = enlistDedicatedReviewer journal managerSessionId lifeId life dedicatedId handleId agentName runtime
+
+            do!
+                ensureReusableReviewerWorkUnit
+                    journal
+                    managerSessionId
+                    handleId
+                    enlisted.ReviewerSessionId
+                    agentName
+                    checkpoint.Assignment.IsNone
+
+            let prepared: TodoWritePrepared =
+                { ManagerSessionId = managerSessionId
+                  ManagerLifeId = lifeId
+                  TodoWriteId = writeId
+                  ToolCallId = checkpoint.ToolCallId
+                  ToolPartOrdinal = checkpoint.ToolPartOrdinal
+                  BaseTodoRef = checkpoint.BaseTodoRef
+                  BaseTodoDigest = checkpoint.BaseTodoDigest
+                  ProposedTodoRef = checkpoint.ProposedTodoRef
+                  ProposedTodoDigest = checkpoint.ProposedTodoDigest
+                  PlanCompleteDeclared = checkpoint.PlanCompleteDeclared
+                  ProviderInputDigest = checkpoint.ProviderInputDigest
+                  ReviewFrontier = checkpoint.ReviewFrontier
+                  SemanticVersion = checkpoint.SemanticVersion }
+
+            return!
+                ensureAssignedAndDeliver
+                    sessions
+                    snapshot
+                    gitTree
+                    journal
+                    managerSessionId
+                    lifeId
+                    writeId
+                    life
+                    managerLife
+                    checkpoint
+                    prepared
+                    enlisted
+                    handleId
+                    agentName
+                    runtime
         }
 
     let ensureReview
@@ -466,123 +757,44 @@ module DedicatedTodoReviewerRuntime =
         (lifeId: ManagerLifeId)
         (writeId: TodoWriteId)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             let projection = AgentJournal.snapshot journal
 
-            match MagicTodoProjection.tryLife lifeId projection.AgentProjections.MagicTodo with
-            | None -> return Error "Magic Todo life is missing"
-            | Some life ->
-                match Map.tryFind (writeKey writeId) life.Checkpoints with
-                | None -> return Error "TodoWrite checkpoint is missing"
-                | Some { Concluded = Some _ } -> return Ok()
-                | Some checkpoint when not checkpoint.Accepted -> return Error "TodoWrite is not Accepted"
-                | Some checkpoint ->
-                    match currentLife journal managerSessionId with
-                    | None -> return Error "open Manager Life is missing"
-                    | Some managerLife when managerLife.LifeId <> lifeId ->
-                        return Error "Manager Life does not match TodoWrite"
-                    | Some managerLife ->
-                        let dedicatedId = MagicTodo.dedicatedReviewerId HostDigest.sha256Hex lifeId
-                        let handleId = agentIdOf dedicatedId
-                        let runtime = forkRuntime sessions snapshot journal managerSessionId
-                        let agentName = reviewerAgentName journal managerSessionId
+            let! life =
+                MagicTodoProjection.tryLife lifeId projection.AgentProjections.MagicTodo
+                |> Result.requireSome "Magic Todo life is missing"
 
-                        let! enlistedResult =
-                            task {
-                                match life.Dedicated with
-                                | Some dedicated ->
-                                    runtime.AdoptChild(handleId, dedicated.ReviewerSessionId)
+            match admitCheckpoint life writeId with
+            | CheckpointMissing -> return! Error "TodoWrite checkpoint is missing"
+            | AlreadyConcluded -> return ()
+            | NotAccepted -> return! Error "TodoWrite is not Accepted"
+            | Ready checkpoint ->
+                let! managerLife = admitManagerLife journal managerSessionId lifeId
 
-                                    return
-                                        Ok
-                                            { ManagerLifeId = lifeId
-                                              DedicatedReviewerId = dedicated.DedicatedReviewerId
-                                              ReviewerSessionId = dedicated.ReviewerSessionId }
-                                | None ->
-                                    match!
-                                        runtime.Fork(
-                                            handleId,
-                                            Role.Reviewer,
-                                            agentName,
-                                            ProviderProse.render
-                                                (ProviderProse.languageOf managerSessionId)
-                                                MagicTodoSurface.Path.ProcessReviewerPreamble
-                                                Map.empty,
-                                            None,
-                                            firstPrompt = true,
-                                            ownership = HandleOwnership.HostOwnedHidden,
-                                            deferSend = true
-                                        )
-                                    with
-                                    | Error reason -> return Error reason
-                                    | Ok _ ->
-                                        match runtime.TryChildSession handleId with
-                                        | None -> return Error "dedicated process reviewer session was not created"
-                                        | Some childId ->
-                                            let enlisted =
-                                                { ManagerLifeId = lifeId
-                                                  DedicatedReviewerId = dedicatedId
-                                                  ReviewerSessionId = childId }
-
-                                            match!
-                                                AgentJournal.appendMagicTodo
-                                                    (StreamId.Session managerSessionId)
-                                                    None
-                                                    (MagicTodoFact.DedicatedTodoReviewerEnlisted enlisted)
-                                                    journal
-                                            with
-                                            | Error failure -> return Error(JournalAppendFailure.describe failure)
-                                            | Ok _ -> return Ok enlisted
-                            }
-
-                        match enlistedResult with
-                        | Error reason -> return Error reason
-                        | Ok enlisted ->
-                            let! reusableResult =
-                                ensureReusableReviewerWorkUnit
-                                    journal
-                                    managerSessionId
-                                    handleId
-                                    enlisted.ReviewerSessionId
-                                    agentName
-                                    checkpoint.Assignment.IsNone
-
-                            match reusableResult with
-                            | Error reason -> return Error reason
-                            | Ok() ->
-                                let prepared: TodoWritePrepared =
-                                    { ManagerSessionId = managerSessionId
-                                      ManagerLifeId = lifeId
-                                      TodoWriteId = writeId
-                                      ToolCallId = checkpoint.ToolCallId
-                                      ToolPartOrdinal = checkpoint.ToolPartOrdinal
-                                      BaseTodoRef = checkpoint.BaseTodoRef
-                                      BaseTodoDigest = checkpoint.BaseTodoDigest
-                                      ProposedTodoRef = checkpoint.ProposedTodoRef
-                                      ProposedTodoDigest = checkpoint.ProposedTodoDigest
-                                      PlanCompleteDeclared = checkpoint.PlanCompleteDeclared
-                                      ProviderInputDigest = checkpoint.ProviderInputDigest
-                                      ReviewFrontier = checkpoint.ReviewFrontier
-                                      SemanticVersion = checkpoint.SemanticVersion }
-
-                                return!
-                                    ensureAssignedAndDeliver
-                                        sessions
-                                        snapshot
-                                        gitTree
-                                        journal
-                                        managerSessionId
-                                        lifeId
-                                        writeId
-                                        life
-                                        managerLife
-                                        checkpoint
-                                        prepared
-                                        enlisted
-                                        handleId
-                                        agentName
-                                        runtime
+                return!
+                    ensureReviewForCheckpoint
+                        sessions
+                        snapshot
+                        gitTree
+                        journal
+                        managerSessionId
+                        lifeId
+                        writeId
+                        life
+                        managerLife
+                        checkpoint
         }
+
+    type private AwaitConcludeDecision =
+        | Done
+        | Fail of reason: string
+        | AwaitConsumable
+
+    let private awaitConcludeDecision (outcome: TodoProcessReviewProgram.ConcludeOutcome) =
+        match outcome with
+        | TodoProcessReviewProgram.ConcludeOutcome.Concluded -> Done
+        | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> Fail reason
+        | TodoProcessReviewProgram.ConcludeOutcome.Pending _ -> AwaitConsumable
 
     let awaitConsumableReview
         (timerPort: ITimerPort)
@@ -594,17 +806,16 @@ module DedicatedTodoReviewerRuntime =
         (lifeId: ManagerLifeId)
         (writeId: TodoWriteId)
         : Task<Result<unit, string>> =
-        task {
-            match! ensureReview timerPort sessions snapshot gitTree journal managerSessionId lifeId writeId with
-            | Error reason -> return Error reason
-            | Ok() ->
-                match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
-                | TodoProcessReviewProgram.ConcludeOutcome.Concluded -> return Ok()
-                | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
-                | TodoProcessReviewProgram.ConcludeOutcome.Pending _ ->
-                    match! TodoProcessReviewProgram.awaitConsumableReview journal lifeId writeId with
-                    | Ok() -> return Ok()
-                    | Error reason -> return Error reason
+        taskResult {
+            do! ensureReview timerPort sessions snapshot gitTree journal managerSessionId lifeId writeId
+            let! outcome = TodoProcessReviewProgram.tryConclude journal lifeId writeId |> TaskResultCE.ofTask
+
+            match awaitConcludeDecision outcome with
+            | Done -> return ()
+            | Fail reason -> return! Error reason
+            | AwaitConsumable ->
+                do! TodoProcessReviewProgram.awaitConsumableReview journal lifeId writeId
+                return ()
         }
 
     let port

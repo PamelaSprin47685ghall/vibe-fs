@@ -46,6 +46,33 @@ module OrchestratorFactFold =
 
     let private reject = FoldRejection.reject
 
+    /// Progress evidence → optional rebased commit for ORCH-007 publish claim.
+    let private tryRebasedCommit (job: ManagerJobProjection) : CommitHash option =
+        match job.Progress with
+        | JobProgress.RebasedCandidateReady rebased -> Some rebased.RebasedCommit
+        | _ -> None
+
+    /// PublishClaimed evidence → fold decision (ORCH-004 requires a rebased candidate).
+    let private foldPublishClaimed
+        (payload: {| ManagerJobId: ManagerJobId; TargetRef: TargetRef; ExpectedHead: CommitHash |})
+        (projection: AgentProjectionSet)
+        : Result<AgentProjectionSet, FoldRejection> =
+        match
+            OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
+            |> Option.bind tryRebasedCommit
+        with
+        | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
+        | Some commit ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress
+                        payload.ManagerJobId
+                        (JobProgress.PublishClaimed
+                            {| RebasedCommit = commit
+                               ExpectedHead = payload.ExpectedHead |}))
+                    projection
+            )
+
     let fold
         (projection: AgentProjectionSet)
         (fact: OrchestratorFactCases)
@@ -91,30 +118,7 @@ module OrchestratorFactFold =
                     projection
             )
 
-        | OrchestratorFactCases.PublishClaimed payload ->
-            // ORCH-007 needs the rebased commit to recognise "already published".
-            // It comes from the job's current progress rather than the claim
-            // fact, because the claim is written inside the CAS window where the
-            // rebased candidate is already established.
-            let rebasedCommit =
-                OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
-                |> Option.bind (fun job ->
-                    match job.Progress with
-                    | JobProgress.RebasedCandidateReady rebased -> Some rebased.RebasedCommit
-                    | _ -> None)
-
-            match rebasedCommit with
-            | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
-            | Some commit ->
-                Ok(
-                    updateOrchestrator
-                        (OrchestratorProjection.recordProgress
-                            payload.ManagerJobId
-                            (JobProgress.PublishClaimed
-                                {| RebasedCommit = commit
-                                   ExpectedHead = payload.ExpectedHead |}))
-                        projection
-                )
+        | OrchestratorFactCases.PublishClaimed payload -> foldPublishClaimed payload projection
 
         | OrchestratorFactCases.Published payload ->
             Ok(

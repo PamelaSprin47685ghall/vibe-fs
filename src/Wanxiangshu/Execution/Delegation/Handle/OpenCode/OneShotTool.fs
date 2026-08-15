@@ -21,6 +21,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
@@ -130,6 +131,290 @@ module OneShotAgentTool =
                         None
         }
 
+    let private unknownAgentMessage (agent: string) =
+        match ManagedAgent.parse agent with
+        | Error parseError -> ManagedAgent.formatParseError parseError
+        | Ok _ -> sprintf "Unknown managed agent '%s'." agent
+
+    let private agentRejection (expectedNames: string list) (agent: string) (roleLabel: string) =
+        match ManagedAgent.tryParse agent with
+        | None when String.IsNullOrWhiteSpace agent ->
+            Error(sprintf "agent is required; use %s" (String.concat " or " expectedNames))
+        | None -> Error(unknownAgentMessage agent)
+        | Some managed when not (List.contains managed.Name expectedNames) ->
+            Error(sprintf "%s tool requires agent %s" roleLabel (String.concat " or " expectedNames))
+        | Some managed -> Ok managed
+
+    let private nonEmptyWorkRecord (workRecord: string option) =
+        match workRecord with
+        | Some text when not (String.IsNullOrWhiteSpace text) -> Some text
+        | _ -> None
+
+    let private childWorkRecord (scope: ToolRuntimeScope) (childId: SessionId) =
+        task {
+            let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
+            return nonEmptyWorkRecord workRecord
+        }
+
+    let private providerRunOf (terminal: AgentRunResult) =
+        if isNull (box terminal.ProviderRun) then ProviderRunIdentity.create "" else terminal.ProviderRun
+
+    let private ignoreAbortResult (pending: Task<Result<unit, string>>) =
+        task {
+            try
+                let! _ = pending
+                return ()
+            with _ ->
+                return ()
+        }
+
+    let private ensureAbortStarted
+        (abortTask: Task<Result<unit, string>> option ref)
+        (startAbort: unit -> Task<Result<unit, string>>)
+        =
+        if abortTask.Value.IsNone then
+            abortTask.Value <- Some(startAbort ())
+
+    let private drainAbort
+        (abortTask: Task<Result<unit, string>> option)
+        (startAbort: unit -> Task<Result<unit, string>>)
+        =
+        task {
+            match abortTask with
+            | Some pending -> do! ignoreAbortResult pending
+            | None -> do! ignoreAbortResult (startAbort ())
+        }
+
+    let private noteSendFailure
+        (succeed: string -> string option -> unit)
+        (sendResult: Result<PromptKey, string>)
+        =
+        match sendResult with
+        | Error sendError -> succeed (sprintf "send failed: %s" sendError) None
+        | Ok _ -> ()
+
+    let private settleOutput
+        (managed: ManagedAgent)
+        (parentWorkRecord: string option)
+        (childId: SessionId)
+        (settled: Result<string * string option, string>)
+        : Result<Outcome, string> =
+        match settled with
+        | Error err -> Error err
+        | Ok(output, workRecord) ->
+            Ok
+                { ChildId = SessionId.value childId
+                  Managed = managed
+                  ParentBackgroundDigest = parentWorkRecord |> Option.map ToolHostCodec.digest
+                  Output = output
+                  WorkRecord = workRecord }
+
+    /// One-shot completion latch: dispose subscription at most once.
+    type private CompletionLatch() =
+        // DSL-MUTABLE: subscription — one-shot terminal subscription
+        let mutable subscription: IDisposable option = None
+        // DSL-MUTABLE: resource — one-shot completion latch
+        let mutable completed = false
+
+        member _.SetSubscription(active: IDisposable) = subscription <- Some active
+
+        member _.Finish(setResult: unit -> unit) =
+            if not completed then
+                completed <- true
+                subscription |> Option.iter (fun active -> active.Dispose())
+                subscription <- None
+                setResult ()
+
+    let private recoverMissingWorkRecord
+        (scope: ToolRuntimeScope)
+        (childId: SessionId)
+        (terminal: AgentRunResult)
+        (succeed: string -> string option -> unit)
+        (latch: CompletionLatch)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        =
+        task {
+            do!
+                XTraceCapture.captureTerminalText
+                    scope.Journal
+                    childId
+                    terminal.TerminalText
+                    (providerRunOf terminal)
+
+            let! workRecord = childWorkRecord scope childId
+
+            match workRecord with
+            | Some wr -> succeed terminal.TurnFormalText (Some wr)
+            | None ->
+                latch.Finish(fun () ->
+                    completion.SetResult(
+                        Error "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
+                    ))
+        }
+
+    let private settleCompletedTerminal
+        (scope: ToolRuntimeScope)
+        (childId: SessionId)
+        (terminal: AgentRunResult)
+        (succeed: string -> string option -> unit)
+        (latch: CompletionLatch)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        =
+        task {
+            let! workRecord = childWorkRecord scope childId
+
+            match workRecord with
+            | Some wr -> succeed terminal.TurnFormalText (Some wr)
+            | None ->
+                // notifyCompleted / some hosts may fire TerminalOutcome without writing
+                // XTrace terminal first; includeOpening=false then yields empty LWR.
+                // Capture TerminalText then re-query ChildWorkRecordFor.
+                do! recoverMissingWorkRecord scope childId terminal succeed latch completion
+        }
+
+    let private onTerminal
+        (roleLabel: string)
+        (scope: ToolRuntimeScope)
+        (childId: SessionId)
+        (succeed: string -> string option -> unit)
+        (fail: exn -> unit)
+        (latch: CompletionLatch)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        (_sessionId: SessionId)
+        (outcome: TerminalOutcome)
+        =
+        match outcome with
+        // COMPANION-005 / HOST-005: a tool result is this turn's formal report, not
+        // session-wide A. The old `FinalText` was the cumulative text including
+        // host-visible reasoning, so the calling model received the child's
+        // reasoning stream as if it were the answer.
+        // EXEC-028: Completed requires child LWR (includeOpening=false); missing → Error.
+        | TerminalOutcome.Completed terminal ->
+            settleCompletedTerminal scope childId terminal succeed latch completion |> ignore
+        | TerminalOutcome.Aborted reason ->
+            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
+        | TerminalOutcome.Failed error ->
+            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
+
+    let private raceCompletionDeadline
+        (outputTask: Task<Result<string * string option, string>>)
+        (roleLabel: string)
+        (abortTask: Task<Result<unit, string>> option ref)
+        (startAbort: unit -> Task<Result<unit, string>>)
+        (latch: CompletionLatch)
+        (managed: ManagedAgent)
+        (parentWorkRecord: string option)
+        (childId: SessionId)
+        : Task<Result<Outcome, string>> =
+        task {
+            // Bound the wait: race completion against a management timer.
+            // On timeout abort the child and return Error — never hang.
+            let! finished = PtyTiming.raceExit (outputTask :> Task) CompletionTimeoutMs
+
+            if not finished then
+                ensureAbortStarted abortTask startAbort
+                latch.Finish(fun () -> ())
+                return Error(sprintf "%s timed out after %d ms" roleLabel CompletionTimeoutMs)
+            else
+                let! settled = outputTask
+                return settleOutput managed parentWorkRecord childId settled
+        }
+
+    let private awaitBoundedCompletion
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (childId: SessionId)
+        (managed: ManagedAgent)
+        (parentWorkRecord: string option)
+        (roleLabel: string)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        (latch: CompletionLatch)
+        : Task<Result<Outcome, string>> =
+        task {
+            // DSL-MUTABLE: cancellation — parent-abort child session task slot
+            let abortTask = ref None
+            let startAbort () = scope.Sessions.AbortSession childId
+
+            let detachAbort =
+                context.AttachAbort(fun () ->
+                    ensureAbortStarted abortTask startAbort
+                    latch.Finish(fun () -> completion.SetResult(Ok("aborted: parent cancelled", None))))
+
+            try
+                return!
+                    raceCompletionDeadline
+                        completion.Task
+                        roleLabel
+                        abortTask
+                        startAbort
+                        latch
+                        managed
+                        parentWorkRecord
+                        childId
+            finally
+                detachAbort ()
+                let! _ = drainAbort abortTask.Value startAbort
+                ()
+        }
+
+    let private runChildSession
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        (managed: ManagedAgent)
+        (roleLabel: string)
+        : Task<Result<Outcome, string>> =
+        taskResult {
+            let parentId = SessionId.create context.SessionId
+            let directory = scope.DirectoryFor context.SessionId
+            // EXEC-006: parent → child keeps Opening.
+            let! parentWorkRecord = scope.ParentWorkRecordFor context.SessionId |> TaskResultCE.ofTask
+
+            let fullPrompt =
+                ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord None [] None
+
+            let! childId =
+                scope.Sessions.CreateChildSession(
+                    parentId,
+                    { Title = Some managed.Name
+                      Agent = Some managed.Name
+                      Directory = directory }
+                )
+
+            directory
+            |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))
+
+            // COMPANION-003 / EXEC-006: child's OpeningMaterial is the
+            // ORIGINAL oneshot assignment (not the rendered relay
+            // envelope), matching HostForkAgent. PromptIngress skips
+            // Opening for AgentOwnerRoot; capture before send.
+            do! XTraceCapture.captureOpening scope.Journal childId request.Prompt [] |> TaskResultCE.ofTask
+
+            // Ok carries (formal text, optional WorkRecord); Error is the
+            // Result.Error channel (timeout sibling) — not SetException.
+            let completion = TaskCompletionSource<Result<string * string option, string>>()
+            emitJsExpr completion.Task "$0.catch(() => {})" |> ignore
+            let latch = CompletionLatch()
+
+            let succeed text workRecord =
+                latch.Finish(fun () -> completion.SetResult(Ok(text, workRecord)))
+
+            let fail (error: exn) =
+                latch.Finish(fun () -> completion.SetException error)
+
+            latch.SetSubscription(
+                scope.Sessions.SubscribeTerminal(
+                    childId,
+                    onTerminal roleLabel scope childId succeed fail latch completion
+                )
+            )
+
+            let! sendResult = send scope childId fullPrompt managed.Name directory |> TaskResultCE.ofTask
+            noteSendFailure succeed sendResult
+
+            return! awaitBoundedCompletion scope context childId managed parentWorkRecord roleLabel completion latch
+        }
+
     let run
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
@@ -137,193 +422,13 @@ module OneShotAgentTool =
         (expectedNames: string list)
         (roleLabel: string)
         =
-        task {
+        taskResult {
             if String.IsNullOrWhiteSpace context.SessionId then
-                return Error "Missing sessionID"
-            elif String.IsNullOrWhiteSpace request.Prompt then
-                return Error(sprintf "%s prompt required" (roleLabel.ToLowerInvariant()))
-            else
-                match ManagedAgent.tryParse request.Agent with
-                | None ->
-                    let message =
-                        if String.IsNullOrWhiteSpace request.Agent then
-                            sprintf "agent is required; use %s" (String.concat " or " expectedNames)
-                        else
-                            match ManagedAgent.parse request.Agent with
-                            | Error parseError -> ManagedAgent.formatParseError parseError
-                            | Ok _ -> sprintf "Unknown managed agent '%s'." request.Agent
+                return! Error "Missing sessionID"
 
-                    return Error message
-                | Some managed when not (List.contains managed.Name expectedNames) ->
-                    return Error(sprintf "%s tool requires agent %s" roleLabel (String.concat " or " expectedNames))
-                | Some managed ->
-                    let parentId = SessionId.create context.SessionId
-                    let directory = scope.DirectoryFor context.SessionId
-                    // EXEC-006: parent → child keeps Opening.
-                    let! parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
+            if String.IsNullOrWhiteSpace request.Prompt then
+                return! Error(sprintf "%s prompt required" (roleLabel.ToLowerInvariant()))
 
-                    let fullPrompt =
-                        ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord None [] None
-
-                    match!
-                        scope.Sessions.CreateChildSession(
-                            parentId,
-                            { Title = Some managed.Name
-                              Agent = Some managed.Name
-                              Directory = directory }
-                        )
-                    with
-                    | Error createError -> return Error createError
-                    | Ok childId ->
-                        directory
-                        |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))
-
-                        // COMPANION-003 / EXEC-006: child's OpeningMaterial is the
-                        // ORIGINAL oneshot assignment (not the rendered relay
-                        // envelope), matching HostForkAgent. PromptIngress skips
-                        // Opening for AgentOwnerRoot; capture before send.
-                        do! XTraceCapture.captureOpening scope.Journal childId request.Prompt []
-
-                        // Ok carries (formal text, optional WorkRecord); Error is the
-                        // Result.Error channel (timeout sibling) — not SetException.
-                        let completion = TaskCompletionSource<Result<string * string option, string>>()
-                        emitJsExpr completion.Task "$0.catch(() => {})" |> ignore
-                        // DSL-MUTABLE: subscription — one-shot terminal subscription
-                        let mutable subscription: IDisposable option = None
-                        // DSL-MUTABLE: resource — one-shot completion latch
-                        let mutable completed = false
-
-                        let finish setResult =
-                            if not completed then
-                                completed <- true
-                                subscription |> Option.iter (fun active -> active.Dispose())
-                                subscription <- None
-                                setResult ()
-
-                        let succeed text workRecord =
-                            finish (fun () -> completion.SetResult(Ok(text, workRecord)))
-
-                        let fail (error: exn) =
-                            finish (fun () -> completion.SetException error)
-
-                        let childWorkRecord () =
-                            task {
-                                match! scope.ChildWorkRecordFor(SessionId.value childId) with
-                                | Some wr when not (String.IsNullOrWhiteSpace wr) -> return Some wr
-                                | _ -> return None
-                            }
-
-                        subscription <-
-                            Some(
-                                scope.Sessions.SubscribeTerminal(
-                                    childId,
-                                    fun _ outcome ->
-                                        match outcome with
-                                        // COMPANION-005 / HOST-005: a tool result is
-                                        // this turn's formal report, not session-wide
-                                        // A. The old `FinalText` was the cumulative
-                                        // text including host-visible reasoning, so
-                                        // the calling model received the child's
-                                        // reasoning stream as if it were the answer.
-                                        // EXEC-028: Completed requires child LWR
-                                        // (includeOpening=false); missing → Error.
-                                        | TerminalOutcome.Completed terminal ->
-                                            task {
-                                                match! childWorkRecord () with
-                                                | Some wr -> succeed terminal.TurnFormalText (Some wr)
-                                                | None ->
-                                                    // notifyCompleted / some hosts may fire
-                                                    // TerminalOutcome without writing XTrace
-                                                    // terminal first; includeOpening=false then
-                                                    // yields empty LWR. Capture TerminalText
-                                                    // then re-query ChildWorkRecordFor.
-                                                    let providerRun =
-                                                        if isNull (box terminal.ProviderRun) then
-                                                            ProviderRunIdentity.create ""
-                                                        else
-                                                            terminal.ProviderRun
-
-                                                    do!
-                                                        XTraceCapture.captureTerminalText
-                                                            scope.Journal
-                                                            childId
-                                                            terminal.TerminalText
-                                                            providerRun
-
-                                                    match! childWorkRecord () with
-                                                    | Some wr -> succeed terminal.TurnFormalText (Some wr)
-                                                    | None ->
-                                                        finish (fun () ->
-                                                            completion.SetResult(
-                                                                Error
-                                                                    "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
-                                                            ))
-                                            }
-                                            |> ignore
-                                        | TerminalOutcome.Aborted reason ->
-                                            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
-                                        | TerminalOutcome.Failed error ->
-                                            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
-                                )
-                            )
-
-                        match! send scope childId fullPrompt managed.Name directory with
-                        | Error sendError -> succeed (sprintf "send failed: %s" sendError) None
-                        | Ok _ -> ()
-
-                        // DSL-MUTABLE: cancellation — parent-abort child session task slot
-                        let mutable abortTask: Task<Microsoft.FSharp.Core.Result<unit, string>> option =
-                            None
-
-                        let detachAbort =
-                            context.AttachAbort(fun () ->
-                                if abortTask.IsNone then
-                                    abortTask <- Some(scope.Sessions.AbortSession childId)
-
-                                succeed "aborted: parent cancelled" None)
-
-                        try
-                            // Bound the wait: race completion against a management timer.
-                            // On timeout abort the child and return Error — never hang.
-                            let outputTask = completion.Task
-
-                            let! finished = PtyTiming.raceExit (outputTask :> Task) CompletionTimeoutMs
-
-                            if not finished then
-                                if abortTask.IsNone then
-                                    abortTask <- Some(scope.Sessions.AbortSession childId)
-
-                                finish (fun () -> ())
-
-                                return Error(sprintf "%s timed out after %d ms" roleLabel CompletionTimeoutMs)
-                            else
-                                let! settled = outputTask
-
-                                match settled with
-                                | Error err -> return Error err
-                                | Ok(output, workRecord) ->
-                                    return
-                                        Ok
-                                            { ChildId = SessionId.value childId
-                                              Managed = managed
-                                              ParentBackgroundDigest =
-                                                parentWorkRecord |> Option.map ToolHostCodec.digest
-                                              Output = output
-                                              WorkRecord = workRecord }
-                        finally
-                            detachAbort ()
-
-                            match abortTask with
-                            | Some pending ->
-                                try
-                                    let! _ = pending
-                                    ()
-                                with _ ->
-                                    ()
-                            | None ->
-                                try
-                                    let! _ = scope.Sessions.AbortSession childId
-                                    ()
-                                with _ ->
-                                    ()
+            let! managed = agentRejection expectedNames request.Agent roleLabel
+            return! runChildSession scope context request managed roleLabel
         }

@@ -36,6 +36,7 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
@@ -164,6 +165,292 @@ module ManagerLifecycleProjection =
 
     let private withLife (life: LifeProjection) (state: ManagerLifeProjection) = { state with CurrentLife = Some life }
 
+    let private requireLife (lifeId: ManagerLifeId) (state: ManagerLifeProjection) =
+        match state.CurrentLife with
+        | Some life when life.LifeId = lifeId -> Ok life
+        | _ -> Error ManagerLifeFoldRejection.LifeUnknown
+
+    let private requireActiveRequest (requestId: FinalityRequestId) (life: LifeProjection) =
+        match life.ActiveFinality with
+        | Some request when request.RequestId = requestId -> Ok request
+        | _ -> Error ManagerLifeFoldRejection.UnknownRequest
+
+    let private requireOpenRequest (requestId: FinalityRequestId) (life: LifeProjection) =
+        match life.ActiveFinality with
+        | Some ({ Resolution = FinalityResolution.Open } as request) when request.RequestId = requestId ->
+            Ok request
+        | _ -> Error ManagerLifeFoldRejection.UnknownRequest
+
+    /// GLORY-055: closed request may be replaced; an open one may not.
+    let private ensureFinalitySlotFree (life: LifeProjection) =
+        match life.ActiveFinality with
+        | Some { Resolution = FinalityResolution.Open } -> Error ManagerLifeFoldRejection.FinalityAlreadyActive
+        | _ -> Ok()
+
+    let private decideLifeOpened
+        (state: ManagerLifeProjection)
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               OpeningUserMessageId: PhysicalUserMessageId
+               OpeningTextRef: BlobRef
+               OpeningTextDigest: BlobDigest
+               OpeningCursorSequence: int64 |})
+        =
+        match state.CurrentLife with
+        | None ->
+            Ok(
+                withLife
+                    { LifeId = payload.LifeId
+                      OpeningUserMessageId = payload.OpeningUserMessageId
+                      OpeningTextRef = payload.OpeningTextRef
+                      OpeningTextDigest = payload.OpeningTextDigest
+                      OpeningCursor = { Sequence = payload.OpeningCursorSequence }
+                      ProtectedPrefixEnd = None
+                      ActiveFinality = None
+                      EnlistedReviewers = Map.empty
+                      LastRejectedWorkRecord = None
+                      LastBlessing = None
+                      CompletedTerminal = None
+                      Completed = false }
+                    state
+            )
+        | Some life when life.LifeId = payload.LifeId -> Ok state
+        | Some _ -> Error ManagerLifeFoldRejection.LifeAlreadyOpen
+
+    let private applyWorkActivated
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               ActivationPromptKey: PromptKey
+               ProtectedPrefixEndSequence: int64 |})
+        (life: LifeProjection)
+        (state: ManagerLifeProjection)
+        =
+        match life.ProtectedPrefixEnd with
+        | Some _ -> state
+        | None ->
+            withLife
+                { life with
+                    ProtectedPrefixEnd = Some { Sequence = payload.ProtectedPrefixEndSequence } }
+                state
+
+    let private openFinalityRequest
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               GitTreeHash: GitTreeHash
+               LastWordsRef: BlobRef
+               LastWordsDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity
+               ToolCallId: ToolCallId |})
+        (life: LifeProjection)
+        (state: ManagerLifeProjection)
+        =
+        withLife
+            { life with
+                ActiveFinality =
+                    Some
+                        { RequestId = payload.RequestId
+                          GitTreeHash = payload.GitTreeHash
+                          LastWordsRef = payload.LastWordsRef
+                          LastWordsDigest = payload.LastWordsDigest
+                          ProviderRun = payload.ProviderRun
+                          ToolCallId = payload.ToolCallId
+                          Members = Map.empty
+                          SiblingSteers = Map.empty
+                          Resolution = FinalityResolution.Open } }
+            state
+
+    /// First enlistment: `finality-new-<requestId>` (GLORY-040); later requests reuse it.
+    let private reviewerAgentId
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               ReviewerOrdinal: int
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               IsNewReviewer: bool |})
+        =
+        if payload.IsNewReviewer then
+            sprintf "finality-new-%s" (FinalityRequestId.value payload.RequestId)
+        else
+            sprintf "finality-reviewer-%s" (SessionId.value payload.ReviewerSessionId)
+
+    let private upsertReviewerStanding
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               ReviewerOrdinal: int
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               IsNewReviewer: bool |})
+        (life: LifeProjection)
+        =
+        match Map.tryFind payload.ReviewerSessionId life.EnlistedReviewers with
+        | Some previous ->
+            { previous with
+                Barriers = payload.BarrierId :: previous.Barriers }
+        | None ->
+            { ReviewerOrdinal = payload.ReviewerOrdinal
+              Barriers = [ payload.BarrierId ]
+              AgentId = reviewerAgentId payload }
+
+    let private enlistReviewer
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               ReviewerOrdinal: int
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               IsNewReviewer: bool |})
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (state: ManagerLifeProjection)
+        =
+        match Map.tryFind payload.ReviewerSessionId request.Members with
+        | Some existing when existing.BarrierId = payload.BarrierId -> state
+        | _ ->
+            let memberRef =
+                { ReviewerSessionId = payload.ReviewerSessionId
+                  ReviewerOrdinal = payload.ReviewerOrdinal
+                  BarrierId = payload.BarrierId
+                  IsNewReviewer = payload.IsNewReviewer }
+
+            let standing = upsertReviewerStanding payload life
+
+            withLife
+                { life with
+                    EnlistedReviewers = Map.add payload.ReviewerSessionId standing life.EnlistedReviewers
+                    ActiveFinality =
+                        Some
+                            { request with
+                                Members = Map.add payload.ReviewerSessionId memberRef request.Members } }
+                state
+
+    let private rejectFinality
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               RejectingReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               WorkRecordRef: BlobRef
+               WorkRecordDigest: BlobDigest |})
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (state: ManagerLifeProjection)
+        =
+        withLife
+            { life with
+                ActiveFinality =
+                    Some
+                        { request with
+                            Resolution =
+                                FinalityResolution.Rejected
+                                    { RejectingReviewer = payload.RejectingReviewerSessionId
+                                      WorkRecordRef = payload.WorkRecordRef
+                                      WorkRecordDigest = payload.WorkRecordDigest } }
+                LastRejectedWorkRecord = Some payload.WorkRecordRef }
+            state
+
+    let private recordSiblingSteer
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               WorkRecordRef: BlobRef
+               WorkRecordDigest: BlobDigest |})
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (state: ManagerLifeProjection)
+        =
+        match Map.tryFind payload.ReviewerSessionId request.SiblingSteers with
+        | Some existing when
+            existing.BarrierId = payload.BarrierId
+            && existing.WorkRecordRef = payload.WorkRecordRef
+            ->
+            state
+        | _ ->
+            let evidence =
+                { ReviewerSessionId = payload.ReviewerSessionId
+                  BarrierId = payload.BarrierId
+                  WorkRecordRef = payload.WorkRecordRef
+                  WorkRecordDigest = payload.WorkRecordDigest }
+
+            withLife
+                { life with
+                    ActiveFinality =
+                        Some
+                            { request with
+                                SiblingSteers = Map.add payload.ReviewerSessionId evidence request.SiblingSteers } }
+                state
+
+    let private blessFinality
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               GitTreeHash: GitTreeHash
+               WorkRecordBundleRef: BlobRef
+               WorkRecordBundleDigest: BlobDigest |})
+        (life: LifeProjection)
+        (request: FinalityRequestProjection)
+        (state: ManagerLifeProjection)
+        =
+        let blessing =
+            { RequestId = payload.RequestId
+              WorkRecordBundleRef = payload.WorkRecordBundleRef
+              WorkRecordBundleDigest = payload.WorkRecordBundleDigest }
+
+        withLife
+            { life with
+                ActiveFinality =
+                    Some
+                        { request with
+                            Resolution = FinalityResolution.Blessed blessing }
+                LastBlessing = Some blessing }
+            state
+
+    let private undecideFinality (life: LifeProjection) (request: FinalityRequestProjection) (state: ManagerLifeProjection) =
+        withLife
+            { life with
+                ActiveFinality =
+                    Some
+                        { request with
+                            Resolution = FinalityResolution.Undecided } }
+            state
+
+    let private completeLife
+        (payload:
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               TerminalRef: BlobRef
+               TerminalDigest: BlobDigest |})
+        (life: LifeProjection)
+        (state: ManagerLifeProjection)
+        =
+        if life.Completed then
+            state
+        else
+            archive
+                { life with
+                    CompletedTerminal = Some payload.TerminalRef
+                    Completed = true }
+                state
+
     /// Fold one lifecycle fact onto the session's lifecycle state.
     ///
     /// Replays are idempotent by identity (PERSIST-010): re-applying the same
@@ -173,243 +460,56 @@ module ManagerLifecycleProjection =
         (fact: ManagerLifecycleFact)
         : Result<ManagerLifeProjection, ManagerLifeFoldRejection> =
         match fact with
-        | ManagerLifecycleFact.LifeOpened payload ->
-            match state.CurrentLife with
-            // First Life of the session, or the first Life after a completed one.
-            | None ->
-                Ok(
-                    withLife
-                        { LifeId = payload.LifeId
-                          OpeningUserMessageId = payload.OpeningUserMessageId
-                          OpeningTextRef = payload.OpeningTextRef
-                          OpeningTextDigest = payload.OpeningTextDigest
-                          OpeningCursor = { Sequence = payload.OpeningCursorSequence }
-                          ProtectedPrefixEnd = None
-                          ActiveFinality = None
-                          EnlistedReviewers = Map.empty
-                          LastRejectedWorkRecord = None
-                          LastBlessing = None
-                          CompletedTerminal = None
-                          Completed = false }
-                        state
-                )
-            // Replay of the same Life opener.
-            | Some life when life.LifeId = payload.LifeId -> Ok state
-            | Some _ -> Error ManagerLifeFoldRejection.LifeAlreadyOpen
-
+        | ManagerLifecycleFact.LifeOpened payload -> decideLifeOpened state payload
         | ManagerLifecycleFact.WorkActivated payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                // Replay of the same activation is idempotent.
-                match life.ProtectedPrefixEnd with
-                | Some _ -> Ok state
-                | None ->
-                    Ok(
-                        withLife
-                            { life with
-                                ProtectedPrefixEnd = Some { Sequence = payload.ProtectedPrefixEndSequence } }
-                            state
-                    )
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                return applyWorkActivated payload life state
+            }
         | ManagerLifecycleFact.FinalityRequested payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                // GLORY-055: a closed request (rejected/blessed/undecided) may
-                // be replaced; an open one may not.
-                | Some { Resolution = FinalityResolution.Open } -> Error ManagerLifeFoldRejection.FinalityAlreadyActive
-                | _ ->
-                    Ok(
-                        withLife
-                            { life with
-                                ActiveFinality =
-                                    Some
-                                        { RequestId = payload.RequestId
-                                          GitTreeHash = payload.GitTreeHash
-                                          LastWordsRef = payload.LastWordsRef
-                                          LastWordsDigest = payload.LastWordsDigest
-                                          ProviderRun = payload.ProviderRun
-                                          ToolCallId = payload.ToolCallId
-                                          Members = Map.empty
-                                          SiblingSteers = Map.empty
-                                          Resolution = FinalityResolution.Open } }
-                            state
-                    )
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                do! ensureFinalitySlotFree life
+                return openFinalityRequest payload life state
+            }
         | ManagerLifecycleFact.FinalityReviewerEnlisted payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                | Some request when request.RequestId = payload.RequestId ->
-                    match request.Resolution with
-                    | FinalityResolution.Open ->
-                        let memberRef =
-                            { ReviewerSessionId = payload.ReviewerSessionId
-                              ReviewerOrdinal = payload.ReviewerOrdinal
-                              BarrierId = payload.BarrierId
-                              IsNewReviewer = payload.IsNewReviewer }
-
-                        // Replay of the same enlistment is idempotent.
-                        match Map.tryFind payload.ReviewerSessionId request.Members with
-                        | Some existing when existing.BarrierId = payload.BarrierId -> Ok state
-                        | _ ->
-                            let standing =
-                                match Map.tryFind payload.ReviewerSessionId life.EnlistedReviewers with
-                                | Some previous ->
-                                    { previous with
-                                        Barriers = payload.BarrierId :: previous.Barriers }
-                                | None ->
-                                    // First enlistment of this session. A fresh
-                                    // Reviewer is forked under
-                                    // `finality-new-<requestId>` (GLORY-040); keep
-                                    // that id for every later request so the
-                                    // durable handle identity never drifts.
-                                    { ReviewerOrdinal = payload.ReviewerOrdinal
-                                      Barriers = [ payload.BarrierId ]
-                                      AgentId =
-                                        if payload.IsNewReviewer then
-                                            sprintf "finality-new-%s" (FinalityRequestId.value payload.RequestId)
-                                        else
-                                            sprintf "finality-reviewer-%s" (SessionId.value payload.ReviewerSessionId) }
-
-                            Ok(
-                                withLife
-                                    { life with
-                                        EnlistedReviewers =
-                                            Map.add payload.ReviewerSessionId standing life.EnlistedReviewers
-                                        ActiveFinality =
-                                            Some
-                                                { request with
-                                                    Members =
-                                                        Map.add payload.ReviewerSessionId memberRef request.Members } }
-                                    state
-                            )
-                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                let! request = requireOpenRequest payload.RequestId life
+                return enlistReviewer payload life request state
+            }
         | ManagerLifecycleFact.FinalityRejected payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                | Some request when request.RequestId = payload.RequestId ->
-                    match request.Resolution with
-                    | FinalityResolution.Open ->
-                        Ok(
-                            withLife
-                                { life with
-                                    ActiveFinality =
-                                        Some
-                                            { request with
-                                                Resolution =
-                                                    FinalityResolution.Rejected
-                                                        { RejectingReviewer = payload.RejectingReviewerSessionId
-                                                          WorkRecordRef = payload.WorkRecordRef
-                                                          WorkRecordDigest = payload.WorkRecordDigest } }
-                                    LastRejectedWorkRecord = Some payload.WorkRecordRef }
-                                state
-                        )
-                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                let! request = requireOpenRequest payload.RequestId life
+                return rejectFinality payload life request state
+            }
         | ManagerLifecycleFact.FinalitySiblingSteered payload ->
             // GLORY-044: record a sibling steer; never rewrite Rejected/Blessed/Undecided.
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                | Some request when request.RequestId = payload.RequestId ->
-                    match Map.tryFind payload.ReviewerSessionId request.SiblingSteers with
-                    | Some existing when
-                        existing.BarrierId = payload.BarrierId
-                        && existing.WorkRecordRef = payload.WorkRecordRef
-                        ->
-                        Ok state
-                    | _ ->
-                        let evidence =
-                            { ReviewerSessionId = payload.ReviewerSessionId
-                              BarrierId = payload.BarrierId
-                              WorkRecordRef = payload.WorkRecordRef
-                              WorkRecordDigest = payload.WorkRecordDigest }
-
-                        Ok(
-                            withLife
-                                { life with
-                                    ActiveFinality =
-                                        Some
-                                            { request with
-                                                SiblingSteers =
-                                                    Map.add payload.ReviewerSessionId evidence request.SiblingSteers } }
-                                state
-                        )
-                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                let! request = requireActiveRequest payload.RequestId life
+                return recordSiblingSteer payload life request state
+            }
         | ManagerLifecycleFact.FinalityBlessed payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                | Some request when request.RequestId = payload.RequestId ->
-                    match request.Resolution with
-                    | FinalityResolution.Open ->
-                        let blessing =
-                            { RequestId = payload.RequestId
-                              WorkRecordBundleRef = payload.WorkRecordBundleRef
-                              WorkRecordBundleDigest = payload.WorkRecordBundleDigest }
-
-                        Ok(
-                            withLife
-                                { life with
-                                    ActiveFinality =
-                                        Some
-                                            { request with
-                                                Resolution = FinalityResolution.Blessed blessing }
-                                    LastBlessing = Some blessing }
-                                state
-                        )
-                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                let! request = requireOpenRequest payload.RequestId life
+                return blessFinality payload life request state
+            }
         | ManagerLifecycleFact.FinalityUndecided payload ->
             // GLORY-057: closes the request exactly like a rejection, but never
             // fabricates a wound record.
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                match life.ActiveFinality with
-                | Some request when request.RequestId = payload.RequestId ->
-                    match request.Resolution with
-                    | FinalityResolution.Open ->
-                        Ok(
-                            withLife
-                                { life with
-                                    ActiveFinality =
-                                        Some
-                                            { request with
-                                                Resolution = FinalityResolution.Undecided } }
-                                state
-                        )
-                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
-
+            result {
+                let! life = requireLife payload.LifeId state
+                let! request = requireOpenRequest payload.RequestId life
+                return undecideFinality life request state
+            }
         | ManagerLifecycleFact.LifeCompleted payload ->
-            match state.CurrentLife with
-            | Some life when life.LifeId = payload.LifeId ->
-                // Replay idempotent: a completed Life is already archived.
-                if life.Completed then
-                    Ok state
-                else
-                    Ok(
-                        archive
-                            { life with
-                                CompletedTerminal = Some payload.TerminalRef
-                                Completed = true }
-                            state
-                    )
-            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
+            result {
+                let! life = requireLife payload.LifeId state
+                return completeLife payload life state
+            }
 
     /// GLORY-011: an open request is still awaiting its cohort resolution.
     let isOpen (request: FinalityRequestProjection) =

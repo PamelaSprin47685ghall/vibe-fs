@@ -12,6 +12,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -130,6 +131,16 @@ module HostForkAgent =
                 (AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId)
         )
 
+    let private consumeRequirementText (input: ReviewRequirementInput) (messages: SessionMessage list) =
+        // The Authority Root was promoted from a physical message, so its
+        // value is that message's wire address. Compared as an address
+        // because the transcript has no notion of authority.
+        let address = AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId
+
+        messages
+        |> List.tryFind (fun message -> message.Id = address)
+        |> Option.bind userPromptText
+
     let rec private resolveReviewRequirementInputs
         (port: ISessionSnapshotPort)
         (inputs: ReviewRequirementInput list)
@@ -139,39 +150,66 @@ module HostForkAgent =
         task {
             match inputs with
             | [] -> return Ok(List.rev resolved)
-            | input :: remaining ->
-                let consume (messages: SessionMessage list) =
-                    // The Authority Root was promoted from a physical message, so its
-                    // value is that message's wire address. Compared as an address
-                    // because the transcript has no notion of authority.
-                    let address = AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId
-
-                    messages
-                    |> List.tryFind (fun message -> message.Id = address)
-                    |> Option.bind userPromptText
-
-                match Map.tryFind input.SourceSessionId cached with
-                | Some messages ->
-                    match consume messages with
-                    | Some text -> return! resolveReviewRequirementInputs port remaining cached (text :: resolved)
-                    | None -> return! resolveReviewRequirementInputs port remaining cached resolved
-                | None ->
-                    let! messagesResult = port.GetMessages input.SourceSessionId
-
-                    match messagesResult with
-                    | Error err -> return Error(sprintf "Cannot load original user requirements for reviewer: %s" err)
-                    | Ok messages ->
-                        let updated = Map.add input.SourceSessionId messages cached
-
-                        match consume messages with
-                        | Some text -> return! resolveReviewRequirementInputs port remaining updated (text :: resolved)
-                        // Host revert cleanup permanently removes the reverted user
-                        // message. Its HumanRoot requirement is therefore withdrawn,
-                        // not unavailable: continue with the still-live roots. A
-                        // snapshot Error above remains fail-closed and cannot be
-                        // mistaken for a withdrawal.
-                        | None -> return! resolveReviewRequirementInputs port remaining updated resolved
+            | input :: remaining -> return! stepRequirementInput port input remaining cached resolved
         }
+
+    and private advanceResolved
+        (port: ISessionSnapshotPort)
+        (remaining: ReviewRequirementInput list)
+        (cached: Map<SessionId, SessionMessage list>)
+        (resolved: string list)
+        (textOpt: string option)
+        =
+        match textOpt with
+        | Some text -> resolveReviewRequirementInputs port remaining cached (text :: resolved)
+        | None -> resolveReviewRequirementInputs port remaining cached resolved
+
+    and private afterMessagesLoaded
+        (port: ISessionSnapshotPort)
+        (input: ReviewRequirementInput)
+        (remaining: ReviewRequirementInput list)
+        (cached: Map<SessionId, SessionMessage list>)
+        (resolved: string list)
+        (messagesResult: Result<SessionMessage list, string>)
+        =
+        match messagesResult with
+        | Error err -> Task.FromResult(Error(sprintf "Cannot load original user requirements for reviewer: %s" err))
+        | Ok messages ->
+            // Host revert cleanup permanently removes the reverted user
+            // message. Its HumanRoot requirement is therefore withdrawn,
+            // not unavailable: continue with the still-live roots. A
+            // snapshot Error above remains fail-closed and cannot be
+            // mistaken for a withdrawal.
+            let updated = Map.add input.SourceSessionId messages cached
+            advanceResolved port remaining updated resolved (consumeRequirementText input messages)
+
+    and private stepRequirementInput
+        (port: ISessionSnapshotPort)
+        (input: ReviewRequirementInput)
+        (remaining: ReviewRequirementInput list)
+        (cached: Map<SessionId, SessionMessage list>)
+        (resolved: string list)
+        =
+        task {
+            match Map.tryFind input.SourceSessionId cached with
+            | Some messages ->
+                return! advanceResolved port remaining cached resolved (consumeRequirementText input messages)
+            | None ->
+                let! messagesResult = port.GetMessages input.SourceSessionId
+                return! afterMessagesLoaded port input remaining cached resolved messagesResult
+        }
+
+    let private loadReviewerRequirements
+        (snapshot: ISessionSnapshotPort option)
+        (promptInputs: ReviewRequirementInput list)
+        : Task<Result<string list, string>> =
+        match snapshot with
+        | None ->
+            Task.FromResult(
+                Error
+                    "Cannot start reviewer: original user requirements are unavailable without a session transcript"
+            )
+        | Some port -> resolveReviewRequirementInputs port promptInputs Map.empty []
 
     /// REVIEW-002's authoritative review scope, as the texts themselves.
     ///
@@ -188,18 +226,514 @@ module HostForkAgent =
         (snapshot: ISessionSnapshotPort option)
         (parentId: SessionId)
         : Task<Result<string list, string>> =
-        task {
-            let promptInputs = AgentJournal.pendingReviewRequirements journal parentId
+        let promptInputs = AgentJournal.pendingReviewRequirements journal parentId
 
-            if List.isEmpty promptInputs then
-                return Ok []
+        if List.isEmpty promptInputs then
+            Task.FromResult(Ok [])
+        else
+            loadReviewerRequirements snapshot promptInputs
+
+    let private requirementsForRole (runtime: HostForkRuntime) (role: Role) =
+        match role with
+        | Role.Reviewer -> resolveReviewerRequirements runtime.Journal runtime.SessionSnapshot runtime.ParentId
+        | _ -> Task.FromResult(Ok [])
+
+    let private buildRelayEnvelope
+        (runtime: HostForkRuntime)
+        (role: Role)
+        (prompt: string)
+        (payload: string option)
+        : Task<Result<string list * string, string>> =
+        task {
+            let! requirementsResult = requirementsForRole runtime role
+            let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
+
+            return
+                requirementsResult
+                |> Result.map (fun requirements ->
+                    requirements,
+                    ForkChildPayload.relay
+                        (forkInstructions runtime.ParentId)
+                        prompt
+                        parentWorkRecord
+                        None
+                        requirements
+                        payload)
+        }
+
+    let private enrichFirstPrompt
+        (runtime: HostForkRuntime)
+        (role: Role)
+        (prompt: string)
+        (payload: string option)
+        (renderedPrompt: string option)
+        : Task<Result<string list * string, string>> =
+        match renderedPrompt with
+        | Some rendered -> Task.FromResult(Ok([], rendered))
+        | None -> buildRelayEnvelope runtime role prompt payload
+
+    let private maybeReplaceToolEstimate
+        (journal: AgentJournal option)
+        (expectedToolCalls: int option)
+        (childId: SessionId)
+        : Task<unit> =
+        match journal, expectedToolCalls with
+        | Some journal, Some expected -> DelegatedToolEstimateLedger.replace journal childId expected
+        | _ -> Task.FromResult(())
+
+    let private sendFirstPromptOutcome
+        (runtime: HostForkRuntime)
+        (run: PendingHostRun)
+        (agentId: string)
+        (childId: SessionId)
+        (agentName: string)
+        (enrichedPrompt: string)
+        (result: ForkResult)
+        : Task<Result<ForkResult, string>> =
+        task {
+            let! sent =
+                HostForkAgentOwner.sendFirstPrompt
+                    runtime.Sessions
+                    runtime.Journal
+                    childId
+                    agentName
+                    (runtime.DirectoryOf agentId)
+                    enrichedPrompt
+
+            match sent with
+            | Ok _ -> return Ok result
+            | Error err ->
+                do! runtime.FailRun(run, err)
+                return Error err
+        }
+
+    let private finishSuccessfulNewChild
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (agentName: string)
+        (prompt: string)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        (run: PendingHostRun)
+        (result: ForkResult)
+        : Task<Result<ForkResult, string>> =
+        task {
+            runtime.MarkReady(run)
+
+            // COMPANION-003 / EXEC-006: the child's OpeningMaterial is the ORIGINAL
+            // fork assignment and authoritative requirements, NOT the rendered
+            // envelope (which carries commissioner_record and would nest the
+            // parent LWR recursively). Captured before the first prompt is sent;
+            // idempotent.
+            if isFirstPrompt then
+                do! XTraceCapture.captureOpening runtime.Journal childId prompt requirements
+
+            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+
+            if deferSend && isFirstPrompt then
+                runtime.DeferredFirstPrompts.[agentId] <-
+                    {| ChildId = childId
+                       AgentName = agentName
+                       Prompt = enrichedPrompt |}
+
+                return Ok result
             else
-                match snapshot with
-                | None ->
-                    return
-                        Error
-                            "Cannot start reviewer: original user requirements are unavailable without a session transcript"
-                | Some port -> return! resolveReviewRequirementInputs port promptInputs Map.empty []
+                return! sendFirstPromptOutcome runtime run agentId childId agentName enrichedPrompt result
+        }
+
+    let private afterRuntimeFork
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (agentName: string)
+        (prompt: string)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        (run: PendingHostRun)
+        (result: ForkResult)
+        : Task<Result<ForkResult, string>> =
+        match result with
+        | ForkResult.NotFound _ ->
+            task {
+                do! runtime.FailRun(run, "Fork runtime is cancelled")
+                return Error "Fork runtime is cancelled"
+            }
+        | _ ->
+            finishSuccessfulNewChild
+                runtime
+                agentId
+                childId
+                agentName
+                prompt
+                requirements
+                enrichedPrompt
+                isFirstPrompt
+                deferSend
+                expectedToolCalls
+                run
+                result
+
+    let private afterLinkage
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (role: Role)
+        (agentName: string)
+        (prompt: string)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        (childId: SessionId)
+        (linkageResult: Result<unit, string>)
+        : Task<Result<ForkResult, string>> =
+        match linkageResult with
+        | Error err ->
+            task {
+                let! _ = runtime.Sessions.AbortSession childId
+                return Error err
+            }
+        | Ok() ->
+            task {
+                let run = runtime.InstallRun(agentId, childId, role)
+
+                lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
+
+                runtime.ChildCreated agentId role childId
+                runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
+
+                // GLORY-033: the fork surface no longer opens review barriers. A
+                // Manager cannot fork a Reviewer at all (GLORY-031), and every
+                // Host-owned barrier opens at its reverify site
+                // (HostReviewProgram / ORCH-006).
+                let result =
+                    runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+
+                return!
+                    afterRuntimeFork
+                        runtime
+                        agentId
+                        childId
+                        agentName
+                        prompt
+                        requirements
+                        enrichedPrompt
+                        isFirstPrompt
+                        deferSend
+                        expectedToolCalls
+                        run
+                        result
+            }
+
+    let private forkNewChild
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (role: Role)
+        (agentName: string)
+        (providerByname: string)
+        (prompt: string)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        (handleOwnership: Fact.HandleOwnership)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        : Task<Result<ForkResult, string>> =
+        task {
+            let! childResult =
+                runtime.Sessions.CreateChildSession(
+                    runtime.ParentId,
+                    { Title = Some agentId
+                      Agent = Some agentName
+                      Directory = runtime.DirectoryOf agentId }
+                )
+
+            match childResult with
+            | Error err -> return Error err
+            | Ok childId ->
+                let! linkageRaw =
+                    HandleController.linkNamed
+                        runtime.Journal
+                        runtime.ParentId
+                        agentId
+                        childId
+                        agentName
+                        providerByname
+                        role
+                        handleOwnership
+
+                let linkageResult =
+                    linkageRaw |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
+
+                return!
+                    afterLinkage
+                        runtime
+                        agentId
+                        role
+                        agentName
+                        prompt
+                        requirements
+                        enrichedPrompt
+                        isFirstPrompt
+                        deferSend
+                        expectedToolCalls
+                        childId
+                        linkageResult
+        }
+
+    let private forkExistingChild
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (agentName: string)
+        (prompt: string)
+        (enrichedPrompt: string)
+        (isFirstPrompt: bool)
+        (expectedToolCalls: int option)
+        : Task<Result<ForkResult, string>> =
+        task {
+            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+
+            let sendAgent =
+                HostForkBinding.managedAgent runtime.Journal runtime.ParentId runtime.Runtime agentId childId
+                |> Option.defaultValue agentName
+
+            return!
+                HostForkChildDispatch.sendToExistingChild
+                    runtime.Gate
+                    runtime.PendingRuns
+                    runtime.Journal
+                    runtime.ParentId
+                    runtime.Sessions
+                    runtime.ChildWorkRecordOf
+                    runtime.Runtime
+                    runtime.SendChildPrompt
+                    runtime.SendBusyNudge
+                    (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                    agentId
+                    childId
+                    role
+                    prompt
+                    sendAgent
+                    (if isFirstPrompt then Some enrichedPrompt else None)
+        }
+
+    let private forkAfterEnrich
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (role: Role)
+        (agentName: string)
+        (providerByname: string)
+        (prompt: string)
+        (handleOwnership: Fact.HandleOwnership)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        (retired: bool option)
+        (existing: SessionId option)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        : Task<Result<ForkResult, string>> =
+        match retired, existing with
+        | Some true, _ -> Task.FromResult(Error(sprintf "RetiredHandle: %s" agentId))
+        | _, Some childId ->
+            forkExistingChild
+                runtime
+                agentId
+                childId
+                role
+                agentName
+                prompt
+                enrichedPrompt
+                isFirstPrompt
+                expectedToolCalls
+        | _, None ->
+            forkNewChild
+                runtime
+                agentId
+                role
+                agentName
+                providerByname
+                prompt
+                requirements
+                enrichedPrompt
+                handleOwnership
+                isFirstPrompt
+                deferSend
+                expectedToolCalls
+
+    let private resolveReuseEnrichedPrompt
+        (runtime: HostForkRuntime)
+        (prompt: string)
+        (renderedPrompt: string option)
+        : Task<string option> =
+        match renderedPrompt with
+        | Some rendered -> Task.FromResult(Some rendered)
+        | None ->
+            task {
+                let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
+
+                return
+                    Some(
+                        ForkChildPayload.relay
+                            (forkInstructions runtime.ParentId)
+                            prompt
+                            parentWorkRecord
+                            None
+                            []
+                            None
+                    )
+            }
+
+    let private reuseAfterRelink
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (agentName: string)
+        (prompt: string)
+        (renderedPrompt: string option)
+        (wasDormant: bool)
+        (linkResult: Result<unit, string>)
+        : Task<Result<ForkResult, string>> =
+        match linkResult with
+        | Error linkError -> Task.FromResult(Error linkError)
+        | Ok() ->
+            task {
+                runtime.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
+                let! enriched = resolveReuseEnrichedPrompt runtime prompt renderedPrompt
+
+                return!
+                    HostForkChildDispatch.sendToExistingChild
+                        runtime.Gate
+                        runtime.PendingRuns
+                        runtime.Journal
+                        runtime.ParentId
+                        runtime.Sessions
+                        runtime.ChildWorkRecordOf
+                        runtime.Runtime
+                        runtime.SendChildPrompt
+                        runtime.SendBusyNudge
+                        (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                        agentId
+                        childId
+                        role
+                        prompt
+                        agentName
+                        enriched
+            }
+
+    let private reuseWithManagedAgent
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        (agentName: string)
+        (prompt: string)
+        (renderedPrompt: string option)
+        (wasDormant: bool)
+        : Task<Result<ForkResult, string>> =
+        task {
+            let providerByname =
+                runtime.Journal
+                |> Option.bind (fun durable ->
+                    AgentJournal.handleProjection durable runtime.ParentId
+                    |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+                |> Option.map (fun handle -> handle.Byname)
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                |> Option.defaultValue agentName
+
+            let activeRun = lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+
+            if activeRun then
+                return!
+                    HostForkChildDispatch.sendToExistingChild
+                        runtime.Gate
+                        runtime.PendingRuns
+                        runtime.Journal
+                        runtime.ParentId
+                        runtime.Sessions
+                        runtime.ChildWorkRecordOf
+                        runtime.Runtime
+                        runtime.SendChildPrompt
+                        runtime.SendBusyNudge
+                        (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                        agentId
+                        childId
+                        role
+                        prompt
+                        agentName
+                        None
+            else
+                let! linkResult =
+                    HandleController.linkNamed
+                        runtime.Journal
+                        runtime.ParentId
+                        agentId
+                        childId
+                        agentName
+                        providerByname
+                        role
+                        runtime.HandleOwnership
+
+                return!
+                    reuseAfterRelink
+                        runtime
+                        agentId
+                        childId
+                        role
+                        agentName
+                        prompt
+                        renderedPrompt
+                        wasDormant
+                        linkResult
+        }
+
+    let private reuseLiveChild
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (childId: SessionId)
+        (wasDormant: bool)
+        (prompt: string)
+        (renderedPrompt: string option)
+        (expectedToolCalls: int option)
+        : Task<Result<ForkResult, string>> =
+        task {
+            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+
+            // The record carries the managed name this handle was forked with.
+            // Rebuilding it from the role would silently downgrade a deep-* agent
+            // to fast-* on reuse.
+            let recordOpt =
+                runtime.Runtime.List()
+                |> fst
+                |> List.tryFind (fun agent -> agent.AgentId = agentId)
+
+            let boundAgent =
+                HostForkBinding.managedAgent runtime.Journal runtime.ParentId runtime.Runtime agentId childId
+
+            match recordOpt, boundAgent with
+            | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
+            | _, None -> return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
+            | Some record, Some agentName ->
+                return!
+                    reuseWithManagedAgent
+                        runtime
+                        agentId
+                        childId
+                        record.Role
+                        agentName
+                        prompt
+                        renderedPrompt
+                        wasDormant
         }
 
     type HostForkRuntime with
@@ -266,154 +800,29 @@ module HostForkAgent =
                 // document when present; otherwise Host builds the relay envelope.
                 let! enrichedResult =
                     if isFirstPrompt then
-                        match renderedPrompt with
-                        | Some rendered -> Task.FromResult(Ok([], rendered))
-                        | None ->
-                            task {
-                                let! requirementsResult =
-                                    match role with
-                                    | Role.Reviewer ->
-                                        resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
-                                    | _ -> Task.FromResult(Ok [])
-
-                                let! parentWorkRecord = this.ParentWorkRecordOf this.ParentId
-
-                                return
-                                    requirementsResult
-                                    |> Result.map (fun requirements ->
-                                        requirements,
-                                        ForkChildPayload.relay
-                                            (forkInstructions this.ParentId)
-                                            prompt
-                                            parentWorkRecord
-                                            None
-                                            requirements
-                                            payload)
-                            }
+                        enrichFirstPrompt this role prompt payload renderedPrompt
                     else
                         Task.FromResult(Ok([], prompt))
 
                 match enrichedResult with
                 | Error err -> return Error err
                 | Ok(requirements, enrichedPrompt) ->
-                    match retired, existing with
-                    | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
-                    | _, Some childId ->
-                        match this.Journal, expectedToolCalls with
-                        | Some journal, Some expected ->
-                            do! DelegatedToolEstimateLedger.replace journal childId expected
-                        | _ -> ()
-
-                        let sendAgent =
-                            this.BoundManagedAgent(agentId, childId) |> Option.defaultValue agentName
-
-                        return!
-                            HostForkChildDispatch.sendToExistingChild
-                                this.Gate
-                                this.PendingRuns
-                                this.Journal
-                                this.ParentId
-                                this.Sessions
-                                this.ChildWorkRecordOf
-                                this.Runtime
-                                this.SendChildPrompt
-                                this.SendBusyNudge
-                                (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                agentId
-                                childId
-                                role
-                                prompt
-                                sendAgent
-                                (if isFirstPrompt then Some enrichedPrompt else None)
-                    | _, None ->
-                        let! childResult =
-                            this.Sessions.CreateChildSession(
-                                this.ParentId,
-                                { Title = Some agentId
-                                  Agent = Some agentName
-                                  Directory = this.DirectoryOf agentId }
-                            )
-
-                        match childResult with
-                        | Error err -> return Error err
-                        | Ok childId ->
-                            let! linkageResult =
-                                HandleController.linkNamed
-                                    this.Journal
-                                    this.ParentId
-                                    agentId
-                                    childId
-                                    agentName
-                                    providerByname
-                                    role
-                                    handleOwnership
-
-                            let linkageResult =
-                                linkageResult |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
-
-                            match linkageResult with
-                            | Error err ->
-                                let! _ = this.Sessions.AbortSession childId
-                                return Error err
-                            | Ok() ->
-                                let run = this.InstallRun(agentId, childId, role)
-
-                                lock this.Gate (fun () -> this.Children.[agentId] <- childId)
-
-                                this.ChildCreated agentId role childId
-                                this.ChildCreatedDir agentId childId (this.DirectoryOf agentId)
-
-                                // GLORY-033: the fork surface no longer opens review
-                                // barriers. A Manager cannot fork a Reviewer at all
-                                // (GLORY-031), and every Host-owned barrier opens at
-                                // its reverify site (HostReviewProgram / ORCH-006).
-                                let result =
-                                    this.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
-
-                                match result with
-                                | ForkResult.NotFound _ ->
-                                    do! this.FailRun(run, "Fork runtime is cancelled")
-                                    return Error "Fork runtime is cancelled"
-                                | _ ->
-                                    this.MarkReady(run)
-
-                                    // COMPANION-003 / EXEC-006: the child's
-                                    // OpeningMaterial is the ORIGINAL fork
-                                    // assignment and authoritative requirements,
-                                    // NOT the rendered envelope (which carries
-                                    // commissioner_record and would nest the
-                                    // parent LWR recursively). Captured before
-                                    // the first prompt is sent; idempotent.
-                                    if isFirstPrompt then
-                                        do! XTraceCapture.captureOpening this.Journal childId prompt requirements
-
-                                    match this.Journal, expectedToolCalls with
-                                    | Some journal, Some expected ->
-                                        do! DelegatedToolEstimateLedger.replace journal childId expected
-                                    | _ -> ()
-
-                                    if deferSend && isFirstPrompt then
-                                        this.DeferredFirstPrompts.[agentId] <-
-                                            {| ChildId = childId
-                                               AgentName = agentName
-                                               Prompt = enrichedPrompt |}
-
-                                        return Ok result
-                                    else
-                                        let! sent =
-                                            HostForkAgentOwner.sendFirstPrompt
-                                                this.Sessions
-                                                this.Journal
-                                                childId
-                                                agentName
-                                                (this.DirectoryOf agentId)
-                                                enrichedPrompt
-
-                                        match sent with
-                                        | Ok _ -> return Ok result
-                                        | Error err ->
-                                            do! this.FailRun(run, err)
-                                            return Error err
+                    return!
+                        forkAfterEnrich
+                            this
+                            agentId
+                            role
+                            agentName
+                            providerByname
+                            prompt
+                            handleOwnership
+                            isFirstPrompt
+                            deferSend
+                            expectedToolCalls
+                            retired
+                            existing
+                            requirements
+                            enrichedPrompt
             }
 
         member this.Reuse
@@ -437,107 +846,5 @@ module HostForkAgent =
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | _, Some(childId, wasDormant) ->
-                    match this.Journal, expectedToolCalls with
-                    | Some journal, Some expected -> do! DelegatedToolEstimateLedger.replace journal childId expected
-                    | _ -> ()
-
-                    // The record carries the managed name this handle was forked
-                    // with. Rebuilding it from the role would silently downgrade a
-                    // deep-* agent to fast-* on reuse.
-                    let recordOpt =
-                        this.Runtime.List()
-                        |> fst
-                        |> List.tryFind (fun agent -> agent.AgentId = agentId)
-
-                    match recordOpt with
-                    | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                    | Some record ->
-                        match this.BoundManagedAgent(agentId, childId) with
-                        | None -> return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
-                        | Some agentName ->
-                            let role = record.Role
-
-                            let providerByname =
-                                this.Journal
-                                |> Option.bind (fun durable ->
-                                    AgentJournal.handleProjection durable this.ParentId
-                                    |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-                                |> Option.map (fun handle -> handle.Byname)
-                                |> Option.filter (String.IsNullOrWhiteSpace >> not)
-                                |> Option.defaultValue agentName
-
-                            let activeRun = lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
-
-                            if activeRun then
-                                return!
-                                    HostForkChildDispatch.sendToExistingChild
-                                        this.Gate
-                                        this.PendingRuns
-                                        this.Journal
-                                        this.ParentId
-                                        this.Sessions
-                                        this.ChildWorkRecordOf
-                                        this.Runtime
-                                        this.SendChildPrompt
-                                        this.SendBusyNudge
-                                        (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                        agentId
-                                        childId
-                                        role
-                                        prompt
-                                        agentName
-                                        None
-                            else
-                                match!
-                                    HandleController.linkNamed
-                                        this.Journal
-                                        this.ParentId
-                                        agentId
-                                        childId
-                                        agentName
-                                        providerByname
-                                        role
-                                        this.HandleOwnership
-                                with
-                                | Error linkError -> return Error linkError
-                                | Ok() ->
-                                    this.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
-
-                                    let! enriched =
-                                        match renderedPrompt with
-                                        | Some rendered -> Task.FromResult(Some rendered)
-                                        | None ->
-                                            task {
-                                                let! parentWorkRecord = this.ParentWorkRecordOf this.ParentId
-
-                                                return
-                                                    Some(
-                                                        ForkChildPayload.relay
-                                                            (forkInstructions this.ParentId)
-                                                            prompt
-                                                            parentWorkRecord
-                                                            None
-                                                            []
-                                                            None
-                                                    )
-                                            }
-
-                                    return!
-                                        HostForkChildDispatch.sendToExistingChild
-                                            this.Gate
-                                            this.PendingRuns
-                                            this.Journal
-                                            this.ParentId
-                                            this.Sessions
-                                            this.ChildWorkRecordOf
-                                            this.Runtime
-                                            this.SendChildPrompt
-                                            this.SendBusyNudge
-                                            (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                            agentId
-                                            childId
-                                            role
-                                            prompt
-                                            agentName
-                                            enriched
+                    return! reuseLiveChild this agentId childId wasDormant prompt renderedPrompt expectedToolCalls
             }

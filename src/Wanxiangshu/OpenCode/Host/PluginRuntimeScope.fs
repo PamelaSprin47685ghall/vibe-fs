@@ -142,6 +142,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: resource — assistance durable session-drop handler attachment slot
     let mutable assistanceDropSession: (SessionId -> Task) option = None
 
+    let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
+        task {
+            match owner with
+            | Some active -> do! active.DisposeAsync()
+            | None -> ()
+        }
+
     member _.Journal = journal
 
     /// Composition-of-owners: Strength decision-local state lives in its own scope.
@@ -335,9 +342,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                                 toolRuntime <- None
                                 owner)
 
-                        match runtimeOwner with
-                        | Some owner -> do! owner.DisposeAsync()
-                        | None -> ()
+                        do! disposeRuntimeOwner runtimeOwner
 
                         sessions.Dispose()
                         syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())

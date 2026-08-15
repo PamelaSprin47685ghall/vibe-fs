@@ -119,19 +119,19 @@ module CompanionProjectionBuilder =
 
         let pairedHistory = pairTipFrameUnits tipMsgs frameMessages
 
+        let deltaMessagesForPhysical =
+            match physicalDelta with
+            | Some(messageId, toml) ->
+                [ { MessageId = messageId
+                    Role = "user"
+                    Text = CompanionPrompt.newWorkMessage normalInstructionLines toml
+                    IsPhysical = true } ]
+            | None -> []
+
         match kind with
         | CompanionRequestKind.Normal ->
-            let deltaMessages =
-                match physicalDelta with
-                | Some(messageId, toml) ->
-                    [ { MessageId = messageId
-                        Role = "user"
-                        Text = CompanionPrompt.newWorkMessage normalInstructionLines toml
-                        IsPhysical = true } ]
-                | None -> []
-
             // Paired observation units then combined delta last (HOST-010).
-            { Messages = pairedHistory @ deltaMessages }
+            { Messages = pairedHistory @ deltaMessagesForPhysical }
         | CompanionRequestKind.Squash _ ->
             let instruction =
                 { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)

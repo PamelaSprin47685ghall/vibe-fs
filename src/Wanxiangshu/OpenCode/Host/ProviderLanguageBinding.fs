@@ -77,12 +77,14 @@ module ProviderLanguageBinding =
 
     /// Root / first-touch: bind from global preference once.
     let ensureRoot (sessionId: SessionId) : ProviderLanguage =
-        match SessionProviderLanguage.tryGet sessionId with
-        | Some lang -> lang
-        | None ->
+        let bindFromGlobal () =
             match SessionProviderLanguage.bindOnce sessionId (readGlobalPreference ()) with
             | Ok lang -> lang
             | Error msg -> raise (InvalidOperationException msg)
+
+        match SessionProviderLanguage.tryGet sessionId with
+        | Some lang -> lang
+        | None -> bindFromGlobal ()
 
     /// Child / attached / InternalLeaf: inherit owner|commissioner; never re-read global.
     let ensureInherited (ownerId: SessionId) (childId: SessionId) : ProviderLanguage =
