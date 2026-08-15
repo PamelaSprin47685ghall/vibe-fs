@@ -115,7 +115,7 @@ module EnforcerFrameRecovery =
         taskResult {
             let! frames =
                 BlogProjection.frames blog
-                |> List.traverseTaskResultM (resolveFrameBlob journal)
+                |> TaskResultList.traverseM (resolveFrameBlob journal)
 
             return frames, blog.FrameEpochId
         }

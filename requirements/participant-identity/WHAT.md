@@ -7,7 +7,7 @@
 
 `Role` 是可数个固定 office 身份（`src/Wanxiangshu/Kernel/Roles.fs`：Manager / Orchestrator / Coder /
 Inspector / DevOps / Browser / Inquiry / Reviewer / Distiller / Blogger），`AgentTier` 只有 Fast/Deep。
-Tier **只**改变模型绑定（ExecutionBinding，AGENT-029），不产生新 Role、不改变 Role Law、不改变工具权限。
+Tier **只**改变 ExecutionBinding 的机器档位（EffectiveAgent；具体物理 ModelTarget 由 `execution-model-routing` 的 scheduler/lease 决定，AGENT-029），不产生新 Role、不改变 Role Law、不改变工具权限。
 
 含义/动机：若 tier 参与身份，fast/deep 会演化成两套产品；Peer Fallback 换 tier 时角色漂移。
 
@@ -20,7 +20,7 @@ public Role DU → `session-ontology`（InternalLeaf）。
 ## PID-002：Role ≠ Persona ≠ ExecutionBinding 三轴分离
 
 Role = 职责 office（session 内不变）；Persona = 自我模型（session 创建时一次绑定，不可变）；
-ExecutionBinding = 物理模型 / tier / config（可随 Peer Fallback / Strength 变化）（AGENT-029）。
+ExecutionBinding = EffectiveAgent/tier + 其物理执行 lease（可随 Peer Fallback / Strength 切换 EffectiveAgent；具体模型资源路由归 `execution-model-routing`）（AGENT-029）。
 
 含义/动机：三轴合一的历史病理（Bookkeeper 用 inspector binding 却收 inspector prompt）在
 历史 agent 条款 有完整事故记录；分离使「换执行者」与「换人」在类型层面就是不同操作。
@@ -88,38 +88,26 @@ tier/binding 输入」这个事实。
 
 ## PID-007：Peer 配对本体：peer(fast-ROLE)=deep-ROLE，对称且启动可证明
 
-`peer(fast-ROLE) = deep-ROLE`、`peer(deep-ROLE) = fast-ROLE`（AGENT-003）；peer 名必须在启动配置
-验证阶段证明存在；同 pair 的 model 必须非空且互异。Bookkeeper pair 同律（`fast-bookkeeper` ↔
-`deep-bookkeeper`）。
+`peer(fast-ROLE) = deep-ROLE`、`peer(deep-ROLE) = fast-ROLE`（AGENT-003）；peer 名必须在 managed catalog 中存在且对称。Bookkeeper pair 同律（`fast-bookkeeper` ↔ `deep-bookkeeper`）。
 
-含义/动机：fallback 消费 peer 的前提是 peer 确实存在且可区分；pair 是「同一 office 的另一个执行
-档」，不是另一身份。
+含义/动机：fallback 消费 peer 的前提是 peer 确实存在；pair 是「同一 office 的另一个执行档」，不是另一身份。物理模型是否相同不参与 peer 本体——A/B 可以最终解析到同一 model。
 
-边界：fallback 何时/如何消费 peer → `provider-attempt-recovery`；「恰好 22 名」的精确目录是 HOW/
-GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
+边界：fallback 何时/如何消费 peer → `provider-attempt-recovery`；EffectiveAgent→MJS scheduler→ModelTarget、lease occupancy 与等待 → `execution-model-routing`；「恰好 22 名」的精确目录是 HOW/GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
 
-证据：`catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric` +
-`requirements/capability-enforcement/tests/managed-agent-config.test.mjs`
-`MACFG_validate_rejects_duplicate_pair_model`（pair model 互异）。
+证据：`catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric`。
 
-## PID-008：managed session 创建冻结 binding；user-facing 由最近真实用户请求决定；override 单次不冻底
+## PID-008：managed session 冻结 agent 档位；user-facing 由最近真实用户请求决定 EffectiveAgent；model 不属于用户 binding authority
 
-- 有 parent 的 managed session：创建时冻结 execution binding；hook / prompt / continuation 必须保持
-  frozen agent/model；请求字段与 Host default 都不能重绑；发现不一致 → fail-closed，禁止静默发送。
-- 无 parent 的 user-facing session：base binding 由最近一次真实外部用户请求决定；插件自产 prompt /
-  hook / continuation 不是用户重绑证据；普通 `Preserve` 沿用最近观测到的 base。
-- 显式换档（Fallback / Assistance）只允许经 typed `ExplicitExecutionOverride` 做**单次** override；
-  override 不改变 frozen base，下一次普通发送恢复 base；未知/缺失 base → fail-closed（PROMPT-006）。
+- 有 parent 的 managed session：创建时冻结 base EffectiveAgent；hook / prompt / continuation 必须保持该 agent，除 typed override 外请求字段与 Host default 都不能重绑。
+- 无 parent 的 user-facing session：base EffectiveAgent 由最近一次真实外部用户请求决定；插件自产 prompt / hook / continuation 不是用户重绑证据；普通 `Preserve` 沿用最近观测到的 agent。
+- 物理 model 不由 Host/user message 决定。`(SessionId, EffectiveAgent)` 的 ModelTarget 由 `execution-model-routing` 获取并在 live session 内稳定；Host 实际 provider model 与 lease 不一致 → fail closed。
+- 显式换档（Fallback / Assistance）只允许经 typed `ExplicitExecutionOverride` 做**单次** EffectiveAgent override；override 不改变 frozen base，下一次普通发送恢复 base。override 对应的 ModelTarget 由目标 EffectiveAgent 的 lane lease 解析（PROMPT-006）。
 
-含义/动机：execution binding 是身份轴的一部分（PID-002）；允许内部路径静默改 binding = 机器拓扑
-冒充用户选择，或冒充换人。历史 agent 条款 的 PROMPT-006 即为此立法。
+含义/动机：execution binding 是身份轴的一部分（PID-002）；外部用户可以选择 managed agent/tier，但不能用 Host model 字段绕过 Wanxiangshu 的资源路由。内部路径也不能用 model 漂移冒充换档。
 
-边界：发送海关机制（Preserve/override 的 wire 语义、fail-closed 的物理实现）与 `dispatch-protocol` /
-`provider-attempt-recovery` 共用，但解析律的语义 owner 在本包（COVERAGE PROMPT-006）。
+边界：发送海关机制（Preserve/override 的 wire 语义、fail-closed 的物理实现）与 `dispatch-protocol` / `provider-attempt-recovery` 共用；模型 lease 与容量由 `execution-model-routing` 拥有；本包只拥有 EffectiveAgent 选择与身份不变。
 
-证据：`requirements/participant-identity/tests/session-execution-binding.test.mjs`
-`PROMPT_006_parented_session_rejects_agent_and_model_drift_before_host_send` +
-`PROMPT_006_only_external_user_choice_rebinds_root_session`。
+证据：现有 `session-execution-binding.test.mjs` 的 agent/override 断言继续承载；model authority 迁移由 `execution-model-routing` GAP-016 新 oracle 接管。
 
 ## PID-009：内部身份有机器身份 + Persona + peer，但不进 public Role DU
 

@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **46 张 boundary card**。46 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **47 张 boundary card**。47 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -30,6 +30,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `participant-identity` | Role、Persona、ExecutionBinding 必须分离，使换执行者不等于换人。 |
+| `execution-model-routing` | EffectiveAgent 与物理模型策略必须分离；唯一 MJS scheduler 以 `role + running` 决定 ModelTarget，runtime 只维护 lease occupancy。 |
 | `office-capability` | office 必须由有资格产生的后果定义，而不是 persona 名或工具白名单。 |
 | `capability-enforcement` | provider 看见的 capability 与 runtime 真能执行的 capability 必须同源且不扩大 office entitlement。 |
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon。 |
@@ -130,7 +131,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（97 edges，0 cycle；Fission 激活后新增 10 条 semantic prerequisite）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（102 edges，0 cycle；execution-model-routing 新增 5 条 semantic prerequisite/cross-consumption edge）。
 
 ```text
 requirement-system       → 无
@@ -142,6 +143,7 @@ session-ontology         → 无
 managed-session-lifecycle→ session-ontology, crash-reconciliation
 host-boundary            → 无
 participant-identity     → session-ontology
+execution-model-routing  → participant-identity, managed-session-lifecycle, host-boundary
 office-capability        → participant-identity
 capability-enforcement   → office-capability, participant-identity
 participant-horizon      → 无
@@ -164,7 +166,7 @@ semantic-trace           → durable-events
 work-record              → semantic-trace, context-compression, participant-horizon
 context-compression      → semantic-trace, provider-projection
 prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
-provider-attempt-recovery→ participant-identity, interaction-authority
+provider-attempt-recovery→ participant-identity, execution-model-routing, interaction-authority
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → provider-attempt-recovery, host-boundary
 obligation-ledger        → durable-events, effect-accounting, semantic-trace
@@ -176,7 +178,7 @@ guidance-delivery        → behavior-diagnosis, participant-horizon, durable-ev
 repository-investigation → office-capability, participant-horizon
 knowledge-reuse          → repository-investigation, durable-events, durable-convergence
 repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon
-speculative-investigation→ repository-investigation, participant-identity, participant-horizon, provider-projection, semantic-trace
+speculative-investigation→ repository-investigation, participant-identity, execution-model-routing, participant-horizon, provider-projection, semantic-trace
 epistemic-reasoning      → participant-horizon
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
 ```
@@ -190,4 +192,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-其余 97 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。
+其余 102 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。

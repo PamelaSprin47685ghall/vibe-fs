@@ -109,7 +109,7 @@ module XWire =
         }
 
     let private readFrameBodies (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string list, string>> =
-        frames |> List.traverseTaskResultM (readFrameBody journal)
+        frames |> TaskResultList.traverseM (readFrameBody journal)
 
     let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string, string>> =
         task {

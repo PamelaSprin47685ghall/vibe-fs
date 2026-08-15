@@ -290,3 +290,38 @@ Opening cursor 纯推导，不是 Stage；不绑回 `WorkActivated`（TODO-001�
 
 **证据**：CTX-016；TODO-001；`Mission/Manager/Life/OpeningFloor.fs`；`Domain/MagicTodo.fs`
 （`bloggerEffectiveStart`）；`tests/ctx-opening-floor.test.mjs`（NEW）全部。
+
+---
+
+## CONTEXT-COMPRESSION-018：Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 在同一存活执行内必须 park 等未来 material
+
+**规范**：一次 main-material wake 可驱动多个 ≤200 KiB Blogger cycle，直到当前 canonical Current
+暂时无可消费 material。每个已提交 cycle 后，下一块必须由**当时最新**的 Blog coverage 与 XTrace
+Current 重新派生；禁止冻结、缓存或持久化 wake-time / cycle-time XTrace head 作为 drain frontier、
+upper bound、target sequence 或等价截止线。drain 期间新到且满足 coverage 规则的 material 必须被
+同一连续 catch-up 消费，不得人为推迟到下一次 main-material wake。
+
+当前暂时无 material（caught-up / quiet）**不是完成条件**。在当前物理执行仍存活、main 未被 durable
+seal 或其它已有合法终止语义关闭时，Blogger continuation 必须先进入 parked wait；material 到达后恢复
+同一 catch-up，并再次从最新 Current 派生下一块。禁止以 caught-up、quiet、当前 XTrace head 已覆盖为由
+直接结束该连续 drain。park waiter 自身既有的 cancel / physical lifetime 解除语义保持不变；它们是
+物理等待边界，不是“caught-up 已完成”的业务证据。**进程死亡不属于这里的“等待未来”**：按
+CRASH-017/018，旧 tool/continuation 已中断，新 Host 不得自动恢复、重放或补 terminal；显式 `/continue`
+也只能公开断点并重新登记 surviving child，不能续跑旧 Blogger tool invocation。
+
+**含义/动机**：200 KiB 只限制单次输入，不限制一次 wake 的总追平量。冻结 frontier 会降低吞吐并
+改变 material 可见时序；把 quiet 当完成则把持续 Companion 变成依赖下一次用户/主会话动作的离散批处理。
+`ParkTransform`/pending offer 只承载物理等待与唤醒，不得成为业务 Stage/程序计数器；业务流程仍由
+F# CE 的等待与继续直接表达（STRUCTURED-WORKFLOW-001/002/003）。
+
+**边界**：
+- canonical Current 的积分只归 DURABLE-EVENTS-019 Integrator；本条禁止业务路径自行扫描/重放 Journal。
+- seal/cancel 的终止资格归各自 owner；Host restart / 显式续传归 `crash-reconciliation` CRASH-017/018。
+  本条不创建跨进程 recovery owner，也不允许 restart 自动续跑旧 Blogger continuation。
+- waiting 的因果诊断归 `causal-wait`；诊断 observation 不得反向决定是否继续 drain。
+
+**证据**：`tests/enforcer-cycle-commit-convergence.test.mjs`
+`ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier`；
+`tests/blogger-convergence-gaps.test.mjs`
+`C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current`；跨包 restart 边界 REUSE
+`requirements/crash-reconciliation/tests/explicit-continue.test.mjs` 的 CRASH-017/018；PROOF.md 第 018 行。

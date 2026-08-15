@@ -224,11 +224,11 @@ module JsToolWorkflow =
 
     let private mapPrepareFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
         operation
-        |> Task.map (Result.mapError (fun _ -> JsFailure.TransactionPrepareFailed))
+        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionPrepareFailed))
 
     let private mapCommitFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
         operation
-        |> Task.map (Result.mapError (fun _ -> JsFailure.TransactionCommitFailed))
+        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionCommitFailed))
 
     let private commitDurable
         (durable: IJsTransactionPersistence)

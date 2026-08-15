@@ -112,8 +112,8 @@ Task<Result<_,_>> 使用本仓自己的 Fable-compatible CE：
     }
 
 为什么不是直接依赖库里的 .NET taskResult？
-因为本仓的构建目标包含 Fable。
-当前依赖的 Fable source surface 没有暴露对应 taskResult CE。
+因为本仓只有 Fable 平台，不存在 .NET 编译目标。
+当前依赖的 FsToolkit Fable source surface 没有暴露对应 taskResult CE。
 所以 Foundation/TaskResult.fs 是项目级 async Result vocabulary。
 
 这个 builder 故意不提供模糊的 Task<'T> Bind overload。
@@ -155,14 +155,24 @@ Task<Result<_,_>> 使用本仓自己的 Fable-compatible CE：
 除非你正在定义新的 reusable adapter。
 调用点直接用 TaskResultCE.ofTask。
 
+只做 plumbing 映射时使用项目 vocabulary，不要引用 FsToolkit 的 .NET-only Task helpers：
+
+    operation |> TaskValue.map f
+    operationResult |> TaskResult.mapError mapError
+    items |> TaskResultList.traverseM readOne
+
+这些名字只表达 functor / error-map / short-circuit traversal；真正业务 decision 仍应拥有领域名字。
+
 先修自检：
 
     ① 文件是否 open FsToolkit.ErrorHandling？
     ② Task<Result<_,_>> workflow 是否 open Wanxiangshu.Foundation？
     ③ 普通 Task 是否经 TaskResultCE.ofTask？
-    ④ 是否又出现新的 ResultBuilder / TaskResultBuilder 私有复制？
+    ④ async Result plumbing 是否只用 TaskValue / TaskResult / TaskResultList？
+    ⑤ 是否引用 FsToolkit 的 Task.map / TaskResult.* / List.traverseTaskResultM？
+    ⑥ 是否又出现新的 ResultBuilder / TaskResultBuilder 私有复制？
 
-如果 ④ 是 YES，先停。
+如果 ⑤ 或 ⑥ 是 YES，先停。
 项目级 vocabulary 已经存在。
 
 ────────────────────────────────────────────────────────────
@@ -614,12 +624,17 @@ scanner 仍会在 helper 内抓到。
 它不是永远错误。
 但先检查是否只是 traverse。
 
-本仓 FsToolkit.ErrorHandling 提供：
+本仓 FsToolkit.ErrorHandling 的 Fable surface 提供纯 Result traversal：
 
     List.traverseResultM
     List.sequenceResultM
-    List.traverseTaskResultM
-    List.sequenceTaskResultM
+
+异步 Result traversal 归 Wanxiangshu.Foundation：
+
+    TaskResultList.traverseM
+
+不要写 FsToolkit 的 List.traverseTaskResultM / sequenceTaskResultM；
+它们在当前依赖中位于 #if !FABLE_COMPILER，Fable 根本不存在。
 
 纯 Result：
 
@@ -634,7 +649,7 @@ scanner 仍会在 helper 内抓到。
 Task<Result<_,_>>：
 
     items
-    |> List.traverseTaskResultM readOne
+    |> TaskResultList.traverseM readOne
 
 M 后缀表示 monadic short-circuit 语义。
 如果你需要 accumulate 所有错误，不要偷偷换 M。

@@ -5,10 +5,7 @@
 
 ## WHAT 概览
 
-本包保证：角色（office 身份）、Persona（自我模型）、ExecutionBinding（物理执行者）是三条独立轴；
-Persona 一次冻结不可变；换模型/换 tier/换 peer 只改 ExecutionBinding；`fast-*`/`deep-*` 是机器路由
-身份，不是 provider 可见自称；managed session 的 execution binding 创建即冻结，用户面 binding 由最近
-真实用户请求决定。全部命题见 `WHAT.md`（`PID-001..010`）。
+本包保证：角色（office 身份）、Persona（自我模型）、ExecutionBinding（物理执行者）是三条独立轴；Persona 一次冻结不可变；换 tier/peer 只改 EffectiveAgent，具体物理 ModelTarget 由 `execution-model-routing` 的 session lease 解析；`fast-*`/`deep-*` 是机器路由身份，不是 provider 可见自称；managed session 的 base EffectiveAgent 创建即冻结，用户面 EffectiveAgent 由最近真实用户请求决定。全部命题见 `WHAT.md`（`PID-001..010`）。
 
 ## HOW 概览
 
@@ -41,4 +38,5 @@ Persona 一次冻结不可变；换模型/换 tier/换 peer 只改 ExecutionBind
 - provider 看见的与可执行的 capability 同源不扩权 → `capability-enforcement`。
 - session 的 execution class / ownership / attachment → `session-ontology`（本包 DEPENDS ON 它）。
 - attempt 失败后有界换 binding（fallback 算法）→ `provider-attempt-recovery`。
+- EffectiveAgent→MJS scheduler→ModelTarget、lease occupancy 与等待 → `execution-model-routing`。
 - 已呈现前缀字节稳定性 → `prefix-stability`；provider 语言绑定 → `provider-language`。

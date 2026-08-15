@@ -73,14 +73,14 @@ normative authority」= 连元规则都有归属文件。
 
 ## REQUIREMENT-SYSTEM-006：索引完整性
 
-**规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 46 个包每个都有
+**规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 47 个包每个都有
 `{README,WHY,WHAT,HOW,PROOF}.md`；树入口（requirements/README.md）与
 `requirements/INDEX.md` 命名同一包集。
 
 **含义/动机**：包清单是机器可校验的边界；目录级越界（INDEX 外神秘包）与文件级残缺
 （缺 WHY）都必须可红。
 
-**边界**：包数量（当前 46）是设计期结果不是稳定 API；但「树 == 索引」的封闭性永久成立。
+**边界**：包数量（当前 47）是设计期结果不是稳定 API；但「树 == 索引」的封闭性永久成立。
 
 **证据指针**：→ PROOF.md L13。
 
@@ -216,7 +216,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **规范陈述**：每个包 README/WHY/WHAT 中出现的 DEPENDS ON 引用集合是 INDEX 依赖骨架的子集
 （允许子集，不允许多出边）；引用别的包用包名，不得复制别的包的命题。
 
-**含义/动机**：依赖骨架（`requirements/INDEX.md`，87 edge / 0 cycle）是唯一来源；
+**含义/动机**：依赖骨架（`requirements/INDEX.md`，当前 102 edge / 0 cycle）是唯一来源；
 多出的边 = 未裁决的 coupling。子集允许 = 包可以只声明它实际消费的 guarantee。
 
 **边界**：骨架已于 2026-08-14 cutover 迁入 `requirements/INDEX.md`。本命题管「边不超集」，

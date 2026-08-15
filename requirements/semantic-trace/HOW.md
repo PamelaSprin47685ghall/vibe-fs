@@ -99,4 +99,4 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 ## 6. 依赖理由（DEPENDS ON）
 
 - `durable-events`：XTrace 的 append-only 与可重放必须由不可变事实 + 原子提交 + 确定性 fold
-  提供（INDEX.md 87-edge 骨架的唯一 hard edge）。
+  提供（INDEX.md 当前 102-edge 骨架的唯一 hard edge）。

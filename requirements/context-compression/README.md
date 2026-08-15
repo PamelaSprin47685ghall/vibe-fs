@@ -17,6 +17,7 @@ provider history 可能超过可用上下文。压缩若靠猜模型窗口、先
 | 候选诚实 | CONTEXT-COMPRESSION-009/010/011 | 候选未提交不是事实；选择严格新于已提交；提交语义分型 |
 | 压缩材料 | CONTEXT-COMPRESSION-012/013/014 | delta TOML 合同；诊断不是控制输入；只覆盖本 X frames |
 | 证据边界 | CONTEXT-COMPRESSION-015/016/017 | busy 不推进 coverage；Y 只物化 PrefixCoverage 完整 turn；Opening floor |
+| 连续追平 | CONTEXT-COMPRESSION-018 | 不冻结 drain frontier；quiet 先 park；未来 material 唤醒后继续读 live Current |
 
 ## HOW 概览（→ HOW.md）
 

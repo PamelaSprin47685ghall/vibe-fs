@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 
 const root = process.cwd()
 const read = (path) => readFileSync(join(root, path), 'utf8')
+const productionFiles = (dir) =>
+  readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    return entry.isDirectory() ? productionFiles(path) : entry.name.endsWith('.fs') ? [path] : []
+  })
 
 test('CONTROL_PYRAMID_PREREQ_FsToolkit_ErrorHandling_is_the_repo_Result_vocabulary', () => {
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
@@ -39,6 +44,20 @@ test('CONTROL_PYRAMID_PREREQ_project_owns_a_Fable_compatible_TaskResult_CE', () 
   assert.match(source, /member this\.For/)
   assert.match(source, /let taskResult = TaskResultBuilder\(\)/)
   assert.match(source, /let ofTask /)
+})
+
+test('CONTROL_PYRAMID_PREREQ_Fable_async_Result_plumbing_is_repo_owned_not_FsToolkit_dotnet_only_API', () => {
+  const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+  const source = read('src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs')
+  const production = productionFiles('src/Wanxiangshu').map(read).join('\n')
+
+  assert.match(fsproj, /<Compile Include="Foundation\/FsToolkitFableCompat\.fs"\/>/)
+  assert.match(source, /module TaskValue =/)
+  assert.match(source, /module TaskResult =/)
+  assert.match(source, /module TaskResultList =/)
+  assert.match(source, /let traverseM/)
+  assert.doesNotMatch(production, /\bTask\.map\b/)
+  assert.doesNotMatch(production, /\bList\.traverseTaskResultM\b/)
 })
 
 test('CONTROL_PYRAMID_PREREQ_representative_Task_Result_pyramid_uses_the_vocabulary', () => {

@@ -302,6 +302,25 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   )
 })
 
+test('C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
+  const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
+  const committed = host.indexOf('| CycleDisposition.Committed afterSquashMain')
+  const quiet = host.indexOf('| None, None ->', committed)
+  const park = host.indexOf('ParkTransform', quiet)
+  const wakeRefresh = host.indexOf('RefreshMainContext', park)
+
+  assert.ok(committed >= 0 && quiet > committed, 'Committed catch-up must have an explicit quiet branch')
+  assert.ok(park > quiet, 'caught-up/quiet must enter ParkTransform instead of completing immediately')
+  assert.ok(wakeRefresh > park, 'park wake must re-read live Current before choosing the next window')
+
+  const quietBranch = host.slice(quiet, wakeRefresh)
+  assert.doesNotMatch(
+    quietBranch,
+    /return ctx\.Stop "(?:caught-up|catch-up-complete|quiet)/,
+    'caught-up itself must not be treated as completion before the parked wait',
+  )
+})
+
 // ── status / pending ────────────────────────────────────────────────────────
 
 test('C0_adopted_blogger_motion_is_not_active_PENDING', () => {

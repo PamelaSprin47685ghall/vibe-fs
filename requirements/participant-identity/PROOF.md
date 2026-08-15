@@ -13,8 +13,8 @@
 | PID-004 | `requirements/prefix-stability/tests/system-prompt-stability.test.mjs` `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes` | REUSE（SPLIT：prompt-stability 三方 owner = participant-identity + prefix-stability + provider-language；Persona 断言归本包） | `node --test requirements/prefix-stability/tests/system-prompt-stability.test.mjs` |
 | PID-005 | `tests/session-persona.test.mjs` `FALLBACK_014_system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 值 `doesNotMatch /fast\|deep/i`） | MOVE | `node --test requirements/participant-identity/tests/session-persona.test.mjs` |
 | PID-006 | `tests/session-persona.test.mjs` `FALLBACK_014_...`（prompt identity 不含 binding 名）；horizon 侧拦截由 `participant-horizon` Gate B 承担（交叉引用） | MOVE | 同上 |
-| PID-007 | `tests/catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric` + `requirements/capability-enforcement/tests/managed-agent-config.test.mjs` `MACFG_validate_rejects_duplicate_pair_model` | MOVE + REUSE（SPLIT@cutover：pair-model 互异断言物理在 enforcement 包文件内，语义 owner 是本包） | 两者分别 `node --test` |
-| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs` `PROMPT_006_parented_session_rejects_agent_and_model_drift_before_host_send`、`PROMPT_006_only_external_user_choice_rebinds_root_session` | REUSE（SPLIT：文件同时含 provider-language bind-once 断言） | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs` |
+| PID-007 | `tests/catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric` | MOVE；旧 pair-model 互异 proof 已废弃，model equality 归 `execution-model-routing` EMR-008 | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
+| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs` 继续证明 EffectiveAgent preserve/override；managed model authority/lease 部分由 `execution-model-routing` EMR-006/009 接管 | REUSE + GAP-016 | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs`；model 部分见 execution-model-routing PROOF |
 | PID-009 | `tests/catalog.test.mjs`（`AGENT_001` public/internal 划分、`AGENT_002` bookkeeper 名/peer）+ `tests/session-persona.test.mjs`（`bookkeeperPersona` = Clerk/Curator） | MOVE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
 | PID-010 | `tests/session-persona.test.mjs` `AGENT_028_SessionPersona_bind_once_and_inherit`（`inheritFromOwner` 后 replica = 'Engineer'） | MOVE | 同上 |
 
@@ -27,7 +27,7 @@
 
 ## 计数
 
-WHAT 命题 10；落点 10（MOVE 8 行 × REUSE 4 行，含组合行）；GAP 0。
+WHAT 命题 10；identity 本体落点仍 10；PID-008 的 model-routing 交叉证明等待 `execution-model-routing` GAP-016。
 
 ## semantic anchor id 清单（`scripts/checks/semantic-anchors.mjs`）
 

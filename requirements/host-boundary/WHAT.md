@@ -221,21 +221,15 @@ outcome 完成新 run。
 **证据**：`Infrastructure/OpenCode/Host/Events.js`（`Events_HostEventPort`）；
 → PROOF.md `HOST-BOUNDARY-016`（MOVE `events-port.test.mjs`）。
 
-## HOST-BOUNDARY-017：Host 身份/配置观察适配（HostSessionContext / ManagedAgentConfig）
+## HOST-BOUNDARY-017：Host 身份观察 + managed config 投影适配（HostSessionContext / ManagedAgentConfig）
 
-**规范**：Host 侧只做观察适配：raw event → `(sessionId, agent)` 提取（`properties.sessionID`
-优先，`event.sessionID` 兜底；agent 只从 `properties.info` 取）；agent 名 → Role 解析（
-`fast-coder` → Coder；`build`/`plan` 等 alias 拒绝）经 `AgentRoleIdentity`；`ManagedAgentConfig`
-校验 managed agent inventory 与 `external_directory` 归属字段。Host 适配不创建任何业务 authority。
+**规范**：Host 边界负责两类薄适配：raw event → `(sessionId, agent)` 提取（`properties.sessionID` 优先，`event.sessionID` 兜底；agent 只从 `properties.info` 取），agent 名 → Role 解析（`fast-coder` → Coder；`build`/`plan` 等 alias 拒绝）经 `AgentRoleIdentity`；以及把 Wanxiangshu-owned managed agent fields 投影到 Host config。`ManagedAgentConfig` 不再从 Host-final agent inventory 读取 managed model authority，模型来源与容量路由归 `execution-model-routing`。Host 适配不创建任何业务 authority。
 
-**含义/动机**：身份观察是 Host 边界能力；alias 拒绝防止把非 managed 名当真实角色。
+**含义/动机**：身份观察与 Host schema 投影都是边界能力；alias 拒绝防止把非 managed 名当真实角色，单向投影防止 `opencode.json` 反向成为模型 truth。
 
-**边界**：Role 身份规则本体归 `participant-identity`；`external_directory` 允许语义归
-`capability-enforcement`（AGENT-019 交叉）；本命题只拥有「Host 观察适配面」。
+**边界**：Role 身份规则本体归 `participant-identity`；`external_directory` 允许语义归 `capability-enforcement`（AGENT-019 交叉）；managed model scheduler source/lease occupancy 归 `execution-model-routing`；本命题只拥有 Host 观察/投影适配面。
 
-**证据**：`HostSessionContext.read/roleOf`、`ManagedAgentConfig.validate/applyOwnedFields`；
-→ PROOF.md `HOST-BOUNDARY-017`（MOVE `host-session-context.test.mjs`；REUSE
-`managed-agent-config.test.mjs` 的 owned-fields 部分）。
+**证据**：`HostSessionContext.read/roleOf`、`ManagedAgentConfig` owned-field projection；model-authority 迁移见 `execution-model-routing` GAP-016。
 
 ## HOST-BOUNDARY-018：默认不修改 Host 本体；Host fork 另立需求
 
@@ -249,10 +243,7 @@ card DOES NOT OWN 之外的产品决策）。
 
 ## HOST-BOUNDARY-019：Host capability 缺口必须由 canary/contract proof 证明
 
-**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、
-因果读唯一性）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或
-假设上游默认值（HOST-019/024/025 blocking canaries；PROOF.md Magic Todo membrane
-canary 清单 A..R）。
+**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider、title/compaction 显式模型投影）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；PROOF.md Magic Todo membrane canary 清单 A..R；模型路由 canary 见 `execution-model-routing` GAP-016）。
 
 **含义/动机**：未验证能力 = 上线首炸；`HostContractUnsupported` 是显式失败而非悄悄降级。
 
@@ -272,7 +263,7 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 
 ## HOST-BOUNDARY-021：plugin load/init 不得执行业务语义或反向调用 Host
 
-**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools。禁止在此阶段：
+**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools，以及对**缺失的 Wanxiangshu 用户配置载体**执行无业务语义的 create-if-absent bootstrap（当前为 `~/.config/opencode/wanxiangshu.mjs` 推荐模板；已有文件绝不改写）。禁止在此阶段：
 
 - 调用 `client.session.*`、prompt/abort/create/list 等任何会进入 Host 业务路径的 API；
 - 执行 crash/business recovery、全局 recovery sweep、恢复 session/fission/assistance runtime cache；
