@@ -44,22 +44,34 @@ module SyntheticToml =
         else
             text.Replace("\r\n", "\n").Replace("\r", "\n")
 
+    let private appendEscaped (sb: StringBuilder) (ch: char) =
+        match ch with
+        | '"' -> sb.Append "\\\"" |> ignore
+        | '\\' -> sb.Append "\\\\" |> ignore
+        | '\b' -> sb.Append "\\b" |> ignore
+        | '\t' -> sb.Append "\\t" |> ignore
+        | '\n' -> sb.Append "\\n" |> ignore
+        | '\f' -> sb.Append "\\f" |> ignore
+        | '\r' -> sb.Append "\\r" |> ignore
+        | c when c < ' ' || c = '\u007F' -> sb.Append(sprintf "\\u%04X" (int c)) |> ignore
+        | c -> sb.Append c |> ignore
+
     let private escapeBasic (text: string) =
         let sb = StringBuilder()
 
         for ch in text do
-            match ch with
-            | '"' -> sb.Append "\\\"" |> ignore
-            | '\\' -> sb.Append "\\\\" |> ignore
-            | '\b' -> sb.Append "\\b" |> ignore
-            | '\t' -> sb.Append "\\t" |> ignore
-            | '\n' -> sb.Append "\\n" |> ignore
-            | '\f' -> sb.Append "\\f" |> ignore
-            | '\r' -> sb.Append "\\r" |> ignore
-            | c when c < ' ' || c = '\u007F' -> sb.Append(sprintf "\\u%04X" (int c)) |> ignore
-            | c -> sb.Append c |> ignore
+            appendEscaped sb ch
 
         sb.ToString()
+
+    let private advanceLiteralSafety (c: char) (quoteRun: int) =
+        if c = '\'' then
+            let nextRun = quoteRun + 1
+            nextRun, nextRun < 3
+        elif c <> '\n' && c <> '\t' && Char.IsControl c then
+            0, false
+        else
+            0, true
 
     /// Can this text sit inside `'''…'''` unchanged?
     ///
@@ -81,19 +93,9 @@ module SyntheticToml =
         let mutable safe = true
 
         while safe && index < stop do
-            let c = text.[index]
-
-            if c = '\'' then
-                quoteRun <- quoteRun + 1
-
-                if quoteRun >= 3 then
-                    safe <- false
-            else
-                quoteRun <- 0
-
-                if c <> '\n' && c <> '\t' && Char.IsControl c then
-                    safe <- false
-
+            let nextRun, stillSafe = advanceLiteralSafety text.[index] quoteRun
+            quoteRun <- nextRun
+            safe <- stillSafe
             index <- index + 1
 
         safe
@@ -396,6 +398,25 @@ module SyntheticToml =
         | [], _ -> String.concat "\n" ordered + "\n"
         | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n" ordered + "\n"
 
+    let private isUtf16LowSurrogate (code: int) = code >= 0xDC00 && code <= 0xDFFF
+
+    let private utf8Step (text: string) (index: int) (stop: int) =
+        let code = int text.[index]
+
+        if code < 0x80 then
+            1, 1
+        elif code < 0x800 then
+            2, 1
+        elif
+            code >= 0xD800
+            && code <= 0xDBFF
+            && index + 1 < stop
+            && isUtf16LowSurrogate (int text.[index + 1])
+        then
+            4, 2
+        else
+            3, 1
+
     let private byteCountRange (text: string) (origin: int) (stop: int) : int =
         // DSL-MUTABLE: algorithm-scratch — span byte-count total accumulator
         let mutable total = 0
@@ -403,29 +424,43 @@ module SyntheticToml =
         let mutable index = origin
 
         while index < stop do
-            let code = int text.[index]
-
-            if code < 0x80 then
-                total <- total + 1
-            elif code < 0x800 then
-                total <- total + 2
-            elif code >= 0xD800 && code <= 0xDBFF && index + 1 < stop then
-                let low = int text.[index + 1]
-
-                if low >= 0xDC00 && low <= 0xDFFF then
-                    total <- total + 4
-                    index <- index + 1
-                else
-                    total <- total + 3
-            else
-                total <- total + 3
-
-            index <- index + 1
+            let width, advance = utf8Step text index stop
+            total <- total + width
+            index <- index + advance
 
         total
 
     /// Byte length of `escapeBasic` over `[origin, stop)` without allocating the
     /// escaped string. Arms and UTF-8 pairing must stay in lockstep with `escapeBasic`.
+    let private escapeBasicByteStep (text: string) (index: int) (stop: int) =
+        let code = int text.[index]
+
+        if
+            code = 0x22
+            || code = 0x5C
+            || code = 0x08
+            || code = 0x09
+            || code = 0x0A
+            || code = 0x0C
+            || code = 0x0D
+        then
+            2, 1
+        elif code < 0x20 || code = 0x7F then
+            6, 1
+        elif code < 0x80 then
+            1, 1
+        elif code < 0x800 then
+            2, 1
+        elif
+            code >= 0xD800
+            && code <= 0xDBFF
+            && index + 1 < stop
+            && isUtf16LowSurrogate (int text.[index + 1])
+        then
+            4, 2
+        else
+            3, 1
+
     let private escapeBasicByteCountRange (text: string) (origin: int) (stop: int) : int =
         // DSL-MUTABLE: algorithm-scratch — escaped-byte total accumulator
         let mutable total = 0
@@ -433,56 +468,20 @@ module SyntheticToml =
         let mutable index = origin
 
         while index < stop do
-            let code = int text.[index]
-
-            if
-                code = 0x22
-                || code = 0x5C
-                || code = 0x08
-                || code = 0x09
-                || code = 0x0A
-                || code = 0x0C
-                || code = 0x0D
-            then
-                total <- total + 2
-                index <- index + 1
-            elif code < 0x20 || code = 0x7F then
-                total <- total + 6
-                index <- index + 1
-            elif code < 0x80 then
-                total <- total + 1
-                index <- index + 1
-            elif code < 0x800 then
-                total <- total + 2
-                index <- index + 1
-            elif code >= 0xD800 && code <= 0xDBFF && index + 1 < stop then
-                let low = int text.[index + 1]
-
-                if low >= 0xDC00 && low <= 0xDFFF then
-                    total <- total + 4
-                    index <- index + 2
-                else
-                    total <- total + 3
-                    index <- index + 1
-            else
-                total <- total + 3
-                index <- index + 1
+            let width, advance = escapeBasicByteStep text index stop
+            total <- total + width
+            index <- index + advance
 
         total
 
     let private rangeContainsNewline (text: string) (origin: int) (stop: int) =
         // DSL-MUTABLE: algorithm-scratch — newline-scan index
         let mutable index = origin
-        // DSL-MUTABLE: algorithm-scratch — newline-scan found flag
-        let mutable found = false
 
-        while (not found) && index < stop do
-            if text.[index] = '\n' then
-                found <- true
-
+        while index < stop && text.[index] <> '\n' do
             index <- index + 1
 
-        found
+        index < stop
 
     let private tripleQuoteJoins (head: string) (headLen: int) (tail: string) =
         let total = headLen + tail.Length

@@ -101,6 +101,149 @@ module OrdinaryTurnWorkflow =
 
     /// Own the reconciled ordinary-turn outcome match.
     /// `timerPort` and `abortParent` are injected by Host composition (Process is not Application).
+    let private clearArmedLoopKill (loopSensor: LoopSensor option) (sessionId: SessionId) =
+        match loopSensor with
+        | Some sensor when sensor.IsArmed sessionId ->
+            sensor.ClearArmed sessionId
+            true
+        | _ -> false
+
+    let private handleAborted
+        (timerPort: ITimerPort)
+        (abortParent: string -> unit)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (abortedSessions: HashSet<string>)
+        (loopSensor: LoopSensor option)
+        (turn: ReconciledTurn)
+        (sessionKey: string)
+        (reason: string)
+        =
+        // LOOP-006: our own kill is bridged into the provider-failure AABB path.
+        // User / cleanup aborts still report Aborted and do not advance the cursor.
+        if clearArmedLoopKill loopSensor turn.SessionId then
+            ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
+        else
+            abortedSessions.Add sessionKey |> ignore
+            abortParent sessionKey
+            sessionPort.AbortChildren turn.SessionId |> ignore
+
+            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+            |> ignore
+
+            AsyncSupport.completedTask ()
+
+    let private applyJoinGuardNudge
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (turn: ReconciledTurn)
+        =
+        task {
+            match!
+                HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
+            with
+            | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                |> ignore
+            | _ -> ()
+        }
+
+    let private handleCompleted
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (abortedSessions: HashSet<string>)
+        (turn: ReconciledTurn)
+        (sessionKey: string)
+        (completeAgent: unit -> Task<bool * bool>)
+        =
+        task {
+            let joinOutstanding =
+                TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
+
+            let! wasAborted, terminalValid =
+                if joinOutstanding then
+                    let aborted = abortedSessions.Contains sessionKey
+                    abortedSessions.Remove sessionKey |> ignore
+                    Task.FromResult(aborted, false)
+                else
+                    completeAgent ()
+
+            if terminalValid then
+                AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+
+            if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+                return ()
+            elif joinOutstanding then
+                return! applyJoinGuardNudge sessionPort eventPort journal joinGuardNudges turn
+            else
+                return ()
+        }
+        :> Task
+
+    let private handleOutcome
+        (timerPort: ITimerPort)
+        (abortParent: string -> unit)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (abortedSessions: HashSet<string>)
+        (loopSensor: LoopSensor option)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (completeAgent: unit -> Task<bool * bool>)
+        =
+        let turn = context.Turn
+        let sessionKey = SessionId.value turn.SessionId
+
+        match turn.Outcome with
+        | ReconcileProgram.TurnInProgress ->
+            InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+        | ReconcileProgram.TurnNeedsContinuation _ ->
+            // Absorb text and reasoning into the XTrace even though this turn is
+            // not completable, then ask for the missing report. Still not fallback.
+            // (The XTrace parts are captured at the transform boundary.)
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+        | ReconcileProgram.TurnAborted reason ->
+            handleAborted
+                timerPort
+                abortParent
+                sessionPort
+                eventPort
+                journal
+                abortedSessions
+                loopSensor
+                turn
+                sessionKey
+                reason
+        | ReconcileProgram.TurnFailed error ->
+            ProviderRecoveryWorkflow.continueAfterConfirmedFailure
+                timerPort
+                sessionPort
+                eventPort
+                journal
+                turn
+                error
+                (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
+        | ReconcileProgram.TurnCompleted ->
+            handleCompleted
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                hasLivePty
+                abortedSessions
+                turn
+                sessionKey
+                completeAgent
+
     let observe
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
@@ -115,7 +258,6 @@ module OrdinaryTurnWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn
-        let sessionKey = SessionId.value turn.SessionId
 
         let isFissionReplaced =
             FissionRuntime.isSilentInterrupt turn.SessionId
@@ -134,71 +276,16 @@ module OrdinaryTurnWorkflow =
             let completeAgent () =
                 TerminalReporter.complete eventPort journal abortedSessions turn
 
-            match turn.Outcome with
-            | ReconcileProgram.TurnInProgress ->
-                InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
-            | ReconcileProgram.TurnNeedsContinuation _ ->
-                // Absorb text and reasoning into the XTrace even though this turn is
-                // not completable, then ask for the missing report. Still not fallback.
-                // (The XTrace parts are captured at the transform boundary.)
-                InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-            | ReconcileProgram.TurnAborted reason ->
-                // LOOP-006: our own kill is bridged into the provider-failure AABB path.
-                // User / cleanup aborts still report Aborted and do not advance the cursor.
-                let loopKill =
-                    match loopSensor with
-                    | Some sensor when sensor.IsArmed turn.SessionId ->
-                        sensor.ClearArmed turn.SessionId
-                        true
-                    | _ -> false
-
-                if loopKill then
-                    ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
-                else
-                    abortedSessions.Add sessionKey |> ignore
-                    abortParent sessionKey
-                    sessionPort.AbortChildren turn.SessionId |> ignore
-
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-                    |> ignore
-
-                    AsyncSupport.completedTask ()
-            | ReconcileProgram.TurnFailed error ->
-                ProviderRecoveryWorkflow.continueAfterConfirmedFailure
-                    timerPort
-                    sessionPort
-                    eventPort
-                    journal
-                    turn
-                    error
-                    (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
-            | ReconcileProgram.TurnCompleted ->
-                task {
-                    let joinOutstanding =
-                        TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
-
-                    let! wasAborted, terminalValid =
-                        if joinOutstanding then
-                            let aborted = abortedSessions.Contains sessionKey
-                            abortedSessions.Remove sessionKey |> ignore
-                            Task.FromResult(aborted, false)
-                        else
-                            completeAgent ()
-
-                    if terminalValid then
-                        AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
-
-                    if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                        return ()
-                    elif joinOutstanding then
-                        match!
-                            HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
-                        with
-                        | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
-                            |> ignore
-                        | _ -> ()
-                    else
-                        ()
-                }
-                :> Task
+            handleOutcome
+                timerPort
+                abortParent
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                hasLivePty
+                abortedSessions
+                loopSensor
+                quiescence
+                context
+                completeAgent

@@ -84,18 +84,24 @@ module EnforcerTipGuidance =
 
     let private tipIdentityText (tipName: string) : string = sprintf "tip: %s" tipName
 
+    let private tipHeading (lang: ProviderLanguage) =
+        match lang with
+        | ProviderLanguage.English -> "# Enforcer Tip"
+        | ProviderLanguage.SimplifiedChinese -> "# Enforcer Tip（规则提示）"
+
     let private tipFullText (lang: ProviderLanguage) (tipName: string) (mainText: string) : string =
         let body = if isNull mainText then "" else mainText.Trim()
 
         if body.Length = 0 then
             tipIdentityText tipName
         else
-            let heading =
-                match lang with
-                | ProviderLanguage.English -> "# Enforcer Tip"
-                | ProviderLanguage.SimplifiedChinese -> "# Enforcer Tip（规则提示）"
+            sprintf "%s\ntip = \"%s\"\n\n%s" (tipHeading lang) tipName body
 
-            sprintf "%s\ntip = \"%s\"\n\n%s" heading tipName body
+    let private asMainIfNotCompanion (associations: Map<SessionId, SessionAssociation>) (sessionId: SessionId) =
+        if SessionAssociationProjection.isCompanion sessionId associations then
+            None
+        else
+            Some sessionId
 
     let private tryOwnerMainSession (journal: AgentJournal) (mainOrBloggerSession: SessionId) : SessionId option =
         let associations = (AgentJournal.snapshot journal).AgentProjections.Associations
@@ -104,10 +110,9 @@ module EnforcerTipGuidance =
         | Some owner -> Some owner
         | None ->
             // Already a main / work session (or unassociated): treat as main session id.
-            match SessionAssociationProjection.tryBloggerOf mainOrBloggerSession associations with
-            | Some _ -> Some mainOrBloggerSession
-            | None when SessionAssociationProjection.isCompanion mainOrBloggerSession associations -> None
-            | None -> Some mainOrBloggerSession
+            SessionAssociationProjection.tryBloggerOf mainOrBloggerSession associations
+            |> Option.map (fun _ -> mainOrBloggerSession)
+            |> Option.orElseWith (fun () -> asMainIfNotCompanion associations mainOrBloggerSession)
 
     let private latestOwnerTipField (journal: AgentJournal) (mainSessionId: SessionId) : string option =
         match
@@ -158,6 +163,68 @@ module EnforcerTipGuidance =
                       "result", JournalAppendFailure.describe failure ]
         }
 
+    let private tipNameOf (field: string) (rule: EnforcerRule) =
+        if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
+            rule.Name.Trim()
+        else
+            field.Trim()
+
+    let private guidanceForRule
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (lang: ProviderLanguage)
+        (field: string)
+        (rule: EnforcerRule)
+        : Task<TipGuidance option> =
+        task {
+            let tipName = tipNameOf field rule
+
+            if tipName.Length = 0 then
+                return None
+            elif hasFullTipDelivered journal mainSessionId tipName then
+                let guidance: TipGuidance =
+                    { TipName = tipName
+                      Presentation = TipPresentation.IdentityOnly
+                      Text = tipIdentityText tipName }
+
+                return Some guidance
+            else
+                let text = tipFullText lang tipName rule.MainText
+                do! recordFullTipDelivered journal mainSessionId tipName
+
+                let guidance: TipGuidance =
+                    { TipName = tipName
+                      Presentation = TipPresentation.Full
+                      Text = text }
+
+                return Some guidance
+        }
+
+    let private guidanceForField
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (field: string)
+        : Task<TipGuidance option> =
+        task {
+            let lang =
+                SessionProviderLanguage.tryGet mainSessionId
+                |> Option.defaultValue ProviderLanguage.English
+
+            match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
+            | None -> return None
+            | Some rule -> return! guidanceForRule journal mainSessionId lang field rule
+        }
+
+    let private guidanceForOwner
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        : Task<TipGuidance option> =
+        task {
+            match latestOwnerTipField journal mainSessionId with
+            | None -> return None
+            | Some field -> return! guidanceForField journal mainSessionId field
+        }
+
     /// Resolve Main tip guidance for the auto-injected marker tip half.
     ///
     /// First Full delivery of a tip in this Main session → main.md body (+ name header).
@@ -170,42 +237,7 @@ module EnforcerTipGuidance =
         task {
             match tryOwnerMainSession journal mainOrBloggerSession with
             | None -> return None
-            | Some mainSessionId ->
-                match latestOwnerTipField journal mainSessionId with
-                | None -> return None
-                | Some field ->
-                    let lang =
-                        SessionProviderLanguage.tryGet mainSessionId
-                        |> Option.defaultValue ProviderLanguage.English
-
-                    match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
-                    | None -> return None
-                    | Some rule ->
-                        let tipName =
-                            if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
-                                rule.Name.Trim()
-                            else
-                                field.Trim()
-
-                        if tipName.Length = 0 then
-                            return None
-                        elif hasFullTipDelivered journal mainSessionId tipName then
-                            let guidance: TipGuidance =
-                                { TipName = tipName
-                                  Presentation = TipPresentation.IdentityOnly
-                                  Text = tipIdentityText tipName }
-
-                            return Some guidance
-                        else
-                            let text = tipFullText lang tipName rule.MainText
-                            do! recordFullTipDelivered journal mainSessionId tipName
-
-                            let guidance: TipGuidance =
-                                { TipName = tipName
-                                  Presentation = TipPresentation.Full
-                                  Text = text }
-
-                            return Some guidance
+            | Some mainSessionId -> return! guidanceForOwner journal mainSessionId
         }
 
     /// Latest tip guidance text for Main marker (Full or Identity). None when no tip.

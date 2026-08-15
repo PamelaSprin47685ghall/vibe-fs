@@ -22,6 +22,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -62,6 +63,12 @@ module TerminalPolicy =
     let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
         (tryLinkedChild journal sessionKey).IsSome
 
+    let private canonicalRoleOf (authority: PromptAuthority.PromptAuthorityProjection) =
+        match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
+        | Some run, _ -> Some run.CanonicalRole
+        | None, Some profile -> Some profile.CanonicalRole
+        | None, None -> None
+
     /// ORCH-003: true when the session's registered parent is an Orchestrator
     /// session (its own canonical role is Orchestrator). Only that parent
     /// suppresses the top-level Manager guard; a HumanRoot-forked Manager stays
@@ -75,11 +82,7 @@ module TerminalPolicy =
         | true, parentId ->
             Map.tryFind (SessionId.create parentId) projection.Sessions
             |> Option.bind (fun parent -> parent.PromptAuthority)
-            |> Option.bind (fun authority ->
-                match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
-                | Some run, _ -> Some run.CanonicalRole
-                | None, Some profile -> Some profile.CanonicalRole
-                | None, None -> None)
+            |> Option.bind canonicalRoleOf
             |> Option.exists (fun role -> role = Role.Orchestrator)
         | false, _ -> false
 
@@ -89,6 +92,46 @@ module TerminalPolicy =
         match journal with
         | None -> false
         | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
+
+    let private unlinkedTopLevel (sessionParents: Dictionary<string, string>) (journal: AgentJournal option) (sessionKey: string) =
+        not (sessionParents.ContainsKey sessionKey) && not (isLinkedChild journal sessionKey)
+
+    let private managerOwnsTopLevel
+        (sessionParents: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (sessionKey: string)
+        (projection: AgentProjectionSet)
+        (authority: PromptAuthority.PromptAuthorityProjection)
+        =
+        match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
+        | Some run, _ ->
+            // ORCH-003: a Manager forked by an Orchestrator (AgentOwnerRoot)
+            // is a job worker, not a top-level Manager — its review is the
+            // Orchestrator's barrier (ORCH-006), never the top-level guard.
+            // `CanonicalRole` alone is not enough: the forked Manager
+            // carries the Manager role on purpose, and parent linkage
+            // alone is not enough either (the HumanRoot's forked Manager
+            // is linked too and must keep its guard). The discriminator
+            // is the parent's own role: an Orchestrator parent means the
+            // guard does not apply (measured: the guard deferred the
+            // completion forever and the barrier review never started).
+            run.CanonicalRole = Role.Manager
+            && not (parentedByOrchestrator projection sessionParents sessionKey)
+        | None, Some profile -> profile.CanonicalRole = Role.Manager
+        | None, None -> unlinkedTopLevel sessionParents journal sessionKey
+
+    let private sessionIsTopLevelManager
+        (sessionParents: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (sessionKey: string)
+        (projection: ProjectionSet)
+        =
+        match Map.tryFind (SessionId.create sessionKey) projection.AgentProjections.Sessions with
+        | Some session ->
+            session.PromptAuthority
+            |> Option.map (managerOwnsTopLevel sessionParents journal sessionKey projection.AgentProjections)
+            |> Option.defaultValue (unlinkedTopLevel sessionParents journal sessionKey)
+        | None -> unlinkedTopLevel sessionParents journal sessionKey
 
     /// Manager Guard applies to any manager that still owns the review loop for its
     /// worktree. Manager children of Orchestrator remain linked to the family root,
@@ -101,36 +144,24 @@ module TerminalPolicy =
         match journal with
         | None -> not (sessionParents.ContainsKey sessionKey)
         | Some j ->
-            let projection = AgentJournal.snapshot j
+            sessionIsTopLevelManager sessionParents journal sessionKey (AgentJournal.snapshot j)
 
-            match Map.tryFind (SessionId.create sessionKey) projection.AgentProjections.Sessions with
-            | Some session ->
-                match session.PromptAuthority with
-                | Some authority ->
-                    match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
-                    | Some run, _ ->
-                        // ORCH-003: a Manager forked by an Orchestrator (AgentOwnerRoot)
-                        // is a job worker, not a top-level Manager — its review is the
-                        // Orchestrator's barrier (ORCH-006), never the top-level guard.
-                        // `CanonicalRole` alone is not enough: the forked Manager
-                        // carries the Manager role on purpose, and parent linkage
-                        // alone is not enough either (the HumanRoot's forked Manager
-                        // is linked too and must keep its guard). The discriminator
-                        // is the parent's own role: an Orchestrator parent means the
-                        // guard does not apply (measured: the guard deferred the
-                        // completion forever and the barrier review never started).
-                        run.CanonicalRole = Role.Manager
-                        && not (parentedByOrchestrator projection.AgentProjections sessionParents sessionKey)
-                    | None, Some profile -> profile.CanonicalRole = Role.Manager
-                    | None, None ->
-                        not (sessionParents.ContainsKey sessionKey)
-                        && not (isLinkedChild journal sessionKey)
-                | None ->
-                    not (sessionParents.ContainsKey sessionKey)
-                    && not (isLinkedChild journal sessionKey)
-            | None ->
-                not (sessionParents.ContainsKey sessionKey)
-                && not (isLinkedChild journal sessionKey)
+    let private hasListableHandles (journal: AgentJournal option) (sessionId: SessionId) =
+        match journal with
+        | None -> false
+        | Some durable ->
+            AgentJournal.handleProjection durable sessionId
+            |> HandleProjection.listable
+            |> List.isEmpty
+            |> not
+
+    let private hasActiveOrchestratorJobs (journal: AgentJournal option) =
+        match journal with
+        | None -> false
+        | Some durable ->
+            OrchestratorProjection.activeJobs (AgentJournal.snapshot durable).AgentProjections.Orchestrator
+            |> List.isEmpty
+            |> not
 
     /// EXEC-016: join-capable role still owns unconsumed background work.
     ///
@@ -143,30 +174,8 @@ module TerminalPolicy =
         (sessionId: SessionId)
         : bool =
         match role with
-        | Some Role.Manager ->
-            match journal with
-            | None -> false
-            | Some durable ->
-                AgentJournal.handleProjection durable sessionId
-                |> HandleProjection.listable
-                |> List.isEmpty
-                |> not
+        | Some Role.Manager -> hasListableHandles journal sessionId
         | Some Role.DevOps ->
-            let durableOutstanding =
-                match journal with
-                | None -> false
-                | Some durable ->
-                    AgentJournal.handleProjection durable sessionId
-                    |> HandleProjection.listable
-                    |> List.isEmpty
-                    |> not
-
-            durableOutstanding || hasLivePty (SessionId.value sessionId)
-        | Some Role.Orchestrator ->
-            match journal with
-            | None -> false
-            | Some durable ->
-                OrchestratorProjection.activeJobs (AgentJournal.snapshot durable).AgentProjections.Orchestrator
-                |> List.isEmpty
-                |> not
+            hasListableHandles journal sessionId || hasLivePty (SessionId.value sessionId)
+        | Some Role.Orchestrator -> hasActiveOrchestratorJobs journal
         | _ -> false

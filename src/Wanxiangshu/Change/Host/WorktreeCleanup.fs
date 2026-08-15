@@ -30,36 +30,44 @@ open Wanxiangshu.Change
 /// ORCH-007 forbids substituting filesystem state for a durable fact, and the
 /// active-job set here comes from the projection.
 module OrchestratorSweep =
+    let private removeOne git path (cont: Task<Result<unit, string>>) =
+        task {
+            match! git.RemoveWorktree path with
+            | Ok() -> return! cont
+            | Error error ->
+                return Error(sprintf "stale worktree cleanup failed for %s: %s" (WorktreePath.value path) error)
+        }
+
     let private removeWorktrees git paths =
         let rec loop remaining =
             task {
                 match remaining with
                 | [] -> return Ok()
-                | path :: tail ->
-                    match! git.RemoveWorktree path with
-                    | Ok() -> return! loop tail
-                    | Error error ->
-                        return Error(sprintf "stale worktree cleanup failed for %s: %s" (WorktreePath.value path) error)
+                | path :: tail -> return! removeOne git path (loop tail)
             }
 
         loop paths
+
+    let private deleteOne git identity (cont: Task<Result<unit, string>>) =
+        task {
+            match! git.DeleteBranch identity with
+            | Ok() -> return! cont
+            | Error error ->
+                return
+                    Error(
+                        sprintf
+                            "stale manager branch cleanup failed for %s: %s"
+                            (WorktreeIdentity.value identity)
+                            error
+                    )
+        }
 
     let private deleteBranches git identities =
         let rec loop remaining =
             task {
                 match remaining with
                 | [] -> return Ok()
-                | identity :: tail ->
-                    match! git.DeleteBranch identity with
-                    | Ok() -> return! loop tail
-                    | Error error ->
-                        return
-                            Error(
-                                sprintf
-                                    "stale manager branch cleanup failed for %s: %s"
-                                    (WorktreeIdentity.value identity)
-                                    error
-                            )
+                | identity :: tail -> return! deleteOne git identity (loop tail)
             }
 
         loop identities
@@ -81,6 +89,35 @@ module OrchestratorSweep =
         else
             identity
 
+    let private afterRemoveWorktrees
+        (git: GitPort)
+        (isStale: WorktreeIdentity -> bool)
+        : Task<Result<unit, string>> =
+        task {
+            match! git.ListManagerBranches() with
+            | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)
+            | Ok branches -> return! deleteBranches git (branches |> List.filter isStale)
+        }
+
+    let private afterListWorktrees
+        (git: GitPort)
+        (isManagerBranch: WorktreeIdentity -> bool)
+        (isStale: WorktreeIdentity -> bool)
+        (entries: (WorktreePath * WorktreeIdentity option) list)
+        : Task<Result<unit, string>> =
+        task {
+            let staleWorktrees =
+                entries
+                |> List.choose (fun (path, identity) ->
+                    match identity with
+                    | Some value when isManagerBranch value && isStale value -> Some path
+                    | _ -> None)
+
+            match! removeWorktrees git staleWorktrees with
+            | Error error -> return Error error
+            | Ok() -> return! afterRemoveWorktrees git isStale
+        }
+
     let sweepStaleArtifacts (git: GitPort) (activeJobs: ManagerJobProjection list) : Task<Result<unit, string>> =
         task {
             let owned = activeJobs |> List.map (fun job -> job.WorktreeIdentity) |> Set.ofList
@@ -99,20 +136,7 @@ module OrchestratorSweep =
 
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
-            | Ok entries ->
-                let staleWorktrees =
-                    entries
-                    |> List.choose (fun (path, identity) ->
-                        match identity with
-                        | Some value when isManagerBranch value && isStale value -> Some path
-                        | _ -> None)
-
-                match! removeWorktrees git staleWorktrees with
-                | Error error -> return Error error
-                | Ok() ->
-                    match! git.ListManagerBranches() with
-                    | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)
-                    | Ok branches -> return! deleteBranches git (branches |> List.filter isStale)
+            | Ok entries -> return! afterListWorktrees git isManagerBranch isStale entries
         }
 
     let sweepLocked

@@ -19,28 +19,51 @@ module LoopEventCodec =
           Field: string option
           Delta: string }
 
-    let private trySessionId (raw: obj) : SessionId option =
-        HostEventCodec.trySessionId raw
-        |> Option.orElse (
-            if isNull raw then
-                None
-            else
-                let properties = raw?properties
-
-                if not (isNull properties) && not (isNull properties?sessionID) then
-                    Some(SessionId.create (unbox<string> properties?sessionID))
-                elif not (isNull properties) && not (isNull properties?sessionId) then
-                    Some(SessionId.create (unbox<string> properties?sessionId))
-                else
-                    None
-        )
-
-    let private stringField (value: obj) : string option =
-        if isNull value then
+    let private trySessionIdFromProperties (raw: obj) : SessionId option =
+        if isNull raw then
             None
         else
-            let text = string value
-            if String.IsNullOrEmpty text then None else Some text
+            let properties = raw?properties
+
+            if isNull properties then
+                None
+            elif not (isNull properties?sessionID) then
+                Some(SessionId.create (unbox<string> properties?sessionID))
+            elif not (isNull properties?sessionId) then
+                Some(SessionId.create (unbox<string> properties?sessionId))
+            else
+                None
+
+    let private trySessionId (raw: obj) : SessionId option =
+        HostEventCodec.trySessionId raw |> Option.orElse (trySessionIdFromProperties raw)
+
+    let private stringField (value: obj) : string option =
+        if isNull value || String.IsNullOrEmpty (string value) then
+            None
+        else
+            Some(string value)
+
+    let private textDeltaField (properties: obj) =
+        if isNull properties?field then Some "text" else stringField properties?field
+
+    let private decodeTextDeltaProperties (sessionId: SessionId) (properties: obj) : TextDelta option =
+        match textDeltaField properties, stringField properties?delta with
+        | Some "text", Some delta when delta.Length > 0 ->
+            Some
+                { SessionId = sessionId
+                  MessageId =
+                    stringField properties?messageID
+                    |> Option.orElse (stringField properties?messageId)
+                  PartId = stringField properties?partID |> Option.orElse (stringField properties?partId)
+                  Field = Some "text"
+                  Delta = delta }
+        | _ -> None
+
+    let private tryTextDeltaBody (sessionId: SessionId) (properties: obj) : TextDelta option =
+        if isNull properties then
+            None
+        else
+            decodeTextDeltaProperties sessionId properties
 
     let isLoopTextDelta (rawInput: obj) : bool =
         let raw = HostEventCodec.unwrap rawInput
@@ -55,39 +78,8 @@ module LoopEventCodec =
     let tryDecodeTextDelta (rawInput: obj) : TextDelta option =
         let raw = HostEventCodec.unwrap rawInput
 
-        if isNull raw then
-            None
-        else
-            match HostEventCodec.eventTypeOf raw with
-            | "message.part.delta" ->
-                match trySessionId raw with
-                | None -> None
-                | Some sessionId ->
-                    let properties = raw?properties
-
-                    if isNull properties then
-                        None
-                    else
-                        let field =
-                            if isNull properties?field then
-                                Some "text"
-                            else
-                                stringField properties?field
-
-                        match field with
-                        | Some "text" ->
-                            match stringField properties?delta with
-                            | None -> None
-                            | Some delta when delta.Length = 0 -> None
-                            | Some delta ->
-                                Some
-                                    { SessionId = sessionId
-                                      MessageId =
-                                        stringField properties?messageID
-                                        |> Option.orElse (stringField properties?messageId)
-                                      PartId =
-                                        stringField properties?partID |> Option.orElse (stringField properties?partId)
-                                      Field = field
-                                      Delta = delta }
-                        | _ -> None
-            | _ -> None
+        match isNull raw, HostEventCodec.eventTypeOf raw, trySessionId raw with
+        | true, _, _ -> None
+        | _, eventType, _ when eventType <> "message.part.delta" -> None
+        | _, _, None -> None
+        | _, _, Some sessionId -> tryTextDeltaBody sessionId (raw?properties)

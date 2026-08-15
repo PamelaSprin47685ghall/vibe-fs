@@ -48,6 +48,51 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 module OrchestratorSessionDirectories =
+    let private tryWorktreePath (worktrees: Dictionary<string, string>) (agentHandle: AgentHandleId) =
+        match worktrees.TryGetValue(AgentHandleId.value agentHandle) with
+        | true, path -> Some path
+        | false, _ -> None
+
+    let private registerReviewerTreeIfNeeded
+        (registerReviewerTree: string -> GitTreePort -> unit)
+        (record: HandleRecord)
+        (path: string)
+        =
+        if record.CanonicalRole = Role.Reviewer then
+            registerReviewerTree (SessionId.value record.ChildSessionId) (GitTree.create path)
+
+    let private registerLinkedChild
+        (worktrees: Dictionary<string, string>)
+        (register: SessionId -> string -> unit)
+        (registerReviewerTree: string -> GitTreePort -> unit)
+        (record: HandleRecord)
+        =
+        match HandleId.tryAgent record.Handle |> Option.bind (tryWorktreePath worktrees) with
+        | None -> ()
+        | Some path ->
+            register record.ChildSessionId path
+            // CanonicalRole is the durable role the fork selected.
+            // The previous version consulted a separate `LinkedRoles`
+            // map, which could disagree with the handle it described.
+            // Typed comparison, not a case-insensitive string match:
+            // the role is a `Role`, so a spelling drift is a compile
+            // error rather than a reviewer tree that silently stops
+            // being registered.
+            registerReviewerTreeIfNeeded registerReviewerTree record path
+
+    let private registerHandles
+        (worktrees: Dictionary<string, string>)
+        (register: SessionId -> string -> unit)
+        (registerReviewerTree: string -> GitTreePort -> unit)
+        (handles: AgentLinkageProjection)
+        =
+        for record in HandleProjection.linkedChildren handles do
+            // `worktrees` is keyed by the runtime agent id, which for an agent
+            // child IS the handle's inner id. PTY and ManagerJob handles have
+            // no agent id and no worktree entry, so they are skipped rather
+            // than rendered into a lookup key.
+            registerLinkedChild worktrees register registerReviewerTree record
+
     let registerRestored
         (snapshot: ProjectionSet)
         (orchestratorId: SessionId)
@@ -55,33 +100,6 @@ module OrchestratorSessionDirectories =
         (register: SessionId -> string -> unit)
         (registerReviewerTree: string -> GitTreePort -> unit)
         =
-        match Map.tryFind orchestratorId snapshot.AgentProjections.Sessions with
-        | Some session ->
-            match session.Handles with
-            | Some handles ->
-                for record in HandleProjection.linkedChildren handles do
-                    // `worktrees` is keyed by the runtime agent id, which for an agent
-                    // child IS the handle's inner id. PTY and ManagerJob handles have
-                    // no agent id and no worktree entry, so they are skipped rather
-                    // than rendered into a lookup key.
-                    match HandleId.tryAgent record.Handle with
-                    | None -> ()
-                    | Some agentHandle ->
-                        match worktrees.TryGetValue(AgentHandleId.value agentHandle) with
-                        | true, path ->
-                            register record.ChildSessionId path
-
-                            // CanonicalRole is the durable role the fork selected.
-                            // The previous version consulted a separate `LinkedRoles`
-                            // map, which could disagree with the handle it described.
-                            // Typed comparison, not a case-insensitive string match:
-                            // the role is a `Role`, so a spelling drift is a compile
-                            // error rather than a reviewer tree that silently stops
-                            // being registered.
-                            match record.CanonicalRole with
-                            | Role.Reviewer ->
-                                registerReviewerTree (SessionId.value record.ChildSessionId) (GitTree.create path)
-                            | _ -> ()
-                        | false, _ -> ()
-            | None -> ()
-        | None -> ()
+        Map.tryFind orchestratorId snapshot.AgentProjections.Sessions
+        |> Option.bind (fun session -> session.Handles)
+        |> Option.iter (registerHandles worktrees register registerReviewerTree)
