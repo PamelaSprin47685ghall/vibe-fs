@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -131,15 +132,17 @@ module MagicTodoMembrane =
         (blobRef: BlobRef)
         (expectedDigest: BlobDigest)
         : Task<Result<ObligationList, PrepareRejection>> =
-        task {
-            match! journal.Writer.BlobWriter.Read blobRef with
-            | Error reason -> return Error(PrepareRejection.BlobRead reason)
-            | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expectedDigest ->
-                return Error(PrepareRejection.BlobDigestMismatch label)
-            | Ok body ->
-                return
-                    MagicTodoObligationCodec.tryDecode body
-                    |> Result.mapError PrepareRejection.BlobDecode
+        taskResult {
+            let! body = journal.Writer.BlobWriter.Read blobRef |> TaskResult.mapError PrepareRejection.BlobRead
+
+            do!
+                Result.requireTrue
+                    (PrepareRejection.BlobDigestMismatch label)
+                    (HostDigest.sha256Hex body = BlobDigest.value expectedDigest)
+
+            return!
+                MagicTodoObligationCodec.tryDecode body
+                |> Result.mapError PrepareRejection.BlobDecode
         }
 
     let private readText
@@ -148,12 +151,15 @@ module MagicTodoMembrane =
         (blobRef: BlobRef)
         (expectedDigest: BlobDigest)
         : Task<Result<string, PrepareRejection>> =
-        task {
-            match! journal.Writer.BlobWriter.Read blobRef with
-            | Error reason -> return Error(PrepareRejection.BlobRead reason)
-            | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expectedDigest ->
-                return Error(PrepareRejection.BlobDigestMismatch label)
-            | Ok body -> return Ok body
+        taskResult {
+            let! body = journal.Writer.BlobWriter.Read blobRef |> TaskResult.mapError PrepareRejection.BlobRead
+
+            do!
+                Result.requireTrue
+                    (PrepareRejection.BlobDigestMismatch label)
+                    (HostDigest.sha256Hex body = BlobDigest.value expectedDigest)
+
+            return body
         }
 
     let private writeList
@@ -161,15 +167,17 @@ module MagicTodoMembrane =
         (label: string)
         (items: ObligationList)
         : Task<Result<BlobWriteReceipt, PrepareRejection>> =
-        task {
+        taskResult {
             let body = MagicTodoObligationCodec.encode items
             let expectedDigest = MagicTodo.obligationListDigest HostDigest.sha256Hex items
+            let! receipt = journal.WriteBlob body |> TaskResult.mapError PrepareRejection.BlobWrite
 
-            match! journal.WriteBlob body with
-            | Error reason -> return Error(PrepareRejection.BlobWrite reason)
-            | Ok receipt when BlobDigest.value receipt.BlobDigest <> expectedDigest ->
-                return Error(PrepareRejection.BlobDigestMismatch label)
-            | Ok receipt -> return Ok receipt
+            do!
+                Result.requireTrue
+                    (PrepareRejection.BlobDigestMismatch label)
+                    (BlobDigest.value receipt.BlobDigest = expectedDigest)
+
+            return receipt
         }
 
     let private existingPrepared
@@ -226,6 +234,201 @@ module MagicTodoMembrane =
           AlreadyAccepted = alreadyAccepted
           AcceptedOutputDigest = acceptedOutputDigest }
 
+    let private snapshotMatchesSubmitted
+        (locality: MagicTodoLocality.LocalizedToolCall)
+        (planCompleteDeclared: bool)
+        (submitted: ObligationList)
+        =
+        match MagicTodoObligationCodec.tryDecodeInput locality.InputCanonical with
+        | Ok snapshotInput ->
+            snapshotInput.PlanComplete = planCompleteDeclared
+            && snapshotInput.Obligations = submitted
+        | Error _ -> false
+
+    let private readCurrentObligations (journal: AgentJournal) (life: MagicTodoProjection.LifeMagicTodoState) =
+        match life.CurrentObligationsRef with
+        | None -> Task.FromResult(Ok [])
+        | Some(blobRef, digest) -> readList journal "CurrentObligations" blobRef digest
+
+    let private readPreviousReviewView (journal: AgentJournal) (life: MagicTodoProjection.LifeMagicTodoState) =
+        match MagicTodoProjection.consumablePreviousReview life with
+        | None -> Task.FromResult(Ok None)
+        | Some concluded ->
+            taskResult {
+                let! report =
+                    readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
+
+                return
+                    Some
+                        { Verdict = concluded.Verdict
+                          ReportText = report }
+            }
+
+    let private replayPreparedBridge
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (life: MagicTodoProjection.LifeMagicTodoState)
+        (currentObligations: ObligationList)
+        (previousReview: PreviousReviewView option)
+        (replayWriteId: TodoWriteId)
+        : Task<Result<PreparedBridge, PrepareRejection>> =
+        taskResult {
+            let! checkpoint =
+                Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints
+                |> Result.requireSome (PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
+
+            let! proposal =
+                readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+
+            return
+                bridge
+                    managerSessionId
+                    lifeId
+                    (preparedFromCheckpoint lifeId checkpoint)
+                    checkpoint.PreparedFactRef
+                    currentObligations
+                    proposal
+                    previousReview
+                    checkpoint.Accepted
+                    checkpoint.OutputDigest
+        }
+
+    let private freshPrepareBridge
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (locality: MagicTodoLocality.LocalizedToolCall)
+        (planCompleteDeclared: bool)
+        (currentObligations: ObligationList)
+        (previousReview: PreviousReviewView option)
+        (preparedPlan: MagicTodoAdmission.ObligationPrepareSuccess)
+        : Task<Result<PreparedBridge, PrepareRejection>> =
+        taskResult {
+            let! baseBlob = writeList journal "BaseTodo" preparedPlan.Base
+            let! proposedBlob = writeList journal "ProposedTodo" preparedPlan.Proposed
+
+            let prepared =
+                { ManagerSessionId = managerSessionId
+                  ManagerLifeId = lifeId
+                  TodoWriteId = preparedPlan.TodoWriteId
+                  ToolCallId = locality.ToolCallId
+                  ToolPartOrdinal = preparedPlan.ToolPartOrdinal
+                  BaseTodoRef = baseBlob.BlobRef
+                  BaseTodoDigest = baseBlob.BlobDigest
+                  ProposedTodoRef = proposedBlob.BlobRef
+                  ProposedTodoDigest = proposedBlob.BlobDigest
+                  PlanCompleteDeclared = planCompleteDeclared
+                  ProviderInputDigest = preparedPlan.ProviderInputDigest
+                  ReviewFrontier = preparedPlan.ReviewFrontier
+                  SemanticVersion = MagicTodo.SemanticVersion }
+
+            let! receipt =
+                AgentJournal.appendMagicTodo
+                    (StreamId.Session managerSessionId)
+                    (Some locality.ProviderRun)
+                    (MagicTodoFact.TodoWritePrepared prepared)
+                    journal
+                |> TaskResult.mapError (fun failure ->
+                    PrepareRejection.JournalAppend(JournalAppendFailure.describe failure))
+
+            return
+                bridge
+                    managerSessionId
+                    lifeId
+                    prepared
+                    receipt.EventId
+                    currentObligations
+                    preparedPlan.Proposed
+                    previousReview
+                    false
+                    None
+        }
+
+    let private materializeAdmission
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (life: MagicTodoProjection.LifeMagicTodoState)
+        (locality: MagicTodoLocality.LocalizedToolCall)
+        (planCompleteDeclared: bool)
+        (currentObligations: ObligationList)
+        (previousReview: PreviousReviewView option)
+        (admission: MagicTodoAdmission.AdmissionOutcome<MagicTodoAdmission.ObligationPrepareSuccess>)
+        : Task<Result<PreparedBridge, PrepareRejection>> =
+        match admission with
+        | AdmissionOutcome.AwaitingConsumableReview pending ->
+            Task.FromResult(Error(PrepareRejection.AwaitingConsumableReview pending))
+        | AdmissionOutcome.Rejected rejection -> Task.FromResult(Error(PrepareRejection.Admission rejection))
+        | AdmissionOutcome.IdempotentReplay replayWriteId ->
+            replayPreparedBridge
+                journal
+                managerSessionId
+                lifeId
+                life
+                currentObligations
+                previousReview
+                replayWriteId
+        | AdmissionOutcome.FreshPrepare preparedPlan ->
+            freshPrepareBridge
+                journal
+                managerSessionId
+                lifeId
+                locality
+                planCompleteDeclared
+                currentObligations
+                previousReview
+                preparedPlan
+
+    let private prepareForOpenLife
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (managerLife: LifeProjection)
+        (locality: MagicTodoLocality.LocalizedToolCall)
+        (providerInputDigest: string)
+        (planCompleteDeclared: bool)
+        (submitted: ObligationList)
+        : Task<Result<PreparedBridge, PrepareRejection>> =
+        taskResult {
+            let lifeId = managerLife.LifeId
+            let todoProjection = (AgentJournal.snapshot journal).AgentProjections.MagicTodo
+
+            let life =
+                Map.tryFind (ManagerLifeId.value lifeId) todoProjection.ByLife
+                |> Option.defaultValue (MagicTodoProjection.emptyLife lifeId)
+
+            let! currentObligations = readCurrentObligations journal life
+            let! previousReview = readPreviousReviewView journal life
+            let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex lifeId locality.ToolCallId
+            let prior = existingPrepared lifeId writeId life
+
+            let admission =
+                MagicTodoAdmission.admitObligations
+                    HostDigest.sha256Hex
+                    lifeId
+                    currentObligations
+                    (MagicTodoProjection.mayAdmitNewCheckpoint life)
+                    prior
+                    { ToolCallId = locality.ToolCallId
+                      ToolPartOrdinal = locality.ToolPartOrdinal
+                      TodowriteCallIdsInMessage = locality.TodowriteCallIdsInMessage
+                      ReviewFrontier = locality.ReviewFrontier
+                      ProviderInputDigest = providerInputDigest }
+                    submitted
+
+            return!
+                materializeAdmission
+                    journal
+                    managerSessionId
+                    lifeId
+                    life
+                    locality
+                    planCompleteDeclared
+                    currentObligations
+                    previousReview
+                    admission
+        }
+
     let prepare
         (journal: AgentJournal)
         (managerSessionId: SessionId)
@@ -235,155 +438,119 @@ module MagicTodoMembrane =
         (submitted: ObligationList)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         task {
-            let snapshotMatchesSubmitted =
-                match MagicTodoObligationCodec.tryDecodeInput locality.InputCanonical with
-                | Ok snapshotInput ->
-                    snapshotInput.PlanComplete = planCompleteDeclared
-                    && snapshotInput.Obligations = submitted
-                | Error _ -> false
+            match
+                locality.ToolName = "todowrite",
+                snapshotMatchesSubmitted locality planCompleteDeclared submitted,
+                managerLife managerSessionId (AgentJournal.snapshot journal)
+            with
+            | false, _, _ -> return Error(PrepareRejection.UnexpectedToolName locality.ToolName)
+            | true, false, _ -> return Error PrepareRejection.SnapshotInputMismatch
+            | true, true, None -> return Error PrepareRejection.NoOpenManagerLife
+            | true, true, Some openLife ->
+                return!
+                    prepareForOpenLife
+                        journal
+                        managerSessionId
+                        openLife
+                        locality
+                        providerInputDigest
+                        planCompleteDeclared
+                        submitted
+        }
 
-            if locality.ToolName <> "todowrite" then
-                return Error(PrepareRejection.UnexpectedToolName locality.ToolName)
-            elif not snapshotMatchesSubmitted then
-                return Error PrepareRejection.SnapshotInputMismatch
-            else
-                let projection = AgentJournal.snapshot journal
+    let private acceptIdempotent
+        (acceptedOutputDigest: string option)
+        (observedOutputDigest: string)
+        : Result<AcceptOutcome, AcceptRejection> =
+        match acceptedOutputDigest with
+        | Some digest when digest = observedOutputDigest ->
+            Ok
+                { EnrichedResult = ""
+                  NeedsDedicatedEnlist = false
+                  NeedsEnsureReview = false }
+        | _ -> Error AcceptRejection.OutputDigestMismatch
 
-                match managerLife managerSessionId projection with
-                | None -> return Error PrepareRejection.NoOpenManagerLife
-                | Some managerLife ->
-                    let lifeId = managerLife.LifeId
-                    let todoProjection = projection.AgentProjections.MagicTodo
+    let private previousReviewBody (lang: ProviderLanguage) (previousReview: PreviousReviewView option) =
+        match previousReview with
+        | Some previous when previous.Verdict = ProcessReviewVerdict.Revise ->
+            ProviderProse.render
+                lang
+                MagicTodoSurface.Path.PreviousReviewBody
+                (MagicTodoSurface.previousReviewSubs
+                    (ProcessReviewVerdict.wire previous.Verdict)
+                    previous.ReportText)
+        | _ -> ""
 
-                    let life =
-                        Map.tryFind (ManagerLifeId.value lifeId) todoProjection.ByLife
-                        |> Option.defaultValue (MagicTodoProjection.emptyLife lifeId)
+    let private enrichAcceptedResult
+        (managerSessionId: SessionId)
+        (isT1Commitment: bool)
+        (rendered: string)
+        =
+        if isT1Commitment then
+            ManagerNarrative.wrapT1AcceptedResult
+                (ProviderProse.documentFor managerSessionId ManagerNarrative.Path.T1Revelation Map.empty)
+                rendered
+        else
+            rendered
 
-                    let! currentResult =
-                        match life.CurrentObligationsRef with
-                        | None -> Task.FromResult(Ok [])
-                        | Some(blobRef, digest) -> readList journal "CurrentObligations" blobRef digest
+    let private acceptFresh
+        (journal: AgentJournal)
+        (bridge: PreparedBridge)
+        (physical: PhysicalSuccessEvidence)
+        (observedInputDigest: string)
+        (observedOutputDigest: string)
+        : Task<Result<AcceptOutcome, AcceptRejection>> =
+        taskResult {
+            let projection = AgentJournal.snapshot journal
 
-                    let! previousReviewResult =
-                        match MagicTodoProjection.consumablePreviousReview life with
-                        | None -> Task.FromResult(Ok None)
-                        | Some concluded ->
-                            task {
-                                match!
-                                    readText
-                                        journal
-                                        "ProcessReviewLWR"
-                                        concluded.WorkRecordRef
-                                        concluded.WorkRecordDigest
-                                with
-                                | Error error -> return Error error
-                                | Ok report ->
-                                    return
-                                        Ok(
-                                            Some
-                                                { Verdict = concluded.Verdict
-                                                  ReportText = report }
-                                        )
-                            }
+            let life =
+                Map.tryFind (ManagerLifeId.value bridge.ManagerLifeId) projection.AgentProjections.MagicTodo.ByLife
+                |> Option.defaultValue (MagicTodoProjection.emptyLife bridge.ManagerLifeId)
 
-                    match currentResult, previousReviewResult with
-                    | Error error, _
-                    | _, Error error -> return Error error
-                    | Ok currentObligations, Ok previousReview ->
-                        let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex lifeId locality.ToolCallId
-                        let prior = existingPrepared lifeId writeId life
+            let checkpoint =
+                Map.tryFind (TodoWriteId.value bridge.Prepared.TodoWriteId) life.Checkpoints
 
-                        let admission =
-                            MagicTodoAdmission.admitObligations
-                                HostDigest.sha256Hex
-                                lifeId
-                                currentObligations
-                                (MagicTodoProjection.mayAdmitNewCheckpoint life)
-                                prior
-                                { ToolCallId = locality.ToolCallId
-                                  ToolPartOrdinal = locality.ToolPartOrdinal
-                                  TodowriteCallIdsInMessage = locality.TodowriteCallIdsInMessage
-                                  ReviewFrontier = locality.ReviewFrontier
-                                  ProviderInputDigest = providerInputDigest }
-                                submitted
+            let isT1Commitment =
+                life.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
 
-                        match admission with
-                        | AdmissionOutcome.AwaitingConsumableReview pending ->
-                            return Error(PrepareRejection.AwaitingConsumableReview pending)
-                        | AdmissionOutcome.Rejected rejection -> return Error(PrepareRejection.Admission rejection)
-                        | AdmissionOutcome.IdempotentReplay replayWriteId ->
-                            match Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints with
-                            | None ->
-                                return Error(PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
-                            | Some checkpoint ->
-                                match!
-                                    readList
-                                        journal
-                                        "ProposedTodo"
-                                        checkpoint.ProposedTodoRef
-                                        checkpoint.ProposedTodoDigest
-                                with
-                                | Error error -> return Error error
-                                | Ok proposal ->
-                                    return
-                                        Ok(
-                                            bridge
-                                                managerSessionId
-                                                lifeId
-                                                (preparedFromCheckpoint lifeId checkpoint)
-                                                checkpoint.PreparedFactRef
-                                                currentObligations
-                                                proposal
-                                                previousReview
-                                                checkpoint.Accepted
-                                                checkpoint.OutputDigest
-                                        )
-                        | AdmissionOutcome.FreshPrepare preparedPlan ->
-                            let! baseResult = writeList journal "BaseTodo" preparedPlan.Base
-                            let! proposedResult = writeList journal "ProposedTodo" preparedPlan.Proposed
+            let accepted =
+                { ManagerLifeId = bridge.Prepared.ManagerLifeId
+                  TodoWriteId = bridge.Prepared.TodoWriteId
+                  ToolCallId = bridge.Prepared.ToolCallId
+                  PreparedFactRef = bridge.PreparedFactRef
+                  InputDigest = observedInputDigest
+                  OutputDigest = observedOutputDigest
+                  PhysicalSuccessEvidence = physical
+                  SemanticVersion = bridge.Prepared.SemanticVersion }
 
-                            match baseResult, proposedResult with
-                            | Error error, _
-                            | _, Error error -> return Error error
-                            | Ok baseBlob, Ok proposedBlob ->
-                                let prepared =
-                                    { ManagerSessionId = managerSessionId
-                                      ManagerLifeId = lifeId
-                                      TodoWriteId = preparedPlan.TodoWriteId
-                                      ToolCallId = locality.ToolCallId
-                                      ToolPartOrdinal = preparedPlan.ToolPartOrdinal
-                                      BaseTodoRef = baseBlob.BlobRef
-                                      BaseTodoDigest = baseBlob.BlobDigest
-                                      ProposedTodoRef = proposedBlob.BlobRef
-                                      ProposedTodoDigest = proposedBlob.BlobDigest
-                                      PlanCompleteDeclared = planCompleteDeclared
-                                      ProviderInputDigest = preparedPlan.ProviderInputDigest
-                                      ReviewFrontier = preparedPlan.ReviewFrontier
-                                      SemanticVersion = MagicTodo.SemanticVersion }
+            let lang = ProviderProse.languageOf bridge.ManagerSessionId
+            let previousBody = previousReviewBody lang bridge.PreviousReview
 
-                                match!
-                                    AgentJournal.appendMagicTodo
-                                        (StreamId.Session managerSessionId)
-                                        (Some locality.ProviderRun)
-                                        (MagicTodoFact.TodoWritePrepared prepared)
-                                        journal
-                                with
-                                | Error failure ->
-                                    return Error(PrepareRejection.JournalAppend(JournalAppendFailure.describe failure))
-                                | Ok receipt ->
-                                    return
-                                        Ok(
-                                            bridge
-                                                managerSessionId
-                                                lifeId
-                                                prepared
-                                                receipt.EventId
-                                                currentObligations
-                                                preparedPlan.Proposed
-                                                previousReview
-                                                false
-                                                None
-                                        )
+            let acceptedEpilogue =
+                ProviderProse.render lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
+
+            let rendered =
+                ProviderProse.render
+                    lang
+                    MagicTodoSurface.Path.ObligationWriteResult
+                    (MagicTodoSurface.obligationWriteSubs previousBody acceptedEpilogue)
+
+            let enrichedResult = enrichAcceptedResult bridge.ManagerSessionId isT1Commitment rendered
+
+            let! _ =
+                AgentJournal.appendMagicTodo
+                    (StreamId.Session bridge.ManagerSessionId)
+                    None
+                    (MagicTodoFact.TodoWriteAccepted accepted)
+                    journal
+                |> TaskResult.mapError (fun failure ->
+                    AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
+
+            return
+                { EnrichedResult = enrichedResult
+                  NeedsDedicatedEnlist = life.Dedicated.IsNone
+                  NeedsEnsureReview =
+                    checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
         }
 
     let accept
@@ -397,85 +564,9 @@ module MagicTodoMembrane =
             if bridge.Prepared.ProviderInputDigest <> observedInputDigest then
                 return Error AcceptRejection.InputDigestMismatch
             elif bridge.AlreadyAccepted then
-                match bridge.AcceptedOutputDigest with
-                | Some digest when digest = observedOutputDigest ->
-                    return
-                        Ok
-                            { EnrichedResult = ""
-                              NeedsDedicatedEnlist = false
-                              NeedsEnsureReview = false }
-                | _ -> return Error AcceptRejection.OutputDigestMismatch
+                return acceptIdempotent bridge.AcceptedOutputDigest observedOutputDigest
             else
-                let projection = AgentJournal.snapshot journal
-
-                let life =
-                    Map.tryFind (ManagerLifeId.value bridge.ManagerLifeId) projection.AgentProjections.MagicTodo.ByLife
-                    |> Option.defaultValue (MagicTodoProjection.emptyLife bridge.ManagerLifeId)
-
-                let checkpoint =
-                    Map.tryFind (TodoWriteId.value bridge.Prepared.TodoWriteId) life.Checkpoints
-
-                let isT1Commitment =
-                    life.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
-
-                let accepted =
-                    { ManagerLifeId = bridge.Prepared.ManagerLifeId
-                      TodoWriteId = bridge.Prepared.TodoWriteId
-                      ToolCallId = bridge.Prepared.ToolCallId
-                      PreparedFactRef = bridge.PreparedFactRef
-                      InputDigest = observedInputDigest
-                      OutputDigest = observedOutputDigest
-                      PhysicalSuccessEvidence = physical
-                      SemanticVersion = bridge.Prepared.SemanticVersion }
-
-                let lang = ProviderProse.languageOf bridge.ManagerSessionId
-
-                let previousBody =
-                    match bridge.PreviousReview with
-                    | Some previous when previous.Verdict = ProcessReviewVerdict.Revise ->
-                        ProviderProse.render
-                            lang
-                            MagicTodoSurface.Path.PreviousReviewBody
-                            (MagicTodoSurface.previousReviewSubs
-                                (ProcessReviewVerdict.wire previous.Verdict)
-                                previous.ReportText)
-                    | _ -> ""
-
-                let acceptedEpilogue =
-                    ProviderProse.render lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
-
-                let rendered =
-                    ProviderProse.render
-                        lang
-                        MagicTodoSurface.Path.ObligationWriteResult
-                        (MagicTodoSurface.obligationWriteSubs previousBody acceptedEpilogue)
-
-                let enrichedResult =
-                    if isT1Commitment then
-                        ManagerNarrative.wrapT1AcceptedResult
-                            (ProviderProse.documentFor
-                                bridge.ManagerSessionId
-                                ManagerNarrative.Path.T1Revelation
-                                Map.empty)
-                            rendered
-                    else
-                        rendered
-
-                match!
-                    AgentJournal.appendMagicTodo
-                        (StreamId.Session bridge.ManagerSessionId)
-                        None
-                        (MagicTodoFact.TodoWriteAccepted accepted)
-                        journal
-                with
-                | Error failure -> return Error(AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
-                | Ok _ ->
-                    return
-                        Ok
-                            { EnrichedResult = enrichedResult
-                              NeedsDedicatedEnlist = life.Dedicated.IsNone
-                              NeedsEnsureReview =
-                                checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
+                return! acceptFresh journal bridge physical observedInputDigest observedOutputDigest
         }
 
 /// Physical OpenCode V1 hook overlay for Magic Todo. The Host builtin remains
@@ -532,6 +623,270 @@ module MagicTodoHostHooks =
         else
             CanonicalJson.canonicalJson output?output
 
+    let private sessionTextOf (input: obj) =
+        if isNull input || isNull input?sessionID then
+            ""
+        else
+            string input?sessionID
+
+    let private languageForSession (sessionText: string) =
+        if String.IsNullOrWhiteSpace sessionText then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            SessionProviderLanguage.tryGet (SessionId.create sessionText)
+            |> Option.defaultWith ProviderLanguageBinding.readGlobalPreference
+
+    let private requirePort (reason: string) (port: 'a option) =
+        match port with
+        | Some value -> value
+        | None -> fatalInfrastructure "" reason
+
+    let private preparationFailure (sessionText: string) (reason: MagicTodoMembrane.PrepareRejection) =
+        match syntaxPrepareFailure reason with
+        | Some syntax -> ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
+        | None -> fatalInfrastructure sessionText (sprintf "prepare invariant failed: %A" reason)
+
+    let private admitPreparationAttempt
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (sessionText: string)
+        (locality: MagicTodoLocality.LocalizedToolCall)
+        (providerInputDigest: string)
+        (planComplete: bool)
+        (obligations: ObligationList)
+        =
+        task {
+            match!
+                MagicTodoMembrane.prepare
+                    durable
+                    sessionId
+                    locality
+                    providerInputDigest
+                    planComplete
+                    obligations
+            with
+            | Ok value -> return ObligationLedgerWorkflow.PreparationAttempt.Prepared value
+            | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
+                return ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
+            | Error reason -> return preparationFailure sessionText reason
+        }
+
+    let private requireMessages (sessionText: string) (messagesResult: Result<SessionMessage list, string>) =
+        match messagesResult with
+        | Error reason -> fatalInfrastructure sessionText ("snapshot unavailable: " + reason)
+        | Ok messages -> messages
+
+    let private requireLocality
+        (sessionText: string)
+        (localityResult: Result<MagicTodoLocality.LocalizedToolCall, MagicTodoLocality.LocalityRejection>)
+        =
+        match localityResult with
+        | Error reason -> fatalInfrastructure sessionText (sprintf "locality failed: %A" reason)
+        | Ok locality -> locality
+
+    let private requireMaterialized
+        (sessionText: string)
+        (materialized: Result<MagicTodoLocality.LocalizedToolCall, MagicTodoLocality.InputMaterializationRejection>)
+        =
+        match materialized with
+        | Error reason -> fatalInfrastructure sessionText (sprintf "input materialization failed: %A" reason)
+        | Ok locality -> locality
+
+    let private resolvePreparationFailure sessionText failure : Result<MagicTodoMembrane.PreparedBridge, string> =
+        match failure with
+        | ObligationLedgerWorkflow.PreparationFailure.AttemptFailed syntax -> Error syntax
+        | ObligationLedgerWorkflow.PreparationFailure.ReviewWaitFailed reason ->
+            fatalInfrastructure sessionText ("await ConsumableReview failed: " + reason)
+        | ObligationLedgerWorkflow.PreparationFailure.MissingPendingReview ->
+            fatalInfrastructure
+                sessionText
+                "lag-1 wait without pending ConsumableReview (projection inconsistent)"
+        | ObligationLedgerWorkflow.PreparationFailure.ReviewDidNotConverge ->
+            fatalInfrastructure
+                sessionText
+                "ConsumableReview wait completed but checkpoint admission still reports the same pending review"
+
+    let private prepareDeferredBridge
+        (durable: AgentJournal)
+        (snapshots: ISessionSnapshotPort)
+        (reviews: ProcessReviewPort)
+        (sessionId: SessionId)
+        (sessionText: string)
+        (callId: ToolCallId)
+        (providerInputCanonical: string)
+        (planComplete: bool)
+        (obligations: ObligationList)
+        : Task<Result<MagicTodoMembrane.PreparedBridge, string>> =
+        task {
+            let! messagesResult = snapshots.GetMessages sessionId
+            let messages = requireMessages sessionText messagesResult
+
+            let locality =
+                MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId
+                |> requireLocality sessionText
+                |> fun initial -> MagicTodoLocality.materializeInput initial providerInputCanonical
+                |> requireMaterialized sessionText
+
+            let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
+
+            let admitNow () =
+                admitPreparationAttempt
+                    durable
+                    sessionId
+                    sessionText
+                    locality
+                    providerInputDigest
+                    planComplete
+                    obligations
+
+            let currentPendingReview () =
+                let snapshotNow = AgentJournal.snapshot durable
+
+                AgentProjection.tryFind sessionId snapshotNow.AgentProjections
+                |> Option.bind (fun session -> session.ManagerLife)
+                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                |> Option.bind (fun mlife ->
+                    MagicTodoProjection.tryLife mlife.LifeId snapshotNow.AgentProjections.MagicTodo
+                    |> Option.bind MagicTodoProjection.pendingReviewObligation
+                    |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
+
+            let awaitReview (lifeId, writeId) =
+                reviews.AwaitConsumableReview durable sessionId lifeId writeId
+
+            let! outcome = ObligationLedgerWorkflow.prepareCheckpoint admitNow currentPendingReview awaitReview
+
+            match outcome with
+            | Ok value -> return Ok value
+            | Error failure -> return resolvePreparationFailure sessionText failure
+        }
+
+    let private unwrapPrepared
+        (preparedResult: Result<MagicTodoMembrane.PreparedBridge, string>)
+        : MagicTodoMembrane.PreparedBridge =
+        match preparedResult with
+        | Ok value -> value
+        | Error syntaxReason -> invalidOp syntaxReason
+
+    let private ensureReviewPort
+        (processReview: ProcessReviewPort option)
+        (durable: AgentJournal)
+        (prepared: MagicTodoMembrane.PreparedBridge)
+        =
+        match processReview with
+        | None -> Task.FromResult(Error "Magic Todo process review runtime disappeared after before")
+        | Some port ->
+            port.EnsureReview
+                durable
+                prepared.ManagerSessionId
+                prepared.ManagerLifeId
+                prepared.Prepared.TodoWriteId
+
+    let private applyEnrichedResult (output: obj) (accepted: MagicTodoMembrane.AcceptOutcome) =
+        if not (String.IsNullOrEmpty accepted.EnrichedResult) then
+            MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
+
+    let private acceptResolvedCheckpoint sessionText outcome (output: obj) =
+        match outcome with
+        | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed reason) ->
+            fatalInfrastructure sessionText (sprintf "Magic Todo accept invariant failed: %A" reason)
+        | Error(ObligationLedgerWorkflow.AcceptanceFailure.ReviewFailed reason) ->
+            fatalInfrastructure sessionText ("Magic Todo ensureReview infrastructure failed: " + reason)
+        | Ok accepted -> applyEnrichedResult output accepted
+
+    let private acceptAfterPrepare
+        (durable: AgentJournal)
+        (processReview: ProcessReviewPort option)
+        (sessionText: string)
+        (preparedTask: Task<Result<MagicTodoMembrane.PreparedBridge, string>>)
+        (output: obj)
+        =
+        task {
+            let! preparedResult = preparedTask
+            let prepared = unwrapPrepared preparedResult
+            let outputDigest = outputCanonical output |> HostDigest.sha256Hex
+
+            let acceptDurably () =
+                MagicTodoMembrane.accept
+                    durable
+                    prepared
+                    PhysicalSuccessEvidence.LiveAfterSuccess
+                    prepared.Prepared.ProviderInputDigest
+                    outputDigest
+
+            let shouldEnsureReview (accepted: MagicTodoMembrane.AcceptOutcome) =
+                accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist
+
+            let ensureReview (_accepted: MagicTodoMembrane.AcceptOutcome) =
+                ensureReviewPort processReview durable prepared
+
+            let! outcome =
+                ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
+
+            acceptResolvedCheckpoint sessionText outcome output
+        }
+
+    let private runAfterTodo
+        (journal: AgentJournal option)
+        (processReview: ProcessReviewPort option)
+        (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
+        (input: obj)
+        (output: obj)
+        =
+        task {
+            let durable = requirePort "Magic Todo requires a durable AgentJournal" journal
+            let sessionText = requiredText input "sessionID"
+            let callText = requiredText input "callID"
+            let key = bridgeKey sessionText callText
+
+            let preparedTask =
+                match bridges.TryGetValue key with
+                | false, _ -> fatalInfrastructure sessionText "Magic Todo after hook has no deferred prepare"
+                | true, value -> value
+
+            try
+                do! acceptAfterPrepare durable processReview sessionText preparedTask output
+            finally
+                bridges.Remove key |> ignore
+        }
+
+    let private runBeforeTodo
+        (journal: AgentJournal option)
+        (snapshot: ISessionSnapshotPort option)
+        (processReview: ProcessReviewPort option)
+        (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
+        (input: obj)
+        (output: obj)
+        =
+        task {
+            let durable = requirePort "Magic Todo requires a durable AgentJournal" journal
+            let snapshots = requirePort "Magic Todo requires the full session snapshot port" snapshot
+            let reviews = requirePort "Magic Todo requires the process review runtime" processReview
+            let sessionText = requiredText input "sessionID"
+            let callText = requiredText input "callID"
+            let sessionId = SessionId.create sessionText
+            let callId = ToolCallId.create callText
+            let args: obj = output?args
+
+            match MagicTodoHostCodec.tryDecodeInput args with
+            | Error reason -> invalidOp reason
+            | Ok submittedInput ->
+                let obligations = submittedInput.Obligations
+                let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
+                MagicTodoHostCodec.replaceCompatibilityArgs output (obligationsToCompatibilityRows obligations)
+
+                bridges[bridgeKey sessionText callText] <-
+                    prepareDeferredBridge
+                        durable
+                        snapshots
+                        reviews
+                        sessionId
+                        sessionText
+                        callId
+                        providerInputCanonical
+                        submittedInput.PlanComplete
+                        obligations
+        }
+
     let create
         (journal: AgentJournal option)
         (snapshot: ISessionSnapshotPort option)
@@ -542,222 +897,20 @@ module MagicTodoHostHooks =
 
         let definition (input: obj) (output: obj) =
             if isTodoTool input "toolID" then
-                let sessionText =
-                    if isNull input || isNull input?sessionID then
-                        ""
-                    else
-                        string input?sessionID
-
-                let lang =
-                    if String.IsNullOrWhiteSpace sessionText then
-                        ProviderLanguageBinding.readGlobalPreference ()
-                    else
-                        let sid = SessionId.create sessionText
-
-                        match SessionProviderLanguage.tryGet sid with
-                        | Some value -> value
-                        | None -> ProviderLanguageBinding.readGlobalPreference ()
-
+                let sessionText = sessionTextOf input
+                let lang = languageForSession sessionText
                 MagicTodoHostCodec.applyDefinition lang output
 
         let before (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    let durable =
-                        match journal with
-                        | Some value -> value
-                        | None -> fatalInfrastructure "" "Magic Todo requires a durable AgentJournal"
-
-                    let snapshots =
-                        match snapshot with
-                        | Some value -> value
-                        | None -> fatalInfrastructure "" "Magic Todo requires the full session snapshot port"
-
-                    let reviews =
-                        match processReview with
-                        | Some value -> value
-                        | None -> fatalInfrastructure "" "Magic Todo requires the process review runtime"
-
-                    let sessionText = requiredText input "sessionID"
-                    let callText = requiredText input "callID"
-                    let sessionId = SessionId.create sessionText
-                    let callId = ToolCallId.create callText
-                    let args: obj = output?args
-
-                    match MagicTodoHostCodec.tryDecodeInput args with
-                    | Error reason -> invalidOp reason
-                    | Ok submittedInput ->
-                        let obligations = submittedInput.Obligations
-                        let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
-                        MagicTodoHostCodec.replaceCompatibilityArgs output (obligationsToCompatibilityRows obligations)
-
-                        let prepared =
-                            task {
-                                let! messagesResult = snapshots.GetMessages sessionId
-
-                                match messagesResult with
-                                | Error reason ->
-                                    return fatalInfrastructure sessionText ("snapshot unavailable: " + reason)
-                                | Ok messages ->
-                                    match
-                                        MagicTodoLocality.resolve
-                                            sessionId
-                                            messages
-                                            (AgentJournal.snapshot durable)
-                                            callId
-                                    with
-                                    | Error reason ->
-                                        return fatalInfrastructure sessionText (sprintf "locality failed: %A" reason)
-                                    | Ok initialLocality ->
-                                        match
-                                            MagicTodoLocality.materializeInput initialLocality providerInputCanonical
-                                        with
-                                        | Error reason ->
-                                            return
-                                                fatalInfrastructure
-                                                    sessionText
-                                                    (sprintf "input materialization failed: %A" reason)
-                                        | Ok locality ->
-                                            let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
-
-                                            let admitNow () =
-                                                task {
-                                                    match!
-                                                        MagicTodoMembrane.prepare
-                                                            durable
-                                                            sessionId
-                                                            locality
-                                                            providerInputDigest
-                                                            submittedInput.PlanComplete
-                                                            obligations
-                                                    with
-                                                    | Ok value ->
-                                                        return
-                                                            ObligationLedgerWorkflow.PreparationAttempt.Prepared value
-                                                    | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
-                                                        return
-                                                            ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
-                                                    | Error reason ->
-                                                        match syntaxPrepareFailure reason with
-                                                        | Some syntax ->
-                                                            return
-                                                                ObligationLedgerWorkflow.PreparationAttempt.Failed
-                                                                    syntax
-                                                        | None ->
-                                                            return
-                                                                fatalInfrastructure
-                                                                    sessionText
-                                                                    (sprintf "prepare invariant failed: %A" reason)
-                                                }
-
-                                            let currentPendingReview () =
-                                                let snapshotNow = AgentJournal.snapshot durable
-
-                                                AgentProjection.tryFind sessionId snapshotNow.AgentProjections
-                                                |> Option.bind (fun session -> session.ManagerLife)
-                                                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                                                |> Option.bind (fun mlife ->
-                                                    MagicTodoProjection.tryLife
-                                                        mlife.LifeId
-                                                        snapshotNow.AgentProjections.MagicTodo
-                                                    |> Option.bind MagicTodoProjection.pendingReviewObligation
-                                                    |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
-
-                                            let awaitReview (lifeId, writeId) =
-                                                reviews.AwaitConsumableReview durable sessionId lifeId writeId
-
-                                            match!
-                                                ObligationLedgerWorkflow.prepareCheckpoint
-                                                    admitNow
-                                                    currentPendingReview
-                                                    awaitReview
-                                            with
-                                            | Ok value -> return Ok value
-                                            | Error(ObligationLedgerWorkflow.PreparationFailure.AttemptFailed syntax) ->
-                                                return Error syntax
-                                            | Error(ObligationLedgerWorkflow.PreparationFailure.ReviewWaitFailed reason) ->
-                                                return
-                                                    fatalInfrastructure
-                                                        sessionText
-                                                        ("await ConsumableReview failed: " + reason)
-                                            | Error ObligationLedgerWorkflow.PreparationFailure.MissingPendingReview ->
-                                                return
-                                                    fatalInfrastructure
-                                                        sessionText
-                                                        "lag-1 wait without pending ConsumableReview (projection inconsistent)"
-                                            | Error ObligationLedgerWorkflow.PreparationFailure.ReviewDidNotConverge ->
-                                                return
-                                                    fatalInfrastructure
-                                                        sessionText
-                                                        "ConsumableReview wait completed but checkpoint admission still reports the same pending review"
-                            }
-
-                        bridges[bridgeKey sessionText callText] <- prepared
+                    do! runBeforeTodo journal snapshot processReview bridges input output
             }
 
         let after (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    let durable =
-                        match journal with
-                        | Some value -> value
-                        | None -> fatalInfrastructure "" "Magic Todo requires a durable AgentJournal"
-
-                    let sessionText = requiredText input "sessionID"
-                    let callText = requiredText input "callID"
-                    let key = bridgeKey sessionText callText
-
-                    match bridges.TryGetValue key with
-                    | false, _ -> fatalInfrastructure sessionText "Magic Todo after hook has no deferred prepare"
-                    | true, preparedTask ->
-                        try
-                            let! preparedResult = preparedTask
-
-                            let prepared =
-                                match preparedResult with
-                                | Ok value -> value
-                                | Error syntaxReason -> invalidOp syntaxReason
-
-                            let outputDigest = outputCanonical output |> HostDigest.sha256Hex
-
-                            let acceptDurably () =
-                                MagicTodoMembrane.accept
-                                    durable
-                                    prepared
-                                    PhysicalSuccessEvidence.LiveAfterSuccess
-                                    prepared.Prepared.ProviderInputDigest
-                                    outputDigest
-
-                            let shouldEnsureReview (accepted: MagicTodoMembrane.AcceptOutcome) =
-                                accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist
-
-                            let ensureReview (_accepted: MagicTodoMembrane.AcceptOutcome) =
-                                match processReview with
-                                | None ->
-                                    Task.FromResult(Error "Magic Todo process review runtime disappeared after before")
-                                | Some port ->
-                                    port.EnsureReview
-                                        durable
-                                        prepared.ManagerSessionId
-                                        prepared.ManagerLifeId
-                                        prepared.Prepared.TodoWriteId
-
-                            match!
-                                ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
-                            with
-                            | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed reason) ->
-                                fatalInfrastructure
-                                    sessionText
-                                    (sprintf "Magic Todo accept invariant failed: %A" reason)
-                            | Error(ObligationLedgerWorkflow.AcceptanceFailure.ReviewFailed reason) ->
-                                fatalInfrastructure
-                                    sessionText
-                                    ("Magic Todo ensureReview infrastructure failed: " + reason)
-                            | Ok accepted ->
-                                if not (String.IsNullOrEmpty accepted.EnrichedResult) then
-                                    MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
-                        finally
-                            bridges.Remove key |> ignore
+                    do! runAfterTodo journal processReview bridges input output
             }
 
         { Definition = definition

@@ -31,7 +31,7 @@
 | `tests/workflow-surface.test.mjs` | NEW | 已跑绿（3 pass） |
 | `tests/recovery-reentry.test.mjs` | NEW | 已跑绿（2 pass） |
 | `tests/semantic-vocabulary.test.mjs` | NEW | 已跑绿（3 pass） |
-| `tests/fsharp-control-pyramid.test.mjs` | NEW | 已跑绿（11 pass；production baseline=2166） |
+| `tests/fsharp-control-pyramid.test.mjs` | NEW | 已跑绿（11 pass；production baseline=1469） |
 | `tests/error-handling-vocabulary.test.mjs` | NEW | 已跑绿（3 pass；Fable build 同步通过） |
 
 ## 3. 单跑命令

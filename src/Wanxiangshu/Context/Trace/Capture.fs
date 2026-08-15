@@ -135,13 +135,19 @@ module XTraceCapture =
         | Ok blob -> blob
         | Error error -> raise (InvalidOperationException(sprintf "%s: %s" context error))
 
+    let private mapBlobWriteError (context: string) (write: Task<Result<'a, string>>) : Task<Result<'a, string>> =
+        task {
+            let! result = write
+            return result |> Result.mapError (fun error -> sprintf "%s: %s" context error)
+        }
+
     /// Evidence → Decision: opening absent and assignment non-blank → capture.
     let private captureOpeningWhenAbsent
         (durable: AgentJournal)
         (sessionId: SessionId)
         (assignmentText: string)
         (authoritativeRequirements: string list)
-        : Task =
+        : Task<unit> =
         task {
             let existing = xTraceOf durable sessionId
 
@@ -181,7 +187,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (text: string)
         (providerRun: ProviderRunIdentity)
-        : Task =
+        : Task<unit> =
         task {
             let! writeResult = durable.WriteBlob text
             let blob = requireBlobWritten "XTrace terminal blob write failed" writeResult
@@ -201,7 +207,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (text: string)
         (providerRun: ProviderRunIdentity)
-        : Task =
+        : Task<unit> =
         task {
             if String.IsNullOrWhiteSpace text then return ()
             elif isReplayTerminal durable sessionId text then return ()
@@ -317,7 +323,7 @@ module XTraceCapture =
         (recorded: Set<string>)
         (nextCursor: unit -> int64)
         (work: PartCaptureWork)
-        : Task =
+        : Task<unit> =
         task {
             if Set.contains work.Provenance recorded then
                 return ()
@@ -425,7 +431,7 @@ module XTraceCapture =
             else
                 let cursor = nextCursor ()
                 let kind, toolName, body = partShape work.Source.Part
-                let! blob = durable.WriteBlob body
+                let! blob = durable.WriteBlob body |> mapBlobWriteError "XTrace part blob write failed"
 
                 do!
                     CompanionFact.XTracePartAppended
@@ -496,7 +502,7 @@ module XTraceCapture =
         (textRef: BlobRef)
         (textDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
-        : Task =
+        : Task<unit> =
         task {
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId

@@ -4,6 +4,8 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -80,6 +82,54 @@ module EnforcerFrameRecovery =
         | DigestMismatch of digest: string
         | EpochMismatch
 
+    let private projectionBlogFrameKind kind =
+        match kind with
+        | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
+        | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
+
+    let private ensureFrameDigest (frame: BlogFrame) (text: string) =
+        let digest = BlobDigest.value frame.Digest
+
+        if HostDigest.sha256Hex text = digest then
+            Ok()
+        else
+            Error(FrameLoadError.DigestMismatch digest)
+
+    let private resolveFrameBlob (journal: AgentJournal) (frame: BlogFrame) =
+        taskResult {
+            let digest = BlobDigest.value frame.Digest
+
+            let! text =
+                journal.Writer.BlobWriter.Read frame.TextRef
+                |> TaskResult.mapError (fun _ -> FrameLoadError.MissingFrameBlob digest)
+
+            do! ensureFrameDigest frame text
+
+            return
+                { Kind = projectionBlogFrameKind frame.Kind
+                  Digest = digest
+                  Body = text }
+        }
+
+    let private loadBlogFrames (journal: AgentJournal) (blog: BlogProjectionState) =
+        taskResult {
+            let! frames =
+                BlogProjection.frames blog
+                |> List.traverseTaskResultM (resolveFrameBlob journal)
+
+            return frames, blog.FrameEpochId
+        }
+
+    let private loadSessionBlogFrames (journal: AgentJournal) (session: SessionAgentProjection) =
+        task {
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+
+            if List.isEmpty blog.Frames then
+                return Ok([], blog.FrameEpochId)
+            else
+                return! loadBlogFrames journal blog
+        }
+
     /// C6: unique fail-closed loader for effective BlogFrames.
     /// Silent List.choose drop of bad frames is forbidden.
     /// Kind is preserved so ProjectionSnapshot.BlogFrames can carry ProjectionBlogFrameKind.
@@ -90,43 +140,141 @@ module EnforcerFrameRecovery =
         task {
             let projections = AgentJournal.snapshot journal
 
-            match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
-            | None -> return Error FrameLoadError.MissingAssociation
-            | Some _ ->
-                match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-                | None -> return Error FrameLoadError.MissingBlogSession
-                | Some session ->
-                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            let association =
+                SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations
 
-                    if List.isEmpty blog.Frames then
-                        return Ok([], blog.FrameEpochId)
-                    else
-                        let rec load (remaining: BlogFrame list) acc =
-                            task {
-                                match remaining with
-                                | [] -> return Ok(List.rev acc, blog.FrameEpochId)
-                                | frame :: rest ->
-                                    match! journal.Writer.BlobWriter.Read frame.TextRef with
-                                    | Error _ ->
-                                        return Error(FrameLoadError.MissingFrameBlob(BlobDigest.value frame.Digest))
-                                    | Ok text ->
-                                        if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
-                                            return Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
-                                        else
-                                            let kind =
-                                                match frame.Kind with
-                                                | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
-                                                | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
+            let session = projections.AgentProjections.Sessions |> Map.tryFind mainSessionId
 
-                                            let resolved: ResolvedBlogFrame =
-                                                { Kind = kind
-                                                  Digest = BlobDigest.value frame.Digest
-                                                  Body = text }
+            match association, session with
+            | None, _ -> return Error FrameLoadError.MissingAssociation
+            | Some _, None -> return Error FrameLoadError.MissingBlogSession
+            | Some _, Some session -> return! loadSessionBlogFrames journal session
+        }
 
-                                            return! load rest (resolved :: acc)
-                            }
+    let private requestKindEvidence (bloggerSessionId: SessionId) (ctx: BloggerRequestContext) =
+        match ctx with
+        | BloggerRequestContext.Main main ->
+            let messageId =
+                CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-                        return! load (BlogProjection.frames blog) []
+            "normal", 0, Some(messageId, main.Toml)
+        | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
+
+    let private previousTipsOf (projections: ProjectionSet) (owner: SessionId) =
+        match projections.AgentProjections.Sessions |> Map.tryFind owner with
+        | Some session ->
+            session.Enforcement
+            |> Option.map EnforcementProjection.recentTips
+            |> Option.defaultValue []
+            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+        | None -> []
+
+    let private hostSourceLabel isPhysical =
+        if isPhysical then "physical-delta" else "synthetic-projection"
+
+    let private wireText (msg: ProviderProjection.WireMessage) =
+        msg.Parts
+        |> List.tryPick (function
+            | ProviderProjection.WireText t -> Some t
+            | _ -> None)
+        |> Option.defaultValue ""
+
+    let private toHostMessage (msg: ProviderProjection.WireMessage, messageId: string option, isPhysical: bool) =
+        match messageId with
+        | None -> None
+        | Some id ->
+            Some(
+                createObj
+                    [ "info",
+                      box (
+                          createObj
+                              [ "id", box id
+                                "role", box msg.Role
+                                "synthetic", box (not isPhysical)
+                                "source", box (hostSourceLabel isPhysical) ]
+                      )
+                      "parts", box [| createObj [ "type", box "text"; "text", box (wireText msg) ] |] ]
+            )
+
+    let private messagesToHost
+        (items: (ProviderProjection.WireMessage * string option * bool) list)
+        : obj list option =
+        let rec fold acc remaining =
+            match remaining with
+            | [] -> Some(List.rev acc)
+            | head :: tail ->
+                toHostMessage head
+                |> Option.bind (fun hostMsg -> fold (hostMsg :: acc) tail)
+
+        fold [] items
+
+    let private renderValidatedHostMessages (snapshot: ProjectionSnapshot) ordered =
+        let rendered =
+            ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
+
+        let n = List.length rendered.Messages
+
+        if
+            List.length rendered.HostMessageIds <> n
+            || List.length rendered.HostIsPhysical <> n
+        then
+            None
+        else
+            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+            |> messagesToHost
+
+    let private renderPlannedHostMessages (snapshot: ProjectionSnapshot) intents =
+        match ProjectionPlanner.plan intents with
+        | Error _ -> None
+        | Ok ordered -> renderValidatedHostMessages snapshot ordered
+
+    let private rebuildForOwner
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (owner: SessionId)
+        (ctx: BloggerRequestContext)
+        (projections: ProjectionSet)
+        : Task<obj list option> =
+        task {
+            // Zero frames is legitimate (first Main before any Entry). Missing
+            // association was already filtered. Blob load still fail-closed.
+            match! loadEffectiveFrames journal owner with
+            | Error FrameLoadError.MissingAssociation
+            | Error FrameLoadError.MissingBlogSession
+            | Error(FrameLoadError.MissingFrameBlob _)
+            | Error(FrameLoadError.DigestMismatch _)
+            | Error FrameLoadError.EpochMismatch -> return None
+            | Ok(resolvedFrames, frameEpoch) ->
+                let requestKind, squashCount, delta = requestKindEvidence bloggerSessionId ctx
+                let previousTips = previousTipsOf projections owner
+                let lang = ProviderProse.languageOf owner
+
+                let blogFramesIntent: BlogFramesIntent =
+                    { RequestKind = requestKind
+                      SquashFrameCount = squashCount
+                      BloggerSessionId = SessionId.value bloggerSessionId
+                      FrameEpoch = FrameEpochId.value frameEpoch
+                      PhysicalDelta = delta
+                      PreviousTips = previousTips
+                      NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
+                      SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
+
+                let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
+                    { ProviderId = None
+                      ModelId = None
+                      Variant = None
+                      Tools = []
+                      System = []
+                      Messages = [] }
+
+                let snapshot: ProjectionSnapshot =
+                    { CurrentProjection = emptyCurrent
+                      CommittedPrefix = None
+                      BlogFrames = resolvedFrames
+                      TransportMessages = Set.empty
+                      HostReanchor = None }
+
+                return renderPlannedHostMessages snapshot [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
         }
 
     /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
@@ -146,121 +294,7 @@ module EnforcerFrameRecovery =
 
             match mainSessionId with
             | None -> return None
-            | Some owner ->
-                // Zero frames is legitimate (first Main before any Entry). Missing
-                // association was already filtered. Blob load still fail-closed.
-                match! loadEffectiveFrames journal owner with
-                | Error FrameLoadError.MissingAssociation
-                | Error FrameLoadError.MissingBlogSession
-                | Error(FrameLoadError.MissingFrameBlob _)
-                | Error(FrameLoadError.DigestMismatch _)
-                | Error FrameLoadError.EpochMismatch -> return None
-                | Ok(resolvedFrames, frameEpoch) ->
-                    let requestKind, squashCount, delta =
-                        match ctx with
-                        | BloggerRequestContext.Main main ->
-                            let messageId =
-                                CompanionIdentity.newWorkMessageId
-                                    HostDigest.sha256Hex
-                                    bloggerSessionId
-                                    main.DeltaDigest
-
-                            "normal", 0, Some(messageId, main.Toml)
-                        | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
-
-                    // ENFORCER-070/071: RecentTips from main session (oldest → newest).
-                    // Same source for normal / squash / restart / recovery / compaction rebuilds.
-                    let previousTips =
-                        match projections.AgentProjections.Sessions |> Map.tryFind owner with
-                        | Some session ->
-                            session.Enforcement
-                            |> Option.map EnforcementProjection.recentTips
-                            |> Option.defaultValue []
-                            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
-                        | None -> []
-
-                    let lang = ProviderProse.languageOf owner
-
-                    let blogFramesIntent: BlogFramesIntent =
-                        { RequestKind = requestKind
-                          SquashFrameCount = squashCount
-                          BloggerSessionId = SessionId.value bloggerSessionId
-                          FrameEpoch = FrameEpochId.value frameEpoch
-                          PhysicalDelta = delta
-                          PreviousTips = previousTips
-                          NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
-                          SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
-
-                    let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-                        { ProviderId = None
-                          ModelId = None
-                          Variant = None
-                          Tools = []
-                          System = []
-                          Messages = [] }
-
-                    let snapshot: ProjectionSnapshot =
-                        { CurrentProjection = emptyCurrent
-                          CommittedPrefix = None
-                          BlogFrames = resolvedFrames
-                          TransportMessages = Set.empty
-                          HostReanchor = None }
-
-                    let intents = [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
-
-                    match ProjectionPlanner.plan intents with
-                    | Error _ -> return None
-                    | Ok ordered ->
-                        let rendered =
-                            ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
-
-                        let n = List.length rendered.Messages
-
-                        if
-                            List.length rendered.HostMessageIds <> n
-                            || List.length rendered.HostIsPhysical <> n
-                        then
-                            return None
-                        else
-                            let zipped =
-                                List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
-
-                            let rec toHost
-                                (acc: obj list)
-                                (items: (ProviderProjection.WireMessage * string option * bool) list)
-                                =
-                                match items with
-                                | [] -> Some(List.rev acc)
-                                | (_, None, _) :: _ -> None
-                                | (msg, Some messageId, isPhysical) :: tail ->
-                                    let text =
-                                        msg.Parts
-                                        |> List.tryPick (function
-                                            | ProviderProjection.WireText t -> Some t
-                                            | _ -> None)
-                                        |> Option.defaultValue ""
-
-                                    let hostMsg =
-                                        createObj
-                                            [ "info",
-                                              box (
-                                                  createObj
-                                                      [ "id", box messageId
-                                                        "role", box msg.Role
-                                                        "synthetic", box (not isPhysical)
-                                                        "source",
-                                                        box (
-                                                            if isPhysical then
-                                                                "physical-delta"
-                                                            else
-                                                                "synthetic-projection"
-                                                        ) ]
-                                              )
-                                              "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
-
-                                    toHost (hostMsg :: acc) tail
-
-                            return toHost [] zipped
+            | Some owner -> return! rebuildForOwner journal bloggerSessionId owner ctx projections
         }
 
     /// Dead-code hygiene: never default a rebuild miss to []. Callers that still
@@ -307,6 +341,102 @@ module EnforcerFrameRecovery =
                         Messages = coveredMessages }
             )
 
+    let private hasJsonKey (raw: obj) (key: string) : bool =
+        emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
+
+    let private tryJsonField (raw: obj) (key: string) : obj option =
+        if hasJsonKey raw key then Some(raw?(key)) else None
+
+    let private asString (raw: obj) (key: string) : string =
+        match tryJsonField raw key with
+        | None -> ""
+        | Some value when isNull value -> ""
+        | Some value when emitJsExpr value "typeof $0 === 'string'" -> unbox<string> value
+        | Some value when emitJsExpr value "typeof $0 === 'number'" -> string (unbox<float> value)
+        | Some _ -> ""
+
+    let private parseInt64Text (text: string) : int64 option =
+        if String.IsNullOrWhiteSpace text then None else Some(int64 (float text))
+
+    let private asInt64 (raw: obj) (key: string) : int64 option =
+        match tryJsonField raw key with
+        | None -> None
+        | Some value when isNull value -> None
+        | Some value when emitJsExpr value "typeof $0 === 'number'" -> Some(int64 (unbox<float> value))
+        | Some value when emitJsExpr value "typeof $0 === 'bigint'" ->
+            Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
+        | Some value when emitJsExpr value "typeof $0 === 'string'" -> parseInt64Text (unbox<string> value)
+        | Some _ -> None
+
+    let private parseIntText (text: string) : int option =
+        if String.IsNullOrWhiteSpace text then None else Some(int (float text))
+
+    let private asInt (raw: obj) (key: string) : int option =
+        match tryJsonField raw key with
+        | None -> None
+        | Some value when isNull value -> None
+        | Some value when emitJsExpr value "typeof $0 === 'number'" -> Some(int (unbox<float> value))
+        | Some value when emitJsExpr value "typeof $0 === 'string'" -> parseIntText (unbox<string> value)
+        | Some _ -> None
+
+    let private resolveDeltaDigest (openReq: OpenBloggerRequest) toml deltaDigestRaw =
+        if not (String.IsNullOrWhiteSpace deltaDigestRaw) then
+            BlobDigest.create deltaDigestRaw
+        elif String.IsNullOrWhiteSpace toml then
+            openReq.ContextDigest
+        else
+            BlobDigest.create (HostDigest.sha256Hex toml)
+
+    let private decodeParsedContext (openReq: OpenBloggerRequest) (raw: obj) : BloggerRequestContext option =
+        if openReq.RequestKind = "squash" then
+            let covered =
+                asInt raw "covered_frame_count"
+                |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
+
+            Some(
+                BloggerRequestContext.Squash
+                    { RequestId = openReq.RequestId
+                      MainSessionId = openReq.MainSessionId
+                      BloggerSessionId = openReq.BloggerSessionId
+                      FrameEpochId = openReq.FrameEpochId
+                      CoveredFrameCount = covered
+                      FrameDigests = openReq.SelectedFrameDigests
+                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+            )
+        else
+            let toml = asString raw "toml"
+            let deltaDigestRaw = asString raw "delta_digest"
+            let deltaDigest = resolveDeltaDigest openReq toml deltaDigestRaw
+
+            let prevIngest =
+                asInt64 raw "prev_ingest"
+                |> Option.defaultValue openReq.PreviousIngestedThroughSequence
+
+            let nextIngest =
+                asInt64 raw "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
+
+            Some(
+                BloggerRequestContext.Main
+                    { RequestId = openReq.RequestId
+                      MainSessionId = openReq.MainSessionId
+                      BloggerSessionId = openReq.BloggerSessionId
+                      Toml = toml
+                      PreviousIngestedThroughSequence = prevIngest
+                      NextIngestedThroughSequence = nextIngest
+                      PreviousCoverableTurnCutoffExclusive = asInt raw "prev_cutoff" |> Option.defaultValue 0
+                      NextCoverableTurnCutoffExclusive = asInt raw "next_cutoff" |> Option.defaultValue 0
+                      NextCoveredPrefixDigest = asString raw "next_prefix_digest"
+                      FrameEpochId = openReq.FrameEpochId
+                      DeltaDigest = deltaDigest
+                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+            )
+
+    let private decodeRequestContextJson (openReq: OpenBloggerRequest) (json: string) : BloggerRequestContext option =
+        try
+            decodeParsedContext openReq (Fable.Core.JS.JSON.parse json)
+        with _ ->
+            None
+
     /// C5: inverse of BloggerCoordinator.materializeRequest blob.
     /// Full typed context — never leave cutoff/digest at zero defaults.
     let tryReloadRequestContext
@@ -316,126 +446,7 @@ module EnforcerFrameRecovery =
         task {
             match! journal.Writer.BlobWriter.Read openReq.ContextRef with
             | Error _ -> return None
-            | Ok json ->
-                let decoded =
-                    try
-                        let raw = Fable.Core.JS.JSON.parse json
-
-                        let hasKey (key: string) : bool =
-                            emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
-
-                        let asString (key: string) : string =
-                            if not (hasKey key) then
-                                ""
-                            else
-                                let value = raw?(key)
-
-                                if isNull value then
-                                    ""
-                                elif emitJsExpr value "typeof $0 === 'string'" then
-                                    unbox<string> value
-                                elif emitJsExpr value "typeof $0 === 'number'" then
-                                    string (unbox<float> value)
-                                else
-                                    ""
-
-                        let asInt64 (key: string) : int64 option =
-                            if not (hasKey key) then
-                                None
-                            else
-                                let value = raw?(key)
-
-                                if isNull value then
-                                    None
-                                elif emitJsExpr value "typeof $0 === 'number'" then
-                                    Some(int64 (unbox<float> value))
-                                elif emitJsExpr value "typeof $0 === 'bigint'" then
-                                    Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
-                                elif emitJsExpr value "typeof $0 === 'string'" then
-                                    let text = unbox<string> value
-
-                                    if String.IsNullOrWhiteSpace text then
-                                        None
-                                    else
-                                        Some(int64 (float text))
-                                else
-                                    None
-
-                        let asInt (key: string) : int option =
-                            if not (hasKey key) then
-                                None
-                            else
-                                let value = raw?(key)
-
-                                if isNull value then
-                                    None
-                                elif emitJsExpr value "typeof $0 === 'number'" then
-                                    Some(int (unbox<float> value))
-                                elif emitJsExpr value "typeof $0 === 'string'" then
-                                    let text = unbox<string> value
-
-                                    if String.IsNullOrWhiteSpace text then
-                                        None
-                                    else
-                                        Some(int (float text))
-                                else
-                                    None
-
-                        if openReq.RequestKind = "squash" then
-                            let covered =
-                                asInt "covered_frame_count"
-                                |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
-
-                            Some(
-                                BloggerRequestContext.Squash
-                                    { RequestId = openReq.RequestId
-                                      MainSessionId = openReq.MainSessionId
-                                      BloggerSessionId = openReq.BloggerSessionId
-                                      FrameEpochId = openReq.FrameEpochId
-                                      CoveredFrameCount = covered
-                                      FrameDigests = openReq.SelectedFrameDigests
-                                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                            )
-                        else
-                            let toml = asString "toml"
-                            let deltaDigestRaw = asString "delta_digest"
-
-                            let deltaDigest =
-                                if String.IsNullOrWhiteSpace deltaDigestRaw then
-                                    if String.IsNullOrWhiteSpace toml then
-                                        openReq.ContextDigest
-                                    else
-                                        BlobDigest.create (HostDigest.sha256Hex toml)
-                                else
-                                    BlobDigest.create deltaDigestRaw
-
-                            let prevIngest =
-                                asInt64 "prev_ingest"
-                                |> Option.defaultValue openReq.PreviousIngestedThroughSequence
-
-                            let nextIngest =
-                                asInt64 "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
-
-                            Some(
-                                BloggerRequestContext.Main
-                                    { RequestId = openReq.RequestId
-                                      MainSessionId = openReq.MainSessionId
-                                      BloggerSessionId = openReq.BloggerSessionId
-                                      Toml = toml
-                                      PreviousIngestedThroughSequence = prevIngest
-                                      NextIngestedThroughSequence = nextIngest
-                                      PreviousCoverableTurnCutoffExclusive =
-                                        asInt "prev_cutoff" |> Option.defaultValue 0
-                                      NextCoverableTurnCutoffExclusive = asInt "next_cutoff" |> Option.defaultValue 0
-                                      NextCoveredPrefixDigest = asString "next_prefix_digest"
-                                      FrameEpochId = openReq.FrameEpochId
-                                      DeltaDigest = deltaDigest
-                                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                            )
-                    with _ ->
-                        None
-
-                return decoded
+            | Ok json -> return decodeRequestContextJson openReq json
         }
 
     /// Live commit authority: InFlight payload only.
@@ -446,6 +457,19 @@ module EnforcerFrameRecovery =
     /// handleContinuation when the open request is still live.
     let tryLiveCycleContext (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
         scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId)
+
+    let private tryOpenBloggerRequest (journal: AgentJournal) mainSessionId bloggerSessionId =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind mainSessionId
+        |> Option.bind (fun session -> session.BloggerCycles)
+        |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+
+    let private reloadOpenCycleContext journal mainSessionId bloggerSessionId =
+        task {
+            match tryOpenBloggerRequest journal mainSessionId bloggerSessionId with
+            | None -> return None
+            | Some req -> return! tryReloadRequestContext journal req
+        }
 
     /// Rebuild / empty-calls only: live InFlight, else reload open without
     /// committing. Does not SetCurrentRequest (no side effect on authority).
@@ -460,14 +484,5 @@ module EnforcerFrameRecovery =
 
             match scope.TryPeekCurrentRequest key with
             | Some ctx -> return Some ctx
-            | None ->
-                let openReq =
-                    (AgentJournal.snapshot journal).AgentProjections.Sessions
-                    |> Map.tryFind mainSessionId
-                    |> Option.bind (fun session -> session.BloggerCycles)
-                    |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
-
-                match openReq with
-                | None -> return None
-                | Some req -> return! tryReloadRequestContext journal req
+            | None -> return! reloadOpenCycleContext journal mainSessionId bloggerSessionId
         }

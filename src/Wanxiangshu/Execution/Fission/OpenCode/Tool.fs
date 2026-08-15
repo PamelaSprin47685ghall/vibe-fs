@@ -159,7 +159,7 @@ module FissionTool =
     let private capturedGroup (durable: AgentJournal) groupId =
         FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission
 
-    let private appendDelivery durable owner providerRun groupId completionId laneIndex =
+    let private appendDelivery (durable: AgentJournal) owner providerRun groupId completionId laneIndex =
         appendFission
             durable
             owner
@@ -169,6 +169,274 @@ module FissionTool =
                    OwnerSessionId = owner
                    CompletionId = completionId
                    LaneIndex = laneIndex |})
+
+    let private writeAndAppendCapture (durable: AgentJournal) owner groupId completionId payload =
+        task {
+            match! durable.WriteBlob payload with
+            | Error _ -> return ()
+            | Ok blob ->
+                let! _ =
+                    appendFission
+                        durable
+                        owner
+                        None
+                        (FissionFact.FissionCompletionCaptured
+                            {| GroupId = groupId
+                               OwnerSessionId = owner
+                               CompletionId = completionId
+                               PayloadRef = blob.BlobRef
+                               PayloadDigest = blob.BlobDigest |})
+
+                return ()
+        }
+
+    let private ensureCompletionCaptured (durable: AgentJournal) owner groupId completionId payload =
+        task {
+            match
+                capturedGroup durable groupId
+                |> Option.bind (fun group -> Map.tryFind completionId group.CapturedCompletions)
+            with
+            | Some _ -> return ()
+            | None -> return! writeAndAppendCapture durable owner groupId completionId payload
+        }
+
+    let private deliveryState (durable: AgentJournal) groupId completionId (lane: FissionStartedLane) =
+        match capturedGroup durable groupId with
+        | None -> true, true
+        | Some group ->
+            let delivered =
+                group.CompletionDeliveries
+                |> Map.tryFind completionId
+                |> Option.defaultValue Set.empty
+                |> Set.contains lane.Index
+
+            delivered, Map.containsKey lane.Index group.LaneWork
+
+    let private continueLiveLane
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lane: FissionStartedLane)
+        (completionId: string)
+        (payload: string)
+        =
+        task {
+            let dispatcher = PromptDispatcher.forJournal durable
+
+            match!
+                dispatcher.SendContinuation
+                    scope.Sessions
+                    lane.SessionId
+                    (deliveryPrompt owner completionId payload)
+                    PromptAuthority.ContinuationKind.FissionHandoff
+                    profile
+                    effectiveAgent
+                    (scope.DirectoryFor(SessionId.value lane.SessionId))
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+            with
+            | Error _ -> return ()
+            | Ok _ ->
+                let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                return ()
+        }
+
+    let private deliverLaneBody
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lane: FissionStartedLane)
+        (completionId: string)
+        (payload: string)
+        (laneClosed: bool)
+        =
+        task {
+            if laneClosed then
+                let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                return ()
+            else
+                return!
+                    continueLiveLane
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lane
+                        completionId
+                        payload
+        }
+
+    let private deliverLaneGuarded
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lane: FissionStartedLane)
+        (completionId: string)
+        (payload: string)
+        (laneClosed: bool)
+        =
+        task {
+            try
+                do!
+                    deliverLaneBody
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lane
+                        completionId
+                        payload
+                        laneClosed
+            finally
+                FissionRuntime.endDelivery groupId completionId lane.Index
+        }
+
+    let private deliverOneLane
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (completionId: string)
+        (payload: string)
+        (lane: FissionStartedLane)
+        =
+        task {
+            let alreadyDelivered, laneClosed = deliveryState durable groupId completionId lane
+
+            if
+                alreadyDelivered
+                || not (FissionRuntime.tryBeginDelivery groupId completionId lane.Index)
+            then
+                return ()
+            else
+                return!
+                    deliverLaneGuarded
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lane
+                        completionId
+                        payload
+                        laneClosed
+        }
+
+    let private readyExceptForRetirement (durable: AgentJournal) groupId =
+        match capturedGroup durable groupId with
+        | None -> false
+        | Some group ->
+            group.LaneWork.Count = group.LaneCount
+            && group.PreFissionCompletionIds
+               |> Set.forall (fun id ->
+                   let delivered =
+                       group.CompletionDeliveries
+                       |> Map.tryFind id
+                       |> Option.defaultValue Set.empty
+
+                   Map.containsKey id group.CapturedCompletions
+                   && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+
+    let private convergeWithEventPort
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (owner: SessionId)
+        (groupId: string)
+        =
+        task {
+            let _, beforeRevision = durable.SnapshotWithRevision
+            let! converged = FissionHost.tryConverge eventPort durable owner
+
+            if converged then
+                return ()
+            elif not (readyExceptForRetirement durable groupId) then
+                return ()
+            else
+                let! _ = durable.AwaitChangeFrom beforeRevision
+                let! _ = FissionHost.tryConverge eventPort durable owner
+                return ()
+        }
+
+    let private convergeOwnerIfNeeded (scope: ToolRuntimeScope) durable owner groupId =
+        task {
+            match scope.EventPort with
+            | None -> return ()
+            | Some eventPort -> return! convergeWithEventPort eventPort durable owner groupId
+        }
+
+    let private deliverAllLaneCompletions
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (completionId: string)
+        (payload: string)
+        =
+        task {
+            for lane in lanes |> List.sortBy (fun lane -> lane.Index) do
+                do!
+                    deliverOneLane
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        completionId
+                        payload
+                        lane
+        }
+
+    let private broadcastAfterBegin
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (completionId: string)
+        (payload: string)
+        =
+        task {
+            try
+                do! ensureCompletionCaptured durable owner groupId completionId payload
+
+                do!
+                    deliverAllLaneCompletions
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lanes
+                        completionId
+                        payload
+
+                do! convergeOwnerIfNeeded scope durable owner groupId
+            finally
+                FissionRuntime.endDelivery groupId completionId -1
+        }
 
     /// Capture exactly one canonical payload for a pre-Fission completion, then
     /// account/deliver that same payload once per lane. Closed lanes are accounted
@@ -189,104 +457,209 @@ module FissionTool =
             if not (FissionRuntime.tryBeginDelivery groupId completionId -1) then
                 return ()
             else
-                try
-                    let captured =
-                        capturedGroup durable groupId
-                        |> Option.bind (fun group -> Map.tryFind completionId group.CapturedCompletions)
-
-                    match captured with
-                    | None ->
-                        match! durable.WriteBlob payload with
-                        | Error _ -> return ()
-                        | Ok blob ->
-                            match!
-                                appendFission
-                                    durable
-                                    owner
-                                    None
-                                    (FissionFact.FissionCompletionCaptured
-                                        {| GroupId = groupId
-                                           OwnerSessionId = owner
-                                           CompletionId = completionId
-                                           PayloadRef = blob.BlobRef
-                                           PayloadDigest = blob.BlobDigest |})
-                            with
-                            | Error _ -> return ()
-                            | Ok() -> ()
-                    | Some _ -> ()
-
-                    for lane in lanes |> List.sortBy (fun lane -> lane.Index) do
-                        let alreadyDelivered, laneClosed =
-                            match capturedGroup durable groupId with
-                            | None -> true, true
-                            | Some group ->
-                                let delivered =
-                                    group.CompletionDeliveries
-                                    |> Map.tryFind completionId
-                                    |> Option.defaultValue Set.empty
-                                    |> Set.contains lane.Index
-
-                                delivered, Map.containsKey lane.Index group.LaneWork
-
-                        if
-                            not alreadyDelivered
-                            && FissionRuntime.tryBeginDelivery groupId completionId lane.Index
-                        then
-                            try
-                                if laneClosed then
-                                    let! _ = appendDelivery durable owner None groupId completionId lane.Index
-                                    ()
-                                else
-                                    let dispatcher = PromptDispatcher.forJournal durable
-
-                                    match!
-                                        dispatcher.SendContinuation
-                                            scope.Sessions
-                                            lane.SessionId
-                                            (deliveryPrompt owner completionId payload)
-                                            PromptAuthority.ContinuationKind.FissionHandoff
-                                            profile
-                                            effectiveAgent
-                                            (scope.DirectoryFor(SessionId.value lane.SessionId))
-                                            PromptDispatcher.AwaitMode.Detached
-                                            None
-                                    with
-                                    | Error _ -> ()
-                                    | Ok _ ->
-                                        let! _ = appendDelivery durable owner None groupId completionId lane.Index
-                                        ()
-                            finally
-                                FissionRuntime.endDelivery groupId completionId lane.Index
-
-                    match scope.EventPort with
-                    | None -> ()
-                    | Some eventPort ->
-                        let _, beforeRevision = durable.SnapshotWithRevision
-                        let! converged = FissionHost.tryConverge eventPort durable owner
-
-                        if not converged then
-                            let readyExceptForRetirement =
-                                match capturedGroup durable groupId with
-                                | Some group ->
-                                    group.LaneWork.Count = group.LaneCount
-                                    && group.PreFissionCompletionIds
-                                       |> Set.forall (fun id ->
-                                           let delivered =
-                                               group.CompletionDeliveries
-                                               |> Map.tryFind id
-                                               |> Option.defaultValue Set.empty
-
-                                           Map.containsKey id group.CapturedCompletions
-                                           && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
-                                | None -> false
-
-                            if readyExceptForRetirement then
-                                let! _ = durable.AwaitChangeFrom beforeRevision
-                                let! _ = FissionHost.tryConverge eventPort durable owner
-                                ()
-                finally
-                    FissionRuntime.endDelivery groupId completionId -1
+                return!
+                    broadcastAfterBegin
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lanes
+                        completionId
+                        payload
         }
+
+    let private payloadFromWorkRecord workRecord fallback =
+        match workRecord with
+        | Some record when not (String.IsNullOrWhiteSpace record) -> record
+        | _ -> fallback
+
+    let private captureCompletedTerminal
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (childId: SessionId)
+        (completionId: string)
+        (terminal: AgentRunResult)
+        =
+        task {
+            let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
+            let payload = payloadFromWorkRecord workRecord terminal.TerminalText
+
+            do!
+                captureAndBroadcast
+                    scope
+                    durable
+                    profile
+                    effectiveAgent
+                    groupId
+                    owner
+                    lanes
+                    completionId
+                    payload
+        }
+
+    let private dispatchTerminalOutcome
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (childId: SessionId)
+        (completionId: string)
+        (outcome: TerminalOutcome)
+        =
+        match outcome with
+        | TerminalOutcome.Aborted _ -> ()
+        | TerminalOutcome.Failed error ->
+            captureAndBroadcast
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                completionId
+                (String.concat "\n" [ "status=failed"; "error=" + error ])
+            |> ignore
+        | TerminalOutcome.Completed terminal ->
+            captureCompletedTerminal
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                childId
+                completionId
+                terminal
+            |> ignore
+
+    let private onPreAgentTerminal
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (childId: SessionId)
+        (completionId: string)
+        (sessionId: SessionId)
+        (outcome: TerminalOutcome)
+        =
+        if sessionId <> childId then
+            ()
+        else
+            dispatchTerminalOutcome
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                childId
+                completionId
+                outcome
+
+    let private ptyCompletionPayload (item: PtyJoinItem) =
+        match item with
+        | PtyJoinItem.PtyExited exit -> exit.Outcome
+        | PtyJoinItem.PtyFailed failure ->
+            String.concat "\n" [ "status=failed"; "code=" + failure.Code; "error=" + failure.Message ]
+        | PtyJoinItem.PtyAborted aborted ->
+            String.concat "\n" [ "status=aborted"; "code=" + aborted.Code; "error=" + aborted.Message ]
+
+    let private installAgentBroadcasts
+        (eventPort: IEventObservationPort)
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (preAgents: (string * SessionId) list)
+        =
+        for agentId, childId in preAgents do
+            let completionId = FissionExternalId.agent agentId
+
+            let subscription =
+                eventPort.SubscribeTerminalListener(
+                    onPreAgentTerminal
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        lanes
+                        childId
+                        completionId
+                )
+
+            FissionRuntime.trackGroupResource groupId subscription
+
+    let private onPtyCompletion
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (wanted: Set<string>)
+        (item: PtyJoinItem)
+        =
+        let ptyId = PtyJoinItem.ptyId item
+
+        if not (Set.contains ptyId wanted) then
+            ()
+        else
+            captureAndBroadcast
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                (FissionExternalId.pty ptyId)
+                (ptyCompletionPayload item)
+            |> ignore
+
+    let private installPtyBroadcasts
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (groupId: string)
+        (owner: SessionId)
+        (lanes: FissionStartedLane list)
+        (prePtys: string list)
+        (ownerRuntime: HostForkRuntime)
+        =
+        if List.isEmpty prePtys then
+            ()
+        else
+            let wanted = Set.ofList prePtys
+
+            let subscription =
+                ownerRuntime.SubscribePtyCompletion(
+                    onPtyCompletion scope durable profile effectiveAgent groupId owner lanes wanted
+                )
+
+            FissionRuntime.trackGroupResource groupId subscription
 
     let private installPreFissionBroadcasts
         (scope: ToolRuntimeScope)
@@ -303,84 +676,332 @@ module FissionTool =
         match scope.EventPort with
         | None -> ()
         | Some eventPort ->
-            for agentId, childId in preAgents do
-                let completionId = FissionExternalId.agent agentId
+            installAgentBroadcasts
+                eventPort
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                preAgents
 
-                let subscription =
-                    eventPort.SubscribeTerminalListener(fun sessionId outcome ->
-                        if sessionId = childId then
-                            match outcome with
-                            | TerminalOutcome.Aborted _ -> ()
-                            | TerminalOutcome.Failed error ->
-                                captureAndBroadcast
-                                    scope
-                                    durable
-                                    profile
-                                    effectiveAgent
-                                    groupId
-                                    owner
-                                    lanes
-                                    completionId
-                                    (String.concat "\n" [ "status=failed"; "error=" + error ])
-                                |> ignore
-                            | TerminalOutcome.Completed terminal ->
-                                task {
-                                    let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
+            installPtyBroadcasts
+                scope
+                durable
+                profile
+                effectiveAgent
+                groupId
+                owner
+                lanes
+                prePtys
+                ownerRuntime
 
-                                    let payload =
-                                        match workRecord with
-                                        | Some record when not (String.IsNullOrWhiteSpace record) -> record
-                                        | _ -> terminal.TerminalText
+    let private parentWorkRecordPort (scope: ToolRuntimeScope) sessionId =
+        task {
+            match! scope.ParentWorkRecordFor(SessionId.value sessionId) with
+            | Some record when not (String.IsNullOrWhiteSpace record) -> return Ok record
+            | _ -> return Error "lifecycle_work_record_unavailable"
+        }
 
-                                    do!
-                                        captureAndBroadcast
-                                            scope
-                                            durable
-                                            profile
-                                            effectiveAgent
-                                            groupId
-                                            owner
-                                            lanes
-                                            completionId
-                                            payload
-                                }
-                                |> ignore)
+    let private createLanePort
+        (scope: ToolRuntimeScope)
+        (groupId: string)
+        (owner: SessionId)
+        (effectiveAgent: string)
+        (directory: string option)
+        (parsedCount: int)
+        (logicalOwner: SessionId)
+        (physicalParent: SessionId option)
+        (lane: FissionLanePrompt)
+        =
+        task {
+            match!
+                scope.Sessions.CreateSiblingSession(
+                    logicalOwner,
+                    physicalParent,
+                    { Title = Some(sprintf "Fission lane %d/%d" (lane.Index + 1) parsedCount)
+                      Agent = Some effectiveAgent
+                      Directory = directory }
+                )
+            with
+            | Error error -> return Error error
+            | Ok laneId ->
+                scope.RegisterPhysicalParent(laneId, physicalParent)
 
-                FissionRuntime.trackGroupResource groupId subscription
+                directory
+                |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value laneId, path))
 
-            if not (List.isEmpty prePtys) then
-                let wanted = Set.ofList prePtys
+                FissionRuntime.bindLane groupId owner lane.Index parsedCount laneId
+                return Ok laneId
+        }
 
-                let subscription =
-                    ownerRuntime.SubscribePtyCompletion(fun item ->
-                        let ptyId = PtyJoinItem.ptyId item
+    let private startLanePort
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string)
+        (directory: string option)
+        (laneId: SessionId)
+        (startup: string)
+        =
+        task {
+            scope.RunStarted laneId profile.CanonicalRole directory
+            do! XTraceCapture.captureOpening scope.Journal laneId startup []
 
-                        if Set.contains ptyId wanted then
-                            let payload =
-                                match item with
-                                | PtyJoinItem.PtyExited exit -> exit.Outcome
-                                | PtyJoinItem.PtyFailed failure ->
-                                    String.concat
-                                        "\n"
-                                        [ "status=failed"; "code=" + failure.Code; "error=" + failure.Message ]
-                                | PtyJoinItem.PtyAborted aborted ->
-                                    String.concat
-                                        "\n"
-                                        [ "status=aborted"; "code=" + aborted.Code; "error=" + aborted.Message ]
+            let dispatcher = PromptDispatcher.forJournal durable
 
-                            captureAndBroadcast
-                                scope
-                                durable
-                                profile
-                                effectiveAgent
-                                groupId
-                                owner
-                                lanes
-                                (FissionExternalId.pty ptyId)
-                                payload
-                            |> ignore)
+            match!
+                dispatcher.SendContinuation
+                    scope.Sessions
+                    laneId
+                    startup
+                    PromptAuthority.ContinuationKind.FissionHandoff
+                    profile
+                    effectiveAgent
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+            with
+            | Ok _ -> return Ok()
+            | Error error -> return Error error
+        }
 
-                FissionRuntime.trackGroupResource groupId subscription
+    let private abortLanePort (scope: ToolRuntimeScope) (laneId: SessionId) =
+        task {
+            FissionRuntime.unbindLane laneId
+            SessionExecutionBinding.drop laneId
+            let! _ = scope.Sessions.AbortSession laneId
+            return ()
+        }
+        :> Task
+
+    let private silentInterruptOwnerPort (scope: ToolRuntimeScope) (sessionId: SessionId) =
+        task {
+            FissionRuntime.markSilentInterrupt sessionId
+
+            match! scope.Sessions.InterruptSessionOnly sessionId with
+            | Ok() -> return Ok()
+            | Error error ->
+                FissionRuntime.clearSilentInterrupt sessionId
+                return Error error
+        }
+
+    let private onLanesCreatedHook
+        (durable: AgentJournal)
+        (groupId: string)
+        (toolCallId: ToolCallId)
+        (parsedCount: int)
+        (preCompletionIds: string list)
+        (providerRun: ProviderRunIdentity option)
+        (logicalOwner: SessionId)
+        (physicalParent: SessionId option)
+        (ownerWorkRecord: string)
+        (created: FissionStartedLane list)
+        =
+        task {
+            match! durable.WriteBlob ownerWorkRecord with
+            | Error error -> return Error error
+            | Ok blob ->
+                let ordered = created |> List.sortBy (fun lane -> lane.Index)
+
+                return!
+                    appendFission
+                        durable
+                        logicalOwner
+                        providerRun
+                        (FissionFact.FissionAdmitted
+                            {| GroupId = groupId
+                               OwnerSessionId = logicalOwner
+                               ParentSessionId = physicalParent
+                               OriginToolCallId = toolCallId
+                               LaneCount = parsedCount
+                               LaneSessions = ordered |> List.map (fun lane -> lane.SessionId)
+                               LanePrompts = ordered |> List.map (fun lane -> lane.Prompt)
+                               OwnerWorkRecordRef = blob.BlobRef
+                               OwnerWorkRecordDigest = blob.BlobDigest
+                               PreFissionCompletionIds = preCompletionIds |})
+        }
+
+    let private onFailedHook
+        (durable: AgentJournal)
+        (groupId: string)
+        (providerRun: ProviderRunIdentity option)
+        (logicalOwner: SessionId)
+        (reason: string)
+        =
+        task {
+            let! _ =
+                appendFission
+                    durable
+                    logicalOwner
+                    providerRun
+                    (FissionFact.FissionFailed
+                        {| GroupId = groupId
+                           OwnerSessionId = logicalOwner
+                           Reason = reason |})
+
+            return ()
+        }
+        :> Task
+
+    let private runAdmission
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (owner: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (ownerRuntime: HostForkRuntime)
+        (preAgents: (string * SessionId) list)
+        (prePtys: string list)
+        =
+        task {
+            let effectiveAgent = currentEffectiveAgent profile ctx
+            let groupId = groupIdFor owner toolCallId
+            let directory = scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+            let preCompletionIds =
+                (preAgents |> List.map (fst >> FissionExternalId.agent))
+                @ (prePtys |> List.map FissionExternalId.pty)
+
+            let deps: FissionAdmissionDependencies =
+                { ParentOf = scope.Sessions.TryGetParentSession
+                  OwnerWorkRecord = parentWorkRecordPort scope
+                  CreateLane = createLanePort scope groupId owner effectiveAgent directory parsed.Count
+                  StartLane = startLanePort scope durable profile effectiveAgent directory
+                  AbortLane = abortLanePort scope
+                  SilentInterruptOwner = silentInterruptOwnerPort scope }
+
+            let hooks: FissionAdmissionHooks =
+                { OnLanesCreated =
+                    onLanesCreatedHook durable groupId toolCallId parsed.Count preCompletionIds ctx.ProviderRunId
+                  OnFailed = onFailedHook durable groupId ctx.ProviderRunId }
+
+            let admissionRuntime = FissionAdmission.createWithHooks deps hooks
+
+            match! FissionAdmission.admit admissionRuntime owner parsed with
+            | Error FissionRejectReason.AlreadyFissioned -> return consequence language Path.AlreadyActive
+            | Error FissionRejectReason.CapacityExceeded -> return consequence language Path.Capacity
+            | Error _ -> return consequence language Path.Unavailable
+            | Ok admission ->
+                installPreFissionBroadcasts
+                    scope
+                    durable
+                    profile
+                    effectiveAgent
+                    groupId
+                    owner
+                    admission.Lanes
+                    preAgents
+                    prePtys
+                    ownerRuntime
+
+                return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+        }
+
+    let private admitWhenEventPortReady
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (owner: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (ownerRuntime: HostForkRuntime)
+        =
+        task {
+            let preAgents = ownerRuntime.SnapshotOutstandingAgentRuns()
+            let prePtys = ownerRuntime.SnapshotOutstandingPtyRuns()
+
+            if
+                (not (List.isEmpty preAgents) || not (List.isEmpty prePtys))
+                && scope.EventPort.IsNone
+            then
+                return consequence language Path.Unavailable
+            else
+                return!
+                    runAdmission
+                        scope
+                        durable
+                        ctx
+                        language
+                        parsed
+                        toolCallId
+                        owner
+                        profile
+                        ownerRuntime
+                        preAgents
+                        prePtys
+        }
+
+    let private executeWhenIdle
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (durable: AgentJournal)
+        (owner: SessionId)
+        =
+        task {
+            match scope.ActiveProfileFor owner, scope.RuntimeFor ctx with
+            | None, _
+            | _, Error _ -> return consequence language Path.Unavailable
+            | Some profile, Ok ownerRuntime ->
+                return!
+                    admitWhenEventPortReady
+                        scope
+                        durable
+                        ctx
+                        language
+                        parsed
+                        toolCallId
+                        owner
+                        profile
+                        ownerRuntime
+        }
+
+    let private executeWithJournal
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (durable: AgentJournal)
+        =
+        task {
+            let caller = SessionId.create ctx.SessionId
+            let owner = scope.LogicalOwnerFor caller
+            let fissionState = (AgentJournal.snapshot durable).AgentProjections.Fission
+
+            if FissionRuntime.tryLane caller |> Option.isSome then
+                return consequence language Path.AlreadyActive
+            elif FissionProjection.tryActiveForOwner owner fissionState |> Option.isSome then
+                return consequence language Path.AlreadyActive
+            else
+                return! executeWhenIdle scope ctx language parsed toolCallId durable owner
+        }
+
+    let private executeParsed
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        (parsed: ParsedFissionPrompts)
+        =
+        task {
+            match ctx.ToolCallId, scope.Journal with
+            | None, _
+            | _, None -> return consequence language Path.Unavailable
+            | Some _, Some _ when String.IsNullOrWhiteSpace ctx.SessionId ->
+                return consequence language Path.Unavailable
+            | Some toolCallId, Some durable ->
+                return! executeWithJournal scope ctx language parsed toolCallId durable
+        }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
@@ -391,201 +1012,7 @@ module FissionTool =
             | Error FissionRejectReason.TooFewLanes
             | Error(FissionRejectReason.EmptyLanePrompt _) -> return consequence language Path.TooFew
             | Error _ -> return consequence language Path.Unavailable
-            | Ok parsed ->
-                match ctx.ToolCallId, scope.Journal with
-                | None, _
-                | _, None -> return consequence language Path.Unavailable
-                | Some toolCallId, Some durable when String.IsNullOrWhiteSpace ctx.SessionId ->
-                    return consequence language Path.Unavailable
-                | Some toolCallId, Some durable ->
-                    let caller = SessionId.create ctx.SessionId
-                    let owner = scope.LogicalOwnerFor caller
-                    let fissionState = (AgentJournal.snapshot durable).AgentProjections.Fission
-
-                    if FissionRuntime.tryLane caller |> Option.isSome then
-                        return consequence language Path.AlreadyActive
-                    elif FissionProjection.tryActiveForOwner owner fissionState |> Option.isSome then
-                        return consequence language Path.AlreadyActive
-                    else
-                        match scope.ActiveProfileFor owner, scope.RuntimeFor ctx with
-                        | None, _
-                        | _, Error _ -> return consequence language Path.Unavailable
-                        | Some profile, Ok ownerRuntime ->
-                            let effectiveAgent = currentEffectiveAgent profile ctx
-                            let groupId = groupIdFor owner toolCallId
-
-                            let directory =
-                                scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
-
-                            let preAgents = ownerRuntime.SnapshotOutstandingAgentRuns()
-                            let prePtys = ownerRuntime.SnapshotOutstandingPtyRuns()
-
-                            if
-                                (not (List.isEmpty preAgents) || not (List.isEmpty prePtys))
-                                && scope.EventPort.IsNone
-                            then
-                                return consequence language Path.Unavailable
-                            else
-                                let preCompletionIds =
-                                    (preAgents |> List.map (fst >> FissionExternalId.agent))
-                                    @ (prePtys |> List.map FissionExternalId.pty)
-
-                                let deps: FissionAdmissionDependencies =
-                                    { ParentOf = scope.Sessions.TryGetParentSession
-                                      OwnerWorkRecord =
-                                        (fun sessionId ->
-                                            task {
-                                                match! scope.ParentWorkRecordFor(SessionId.value sessionId) with
-                                                | Some record when not (String.IsNullOrWhiteSpace record) ->
-                                                    return Ok record
-                                                | _ -> return Error "lifecycle_work_record_unavailable"
-                                            })
-                                      CreateLane =
-                                        (fun logicalOwner physicalParent lane ->
-                                            task {
-                                                match!
-                                                    scope.Sessions.CreateSiblingSession(
-                                                        logicalOwner,
-                                                        physicalParent,
-                                                        { Title =
-                                                            Some(
-                                                                sprintf
-                                                                    "Fission lane %d/%d"
-                                                                    (lane.Index + 1)
-                                                                    parsed.Count
-                                                            )
-                                                          Agent = Some effectiveAgent
-                                                          Directory = directory }
-                                                    )
-                                                with
-                                                | Error error -> return Error error
-                                                | Ok laneId ->
-                                                    scope.RegisterPhysicalParent(laneId, physicalParent)
-
-                                                    directory
-                                                    |> Option.iter (fun path ->
-                                                        scope.RegisterDirectory(SessionId.value laneId, path))
-
-                                                    FissionRuntime.bindLane
-                                                        groupId
-                                                        owner
-                                                        lane.Index
-                                                        parsed.Count
-                                                        laneId
-
-                                                    return Ok laneId
-                                            })
-                                      StartLane =
-                                        (fun laneId startup ->
-                                            task {
-                                                scope.RunStarted laneId profile.CanonicalRole directory
-                                                do! XTraceCapture.captureOpening scope.Journal laneId startup []
-
-                                                let dispatcher = PromptDispatcher.forJournal durable
-
-                                                match!
-                                                    dispatcher.SendContinuation
-                                                        scope.Sessions
-                                                        laneId
-                                                        startup
-                                                        PromptAuthority.ContinuationKind.FissionHandoff
-                                                        profile
-                                                        effectiveAgent
-                                                        directory
-                                                        PromptDispatcher.AwaitMode.Detached
-                                                        None
-                                                with
-                                                | Ok _ -> return Ok()
-                                                | Error error -> return Error error
-                                            })
-                                      AbortLane =
-                                        (fun laneId ->
-                                            task {
-                                                FissionRuntime.unbindLane laneId
-                                                SessionExecutionBinding.drop laneId
-                                                let! _ = scope.Sessions.AbortSession laneId
-                                                return ()
-                                            }
-                                            :> Task)
-                                      SilentInterruptOwner =
-                                        (fun sessionId ->
-                                            task {
-                                                FissionRuntime.markSilentInterrupt sessionId
-
-                                                match! scope.Sessions.InterruptSessionOnly sessionId with
-                                                | Ok() -> return Ok()
-                                                | Error error ->
-                                                    FissionRuntime.clearSilentInterrupt sessionId
-                                                    return Error error
-                                            }) }
-
-                                let hooks: FissionAdmissionHooks =
-                                    { OnLanesCreated =
-                                        (fun logicalOwner physicalParent ownerWorkRecord created ->
-                                            task {
-                                                match! durable.WriteBlob ownerWorkRecord with
-                                                | Error error -> return Error error
-                                                | Ok blob ->
-                                                    let ordered = created |> List.sortBy (fun lane -> lane.Index)
-
-                                                    return!
-                                                        appendFission
-                                                            durable
-                                                            logicalOwner
-                                                            ctx.ProviderRunId
-                                                            (FissionFact.FissionAdmitted
-                                                                {| GroupId = groupId
-                                                                   OwnerSessionId = logicalOwner
-                                                                   ParentSessionId = physicalParent
-                                                                   OriginToolCallId = toolCallId
-                                                                   LaneCount = parsed.Count
-                                                                   LaneSessions =
-                                                                    ordered |> List.map (fun lane -> lane.SessionId)
-                                                                   LanePrompts =
-                                                                    ordered |> List.map (fun lane -> lane.Prompt)
-                                                                   OwnerWorkRecordRef = blob.BlobRef
-                                                                   OwnerWorkRecordDigest = blob.BlobDigest
-                                                                   PreFissionCompletionIds = preCompletionIds |})
-                                            })
-                                      OnFailed =
-                                        (fun logicalOwner reason ->
-                                            task {
-                                                let! _ =
-                                                    appendFission
-                                                        durable
-                                                        logicalOwner
-                                                        ctx.ProviderRunId
-                                                        (FissionFact.FissionFailed
-                                                            {| GroupId = groupId
-                                                               OwnerSessionId = logicalOwner
-                                                               Reason = reason |})
-
-                                                return ()
-                                            }
-                                            :> Task) }
-
-                                let admissionRuntime = FissionAdmission.createWithHooks deps hooks
-
-                                match! FissionAdmission.admit admissionRuntime owner parsed with
-                                | Error FissionRejectReason.AlreadyFissioned ->
-                                    return consequence language Path.AlreadyActive
-                                | Error FissionRejectReason.CapacityExceeded ->
-                                    return consequence language Path.Capacity
-                                | Error _ -> return consequence language Path.Unavailable
-                                | Ok admission ->
-                                    installPreFissionBroadcasts
-                                        scope
-                                        durable
-                                        profile
-                                        effectiveAgent
-                                        groupId
-                                        owner
-                                        admission.Lanes
-                                        preAgents
-                                        prePtys
-                                        ownerRuntime
-
-                                    return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+            | Ok parsed -> return! executeParsed scope ctx language parsed
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

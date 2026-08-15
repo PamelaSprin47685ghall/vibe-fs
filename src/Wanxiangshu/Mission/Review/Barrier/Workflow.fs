@@ -44,7 +44,12 @@ module ReviewBarrier =
 
                 let! _ =
                     AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable
-                    |> Task.map (Result.mapError JournalAppendFailure.describe)
+                    |> fun append ->
+                        task {
+                            match! append with
+                            | Ok value -> return Ok value
+                            | Error failure -> return Error(JournalAppendFailure.describe failure)
+                        }
 
                 return ()
         }

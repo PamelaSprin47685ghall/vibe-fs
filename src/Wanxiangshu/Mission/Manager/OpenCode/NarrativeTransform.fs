@@ -185,9 +185,9 @@ module ManagerNarrativeTransform =
 
     let private partIsEndingEvidence part =
         match part with
-        | WireToolCall(_callId, name, _args) -> name = "suicide"
-        | WireToolResult(_callId, result) -> isEndingEvidence result
-        | WireText text -> isEndingEvidence text
+        | ProviderProjection.WireToolCall(_callId, name, _args) -> name = "suicide"
+        | ProviderProjection.WireToolResult(_callId, result) -> isEndingEvidence result
+        | ProviderProjection.WireText text -> isEndingEvidence text
         | _ -> false
 
     let private messageHasEndingEvidence (raw: obj) =
@@ -208,7 +208,7 @@ module ManagerNarrativeTransform =
 
     let private isNonTextPart (part: obj) =
         match ProviderWireDecode.decodePart part with
-        | Some(WireText _) -> false
+        | Some(ProviderProjection.WireText _) -> false
         | _ -> true
     let private rewriteRawMessage (raw: obj) (projection: ManagerNarrative.NarrativeProjection) =
         let parts = ProviderWireDecode.rawPartsOf raw
@@ -270,11 +270,11 @@ module ManagerNarrativeTransform =
         else
             Some(choose rawText)
 
-    let private textPartsOf message =
+    let private textPartsOf (message: ProviderProjection.WireMessage) =
         message.Parts
         |> List.choose (fun part ->
             match part with
-            | WireText text -> Some text
+            | ProviderProjection.WireText text -> Some text
             | _ -> None)
         |> String.concat "\n"
 
@@ -341,7 +341,7 @@ module ManagerNarrativeTransform =
                 message.Parts
                 |> List.exists (fun part ->
                     match part with
-                    | WireText text ->
+                    | ProviderProjection.WireText text ->
                         text.StartsWith("Generate a title for this conversation:", StringComparison.Ordinal)
                     | _ -> false))
 
@@ -589,7 +589,7 @@ module ManagerNarrativeTransform =
 
     let private partIsWorkActivationAnchor part =
         match part with
-        | WireText text ->
+        | ProviderProjection.WireText text ->
             workActivationAnchors.Value
             |> List.exists (fun anchor -> text.Contains(anchor, StringComparison.Ordinal))
         | _ -> false

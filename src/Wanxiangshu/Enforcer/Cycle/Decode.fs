@@ -62,6 +62,35 @@ module EnforcerCycleDecode =
     /// ENFORCER-042: defensive multi-call cap (protocol violation still merged).
     let MaxMergedToolCalls = 32
 
+    let private optUnboxString (value: obj) : string option =
+        if isNull value then None else Some(unbox<string> value)
+
+    let private stringOrEmpty (value: obj) : string =
+        match optUnboxString value with
+        | None -> ""
+        | Some text -> text
+
+    let private callIdOf (part: obj) : string option =
+        match optUnboxString part?callID with
+        | Some id -> Some id
+        | None -> optUnboxString part?callId
+
+    let private statusOf (part: obj) : string option =
+        if isNull part?state then None else optUnboxString part?state?status
+
+    let private inputOf (part: obj) : obj =
+        if isNull part?state || isNull part?state?input then createEmpty else part?state?input
+
+    let private toolNameOf (part: obj) : string =
+        match optUnboxString part?tool with
+        | Some tool -> tool
+        | None -> stringOrEmpty part?name
+
+    let private completedBlogInput (part: obj) : (ToolCallId * obj) option =
+        match callIdOf part, statusOf part with
+        | Some id, Some "completed" -> Some(ToolCallId.create id, inputOf part)
+        | _ -> None
+
     /// Raw part object → completed `blog` call arguments.
     ///
     /// ENFORCER-041: identity comes from the part itself here (the transform
@@ -71,49 +100,16 @@ module EnforcerCycleDecode =
     let private blogCallFromPart (part: obj) : (ToolCallId * obj) option =
         if isNull part then
             None
+        elif stringOrEmpty part?``type`` <> "tool" || toolNameOf part <> "chronicle" then
+            None
         else
-            let kind =
-                if isNull part?``type`` then
-                    ""
-                else
-                    unbox<string> part?``type``
+            completedBlogInput part
 
-            let name =
-                if isNull part?tool then
-                    if isNull part?name then "" else unbox<string> part?name
-                else
-                    unbox<string> part?tool
+    let private messageInfo (message: obj) : obj =
+        if isNull message?info then message else message?info
 
-            if kind <> "tool" || name <> "chronicle" then
-                None
-            else
-                let callId =
-                    if isNull part?callID then
-                        if isNull part?callId then
-                            None
-                        else
-                            Some(unbox<string> part?callId)
-                    else
-                        Some(unbox<string> part?callID)
-
-                let status =
-                    if isNull part?state then
-                        None
-                    else
-                        match part?state?status with
-                        | null -> None
-                        | value -> Some(unbox<string> value)
-
-                match callId, status with
-                | Some id, Some "completed" ->
-                    let input =
-                        if isNull part?state || isNull part?state?input then
-                            createEmpty
-                        else
-                            part?state?input
-
-                    Some(ToolCallId.create id, input)
-                | _ -> None
+    let private timeCompleted (source: obj) =
+        if isNull source || isNull source?time then null else source?time?completed
 
     /// The last assistant message of a transform snapshot and its parts.
     /// Host sets `time.completed` only when the run ends or is interrupted
@@ -123,51 +119,34 @@ module EnforcerCycleDecode =
         if isNull message then
             false
         else
-            let info = if isNull message?info then message else message?info
-
-            let timeCompleted (source: obj) =
-                if isNull source || isNull source?time then
-                    null
-                else
-                    source?time?completed
-
+            let info = messageInfo message
             not (isNull (timeCompleted info)) || not (isNull (timeCompleted message))
+
+    let private messageRole (info: obj) : string option =
+        if isNull info then None else optUnboxString info?role
+
+    let private messageIdOf (info: obj) : string option =
+        if isNull info then None
+        elif isNull info?id then None
+        else Some(unbox<string> info?id)
+
+    let private messageParts (message: obj) : obj list =
+        if isNull message?parts then [] else unbox<obj array> message?parts |> Array.toList
+
+    let private assistantStepFromMessage (message: obj) : (string * obj list * bool) option =
+        let info = messageInfo message
+
+        match messageRole info, messageIdOf info with
+        | Some "assistant", Some messageId ->
+            Some(messageId, messageParts message, assistantIsCompleted message)
+        | _ -> None
 
     /// Last assistant terminal as (messageId, calls, completed); public so the
     /// Application-layer recovery probe can bind a claim to the same terminal.
     let lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
         rawMessages
         |> List.choose (fun message ->
-            if isNull message then
-                None
-            else
-                let info = if isNull message?info then message else message?info
-
-                let role =
-                    if isNull info then
-                        None
-                    else
-                        (if isNull info?role then
-                             None
-                         else
-                             Some(unbox<string> info?role))
-
-                let id =
-                    if isNull info || isNull info?id then
-                        None
-                    else
-                        Some(unbox<string> info?id)
-
-                match role, id with
-                | Some "assistant", Some messageId ->
-                    let parts =
-                        if isNull message?parts then
-                            []
-                        else
-                            unbox<obj array> message?parts |> Array.toList
-
-                    Some(messageId, parts, assistantIsCompleted message)
-                | _ -> None)
+            if isNull message then None else assistantStepFromMessage message)
         |> List.tryLast
 
     /// Decode a raw JS object into a string-keyed map (the codec's input shape).
@@ -179,6 +158,31 @@ module EnforcerCycleDecode =
 
             keys
             |> Array.fold (fun acc key -> Map.add key (emitJsExpr (value, key) "$0[$1]") acc) Map.empty
+
+    let private decodeCanonicalCall
+        (rules: EnforcerRule list)
+        (ordinal: int)
+        (callId: ToolCallId)
+        (input: obj)
+        : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) option =
+        match EnforcerCodec.decodeCall rules (decodeObject input) with
+        | Ok call -> Some(ordinal, callId, call)
+        | Error reason ->
+            // CTX-014: fold identity into result — no whitelist growth for
+            // protocol-skip diagnostics that are never recovery inputs.
+            Diagnostic.emit
+                "enforcer-blog-call-invalid"
+                [ "result",
+                  sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
+
+            None
+
+    let private tryCanonicalCall
+        (rules: EnforcerRule list)
+        (ordinal: int, part: obj)
+        : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) option =
+        blogCallFromPart part
+        |> Option.bind (fun (callId, input) -> decodeCanonicalCall rules ordinal callId input)
 
     /// ENFORCER-042: (PartOrdinal, ToolCallId, CanonicalBlogCall) for one
     /// provider step, in provider-visible order. The ordinal is the part's
@@ -198,23 +202,49 @@ module EnforcerCycleDecode =
 
             let calls =
                 parts
-                |> List.mapi (fun ordinal part -> ordinal, blogCallFromPart part)
-                |> List.choose (fun (ordinal, parsed) ->
-                    parsed
-                    |> Option.bind (fun (callId, input) ->
-                        match EnforcerCodec.decodeCall rules (decodeObject input) with
-                        | Ok call -> Some(ordinal, callId, call)
-                        | Error reason ->
-                            // CTX-014: fold identity into result — no whitelist growth for
-                            // protocol-skip diagnostics that are never recovery inputs.
-                            Diagnostic.emit
-                                "enforcer-blog-call-invalid"
-                                [ "result",
-                                  sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
-
-                            None))
+                |> List.mapi (fun ordinal part -> ordinal, part)
+                |> List.choose (tryCanonicalCall rules)
 
             Some(messageId, calls, completed)
+
+    let private emitMultiCallIfNeeded
+        (merged: EnforcerCycle.MergedCycle)
+        (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
+        =
+        if merged.MultiCall then
+            // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
+            Diagnostic.emit
+                "enforcer-protocol-violation"
+                [ "result",
+                  "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
+                  "call_count", string (List.length calls) ]
+
+    let private validateMergedBounds
+        (merged: EnforcerCycle.MergedCycle)
+        (callIds: ToolCallId list)
+        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
+        if not (EnforcerCycle.isValidCycle merged) then
+            Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
+        elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
+            Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
+        elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
+            Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
+        else
+            Ok(merged, callIds)
+
+    let private validateMergedCycle
+        (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
+        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
+        let callIds = calls |> List.map (fun (_, callId, _) -> callId)
+
+        if List.length (List.distinct callIds) <> List.length calls then
+            Error "blog cycle has duplicate ToolCallIds (ENFORCER-043)"
+        else
+            let merged =
+                EnforcerCycle.mergeCalls (calls |> List.map (fun (ordinal, _, call) -> ordinal, call))
+
+            emitMultiCallIfNeeded merged calls
+            validateMergedBounds merged callIds
 
     /// ENFORCER-043: a cycle is valid when the provider run is provable, at
     /// least one call exists, the merged text is non-empty, and every
@@ -230,27 +260,4 @@ module EnforcerCycleDecode =
         elif List.length calls > MaxMergedToolCalls then
             Error(sprintf "blog cycle exceeds MaxMergedToolCalls=%d" MaxMergedToolCalls)
         else
-            let callIds = calls |> List.map (fun (_, callId, _) -> callId)
-
-            if List.length (List.distinct callIds) <> List.length calls then
-                Error "blog cycle has duplicate ToolCallIds (ENFORCER-043)"
-            else
-                let merged =
-                    EnforcerCycle.mergeCalls (calls |> List.map (fun (ordinal, _, call) -> ordinal, call))
-
-                if merged.MultiCall then
-                    // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
-                    Diagnostic.emit
-                        "enforcer-protocol-violation"
-                        [ "result",
-                          "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
-                          "call_count", string (List.length calls) ]
-
-                if not (EnforcerCycle.isValidCycle merged) then
-                    Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
-                elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
-                    Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
-                elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
-                    Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
-                else
-                    Ok(merged, callIds)
+            validateMergedCycle calls

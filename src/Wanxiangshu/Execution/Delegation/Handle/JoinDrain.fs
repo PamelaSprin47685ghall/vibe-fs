@@ -376,7 +376,7 @@ module JoinDrain =
                 return! decideConsumeOutcome acc n record rest outcome
             }
 
-        and refreshAfterMiss
+        and continueAfterSkip
             (acc: RunCompletion list)
             (n: int)
             (record: HandleRecord)
@@ -398,7 +398,7 @@ module JoinDrain =
             | Some(Ok completion) -> consumeSafe (completion :: acc) (n - 1) rest
             | Some(Error e) when List.isEmpty acc -> Task.FromResult(Error e)
             | Some(Error _) -> Task.FromResult(Ok(List.rev acc))
-            | None -> refreshAfterMiss acc n record rest
+            | None -> continueAfterSkip acc n record rest
 
         let cap = min maxCount JoinBatch.Max
 

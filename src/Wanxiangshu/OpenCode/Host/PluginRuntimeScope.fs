@@ -142,6 +142,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: resource — assistance durable session-drop handler attachment slot
     let mutable assistanceDropSession: (SessionId -> Task) option = None
 
+    let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
+        task {
+            match owner with
+            | Some active -> do! active.DisposeAsync()
+            | None -> ()
+        }
+
     member _.Journal = journal
 
     /// Composition-of-owners: Strength decision-local state lives in its own scope.
@@ -314,13 +321,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             blogger.DropDrainWindow key
 
             recovery.ClearAttemptPlansFor key
-
-    let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
-        task {
-            match owner with
-            | Some active -> do! active.DisposeAsync()
-            | None -> ()
-        }
 
     member this.DisposeAsync() : Task =
         lock disposeGate (fun () ->

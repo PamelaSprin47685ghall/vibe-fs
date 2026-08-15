@@ -4,6 +4,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Composition.Durable
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -369,7 +370,7 @@ module ForkTool =
         else
             request.Name.Trim()
 
-    let private appendFissionAffinity durable (context: HostToolContext) lane handleId =
+    let private appendFissionAffinity durable (context: HostToolContext) (lane: FissionLaneBinding) handleId =
         taskResult {
             let! _ =
                 task {
