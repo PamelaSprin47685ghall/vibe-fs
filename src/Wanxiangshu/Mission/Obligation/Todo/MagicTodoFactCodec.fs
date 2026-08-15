@@ -91,6 +91,11 @@ module MagicTodoFactCodec =
             | "RecoveredCompletedToolPart" -> Decode.succeed PhysicalSuccessEvidence.RecoveredCompletedToolPart
             | other -> Decode.fail ("unknown PhysicalSuccessEvidence: " + other))
 
+    let private encodeOptional (encode: 'a -> JsonValue) =
+        function
+        | None -> Encode.nil
+        | Some value -> encode value
+
     let private evidenceKindEncoder (k: PrefixEvidenceKind) =
         match k with
         | PrefixEvidenceKind.Probe probeId ->
@@ -99,10 +104,7 @@ module MagicTodoFactCodec =
             Encode.object
                 [ "kind", Encode.string "TodoCheckpoint"
                   "triggerTodoWriteId", todoWriteIdEncoder trigger
-                  "coveredBeforeTodoWriteId",
-                  match covered with
-                  | None -> Encode.nil
-                  | Some id -> todoWriteIdEncoder id ]
+                  "coveredBeforeTodoWriteId", encodeOptional todoWriteIdEncoder covered ]
 
     let private evidenceKindDecoder: Decoder<PrefixEvidenceKind> =
         Decode.object (fun get ->
@@ -255,9 +257,7 @@ module MagicTodoFactCodec =
                     [ "case", Encode.string "PrefixRebaseCommittedV2"
                       "SessionId", Encode.string (SessionId.value p.SessionId)
                       "ManagerLifeId",
-                      match p.ManagerLifeId with
-                      | None -> Encode.nil
-                      | Some id -> Encode.string (ManagerLifeId.value id)
+                      encodeOptional (ManagerLifeId.value >> Encode.string) p.ManagerLifeId
                       "PreviousEpochId", Encode.int64 (PrefixEpochId.value p.PreviousEpochId)
                       "NextEpochId", Encode.int64 (PrefixEpochId.value p.NextEpochId)
                       "EvidenceKind", evidenceKindEncoder p.EvidenceKind
@@ -267,22 +267,11 @@ module MagicTodoFactCodec =
                       "CoveredPrefixDigest", Encode.string p.CoveredPrefixDigest
                       "SealRoot", Encode.string p.SealRoot
                       "SyntheticMessageId", Encode.string p.SyntheticMessageId
-                      "YBundleRef",
-                      match p.YBundleRef with
-                      | None -> Encode.nil
-                      | Some r -> Encode.string (BlobRef.value r)
-                      "YBundleDigest",
-                      match p.YBundleDigest with
-                      | None -> Encode.nil
-                      | Some d -> Encode.string (BlobDigest.value d)
-                      "ProviderPrefixDigest",
-                      match p.ProviderPrefixDigest with
-                      | None -> Encode.nil
-                      | Some s -> Encode.string s
+                      "YBundleRef", encodeOptional (BlobRef.value >> Encode.string) p.YBundleRef
+                      "YBundleDigest", encodeOptional (BlobDigest.value >> Encode.string) p.YBundleDigest
+                      "ProviderPrefixDigest", encodeOptional Encode.string p.ProviderPrefixDigest
                       "SolvingProviderRun",
-                      match p.SolvingProviderRun with
-                      | None -> Encode.nil
-                      | Some r -> Encode.string (ProviderRunIdentity.value r) ]
+                      encodeOptional (ProviderRunIdentity.value >> Encode.string) p.SolvingProviderRun ]
 
         Encode.toString 0 body
 
@@ -392,8 +381,6 @@ module MagicTodoFactCodec =
                 | other -> failwith ("unknown MagicTodoFact case: " + other))
 
         try
-            match Decode.fromString decoder json with
-            | Ok fact -> Ok fact
-            | Error err -> Error err
+            Decode.fromString decoder json
         with error ->
             Error error.Message

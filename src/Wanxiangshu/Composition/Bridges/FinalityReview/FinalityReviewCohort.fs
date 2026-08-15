@@ -21,6 +21,7 @@ open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -62,6 +63,18 @@ module FinalityReviewCohort =
           ReviewerOrdinal: int
           IsNew: bool }
 
+    let private witnessGraduates (standing: ReviewerStanding) (guard: ReviewGuardProjection) =
+        match guard.Witness with
+        | ReviewWitness.Confirmed confirmed -> List.contains confirmed.BarrierId standing.Barriers
+        | ReviewWitness.NoReview
+        | ReviewWitness.RevisionWitness _
+        | ReviewWitness.PerfectPending _ -> false
+
+    let private sessionGraduates (standing: ReviewerStanding) (session: SessionAgentProjection) =
+        match session.ReviewGuard with
+        | None -> false
+        | Some guard -> witnessGraduates standing guard
+
     /// GLORY-045: a Reviewer graduated iff it has a confirmed witness on one of
     /// the barriers this Life enlisted it on. Derived from durable facts only.
     let graduatedReviewer
@@ -71,15 +84,7 @@ module FinalityReviewCohort =
         : bool =
         match AgentProjection.tryFind reviewerSessionId snapshot with
         | None -> false
-        | Some session ->
-            match session.ReviewGuard with
-            | None -> false
-            | Some guard ->
-                match guard.Witness with
-                | ReviewWitness.Confirmed confirmed -> List.contains confirmed.BarrierId standing.Barriers
-                | ReviewWitness.NoReview
-                | ReviewWitness.RevisionWitness _
-                | ReviewWitness.PerfectPending _ -> false
+        | Some session -> sessionGraduates standing session
 
     /// GLORY-003/045: the roster of a new FinalityRequest =
     /// all still-ungraduated historical Reviewers of this Life

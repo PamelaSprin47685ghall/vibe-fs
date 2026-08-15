@@ -104,6 +104,54 @@ module ReconcileProgram =
         | TurnInProgress
         | TurnNeedsContinuation _ -> false
 
+    let private decideExhaustedRetryable (rereadsRemaining: int) (exhausted: ReconcileDecision) =
+        if rereadsRemaining > 1 then
+            ReconcileDecision.Reread(false, rereadsRemaining - 1)
+        else
+            exhausted
+
+    let private exhaustedUnknownDecision (wake: ReconcileWake) =
+        match wake with
+        | ReconcileWake.IdleWake _ ->
+            // Classic black hole: SessionIdle + assistant reasoning +
+            // finish=None + rereads exhausted. Observation is stable —
+            // Publish to business; never StopPass silently. Whether to
+            // send missing-final-report is TurnWorkflow / InteractionRepair.
+            ReconcileDecision.Publish
+        | ReconcileWake.RetryWake
+        | ReconcileWake.FailureWake
+        | ReconcileWake.AbortWake ->
+            // No idle rights. Observation stability only, or an abort that
+            // must not resurrect an idle-derived continuation; the next
+            // real physical signal re-kicks, and a genuine TurnAborted
+            // terminal publishes normally.
+            ReconcileDecision.StopPass
+
+    let private decideExhaustedUnknown (wake: ReconcileWake) (rereadsRemaining: int) =
+        if rereadsRemaining > 1 then
+            ReconcileDecision.Reread(true, rereadsRemaining - 1)
+        else
+            exhaustedUnknownDecision wake
+
+    let private decideExhaustedProvisional (wake: ReconcileWake) =
+        match wake with
+        | ReconcileWake.AbortWake ->
+            // HOST-004: under operator abort, stalled provisional must never
+            // publish an observation that business could turn into
+            // InteractionRepair / "#". StopPass and wait for the real
+            // TurnAborted terminal.
+            ReconcileDecision.StopPass
+        | _ ->
+            // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
+            // publish so the business repair branch runs instead of dying in
+            // StopPass.
+            ReconcileDecision.Publish
+
+    let private tokenAlreadySealed (maps: Map<string, string>) (key: string) (token: string) =
+        match Map.tryFind key maps with
+        | Some previous when previous = token -> true
+        | _ -> false
+
     /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
     ///
     /// 不变量（GLORY-070 / HOST-004 rev.3 / rabbit §7）：SessionIdle 被消费后只允许
@@ -119,45 +167,10 @@ module ReconcileProgram =
         | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | ReconcileEvidence.SnapshotError _
         | ReconcileEvidence.NoTurn ->
-            if rereadsRemaining > 1 then
-                ReconcileDecision.Reread(false, rereadsRemaining - 1)
-            else
-                ReconcileDecision.StopPass
+            decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
         | ReconcileEvidence.Provisional _ ->
-            if rereadsRemaining > 1 then
-                ReconcileDecision.Reread(false, rereadsRemaining - 1)
-            else
-                match wake with
-                | ReconcileWake.AbortWake ->
-                    // HOST-004: under operator abort, stalled provisional must never
-                    // publish an observation that business could turn into
-                    // InteractionRepair / "#". StopPass and wait for the real
-                    // TurnAborted terminal.
-                    ReconcileDecision.StopPass
-                | _ ->
-                    // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
-                    // publish so the business repair branch runs instead of dying in
-                    // StopPass.
-                    ReconcileDecision.Publish
-        | ReconcileEvidence.Unknown _ ->
-            if rereadsRemaining > 1 then
-                ReconcileDecision.Reread(true, rereadsRemaining - 1)
-            else
-                match wake with
-                | ReconcileWake.IdleWake _ ->
-                    // Classic black hole: SessionIdle + assistant reasoning +
-                    // finish=None + rereads exhausted. Observation is stable —
-                    // Publish to business; never StopPass silently. Whether to
-                    // send missing-final-report is TurnWorkflow / InteractionRepair.
-                    ReconcileDecision.Publish
-                | ReconcileWake.RetryWake
-                | ReconcileWake.FailureWake
-                | ReconcileWake.AbortWake ->
-                    // No idle rights. Observation stability only, or an abort that
-                    // must not resurrect an idle-derived continuation; the next
-                    // real physical signal re-kicks, and a genuine TurnAborted
-                    // terminal publishes normally.
-                    ReconcileDecision.StopPass
+            decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
+        | ReconcileEvidence.Unknown _ -> decideExhaustedUnknown wake rereadsRemaining
         | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
 
     let decisionName (decision: ReconcileDecision) : string =
@@ -218,18 +231,16 @@ module ReconcileProgram =
         // HOST-004: TurnUnknown is SnapshotObservation — type-unreachable here.
         // IdleWake → Publish (stable Unknown handoff) lives in decideStep; business
         // repair is TurnWorkflow / InteractionRepair, not this seal layer.
-        if isTerminalOutcome turn.Outcome then
-            match Map.tryFind key maps.Consumed with
-            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-            | _ ->
-                {| shouldPublish = true
-                   maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
+        if isTerminalOutcome turn.Outcome && tokenAlreadySealed maps.Consumed key token then
+            {| shouldPublish = false; maps = maps |}
+        elif isTerminalOutcome turn.Outcome then
+            {| shouldPublish = true
+               maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
+        elif tokenAlreadySealed maps.Provisional key token then
+            {| shouldPublish = false; maps = maps |}
         else
-            match Map.tryFind key maps.Provisional with
-            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-            | _ ->
-                {| shouldPublish = true
-                   maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
+            {| shouldPublish = true
+               maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
 
     let clearProvisional (maps: PublishMaps) (sessionKey: string) : PublishMaps =
         PublishMaps(maps.Consumed, Map.remove sessionKey maps.Provisional)

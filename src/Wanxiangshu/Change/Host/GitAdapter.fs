@@ -80,6 +80,88 @@ module OrchestratorGit =
     /// markers. Checking unmerged *before* add rejected a resolved file that was
     /// still unstaged (ORCH-003 conflict resume: Coder rewrote the file; Manager
     /// joined; finalize must stage then continue).
+    let private continueRebase
+        (runner: Command -> Task<int * string * string>)
+        (worktree: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! contCode, _, contErr =
+                runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+
+            if contCode = 0 then
+                return Ok()
+            else
+                return Error(sprintf "git rebase --continue failed: %s" contErr)
+        }
+
+    let private commitCandidate
+        (runner: Command -> Task<int * string * string>)
+        (managerId: string)
+        (worktree: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! _ = runner (command worktree [ "update-ref"; "-d"; "REBASE_HEAD" ])
+
+            let! commitCode, commitOut, commitErr =
+                runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
+
+            if commitCode = 0 then
+                return Ok()
+            elif (commitOut + commitErr).Contains("nothing to commit") then
+                return Ok()
+            else
+                return Error(sprintf "git commit failed: %s" commitErr)
+        }
+
+    let private finalizeCommitOrRebase
+        (runner: Command -> Task<int * string * string>)
+        (managerId: string)
+        (worktree: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! hasRb = hasRebaseHead runner worktree
+
+            if hasRb then
+                return! continueRebase runner worktree
+            else
+                return! commitCandidate runner managerId worktree
+        }
+
+    let private refuseConflictMarkers
+        (runner: Command -> Task<int * string * string>)
+        (managerId: string)
+        (worktree: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! grepCode, grepOut, _ =
+                runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
+
+            // git grep exit 0 = matches, 1 = no match, >1 = error
+            if grepCode = 0 && not (String.IsNullOrWhiteSpace grepOut) then
+                return Error(sprintf "conflict markers remain in worktree:\n%s" (grepOut.Trim()))
+            elif grepCode > 1 then
+                return Error "conflict-marker scan failed"
+            else
+                return! finalizeCommitOrRebase runner managerId worktree
+        }
+
+    let private afterStage
+        (runner: Command -> Task<int * string * string>)
+        (managerId: string)
+        (worktree: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! unmergedCode, unmergedOut, unmergedErr =
+                runner (command worktree [ "diff"; "--name-only"; "--diff-filter=U" ])
+
+            if unmergedCode <> 0 then
+                return Error(sprintf "conflict scan failed: %s" unmergedErr)
+            elif not (String.IsNullOrWhiteSpace unmergedOut) then
+                return Error(sprintf "unmerged paths remain after stage: %s" (unmergedOut.Trim()))
+            else
+                return! refuseConflictMarkers runner managerId worktree
+        }
+
     let finalizeWorktree
         (runner: Command -> Task<int * string * string>)
         (managerId: string)
@@ -91,41 +173,5 @@ module OrchestratorGit =
             if addCode <> 0 then
                 return Error(sprintf "git add failed: %s" addErr)
             else
-                let! unmergedCode, unmergedOut, unmergedErr =
-                    runner (command worktree [ "diff"; "--name-only"; "--diff-filter=U" ])
-
-                if unmergedCode <> 0 then
-                    return Error(sprintf "conflict scan failed: %s" unmergedErr)
-                elif not (String.IsNullOrWhiteSpace unmergedOut) then
-                    return Error(sprintf "unmerged paths remain after stage: %s" (unmergedOut.Trim()))
-                else
-                    let! grepCode, grepOut, _ =
-                        runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
-
-                    // git grep exit 0 = matches, 1 = no match, >1 = error
-                    if grepCode = 0 && not (String.IsNullOrWhiteSpace grepOut) then
-                        return Error(sprintf "conflict markers remain in worktree:\n%s" (grepOut.Trim()))
-                    elif grepCode > 1 then
-                        return Error "conflict-marker scan failed"
-                    else
-                        let! hasRb = hasRebaseHead runner worktree
-
-                        match hasRb with
-                        | true ->
-                            let! contCode, _, contErr =
-                                runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
-
-                            match contCode with
-                            | 0 -> return Ok()
-                            | _ -> return Error(sprintf "git rebase --continue failed: %s" contErr)
-                        | false ->
-                            let! _ = runner (command worktree [ "update-ref"; "-d"; "REBASE_HEAD" ])
-
-                            let! commitCode, commitOut, commitErr =
-                                runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
-
-                            match commitCode with
-                            | 0 -> return Ok()
-                            | _ when (commitOut + commitErr).Contains("nothing to commit") -> return Ok()
-                            | _ -> return Error(sprintf "git commit failed: %s" commitErr)
+                return! afterStage runner managerId worktree
         }

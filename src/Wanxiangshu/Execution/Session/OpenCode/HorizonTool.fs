@@ -110,24 +110,34 @@ module HorizonTool =
     let private labelForHandle language (handle: HandleRecord) =
         if not (String.IsNullOrWhiteSpace handle.Byname) then
             handle.Byname.Trim()
-        elif not (String.IsNullOrWhiteSpace handle.TargetAgent) then
-            match ManagedAgent.tryParse handle.TargetAgent with
-            | Some managed -> managed.Name
-            | None -> handle.TargetAgent.Trim()
-        else
+        elif String.IsNullOrWhiteSpace handle.TargetAgent then
             ProviderProse.render language Path.Someone Map.empty
+        else
+            ManagedAgent.tryParse handle.TargetAgent
+            |> Option.map (fun managed -> managed.Name)
+            |> Option.defaultValue (handle.TargetAgent.Trim())
 
-    let private lineForHandle language (handle: HandleRecord) (runtimeRecord: AgentRecord option) : string =
+    let private activeHandleLine language label runtimeRecord =
+        match runtimeRecord with
+        | Some record when record.CompletionCellSettled -> labeled language Path.Returned label
+        | _ -> labeled language Path.StillAway label
+
+    let private lineForHandle language (handle: HandleRecord) runtimeRecord : string =
         let label = labelForHandle language handle
 
         match handle.Lifecycle with
         | HandleLifecycle.CompletedAwaitingJoin _ -> labeled language Path.Returned label
-        | HandleLifecycle.Active ->
-            match runtimeRecord with
-            | Some record when record.CompletionCellSettled -> labeled language Path.Returned label
-            | _ -> labeled language Path.StillAway label
+        | HandleLifecycle.Active -> activeHandleLine language label runtimeRecord
         | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> labeled language Path.DidNotReturn label
+
+    let private workRecordText language (journal: AgentJournal) (label: string) frame : Task<string> =
+        task {
+            match! journal.Writer.BlobWriter.Read frame.TextRef with
+            | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
+                return ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ])
+            | _ -> return labeled language Path.LatestWorkUnavailable label
+        }
 
     let private workRecordForHandle
         language
@@ -135,22 +145,16 @@ module HorizonTool =
         (snapshot: ProjectionSet)
         (handle: HandleRecord)
         : Task<string> =
-        task {
-            let label = labelForHandle language handle
+        let label = labelForHandle language handle
 
-            let latestFrame =
-                AgentProjection.tryFind handle.ChildSessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.Blog)
-                |> Option.bind (BlogProjection.frames >> List.tryLast)
+        let latestFrame =
+            AgentProjection.tryFind handle.ChildSessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.Blog)
+            |> Option.bind (BlogProjection.frames >> List.tryLast)
 
-            match latestFrame with
-            | None -> return labeled language Path.NoWorkYet label
-            | Some frame ->
-                match! journal.Writer.BlobWriter.Read frame.TextRef with
-                | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
-                    return ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ])
-                | _ -> return labeled language Path.LatestWorkUnavailable label
-        }
+        match latestFrame with
+        | None -> Task.FromResult(labeled language Path.NoWorkYet label)
+        | Some frame -> workRecordText language journal label frame
 
     let private lineForPty language (record: PtyRecord) : string =
         let label =
@@ -164,55 +168,70 @@ module HorizonTool =
     let private unavailable language path =
         ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render language path Map.empty ] []
 
+    let private appendHandleLines
+        language
+        journal
+        snapshot
+        runtimeByAgentId
+        (agentLines: ResizeArray<string>)
+        handle
+        =
+        task {
+            match HandleId.tryAgent handle.Handle with
+            | None -> ()
+            | Some handleId ->
+                let agentId = AgentHandleId.value handleId
+                agentLines.Add(lineForHandle language handle (Map.tryFind agentId runtimeByAgentId))
+                let! workRecord = workRecordForHandle language journal snapshot handle
+                agentLines.Add workRecord
+        }
+
+    let private rosterInstructions language (lines: string list) =
+        if List.isEmpty lines then
+            ProviderProse.instructionLines language Path.EmptyRoster Map.empty
+        else
+            lines
+
+    let private executeWithJournal language (scope: ToolRuntimeScope) context (journal: AgentJournal) =
+        task {
+            match scope.RuntimeFor context with
+            | Error _ -> return unavailable language Path.CannotBeSeen
+            | Ok runtime ->
+                let agents, ptys = runtime.List()
+                let snapshot = AgentJournal.snapshot journal
+                let parentSessionId = SessionId.create context.SessionId |> scope.LogicalOwnerFor
+
+                let durableHandles =
+                    AgentProjection.tryFind parentSessionId snapshot.AgentProjections
+                    |> Option.bind (fun session -> session.Handles)
+                    |> Option.defaultValue HandleProjection.empty
+
+                let runtimeByAgentId =
+                    agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
+
+                let agentLines = ResizeArray<string>()
+
+                for handle in HandleProjection.listable durableHandles do
+                    do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
+
+                let agentLines = agentLines |> Seq.toList
+
+                let ptyLines =
+                    ptys
+                    |> List.sortBy (fun record -> record.PtyId)
+                    |> List.map (lineForPty language)
+
+                let lines = List.append agentLines ptyLines
+                return ToolHostCodec.tomlObjectWithInstructions (rosterInstructions language lines) []
+        }
+
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {
             let language = lang context
 
             match scope.Journal with
             | None -> return unavailable language Path.UnavailableFromContext
-            | Some journal ->
-                match scope.RuntimeFor context with
-                | Error _ -> return unavailable language Path.CannotBeSeen
-                | Ok runtime ->
-                    let agents, ptys = runtime.List()
-                    let snapshot = AgentJournal.snapshot journal
-                    let parentSessionId = SessionId.create context.SessionId |> scope.LogicalOwnerFor
-
-                    let durableHandles =
-                        AgentProjection.tryFind parentSessionId snapshot.AgentProjections
-                        |> Option.bind (fun session -> session.Handles)
-                        |> Option.defaultValue HandleProjection.empty
-
-                    let runtimeByAgentId =
-                        agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
-
-                    let agentLines = ResizeArray<string>()
-
-                    for handle in HandleProjection.listable durableHandles do
-                        match HandleId.tryAgent handle.Handle with
-                        | Some handleId ->
-                            let agentId = AgentHandleId.value handleId
-                            agentLines.Add(lineForHandle language handle (Map.tryFind agentId runtimeByAgentId))
-                            let! workRecord = workRecordForHandle language journal snapshot handle
-                            agentLines.Add workRecord
-                        | None -> ()
-
-                    let agentLines = agentLines |> Seq.toList
-
-                    let ptyLines =
-                        ptys
-                        |> List.sortBy (fun record -> record.PtyId)
-                        |> List.map (lineForPty language)
-
-                    let lines = List.append agentLines ptyLines
-
-                    let instructions =
-                        if List.isEmpty lines then
-                            ProviderProse.instructionLines language Path.EmptyRoster Map.empty
-                        else
-                            lines
-
-                    return ToolHostCodec.tomlObjectWithInstructions instructions []
+            | Some journal -> return! executeWithJournal language scope context journal
         }
 
     let spec scope =

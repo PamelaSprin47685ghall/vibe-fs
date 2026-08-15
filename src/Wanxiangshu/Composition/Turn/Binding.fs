@@ -82,6 +82,14 @@ module TurnBinding =
     ///
     /// Physical stays `None` when nothing is bound. It is not backfilled from the
     /// root, because PROMPT-002 makes promotion one-way and there is deliberately
+    let private tryBoundPhysical
+        (userBindings: Dictionary<string, PhysicalUserMessageId>)
+        (sessionId: SessionId)
+        =
+        match userBindings.TryGetValue(SessionId.value sessionId) with
+        | true, bound -> Some bound
+        | false, _ -> None
+
     /// no `AuthorityRootUserMessageId -> PhysicalUserMessageId` inverse. Reconcile
     /// resolves the missing physical against the root's own wire address instead.
     let fromProjection
@@ -93,16 +101,11 @@ module TurnBinding =
         match projection.ActiveLogicalRun with
         | None -> None
         | Some run ->
-            let physical =
-                match userBindings.TryGetValue(SessionId.value sessionId) with
-                | true, bound -> Some bound
-                | false, _ -> None
-
             Some
                 { SessionId = sessionId
                   RunId = None
                   AuthorityRootUserMessageId = Some run.AuthorityRootUserMessageId
-                  PhysicalUserMessageId = physical
+                  PhysicalUserMessageId = tryBoundPhysical userBindings sessionId
                   ContinuationMessageIds = continuationIds
                   Role = canonicalRoleOf run.CanonicalRole
                   Directory = None }
@@ -204,19 +207,14 @@ module TurnBinding =
                     | true, set -> set
                     | false, _ -> Set.empty
 
-                match projection with
-                | None -> fromExplicit ()
-                | Some proj ->
-                    let projected =
-                        match Map.tryFind sessionId proj.Sessions with
-                        | None -> None
-                        | Some session ->
-                            match session.PromptAuthority with
-                            | None -> None
-                            | Some authority -> fromProjection sessionId authority userMessageBindings continuations
+                let projectedBinding (proj: AgentProjectionSet) =
+                    Map.tryFind sessionId proj.Sessions
+                    |> Option.bind (fun session -> session.PromptAuthority)
+                    |> Option.bind (fun authority -> fromProjection sessionId authority userMessageBindings continuations)
 
-                    match fromExplicit (), projected with
-                    | Some binding, Some p when binding.AuthorityRootUserMessageId.IsNone ->
+                let mergeBindings (explicitBinding: ActiveRunBinding option) (projected: ActiveRunBinding option) =
+                    match explicitBinding, projected with
+                    | Some binding, Some p when Option.isNone binding.AuthorityRootUserMessageId ->
                         Some
                             { binding with
                                 AuthorityRootUserMessageId = p.AuthorityRootUserMessageId
@@ -231,17 +229,20 @@ module TurnBinding =
                         Some
                             { p with
                                 ContinuationMessageIds = p.ContinuationMessageIds + continuations }
-                    | None, None -> None)
+                    | None, None -> None
+
+                match projection with
+                | None -> fromExplicit ()
+                | Some proj -> mergeBindings (fromExplicit ()) (projectedBinding proj))
 
         /// Latest physical user message for the active logical run.
         member _.TryPhysicalUserMessage(sessionId: SessionId) : PhysicalUserMessageId option =
             lock gate (fun () ->
-                match activeBindings.TryGetValue(SessionId.value sessionId) with
+                let key = SessionId.value sessionId
+
+                match activeBindings.TryGetValue(key) with
                 | true, binding -> binding.PhysicalUserMessageId
-                | false, _ ->
-                    match userMessageBindings.TryGetValue(SessionId.value sessionId) with
-                    | true, bound -> Some bound
-                    | false, _ -> None)
+                | false, _ -> tryBoundPhysical userMessageBindings sessionId)
 
         /// Remove all state for a session (session.deleted or explicit cleanup).
         member _.ClearSession(sessionId: SessionId) =

@@ -88,9 +88,7 @@ type VerdictMailbox() =
 
     /// Non-blocking FIFO drain (up to maxCount). Remaining stay queued.
     member _.DrainAvailable(maxCount: int) : OrchestratorVerdict list =
-        if maxCount <= 0 then
-            []
-        else
+        let drain () =
             lock gate (fun () ->
                 // DSL-MUTABLE: algorithm-scratch — drain-loop counter
                 [ let mutable n = 0
@@ -98,6 +96,8 @@ type VerdictMailbox() =
                   while n < maxCount && verdicts.Count > 0 do
                       n <- n + 1
                       yield verdicts.Dequeue() ])
+
+        if maxCount <= 0 then [] else drain ()
 
     member _.HasActive = lock gate (fun () -> active > 0)
     member _.PendingCount = lock gate (fun () -> verdicts.Count)
@@ -147,20 +147,17 @@ type VerdictMailbox() =
 
     /// EXEC-019: first verdict wakes; immediately drain backlog; cap MaxJoinBatch; FIFO.
     member this.TryJoinBatch(maxCount: int) : Task<OrchestratorVerdict list> =
-        let cap = min (max 0 maxCount) JoinBatch.Max
-
-        if cap <= 0 then
-            Task.FromResult []
-        else
-            let ready = this.DrainAvailable cap
-
-            match ready with
-            | _ :: _ -> Task.FromResult ready
+        let joinWhenCapped (cap: int) =
+            match this.DrainAvailable cap with
+            | _ :: _ as ready -> Task.FromResult ready
             | [] ->
                 task {
                     do! this.awaitSignal ()
                     return this.DrainAvailable cap
                 }
+
+        let cap = min (max 0 maxCount) JoinBatch.Max
+        if cap <= 0 then Task.FromResult [] else joinWhenCapped cap
 
     /// Compatibility single-result join.
     member this.TryJoin() : Task<OrchestratorVerdict option> =
@@ -168,6 +165,39 @@ type VerdictMailbox() =
             let! batch = this.TryJoinBatch 1
             return List.tryHead batch
         }
+
+    member private _.signalOrEnqueue(waiter: TaskCompletionSource<unit>) =
+        lock gate (fun () ->
+            if verdicts.Count > 0 || active = 0 then
+                AsyncSupport.trySetResult waiter () |> ignore
+            else
+                waiters.Enqueue waiter)
+
+    member private this.resolveEmptyDrain
+        (waiter: TaskCompletionSource<unit>)
+        (kind: int)
+        (winner: obj)
+        =
+        if kind = 0 then
+            // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
+            ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
+        else
+            this.dropWaiter waiter
+            let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
+            Interrupted reason
+
+    member private this.resolveAfterDrain
+        (waiter: TaskCompletionSource<unit>)
+        (cap: int)
+        (winner: obj)
+        =
+        let after = this.DrainAvailable cap
+
+        match NonEmptyBatch.tryOfList after with
+        | Some batch -> ResultsAvailable batch
+        | None ->
+            let kind: int = emitJsExpr winner "$0.kind"
+            this.resolveEmptyDrain waiter kind winner
 
     /// EXEC-017 / EXEC-019: drain-first → race wait/interrupt → re-drain.
     /// A local operator abort is not a publish failure.
@@ -185,11 +215,7 @@ type VerdictMailbox() =
             let waiter =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            lock gate (fun () ->
-                if verdicts.Count > 0 || active = 0 then
-                    AsyncSupport.trySetResult waiter () |> ignore
-                else
-                    waiters.Enqueue waiter)
+            this.signalOrEnqueue waiter
 
             // Race arms as int tags — no nested task{} (dsl-ownership raw-task budget).
             let waitTask: Task<obj> =
@@ -216,18 +242,5 @@ type VerdictMailbox() =
                         (emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>)
 
                 // Always re-drain first (EXEC-018).
-                let after = this.DrainAvailable cap
-
-                match NonEmptyBatch.tryOfList after with
-                | Some batch -> return ResultsAvailable batch
-                | None ->
-                    let kind: int = emitJsExpr winner "$0.kind"
-
-                    if kind = 0 then
-                        // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
-                        return ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
-                    else
-                        this.dropWaiter waiter
-                        let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
-                        return Interrupted reason
+                return this.resolveAfterDrain waiter cap winner
             }

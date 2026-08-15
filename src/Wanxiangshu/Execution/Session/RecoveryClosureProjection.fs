@@ -31,6 +31,96 @@ module RecoveryClosureProjection =
         |> Option.bind (fun session -> session.Handles)
         |> Option.defaultValue HandleProjection.empty
 
+    let private addBloggerPair
+        (add: RecoveryNode -> unit)
+        (owner: SessionId)
+        (projection: AgentProjectionSet)
+        =
+        match SessionAssociationProjection.tryBloggerOf owner projection.Associations with
+        | Some blogger ->
+            add (RecoveryNode.Companion(owner, blogger))
+            add (RecoveryNode.Blogger(owner, blogger))
+        | None -> ()
+
+    let private addLinkedChild
+        (root: SessionId)
+        (projection: AgentProjectionSet)
+        (add: RecoveryNode -> unit)
+        (linkedChildIds: System.Collections.Generic.HashSet<string>)
+        (record: HandleRecord)
+        =
+        ignore (linkedChildIds.Add(SessionId.value record.ChildSessionId))
+        // GLORY-002 / SURFACE-006: the hidden Finality Reviewer is not part
+        // of the parent's recovery family; the Host-owned workflow owns it.
+        match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with
+        | Fact.HandleOwnership.HostOwnedHidden, _, _ -> ()
+        | _, HandleLifecycle.Retired, _
+        | _, HandleLifecycle.Abandoned _, _
+        | _, _, None -> ()
+        | _, HandleLifecycle.Active, Some agentHandle
+        | _, HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
+            add (RecoveryNode.AgentChild(root, record.ChildSessionId, agentHandle))
+            addBloggerPair add record.ChildSessionId projection
+
+    let private addManagerJob
+        (root: SessionId)
+        (projection: AgentProjectionSet)
+        (add: RecoveryNode -> unit)
+        (linkedChildIds: System.Collections.Generic.HashSet<string>)
+        job
+        =
+        let related =
+            job.ManagerSessionId = root
+            || linkedChildIds.Contains(SessionId.value job.ManagerSessionId)
+
+        if not related then
+            ()
+        elif job.ManagerSessionId = root then
+            add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))
+            addBloggerPair add job.ManagerSessionId projection
+        else
+            add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))
+
+            add (
+                RecoveryNode.AgentChild(
+                    root,
+                    job.ManagerSessionId,
+                    AgentHandleId.create (ManagerJobId.value job.ManagerJobId)
+                )
+            )
+
+            addBloggerPair add job.ManagerSessionId projection
+
+    let private sessionNeedsRecovery session =
+        let pending =
+            session.PromptAuthority
+            |> Option.map (fun authority -> not (Map.isEmpty authority.PendingClaims))
+            |> Option.defaultValue false
+
+        let openBlogger =
+            session.BloggerCycles
+            |> Option.map (fun cycles -> not (Map.isEmpty cycles.OpenByRequestId))
+            |> Option.defaultValue false
+
+        pending || openBlogger
+
+    let private addPendingSession
+        (root: SessionId)
+        (projection: AgentProjectionSet)
+        (add: RecoveryNode -> unit)
+        (linkedChildIds: System.Collections.Generic.HashSet<string>)
+        (sessionId: SessionId)
+        session
+        =
+        if not (sessionNeedsRecovery session) then
+            ()
+        elif
+            sessionId = root
+            || SessionAssociationProjection.tryMainSessionOf sessionId projection.Associations = Some root
+            || linkedChildIds.Contains(SessionId.value sessionId)
+        then
+            add (RecoveryNode.WorkSession sessionId)
+
     /// Discover durable recovery dependency closure for a parent session.
     let discover (root: SessionId) (projection: AgentProjectionSet) (journalSequence: int64) : RecoveryClosure =
         let nodes = ResizeArray<RecoveryNode>()
@@ -46,72 +136,15 @@ module RecoveryClosureProjection =
         add (RecoveryNode.WorkSession root)
 
         for record in HandleProjection.linkedChildren (rootHandles root projection) do
-            ignore (linkedChildIds.Add(SessionId.value record.ChildSessionId))
-            // GLORY-002 / SURFACE-006: the hidden Finality Reviewer is not part
-            // of the parent's recovery family; the Host-owned workflow owns it.
-            match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with
-            | Fact.HandleOwnership.HostOwnedHidden, _, _ -> ()
-            | _, HandleLifecycle.Retired, _
-            | _, HandleLifecycle.Abandoned _, _
-            | _, _, None -> ()
-            | _, HandleLifecycle.Active, Some agentHandle
-            | _, HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
-                add (RecoveryNode.AgentChild(root, record.ChildSessionId, agentHandle))
+            addLinkedChild root projection add linkedChildIds record
 
-                match SessionAssociationProjection.tryBloggerOf record.ChildSessionId projection.Associations with
-                | Some blogger ->
-                    add (RecoveryNode.Companion(record.ChildSessionId, blogger))
-                    add (RecoveryNode.Blogger(record.ChildSessionId, blogger))
-                | None -> ()
-
-        match SessionAssociationProjection.tryBloggerOf root projection.Associations with
-        | Some blogger ->
-            add (RecoveryNode.Companion(root, blogger))
-            add (RecoveryNode.Blogger(root, blogger))
-        | None -> ()
+        addBloggerPair add root projection
 
         for job in OrchestratorProjection.activeJobs projection.Orchestrator do
-            let related =
-                job.ManagerSessionId = root
-                || linkedChildIds.Contains(SessionId.value job.ManagerSessionId)
-
-            if related then
-                add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))
-
-                if job.ManagerSessionId <> root then
-                    add (
-                        RecoveryNode.AgentChild(
-                            root,
-                            job.ManagerSessionId,
-                            AgentHandleId.create (ManagerJobId.value job.ManagerJobId)
-                        )
-                    )
-
-                match SessionAssociationProjection.tryBloggerOf job.ManagerSessionId projection.Associations with
-                | Some blogger ->
-                    add (RecoveryNode.Companion(job.ManagerSessionId, blogger))
-                    add (RecoveryNode.Blogger(job.ManagerSessionId, blogger))
-                | None -> ()
+            addManagerJob root projection add linkedChildIds job
 
         for sessionId, session in Map.toList projection.Sessions do
-            let pending =
-                session.PromptAuthority
-                |> Option.map (fun authority -> not (Map.isEmpty authority.PendingClaims))
-                |> Option.defaultValue false
-
-            let openBlogger =
-                session.BloggerCycles
-                |> Option.map (fun cycles -> not (Map.isEmpty cycles.OpenByRequestId))
-                |> Option.defaultValue false
-
-            if pending || openBlogger then
-                let related =
-                    sessionId = root
-                    || SessionAssociationProjection.tryMainSessionOf sessionId projection.Associations = Some root
-                    || linkedChildIds.Contains(SessionId.value sessionId)
-
-                if related then
-                    add (RecoveryNode.WorkSession sessionId)
+            addPendingSession root projection add linkedChildIds sessionId session
 
         let rank =
             function
