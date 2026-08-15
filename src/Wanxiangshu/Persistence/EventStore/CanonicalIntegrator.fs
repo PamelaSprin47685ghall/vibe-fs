@@ -62,6 +62,7 @@ open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
+open FsToolkit.ErrorHandling
 
 /// Structural frontier oracle. It sees every durable event but owns no business
 /// meaning; DomainConflict is simply `heads.Count > 1` in this Integrator slot.
@@ -182,90 +183,100 @@ module CanonicalIntegrator =
 
     /// The only single-event integration primitive. Both replay and live paths
     /// call this exact function.
+    let private integrateExisting
+        (state: IntegratorState)
+        (existing: EventEnvelope)
+        (normalized: EventEnvelope)
+        : Result<IntegratorState, string> =
+        CanonicalEventCodec.checkIdentity existing normalized
+        |> Result.map (fun () -> state)
+        |> Result.mapError (sprintf "identity collision: %A")
+
+    let private integrateRules
+        (currents: Map<string, obj>)
+        (normalized: EventEnvelope)
+        (remaining: IntegrationRule list)
+        : Result<Map<string, obj>, string> =
+        let rec loop (currents: Map<string, obj>) (remaining: IntegrationRule list) =
+            match remaining with
+            | [] -> Ok currents
+            | rule :: tail ->
+                let current = currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
+
+                rule.Integrate current normalized
+                |> Result.mapError (sprintf "%s: %s" rule.Name)
+                |> Result.bind (fun next -> loop (Map.add rule.Name next currents) tail)
+
+        loop currents remaining
+
+    let private integrateNew
+        (state: IntegratorState)
+        (normalized: EventEnvelope)
+        (key: string)
+        : Result<IntegratorState, string> =
+        let missingParent =
+            normalized.Parents
+            |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
+
+        match missingParent with
+        | Some parent -> Error(sprintf "missing parent during integration: %s" (EventId.value parent))
+        | None ->
+            integrateRules state.Currents normalized (matchingRule normalized)
+            |> Result.map (fun currents ->
+                { Currents = currents
+                  Events = Map.add key normalized state.Events })
+
     let private integrateOne (state: IntegratorState) (envelope: EventEnvelope) : Result<IntegratorState, string> =
         let normalized = EventEnvelope.normalize envelope
         let key = eventKey normalized.EventId
 
         match Map.tryFind key state.Events with
-        | Some existing ->
-            match CanonicalEventCodec.checkIdentity existing normalized with
-            | Ok() -> Ok state
-            | Error error -> Error(sprintf "identity collision: %A" error)
-        | None ->
-            let missingParent =
-                normalized.Parents
-                |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
-
-            match missingParent with
-            | Some parent -> Error(sprintf "missing parent during integration: %s" (EventId.value parent))
-            | None ->
-                let rec integrateRules (currents: Map<string, obj>) (remaining: IntegrationRule list) =
-                    match remaining with
-                    | [] -> Ok currents
-                    | rule :: tail ->
-                        let current = currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
-
-                        match rule.Integrate current normalized with
-                        | Error error -> Error(sprintf "%s: %s" rule.Name error)
-                        | Ok next -> integrateRules (Map.add rule.Name next currents) tail
-
-                match integrateRules state.Currents (matchingRule normalized) with
-                | Error error -> Error error
-                | Ok currents ->
-                    Ok
-                        { Currents = currents
-                          Events = Map.add key normalized state.Events }
+        | Some existing -> integrateExisting state existing normalized
+        | None -> integrateNew state normalized key
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
     /// This module alone turns that ordered history into business Current.
     let private replay (streams: (string * EventEnvelope list) list) : Result<IntegratorState, string> =
-        match EventKWayMerge.merge streams with
-        | Error error -> Error(sprintf "writer-stream replay invalid: %A" error)
-        | Ok ordered ->
-            let rec integrate state remaining =
-                match remaining with
-                | [] -> Ok state
-                | head :: tail ->
-                    match integrateOne state head with
-                    | Error error -> Error error
-                    | Ok next -> integrate next tail
+        let rec integrate (state: IntegratorState) (remaining: EventEnvelope list) =
+            match remaining with
+            | [] -> Ok state
+            | head :: tail -> integrateOne state head |> Result.bind (fun next -> integrate next tail)
 
-            integrate initialState ordered
+        EventKWayMerge.merge streams
+        |> Result.mapError (sprintf "writer-stream replay invalid: %A")
+        |> Result.bind (fun ordered -> integrate initialState ordered)
 
     /// Live and boot both reduce through integrateOne. This helper exists so the
     /// two entry paths cannot grow separate reducers while still letting EventStore
     /// prepare a whole append batch before making its bytes durable.
     let private integrateLive (state: IntegratorState) (events: EventEnvelope list) =
-        let rec loop current remaining =
+        let rec loop (current: IntegratorState) (remaining: EventEnvelope list) =
             match remaining with
             | [] -> Ok current
-            | head :: tail ->
-                match integrateOne current head with
-                | Error error -> Error error
-                | Ok next -> loop next tail
+            | head :: tail -> integrateOne current head |> Result.bind (fun next -> loop next tail)
 
         loop state events
 
     let private validateLocalHistory commonDir streams =
-        let events = streams |> List.collect snd
+        result {
+            let events = streams |> List.collect snd
 
-        let unknown =
-            events
-            |> List.tryFind (fun envelope -> not (AuthoritativeEventTypes.isKnown envelope.EventType))
+            do!
+                events
+                |> List.tryFind (fun envelope -> not (AuthoritativeEventTypes.isKnown envelope.EventType))
+                |> Option.map (fun envelope ->
+                    Error(sprintf "unknown durable event type during replay: %s" envelope.EventType))
+                |> Option.defaultValue (Ok())
 
-        match unknown with
-        | Some envelope -> Error(sprintf "unknown durable event type during replay: %s" envelope.EventType)
-        | None ->
-            let missingPayload =
+            do!
                 events
                 |> List.collect (fun envelope -> envelope.PayloadRefs)
                 |> PayloadRefs.canonicalize
                 |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
-
-            match missingPayload with
-            | Some payloadRef ->
-                Error(sprintf "missing durable payload during replay: %s" (PayloadRef.value payloadRef))
-            | None -> Ok()
+                |> Option.map (fun payloadRef ->
+                    Error(sprintf "missing durable payload during replay: %s" (PayloadRef.value payloadRef)))
+                |> Option.defaultValue (Ok())
+        }
 
     let create () : ICanonicalIntegrator =
         let gate = obj ()
@@ -277,33 +288,33 @@ module CanonicalIntegrator =
         { new ICanonicalIntegrator with
             member _.ReloadLocal(commonDir) =
                 lock gate (fun () ->
-                    match ProcessEventLog.readStreams commonDir with
-                    | Error error -> Error(sprintf "local event history read failed: %A" error)
-                    | Ok streams ->
-                        match validateLocalHistory commonDir streams with
-                        | Error error -> Error error
-                        | Ok() ->
-                            match replay streams with
-                            | Error error -> Error error
-                            | Ok replayed ->
-                                state <- replayed
-                                generation <- generation + 1L
-                                Ok())
+                    result {
+                        let! streams =
+                            ProcessEventLog.readStreams commonDir
+                            |> Result.mapError (sprintf "local event history read failed: %A")
+
+                        do! validateLocalHistory commonDir streams
+                        let! replayed = replay streams
+                        state <- replayed
+                        generation <- generation + 1L
+                        return ()
+                    })
 
             member _.PrepareLive(events) =
                 lock gate (fun () ->
-                    match integrateLive state events with
-                    | Error error -> Error error
-                    | Ok prepared ->
+                    result {
+                        let! prepared = integrateLive state events
                         let expectedGeneration = generation
 
-                        Ok(fun () ->
-                            lock gate (fun () ->
-                                if generation <> expectedGeneration then
-                                    failwith "CanonicalIntegrator Current changed between prepare and durable append"
+                        return
+                            fun () ->
+                                lock gate (fun () ->
+                                    if generation <> expectedGeneration then
+                                        failwith "CanonicalIntegrator Current changed between prepare and durable append"
 
-                                state <- prepared
-                                generation <- generation + 1L)))
+                                    state <- prepared
+                                    generation <- generation + 1L)
+                    })
 
             member _.TryCurrent(key) =
                 lock gate (fun () -> Map.tryFind key state.Currents)

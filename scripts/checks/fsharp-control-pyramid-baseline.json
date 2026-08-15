@@ -225,7 +225,6 @@
     "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs": 20,
     "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs": 5,
     "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs": 4,
-    "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs": 12,
     "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs": 8,
     "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs": 13,
     "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs": 9,
