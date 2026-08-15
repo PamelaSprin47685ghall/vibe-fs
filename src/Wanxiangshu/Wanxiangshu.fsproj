@@ -312,6 +312,7 @@
     <Compile Include="Interaction/Dispatch/Ingress.fs"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
+    <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Wait.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Store.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Workflow.fs"/>

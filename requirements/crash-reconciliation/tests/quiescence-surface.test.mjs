@@ -1,0 +1,122 @@
+// P4 pilot: QuiescenceSurface — opaque capability + behavior surface proof.
+// owner: crash-reconciliation. HOST-004 idle-derived continuation admission.
+//
+// JS-SEMANTIC-SURFACE-002/003/005: the registered surface is the legal entry
+// point; `gate` and `permit` are opaque handles (obtain → pass back → dispose),
+// never inspected. Session ids cross as plain strings.
+
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+
+const quiescence = await import('../../../dist/OpenCode/Host/QuiescenceSurface.js')
+
+const S = 'ses-q'
+
+test('Q01_normal_stable_idle_yields_one_consumable_permit', () => {
+  const gate = quiescence.create()
+  assertOpaque(gate, 'gate')
+  quiescence.beginAttempt(gate, S)
+  const permit = quiescence.observeIdle(gate, S)
+  assertOpaque(permit, 'permit')
+
+  assert.equal(quiescence.tryConsume(gate, permit), true, 'fresh idle permit must consume once')
+  assert.equal(quiescence.tryConsume(gate, permit), false, 'a consumed permit must never send again')
+})
+
+test('Q02_new_provider_attempt_invalidates_the_old_permit', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const permit = quiescence.observeIdle(gate, S)
+
+  // The core race: attempt B's transform begins BEFORE the old reconcile's
+  // side effect executes.
+  quiescence.beginAttempt(gate, S)
+
+  assert.equal(quiescence.tryConsume(gate, permit), false, 'stale permit must be rejected')
+})
+
+test('Q03_repeated_idle_does_not_repeat_send', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const first = quiescence.observeIdle(gate, S)
+  const second = quiescence.observeIdle(gate, S)
+
+  assert.equal(quiescence.tryConsume(gate, first), true)
+  assert.equal(quiescence.tryConsume(gate, second), false, 'the same idle occasion admits at most one send')
+})
+
+test('Q04_new_attempt_own_idle_can_send_again', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const aPermit = quiescence.observeIdle(gate, S)
+  assert.equal(quiescence.tryConsume(gate, aPermit), true)
+
+  // A fresh attempt gets its own fresh idle right — a consumed permit never
+  // permanently suppresses the session.
+  quiescence.beginAttempt(gate, S)
+  const bPermit = quiescence.observeIdle(gate, S)
+  assert.equal(quiescence.tryConsume(gate, bPermit), true, 'B must be able to send on its own idle')
+})
+
+test('Q07_restart_gate_holds_no_permit', () => {
+  const before = quiescence.create()
+  quiescence.beginAttempt(before, S)
+  const oldPermit = quiescence.observeIdle(before, S)
+
+  // New process incarnation: the gate is empty, so the old permit is unknown
+  // to it and no idle-derived continuation can pass.
+  const after = quiescence.create()
+  assert.equal(quiescence.tryConsume(after, oldPermit), false, 'restart must not inherit idle truth')
+})
+
+test('Q10_session_deleted_drops_every_permit', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const permit = quiescence.observeIdle(gate, S)
+
+  quiescence.dropSession(gate, S)
+  assert.equal(quiescence.tryConsume(gate, permit), false, 'a dropped session never sends on an old permit')
+})
+
+test('ESC_P0_2_operator_abort_revokes_unconsumed_idle_permit', () => {
+  // HOST-004: a permit is minted on fresh idle but not yet consumed; Esc
+  // revokes the attempt. A delayed reconcile must NOT be able to consume the
+  // old permit (which is what would mint a bare `#` missing-final-report repair).
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const permit = quiescence.observeIdle(gate, S)
+
+  quiescence.revoke(gate, S)
+
+  assert.equal(quiescence.tryConsume(gate, permit), false, 'abort must permanently void the pending idle permit')
+})
+
+test('ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idle', () => {
+  // After Esc, a delayed SessionIdle must NOT re-establish a usable idle
+  // permit for the aborted attempt; eligibility returns only with the next
+  // real BeginProviderAttempt (HOST-004).
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+
+  quiescence.revoke(gate, S)
+  const latePermit = quiescence.observeIdle(gate, S)
+
+  assert.equal(quiescence.tryConsume(gate, latePermit), false, 'revoked attempt must not mint a usable idle permit')
+
+  // A genuine new attempt restores eligibility.
+  quiescence.beginAttempt(gate, S)
+  const freshPermit = quiescence.observeIdle(gate, S)
+  assert.equal(quiescence.tryConsume(gate, freshPermit), true, 'next real BeginProviderAttempt re-establishes idle rights')
+})
+
+test('P4_SURFACE_exports_exact_capability_names', () => {
+  assert.deepEqual(Object.getOwnPropertyNames(quiescence).sort(), [
+    'beginAttempt',
+    'create',
+    'dropSession',
+    'observeIdle',
+    'revoke',
+    'tryConsume',
+  ])
+})

@@ -47,6 +47,7 @@ export const BUILD_VERIFICATION_FILES = new Set([
  */
 export const SURFACE_MODULES = [
   'Execution/Delegation/Fork/Surface.js',
+  'OpenCode/Host/QuiescenceSurface.js',
 ]
 
 const SURFACE_ALT = SURFACE_MODULES.map((m) => m.replace(/[.]/g, '\\.')).join('|')

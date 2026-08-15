@@ -2448,7 +2448,7 @@ surface 应跟着 semantic owner 分布。
 
 **完成条件：**证明 JSON-shaped contract 可行。
 
-### P4 — Stateful pilot
+### P4 — Stateful pilot ✅
 
 迁 `SessionQuiescenceGate` 一类 abstraction。
 

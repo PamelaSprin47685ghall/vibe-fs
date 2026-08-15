@@ -241,10 +241,6 @@
     "interop-helper": 2,
     "du-shape": 4
   },
-  "requirements/crash-reconciliation/tests/session-quiescence-gate.test.mjs": {
-    "deep-dist-import": 1,
-    "export-discovery": 1
-  },
   "requirements/crash-reconciliation/tests/session-recovery-combine.test.mjs": {
     "deep-dist-import": 2,
     "interop-helper": 6
