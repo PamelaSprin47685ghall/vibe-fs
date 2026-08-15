@@ -257,7 +257,6 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages, snapshotGetMes
     (_session, charge) => inspectorPrompts.push(charge),
     undefined,
     undefined,
-    undefined,
     // EXEC-031: bounded WorkRecord via the real journal projector.
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )

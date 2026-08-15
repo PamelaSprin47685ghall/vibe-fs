@@ -52,8 +52,6 @@ const DEEP_BROWSER = [
 ]
 
 const pools = new Map([
-  ["title", FASTEST],
-  ["compaction", FASTEST],
   ["fast-distiller", FASTEST],
   ["fast-blogger", FASTEST],
   ["deep-distiller", FASTEST_II],
@@ -104,9 +102,11 @@ homedir()/.config/opencode/wanxiangshu.mjs
 若文件不存在：
 
 1. `mkdir ~/.config/opencode`（recursive/idempotent）；
-2. 用 exclusive create（Node `wx` 等价语义）写出随包 resource 的推荐模板；
-3. 若 exclusive create 因 `EEXIST` 失败，视为并发 bootstrap 已有 winner，禁止覆盖；
-4. 无论自己创建还是别人创建，最后都从磁盘 import 该文件。
+2. 在同目录用 exclusive create 写完整临时文件；
+3. 用原子 hard-link/create-if-absent 把该完整 inode 发布为 `wanxiangshu.mjs`；目标已存在 (`EEXIST`) 表示另一 bootstrap 已有 winner，禁止覆盖；
+4. 删除临时名；无论自己发布还是别人先赢，最后都从磁盘 import winner 文件。
+
+不要直接对最终路径做 `writeFile(..., flag="wx")`：虽然它防覆盖，但目标名会先出现、内容后写完，另一个进程可能在极窄窗口 import 到半截模块。
 
 这样“推荐默认”只存在于可见、可编辑、持久化的 MJS 文件中；runtime 内存里没有另一套 fallback。目录/写入的其它错误 fail closed。
 
@@ -150,11 +150,10 @@ registry 至少维护：
 
 ```text
 managedLeases: (SessionId, EffectiveAgent) → ModelTarget
-ephemeralAllocations: SystemInvocationId → ModelTarget
 pending: arrival-ordered demands
 ```
 
-`running` 每次调用临时由两张 allocation 表的 values 拼成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。
+`running` 每次调用临时由 managed lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。
 
 同一 SessionId 的两个 EffectiveAgent 若都指向同一 target，values 中自然出现两个重复元素。
 
@@ -232,26 +231,13 @@ B/B → lease(session, PeerAgent)
 
 Strength 不再读取静态 fast/deep model string。它对 `fast-<owner-role>` 做一次 optional scheduler probe；`null` → K0，不阻塞 owner；target 可用才创建/运行 replica。是否仍有成本收益继续归 speculative-investigation，而不是 model router。
 
-## 9. title / compaction
+## 9. lifecycle 与进程边界
 
-这两类 Host system request 用 pseudo-role 进入同一 scheduler：
-
-```text
-route("title", running)
-route("compaction", running)
-```
-
-返回 target 后建立 ephemeral allocation；必须在真实 provider terminal/abort 路径释放。`null` 作为 required Host demand 等待 occupancy event。
-
-这需要 Host 能在 title/compaction 发出前接受显式 model/reasoning override；能力不存在时应由 contract canary 让 GAP-016 保持 OPEN，而不是退回静态 `small_model`/agent model 猜测。
-
-## 10. lifecycle 与进程边界
-
-managed lease 只在 session retire/delete 正常释放；普通 idle/completion 不释放。plugin shutdown 清理当前进程 pending/ephemeral 状态；进程退出自然丢失 process-local lease registry。
+managed lease 只在 session retire/delete 正常释放；普通 idle/completion 不释放。plugin shutdown 清理当前进程 pending 状态；进程退出自然丢失 process-local lease registry。
 
 process restart 重新 import MJS 并开启新 routing epoch。本包当前不把 model lease 写入 durable event history；若未来要求历史 session 跨进程保持完全相同 physical target，应另立 durable binding requirement。
 
-## 11. 主要实现影响面
+## 10. 主要实现影响面
 
 - 新增 MJS loader + process-shared `ModelRoutingRuntime`；不新增 lane/config schema。
 - `ManagedAgentConfig.fs`：删除 Host model inventory authority 与 duplicate-pair-model validation；保留 owned Host fields 投影。
@@ -260,4 +246,3 @@ process restart 重新 import MJS 并开启新 routing epoch。本包当前不�
 - `ChatParamsHook.fs` + request mutation hook：managed model/reasoning route/validate。
 - `PluginSessionWiring.fs` / Strength：删除静态 inventory model 依赖，optional replica 走 scheduler probe。
 - session dispose/drop/fission cleanup：统一释放对应 managed lease。
-- Host title/compaction adapter：建立/释放 ephemeral allocation，并补 physical canary。

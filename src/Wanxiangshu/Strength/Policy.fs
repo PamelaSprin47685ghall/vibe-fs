@@ -43,7 +43,6 @@ type StrengthOpportunity =
       EventStoreHealthy: bool
       HostCanaryHealthy: bool
       FastPeerAvailable: bool
-      ModelBindingsDistinct: bool
       CostModelAvailable: bool }
 
 type StrengthPrediction =
@@ -100,8 +99,6 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "host-canary-unhealthy"
         elif not opportunity.FastPeerAvailable then
             StrengthEligibility.Ineligible "fast-peer-unavailable"
-        elif not opportunity.ModelBindingsDistinct then
-            StrengthEligibility.Ineligible "model-bindings-not-distinct"
         elif not opportunity.CostModelAvailable then
             StrengthEligibility.Ineligible "cost-model-unavailable"
         else

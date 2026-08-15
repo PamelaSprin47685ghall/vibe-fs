@@ -1,19 +1,57 @@
-// Split from tests/unit/host/session-execution-binding.test.mjs (cutover Wave 2a);
-// owner: host-boundary. HOST-BOUNDARY-008 / PROMPT-008 物理身份：InjectedSessionPort
-// 发送边界拒绝漂移 —— parented session 在 host send 前拒绝 agent/model drift。
-// root 重绑解析律断言归 participant-identity（PID-008）。
+// host-boundary: parented sends preserve frozen EffectiveAgent at the physical
+// Host boundary. Caller-supplied model is non-authoritative and is replaced by the
+// execution-model-routing lease before the underlying Host port sees it.
 
 import assert from 'node:assert/strict'
+import { after } from 'node:test'
 import test from 'node:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
+const previousHome = process.env.HOME
+const previousUserProfile = process.env.USERPROFILE
+const home = mkdtempSync(join(tmpdir(), 'wxs-host-binding-routing-'))
+const routingDir = join(home, '.config', 'opencode')
+mkdirSync(routingDir, { recursive: true })
+writeFileSync(
+  join(routingDir, 'wanxiangshu.mjs'),
+  `export default function route(role) {
+  return { model: 'provider/' + role + '-leased', reasoning: 'none' }
+}\n`,
+  'utf8',
+)
+process.env.HOME = home
+process.env.USERPROFILE = home
+
+const routing = await import('../../../dist/OpenCode/Host/ModelRouting.js')
+await routing.ModelRouting_initialize()
 const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const binding = await import('../../../dist/OpenCode/Host/SessionExecutionBinding.js')
 const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
-import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
+const { SessionIdModule_create: sessionId } = await import('../../../dist/Foundation/Identity.js')
 
 const eventPort = { SubscribeTerminalListener: () => ({ Dispose: () => {} }) }
 const preserve = { tag: 0, fields: [] }
 
-test('PROMPT_006_parented_session_rejects_agent_and_model_drift_before_host_send', async () => {
+const sendOptions = (agent, model) => ({
+  Model: model,
+  Agent: agent,
+  Directory: undefined,
+  Metadata: undefined,
+  Tools: undefined,
+  BindingIntent: preserve,
+})
+
+after(() => {
+  if (previousHome === undefined) delete process.env.HOME
+  else process.env.HOME = previousHome
+  if (previousUserProfile === undefined) delete process.env.USERPROFILE
+  else process.env.USERPROFILE = previousUserProfile
+  rmSync(home, { recursive: true, force: true })
+})
+
+test('PROMPT_006_parented_send_overrides_model_but_rejects_agent_drift_before_host', async () => {
   const child = sessionId('ses_binding_child')
   const sends = []
   const port = createPort(
@@ -32,25 +70,34 @@ test('PROMPT_006_parented_session_rejects_agent_and_model_drift_before_host_send
   const subscription = port.SubscribeTerminal(child, () => {})
 
   try {
-    const accepted = await port.SendPrompt(child, 'first', {
-      Model: { providerID: 'anthropic', modelID: 'deep-opus' },
-      Agent: 'deep-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
+    const accepted = await port.SendPrompt(
+      child,
+      'first',
+      sendOptions('deep-coder', { providerID: 'host-placeholder', modelID: 'wrong-model' }),
+    )
     assert.equal(accepted.tag, 0)
+    assert.equal(sends[0].options.Model.providerID, 'provider')
+    assert.equal(sends[0].options.Model.modelID, 'deep-coder-leased')
+    assert.equal(sends[0].options.Model.variant, 'none')
 
-    const wrongModel = await port.SendPrompt(child, 'wrong model', {
-      Model: { providerID: 'anthropic', modelID: 'fast-haiku' },
-      Agent: 'deep-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(wrongModel.tag, 4)
+    const stillLeased = await port.SendPrompt(
+      child,
+      'second',
+      sendOptions('deep-coder', { providerID: 'another-placeholder', modelID: 'also-wrong' }),
+    )
+    assert.equal(stillLeased.tag, 0)
+    assert.equal(sends[1].options.Model.modelID, 'deep-coder-leased')
 
-    const wrongAgent = await port.SendPrompt(child, 'wrong agent', {
-      Model: { providerID: 'anthropic', modelID: 'fast-haiku' },
-      Agent: 'fast-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
+    const wrongAgent = await port.SendPrompt(
+      child,
+      'wrong agent',
+      sendOptions('fast-coder', { providerID: 'provider', modelID: 'fast-coder-leased' }),
+    )
     assert.equal(wrongAgent.tag, 4)
-    assert.equal(sends.length, 1)
+    assert.match(wrongAgent.fields[0], /agent drift/i)
+    assert.equal(sends.length, 2)
   } finally {
+    binding.drop(child)
     subscription.Dispose()
   }
 })

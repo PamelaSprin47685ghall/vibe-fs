@@ -80,7 +80,6 @@ test('STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportu
     EventStoreHealthy: true,
     HostCanaryHealthy: true,
     FastPeerAvailable: true,
-    ModelBindingsDistinct: true,
     CostModelAvailable: true,
   }
 

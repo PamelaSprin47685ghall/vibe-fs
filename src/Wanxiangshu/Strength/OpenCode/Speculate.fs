@@ -119,17 +119,6 @@ module StrengthSpeculate =
         |> HostDigest.sha256Hex
         |> StrengthDecisionId.create
 
-    let private fastBinding
-        (inventory: ManagedAgentConfig.ManagedAgentInventory)
-        (role: Role)
-        : (string * string * string) option =
-        let fastName = ManagedAgent.nameOf AgentTier.Fast role
-        let deepName = ManagedAgent.nameOf AgentTier.Deep role
-
-        match Map.tryFind fastName inventory.Bindings, Map.tryFind deepName inventory.Bindings with
-        | Some fast, Some deep -> Some(fastName, fast.Model, deep.Model)
-        | _ -> None
-
     let private rootWork (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) =
         match SessionOwnershipClassification.tryClassify sessionId associations with
         | Some(SessionExecutionClass.Work, Some SessionOwnership.Root) -> true
@@ -239,8 +228,7 @@ module StrengthSpeculate =
         { Snapshots: ISessionSnapshotPort
           Durable: AgentJournal
           Runtime: StrengthReplicaRuntime
-          Durability: StrengthDurabilityPort
-          Inventory: ManagedAgentConfig.ManagedAgentInventory }
+          Durability: StrengthDurabilityPort }
 
     type private OpportunitySurface =
         { Owner: SessionId
@@ -563,7 +551,6 @@ module StrengthSpeculate =
         (effectiveAgent: string)
         (hasPrefixProbe: bool)
         (fastAgent: string option)
-        (modelsDistinct: bool)
         : StrengthOpportunity =
         let costsAvailable = settings.Costs.IsSome
 
@@ -589,7 +576,6 @@ module StrengthSpeculate =
             && stableCaptureEligible
             && scope.Strength.StrengthFuseReason.IsNone
           FastPeerAvailable = fastAgent.IsSome
-          ModelBindingsDistinct = modelsDistinct
           CostModelAvailable = costsAvailable }
 
     let private buildSurface
@@ -606,13 +592,7 @@ module StrengthSpeculate =
         let requestKind, effectiveAgent, hasPrefixProbe =
             planEvidence scope owner target projections authority
 
-        let fast = fastBinding ports.Inventory authority.CanonicalRole
-        let fastAgent = fast |> Option.map (fun (name, _, _) -> name)
-
-        let modelsDistinct =
-            fast
-            |> Option.exists (fun (_, fastModel, deepModel) ->
-                not (String.Equals(fastModel, deepModel, StringComparison.Ordinal)))
+        let fastAgent = Some(ManagedAgent.nameOf AgentTier.Fast authority.CanonicalRole)
 
         let opportunity =
             buildOpportunity
@@ -627,7 +607,6 @@ module StrengthSpeculate =
                 effectiveAgent
                 hasPrefixProbe
                 fastAgent
-                modelsDistinct
 
         let wire = ProviderWireCapture.decodeMessageView rawMessages
         let semantic = ProviderProjection.toSemantic wire
@@ -846,18 +825,16 @@ module StrengthSpeculate =
                 snapshotPort,
                 scope.Strength.StrengthReplicaRuntime,
                 strengthDurability,
-                scope.Strength.ManagedAgentInventory,
                 ProviderWireDecode.projectionSessionIdFromMessages output
 
             let bound =
                 match candidates with
-                | Some durable, Some snapshots, Some runtime, Some durability, Some inventory, Some sessionIdText ->
+                | Some durable, Some snapshots, Some runtime, Some durability, Some sessionIdText ->
                     Some(
                         { Snapshots = snapshots
                           Durable = durable
                           Runtime = runtime
-                          Durability = durability
-                          Inventory = inventory },
+                          Durability = durability },
                         SessionId.create sessionIdText
                     )
                 | _ -> None

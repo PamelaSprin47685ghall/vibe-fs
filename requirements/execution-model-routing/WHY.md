@@ -52,8 +52,6 @@ required execution 应保持 pending；只有真实 occupancy 变化时才重新
 
 因此 managed binding 在 `(SessionId, EffectiveAgent)` 首次成功调度后冻结到该 live session retire/delete。两次 prompt 之间仍占一个 occurrence。AABB 切到 peer 时为另一个 EffectiveAgent 单独取得 lease；切回 A 时复用原 lease。
 
-Host title/compaction 没有这样的 managed session life，所以使用短生命周期 ephemeral allocation：provider invocation 结束即释放。
-
 ## 6. 为什么事件驱动状态必须 process-shared
 
 OpenCode 会按 directory/worktree 建多个 plugin instance，但它们仍在同一 OS process 中争用同一模型资源。若每个 instance 各维护 `running`，MJS 看到的 occupancy 就是假的。

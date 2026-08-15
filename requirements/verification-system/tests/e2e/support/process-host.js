@@ -347,6 +347,7 @@ function buildEnv(opts) {
     llmUrl: opts.providerUrl,
     pluginPaths: opts.pluginPaths,
     contextLimit: opts.contextLimit,
+    routingSource: opts.routingSource,
     extraEnv: opts.extraEnv,
   });
 

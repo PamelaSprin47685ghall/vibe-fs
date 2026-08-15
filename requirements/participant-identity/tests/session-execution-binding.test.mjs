@@ -1,229 +1,155 @@
-// Split from tests/unit/host/session-execution-binding.test.mjs (cutover Wave 2a);
-// owner: participant-identity. PID-008（PROMPT-006 binding 解析律）：只有外部
-// 用户选择重绑 root session —— 无 user binding 证明的内部 prompt fail-closed、
-// chat.params 观察不持久化临时 override、用户切换后跟随新 binding。
-// parented 发送边界拒绝漂移断言归 host-boundary（HOST-BOUNDARY-008）。
+// PID-008 / PROMPT-006: external user messages own EffectiveAgent selection;
+// execution model is always leased from execution-model-routing and never from Host config.
 
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test, { after } from 'node:test'
 
+const originalHome = process.env.HOME
+const home = await mkdtemp(join(tmpdir(), 'wanxiangshu-binding-home-'))
+process.env.HOME = home
+await mkdir(join(home, '.config', 'opencode'), { recursive: true })
+await writeFile(join(home, '.config', 'opencode', 'wanxiangshu.mjs'), `
+export default function route(role) {
+  if (role.startsWith('deep-')) return { model: 'test/deep', reasoning: 'high' }
+  if (role.startsWith('fast-')) return { model: 'test/fast', reasoning: 'none' }
+  return { model: 'test/system', reasoning: 'none' }
+}
+`, 'utf8')
+
+const routing = await import('../../../dist/OpenCode/Host/ModelRouting.js')
+await routing.ModelRouting_initialize()
+const binding = await import('../../../dist/OpenCode/Host/SessionExecutionBinding.js')
 const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
+const { create: createChatParams } = await import('../../../dist/OpenCode/Host/ChatParamsHook.js')
+const { SessionIdModule_create: sessionId } = await import('../../../dist/Foundation/Identity.js')
+
 const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
-import { create as createChatParams } from '../../../dist/OpenCode/Host/ChatParamsHook.js'
-import { validate, configureFromHostConfig } from '../../../dist/OpenCode/Host/ManagedAgentConfig.js'
-import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
-import { runtimeResources } from '../../verification-system/tests/support/domain.mjs'
-
-runtimeResources.installFromPackage()
-
 const eventPort = { SubscribeTerminalListener: () => ({ Dispose: () => {} }) }
 const preserve = { tag: 0, fields: [] }
 const override = { tag: 1, fields: [] }
 
-const inventory = () => {
-  const agent = {}
-  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper']) {
-    agent[`fast-${role}`] = { model: 'opencode-go/deepseek-v4-flash' }
-    agent[`deep-${role}`] = { model: 'opencode-go/deepseek-v4' }
-  }
+const options = (agent, intent = preserve) => ({
+  Model: undefined,
+  Agent: agent,
+  Directory: undefined,
+  Metadata: undefined,
+  Tools: undefined,
+  BindingIntent: intent,
+})
 
-  const parsed = validate({ agent })
-  assert.equal(parsed.tag, 0)
-  return parsed.fields[0]
+const modelKey = (model) => `${model.providerID}/${model.modelID}[${model.variant}]`
+
+const applyParams = (hook, sessionID, agent, model) => {
+  const next = hook({
+    sessionID,
+    agent,
+    model: { providerID: model.providerID, modelID: model.modelID },
+    message: { agent, model },
+  })
+  if (typeof next === 'function') next({})
 }
 
-const applyHook = (hook, input, output = {}) => {
-  const next = hook(input, output)
-  if (typeof next === 'function') next(output)
-  return output
-}
+after(async () => {
+  if (originalHome === undefined) delete process.env.HOME
+  else process.env.HOME = originalHome
+  await rm(home, { recursive: true, force: true })
+})
 
-test('PROMPT_006_only_external_user_choice_rebinds_root_session', async () => {
+test('PROMPT_006_root_requires_external_agent_proof_then_model_is_scheduler_owned', async () => {
   const root = sessionId('ses_binding_root')
   const sends = []
-  let hook
+  const hook = createChatParams()
 
-  const port = createPort(
-    {
-      SendPrompt: async (sid, text, options) => {
-        sends.push({ sid: sid.fields[0], text, options })
-        applyHook(hook, {
-          sessionID: sid.fields[0],
-          agent: options.Agent,
-          model: options.Model,
-          message: { agent: options.Agent, model: options.Model },
-        })
-        return { tag: 0, fields: [{ fields: [`accepted-${sid.fields[0]}`] }] }
-      },
+  const port = createPort({
+    SendPrompt: async (sid, text, sent) => {
+      sends.push({ sid: sid.fields[0], text, sent })
+      applyParams(hook, sid.fields[0], sent.Agent, sent.Model)
+      return { tag: 0, fields: [{ fields: [`accepted-${sid.fields[0]}`] }] }
     },
-    eventPort,
-  )
-
-  hook = createChatParams(undefined, inventory)
+  }, eventPort)
   const subscription = port.SubscribeTerminal(root, () => {})
 
   try {
-    const unproven = await port.SendPrompt(root, 'plugin has no user binding proof', {
-      Model: { providerID: 'opencode-go', modelID: 'deepseek-v4' },
-      Agent: 'deep-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(unproven.tag, 4, 'internal prompt must fail closed until a real user binding is observed')
+    const unproven = await port.SendPrompt(root, 'no external user binding', options('deep-coder'))
+    assert.equal(unproven.tag, 4)
     assert.equal(sends.length, 0)
 
-    applyHook(hook, {
-      sessionID: 'ses_binding_root',
-      agent: 'title',
-      model: { providerID: 'opencode-go', modelID: 'small-title-model' },
-      message: { agent: 'deep-coder', model: { providerID: 'opencode-go', modelID: 'deepseek-v4' } },
-    })
+    binding.observeUserFacingAgent(root, 'deep-coder')
+    const deep = await port.SendPrompt(root, 'ordinary continuation', options('deep-coder'))
+    assert.equal(deep.tag, 0)
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/deep[high]')
 
-    const accidental = await port.SendPrompt(root, 'plugin mistake', {
-      Model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' },
-      Agent: 'fast-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(accidental.tag, 4)
-    assert.equal(sends.length, 0)
-
-    const temporary = await port.SendPrompt(root, 'typed override', {
-      Model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' },
-      Agent: 'fast-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: override,
-    })
+    const temporary = await port.SendPrompt(root, 'peer fallback', options('fast-coder', override))
     assert.equal(temporary.tag, 0)
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/fast[none]')
 
-    const stillDeep = await port.SendPrompt(root, 'ordinary continuation', {
-      Model: { providerID: 'opencode-go', modelID: 'deepseek-v4' },
-      Agent: 'deep-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(stillDeep.tag, 0, 'internal chat.params observation must not persist the temporary override')
+    const stillDeep = await port.SendPrompt(root, 'ordinary continuation', options('deep-coder'))
+    assert.equal(stillDeep.tag, 0, 'internal peer override cannot rewrite external user selection')
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/deep[high]')
 
-    applyHook(hook, {
-      sessionID: 'ses_binding_root',
-      agent: 'title',
-      model: { providerID: 'anthropic', modelID: 'small-title-model' },
-      message: { agent: 'fast-coder', model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' } },
-    })
-
-    const afterUserSwitch = await port.SendPrompt(root, 'follow external user choice', {
-      Model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' },
-      Agent: 'fast-coder', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(afterUserSwitch.tag, 0)
-    assert.equal(sends.length, 3)
+    binding.observeUserFacingAgent(root, 'fast-coder')
+    const switched = await port.SendPrompt(root, 'follow next external user choice', options('fast-coder'))
+    assert.equal(switched.tag, 0)
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/fast[none]')
   } finally {
+    binding.drop(root)
     subscription.Dispose()
   }
 })
 
-test('PROMPT_006_subsession_accepts_model_with_default_or_unconstrained_variant', async () => {
-  const hook = createChatParams(undefined, inventory)
-  const agent = {}
-  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper']) {
-    agent[`fast-${role}`] = { model: 'opencode-go/deepseek-v4-flash' }
-    agent[`deep-${role}`] = { model: 'opencode-go/deepseek-v4' }
-  }
-  configureFromHostConfig({ agent })
+test('PROMPT_006_parented_session_uses_stable_agent_lease_and_authorized_peer_only', async () => {
+  const parent = sessionId('ses_parent')
+  const child = sessionId('ses_child')
+  const sends = []
+  const hook = createChatParams()
 
-  const child = sessionId('ses_variant_child')
-  const port = createPort(
-    {
-      CreateChildSession: async () => ({ tag: 0, fields: [child] }),
-      SendPrompt: async () => ({ tag: 0, fields: [{ fields: ['accepted'] }] }),
+  const port = createPort({
+    CreateChildSession: async () => ({ tag: 0, fields: [child] }),
+    SendPrompt: async (sid, text, sent) => {
+      sends.push({ sid: sid.fields[0], text, sent })
+      applyParams(hook, sid.fields[0], sent.Agent, sent.Model)
+      return { tag: 0, fields: [{ fields: ['accepted'] }] }
     },
-    eventPort,
-  )
+  }, eventPort)
 
-  const created = await port.CreateChildSession(sessionId('ses_variant_parent'), { Agent: 'fast-distiller' })
+  const created = await port.CreateChildSession(parent, { Agent: 'fast-distiller' })
   assert.equal(created.tag, 0)
   const subscription = port.SubscribeTerminal(child, () => {})
 
   try {
-    const sent = await port.SendPrompt(child, 'first opening', {
-      Model: undefined,
-      Agent: 'fast-distiller', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
-    assert.equal(sent.tag, 0)
-
-    // OpenCode runtime passes variant: 'default' or variant: undefined or camelCase providerId/modelId
-    assert.doesNotThrow(() => {
-      applyHook(hook, {
-        sessionID: 'ses_variant_child',
-        agent: 'fast-distiller',
-        message: {
-          agent: 'fast-distiller',
-          model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash', variant: 'default' },
-        },
-      })
-    })
-
-    // Also accepts camelCase properties
-    assert.doesNotThrow(() => {
-      applyHook(hook, {
-        sessionID: 'ses_variant_child',
-        agent: 'fast-distiller',
-        message: {
-          agent: 'fast-distiller',
-          model: { providerId: 'opencode-go', modelId: 'deepseek-v4-flash' },
-        },
-      })
-    })
-  } finally {
-    subscription.Dispose()
-  }
-})
-
-test('PROMPT_006_subsession_accepts_authorized_peer_fallback_override', async () => {
-  const hook = createChatParams(undefined, inventory)
-  const agent = {}
-  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper']) {
-    agent[`fast-${role}`] = { model: 'opencode-go/deepseek-v4-flash' }
-    agent[`deep-${role}`] = { model: 'opencode-go/deepseek-v4' }
-  }
-  configureFromHostConfig({ agent })
-
-  const child = sessionId('ses_fallback_child')
-  const port = createPort(
-    {
-      CreateChildSession: async () => ({ tag: 0, fields: [child] }),
-      SendPrompt: async () => ({ tag: 0, fields: [{ fields: ['accepted'] }] }),
-    },
-    eventPort,
-  )
-
-  const created = await port.CreateChildSession(sessionId('ses_fallback_parent'), { Agent: 'fast-distiller' })
-  assert.equal(created.tag, 0)
-  const subscription = port.SubscribeTerminal(child, () => {})
-
-  try {
-    const opening = await port.SendPrompt(child, 'first opening', {
-      Model: undefined,
-      Agent: 'fast-distiller', Directory: undefined, Metadata: undefined, Tools: undefined, BindingIntent: preserve,
-    })
+    const opening = await port.SendPrompt(child, 'opening', options('fast-distiller'))
     assert.equal(opening.tag, 0)
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/fast[none]')
 
-    // Fallback peer override: fast-distiller -> deep-distiller (with its bound model)
-    assert.doesNotThrow(() => {
-      applyHook(hook, {
-        sessionID: 'ses_fallback_child',
-        agent: 'deep-distiller',
-        message: {
-          agent: 'deep-distiller',
-          model: { providerID: 'opencode-go', modelID: 'deepseek-v4' },
-        },
-      })
-    })
+    const peer = await port.SendPrompt(child, 'fallback', options('deep-distiller', override))
+    assert.equal(peer.tag, 0)
+    assert.equal(modelKey(sends.at(-1).sent.Model), 'test/deep[high]')
 
-    // Foreign agent drift is still rejected fail-closed
-    assert.throws(() => {
-      applyHook(hook, {
-        sessionID: 'ses_fallback_child',
-        agent: 'fast-coder',
-        message: {
-          agent: 'fast-coder',
-          model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' },
-        },
-      })
-    }, /provider agent drift \(fast-distiller -> fast-coder\)/)
+    const foreign = await port.SendPrompt(child, 'illegal role change', options('fast-coder', override))
+    assert.equal(foreign.tag, 4)
+    assert.match(foreign.fields[0], /not the peer|override/i)
   } finally {
+    binding.drop(child)
     subscription.Dispose()
   }
+})
+
+test('PROMPT_006_provider_reasoning_variant_must_match_the_exact_lease', async () => {
+  const child = sessionId('ses_variant_exact')
+  binding.bind(sessionId('ses_variant_parent'), child, 'deep-distiller')
+  await routing.ModelRouting_acquireManaged(child, 'deep-distiller')
+  const hook = createChatParams()
+
+  assert.doesNotThrow(() => applyParams(hook, 'ses_variant_exact', 'deep-distiller', {
+    providerID: 'test', modelID: 'deep', variant: 'high',
+  }))
+
+  assert.throws(() => applyParams(hook, 'ses_variant_exact', 'deep-distiller', {
+    providerID: 'test', modelID: 'deep', variant: 'default',
+  }), /model\/reasoning drift/i)
+
+  binding.drop(child)
 })

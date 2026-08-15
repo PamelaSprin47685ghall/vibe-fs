@@ -40,7 +40,6 @@ const eligibleOpportunity = {
   EventStoreHealthy: true,
   HostCanaryHealthy: true,
   FastPeerAvailable: true,
-  ModelBindingsDistinct: true,
   CostModelAvailable: true,
 }
 

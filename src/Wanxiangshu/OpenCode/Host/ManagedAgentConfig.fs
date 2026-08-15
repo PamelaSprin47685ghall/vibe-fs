@@ -42,11 +42,11 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 
-/// managed agent config gate: validate Host-final opencode.json agent inventory.
-/// Does not invent missing agents, fill models, or read model env vars.
+/// Managed agent Host-config gate. This owns only catalog presence and Wanxiangshu-owned
+/// non-model fields. Physical model routing is exclusively owned by ModelRouting.
 module ManagedAgentConfig =
 
-    type ManagedAgentBinding = { Agent: ManagedAgent; Model: string }
+    type ManagedAgentBinding = { Agent: ManagedAgent }
 
     type ManagedAgentInventory =
         { Bindings: Map<string, ManagedAgentBinding> }
@@ -54,44 +54,8 @@ module ManagedAgentConfig =
     type ConfigGateError =
         | MissingAgentMap
         | MissingManagedAgent of string
-        | MissingModel of string
-        | EmptyModel of string
-        | DuplicatePairModel of fast: string * deep: string * model: string
         | LegacyAgentPresent of string
         | InvalidManagedAgent of string * detail: string
-
-    let private nonNullObj (value: obj) : obj option =
-        if isNull value then None else Some value
-
-    let private modelFromProviderFields (other: obj) : string option =
-        match other?providerID, other?modelID with
-        | p, m when not (isNull p) && not (isNull m) -> Some(sprintf "%s/%s" (string p) (string m))
-        | _ -> None
-
-    let private modelTextFromJsObject (other: obj) : string option =
-        let asString = other?ToString ()
-
-        if isNull asString then
-            None
-        elif
-            String.IsNullOrWhiteSpace(string asString)
-            || string asString = "[object Object]"
-        then
-            modelFromProviderFields other
-        else
-            Some(string asString)
-
-    let private coerceModelValue (model: obj) : string option =
-        match unbox<obj> model with
-        | :? string as s -> Some s
-        | other when not (isNull other) -> modelTextFromJsObject other
-        | _ -> None
-
-    let private readModel (agentObj: obj) : string option =
-        agentObj
-        |> nonNullObj
-        |> Option.bind (fun agent -> agent?model |> nonNullObj)
-        |> Option.bind coerceModelValue
 
     let private agentEntry (agents: obj) (name: string) : obj option =
         if isNull agents then
@@ -104,14 +68,6 @@ module ManagedAgentConfig =
         match err with
         | MissingAgentMap -> "Managed agents require config.agent from the Host-final opencode.json."
         | MissingManagedAgent name -> sprintf "Missing required managed agent '%s' in opencode.json agent map." name
-        | MissingModel name -> sprintf "Managed agent '%s' is missing a non-empty model binding." name
-        | EmptyModel name -> sprintf "Managed agent '%s' has an empty model binding." name
-        | DuplicatePairModel(fast, deep, model) ->
-            sprintf
-                "Managed agent pair %s/%s resolves to the same model.\nConfigure two distinct models or correct opencode.json.\nShared model: %s"
-                fast
-                deep
-                model
         | LegacyAgentPresent name -> ManagedAgentCatalog.formatLegacyNameInConfig name
         | InvalidManagedAgent(name, detail) -> sprintf "Invalid managed agent '%s': %s" name detail
 
@@ -128,18 +84,10 @@ module ManagedAgentConfig =
         | Some legacy -> Error(LegacyAgentPresent legacy)
         | None -> Ok()
 
-    let private requireNonEmptyModel (name: string) (model: string) : Result<string, ConfigGateError> =
-        result {
-            do! Result.requireTrue (EmptyModel name) (not (String.IsNullOrWhiteSpace model))
-            return model
-        }
-
     let private validateBookkeeperPresence (agents: obj) (name: string) : Result<unit, ConfigGateError> =
-        result {
-            let! entry = agentEntry agents name |> Result.requireSome (MissingManagedAgent name)
-            let! model = readModel entry |> Result.requireSome (MissingModel name)
-            do! requireNonEmptyModel name model |> Result.map ignore
-        }
+        agentEntry agents name
+        |> Result.requireSome (MissingManagedAgent name)
+        |> Result.map ignore
 
     let private validateRoleBinding
         (agents: obj)
@@ -150,14 +98,8 @@ module ManagedAgentConfig =
                 ManagedAgent.tryParse name
                 |> Result.requireSome (InvalidManagedAgent(name, "failed to parse required name"))
 
-            let! entry = agentEntry agents name |> Result.requireSome (MissingManagedAgent name)
-            let! model = readModel entry |> Result.requireSome (MissingModel name)
-            let! nonEmpty = requireNonEmptyModel name model
-
-            return
-                name,
-                { Agent = managed
-                  Model = nonEmpty.Trim() }
+            do! agentEntry agents name |> Result.requireSome (MissingManagedAgent name) |> Result.map ignore
+            return name, { Agent = managed }
         }
 
     let private validateRequiredName
@@ -170,60 +112,15 @@ module ManagedAgentConfig =
             validateRoleBinding agents name |> Result.map Some
 
     let private collectBindings (agents: obj) : Result<Map<string, ManagedAgentBinding>, ConfigGateError> =
-        result {
-            let! entries = ManagedAgent.requiredNames |> List.traverseResultM (validateRequiredName agents)
-
-            return entries |> List.choose id |> Map.ofList
-        }
-
-    let private rejectDuplicateRolePair
-        (bindings: Map<string, ManagedAgentBinding>)
-        (role: Role)
-        : Result<unit, ConfigGateError> =
-        let fastName = ManagedAgent.nameOf AgentTier.Fast role
-        let deepName = ManagedAgent.nameOf AgentTier.Deep role
-
-        match Map.tryFind fastName bindings, Map.tryFind deepName bindings with
-        | Some fast, Some deep when fast.Model = deep.Model -> Error(DuplicatePairModel(fastName, deepName, fast.Model))
-        | _ -> Ok()
-
-    let private validateRolePairs (bindings: Map<string, ManagedAgentBinding>) : Result<unit, ConfigGateError> =
-        ManagedAgent.allRoles
-        |> List.traverseResultM (rejectDuplicateRolePair bindings)
-        |> Result.map ignore
-
-    let private readEntryModel (agents: obj) (name: string) : string option =
-        agentEntry agents name |> Option.bind readModel
-
-    let private rejectDuplicateTrimmedModels
-        (fastName: string)
-        (deepName: string)
-        (models: (string * string) option)
-        : Result<unit, ConfigGateError> =
-        match models with
-        | Some(fastModel, deepModel) when
-            not (String.IsNullOrWhiteSpace fastModel)
-            && not (String.IsNullOrWhiteSpace deepModel)
-            && fastModel.Trim() = deepModel.Trim()
-            ->
-            Error(DuplicatePairModel(fastName, deepName, fastModel.Trim()))
-        | _ -> Ok()
-
-    let private validateBookkeeperPair (agents: obj) : Result<unit, ConfigGateError> =
-        let fastBk = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Fast
-        let deepBk = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Deep
-
-        match readEntryModel agents fastBk, readEntryModel agents deepBk with
-        | Some fastModel, Some deepModel -> rejectDuplicateTrimmedModels fastBk deepBk (Some(fastModel, deepModel))
-        | _ -> Ok()
+        ManagedAgent.requiredNames
+        |> List.traverseResultM (validateRequiredName agents)
+        |> Result.map (List.choose id >> Map.ofList)
 
     let validate (config: obj) : Result<ManagedAgentInventory, string> =
         result {
             let! agents = requireAgents config
             do! rejectLegacy agents
             let! bindings = collectBindings agents
-            do! validateRolePairs bindings
-            do! validateBookkeeperPair agents
             return { Bindings = bindings }
         }
         |> Result.mapError formatError
@@ -318,14 +215,11 @@ module ManagedAgentConfig =
         elif isNull (config?agent) then ()
         else applyAgentsOwnedFields config (config?agent) inventory
 
-    let private liveInventory: ManagedAgentInventory option ref = ref None
-
-    /// Best-effort bindings for the Error path: role knowledge only, no model
-    /// validation (the model checks are what failed). Enough to write owned
-    /// fields so AGENT-007's fail-closed first layer survives a gate error.
+    /// Best-effort bindings for the Error path: role knowledge only. Enough to write
+    /// owned fields so AGENT-007's fail-closed first layer survives a catalog error.
     let private tryRoleBinding (agents: obj) (name: string) : (string * ManagedAgentBinding) option =
         match agentEntry agents name, ManagedAgent.tryParse name with
-        | Some _, Some managed -> Some(name, { Agent = managed; Model = "" })
+        | Some _, Some managed -> Some(name, { Agent = managed })
         | _ -> None
 
     let private roleBindings (agents: obj) : Map<string, ManagedAgentBinding> =
@@ -334,66 +228,11 @@ module ManagedAgentConfig =
     let configureFromHostConfig (config: obj) : Result<ManagedAgentInventory, string> =
         match validate config with
         | Error err ->
-            // AGENT-007 fail-closed: a validation failure elsewhere in the config
-            // (e.g. a duplicate model pair) must not silently drop every
-            // permission/mode/prompt write. Apply what the config itself names;
-            // the Host logs the gate error and keeps running.
+            // AGENT-007 fail-closed: a catalog validation failure must not silently
+            // drop every permission/mode/prompt write. Apply what the config names.
             let agents = if isNull config then null else config?agent
             applyOwnedFields config { Bindings = if isNull agents then Map.empty else roleBindings agents }
             Error err
         | Ok inventory ->
             applyOwnedFields config inventory
-            liveInventory.Value <- Some inventory
-
             Ok inventory
-
-    let private inheritProviderModel (text: string) (current: OpencodeModel option) : OpencodeModel option =
-        match current with
-        | Some existing when not (String.IsNullOrWhiteSpace existing.providerID) ->
-            Some { existing with modelID = text }
-        | _ -> None
-
-    let private modelFromBindingText (text: string) (current: OpencodeModel option) : OpencodeModel option =
-        match text.IndexOf '/' with
-        | index when index > 0 && index < text.Length - 1 ->
-            Some
-                { providerID = text.Substring(0, index)
-                  modelID = text.Substring(index + 1)
-                  variant = current |> Option.bind (fun model -> model.variant) }
-        | _ -> inheritProviderModel text current
-
-    let private bindingModel
-        (inventory: ManagedAgentInventory)
-        (agent: string)
-        (current: OpencodeModel option)
-        : OpencodeModel option =
-        match Map.tryFind (agent.Trim()) inventory.Bindings with
-        | Some binding when not (String.IsNullOrWhiteSpace binding.Model) ->
-            modelFromBindingText (binding.Model.Trim()) current
-        | _ -> None
-
-    /// Parse Host-final agent model binding into an OpencodeModel.
-    ///
-    /// `provider/modelID` is the ordinary opencode.json form. A bare model id
-    /// keeps the current request's provider when one is already present, so a
-    /// Host default of the cheap id can be overwritten without inventing a
-    /// provider. Incomplete bindings (bare id, no current provider) are refused
-    /// rather than filled with a Fast default.
-    let tryOpencodeModel
-        (inventory: ManagedAgentInventory)
-        (agent: string)
-        (current: OpencodeModel option)
-        : OpencodeModel option =
-        if String.IsNullOrWhiteSpace agent then
-            None
-        else
-            bindingModel inventory agent current
-
-    /// PROMPT-006 Host resolution: Dispatcher sends `Model = None`; the transport
-    /// binds `config.agent[effectiveAgent].model` before prompt_async. OpenCode
-    /// otherwise treats an agent-less / history-inferred request as the default
-    /// Fast model and overwrites a Deep child mid-conversation.
-    let tryBoundModel (agent: string) : OpencodeModel option =
-        match liveInventory.Value with
-        | Some inventory -> tryOpencodeModel inventory agent None
-        | None -> None

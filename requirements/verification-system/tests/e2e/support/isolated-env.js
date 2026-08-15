@@ -46,6 +46,7 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     },
     cost: { input: 0, output: 0 },
     options: {},
+    variants: { none: {} },
   };
   const modelBDef = {
     ...modelDef,
@@ -138,6 +139,7 @@ function createFixtureUvx(scenarioDir, fixturePath) {
  * @param {number} [opts.contextLimit] - Provider context limit
  * @param {string} [opts.model] - Model ID string (default "test/test-model")
  * @param {string} [opts.apiKey] - Provider API key
+ * @param {string} [opts.routingSource] - Exact isolated ~/.config/opencode/wanxiangshu.mjs body
  * @param {string} [opts.mcpFixturePath] - Path to stealth MCP fixture
  * @param {object} [opts.extraEnv] - Additional env vars for this test
  * @returns {object} Environment key-value object to merge over process.env
@@ -154,6 +156,20 @@ export function createIsolatedEnv(opts) {
   for (const dir of [home, xdgData, xdgConfig, xdgCache, xdgState, tmpDir]) {
     fs.mkdirSync(dir, { recursive: true });
   }
+
+  // execution-model-routing intentionally ignores XDG_CONFIG_HOME and owns the
+  // fixed ~/.config/opencode/wanxiangshu.mjs path. E2E must therefore seed the
+  // isolated HOME explicitly; otherwise production would bootstrap its real-world
+  // recommended providers into a test provider process.
+  const routingDir = path.join(home, '.config', 'opencode');
+  fs.mkdirSync(routingDir, { recursive: true });
+  const routingSource = opts.routingSource || `export default function route(role) {
+  if (role.startsWith('fast-')) return { model: 'test/test-model', reasoning: 'none' }
+  if (role.startsWith('deep-')) return { model: 'test/test-model-b', reasoning: 'none' }
+  throw new Error('unexpected managed role: ' + role)
+}\n`;
+  fs.writeFileSync(path.join(routingDir, 'wanxiangshu.mjs'), routingSource, 'utf8');
+
   provisionPluginDependency(path.join(xdgConfig, 'opencode'));
 
   const realCacheDir = process.env.XDG_CACHE_HOME || path.join(process.env.HOME || '', '.cache');

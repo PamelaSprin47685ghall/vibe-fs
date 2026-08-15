@@ -256,6 +256,7 @@
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/Host/ModelRouting.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>

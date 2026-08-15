@@ -121,15 +121,38 @@ module private StrengthReplicaRuntimeLogic =
     let registerLiveOrAbort
         (sessions: ISessionHostPort)
         (liveRegistry: StrengthRuntime)
+        (releaseModel: (SessionId -> unit) option)
         (binding: StrengthReplicaBinding)
         (replica: SessionId)
         : Task<Result<unit, string>> =
         task {
             match liveRegistry.Register binding with
             | Error error ->
+                releaseModel |> Option.iter (fun release -> release replica)
                 let! _ = sessions.AbortSession replica
                 return Error(sprintf "StrengthReplica live registration failed: %A" error)
             | Ok() -> return Ok()
+        }
+
+    let acquireOptionalModelOrAbort
+        (sessions: ISessionHostPort)
+        (tryAcquireModel: (SessionId -> string -> OpencodeModel option) option)
+        (replica: SessionId)
+        (fastAgent: string)
+        : Task<Result<OpencodeModel option, string>> =
+        task {
+            match tryAcquireModel with
+            | None -> return Ok None
+            | Some acquire ->
+                try
+                    match acquire replica fastAgent with
+                    | Some model -> return Ok(Some model)
+                    | None ->
+                        let! _ = sessions.AbortSession replica
+                        return Error "model-capacity-unavailable"
+                with ex ->
+                    let! _ = sessions.AbortSession replica
+                    return raise ex
         }
 
     let tryClaimCollector
@@ -152,6 +175,7 @@ module private StrengthReplicaRuntimeLogic =
         (sessionKey: SessionId -> string)
         (liveRegistry: StrengthRuntime)
         (sessions: ISessionHostPort)
+        (releaseModel: (SessionId -> unit) option)
         (registerReplica: SessionId -> SessionId -> string -> unit)
         (owner: SessionId)
         (replica: SessionId)
@@ -164,6 +188,7 @@ module private StrengthReplicaRuntimeLogic =
                 return Ok()
             else
                 liveRegistry.Retire replica |> ignore
+                releaseModel |> Option.iter (fun release -> release replica)
                 let! _ = sessions.AbortSession replica
                 return Error "StrengthReplica in-flight state collided after live registration"
         }
@@ -182,7 +207,7 @@ module private StrengthReplicaRuntimeLogic =
         (sessions: ISessionHostPort)
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
         (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
-        (promptModelFor: (string -> OpencodeModel option) option)
+        (promptModel: OpencodeModel option)
         (directory: string option)
         (replica: SessionId)
         (fastAgent: string)
@@ -200,7 +225,7 @@ module private StrengthReplicaRuntimeLogic =
                         PromptDispatcher.AwaitMode.Detached
                         None
                         StrengthReplicaTools.exactReadonlyHostToolMap
-                        (promptModelFor |> Option.bind (fun lookup -> lookup fastAgent))
+                        promptModel
 
                 applyBootstrapSendResult complete state sent
             with ex ->
@@ -289,11 +314,14 @@ module private StrengthReplicaRuntimeLogic =
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
         (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
         (liveRegistry: StrengthRuntime)
+        (releaseModel: (SessionId -> unit) option)
         (binding: StrengthReplicaBinding)
         : Task<unit> =
         task {
             match tryState binding.ReplicaSessionId with
-            | None -> liveRegistry.Retire binding.ReplicaSessionId |> ignore
+            | None ->
+                liveRegistry.Retire binding.ReplicaSessionId |> ignore
+                releaseModel |> Option.iter (fun release -> release binding.ReplicaSessionId)
             | Some state ->
                 complete StrengthReplicaTerminal.Cancelled state
                 do! abortReplica state
@@ -330,7 +358,8 @@ type StrengthReplicaRuntime
         ?workspaceDirectory: string,
         ?maxLatencyMs: int,
         ?maxFrameBytes: int,
-        ?promptModelFor: (string -> OpencodeModel option)
+        ?tryAcquireModel: (SessionId -> string -> OpencodeModel option),
+        ?releaseModel: (SessionId -> unit)
     ) =
 
     let gate = obj ()
@@ -401,6 +430,7 @@ type StrengthReplicaRuntime
             | _ -> ())
 
         liveRegistry.Retire state.Replica |> ignore
+        releaseModel |> Option.iter (fun release -> release state.Replica)
 
     member _.MaxFrameBytes = frameByteLimit
 
@@ -448,7 +478,14 @@ type StrengthReplicaRuntime
             match liveRegistry.TryFindByOwner owner with
             | None -> ()
             | Some binding ->
-                do! StrengthReplicaRuntimeLogic.cancelReplicaBinding tryState complete abortReplica liveRegistry binding
+                do!
+                    StrengthReplicaRuntimeLogic.cancelReplicaBinding
+                        tryState
+                        complete
+                        abortReplica
+                        liveRegistry
+                        releaseModel
+                        binding
         }
 
     member private _.ObserveDryRun(state: StrengthReplicaDecisionState) =
@@ -530,6 +567,13 @@ type StrengthReplicaRuntime
                       Directory = directory }
                 )
 
+            let! promptModel =
+                StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort
+                    sessions
+                    tryAcquireModel
+                    replica
+                    fastAgent
+
             // AGENT-028/029 / STRENGTH-004: inherit owner Persona + language;
             // ExecutionBinding alone switches to fast-<role>.
             PersonaBinding.ensureInherited owner replica |> ignore
@@ -549,7 +593,7 @@ type StrengthReplicaRuntime
                   LocalizedMirrorMessages = localizedMirror
                   ToolCapabilitySet = capabilities }
 
-            do! StrengthReplicaRuntimeLogic.registerLiveOrAbort sessions liveRegistry binding replica
+            do! StrengthReplicaRuntimeLogic.registerLiveOrAbort sessions liveRegistry releaseModel binding replica
 
             let state =
                 { Owner = owner
@@ -566,6 +610,7 @@ type StrengthReplicaRuntime
                     key
                     liveRegistry
                     sessions
+                    releaseModel
                     registerReplica
                     owner
                     replica
@@ -578,7 +623,7 @@ type StrengthReplicaRuntime
                     sessions
                     complete
                     abortReplica
-                    promptModelFor
+                    promptModel
                     directory
                     replica
                     fastAgent
@@ -642,6 +687,7 @@ type StrengthReplicaRuntime
 
         for state in states do
             complete StrengthReplicaTerminal.Cancelled state
+            releaseModel |> Option.iter (fun release -> release state.Replica)
 
         lock gate (fun () -> byReplica.Clear())
         liveRegistry.Clear()

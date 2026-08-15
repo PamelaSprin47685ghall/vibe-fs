@@ -69,6 +69,10 @@ type PluginSessionScope() =
     // Companions 等）保持 per-instance。
     member val SessionDirectories = SharedState.SessionDirectories
     member val OwnedSessions = HashSet<string>()
+    /// EMR-004: per-plugin-instance routing demands, including a root chat.message
+    /// that may block before PromptIngress has had a chance to register ownership.
+    /// This is cleanup bookkeeping only, never business/session authority.
+    member val ModelRoutingSessions = HashSet<string>()
     member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
     member val SessionParents = SharedState.SessionParents
     member val Companions = Dictionary<string, CompanionHost>()
@@ -112,6 +116,7 @@ type PluginSessionScope() =
         | false, _ -> ()
 
         this.OwnedSessions.Remove sessionId |> ignore
+        this.ModelRoutingSessions.Remove sessionId |> ignore
         this.UserMessageBindings.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
         SessionExecutionBinding.drop (SessionId.create sessionId)
@@ -126,9 +131,22 @@ type PluginSessionScope() =
         // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
         this.JoinInterrupts.ClearSession sid
 
-    /// Plugin dispose releases every companion host.
+    /// Plugin dispose releases every companion host and every routing demand/lease
+    /// this instance touched. The process-shared allocator remains alive for sibling
+    /// root/worktree plugin instances.
     member this.Dispose() =
         for companion in this.Companions.Values |> Seq.toList do
             (companion :> IDisposable).Dispose()
 
         this.Companions.Clear()
+
+        let routed =
+            Seq.append this.ModelRoutingSessions this.OwnedSessions
+            |> Seq.distinct
+            |> Seq.toArray
+
+        for sessionId in routed do
+            SessionExecutionBinding.drop (SessionId.create sessionId)
+
+        this.ModelRoutingSessions.Clear()
+        this.OwnedSessions.Clear()

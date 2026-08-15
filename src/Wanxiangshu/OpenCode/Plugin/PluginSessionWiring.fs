@@ -113,10 +113,6 @@ module PluginSessionWiring =
 
             let dispatcher = PromptDispatcher.forJournal durable
 
-            let promptModelFor agent =
-                scope.Strength.ManagedAgentInventory
-                |> Option.bind (fun inventory -> ManagedAgentConfig.tryOpencodeModel inventory agent None)
-
             let registerDelegate (delegateId: SessionId) (agent: string) =
                 wired.RegisterOwned(SessionId.value delegateId)
 
@@ -143,8 +139,7 @@ module PluginSessionWiring =
                     ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector,
                     ?workRecordFor =
                         Some(fun sessionId range ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range),
-                    ?promptModelFor = Some promptModelFor
+                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range)
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate
@@ -168,7 +163,8 @@ module PluginSessionWiring =
                     scope.Strength.StrengthRuntime,
                     registerStrengthReplica,
                     ?workspaceDirectory = workspaceDirectory,
-                    ?promptModelFor = Some promptModelFor
+                    ?tryAcquireModel = Some(fun sessionId agent -> ModelRouting.tryAcquireManaged sessionId agent |> Option.map ModelRouting.toOpenCodeModel),
+                    ?releaseModel = Some(fun sessionId -> ModelRouting.releaseSession sessionId)
                 )
 
             scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime

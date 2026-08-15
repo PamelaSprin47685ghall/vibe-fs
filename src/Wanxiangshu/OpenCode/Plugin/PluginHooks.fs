@@ -219,8 +219,7 @@ module PluginHooks =
                       // would report the symptom without the observation.
                       "config",
                       box (fun (config: obj) ->
-                          let inventory = ManagerConfig.configureManager config
-                          scope.Strength.RecordManagedAgentInventory inventory
+                          ManagerConfig.configureManager config |> ignore
                           scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
                           ExplicitSessionResume.registerCommand config)
                       // HOST-006: this hook cannot refuse a compaction — its output

@@ -57,10 +57,17 @@ type IOpenCodePort =
 
 module OpenCodePort =
 
-    let private boundModel (opts: OpenCodePromptOptions) =
-        match opts.Model with
-        | Some model -> Some model
-        | None -> opts.Agent |> Option.bind ManagedAgentConfig.tryBoundModel
+    let private wireModel (model: OpencodeModel) =
+        createObj [ "providerID", box model.providerID; "modelID", box model.modelID ]
+
+    let private modelRequestFields (model: OpencodeModel option) =
+        match model with
+        | None -> []
+        | Some bound ->
+            [ "model", box (wireModel bound) ]
+            @ (bound.variant
+               |> Option.map (fun variant -> [ "variant", box variant ])
+               |> Option.defaultValue [])
 
     let private responseBody (res: obj) =
         if not (isNull res) && not (isNull res?data) then
@@ -179,13 +186,11 @@ module OpenCodePort =
                             [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
                         | None -> [| createObj [ "type", box "text"; "text", box text ] |]
 
-                    let model = boundModel opts
+                    let model = opts.Model
 
                     let bodyFields =
                         [ "parts", box parts ]
-                        @ (model
-                           |> Option.map (fun bound -> [ "model", box bound ])
-                           |> Option.defaultValue [])
+                        @ modelRequestFields model
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])
                            |> Option.defaultValue [])
@@ -213,9 +218,7 @@ module OpenCodePort =
                               "headers", box (headersObj opts.Directory)
                               "sessionID", box sId
                               "parts", box parts ]
-                            @ (model
-                               |> Option.map (fun bound -> [ "model", box bound ])
-                               |> Option.defaultValue [])
+                            @ modelRequestFields model
                             @ (opts.Agent
                                |> Option.map (fun agent -> [ "agent", box agent ])
                                |> Option.defaultValue [])
@@ -418,13 +421,11 @@ module OpenCodePort =
                             [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
                         | None -> [| createObj [ "type", box "text"; "text", box text ] |]
 
-                    let model = boundModel opts
+                    let model = opts.Model
 
                     let bodyFields =
                         [ "parts", box parts ]
-                        @ (model
-                           |> Option.map (fun bound -> [ "model", box bound ])
-                           |> Option.defaultValue [])
+                        @ modelRequestFields model
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])
                            |> Option.defaultValue [])

@@ -137,11 +137,26 @@ type InjectedSessionPort
                 do! abortOneChild childId
         }
 
-    let normalizeSendOptions (sessionId: SessionId) (opts: SessionPromptOptions) =
-        if managedChild sessionId then
-            SessionExecutionBinding.normalizeManagedPrompt sessionId opts
-        else
-            SessionExecutionBinding.normalizeUserFacingPrompt sessionId opts
+    let routeSendOptions (sessionId: SessionId) (opts: SessionPromptOptions) =
+        task {
+            match SessionExecutionBinding.effectiveAgent sessionId opts with
+            | Error error -> return Error error
+            | Ok effectiveAgent ->
+                // EMR-004/006: required execution waits on the scheduler rather than
+                // turning capacity backpressure into a provider/business failure.
+                let! target = ModelRouting.acquireManaged sessionId effectiveAgent
+
+                let routed =
+                    { opts with
+                        Agent = Some effectiveAgent
+                        Model = Some(ModelRouting.toOpenCodeModel target) }
+
+                return
+                    if managedChild sessionId then
+                        SessionExecutionBinding.normalizeManagedPrompt sessionId routed
+                    else
+                        SessionExecutionBinding.normalizeUserFacingPrompt sessionId routed
+        }
 
     let sendThroughPort
         (port: IOpenCodePort)
@@ -236,25 +251,25 @@ type InjectedSessionPort
             task {
                 let hasListener = lock lockObj (fun () -> activeListeners.Contains(sessionId))
 
-                match hasListener, normalizeSendOptions sessionId opts, underlyingPort with
-                | false, _, _ ->
+                if not hasListener then
                     // Fatal, not Retryable: the listener is registered by the caller
                     // before it sends, so this is a call-order defect. Retrying the
                     // same wrong order cannot fix it.
                     return Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
-                | true, Error error, _ -> return Fatal error
-                | true, Ok sendOptions, Some port -> return! sendThroughPort port sessionId text sendOptions
-                | true, Ok _, None ->
-                    // No Host transport was resolved from the plugin input. The
-                    // previous code fabricated a completed AgentRunResult with
-                    // "test output" here, which made a misconfigured runtime
-                    // indistinguishable from a finished agent.
-                    return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
+                else
+                    match! routeSendOptions sessionId opts with
+                    | Error error -> return Fatal error
+                    | Ok sendOptions ->
+                        match underlyingPort with
+                        | Some port -> return! sendThroughPort port sessionId text sendOptions
+                        | None ->
+                            return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
             }
 
         member _.InterruptSessionOnly(sessionId) =
             task {
                 Diagnostic.emit "session-fission-interrupt" [ "session_id", SessionId.value sessionId ]
+                SessionExecutionBinding.cancelPending sessionId
 
                 match underlyingPort with
                 | Some port -> return! port.AbortSession sessionId
@@ -268,6 +283,7 @@ type InjectedSessionPort
                 // identical to a model that simply stopped. One record per abort, visible under
                 // WANXIANGSHU_DIAG=1.
                 Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
+                SessionExecutionBinding.cancelPending sessionId
                 detachChild sessionId
                 do! abortChildren sessionId
 

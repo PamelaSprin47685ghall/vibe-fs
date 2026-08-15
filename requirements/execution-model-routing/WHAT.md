@@ -4,7 +4,7 @@
 
 ## EMR-001：唯一模型调度 authority = `~/.config/opencode/wanxiangshu.mjs`；缺失时原子创建推荐模板
 
-Wanxiangshu 的 managed/system model routing 只能由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 决定。禁止从 `opencode.json`、环境变量、Host-final agent inventory、内建 lane/model 表或其它运行时默认值补齐/覆盖。
+Wanxiangshu 的 managed model routing 只能由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 决定。禁止从 `opencode.json`、环境变量、Host-final agent inventory、内建 lane/model 表或其它运行时默认值补齐/覆盖。
 
 若该文件在 plugin load 时不存在，Wanxiangshu 必须先确保 `~/.config/opencode/` 目录存在，再以 create-if-absent 的原子方式写入随当前版本发布的推荐 MJS 模板；随后立即 import **实际落盘的文件**。并发 plugin/process bootstrap 中若另一方先创建成功，当前方只加载 winner 文件，不覆盖、不 merge。已有文件永远不得自动改写，即使产品版本更新了推荐模板。
 
@@ -21,9 +21,9 @@ export default function route(role, running) {
 }
 ```
 
-- `role` 是当前需要物理模型的机器角色名。managed 请求使用精确 `EffectiveAgent`（如 `fast-coder`、`deep-browser`）；Host system 请求使用 `title` / `compaction`。
+- `role` 是当前需要物理模型的 managed `EffectiveAgent` 精确名（如 `fast-coder`、`deep-browser`）。
 - `running` 是当前进程全部已取得且尚未释放的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`；重复元素必须保留，数组顺序无语义。
-- 非 `null` 返回值必须同时包含非空 OpenCode model selector/name 与非空 `reasoning`；若用户需要消除 provider 歧义可写完整 `provider/model`。非推理模型用显式字符串（推荐 `none`），不得靠缺字段猜测。
+- 非 `null` 返回值必须同时包含完整非空 `provider/model` 与非空 `reasoning`；裸 `modelID` 非法，因为 provider 也必须由同一个 MJS authority 明确决定。非推理模型用显式字符串（推荐 `none`），不得靠缺字段猜测。
 - `null` 的唯一含义是“按当前 occupancy 暂时不能安排”。
 - scheduler throw、返回 Promise、返回其它值或非法 target 都是配置程序错误，fail closed；不得当作 `null`、provider failure 或 fallback 信号。
 
@@ -32,8 +32,6 @@ Wanxiangshu 不向 scheduler 暴露 SessionId、transcript、prompt、Host clien
 ## EMR-003：`running` 是 lease multiset；重复次数就是占用次数，并跨 root/worktree 插件实例共享
 
 managed `(SessionId, EffectiveAgent)` 每成功取得一个稳定 model lease，就向 `running` 贡献一个 `{model, reasoning}` 元素，直到该 lease 被释放。同一 SessionId 的两个 EffectiveAgent 即使取得完全相同 target，也贡献两个重复元素；runtime 不去重。
-
-Host `title` / `compaction` 的一次在途 system model allocation 也贡献一个元素，但只存活到该次 provider invocation terminal。
 
 occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth：root workspace 与 worktree 虽产生不同 plugin instance，必须观察同一 multiset。不同 OS/OpenCode 进程不共享本地 occupancy。
 
@@ -78,7 +76,7 @@ Strength/assistance/fallback 改档仍通过既有 EffectiveAgent authority；sc
 
 managed/user-facing session 明确 retire/delete 时，runtime 必须释放该 SessionId 持有的全部 `(SessionId, EffectiveAgent)` lease；每个 lease 删除一个 `running` occurrence。重复 cleanup 幂等。
 
-Host `title` / `compaction` 的 ephemeral allocation 在该次 provider invocation terminal/abort 后释放一个 occurrence。每次真实 occupancy 变化都触发 EMR-004 的 pending-demand 重试流程。
+每次真实 occupancy 变化都触发 EMR-004 的 pending-demand 重试流程。
 
 仅切换 A/B、单次 provider failure、普通 idle/completion 不释放 live managed session 的稳定 lease。
 
@@ -93,9 +91,3 @@ Wanxiangshu 可以向 Host managed-agent config 投影必要的 mode/permission/
 真实外部用户请求仍可决定 managed EffectiveAgent/档位；但其 Host message/request 携带的 `model` / reasoning 字段不得成为 Wanxiangshu managed binding authority。进入 provider 前，managed request 必须使用 `(SessionId, EffectiveAgent)` 已取得的 MJS lease；Host 观察到的实际 provider model/reasoning 必须与该 lease 一致，否则 fail closed。
 
 非 managed Host 会话不受本包接管。
-
-## EMR-010：Host `title` / `compaction` 也调用同一个 scheduler
-
-Host `title` 与 `compaction` 不再绑定内建 fastest lane/首选模型。每次这类 system provider invocation 需要模型时，runtime 分别以 `role = "title"` / `role = "compaction"` 和当前 process-shared `running` 调用同一个 MJS scheduler。
-
-非 `null` target 作为 ephemeral allocation 原子加入 `running`，provider terminal 后释放；`null` 时该 required system invocation 等待 occupancy 事件后重试。MJS 因而可以让 title/compaction 与 managed roles 共用或隔离容量，runtime 不内建任何特殊模型优先级。

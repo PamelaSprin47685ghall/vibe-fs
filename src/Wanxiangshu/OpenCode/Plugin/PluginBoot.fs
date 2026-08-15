@@ -58,6 +58,10 @@ module PluginBoot =
             // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
             RuntimeResources.install (RuntimeResources.load ())
 
+            // EMR-001: bootstrap/load the sole model scheduler during Load Phase.
+            // This may create the missing user config atomically, but performs no Host call.
+            do! ModelRouting.initialize ()
+
             let portOpt = OpenCodePort.create input
 
             let! journalResult = PluginHost.createJournal input

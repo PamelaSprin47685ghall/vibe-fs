@@ -130,7 +130,6 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     undefined,
     undefined,
     undefined,
-    undefined,
     // EXEC-031: bounded WorkRecord via the real journal projector.
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )

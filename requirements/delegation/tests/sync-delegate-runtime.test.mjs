@@ -164,7 +164,6 @@ const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
     undefined,
     undefined,
     undefined,
-    undefined,
     // EXEC-031: per-invocation bounded WorkRecord via the real journal
     // projector. Session-mechanics tests must assert the answer flows through
     // Recent work as last assistant text — never re-encode partsText.

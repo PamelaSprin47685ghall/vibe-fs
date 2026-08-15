@@ -6,7 +6,7 @@
 // `scripts/architecture-gate.mjs` scans `['.mjs']`, so this file is still gated.
 
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -573,6 +573,22 @@ export const notifyCompleted = async (runtime, childSessionId, sessionWideText, 
  */
 export const withPluginClient = async (client, body) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-'))
+  const previousHome = process.env.HOME
+  const previousUserProfile = process.env.USERPROFILE
+  const routingHome = join(directory, 'routing-home')
+  const routingDir = join(routingHome, '.config', 'opencode')
+  mkdirSync(routingDir, { recursive: true })
+  writeFileSync(
+    join(routingDir, 'wanxiangshu.mjs'),
+    `export default function route(role) {
+  if (!/^(fast|deep)-/.test(role)) throw new Error('unexpected managed role: ' + role)
+  return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}\n`,
+    'utf8',
+  )
+  process.env.HOME = routingHome
+  process.env.USERPROFILE = routingHome
+
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const hooks = await initSpikePlugin({
@@ -586,6 +602,10 @@ export const withPluginClient = async (client, body) => {
       await hooks.dispose()
     }
   } finally {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousUserProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousUserProfile
     rmSync(directory, { recursive: true, force: true })
   }
 }

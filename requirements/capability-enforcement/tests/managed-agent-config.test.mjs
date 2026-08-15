@@ -1,32 +1,24 @@
-// MACFG: ManagedAgentConfig gate — validate/applyOwnedFields/configureFromHostConfig
-// over the Host-final opencode.json agent inventory.
+// MACFG: Host config owns managed agent presence + Wanxiangshu-owned non-model fields.
+// Model routing authority lives exclusively in execution-model-routing.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { resultOf, runtimeResources, mapEntries, caseOf, isSome, isNone } = await import('../../verification-system/tests/support/domain.mjs')
-
-const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindings))
-
-// configureFromHostConfig injects RuntimeResources prompts into StaticTools.*AgentConfig.
-// Production installs resources at plugin init.
+const { resultOf, runtimeResources, mapEntries, caseOf } = await import('../../verification-system/tests/support/domain.mjs')
 runtimeResources.installFromPackage()
 
-const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel, tryBoundModel } = await import(
+const { validate, applyOwnedFields, configureFromHostConfig } = await import(
   join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js')
 )
-const { configureManager } = await import(
-  join(here, '../../../dist/OpenCode/Host/ManagerConfig.js')
-)
-const { OpencodeModel } = await import(
-  join(here, '../../../dist/OpenCode/Codec/OpencodeTypes.js')
-)
+const { configureManager } = await import(join(here, '../../../dist/OpenCode/Host/ManagerConfig.js'))
 
 const okOf = (r) => resultOf(r)
 const errOf = (r) => resultOf(r).error
+const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindings))
 
 const NAMES = [
   'fast-orchestrator', 'deep-orchestrator',
@@ -42,135 +34,85 @@ const NAMES = [
   'fast-bookkeeper', 'deep-bookkeeper',
 ]
 
-// model differs per tier so no pair collides
-function fullConfig(overrides = {}) {
-  const agent = {}
-  for (const name of NAMES) {
-    agent[name] = { model: name.includes('fast') ? 'fast-model' : 'deep-model' }
-  }
-  return { ...overrides, agent }
+function fullConfig() {
+  return { agent: Object.fromEntries(NAMES.map((name) => [name, {}])) }
 }
 
-test('MACFG_validate_rejects_null_and_missing_agent_map', () => {
+test('MACFG_validate_rejects_null_missing_agent_map_and_missing_managed_agent', () => {
   assert.match(errOf(validate(null)), /config\.agent/)
-  assert.match(errOf(validate(undefined)), /config\.agent/)
   assert.match(errOf(validate({})), /config\.agent/)
-})
-
-test('MACFG_validate_reports_missing_managed_agent_in_order', () => {
-  const err = errOf(validate({ agent: {} }))
-  assert.match(err, /Missing required managed agent 'fast-orchestrator'/)
-})
-
-test('MACFG_validate_reports_missing_model_then_empty_model', () => {
-  const missing = fullConfig()
-  missing.agent['fast-orchestrator'] = {}
-  assert.match(errOf(validate(missing)), /'fast-orchestrator' is missing a non-empty model binding/)
-
-  const empty = fullConfig()
-  empty.agent['fast-orchestrator'] = { model: '   ' }
-  assert.match(errOf(validate(empty)), /'fast-orchestrator' has an empty model binding/)
-})
-
-test('MACFG_validate_accepts_model_object_with_provider_model_ids', () => {
-  const cfg = fullConfig()
-  cfg.agent['fast-manager'] = { model: { providerID: 'anthropic', modelID: 'sonnet' } }
-  const ok = okOf(validate(cfg))
-  assert.equal(ok.ok, true)
-  const bindings = bindingsOf(ok.value)
-  assert.equal(bindings['fast-manager'].Model, 'anthropic/sonnet')
-})
-
-test('MACFG_validate_rejects_duplicate_pair_model', () => {
-  const cfg = fullConfig()
-  cfg.agent['fast-manager'] = { model: 'same' }
-  cfg.agent['deep-manager'] = { model: 'same' }
-  const err = errOf(validate(cfg))
-  assert.match(err, /fast-manager\/deep-manager resolves to the same model/)
-  assert.match(err, /Shared model: same/)
+  assert.match(errOf(validate({ agent: {} })), /fast-orchestrator/)
 })
 
 test('MACFG_validate_rejects_legacy_agent_present', () => {
   const cfg = fullConfig()
-  cfg.agent.coder = { model: 'x' }
-  const err = errOf(validate(cfg))
-  assert.match(err, /coder/)
+  cfg.agent.coder = {}
+  assert.match(errOf(validate(cfg)), /coder/)
 })
 
-test('MACFG_validate_ok_builds_full_inventory_with_trimmed_models', () => {
+test('MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
   const cfg = fullConfig()
-  cfg.agent['fast-coder'] = { model: '  trimmed-model  ' }
-  const ok = okOf(validate(cfg))
-  assert.equal(ok.ok, true)
-  const bindings = bindingsOf(ok.value)
-  assert.equal(bindings['fast-coder'].Model, 'trimmed-model')
-  assert.equal(Object.keys(bindings).length, 20, 'bookkeeper pair validates but is not a Role binding')
+  cfg.agent['fast-manager'].model = 'provider/shared'
+  cfg.agent['deep-manager'].model = 'provider/shared'
+  cfg.agent['fast-coder'].model = ''
+  cfg.agent['deep-coder'].model = { anything: 'host-owned-and-ignored' }
+
+  const result = okOf(validate(cfg))
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  const bindings = bindingsOf(result.value)
+  assert.equal(Object.keys(bindings).length, 20, 'bookkeepers are presence-checked but have no Role binding')
   assert.equal(caseOf(bindings['deep-blogger'].Agent.Role), 'Blogger')
+  assert.equal('Model' in bindings['fast-manager'], false, 'Host model must not enter the managed inventory')
 })
 
 test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   const cfg = fullConfig()
-  const ok = okOf(validate(cfg))
-  assert.equal(ok.ok, true)
-  const inventory = ok.value
+  for (const name of NAMES) cfg.agent[name].model = `host/${name}`
+  const inventory = okOf(validate(cfg)).value
   applyOwnedFields(cfg, inventory)
 
-  assert.equal(cfg.compaction.auto, false, 'compaction.auto must be forced false')
+  assert.equal(cfg.compaction.auto, false)
   assert.equal(cfg.mcp['stealth-browser-mcp'].type, 'local')
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must receive owned mode`)
     assert.ok(entry.permission !== undefined, `${name} must receive owned permission`)
-    assert.equal(entry.model, name.includes('fast') ? 'fast-model' : 'deep-model', 'model must stay untouched')
+    assert.equal(entry.model, `host/${name}`, 'model stays untouched but is never routing truth')
   }
 })
 
-test('MACFG_applyOwnedFields_skips_null_config_and_missing_agents', () => {
-  applyOwnedFields(null, { Bindings: {} }) // must not throw
+test('MACFG_applyOwnedFields_skips_null_config_and_does_not_invent_missing_agents', () => {
+  applyOwnedFields(null, { Bindings: {} })
   const cfg = fullConfig()
   delete cfg.agent['deep-blogger']
   applyOwnedFields(cfg, { Bindings: {} })
-  assert.equal(cfg.agent['deep-blogger'], undefined, 'missing agents are not invented')
-  assert.equal(cfg.agent['fast-coder'].model, 'fast-model', 'unbound agents stay untouched')
+  assert.equal(cfg.agent['deep-blogger'], undefined)
 })
 
 test('MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
   process.env.WANXIANGSHU_CHAT_MAX_RETRIES = '7'
   try {
     const cfg = fullConfig()
-    const okv = okOf(validate(cfg))
-    applyOwnedFields(cfg, okv.value)
+    applyOwnedFields(cfg, okOf(validate(cfg)).value)
     assert.equal(cfg.experimental.chatMaxRetries, 7)
   } finally {
     delete process.env.WANXIANGSHU_CHAT_MAX_RETRIES
   }
 })
 
-test('MACFG_configureFromHostConfig_ok_path_applies_fields_and_returns_inventory', () => {
+test('MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
   const cfg = fullConfig()
-  const ok = okOf(configureFromHostConfig(cfg))
-  assert.equal(ok.ok, true)
-  const bindings = bindingsOf(ok.value)
-  assert.equal(bindings['fast-blogger'].Model, 'fast-model')
+  cfg.agent['fast-manager'].model = 'provider/shared'
+  cfg.agent['deep-manager'].model = 'provider/shared'
+  const result = okOf(configureFromHostConfig(cfg))
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  assert.equal('Model' in bindingsOf(result.value)['fast-manager'], false)
   assert.equal(cfg.compaction.auto, false)
 })
 
-test('MACFG_configureFromHostConfig_error_path_still_writes_role_fields', () => {
+test('MACFG_configureManager_missing_agent_is_fatal_after_owned_fields_land', () => {
   const cfg = fullConfig()
-  cfg.agent['fast-manager'] = { model: 'same' }
-  cfg.agent['deep-manager'] = { model: 'same' }
-  const r = okOf(configureFromHostConfig(cfg))
-  assert.equal(r.ok, false)
-  const err = r.error
-  assert.match(err, /resolves to the same model/)
-  assert.equal(cfg.compaction.auto, false, 'fail-closed: owned fields still applied')
-  assert.ok(cfg.agent['fast-manager'].mode !== undefined)
-})
-
-test('MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fields_land', () => {
-  const cfg = fullConfig()
-  cfg.agent['fast-manager'] = { model: 'same' }
-  cfg.agent['deep-manager'] = { model: 'same' }
+  delete cfg.agent['deep-manager']
   const previousNoFatalExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
   const previousConsoleError = console.error
   const errors = []
@@ -178,71 +120,13 @@ test('MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fiel
   console.error = (message) => errors.push(String(message))
 
   try {
-    assert.throws(
-      () => configureManager(cfg),
-      /unreachable after Diagnostic\.fatal: Managed agent pair fast-manager\/deep-manager resolves to the same model/,
-    )
-    assert.equal(cfg.compaction.auto, false, 'deny settings must land before fatal')
+    assert.throws(() => configureManager(cfg), /Missing required managed agent 'deep-manager'/)
+    assert.equal(cfg.compaction.auto, false)
     assert.equal(cfg.agent['fast-manager'].permission['*'], 'deny')
-    assert.equal(errors.length, 1, 'fatal emits exactly one process-level diagnostic')
-    const fatal = JSON.parse(errors[0])
-    assert.equal(fatal.operation, 'managed-agent-config-invalid')
-    assert.match(fatal.result, /fast-manager\/deep-manager/)
+    assert.equal(errors.length, 1)
   } finally {
     console.error = previousConsoleError
     if (previousNoFatalExit === undefined) delete process.env.WANXIANGSHU_NO_FATAL_EXIT
     else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousNoFatalExit
   }
-})
-
-test('MACFG_tryOpencodeModel_parses_provider_slash_model_and_refuses_to_invent_fast', () => {
-  const cfg = fullConfig()
-  cfg.agent['deep-coder'] = { model: 'anthropic/deep-opus' }
-  cfg.agent['fast-coder'] = { model: 'anthropic/fast-haiku' }
-  const inventory = okOf(validate(cfg)).value
-
-  const deep = tryOpencodeModel(inventory, 'deep-coder', undefined)
-  assert.equal(isSome(deep), true)
-  assert.equal(deep.providerID, 'anthropic')
-  assert.equal(deep.modelID, 'deep-opus')
-
-  const fast = tryOpencodeModel(inventory, 'fast-coder', undefined)
-  assert.equal(fast.modelID, 'fast-haiku')
-  assert.notEqual(fast.modelID, deep.modelID)
-
-  assert.equal(isNone(tryOpencodeModel(inventory, 'unknown-agent', undefined)), true)
-  assert.equal(isNone(tryOpencodeModel(inventory, '', undefined)), true)
-
-  const current = new OpencodeModel('anthropic', 'fast-haiku', undefined)
-  const corrected = tryOpencodeModel(inventory, 'deep-coder', current)
-  assert.equal(corrected.providerID, 'anthropic')
-  assert.equal(corrected.modelID, 'deep-opus')
-})
-
-test('MACFG_tryOpencodeModel_bare_id_keeps_current_provider_and_refuses_without_one', () => {
-  const inventory = okOf(validate(fullConfig())).value
-  assert.equal(isNone(tryOpencodeModel(inventory, 'deep-coder', undefined)), true, 'bare id must not invent a provider')
-
-  const current = new OpencodeModel('anthropic', 'fast-model', undefined)
-  const corrected = tryOpencodeModel(inventory, 'deep-coder', current)
-  assert.equal(corrected.providerID, 'anthropic')
-  assert.equal(corrected.modelID, 'deep-model')
-})
-
-test('MACFG_tryBoundModel_reads_live_inventory_after_configure', () => {
-  const cfg = fullConfig()
-  cfg.agent['deep-coder'] = { model: 'anthropic/deep-opus' }
-  cfg.agent['fast-coder'] = { model: 'anthropic/fast-haiku' }
-  const ok = okOf(configureFromHostConfig(cfg))
-  assert.equal(ok.ok, true, ok.ok ? '' : ok.error)
-
-  const deep = tryBoundModel('deep-coder')
-  assert.equal(isSome(deep), true)
-  assert.equal(deep.providerID, 'anthropic')
-  assert.equal(deep.modelID, 'deep-opus')
-
-  const fast = tryBoundModel('fast-coder')
-  assert.equal(fast.modelID, 'fast-haiku')
-  assert.notEqual(fast.modelID, deep.modelID)
-  assert.equal(isNone(tryBoundModel('unknown-agent')), true)
 })

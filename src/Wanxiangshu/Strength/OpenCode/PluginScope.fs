@@ -76,11 +76,6 @@ type PluginStrengthScope() =
     // STRENGTH-014: decision-local replica ownership/capability registry. Durable
     // causality remains in EventStore; this is only live physical-session state.
     let strengthRuntime = StrengthRuntime()
-    // PROMPT-002/AGENT-003: Host-final managed inventory is captured from the
-    // config gate so Strength can prove same-role fast/deep model bindings differ.
-    // DSL-MUTABLE: resource — process-local Host-final managed-agent inventory cache
-    let mutable managedAgentInventory: ManagedAgentConfig.ManagedAgentInventory option =
-        None
     // STRENGTH-004: physical coordinator is attached after Host ports are wired.
     // The Session StrengthRuntime above remains the sole live ownership/capability registry.
     // DSL-MUTABLE: resource — attached process-local Replica coordinator
@@ -100,10 +95,6 @@ type PluginStrengthScope() =
 
     member _.StrengthRuntime = strengthRuntime
 
-    member _.RecordManagedAgentInventory(inventory: ManagedAgentConfig.ManagedAgentInventory) =
-        managedAgentInventory <- Some inventory
-
-    member _.ManagedAgentInventory = managedAgentInventory
     member _.AttachStrengthReplicaRuntime(runtime: StrengthReplicaRuntime) = strengthReplicaRuntime <- Some runtime
     member _.StrengthReplicaRuntime = strengthReplicaRuntime
 

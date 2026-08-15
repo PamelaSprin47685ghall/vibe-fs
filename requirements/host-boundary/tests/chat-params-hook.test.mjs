@@ -1,86 +1,92 @@
-// Split from tests/unit/host/chat-params-hook.test.mjs (cutover Wave 2a);
-// owner: host-boundary. chat.params 观察适配半边：观察 adapter 永不重写 Host
-// output、不发明 binding（root 显式用户 model 不被覆盖、unknown agent / 空
-// inventory / bare binding 均为 no-op）。
-// parented/agent-less 的 binding 语义断言归 interaction-authority。
+// host-boundary: chat.params is an observation barrier only. Routing authority is
+// execution-model-routing; this hook validates the physical provider binding and
+// never mutates Host output.
 
 import assert from 'node:assert/strict'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { after } from 'node:test'
 import test from 'node:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-const here = dirname(fileURLToPath(import.meta.url))
-const { mapOf, resultOf } = await import('../../verification-system/tests/support/domain.mjs')
+const previousHome = process.env.HOME
+const previousUserProfile = process.env.USERPROFILE
+const home = mkdtempSync(join(tmpdir(), 'wxs-chat-params-routing-'))
+const routingDir = join(home, '.config', 'opencode')
+mkdirSync(routingDir, { recursive: true })
+writeFileSync(
+  join(routingDir, 'wanxiangshu.mjs'),
+  `export default function route(role) {
+  return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}\n`,
+  'utf8',
+)
+process.env.HOME = home
+process.env.USERPROFILE = home
 
-const { create } = await import(join(here, '../../../dist/OpenCode/Host/ChatParamsHook.js'))
-const { validate } = await import(join(here, '../../../dist/OpenCode/Host/ManagedAgentConfig.js'))
+const routing = await import('../../../dist/OpenCode/Host/ModelRouting.js')
+const binding = await import('../../../dist/OpenCode/Host/SessionExecutionBinding.js')
+const { create } = await import('../../../dist/OpenCode/Host/ChatParamsHook.js')
+const { SessionIdModule_create: sessionId } = await import('../../../dist/Foundation/Identity.js')
+await routing.ModelRouting_initialize()
 
-const NAMES = [
-  'fast-orchestrator', 'deep-orchestrator',
-  'fast-manager', 'deep-manager',
-  'fast-coder', 'deep-coder',
-  'fast-inspector', 'deep-inspector',
-  'fast-devops', 'deep-devops',
-  'fast-browser', 'deep-browser',
-  'fast-inquiry', 'deep-inquiry',
-  'fast-reviewer', 'deep-reviewer',
-  'fast-blogger', 'deep-blogger',
-  'fast-distiller', 'deep-distiller',
-  'fast-bookkeeper', 'deep-bookkeeper',
-]
-
-const slashConfig = () => {
-  const agent = {}
-  for (const name of NAMES) {
-    agent[name] = { model: name.includes('fast') ? 'anthropic/fast-haiku' : 'anthropic/deep-opus' }
-  }
-  return { agent }
-}
-
-const bareConfig = () => {
-  const agent = {}
-  for (const name of NAMES) {
-    agent[name] = { model: name.includes('fast') ? 'fast-model' : 'deep-model' }
-  }
-  return { agent }
-}
-
-const inventoryOf = (config) => {
-  const parsed = resultOf(validate(config))
-  assert.equal(parsed.ok, true, parsed.ok ? '' : parsed.error)
-  return parsed.value
-}
-
-const applyHook = (hook, input, output) => {
-  const next = hook(input, output)
+const hook = create()
+const applyHook = (input, output) => {
+  const next = hook(input)
   if (typeof next === 'function') next(output)
 }
+const outputSeed = () => ({ temperature: 0, options: { sentinel: true } })
 
-test('CHAT_PARAMS_root_session_does_not_override_explicit_user_model', () => {
-  const hook = create(undefined, () => inventoryOf(slashConfig()))
-  const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
-  applyHook(hook, { sessionID: 'ses_deep', agent: 'deep-coder' }, output)
-  assert.equal(output.model.providerID, 'anthropic')
-  assert.equal(output.model.modelID, 'fast-haiku')
+const managedInput = (sessionID, agent, variant = 'none') => ({
+  sessionID,
+  agent,
+  model: { providerID: 'provider', modelID: `${agent}-model` },
+  message: {
+    agent,
+    model: { providerID: 'provider', modelID: `${agent}-model`, variant },
+  },
 })
 
-test('CHAT_PARAMS_unknown_agent_does_not_invent_fast', () => {
-  const hook = create(undefined, () => inventoryOf(slashConfig()))
-  const output = { model: { providerID: 'anthropic', modelID: 'already-there' } }
-  applyHook(hook, { sessionID: 'ses_unknown', agent: 'build' }, output)
-  assert.equal(output.model.modelID, 'already-there')
+after(() => {
+  if (previousHome === undefined) delete process.env.HOME
+  else process.env.HOME = previousHome
+  if (previousUserProfile === undefined) delete process.env.USERPROFILE
+  else process.env.USERPROFILE = previousUserProfile
+  rmSync(home, { recursive: true, force: true })
 })
 
-test('CHAT_PARAMS_empty_inventory_is_a_noop', () => {
-  const hook = create(undefined, () => ({ Bindings: mapOf({}) }))
-  const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
-  applyHook(hook, { sessionID: 'ses_empty', agent: 'deep-coder' }, output)
-  assert.equal(output.model.modelID, 'fast-haiku')
+test('CHAT_PARAMS_non_managed_agent_is_out_of_scope_and_output_is_untouched', () => {
+  const output = outputSeed()
+  applyHook({ sessionID: 'ses_unknown', agent: 'build', model: {} }, output)
+  assert.deepEqual(output, outputSeed())
 })
 
-test('CHAT_PARAMS_root_bare_binding_is_a_noop', () => {
-  const hook = create(undefined, () => inventoryOf(bareConfig()))
-  const output = {}
-  applyHook(hook, { sessionID: 'ses_bare', agent: 'deep-coder' }, output)
-  assert.equal(output.model, undefined)
+test('CHAT_PARAMS_managed_provider_run_without_execution_binding_fails_closed', () => {
+  assert.throws(
+    () => applyHook(managedInput('ses_unbound', 'deep-coder'), outputSeed()),
+    /not recognized as a bound session|no model-routing lease/i,
+  )
+})
+
+test('CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', async () => {
+  const sid = sessionId('ses_exact')
+  binding.observeUserFacingAgent(sid, 'deep-coder')
+  await routing.ModelRouting_acquireManaged(sid, 'deep-coder')
+
+  const output = outputSeed()
+  assert.doesNotThrow(() => applyHook(managedInput('ses_exact', 'deep-coder'), output))
+  assert.deepEqual(output, outputSeed())
+  binding.drop(sid)
+})
+
+test('CHAT_PARAMS_reasoning_variant_drift_fails_closed', async () => {
+  const sid = sessionId('ses_variant_drift')
+  binding.observeUserFacingAgent(sid, 'fast-coder')
+  await routing.ModelRouting_acquireManaged(sid, 'fast-coder')
+
+  assert.throws(
+    () => applyHook(managedInput('ses_variant_drift', 'fast-coder', 'default'), outputSeed()),
+    /model\/reasoning drift/i,
+  )
+  binding.drop(sid)
 })

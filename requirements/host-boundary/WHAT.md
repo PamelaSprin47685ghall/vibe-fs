@@ -243,7 +243,7 @@ card DOES NOT OWN 之外的产品决策）。
 
 ## HOST-BOUNDARY-019：Host capability 缺口必须由 canary/contract proof 证明
 
-**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider、title/compaction 显式模型投影）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；PROOF.md Magic Todo membrane canary 清单 A..R；模型路由 canary 见 `execution-model-routing` GAP-016）。
+**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；PROOF.md Magic Todo membrane canary 清单 A..R；模型路由 canary 见 `execution-model-routing` GAP-016）。
 
 **含义/动机**：未验证能力 = 上线首炸；`HostContractUnsupported` 是显式失败而非悄悄降级。
 

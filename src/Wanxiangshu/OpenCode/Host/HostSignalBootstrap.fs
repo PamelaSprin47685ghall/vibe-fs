@@ -422,27 +422,71 @@ module HostSignalBootstrap =
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
-                    match durabilityActivation.Value with
-                    | Ok() -> ()
-                    | Error error -> Diagnostic.emit "durability-activation-failed" [ "result", error ]
+                    task {
+                        // Decode once up front so Host compaction stays entirely outside
+                        // execution-model-routing. The authority path re-decodes inside
+                        // createHook; this local value only gates routing + join wake.
+                        let decoded = PromptIngressCodec.decode input output
 
-                    // Decode once for join wake; authority path re-decodes inside
-                    // createHook (PROMPT-004 fail-closed unchanged). Signal even when
-                    // mid-run UnknownOrigin — not only after AcceptHumanRoot.
-                    // physical id + no PromptKey + not compaction → join wake.
-                    let decoded = PromptIngressCodec.decode input output
+                        // EMR-009: for a real managed user message, the Host-created model
+                        // is only a placeholder. Acquire the Wanxiangshu lease and
+                        // mutate the canonical UserMessage before the provider loop.
+                        let message = if isNull output then null else output?message
 
-                    match
-                        decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction
-                    with
-                    // An external user message interrupts ONLY the current active
-                    // join attempts; with none active it is dropped as a join wake
-                    // (the message itself stays in the normal Host queue). No future
-                    // join is latched or woken by this older message (EXEC-017).
-                    | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
-                    | _ -> ()
+                        let sessionText =
+                            if not (isNull input) && not (isNull input?sessionID) then
+                                string input?sessionID
+                            elif not (isNull message) && not (isNull message?sessionID) then
+                                string message?sessionID
+                            else
+                                ""
 
-                    promptIngressHook input output
+                        let agentText =
+                            if not (isNull message) && not (isNull message?agent) then
+                                string message?agent
+                            elif not (isNull input) && not (isNull input?agent) then
+                                string input?agent
+                            else
+                                ""
+
+                        if
+                            not decoded.IsHostCompaction
+                            && not (String.IsNullOrWhiteSpace sessionText)
+                            && not (String.IsNullOrWhiteSpace agentText)
+                            && (ManagedAgent.requiredNames |> List.contains (agentText.Trim()))
+                        then
+                            let sessionText = sessionText.Trim()
+                            let sessionId = SessionId.create sessionText
+                            let agent = agentText.Trim()
+                            scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
+                            SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                            let! target = ModelRouting.acquireManaged sessionId agent
+                            let routed = ModelRouting.toOpenCodeModel target
+
+                            if isNull message then
+                                invalidOp "EMR-009: chat.message managed routing has no mutable output.message"
+
+                            message?model <- box routed
+
+                        match durabilityActivation.Value with
+                        | Ok() -> ()
+                        | Error error -> Diagnostic.emit "durability-activation-failed" [ "result", error ]
+
+                        // Signal even when mid-run UnknownOrigin — not only after
+                        // AcceptHumanRoot. physical id + no PromptKey + not compaction
+                        // → join wake.
+                        match
+                            decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction
+                        with
+                        // An external user message interrupts ONLY the current active
+                        // join attempts; with none active it is dropped as a join wake
+                        // (the message itself stays in the normal Host queue). No future
+                        // join is latched or woken by this older message (EXEC-017).
+                        | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
+                        | _ -> ()
+
+                        do! promptIngressHook input output
+                    }
 
             let cancelSignals (ids: SessionId seq) =
                 ids

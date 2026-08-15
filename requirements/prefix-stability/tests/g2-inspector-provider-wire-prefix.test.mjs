@@ -99,10 +99,7 @@ let activeJournal
 
 const withHarness = async (fn, options = {}) => {
   SessionPersona_clearAllForTests()
-  const { tier = 'Fast', promptModelFor } = options
-  const promptModel = Object.prototype.hasOwnProperty.call(options, 'promptModel')
-    ? options.promptModel
-    : INSPECTOR_MODEL
+  const { tier = 'Fast' } = options
   const base = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
   const opened = await agentJournal.create({ directory: base })
   activeJournal = opened.journal
@@ -122,11 +119,11 @@ const withHarness = async (fn, options = {}) => {
 
   const captureOpenAiBody = (sessionKey, text, options) => {
     const agent = options?.Agent
-    const boundModelId = modelIdOf(options)
-    assert.ok(
-      typeof boundModelId === 'string' && boundModelId.length > 0,
-      'Inspector child SendPrompt Model.modelID is missing; PREFIX LAW ModelId is unprovable while ChatParamsHook/PromptDispatcherSend default Model=None',
-    )
+    // Model routing is owned by execution-model-routing outside this fake session
+    // port. Prefix-stability supplies a provider-wire fixture model only to prove
+    // same-prefix semantics; SyncDelegate itself must not own a model seam.
+    assert.equal(modelIdOf(options), undefined)
+    const boundModelId = INSPECTOR_MODEL_ID
     sessionTranscript(sessionKey).push({ role: 'user', content: text })
     const body = {
       model: boundModelId,
@@ -186,10 +183,8 @@ const withHarness = async (fn, options = {}) => {
     undefined,
     undefined,
     undefined,
-    promptModel,
     // EXEC-031: bounded WorkRecord via the real journal projector.
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
-    promptModelFor,
   )
 
   try {

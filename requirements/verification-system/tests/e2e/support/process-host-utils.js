@@ -14,7 +14,7 @@ import { terminateTree } from "./process-lifecycle.js";
 import { recordSpawn, recordExit } from "./spawn-ledger.js";
 import { SIGTERM_GRACE_MS, SIGKILL_GRACE_MS } from "./time-budget.js";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
 /** Prefer repo-local bin so CI `npm ci` can run ProcessHost without a global install. */
 function defaultOpencodeBin() {

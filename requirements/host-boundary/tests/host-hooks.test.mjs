@@ -304,22 +304,36 @@ const triggeredHooks = (hooks) =>
     ([name, value]) => typeof value === 'function' && name !== 'event' && name !== 'dispose',
   )
 
-test('CHAT_PARAMS_observes_user_binding_without_rewriting_host_output', async () => {
+test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async () => {
   await withPlugin(async (hooks) => {
     await hooks.config(hostFinalConfig())
-    const output = { model: { providerID: 'provider', modelID: 'fast-coder-model' } }
+    const messageOutput = {
+      message: {
+        id: 'msg_routed_probe',
+        role: 'user',
+        sessionID: SESSION,
+        agent: 'deep-coder',
+        model: { providerID: 'host-placeholder', modelID: 'wrong-model' },
+      },
+      parts: [],
+    }
+
+    await hooks['chat.message']({ sessionID: SESSION, agent: 'deep-coder' }, messageOutput)
+    assert.equal(messageOutput.message.model.providerID, 'provider')
+    assert.equal(messageOutput.message.model.modelID, 'deep-coder-model')
+    assert.equal(messageOutput.message.model.variant, 'none')
+
+    const output = { temperature: 0, options: { sentinel: true } }
     await hooks['chat.params'](
       {
         sessionID: SESSION,
-        message: {
-          agent: 'deep-coder',
-          model: { providerID: 'provider', modelID: 'deep-coder-model' },
-        },
+        agent: 'deep-coder',
+        model: { providerID: 'provider', modelID: 'deep-coder-model' },
+        message: messageOutput.message,
       },
       output,
     )
-    assert.equal(output.model.providerID, 'provider')
-    assert.equal(output.model.modelID, 'fast-coder-model', 'chat.params is observation-only')
+    assert.deepEqual(output, { temperature: 0, options: { sentinel: true } }, 'chat.params is observation-only')
   })
 })
 

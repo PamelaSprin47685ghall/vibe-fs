@@ -78,32 +78,18 @@ type SyncDelegateRuntime
         ?onInspectorPrompt: string -> string -> unit,
         ?onInspectorAnswer: string -> string -> unit,
         ?onInspectorCleanup: string -> unit,
-        /// G2 PREFIX LAW: bind the same ModelId on every Inspector/Coder child
-        /// SendPrompt. Test override for a single model; production uses
-        /// `promptModelFor` so mixed Deep/Fast owners keep their own binding.
-        ?promptModel: OpencodeModel,
         /// EXEC-031: per-invocation bounded WorkRecord projector
         /// (includeOpening=false). Injected from plugin wiring so Session does
         /// not depend on Finality compile order; range = the invocation's
         /// XTrace [StartInclusive, EndExclusive).
-        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> Task<string option>,
-        /// Per-send model lookup from the Host-final agent inventory.
-        /// `promptModel` remains a test override; production must not pass a
-        /// process-wide model, or mixed Deep/Fast owners would collapse.
-        ?promptModelFor: (string -> OpencodeModel option)
+        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> Task<string option>
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
-    let boundPromptModel = promptModel
     let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> Task.FromResult None)
-
-    let modelFor (agent: string) =
-        match boundPromptModel with
-        | Some model -> Some model
-        | None -> promptModelFor |> Option.bind (fun lookup -> lookup agent)
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -165,7 +151,7 @@ type SyncDelegateRuntime
                     PromptDispatcher.AwaitMode.Detached
                     None
                     tools
-                    (modelFor call.Agent)
+                    None
         }
 
     let deps: SyncDelegateWorkflow.Dependencies =
