@@ -69,6 +69,37 @@ open HostMessageProjection
 
 module CompanionTransform =
 
+    let private restoredBloggerId (journal: AgentJournal option) (sessionId: string) =
+        journal
+        |> Option.bind (fun j ->
+            (AgentJournal.snapshot j).AgentProjections.Sessions
+            |> Map.tryFind (SessionId.create sessionId)
+            |> Option.bind (fun s -> s.Companion)
+            |> Option.bind (fun companion -> companion.BloggerSessionId)
+            |> Option.map SessionId.value)
+
+    let private bindSquashPlan (scope: PluginRuntimeScope) (journal: AgentJournal option) (value: CompanionHost) =
+        value.RecordSquashPlan <-
+            fun bloggerId providerRun ->
+                match journal with
+                | None -> ()
+                | Some j ->
+                    PromptAuthorityLedger.activeProfile bloggerId (AgentJournal.snapshot j).AgentProjections
+                    |> Option.iter (fun authority ->
+                        let plan =
+                            AttemptPlanner.plan
+                                authority
+                                AgentPairCursor.initial
+                                (PhysicalUserMessageId.create (SessionId.value bloggerId))
+                                providerRun
+                                (PromptAuthority.PromptOrigin.AuthorityRoot
+                                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                ProviderRequestKind.BloggerSquash
+                                false
+                                (fun () -> Error NoCandidateReason.NoCoverage)
+
+                        scope.RecordAttemptPlan bloggerId providerRun plan)
+
     let private ensureCompanion
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
@@ -87,16 +118,6 @@ module CompanionTransform =
                     journal
                     |> Option.map (fun j -> AgentJournalCompanionPort j :> ICompanionDurablePort)
 
-                let restoredBloggerId =
-                    match journal with
-                    | Some j ->
-                        (AgentJournal.snapshot j).AgentProjections.Sessions
-                        |> Map.tryFind (SessionId.create sessionId)
-                        |> Option.bind (fun s -> s.Companion)
-                        |> Option.bind (fun companion -> companion.BloggerSessionId)
-                        |> Option.map SessionId.value
-                    | None -> None
-
                 let value =
                     new CompanionHost(
                         SessionId.create sessionId,
@@ -104,38 +125,14 @@ module CompanionTransform =
                         ?durable = durable,
                         onBloggerCreated =
                             (fun bloggerId -> onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
-                        ?restoredBloggerId = restoredBloggerId,
+                        ?restoredBloggerId = restoredBloggerId journal sessionId,
                         ?journal = journal,
                         ?bloggerDirectory = workspaceDirectory,
                         satelliteRuntime = scope.Satellites
                     )
 
                 companions.[sessionId] <- value
-
-                value.RecordSquashPlan <-
-                    fun bloggerId providerRun ->
-                        match journal with
-                        | None -> ()
-                        | Some j ->
-                            let projections = (AgentJournal.snapshot j).AgentProjections
-
-                            match PromptAuthorityLedger.activeProfile bloggerId projections with
-                            | None -> ()
-                            | Some authority ->
-                                let plan =
-                                    AttemptPlanner.plan
-                                        authority
-                                        AgentPairCursor.initial
-                                        (PhysicalUserMessageId.create (SessionId.value bloggerId))
-                                        providerRun
-                                        (PromptAuthority.PromptOrigin.AuthorityRoot
-                                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-                                        ProviderRequestKind.BloggerSquash
-                                        false
-                                        (fun () -> Error NoCandidateReason.NoCoverage)
-
-                                scope.RecordAttemptPlan bloggerId providerRun plan
-
+                bindSquashPlan scope journal value
                 value)
 
     /// Main-session transform: Host view unchanged; material decision is sole coordinator.

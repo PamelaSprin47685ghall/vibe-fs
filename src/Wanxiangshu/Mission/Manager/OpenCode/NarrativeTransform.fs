@@ -458,6 +458,53 @@ module ManagerNarrativeTransform =
                 return! openNewHumanRootLife durable sid lifecycle traceState rawMessages messageIndex messageIdValue
         }
 
+    let private openAdmittedHumanRoot
+        (durable: AgentJournal)
+        (sid: SessionId)
+        (lifecycle: ManagerLifeProjection)
+        (traceState: XTraceProjectionState option)
+        (rawMessages: obj list)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (messageIndex: int)
+        (physicalMessageId: PhysicalUserMessageId)
+        =
+        match ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) physicalMessageId with
+        | None -> Task.FromResult None
+        | Some evidence ->
+            let admittedMessageId = HumanRootOpeningEvidence.messageId evidence
+
+            openAfterMigrationCheck
+                durable
+                sid
+                lifecycle
+                traceState
+                rawMessages
+                messageIndex
+                (PhysicalUserMessageId.value admittedMessageId)
+
+    let private tryOpenWithRootMessage
+        (durable: AgentJournal)
+        (sid: SessionId)
+        (lifecycle: ManagerLifeProjection)
+        (traceState: XTraceProjectionState option)
+        (rawMessages: obj list)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        =
+        let rootMessageId = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+
+        match findMessageIndex rawMessages rootMessageId with
+        | None -> Task.FromResult None
+        | Some messageIndex ->
+            openAdmittedHumanRoot
+                durable
+                sid
+                lifecycle
+                traceState
+                rawMessages
+                profile
+                messageIndex
+                (PhysicalUserMessageId.create rootMessageId)
+
     let private tryOpenHumanRootLife
         (durable: AgentJournal)
         (sid: SessionId)
@@ -465,32 +512,10 @@ module ManagerNarrativeTransform =
         (traceState: XTraceProjectionState option)
         (rawMessages: obj list)
         : Task<obj list option> =
-        task {
-            match activeProfile durable sid with
-            | None -> return None
-            | Some profile ->
-                let rootMessageId = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+        match activeProfile durable sid with
+        | None -> Task.FromResult None
+        | Some profile -> tryOpenWithRootMessage durable sid lifecycle traceState rawMessages profile
 
-                match findMessageIndex rawMessages rootMessageId with
-                | None -> return None
-                | Some messageIndex ->
-                    let physicalMessageId = PhysicalUserMessageId.create rootMessageId
-
-                    match ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) physicalMessageId with
-                    | None -> return None
-                    | Some evidence ->
-                        let admittedMessageId = HumanRootOpeningEvidence.messageId evidence
-
-                        return!
-                            openAfterMigrationCheck
-                                durable
-                                sid
-                                lifecycle
-                                traceState
-                                rawMessages
-                                messageIndex
-                                (PhysicalUserMessageId.value admittedMessageId)
-        }
 
     let private transformWithJournal
         (durable: AgentJournal)

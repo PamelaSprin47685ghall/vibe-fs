@@ -61,6 +61,18 @@ module ManagerLifeAdmission =
     /// history. Once any Life has completed, CurrentLife=None means terminally
     /// closed — it can never be interpreted as permission to rematerialize the
     /// same XTrace into another Life.
+    let private initialAgentOwnerOrNone
+        (profile: PromptAuthority.AuthorityExecutionProfile option)
+        (xTrace: XTraceProjectionState option)
+        : EndingLifeAdmission =
+        match profile, xTrace with
+        | Some active, Some trace when
+            isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active
+            && trace.Opening.IsSome
+            ->
+            EndingLifeAdmission.InitialAgentOwnerMigration(InitialAgentOwnerMigrationEvidence trace)
+        | _ -> EndingLifeAdmission.NoLife
+
     let ending
         (lifecycle: ManagerLifeProjection)
         (profile: PromptAuthority.AuthorityExecutionProfile option)
@@ -69,13 +81,4 @@ module ManagerLifeAdmission =
         match lifecycle.CurrentLife with
         | Some life -> EndingLifeAdmission.ExistingLife life
         | None when not (List.isEmpty lifecycle.CompletedLives) -> EndingLifeAdmission.NoLife
-        | None ->
-            match profile, xTrace with
-            | Some active, Some trace when
-                isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active
-                && trace.Opening.IsSome
-                ->
-                EndingLifeAdmission.InitialAgentOwnerMigration(
-                    InitialAgentOwnerMigrationEvidence trace
-                )
-            | _ -> EndingLifeAdmission.NoLife
+        | None -> initialAgentOwnerOrNone profile xTrace
