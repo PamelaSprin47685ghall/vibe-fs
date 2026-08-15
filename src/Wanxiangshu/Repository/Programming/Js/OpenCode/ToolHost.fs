@@ -159,11 +159,7 @@ module JsDescriptionAssets =
           ReasonUnknownAnchor = text lang JsCanonicalDescription.Path.ReasonUnknownAnchor
           ReasonInvalidSlice = text lang JsCanonicalDescription.Path.ReasonInvalidSlice
           ReasonFileReadFailed = text lang JsCanonicalDescription.Path.ReasonFileReadFailed
-          ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented
-          UltraCoderTruncated = text lang JsCanonicalDescription.Path.UltraCoderTruncated
-          UltraInspectorTruncated = text lang JsCanonicalDescription.Path.UltraInspectorTruncated
-          UltraReviewerTruncated = text lang JsCanonicalDescription.Path.UltraReviewerTruncated
-          UltraBrowserTruncated = text lang JsCanonicalDescription.Path.UltraBrowserTruncated }
+          ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram

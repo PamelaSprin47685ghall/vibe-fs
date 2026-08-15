@@ -73,11 +73,11 @@
 
 **证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-007 行。
 
-## REPOSITORY-PROGRAMMING-008 — glob()：gitignore/wildmatch 有界确定性枚举
+## REPOSITORY-PROGRAMMING-008 — glob()：gitignore/wildmatch 确定性枚举
 
-**规范陈述**：`glob(pattern)` 是 gitignore / wildmatch 风格的确定性路径枚举：`*` 不跨 `/`，`**` 匹配零段或多段，`?` 匹配单字符，`[abc]`/`[a-z]` 字符类，`{a,b}` 交替；pattern 不含 `/` 时匹配任意深度，含 `/` 或前导 `/` 时相对 capability 根锚定。永不进入 `.git`；应用根与子目录 `.gitignore` 与 `.git/info/exclude`；不跟随符号链接。有界打在**匹配条数**（不是 DFS 枚举前缀）；返回 `{ paths, truncated }`，截断时 `truncated = true`，不得把截断伪装成空匹配。capability 边界外的路径不出现。不授予 Read。
+**规范陈述**：`glob(pattern)` 是 gitignore / wildmatch 风格的确定性路径枚举：`*` 不跨 `/`，`**` 匹配零段或多段，`?` 匹配单字符，`[abc]`/`[a-z]` 字符类，`{a,b}` 交替；pattern 不含 `/` 时匹配任意深度，含 `/` 或前导 `/` 时相对 capability 根锚定。永不进入 `.git`；应用根与子目录 `.gitignore` 与 `.git/info/exclude`；不跟随符号链接。枚举无内部上界，返回全量 `{ paths }`；超限由最终 tool result 留尾机制一次性收敛（见 host-boundary 的 Host bound）。capability 边界外的路径不出现。不授予 Read。
 
-**含义/动机**：walk-then-filter 的 DFS 会先进入 `.git`，硬上限打在枚举前缀会让真仓库的 `src/**/*.fs` 变成空集；截断必须可见，否则模型把「没找全」当「没有」。
+**含义/动机**：walk-then-filter 的 DFS 会先进入 `.git`；工具内部无截断即无第二套上界语义，超大结果由 Host 最终留尾统一收敛，模型所见即工具所得。
 
 **边界**：具体 maxEntries 数值、glob 实现（`Infrastructure/JsGlobFs.fs`）是 HOW。
 
@@ -85,7 +85,7 @@
 
 ## REPOSITORY-PROGRAMMING-009 — grep()：Grep capability 投影为 Host member
 
-**规范陈述**：`ToolPermission.Grep` 投影为 `grep(needle, pattern = "**/*")` member：needle 为非空字符串（字面量）或 RegExp（忽略调用方 g/y/`lastIndex`）；pattern 用与 `glob()` 同一套 gitignore 选文件。Host 在选中的严格 UTF-8 文件上搜索；不可读或非法 UTF-8 的文件**跳过**，不使整次调用失败。返回 `{ matches: [{ path, line, column, text }], truncated }`：`line`/`column` 1-based，`text` 为匹配子串；有界打在匹配条数；截断可见。不授予 `file()`。Read+Glob 而无 Grep 时仍可 `glob()+file()+RegExp` 组合，但那不是 Grep capability 的投影。
+**规范陈述**：`ToolPermission.Grep` 投影为 `grep(needle, pattern = "**/*")` member：needle 为非空字符串（字面量）或 RegExp（忽略调用方 g/y/`lastIndex`）；pattern 用与 `glob()` 同一套 gitignore 选文件。Host 在选中的严格 UTF-8 文件上搜索；不可读或非法 UTF-8 的文件**跳过**，不使整次调用失败。返回全量 `{ matches: [{ path, line, column, text }] }`：`line`/`column` 1-based，`text` 为匹配子串；无内部上界，超限由最终 tool result 留尾机制收敛。不授予 `file()`。Read+Glob 而无 Grep 时仍可 `glob()+file()+RegExp` 组合，但那不是 Grep capability 的投影。
 
 **含义/动机**：grep「可表达」≠「不需要 primitive」——glob 假阴性让组合零命中，沙箱内逐文件 `file()` 被 timeout/`RESULT_TOO_LARGE`/二进制放大。Grep 是独立的 primitive capability 投影。
 

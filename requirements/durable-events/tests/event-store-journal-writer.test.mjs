@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
-import { agentFact, caseOf, idValue, payloadOf, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
+import { agentFact, blobDigest, blobRef, caseOf, fact, idValue, payloadOf, providerRun, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
 const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
@@ -62,6 +62,75 @@ test('BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Gi
     assert.equal(existsSync(join(local.commonDir, 'wanxiang', 'payloads', handle)), true)
     assert.equal(mustOk(await writer.BlobWriter.Read(receipt.BlobRef)), 'large-body\n')
     writer.Release?.()
+  } finally {
+    local.close()
+  }
+})
+
+test('appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
+  const local = createLocalEventStore({ writerId: 'journal-closure-proof' })
+  try {
+    const [writer, init] = await createFn(runtimeId('rt_es_closure'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
+    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
+    const receipt = mustOk(await writer.BlobWriter.Write('part-body\n'))
+    const handle = idValue.blobRef(receipt.BlobRef).slice('blobs/'.length)
+
+    const factValue = fact('XTracePartAppended', {
+      SessionId: sessionId('ses_closure'),
+      CursorSequence: 1n,
+      Role: 'user',
+      Turn: 0,
+      PartIndex: 0,
+      Kind: 'text',
+      ToolName: undefined,
+      TextRef: receipt.BlobRef,
+      TextDigest: receipt.BlobDigest,
+      Provenance: 'turn:0/part:0',
+      ProviderRun: providerRun('msg_1'),
+    })
+    const appended = await AgentJournal.AgentJournalModule_appendAgent(
+      stream.session(sessionId('ses_closure')),
+      undefined,
+      factValue,
+      journal,
+    )
+    assert.equal(caseOf(appended), 'Ok')
+
+    const ndjson = readFileSync(join(local.commonDir, 'wanxiang', 'events', 'journal-closure-proof.ndjson'), 'utf8')
+    assert.match(ndjson, new RegExp(`"payload_refs":\\["${handle}"\\]`))
+    journal.Dispose?.()
+  } finally {
+    local.close()
+  }
+})
+
+test('closure_fails_closed_when_a_real_content_address_is_missing', async () => {
+  const local = createLocalEventStore({ writerId: 'journal-closure-missing' })
+  try {
+    const [writer, init] = await createFn(runtimeId('rt_es_missing'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
+    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
+    const missingDigest = 'f'.repeat(64)
+
+    const factValue = fact('XTracePartAppended', {
+      SessionId: sessionId('ses_missing'),
+      CursorSequence: 1n,
+      Role: 'user',
+      Turn: 0,
+      PartIndex: 0,
+      Kind: 'text',
+      TextRef: blobRef(`blobs/${missingDigest}`),
+      TextDigest: blobDigest(missingDigest),
+      Provenance: 'turn:0/part:0',
+    })
+    const result = await AgentJournal.AgentJournalModule_appendAgent(
+      stream.session(sessionId('ses_missing')),
+      undefined,
+      factValue,
+      journal,
+    )
+    assert.equal(caseOf(result), 'Error')
+    assert.match(JSON.stringify(result), /MissingPayload/)
+    journal.Dispose?.()
   } finally {
     local.close()
   }

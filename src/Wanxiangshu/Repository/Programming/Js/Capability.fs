@@ -109,8 +109,8 @@ module JsFragmentRegistry =
           MemberName = "glob"
           Signature = "async glob(pattern)"
           Description =
-            "glob(pattern) — gitignore-style bounded path enumeration. Returns "
-            + "{ paths, truncated }. Does not grant Read on those paths."
+            "glob(pattern) — gitignore-style path enumeration. Returns "
+            + "{ paths }. Does not grant Read on those paths."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
@@ -126,7 +126,7 @@ module JsFragmentRegistry =
           Description =
             "grep(needle, pattern = \"**/*\") — search UTF-8 files selected by the same "
             + "gitignore-style glob. needle is a non-empty string or RegExp. Returns "
-            + "{ matches, truncated } with 1-based line/column. Does not grant file()."
+            + "{ matches } with 1-based line/column. Does not grant file()."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"

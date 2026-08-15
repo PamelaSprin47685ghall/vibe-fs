@@ -611,10 +611,9 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
       return { staleReferences: stale.matches, evidence };
     }
     const migrated = await this.grep(/\bnewApi\b/, "src/**/*.{js,ts}");
-    return { staleReferences: [], migratedReferences: migrated.matches, truncated: migrated.truncated };
+    return { staleReferences: [], migratedReferences: migrated.matches };
   }
 }"""
-            [ "ultra_reviewer_truncated", prose.UltraReviewerTruncated ]
 
     let private devOpsUltra =
         """class Js extends JsProgram {
@@ -625,10 +624,9 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     const testScript = pkg.scripts?.test ?? null;
     if (!testScript) return { rootPackage: "package.json", testScript: null, scripts: Object.keys(pkg.scripts || {}) };
     const tests = await this.glob("tests/**/*recovery*.{test,spec}.{js,ts,mjs}");
-    if (tests.truncated) return { testScript, incomplete: true };
     if (tests.paths.length === 0) {
       const hits = await this.grep(/RecoveryClosure|recovery/i, "tests/**/*.{js,ts,mjs}");
-      return { testScript, candidateTests: [...new Set(hits.matches.map(x => x.path))], truncated: hits.truncated };
+      return { testScript, candidateTests: [...new Set(hits.matches.map(x => x.path))] };
     }
     return {
       packageManager: typeof pkg.packageManager === "string" ? pkg.packageManager : null,
@@ -638,15 +636,13 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }
 }"""
 
-    let private browserUltra (prose: Prose) =
-        fill
-            """class Js extends JsProgram {
+    let private browserUltra =
+        """class Js extends JsProgram {
   async run() {
     const hits = await this.grep(/\bWidgetOptions\b/, "artifacts/web/**/*.md");
-    if (hits.truncated) return { incomplete: true, reason: "{{ultra_browser_truncated}}" };
     if (hits.matches.length === 0) {
       const indirect = await this.grep(/widget options|configuration object|deprecated/i, "artifacts/web/**/*.md");
-      return { exact: [], indirect: indirect.matches, truncated: indirect.truncated };
+      return { exact: [], indirect: indirect.matches };
     }
     const paths = [...new Set(hits.matches.map(x => x.path))];
     const sources = await Promise.all(paths.map(async path => {
@@ -663,16 +659,15 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return { sources };
   }
 }"""
-            [ "ultra_browser_truncated", prose.UltraBrowserTruncated ]
 
-    let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
+    let ultraExample (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
             match roleName.Trim().ToLowerInvariant() with
-            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], coderUltra prose)
-            | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra prose)
-            | "reviewer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], reviewerUltra prose)
+            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], coderUltra)
+            | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
+            | "reviewer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], reviewerUltra)
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], devOpsUltra)
-            | "browser" -> Some(set [ JsCapability.Read; JsCapability.Grep ], browserUltra prose)
+            | "browser" -> Some(set [ JsCapability.Read; JsCapability.Grep ], browserUltra)
             | _ -> None
 
         candidate
@@ -684,7 +679,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
     let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
         let ultraBlock =
-            match ultraExample prose roleName capabilities with
+            match ultraExample roleName capabilities with
             | Some example -> prose.UltraFraming + "\n\n```js\n" + example.Source + "\n```"
             | None -> prose.UltraUnavailable
 

@@ -21,7 +21,7 @@
 |---|---|
 | `src/Wanxiangshu/Infrastructure/JsToolsBindings.fs` | `createApi(root, staging)`：注入 sandbox 的 `file`/`glob`/`grep`/`rewrite`/`write` 实现；`resolveInside` 做 path containment（escape → `PATH_DENIED`） |
 | `src/Wanxiangshu/Infrastructure/JsUtf8Fs.fs` | strict UTF-8 解码（`INVALID_UTF8`） |
-| `src/Wanxiangshu/Infrastructure/JsGlobFs.fs` | gitignore/wildmatch glob 实现（有界匹配条数、跳过 `.git`/symlink） |
+| `src/Wanxiangshu/Infrastructure/JsGlobFs.fs` | gitignore/wildmatch glob 实现（全量枚举、跳过 `.git`/symlink） |
 | `src/Wanxiangshu/Infrastructure/JsMutationFs.fs` | 磁盘 mutation 原语（rewrite/create、compare-before-effect） |
 | `src/Wanxiangshu/Infrastructure/JsAnchorFs.fs` | 锚点解析的 fs 侧实现 |
 | `src/Wanxiangshu/Infrastructure/JsToolsTransactionStore.fs` | EventStore 适配：`TransactionStream = "js-tools/transactions"`；`PreparedEventType = "JsTransactionPrepared"` / `CommittedEventType = "JsTransactionCommitted"`；`appendPrepared` / `appendCommitted`；recovery 读取 |

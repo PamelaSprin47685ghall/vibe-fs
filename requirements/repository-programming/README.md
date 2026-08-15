@@ -22,8 +22,8 @@
 | `REPOSITORY-PROGRAMMING-005` | 编程面诚实：base class 只含可执行成员；hook 只推荐 provider-visible 工具。 |
 | `REPOSITORY-PROGRAMMING-006` | sandbox 无 ambient OS authority；runner 只拿数据不拿文件；deadline/memory/output bounded。 |
 | `REPOSITORY-PROGRAMMING-007` | `file()`/FileView：immutable UTF-8 快照；strict UTF-8 fail closed；有序 anchor；`name±N` 是字符串下标。 |
-| `REPOSITORY-PROGRAMMING-008` | `glob()`：gitignore/wildmatch 有界枚举；永不进 `.git`；截断可见不伪装空匹配。 |
-| `REPOSITORY-PROGRAMMING-009` | `grep()`：Grep capability 投影为 Host member；gitignore 选文件；非 UTF-8 跳过；截断可见。 |
+| `REPOSITORY-PROGRAMMING-008` | `glob()`：gitignore/wildmatch 确定性枚举；永不进 `.git`；全量返回，超限由 Host 留尾收敛。 |
+| `REPOSITORY-PROGRAMMING-009` | `grep()`：Grep capability 投影为 Host member；gitignore 选文件；非 UTF-8 跳过；全量返回，超限由 Host 留尾收敛。 |
 | `REPOSITORY-PROGRAMMING-010` | `rewrite()`/`write()` 分离（Edit≠Write）；`FILE_NOT_FOUND`/`FILE_ALREADY_EXISTS`；same-path-once。 |
 | `REPOSITORY-PROGRAMMING-011` | return 必须 JSON-compatible；commit 前校验；`INVALID_RETURN_VALUE`。 |
 | `REPOSITORY-PROGRAMMING-012` | mutation 先入 ephemeral staging；durable prepare 只经统一 EventStore；禁 feature store。 |
