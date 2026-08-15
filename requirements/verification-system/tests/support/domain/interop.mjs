@@ -443,8 +443,6 @@ export const ordinalComparer = { Compare: (left, right) => (left < right ? -1 : 
 export const stringSet = (items) => FsSet.ofArray(items, ordinalComparer)
 
 export const setItems = (value) => Array.from(value)
-export const setCount = (value) => FsSet.count(value)
-export const setContains = (item, value) => FsSet.contains(item, value)
 
 /**
  * array → FSharpList.

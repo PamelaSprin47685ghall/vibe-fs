@@ -856,14 +856,6 @@ export const managedAgentConfig = (() => {
   }
 })()
 
-/** Fixed package-relative read: `resources/<relative>` via import.meta.url. */
-export const packageResources = (() => {
-  const api = bind(PackageResourcesModule, 'PackageResources', ['readText'])
-  return {
-    readText: (relativeResourcePath) => api.readText(relativeResourcePath),
-  }
-})()
-
 // ── docs/what/enforcer.md ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
 
 export const bloggerRequestContext = (() => {

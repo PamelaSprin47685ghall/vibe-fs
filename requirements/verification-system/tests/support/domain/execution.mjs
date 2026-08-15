@@ -44,60 +44,6 @@ import { providerLanguage } from './prompt.mjs'
 // ── failure-driven context recovery (docs/what/context.md) ────────────────────────────────
 
 /**
- * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
- * Class A prose from ProviderResources (PROMPT-019); Domain assembles with ForkChildInstructions.
- */
-export const forkChildPayload = (() => {
-  const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
-    'BasePath',
-    'CommissionerRecordPath',
-    'AttachmentPath',
-    'RequirementsPath',
-    'render',
-    'relay',
-  ])
-  const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
-  const readLines = (semanticPath) =>
-    readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .trimEnd()
-      .split('\n')
-  const readOne = (semanticPath) => readLines(semanticPath).join('\n')
-  const defaultProse = () =>
-    new ForkChildPayloadModule.ForkChildInstructions(
-      toList(readLines(m.BasePath)),
-      readOne(m.CommissionerRecordPath),
-      readOne(m.AttachmentPath),
-      readOne(m.RequirementsPath),
-    )
-
-  return {
-    baseInstructions: readLines(m.BasePath),
-    commissionerRecordInstruction: readOne(m.CommissionerRecordPath),
-    attachmentInstruction: readOne(m.AttachmentPath),
-    /** @deprecated use commissionerRecordInstruction */
-    parentWorkRecordInstruction: readOne(m.CommissionerRecordPath),
-    requirementsInstruction: readOne(m.RequirementsPath),
-
-    render: ({ assignment, commissionerRecord, parentWorkRecord, attachment, originalUserRequirements = [], rootRequirements, payload }) =>
-      m.render(
-        defaultProse(),
-        new ForkChildPayloadModule.ForkChildAssignment(
-          assignment,
-          commissionerRecord ?? parentWorkRecord ?? undefined,
-          attachment,
-          toList(rootRequirements ?? originalUserRequirements),
-          payload,
-        ),
-      ),
-
-    relay: (assignment, commissionerRecord, attachment, requirements = [], payload) =>
-      m.relay(defaultProse(), assignment, commissionerRecord, attachment, toList(requirements), payload),
-  }
-})()
-
-/**
  * Distillation map/reduce: natural-language assignment prompts (no chunk index in wire).
  */
 export const distillation = (() => {
@@ -319,20 +265,6 @@ export const distillationRuntime = (() => {
       }
       return { runtime, cancelled }
     },
-  }
-})()
-
-/** EXEC-011: `min(3 × estimate, administrator ceiling)`. */
-export const processEstimate = (() => {
-  const m = bind(ProcessRequest, 'ProcessEstimate', ['DefaultHardLimit', 'effectiveDeadline', 'outputThreshold'])
-  const runtimeSecondsOf = unionCase(ProcessRequest.EstimatedRuntime, 'EstimatedRuntime')
-  const outputBytesOf = unionCase(ProcessRequest.EstimatedOutput, 'EstimatedOutput')
-
-  return {
-    defaultHardLimitMs: m.DefaultHardLimit,
-    effectiveDeadlineMs: (runtimeSeconds, hardLimitMs) =>
-      m.effectiveDeadline(runtimeSecondsOf('RuntimeSeconds', [runtimeSeconds]), hardLimitMs),
-    outputThreshold: (bytes) => m.outputThreshold(outputBytesOf('OutputBytes', [BigInt(bytes)])),
   }
 })()
 

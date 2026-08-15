@@ -627,34 +627,6 @@ export const reconcileSupervisor = (() => {
   }
 })()
 
-// ── Orchestrator direct-CE workflow (FLOW-001 / PR3) ─────────────────────────
-// Application/Orchestration/Program.fs is the sole production entrypoint.
-// Domain AST + OrchestratorInterpreter were deleted; tests use fake ports via
-// orchestratorRuntime, not reply-bearing Program trees.
-export const orchestratorProgram = (() => {
-  let cached
-  const load = async () => {
-    if (cached) return cached
-    cached = await prod('Change/Program')
-    return cached
-  }
-  return {
-    /** Sole production entrypoint Runtime calls. */
-    run: async (deps, job) => {
-      const mod = await load()
-      const fn = mod.run ?? mod.OrchestratorProgram_run
-      if (typeof fn !== 'function') {
-        throw new Error(
-          `OrchestratorProgram.run missing; exports: ${Object.keys(mod).join(', ')}`,
-        )
-      }
-      if (fn.length >= 2) return fn(deps, job)
-      const partial = fn(deps)
-      return typeof partial === 'function' ? partial(job) : partial
-    },
-  }
-})()
-
 // ── Join direct CE (P0-RECOVERY-JOIN-001 + EXEC-018 / PR5) ───────────────────
 // Domain JoinProgram AST deleted. Application/Reconciliation/Join.fs is the sole
 // permit-gated entry. Tests assert production surface, not AST case names.
