@@ -122,6 +122,49 @@ module InspectorTool =
     let private consequence ctx path subs =
         tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
+    let private invoke
+        (sd: SyncDelegateRuntime)
+        (role: SyncDelegateRole)
+        (context: HostToolContext)
+        (charge: string)
+        (prepareProviderPrompt: unit -> Task<string>)
+        (batch: SyncDelegateBatch option)
+        (expectedToolCalls: int option)
+        =
+        match batch with
+        | Some semanticBatch ->
+            sd.InvokeBatchPrepared(
+                context.SessionId,
+                role,
+                charge,
+                semanticBatch,
+                prepareProviderPrompt,
+                ?expectedToolCalls = expectedToolCalls
+            )
+        | None ->
+            sd.InvokePrepared(
+                context.SessionId,
+                role,
+                charge,
+                prepareProviderPrompt,
+                ?expectedToolCalls = expectedToolCalls
+            )
+            |> TaskValue.map (Result.map SyncDelegateInvocationResult.WorkRecord)
+
+    let private renderResult
+        (context: HostToolContext)
+        (result: Result<SyncDelegateInvocationResult, string>)
+        =
+        match result with
+        | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
+            let instructions = [ workRecord ] |> List.filter (String.IsNullOrWhiteSpace >> not)
+            tomlObjectWithInstructions instructions []
+        | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
+            tomlObjectWithInstructions
+                [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ]
+                []
+        | Error _ -> consequence context Path.Incomplete Map.empty
+
     let private execute
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
@@ -129,77 +172,45 @@ module InspectorTool =
         (context: HostToolContext)
         =
         task {
-            match syncDelegate with
-            | None -> return consequence context Path.Unavailable Map.empty
-            | Some sd ->
-                if String.IsNullOrWhiteSpace context.SessionId then
-                    return consequence context Path.AuthorityRequired Map.empty
-                else
-                    let charge = args.Text "charge"
-                    let keywords = args.Text "keywords"
+            let charge = args.Text "charge"
+            let keywords = args.Text "keywords"
+            let estimate = DelegatedToolEstimate.decode args
 
-                    match DelegatedToolEstimate.decode args with
-                    | Error _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
-                    | Ok expectedToolCalls when String.IsNullOrWhiteSpace charge ->
-                        return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
-                    | Ok expectedToolCalls ->
-                        let prepareProviderPrompt () =
-                            task {
-                                match!
-                                    RepositoryWarmStart.prepare
-                                        (SessionId.create context.SessionId)
-                                        Role.Inspector
-                                        scope.WorkspaceDirectory
-                                        keywords
-                                        charge
-                                with
-                                | Ok prompt -> return prompt
-                                | Error _ -> return charge
-                            }
+            match
+                syncDelegate,
+                String.IsNullOrWhiteSpace context.SessionId,
+                estimate,
+                String.IsNullOrWhiteSpace charge
+            with
+            | None, _, _, _ -> return consequence context Path.Unavailable Map.empty
+            | Some _, true, _, _ -> return consequence context Path.AuthorityRequired Map.empty
+            | Some _, false, Error _, _ ->
+                return consequence context DelegatedToolEstimate.InvalidPath Map.empty
+            | Some _, false, Ok _, true ->
+                return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
+            | Some sd, false, Ok expectedToolCalls, false ->
+                let prepareProviderPrompt () =
+                    RepositoryWarmStart.prepare
+                        (SessionId.create context.SessionId)
+                        Role.Inspector
+                        scope.WorkspaceDirectory
+                        keywords
+                        charge
+                    |> TaskValue.map (Result.defaultValue charge)
 
-                        let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Inspector context
+                let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Inspector context
 
-                        let! result =
-                            match batch with
-                            | Some semanticBatch ->
-                                sd.InvokeBatchPrepared(
-                                    context.SessionId,
-                                    SyncDelegateRole.Inspector,
-                                    charge,
-                                    semanticBatch,
-                                    prepareProviderPrompt,
-                                    ?expectedToolCalls = expectedToolCalls
-                                )
-                            | None ->
-                                task {
-                                    match!
-                                        sd.InvokePrepared(
-                                            context.SessionId,
-                                            SyncDelegateRole.Inspector,
-                                            charge,
-                                            prepareProviderPrompt,
-                                            ?expectedToolCalls = expectedToolCalls
-                                        )
-                                    with
-                                    | Ok workRecord -> return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
-                                    | Error error -> return Error error
-                                }
+                let! result =
+                    invoke
+                        sd
+                        SyncDelegateRole.Inspector
+                        context
+                        charge
+                        prepareProviderPrompt
+                        batch
+                        expectedToolCalls
 
-                        match result with
-                        | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
-                            let instructions =
-                                if String.IsNullOrWhiteSpace workRecord then
-                                    []
-                                else
-                                    [ workRecord ]
-
-                            return tomlObjectWithInstructions instructions []
-                        | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
-                            return
-                                tomlObjectWithInstructions
-                                    [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ]
-                                    []
-                        | Error _ -> return consequence context Path.Incomplete Map.empty
+                return renderResult context result
         }
 
     let spec
