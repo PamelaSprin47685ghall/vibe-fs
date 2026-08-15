@@ -26,14 +26,14 @@ const BLOCKER_STEPS = [
 const COMPLETED_NOT_CURRENT = /Completed.{0,40}不解释当前产品行为/
 const ACTIVE_ORIGIN = /Original proposal|Work origin|用户已冻结的裁决/
 
-test('REQUIREMENT-SYSTEM-015 AGENTS.md keeps the small-fix exemption', () => {
+test('WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption', () => {
   const agents = read('AGENTS.md')
   assert.match(agents, SMALL_FIX)
   const dropped = agents.replace(SMALL_FIX, '')
   assert.doesNotMatch(dropped, SMALL_FIX)
 })
 
-test('REQUIREMENT-SYSTEM-014 WHAT states the four-step blocker protocol', () => {
+test('WHAT[REQUIREMENT-SYSTEM-014] WHAT states the four-step blocker protocol', () => {
   const what = read('requirements/requirement-system/WHAT.md')
   const section = what.slice(what.indexOf('## REQUIREMENT-SYSTEM-014'))
   const body = section.slice(0, section.indexOf('## REQUIREMENT-SYSTEM-015'))
@@ -44,7 +44,7 @@ test('REQUIREMENT-SYSTEM-014 WHAT states the four-step blocker protocol', () => 
   assert.doesNotMatch(dropped, /停止受影响的\s*产品语义修改/)
 })
 
-test('REQUIREMENT-SYSTEM-013 Completed is not current product behavior', () => {
+test('WHAT[REQUIREMENT-SYSTEM-013] Completed is not current product behavior', () => {
   const what = read('requirements/requirement-system/WHAT.md')
   const section = what.slice(what.indexOf('## REQUIREMENT-SYSTEM-013'))
   const body = section.slice(0, section.indexOf('## REQUIREMENT-SYSTEM-014'))
@@ -53,7 +53,7 @@ test('REQUIREMENT-SYSTEM-013 Completed is not current product behavior', () => {
   assert.doesNotMatch(dropped, COMPLETED_NOT_CURRENT)
 })
 
-test('REQUIREMENT-SYSTEM-013 live Active files declare frozen origin', () => {
+test('WHAT[REQUIREMENT-SYSTEM-013] live Active files declare frozen origin', () => {
   const live = join(ROOT, 'changes/active')
   if (!existsSync(live)) return
   const files = readdirSync(live).filter((name) => name.endsWith('.md'))

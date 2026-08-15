@@ -15,7 +15,7 @@ import {
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
-test('spec gate rejects unknown and suffixed clause-looking references', () => {
+test('WHAT[REQUIREMENT-SYSTEM-008] spec gate rejects unknown and suffixed clause-looking references', () => {
   assert.deepEqual(
     unknownClauseReferences(
       ['ARCH-010 is valid', 'ARCH-010-TOOL-BOUND is not', 'SECURITY-001 is unknown', 'SHA-256 is an algorithm'].join('\n'),
@@ -28,7 +28,7 @@ test('spec gate rejects unknown and suffixed clause-looking references', () => {
   )
 })
 
-test('spec gate requires exact README coverage of formal files', () => {
+test('WHAT[REQUIREMENT-SYSTEM-007] spec gate requires exact README coverage of formal files', () => {
   const navigation = [
     '[kept](what/kept.md)',
     '[stale](what/stale.md)',
@@ -43,7 +43,7 @@ test('spec gate requires exact README coverage of formal files', () => {
   )
 })
 
-test('spec gate covers links with spaces and hash characters exactly', () => {
+test('WHAT[REQUIREMENT-SYSTEM-007] spec gate covers links with spaces and hash characters exactly', () => {
   const navigation = [
     '[kept](why/kept.md)',
     '[research](<why/research # note.md>)',
@@ -63,7 +63,7 @@ test('spec gate covers links with spaces and hash characters exactly', () => {
   )
 })
 
-test('spec gate expands slash lists and checks range endpoints', () => {
+test('WHAT[REQUIREMENT-SYSTEM-008] spec gate expands slash lists and checks range endpoints', () => {
   assert.deepEqual(
     clauseReferences(
       ['ARCH-001/003', 'HOST-009..012', 'ARCH-001…008'].join('\n'),
@@ -80,7 +80,7 @@ test('spec gate expands slash lists and checks range endpoints', () => {
   )
 })
 
-test('spec gate finds Clause-shaped headings for any prefix and heading depth', () => {
+test('WHAT[REQUIREMENT-SYSTEM-008] spec gate finds Clause-shaped headings for any prefix and heading depth', () => {
   assert.deepEqual(
     clauseDefinitionHeadings([
       '# PROPOSE-001: candidate',
@@ -96,7 +96,20 @@ test('spec gate finds Clause-shaped headings for any prefix and heading depth', 
   )
 })
 
-test('spec gate distinguishes formal Clause headings from Change IDs', () => {
+test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files', () => {
+  // README/AGENTS/CHANGELOG 不是规范正文（无裸规范权威）；识别器必须仍能发现
+  // 路由文件里的产品条款定义，使 scripts/checks/spec.mjs 的「正式条款只能定义在
+  // package WHAT.md」gate 可以拒绝它。
+  assert.deepEqual(
+    formalClauseDefinitionHeadings([
+      '# README',
+      '## ARCH-002: a clause defined in a navigation file',
+    ].join('\n'), PREFIXES),
+    [{ id: 'ARCH-002', line: 2 }],
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-012] formalClauseDefinitionHeadings separates CHG-001 from product clauses', () => {
   assert.deepEqual(
     formalClauseDefinitionHeadings([
       '# CHG-001: lifecycle identity',
@@ -107,7 +120,20 @@ test('spec gate distinguishes formal Clause headings from Change IDs', () => {
   )
 })
 
-test('spec gate detects retired workflow paths', () => {
+test('WHAT[REQUIREMENT-SYSTEM-009] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
+  // Change 文件不得承担正式定义职责；formalClauseDefinitionHeadings 必须仍能识别
+  // Change 文件里的产品条款定义（ARCH-001），由 scripts/checks/spec.mjs 的
+  //「正式定义只在 WHAT.md」gate 拒绝它。
+  assert.deepEqual(
+    formalClauseDefinitionHeadings([
+      '# CHG-002: some lifecycle identity',
+      '## ARCH-001: a product clause smuggled into a Change file',
+    ].join('\n'), PREFIXES),
+    [{ id: 'ARCH-001', line: 2 }],
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-010] spec gate detects retired workflow paths', () => {
   assert.deepEqual(
     legacyWorkflowPathReferences([
       'read docs/proposal/future.md',
@@ -121,7 +147,7 @@ test('spec gate detects retired workflow paths', () => {
   )
 })
 
-test('spec gate detects references to the deleted archive tree', () => {
+test('WHAT[REQUIREMENT-SYSTEM-010] spec gate detects references to the deleted archive tree', () => {
   assert.deepEqual(
     archivePathReferences([
       '// archive/docs/proof/verify.md is gone',
@@ -136,7 +162,7 @@ test('spec gate detects references to the deleted archive tree', () => {
   )
 })
 
-test('spec gate rejects proposed and specific completed dependencies but allows active scope', () => {
+test('WHAT[REQUIREMENT-SYSTEM-011] spec gate rejects proposed and specific completed dependencies but allows active scope', () => {
   assert.deepEqual(
     changeDependencyReferences([
       '// changes/proposed/future.md is not current',
@@ -151,7 +177,7 @@ test('spec gate rejects proposed and specific completed dependencies but allows 
   )
 })
 
-test('spec gate extracts local Markdown links without treating URLs or anchors as files', () => {
+test('WHAT[REQUIREMENT-SYSTEM-007] spec gate extracts local Markdown links without treating URLs or anchors as files', () => {
   assert.deepEqual(
     markdownLocalLinks([
       '[plain](what/agent.md)',

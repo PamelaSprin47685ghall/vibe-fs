@@ -182,16 +182,18 @@ const resolveLanding = (pkg, token) => {
   return repo
 }
 
-/** 对单个「已迁移」包跑全部结构检查，返回失败消息数组。 */
-const structuralFailures = (pkg, allNames, skeleton) => {
+/** 对单个「已迁移」包跑文档齐备检查。 */
+const docFailures = (pkg) => {
   const failures = []
   for (const doc of REQUIRED_DOCS) {
-    if (!existsSync(join(REQUIREMENTS, pkg, doc))) {
-      failures.push(`${pkg}: missing ${doc}`)
-      return failures
-    }
+    if (!existsSync(join(REQUIREMENTS, pkg, doc))) failures.push(`${pkg}: missing ${doc}`)
   }
+  return failures
+}
 
+/** 对单个「已迁移」包跑 PROOF 反向检查（命题有行、落点文件存在）。 */
+const proofFailures = (pkg) => {
+  const failures = []
   for (const id of propositionIds(pkg)) {
     if (proofRowsFor(pkg, id).length === 0) {
       failures.push(`${pkg}: WHAT proposition ${id} has no row in PROOF.md`)
@@ -208,7 +210,12 @@ const structuralFailures = (pkg, allNames, skeleton) => {
       }
     }
   }
+  return failures
+}
 
+/** 对单个「已迁移」包跑依赖声明 ⊆ 骨架检查。 */
+const depFailures = (pkg, allNames, skeleton) => {
+  const failures = []
   for (const doc of ['README.md', 'WHY.md', 'WHAT.md']) {
     const declared = declaredDependencies(pkg, doc, allNames)
     const allowed = skeleton.get(pkg) ?? new Set()
@@ -218,54 +225,13 @@ const structuralFailures = (pkg, allNames, skeleton) => {
       }
     }
   }
-
   return failures
 }
 
-// ── 两个 test() ──────────────────────────────────────────────────────────────
+// ── 五个 test()：每个恰一个 primary WHAT ─────────────────────────────────────
 
-test('meta verifier: 已迁移包（5 文档齐备）结构一致，删 PROOF 行必红', () => {
+test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all five documents', () => {
   const allNames = packageNamesFromIndexTables()
-  const skeleton = dependencySkeleton()
-  const dirs = readdirSync(REQUIREMENTS)
-    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
-    .sort()
-  const migrated = dirs.filter((pkg) => REQUIRED_DOCS.every((doc) => existsSync(join(REQUIREMENTS, pkg, doc))))
-
-  assert.ok(migrated.length >= 2, 'requirement-system and verification-system must be structurally complete now')
-
-  const failures = []
-  for (const pkg of migrated) {
-    failures.push(...structuralFailures(pkg, allNames, skeleton))
-  }
-
-  assert.deepEqual(
-    failures,
-    [],
-    'every migrated package must be internally consistent:\n' + failures.join('\n'),
-  )
-})
-
-test('meta verifier: 全量迁移状态（INDEX 当前 48 包 × 5 文档，无 INDEX 外目录）', () => {
-  const fromTree = packageNamesFromTreeEntry()
-  const fromIndex = packageNamesFromIndexTables()
-
-  assert.deepEqual(
-    [...fromTree].sort(),
-    [...fromIndex].sort(),
-    'requirements/README.md tree entry and requirements-design/INDEX.md must name the same package set',
-  )
-
-  const allNames = fromIndex
-  assert.equal(allNames.length, 48, `expected 48 packages in INDEX, found ${allNames.length}`)
-
-  const dirs = readdirSync(REQUIREMENTS)
-    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
-    .sort()
-
-  const unknown = dirs.filter((dir) => !allNames.includes(dir))
-  assert.deepEqual(unknown, [], `requirements/ must not contain INDEX-external package dirs: ${unknown.join(', ')}`)
-
   const missing = []
   for (const pkg of allNames) {
     for (const doc of REQUIRED_DOCS) {
@@ -277,5 +243,89 @@ test('meta verifier: 全量迁移状态（INDEX 当前 48 包 × 5 文档，无 
     [],
     'every INDEX package must carry README/WHY/WHAT/HOW/PROOF; missing (expected while migration is mid-flight):\n' +
       missing.join('\n'),
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a PROOF row and a live landing file', () => {
+  const allNames = packageNamesFromIndexTables()
+  const dirs = readdirSync(REQUIREMENTS)
+    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
+    .sort()
+  const migrated = dirs.filter((pkg) => REQUIRED_DOCS.every((doc) => existsSync(join(REQUIREMENTS, pkg, doc))))
+
+  assert.ok(migrated.length >= 2, 'requirement-system and verification-system must be structurally complete now')
+
+  const failures = []
+  for (const pkg of migrated) {
+    failures.push(...proofFailures(pkg))
+  }
+  // 删一个已存在包的 PROOF 行 → 该包进入此失败列表（可红性）。
+  assert.deepEqual(
+    failures,
+    [],
+    'every migrated package must prove every proposition and name live landing files:\n' + failures.join('\n'),
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-001] every product truth has exactly one owner package', () => {
+  // 机器落点（PROOF L8）：requirements/ 无 INDEX 外目录 —— 每个包目录都出现在 INDEX
+  // 中，即每个语义 owner 唯一且被索引。语义归属裁决（WHY/independent-change/failure
+  // meaning）由 cutover 设计期人工完成（历史见 git），本 test 锁物理唯一性。
+  const fromIndex = packageNamesFromIndexTables()
+  const dirs = readdirSync(REQUIREMENTS)
+    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
+    .sort()
+
+  const unknown = dirs.filter((dir) => !fromIndex.includes(dir))
+  assert.deepEqual(unknown, [], `requirements/ must not contain INDEX-external package dirs: ${unknown.join(', ')}`)
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-002] package identity is the name, not the physical layout', () => {
+  // 结构检查只绑定「包名 + 5 份固定文档名」；不读取任何 manifest 格式
+  // （TOML/JSON/…）或目录布局细节，因此整体更换物理布局不改变任何 WHAT。
+  assert.deepEqual(REQUIRED_DOCS, ['README.md', 'WHY.md', 'WHAT.md', 'HOW.md', 'PROOF.md'])
+  // 无 manifest 参与：requirements/<pkg>/ 下不存在强制格式文件（meta-verifier 从不
+  // 读取 .toml/.json manifest；本 test 即机器证明）。
+  assert.ok(!existsSync(join(REQUIREMENTS, 'requirement-system/package.toml')), 'no manifest format may enter the tree contract')
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package set', () => {
+  const fromTree = packageNamesFromTreeEntry()
+  const fromIndex = packageNamesFromIndexTables()
+
+  assert.deepEqual(
+    [...fromTree].sort(),
+    [...fromIndex].sort(),
+    'requirements/README.md tree entry and requirements-design/INDEX.md must name the same package set',
+  )
+
+  assert.equal(fromIndex.length, 48, `expected 48 packages in INDEX, found ${fromIndex.length}`)
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton', () => {
+  const allNames = packageNamesFromIndexTables()
+  const skeleton = dependencySkeleton()
+  const dirs = readdirSync(REQUIREMENTS)
+    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
+    .sort()
+  const migrated = dirs.filter((pkg) => REQUIRED_DOCS.every((doc) => existsSync(join(REQUIREMENTS, pkg, doc))))
+
+  const failures = []
+  for (const pkg of migrated) {
+    failures.push(...depFailures(pkg, allNames, skeleton))
+  }
+
+  assert.deepEqual(
+    failures,
+    [],
+    'declared dependencies must be a subset of the INDEX skeleton:\n' + failures.join('\n'),
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof', () => {
+  // 本测试自身即机器执行：文件存在、随 run.mjs 全量运行、上述断言可红。
+  assert.ok(
+    existsSync(join(REQUIREMENTS, 'requirement-system/tests/meta-verifier.test.mjs')),
+    'meta-verifier.test.mjs must exist and run as the REQUIREMENT-SYSTEM-017 machine proof',
   )
 })

@@ -91,7 +91,7 @@ const activeTests = graph.tests.filter((t) => t.state === 'active')
 
 // orphan: active test with no WHAT tag
 for (const t of graph.tests) {
-  if (packageFilter && !t.file.includes(`/tests/`) && !t.file.includes(`/${packageFilter}/`)) continue
+  if (packageFilter && packageOf(t.file) !== packageFilter) continue
   if (t.whatIds.length === 0 && t.state === 'active') {
     if (strictPackages.size === 0 || [...strictPackages].some((p) => t.file.includes(`/${p}/tests/`))) {
       add(rel(t.file), t.line, 'TRACE_ORPHAN_TEST', `"${t.title}" has no WHAT[<ID>] owner`)
