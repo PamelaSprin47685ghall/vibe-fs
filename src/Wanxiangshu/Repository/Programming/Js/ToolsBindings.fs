@@ -135,12 +135,11 @@ module JsToolsBindings =
                                 | Error failure -> failureObj failure
                         "glob"
                         ==> fun (pattern: string) ->
-                            match JsGlobFs.glob root pattern 256 with
+                            match JsGlobFs.glob root pattern with
                             | Ok listing ->
                                 createObj
                                     [ "ok" ==> true
-                                      "paths" ==> (List.toArray listing.Paths)
-                                      "truncated" ==> listing.Truncated ]
+                                      "paths" ==> (List.toArray listing.Paths) ]
                             | Error failure -> failureObj failure
                         "grep"
                         ==> fun (needle: obj) (pattern: string) ->
@@ -157,7 +156,7 @@ module JsToolsBindings =
                                 | AnchorSpec.Exact text when System.String.IsNullOrEmpty text ->
                                     failureObj JsFailure.AnchorEmptyContent
                                 | _ ->
-                                    match JsAnchorFs.grep root spec globPattern 500 with
+                                    match JsAnchorFs.grep root spec globPattern with
                                     | Error failure -> failureObj failure
                                     | Ok listing ->
                                         let matches =
@@ -171,8 +170,7 @@ module JsToolsBindings =
 
                                         createObj
                                             [ "ok" ==> true
-                                              "matches" ==> (List.toArray matches)
-                                              "truncated" ==> listing.Truncated ]
+                                              "matches" ==> (List.toArray matches) ]
                         "edit"
                         ==> fun (path: string) (newText: obj) ->
                             let replacement = string newText

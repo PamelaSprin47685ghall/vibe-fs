@@ -119,79 +119,115 @@ module JournalPayloadClosure =
                 | AgentFact.Execution execution ->
                     match execution with
                     | ExecutionFactCases.HandleCompleted p ->
-                        (p.CompletionRef |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobRef)
-                        @ (p.CompletionDigest |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobDigest)
+                        (p.CompletionRef |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
+                        @ (p.CompletionDigest |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
                     | ExecutionFactCases.HandleFalseCompletionRejected p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.ExpectedCompletionRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.ExpectedCompletionDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.ExpectedCompletionRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.ExpectedCompletionDigest ]
                     | ExecutionFactCases.HandleFalseTerminalReported p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.BadCompletionRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.BadCompletionRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
                     | ExecutionFactCases.ParentJoinCorrectionRequested p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
+                        List.choose id [ MagicTodoFactCodec.payloadRefOfBlobDigest p.BadCompletionDigest ]
                     | _ -> []
                 | AgentFact.Companion companion ->
                     match companion with
                     | CompanionFactCases.XTracePartAppended p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
                     | CompanionFactCases.TerminalOutputCaptured p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
                     | _ -> []
                 | AgentFact.Context context ->
                     match context with
                     | ContextFactCases.BlogObservationCommitted p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
-                        @ (p.EvidenceRef |> Option.toList |> List.map MagicTodoFactCodec.payloadRefOfBlobRef)
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                        @ (p.EvidenceRef |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
                     | ContextFactCases.BlogObservationsSquashed p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.TextRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.TextDigest ]
                     | ContextFactCases.BloggerRequestMaterialized p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.ContextRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.ContextDigest ]
-                        @ (p.SelectedFrameDigests |> List.map MagicTodoFactCodec.payloadRefOfBlobDigest)
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.ContextRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.ContextDigest ]
+                        @ (p.SelectedFrameDigests |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
                     | ContextFactCases.PrefixRebaseCommitted p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.FrozenRecordPrefixRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.FrozenRecordPrefixRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
                     | _ -> []
                 | AgentFact.Fission fission ->
                     match fission with
                     | FissionFactCases.FissionAdmitted p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.OwnerWorkRecordRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.OwnerWorkRecordDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.OwnerWorkRecordRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.OwnerWorkRecordDigest ]
                     | FissionFactCases.FissionLaneMaterialized p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
                     | FissionFactCases.FissionCompletionCaptured p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.PayloadRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.PayloadDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.PayloadRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.PayloadDigest ]
                     | FissionFactCases.FissionConverged p ->
-                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.AggregateWorkRecordRef
-                          MagicTodoFactCodec.payloadRefOfBlobDigest p.AggregateWorkRecordDigest ]
+                        List.choose
+                            id
+                            [ MagicTodoFactCodec.payloadRefOfBlobRef p.AggregateWorkRecordRef
+                              MagicTodoFactCodec.payloadRefOfBlobDigest p.AggregateWorkRecordDigest ]
                     | _ -> []
                 | _ -> []
             | Fact.ManagerLifecycle lifecycle ->
                 match lifecycle with
                 | ManagerLifecycleFact.LifeOpened p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.OpeningTextRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.OpeningTextDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.OpeningTextRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.OpeningTextDigest ]
                 | ManagerLifecycleFact.FinalityRequested p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.LastWordsRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.LastWordsDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.LastWordsRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.LastWordsDigest ]
                 | ManagerLifecycleFact.FinalityRejected p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
                 | ManagerLifecycleFact.FinalitySiblingSteered p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordDigest ]
                 | ManagerLifecycleFact.FinalityBlessed p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordBundleRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordBundleDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.WorkRecordBundleRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.WorkRecordBundleDigest ]
                 | ManagerLifecycleFact.LifeCompleted p ->
-                    [ MagicTodoFactCodec.payloadRefOfBlobRef p.TerminalRef
-                      MagicTodoFactCodec.payloadRefOfBlobDigest p.TerminalDigest ]
+                    List.choose
+                        id
+                        [ MagicTodoFactCodec.payloadRefOfBlobRef p.TerminalRef
+                          MagicTodoFactCodec.payloadRefOfBlobDigest p.TerminalDigest ]
                 | _ -> []
 
         PayloadRefs.canonicalize refs

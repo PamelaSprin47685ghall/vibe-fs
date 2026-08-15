@@ -58,8 +58,8 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 
-/// JS-007: the bounded, deterministic gitignore-aware glob adapter behind the
-/// js-* runtime bindings. Durable facts never live here; EventStore owns them
+/// JS-007: the deterministic gitignore-aware glob adapter behind the js-*
+/// runtime bindings. Durable facts never live here; EventStore owns them
 /// (JS-012).
 module JsGlobFs =
 
@@ -87,7 +87,7 @@ module JsGlobFs =
     [<Emit("$0.test($1)")>]
     let private regexTest (re: obj) (text: string) : bool = jsNative
 
-    type JsGlobListing = { Paths: string list; Truncated: bool }
+    type JsGlobListing = { Paths: string list }
 
     type private IgnoreRule =
         { Base: string
@@ -251,82 +251,63 @@ module JsGlobFs =
 
         go 0 false
 
-    let private collectVisibleFiles (root: string) (collectCap: int) (visitCap: int) : string list * bool =
+    let private collectVisibleFiles (root: string) : string list =
         let files = ResizeArray<string>()
         let rules = ResizeArray<IgnoreRule>()
-        // DSL-MUTABLE: resource — file collector truncation and visit counters
-        let mutable truncated = false
-        let mutable visits = 0
 
         let rec walk (dir: string) (rel: string) =
-            if truncated then
-                ()
-            elif visits >= visitCap then
-                truncated <- true
-            else
-                visits <- visits + 1
+            let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
+            let mark = rules.Count
 
-                let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
-                let mark = rules.Count
-
-                if rel = "" then
-                    for rule in loadIgnoreFile (pathJoin root ".git/info/exclude") "" do
-                        rules.Add(rule)
-
-                for rule in nested do
+            if rel = "" then
+                for rule in loadIgnoreFile (pathJoin root ".git/info/exclude") "" do
                     rules.Add(rule)
 
+            for rule in nested do
+                rules.Add(rule)
+
+            try
                 try
-                    try
-                        let entries = readdirSync dir |> Array.toList |> List.sort
+                    let entries = readdirSync dir |> Array.toList |> List.sort
 
-                        for entry in entries do
-                            if not truncated && entry <> ".git" then
-                                let full = pathJoin dir entry
-                                let childRel = if rel = "" then entry else rel + "/" + entry
+                    for entry in entries do
+                        if entry <> ".git" then
+                            let full = pathJoin dir entry
+                            let childRel = if rel = "" then entry else rel + "/" + entry
 
-                                try
-                                    let st = lstatSync full
+                            try
+                                let st = lstatSync full
 
-                                    if isSymbolicLink st then
-                                        ()
-                                    elif isDirectory st then
-                                        if not (isIgnored rules childRel true) then
-                                            walk full childRel
-                                    elif isFile st then
-                                        if not (isIgnored rules childRel false) then
-                                            if files.Count >= collectCap then
-                                                truncated <- true
-                                            else
-                                                files.Add(childRel.Replace('\\', '/'))
-                                with _ ->
+                                if isSymbolicLink st then
                                     ()
-                    with _ ->
-                        ()
-                finally
-                    rules.RemoveRange(mark, rules.Count - mark)
+                                elif isDirectory st then
+                                    if not (isIgnored rules childRel true) then
+                                        walk full childRel
+                                elif isFile st then
+                                    if not (isIgnored rules childRel false) then
+                                        files.Add(childRel.Replace('\\', '/'))
+                            with _ ->
+                                ()
+                with _ ->
+                    ()
+            finally
+                rules.RemoveRange(mark, rules.Count - mark)
 
         walk root ""
-        List.ofSeq files, truncated
+        List.ofSeq files
 
-    /// JS-007: gitignore-style glob. maxEntries bounds the returned match
-    /// count; truncated is true when matches or traversal hit a cap.
-    let glob (root: string) (pattern: string) (maxEntries: int) : Result<JsGlobListing, JsFailure> =
+    /// JS-007: gitignore-style glob. Full deterministic enumeration — no
+    /// internal bound. An oversized result is tail-kept once, by the Host
+    /// tool-result bound at the final boundary.
+    let glob (root: string) (pattern: string) : Result<JsGlobListing, JsFailure> =
         match compileUserPatterns pattern with
         | Error failure -> Error failure
         | Ok matchers ->
-            let cap = max maxEntries 0
-            let collectCap = min 8192 (max cap (cap * 8 + 8))
-            let files, walkTruncated = collectVisibleFiles root collectCap 100000
+            let files = collectVisibleFiles root
             let matched = ResizeArray<string>()
 
             for rel in files do
                 if Array.exists (fun re -> regexTest re rel) matchers then
                     matched.Add(rel)
 
-            let sorted = matched |> Seq.toList |> List.sort
-            let truncated = walkTruncated || sorted.Length > cap
-
-            Ok
-                { Paths = List.truncate cap sorted
-                  Truncated = truncated }
+            Ok { Paths = matched |> Seq.toList |> List.sort }

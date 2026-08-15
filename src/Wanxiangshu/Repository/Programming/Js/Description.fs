@@ -149,18 +149,6 @@ module JsCanonicalDescription =
         let ReasonRunUnimplemented = "tool/js-program/reason-run-unimplemented"
 
         [<Literal>]
-        let UltraCoderTruncated = "tool/js-program/ultra-coder-truncated"
-
-        [<Literal>]
-        let UltraInspectorTruncated = "tool/js-program/ultra-inspector-truncated"
-
-        [<Literal>]
-        let UltraReviewerTruncated = "tool/js-program/ultra-reviewer-truncated"
-
-        [<Literal>]
-        let UltraBrowserTruncated = "tool/js-program/ultra-browser-truncated"
-
-        [<Literal>]
         let ArgProgram = "tool/js-program/arg-program"
 
         [<Literal>]
@@ -203,11 +191,7 @@ module JsCanonicalDescription =
           ReasonUnknownAnchor: string
           ReasonInvalidSlice: string
           ReasonFileReadFailed: string
-          ReasonRunUnimplemented: string
-          UltraCoderTruncated: string
-          UltraInspectorTruncated: string
-          UltraReviewerTruncated: string
-          UltraBrowserTruncated: string }
+          ReasonRunUnimplemented: string }
 
     let private fill (template: string) (pairs: (string * string) list) =
         let replaced =
@@ -480,7 +464,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                       """  async glob(pattern) {
     const result = this._api.js.glob(pattern);
     {{rethrow_host}}
-    return { paths: result.paths, truncated: result.truncated === true };
+    return { paths: result.paths };
   }"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Grep then
@@ -489,7 +473,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   async grep(needle, pattern = "**/*") {
     const result = this._api.js.grep(needle, pattern);
     {{rethrow_host}}
-    return { matches: result.matches, truncated: result.truncated === true };
+    return { matches: result.matches };
   }"""
                       [ "rethrow_host", rethrowHost ]
                   |> fun s -> s.TrimStart('\n')
@@ -563,12 +547,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
         String.concat "\n\n" blocks
 
-    let private coderUltra (prose: Prose) =
-        fill
-            """class Js extends JsProgram {
+    let private coderUltra =
+        """class Js extends JsProgram {
   async run() {
     const refs = await this.grep(/\boldApi\b/, "{src,tests}/**/*.{js,ts}");
-    if (refs.truncated) throw new Error("{{ultra_coder_truncated}}");
     const paths = [...new Set(refs.matches.map(x => x.path))];
     const core = await this.file("src/api.js", [
       ["definition", "afterDefinition", /const oldApi = buildApi\(\);/],
@@ -593,18 +575,15 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return { migrated: `oldApi → newApi`, referencesObserved: refs.matches.length };
   }
 }"""
-            [ "ultra_coder_truncated", prose.UltraCoderTruncated ]
 
-    let private inspectorUltra (prose: Prose) =
-        fill
-            """class Js extends JsProgram {
+    let private inspectorUltra =
+        """class Js extends JsProgram {
   async run() {
     const declarations = await this.grep(/\b(?:type|module)\s+RetryPolicy\b/, "src/**/*.fs");
-    if (declarations.truncated) return { incomplete: true, reason: "{{ultra_inspector_truncated}}" };
     const paths = [...new Set(declarations.matches.map(x => x.path))];
     if (paths.length === 0) {
       const usages = await this.grep(/\bRetryPolicy\b/, "{src,tests}/**/*.fs");
-      return { declarations: [], usages: usages.matches, truncated: usages.truncated };
+      return { declarations: [], usages: usages.matches };
     }
     const evidence = await Promise.all(paths.map(async path => {
       try {
@@ -618,14 +597,11 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return { declarations: declarations.matches, evidence };
   }
 }"""
-            [ "ultra_inspector_truncated", prose.UltraInspectorTruncated ]
 
-    let private reviewerUltra (prose: Prose) =
-        fill
-            """class Js extends JsProgram {
+    let private reviewerUltra =
+        """class Js extends JsProgram {
   async run() {
     const stale = await this.grep(/\boldApi\b/, "src/**/*.{js,ts}");
-    if (stale.truncated) return { incomplete: true, reason: "{{ultra_reviewer_truncated}}" };
     if (stale.matches.length > 0) {
       const paths = [...new Set(stale.matches.map(x => x.path))].slice(0, 6);
       const evidence = await Promise.all(paths.map(async path => {

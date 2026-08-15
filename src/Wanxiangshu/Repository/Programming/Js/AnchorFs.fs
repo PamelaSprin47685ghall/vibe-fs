@@ -114,9 +114,7 @@ module JsAnchorFs =
           Column: int
           Text: string }
 
-    type JsGrepListing =
-        { Matches: JsGrepHit list
-          Truncated: bool }
+    type JsGrepListing = { Matches: JsGrepHit list }
 
     /// 每行起始偏移索引。lineOffsets[0]=0；每个 '\n' 之后紧跟下一行起始。
     /// 只认 '\n'（不做 CRLF 修正），与历史 lineColumn 计法一致。
@@ -165,52 +163,41 @@ module JsAnchorFs =
         with _ ->
             []
 
-    /// JS-020: Host grep over gitignore-selected UTF-8 files.
-    let grep (root: string) (spec: AnchorSpec) (pattern: string) (maxMatches: int) : Result<JsGrepListing, JsFailure> =
+    /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
+    /// no internal bound; the Host tool-result bound tail-keeps the tail.
+    let grep (root: string) (spec: AnchorSpec) (pattern: string) : Result<JsGrepListing, JsFailure> =
         let globPattern =
             if System.String.IsNullOrEmpty pattern then
                 "**/*"
             else
                 pattern
 
-        let cap = max maxMatches 0
-
-        match JsGlobFs.glob root globPattern 4096 with
+        match JsGlobFs.glob root globPattern with
         | Error failure -> Error failure
         | Ok listing ->
             let acc = ResizeArray<JsGrepHit>()
-            // DSL-MUTABLE: resource — grep match truncation latch
-            let mutable truncated = listing.Truncated
 
             for rel in listing.Paths do
-                if acc.Count >= cap then
-                    truncated <- true
-                else
-                    match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
-                    | Error _ -> ()
-                    | Ok text ->
-                        let offsets = lineOffsets text
+                match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
+                | Error _ -> ()
+                | Ok text ->
+                    let offsets = lineOffsets text
 
-                        let hits =
-                            match spec with
-                            | AnchorSpec.Exact needle -> exactHits text needle
-                            | AnchorSpec.Regex source -> regexHits text source
+                    let hits =
+                        match spec with
+                        | AnchorSpec.Exact needle -> exactHits text needle
+                        | AnchorSpec.Regex source -> regexHits text source
 
-                        for (index, matched) in hits do
-                            if acc.Count >= cap then
-                                truncated <- true
-                            else
-                                let line, column = lineColumn offsets index
+                    for (index, matched) in hits do
+                        let line, column = lineColumn offsets index
 
-                                acc.Add
-                                    { Path = rel
-                                      Line = line
-                                      Column = column
-                                      Text = matched }
+                        acc.Add
+                            { Path = rel
+                              Line = line
+                              Column = column
+                              Text = matched }
 
-            Ok
-                { Matches = List.ofSeq acc
-                  Truncated = truncated }
+            Ok { Matches = List.ofSeq acc }
 
     /// JS-006: ordered string/RegExp anchor matching. `occurrence` is 1-based.
     /// Returns (start, end); zero-width matches yield start = end.

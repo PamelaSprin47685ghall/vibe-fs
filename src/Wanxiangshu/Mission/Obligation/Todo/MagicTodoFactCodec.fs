@@ -115,19 +115,30 @@ module MagicTodoFactCodec =
                 )
             | other -> failwith ("unknown PrefixEvidenceKind: " + other))
 
-    /// PayloadRef a BlobRef names: the local content-address under the "blobs/" prefix.
-    let payloadRefOfBlobRef (ref: BlobRef) : PayloadRef =
+    /// A blob handle is an EventStore payload reference only when it is the
+    /// content address (lowercase sha256 hex) the store names files by. Anything
+    /// else — a test placeholder or malformed data — is not a payload dependency.
+    let private payloadRefOfContentAddress (value: string) : PayloadRef option =
+        let isHex c = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+
+        if value.Length = 64 && value |> Seq.forall isHex then
+            Some(PayloadRef.create value)
+        else
+            None
+
+    /// PayloadRef a BlobRef names ("blobs/<sha256>"); None when not content-addressed.
+    let payloadRefOfBlobRef (ref: BlobRef) : PayloadRef option =
         let value = BlobRef.value ref
         let prefix = "blobs/"
 
         if value.StartsWith(prefix, System.StringComparison.Ordinal) then
-            PayloadRef.create (value.Substring(prefix.Length))
+            payloadRefOfContentAddress (value.Substring(prefix.Length))
         else
-            PayloadRef.create value
+            None
 
-    /// PayloadRef a BlobDigest names: sha256 of the payload bytes == store filename.
-    let payloadRefOfBlobDigest (digest: BlobDigest) : PayloadRef =
-        PayloadRef.create (BlobDigest.value digest)
+    /// PayloadRef a BlobDigest names (sha256 of the payload bytes); None when not content-addressed.
+    let payloadRefOfBlobDigest (digest: BlobDigest) : PayloadRef option =
+        payloadRefOfContentAddress (BlobDigest.value digest)
 
     /// Unified payload closure of one MagicTodo fact: every EventStore payload it
     /// references, so the envelope `payload_refs` field is authoritative rather
@@ -135,24 +146,33 @@ module MagicTodoFactCodec =
     let payloadRefs (fact: MagicTodoFact) : PayloadRef list =
         match fact with
         | MagicTodoFact.TodoWritePrepared p ->
-            [ payloadRefOfBlobRef p.BaseTodoRef
-              payloadRefOfBlobDigest p.BaseTodoDigest
-              payloadRefOfBlobRef p.ProposedTodoRef
-              payloadRefOfBlobDigest p.ProposedTodoDigest ]
+            List.choose
+                id
+                [ payloadRefOfBlobRef p.BaseTodoRef
+                  payloadRefOfBlobDigest p.BaseTodoDigest
+                  payloadRefOfBlobRef p.ProposedTodoRef
+                  payloadRefOfBlobDigest p.ProposedTodoDigest ]
         | MagicTodoFact.TodoReviewConcluded p ->
-            [ payloadRefOfBlobRef p.WorkRecordRef
-              payloadRefOfBlobDigest p.WorkRecordDigest
-              payloadRefOfBlobRef p.SettledTodoRef
-              payloadRefOfBlobDigest p.SettledTodoDigest ]
-        | MagicTodoFact.DedicatedTodoReviewerReplaced p -> [ payloadRefOfBlobRef p.EvidenceRef ]
+            List.choose
+                id
+                [ payloadRefOfBlobRef p.WorkRecordRef
+                  payloadRefOfBlobDigest p.WorkRecordDigest
+                  payloadRefOfBlobRef p.SettledTodoRef
+                  payloadRefOfBlobDigest p.SettledTodoDigest ]
+        | MagicTodoFact.DedicatedTodoReviewerReplaced p ->
+            List.choose id [ payloadRefOfBlobRef p.EvidenceRef ]
         | MagicTodoFact.LegacyTodoSeedAdopted p ->
-            [ payloadRefOfBlobRef p.SeedTodoRef
-              payloadRefOfBlobDigest p.SeedTodoDigest ]
+            List.choose
+                id
+                [ payloadRefOfBlobRef p.SeedTodoRef
+                  payloadRefOfBlobDigest p.SeedTodoDigest ]
         | MagicTodoFact.PrefixRebaseCommittedV2 p ->
-            [ payloadRefOfBlobRef p.FrozenRecordPrefixRef
-              payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
-            @ (p.YBundleRef |> Option.toList |> List.map payloadRefOfBlobRef)
-            @ (p.YBundleDigest |> Option.toList |> List.map payloadRefOfBlobDigest)
+            List.choose
+                id
+                [ payloadRefOfBlobRef p.FrozenRecordPrefixRef
+                  payloadRefOfBlobDigest p.FrozenRecordPrefixDigest ]
+            @ (p.YBundleRef |> Option.toList |> List.choose payloadRefOfBlobRef)
+            @ (p.YBundleDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
         | _ -> []
 
     /// Encode one Magic Todo fact as a tagged JSON object (case name + fields).
