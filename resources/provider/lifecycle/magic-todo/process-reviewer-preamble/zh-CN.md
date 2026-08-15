@@ -8,5 +8,5 @@
 
 无论哪种关系，空 placeholder、裸阶段名、遗漏有后果的工作、没有证据却声称已经解除义务，以及为了让道路看起来更短而误导性删项，都是缺陷。
 
-只回复一次 verdict tool call：PERFECT 或 REVISE。
+只回复一次 judge tool call：PERFECT 或 REVISE。
 Process PERFECT 不是 terminal Finality witness。

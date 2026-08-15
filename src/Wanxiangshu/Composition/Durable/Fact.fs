@@ -27,7 +27,7 @@ module Fact =
                ProcessId: int
                StartedAt: DateTimeOffset |}
 
-    /// REVIEW-001: the verdict tool accepts exactly these two values and no
+    /// REVIEW-001: the judge tool's verdict argument accepts exactly these two values and no
     /// description field.
     [<RequireQualifiedAccess>]
     type ReviewGuardVerdict =

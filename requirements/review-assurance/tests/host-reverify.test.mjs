@@ -28,9 +28,11 @@ import {
 test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
   let live
   let barrierVisibleAtSend = false
+  let reviewPrompt = ''
   live = await liveOrchestrator({
     sessionBehaviour: {
-      onSendPrompt: (reviewerId) => {
+      onSendPrompt: (reviewerId, prompt) => {
+        reviewPrompt = prompt
         const reviewerKey = reviewerId?.fields?.[0] ?? reviewerId
         const projection = mapEntries(agentJournal.snapshot(live.journal).AgentProjections.Sessions)
           .find(([sid]) => (sid?.fields?.[0] ?? sid) === reviewerKey)?.[1]
@@ -51,6 +53,8 @@ test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async (
     )
     assert.equal(result.ok, false, 'probe intentionally fails the transport after observing send order')
     assert.equal(barrierVisibleAtSend, true, 'reviewer provider lane must not start before ReviewBarrierStarted is durable')
+    assert.match(reviewPrompt, /judge tool/, 'orchestrator review must use the shared Reviewer opening resource')
+    assert.doesNotMatch(reviewPrompt, /verdict tool/, 'orchestrator review must not retain the removed hard-coded tool name')
   } finally {
     live.cleanup()
     rmSync(worktree, { recursive: true, force: true })

@@ -82,8 +82,10 @@ module SharedState =
     /// reservations. Root and worktree plugin instances each own a journal
     /// (distinct RuntimeId) and a per-scope NudgeSent set; keying a reservation
     /// by RuntimeId made the "process-wide" lock miss its twin, so the same
-    /// ReviewerVerdictRequired prose was always delivered twice. Session +
-    /// continuation kind + occasion + reason — never RuntimeId.
+    /// ReviewerVerdictRequired prose was always delivered twice. Missing-verdict
+    /// identity is session + durable ReviewBarrierId — never RuntimeId and never
+    /// the provider run that merely observed the missing judge. Confirmation is
+    /// session + the first PERFECT provider run whose challenge is outstanding.
     let ReviewGuardNudgeGate = obj ()
     let ReviewGuardNudges = HashSet<string>()
 

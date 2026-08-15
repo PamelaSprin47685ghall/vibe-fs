@@ -33,7 +33,7 @@ type ReviewHostPort =
 /// semantic decision of when a verdict/challenge must be ensured; Infrastructure
 /// owns transport dedupe and Host delivery.
 type ReviewerContinuationPort =
-    { NudgeMissingVerdict: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>>
+    { NudgeMissingVerdict: SessionId -> Task<Result<unit, string>>
       SendPerfectChallenge: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>> }
 
 /// HOST-021 / TODO-006: Host-owned process-review ensure and lag-1 wait.

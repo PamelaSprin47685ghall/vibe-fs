@@ -246,12 +246,7 @@ module ReviewerWorkflow =
         | ReviewerEvidence.Need.EnsureVerdictSubmitted ->
             task {
                 let! outcome =
-                    ReviewerContinuation.ensureVerdictSubmitted
-                        continuationPort
-                        journal
-                        turn.SessionId
-                        turn.ProviderRun
-                        reviewerKey
+                    ReviewerContinuation.ensureVerdictSubmitted continuationPort journal turn.SessionId reviewerKey
 
                 reportContinuationFailure eventPort turn.SessionId outcome
             }

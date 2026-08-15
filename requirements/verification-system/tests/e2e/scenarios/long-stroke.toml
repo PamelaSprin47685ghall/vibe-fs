@@ -584,6 +584,7 @@ id = "manager-finality-revise"
 internal = true
 user = "# Review the current worktree against all authoritative user requirements."
 tools = ["judge"]
+forbiddenTools = ["glob", "grep", "read"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "REVISE" } }
@@ -637,7 +638,7 @@ tools = ["write"]
 [[turn]]
 id = "barrier-reviewer"
 internal = true
-user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
+user = "# Review the current worktree against all authoritative user requirements."
 tools = ["glob", "grep", "read", "judge"]
 
   [[turn.step]]

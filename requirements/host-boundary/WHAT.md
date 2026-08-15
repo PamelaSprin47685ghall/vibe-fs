@@ -135,6 +135,9 @@ closed。禁止用 after 的 callID 与别处 messageID 猜测配对；禁止使
 禁止「读取 → await → 按旧值回写」RMW（HOST-012 C2）。
 `ReviewGuardNudges` 的 key **不得**含 RuntimeId（每实例 Journal 各有 RuntimeId；含之则
 root/worktree 双实例对同一 missing-verdict occasion 各发一次 `ReviewerVerdictRequired`）。
+missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用触发观察的
+`ProviderRunIdentity`：同一 review requirement 可被两个实例在不同 provider run 上并发观察，
+但物理 repair 仍只允许一次。无 open barrier 时不得发送未定域的 reviewer repair。
 
 **含义/动机**：第二 worktree 实例读不到主实例 verdict 是实测边界（why/host.md §7）；
 共享 Journal writer 会折叠写盘。

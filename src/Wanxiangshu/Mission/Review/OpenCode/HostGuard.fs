@@ -77,6 +77,26 @@ module HostReviewGuard =
         | NoLongerRequired
         | Failed of reason: string
 
+    /// Identity of one Reviewer guard continuation. Missing-verdict is scoped to
+    /// the durable review requirement (barrier), never to whichever provider run
+    /// happened to expose the missing judge. Confirmation is scoped to the first
+    /// PERFECT provider run whose challenge must be consumed.
+    [<RequireQualifiedAccess>]
+    type private GuardNudgeOccasion =
+        | MissingVerdict of ReviewBarrierId
+        | PerfectConfirmation of ProviderRunIdentity
+
+    let private kindForOccasion =
+        function
+        | GuardNudgeOccasion.MissingVerdict _ -> PromptAuthority.ContinuationKind.ReviewerGuard
+        | GuardNudgeOccasion.PerfectConfirmation _ -> PromptAuthority.ContinuationKind.ReviewConfirmation
+
+    let private occasionIdentity =
+        function
+        | GuardNudgeOccasion.MissingVerdict barrierId -> "barrier:" + ReviewBarrierId.value barrierId
+        | GuardNudgeOccasion.PerfectConfirmation providerRun ->
+            "perfect-run:" + ProviderRunIdentity.value providerRun
+
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
     /// Derived from PROMPT-005 `PendingClaims` on the *calling* instance journal.
@@ -94,34 +114,32 @@ module HostReviewGuard =
             |> Map.exists (fun _ claim -> claim.Origin = PromptAuthority.PromptOrigin.Continuation kind))
         |> Option.defaultValue false
 
-    /// HOST-012: session-scoped reservation identity. Never RuntimeId — each
-    /// plugin instance has its own journal RuntimeId; including it made the
-    /// shared lock miss the twin instance and double-delivered ReviewerVerdictRequired.
-    let private guardNudgeKey
-        (targetSessionId: SessionId)
-        (kind: PromptAuthority.ContinuationKind)
-        (dedupeOccasion: string)
-        (reason: string)
-        =
-        let kindLabel =
-            match kind with
-            | PromptAuthority.ContinuationKind.ReviewConfirmation -> "confirm"
-            | PromptAuthority.ContinuationKind.ReviewerGuard -> "guard"
-            | _ -> "other"
-
+    /// HOST-012: session-scoped reservation identity. Never RuntimeId and never
+    /// the provider run that merely observed a missing verdict. Root/worktree
+    /// instances can observe different provider runs for the same barrier; the
+    /// barrier is the durable review requirement and therefore the idempotency key.
+    let private guardNudgeKey (targetSessionId: SessionId) (occasion: GuardNudgeOccasion) =
         sprintf
-            "review-guard:%s:%s:%s:%s"
+            "review-guard:%s:%s"
             (SessionId.value targetSessionId)
-            kindLabel
-            dedupeOccasion
-            reason
+            (occasionIdentity occasion)
+
+    let private currentBarrier (journal: AgentJournal) (targetSessionId: SessionId) =
+        AgentProjection.tryFind targetSessionId (AgentJournal.snapshot journal).AgentProjections
+        |> Option.bind (fun session -> session.ReviewGuard)
+        |> Option.bind (fun guard -> guard.CurrentBarrierId)
 
     let private sessionDirectory (sessionId: SessionId) =
         match SharedState.SessionDirectories.TryGetValue(SessionId.value sessionId) with
         | true, dir -> Some dir
         | false, _ -> None
 
-    let private tryReserve (nudgeKey: string) (journal: AgentJournal) (targetSessionId: SessionId) (kind: PromptAuthority.ContinuationKind) =
+    let private tryReserve
+        (nudgeKey: string)
+        (journal: AgentJournal)
+        (targetSessionId: SessionId)
+        (kind: PromptAuthority.ContinuationKind)
+        =
         lock SharedState.ReviewGuardNudgeGate (fun () ->
             if
                 hasOutstandingGuardClaim journal targetSessionId kind
@@ -139,16 +157,15 @@ module HostReviewGuard =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (targetSessionId: SessionId)
-        (dedupeOccasion: string)
-        (reason: string)
+        (occasion: GuardNudgeOccasion)
         (prompt: string)
-        (continuationKind: PromptAuthority.ContinuationKind)
         : Task<GuardNudgeOutcome> =
         task {
             match journal with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
             | Some durable ->
-                let nudgeKey = guardNudgeKey targetSessionId continuationKind dedupeOccasion reason
+                let continuationKind = kindForOccasion occasion
+                let nudgeKey = guardNudgeKey targetSessionId occasion
 
                 // Synchronous check+reservation is the atomic point. Rejected /
                 // dead-worktree / Failed releases; admitted/unknown keeps it
@@ -189,16 +206,22 @@ module HostReviewGuard =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (triggerProviderRun: ProviderRunIdentity)
-        =
-        sendGuardNudge
-            sessionPort
-            journal
-            sessionId
-            (ProviderRunIdentity.value triggerProviderRun)
-            "missing-verdict"
-            (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-            PromptAuthority.ContinuationKind.ReviewerGuard
+        : Task<GuardNudgeOutcome> =
+        task {
+            match journal with
+            | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
+            | Some durable ->
+                match currentBarrier durable sessionId with
+                | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an open review barrier"
+                | Some barrierId ->
+                    return!
+                        sendGuardNudge
+                            sessionPort
+                            journal
+                            sessionId
+                            (GuardNudgeOccasion.MissingVerdict barrierId)
+                            (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+        }
 
     /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only
     /// makes the Host start the next provider request; the confirmation itself comes
@@ -253,10 +276,8 @@ module HostReviewGuard =
             sessionPort
             journal
             sessionId
-            (ProviderRunIdentity.value triggerProviderRun)
-            "confirm-perfect"
+            (GuardNudgeOccasion.PerfectConfirmation triggerProviderRun)
             (reviewChallengeVisibleBytes sessionId)
-            PromptAuthority.ContinuationKind.ReviewConfirmation
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
@@ -265,9 +286,9 @@ module HostReviewGuard =
         (journal: AgentJournal option)
         : ReviewerContinuationPort =
         { NudgeMissingVerdict =
-            fun sessionId providerRun ->
+            fun sessionId ->
                 task {
-                    let! _ = nudgeReviewer sessionPort journal sessionId providerRun
+                    let! _ = nudgeReviewer sessionPort journal sessionId
                     // Preserve existing boundary: missing-verdict send failure was
                     // not terminal; the next durable observation may re-enter.
                     return Ok()

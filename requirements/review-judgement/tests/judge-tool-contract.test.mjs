@@ -73,6 +73,22 @@ test('REVIEW_001_tool_spec_exposes_judge_with_a_single_verdict_argument', () => 
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
+test('REVIEW_001_reviewer_provider_instructions_name_judge_never_the_removed_verdict_tool', () => {
+  const reviewerInstructionPaths = [
+    'runtime/reviewer-verdict-required',
+    'lifecycle/magic-todo/process-reviewer-preamble',
+    'lifecycle/host-review/opening',
+  ]
+
+  for (const language of [providerLanguage.english, providerLanguage.simplifiedChinese]) {
+    for (const path of reviewerInstructionPaths) {
+      const text = providerResources.readText(language, path)
+      assert.match(text, /judge/, `${path} must name the actual judge tool`)
+      assert.doesNotMatch(text, /verdict tool|verdict 工具/i, `${path} must not name the removed verdict tool`)
+    }
+  }
+})
+
 test('REVIEW_001_receipt_does_not_echo_the_verdict', () => {
   // The success receipt is a fixed sentence. It carries no verdict value, so a
   // reviewer cannot learn "what the system recorded" from the tool result — the

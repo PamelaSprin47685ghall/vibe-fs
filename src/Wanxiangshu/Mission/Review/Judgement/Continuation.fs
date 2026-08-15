@@ -26,21 +26,23 @@ open Wanxiangshu.Foundation.Identity
 /// is still open. Physical Host delivery is an injected port.
 module ReviewerContinuation =
 
-    /// Ensure a reviewer who has not yet used the verdict tool receives the
-    /// missing-verdict nudge exactly once. Closed continuation capability is a
-    /// no-op (Finality may have revoked the challenge after a sibling REVISE).
+    /// Ensure a reviewer who has not yet called `judge` receives the
+    /// missing-verdict nudge exactly once for the current review requirement.
+    /// The occasion identity is resolved by the Host from the durable barrier;
+    /// a provider run is deliberately not part of this capability. Closed
+    /// continuation capability is a no-op (Finality may have revoked the
+    /// challenge after a sibling REVISE).
     let ensureVerdictSubmitted
         (port: ReviewerContinuationPort)
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
         (reviewerKey: string)
         : Task<Result<unit, string>> =
         task {
             if not (ReviewerEvidence.continuationOpen journal reviewerKey) then
                 return Ok()
             else
-                return! port.NudgeMissingVerdict sessionId providerRun
+                return! port.NudgeMissingVerdict sessionId
         }
 
     /// Ensure a first PERFECT awaiting confirmation receives the challenge

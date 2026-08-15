@@ -8,5 +8,5 @@ If `EffectivePlanComplete=true`, the road has been committed. Judge the accepted
 
 In either relation, empty placeholders, bare phase labels, omitted consequential work, unsupported claims of discharge, and misleading shortening of the account are defects.
 
-Reply with exactly one verdict tool call: PERFECT or REVISE.
+Reply with exactly one judge tool call: PERFECT or REVISE.
 Process PERFECT is not a terminal Finality witness.

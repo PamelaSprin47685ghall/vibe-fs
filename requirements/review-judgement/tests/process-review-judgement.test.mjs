@@ -58,7 +58,8 @@ test('REVIEW_013_process_preamble_commands_exactly_one_verdict_and_disclaims_ter
   // One judgement, one tool call. Process PERFECT is explicitly NOT a terminal
   // Finality witness (REVIEW-020 / GLORY-058 boundary, asserted from the
   // judgement side here; the counting algebra lives in review-assurance).
-  assert.match(preamble, /Reply with exactly one verdict tool call: PERFECT or REVISE\./)
+  assert.match(preamble, /Reply with exactly one judge tool call: PERFECT or REVISE\./)
+  assert.doesNotMatch(preamble, /verdict tool/, 'process review must name the real judge tool, never the removed verdict tool')
   assert.match(preamble, /Process PERFECT is not a terminal Finality witness\./)
 
   // The process surface must not leak the Finality confirmation machinery.

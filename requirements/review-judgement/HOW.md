@@ -16,6 +16,7 @@
   - `reviewerVerdictOfString`：唯一解析器，`"PERFECT" → Ok Perfect`、`"REVISE" → Ok Revise`、其它 → `Error`。刻意独立于 assistant 文本：verdict 是工具参数，绝不从 transcript 推断。
   - `reviewerVerdictSchemaJson`：`additionalProperties: false` + `required: ["verdict"]`——从 schema 层杜绝描述字段（REVIEW-JUDGEMENT-001 的可执行证据）。
 - 工具注册表（`ToolRegistry`）把 `judge` 挂到 Reviewer 工具面（旧名 `verdict` 无 alias）。
+- Reviewer-facing 操作指令（`runtime/reviewer-verdict-required`、`lifecycle/magic-todo/process-reviewer-preamble`、`lifecycle/host-review/opening`）必须显式命名 `judge`。把 verdict 参数名误写成工具名会制造自激 repair loop：Reviewer 只能产 prose → Host 仍观察不到 durable judge → 新 provider run 再收到同一 missing-verdict nudge。
 
 ### 2. 判断哲学载体：Role Law + Examiner's Ledger
 

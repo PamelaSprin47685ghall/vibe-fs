@@ -71,9 +71,8 @@ module OrchestratorHostReview =
     /// inferred.
     let DeepReviewerAgent = ManagedAgent.nameOf AgentTier.Deep Role.Reviewer
 
-    [<Literal>]
-    let private OpeningPrompt =
-        "Review the current worktree for correctness. Submit your verdict with the verdict tool."
+    let private openingPrompt (managerSessionId: SessionId) =
+        ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty
 
     /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
     ///
@@ -97,7 +96,7 @@ module OrchestratorHostReview =
                 GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
 
             let host: ReviewHostPort =
-                { ForkReviewer = fun () -> forkReviewer jobId worktree OpeningPrompt
+                { ForkReviewer = fun () -> forkReviewer jobId worktree (openingPrompt managerSessionId)
                   AwaitReviewer = fun () -> awaitReviewer jobId }
 
             let! outcome = ReviewBarrierWorkflow.reverify journal host managerSessionId barrierId tree
