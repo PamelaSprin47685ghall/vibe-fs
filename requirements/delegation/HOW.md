@@ -12,13 +12,26 @@
 | `commission` | Orchestrator | 独立集成之路；calling 在场=新路，缺省=续做；可选 tool-call estimate | `Application/Orchestration/*.fs`、`Infrastructure/Git/WorktreeResource.fs` |
 | `inspect` / `establish-behavior` / `repair-behavior` | SyncDelegate callers | 同步委托；普通 completion → bounded WorkRecord；可选 tool-call estimate | `Session/{SyncDelegateRuntime,SyncDelegateWorkflow,SyncDelegateWait,SyncDelegateCallStore}.fs` |
 
+### fork child 首 prompt：CommissionerRecord / Attachment（DELEG-019 / DELEG-021）
+
+`ForkChildPayload.render`（`src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs`）：
+
+- **instructions**：Assignment + Base +（可选）CommissionerRecord *instruction* +（可选）Attachment
+  *instruction* +（可选）Requirements *instruction*。
+- **body**：可选 `content` 字段 → **CommissionerRecord LWR 原文 prose** → **Attachment LWR 原文 prose** →
+  `[[root_requirement]]` table array。
+
+LWR 以整块 body prose 进入文档，**不得** `record.Split('\n')` 后再塞进 `instructions`
+（那会经 `SyntheticToml.document` → `comment` 变成 `# Opening` / `# Chronicle`）。段标题纯文本合同属
+`work-record`；本包只负责不要在委派 envelope 上二次加 `# `。
+
 ### fork attachment（DELEG-021）
 
 `attach` 在 parent `HandleProjection` 以 Byname 定位 sibling/retired child，再调用唯一
-`LifecycleWorkRecord(includeOpening=true)` projector。`ForkChildPayload` 只接收 `Attachment: string option`
-并在 `commissioner_record` 后、requirements 前渲染 `attached_work_record` data block；不解析 LWR、
-不复制 Journal projection。new fork 与 idle reuse 可物化；busy reuse 不物化，只返回自然语言 deferred
-说明。unknown/self 在任何 send 前拒绝。
+`LifecycleWorkRecord(includeOpening=true)` projector。`ForkChildPayload` 只接收 `Attachment: string option`，
+在 CommissionerRecord prose 之后、`[[root_requirement]]` 之前放入 attachment LWR body prose；不解析 LWR、
+不复制 Journal projection、不发明 `attached_work_record` 字段。new fork 与 idle reuse 可物化；busy reuse
+不物化，只返回自然语言 deferred 说明。unknown/self 在任何 send 前拒绝。
 
 ### delegated tool estimate（DELEG-022）
 

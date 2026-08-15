@@ -85,10 +85,10 @@ module ForkChildPayload =
                  [ assignmentText ])
             @ prose.Base
             @ (match commissionerRecord with
-               | Some record -> [ prose.CommissionerRecord ] @ (record.Split('\n') |> Array.toList)
+               | Some _ -> [ prose.CommissionerRecord ]
                | None -> [])
             @ (match attachment with
-               | Some record -> [ prose.Attachment ] @ (record.Split('\n') |> Array.toList)
+               | Some _ -> [ prose.Attachment ]
                | None -> [])
             @ (if List.isEmpty requirements then
                    []
@@ -100,6 +100,16 @@ module ForkChildPayload =
              | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
                  [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
              | _ -> [])
+            // Commissioner / attachment history as ordinary WorkRecord prose in the
+            // ARCH-010 body (DELEG-019/021). Do NOT Split into instructions: that
+            // would become `# Opening` / `# Chronicle` via SyntheticToml.comment.
+            // Do NOT wrap as opaque TOML fields (historical parent_work_record).
+            @ (match commissionerRecord with
+               | Some record -> [ record ]
+               | None -> [])
+            @ (match attachment with
+               | Some record -> [ record ]
+               | None -> [])
             @ (requirements
                |> List.mapi (fun index text ->
                    SyntheticToml.tableArrayEntry

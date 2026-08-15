@@ -239,15 +239,32 @@ advice 的 prompt 渲染 → `provider-projection` + `prefix-stability`；「何
 
 ## DELEG-019：fork child 首 prompt 是 typed 语义载荷，不是自由文本
 
-fork child 首 prompt 由 `ForkChildAssignment { Assignment; CommissionerRecord; RootRequirements; Payload }`
-类型化渲染（`Domain/ForkChildPayload.fs`）：Assignment 是任务（instruction），其余是 child 可读但不得
+fork child 首 prompt 由 `ForkChildAssignment { Assignment; CommissionerRecord; Attachment; RootRequirements; Payload }`
+类型化渲染（`Execution/Delegation/Fork/Payload.fs`）：Assignment 是任务（instruction），其余是 child 可读但不得
 误认为任务的 context（data）。`Charge`（语义 assignment）与 `ProviderPrompt`（实际发给 provider 的字节）
 是两个概念：无 warm-start 时字节相同；有 keywords 时只 enrich `ProviderPrompt`。禁止解析 rendered TOML
 反推 Charge（EXEC-031/032、ARCH-010/011）。
 
-含义/动机：类型化载荷让「任务」与「背景」在源码层可分，渲染器不猜测 instruction/data 分界。
+**CommissionerRecord / Attachment 的 wire 形态（硬约束，禁止再回归）：**
 
-证据：MOVE `tests/fork-child-payload.test.mjs`（`FORK_CHILD_PAYLOAD_*` 全组）。
+1. 解释性说明（「这是 Commissioner 的历史 / 这是附件背景」）可以进 ARCH-010 **instruction header**（`# …`）。
+2. **canonical `LifecycleWorkRecord` 正文本身必须作为 ordinary WorkRecord prose 进入 ARCH-010 body**——段标题保持
+   纯文本 `Opening` / `Chronicle` / `Recent work`（`work-record` 物化合同）。
+3. **禁止**把 LWR 按行 `Split` 进 `instructions` 再经 `SyntheticToml.comment` 逐行加 `# `（否则子 session 会看到
+   `# Opening` / `# Chronicle`，把背景记录误读成指令骨架）。
+4. **禁止**把 LWR 封进 opaque TOML 字段（历史 `parent_work_record = """…"""` / 同类信封）。
+
+历史事故：`9d6cf339` 在角色 prompt 迁移提交里旁路把 CommissionerRecord 从 body prose 挪进 instruction comments，
+测试期望被一并改写，回归静默通过。本条款把该形态永久定为非法。
+
+含义/动机：类型化载荷让「任务」与「背景」在源码层可分，渲染器不猜测 instruction/data 分界；LWR 是 bounded
+work statement，不是第二套 instruction header。
+
+证据：MOVE `tests/fork-child-payload.test.mjs`
+（`FORK_CHILD_PAYLOAD_commissioner_record_is_prose_with_instruction`、
+`FORK_CHILD_PAYLOAD_commissioner_lwr_stays_body_prose_not_hashed_instructions`、
+`FORK_CHILD_PAYLOAD_*` 全组）；REUSE `tests/handle-exe008-child-background.test.mjs`
+（`EXEC_008_child_background_uses_latest_durable_snapshot`）。
 
 ## DELEG-020：委托语义不依赖当前工具名
 
@@ -262,7 +279,9 @@ fork child 首 prompt 由 `ForkChildAssignment { Assignment; CommissionerRecord;
 ## DELEG-021：fork attachment 只附背景，不转移 charge / authority
 
 `fork(..., attach?)` 可把同一 mission 内另一已知 person 的 canonical
-`LifecycleWorkRecord(includeOpening=true)` 作为 `attached_work_record` 放进被委托者的新 work-unit 首 prompt。
+`LifecycleWorkRecord(includeOpening=true)` 作为 **ordinary WorkRecord prose** 放进被委托者的新 work-unit 首 prompt
+（与 DELEG-019 的 CommissionerRecord 同形态：instruction 只命名「这是附件背景」，LWR 正文进 body，
+**禁止** `# Opening` 式逐行 comment，**禁止** opaque `attached_work_record` 字段信封）。
 `attach` 只接受 parent handle projection 中可按 Byname 解析的 person；不接受任意 Host SessionId。
 attachment 是 data，不是 assignment：不改变本次 `charge`，不把附件中的未竟工作变成被委托者义务，
 不复制附件 person 的 Persona / authority / runtime topology。
@@ -275,7 +294,11 @@ warm-start role gate 不适用于 attachment。V1 只有单个 `attach: string`�
 含义/动机：附件解决“把另一人的已知工作当背景交给新 witness”而不制造 charge 合并、任务转移或
 Session clone。canonical LWR 是唯一可跨 participant 携带的 bounded work statement。
 
-证据：GAP-011；`requirements/delegation/tests/fork-attachment.test.mjs`。
+证据：GAP-011；`requirements/delegation/tests/fork-attachment.test.mjs`
+（`DELEG_021_attachment_is_background_between_commissioner_and_requirements`、
+`DELEG_021_attachment_lwr_stays_body_prose_not_hashed_instructions`、
+`DELEG_021_blank_attachment_is_absent_not_an_empty_section`、
+`DELEG_021_attachment_text_cannot_replace_the_assignment`）。
 
 ## DELEG-022：delegator 可给 callee 一个 advisory `expected_tool_calls` 估算
 
@@ -327,4 +350,3 @@ WorkRecord 结果。
 `CODER_establish_behavior_transient_failure_retries_and_returns_successful_work_record`、
 `INSPECT_exhausted_failure_via_terminal_event_returns_incomplete_error`）与
 `requirements/delegation/tests/assistance-host.test.mjs`（`AGENT_031_consultation_child_transient_failure_does_not_fail_consultation_and_returns_after_retry`）。
-

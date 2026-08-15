@@ -18,17 +18,46 @@ test('DELEG_021_attachment_is_background_between_commissioner_and_requirements',
     rootRequirements: ['Keep authority with this assignment.'],
   })
 
-  const commissionerIndex = document.indexOf(commissioner)
+  const commissionerInstructionIndex = document.indexOf(fork.commissionerRecordInstruction)
   const attachmentInstructionIndex = document.indexOf(fork.attachmentInstruction)
+  const requirementsInstructionIndex = document.indexOf(fork.requirementsInstruction)
+  const commissionerIndex = document.indexOf(commissioner)
   const attachmentIndex = document.indexOf('Opening: Ada was asked')
-  const requirementsIndex = document.indexOf(fork.requirementsInstruction)
+  const requirementsTableIndex = document.indexOf('[[root_requirement]]')
 
-  assert.ok(commissionerIndex >= 0)
-  assert.ok(attachmentInstructionIndex > commissionerIndex)
-  assert.ok(attachmentIndex > attachmentInstructionIndex)
-  assert.ok(requirementsIndex > attachmentIndex)
+  // Instruction header names the background; WorkRecord prose stays in the body.
+  assert.ok(commissionerInstructionIndex >= 0)
+  assert.ok(attachmentInstructionIndex > commissionerInstructionIndex)
+  assert.ok(requirementsInstructionIndex > attachmentInstructionIndex)
+  assert.ok(commissionerIndex > requirementsInstructionIndex)
+  assert.ok(attachmentIndex > commissionerIndex)
+  assert.ok(requirementsTableIndex > attachmentIndex)
   assert.match(fork.attachmentInstruction, /background|context|背景/i)
   assert.match(fork.attachmentInstruction, /does not|not .*assignment|不.*任务|不.*义务/i)
+})
+
+test('DELEG_021_attachment_lwr_stays_body_prose_not_hashed_instructions', () => {
+  const lwr = [
+    'Opening',
+    'Ada was asked to inspect the retry path.',
+    '',
+    'Chronicle',
+    'found duplicate dispatch',
+    '',
+    'Recent work',
+    'edge still open',
+  ].join('\n')
+  const document = fork.render({ assignment, attachment: lwr })
+
+  assert.ok(document.includes(fork.attachmentInstruction))
+  assert.ok(document.includes('\n\nOpening\n'), 'attachment LWR Opening must be bare body prose')
+  assert.ok(document.includes('\nChronicle\n'))
+  assert.ok(document.includes('\nRecent work\n'))
+  assert.equal(document.includes('# Opening'), false, 'must not hash attachment LWR headings')
+  assert.equal(document.includes('# Chronicle'), false)
+  assert.equal(document.includes('# Recent work'), false)
+  // Instruction may name the concept; the opaque TOML field envelope must stay gone.
+  assert.equal(document.includes('attached_work_record ='), false)
 })
 
 test('DELEG_021_blank_attachment_is_absent_not_an_empty_section', () => {

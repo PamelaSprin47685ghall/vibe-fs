@@ -46,6 +46,7 @@ contract（bounded WorkRecord、canonical/sibling 分型）不变——本包 WH
 - **用户消息唤醒 join 被误当 authority**（历史 change（corrective））：唤醒只结束当前 wait，
   不创建 HumanRoot / LogicalRun，不 cancel child。低权限 pulse 与 authority transition 是两类事件。
 - **attachment = clone / charge merge**（历史 active change（fork-attach））：复制第三方 Session/Journal 或把其未竟义务并入 child charge 会制造第二 owner。选择 canonical LWR 只读背景；看得见不等于接手。
+- **CommissionerRecord / Attachment LWR 被写成 `# ` instruction**（`9d6cf339` 旁路回归）：角色 prompt 迁移提交把 body prose 挪进 `instructions` 再 `Split`，子 session 看到 `# Opening` / `# Chronicle`；oracle 被一并改写后静默绿。裁决：解释性说明可进 header，LWR 正文必须留在 ARCH-010 body 作 ordinary WorkRecord prose（DELEG-019/021）；永久由 `FORK_CHILD_PAYLOAD_commissioner_lwr_stays_body_prose_not_hashed_instructions` / `DELEG_021_attachment_lwr_stays_body_prose_not_hashed_instructions` 锁死。
 - **expected tool calls = hard cap / history scan**：OpenCode `maxSteps` 会强制 text-only，和 advisory 语义相反；从 transcript/XTrace 反算 remaining 又把历史当控制面日志。选择 typed observation facts + pure incremental fold，0 只改变下一次 calibration 文案。
 
 ## 与相邻包的边界
