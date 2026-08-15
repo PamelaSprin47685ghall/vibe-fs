@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Core" Version="10.1.203"/>
     <PackageReference Include="Fable.Core" Version="5.0.0"/>
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="5.2.0"/>
     <PackageReference Include="Thoth.Json" Version="10.5.1"/>
   </ItemGroup>
   <ItemGroup>
@@ -17,6 +18,7 @@
     <Compile Include="Foundation/Identity.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
+    <Compile Include="Foundation/TaskResult.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
     <Compile Include="Sphinx/Mcp.fs"/>
     <Compile Include="Sphinx/Types.fs"/>

@@ -27,6 +27,7 @@ cutover 时按 `SPLIT@cutover` 拆分；`NEW` = 新写。运行命令：`node --
 | DELEG-020 语义不依赖工具名 | 命题结构本身（HOW.md「历史与弃权」）；无独立断言（改名不破坏任何断言 = 命题的证明） | — | — |
 | DELEG-021 fork attachment | `tests/fork-attachment.test.mjs`（typed background/order/blank/anti-assignment）；`tests/fork-tool.test.mjs` `DELEG_021_*`（unknown/self 在 child 创建前拒绝、fresh LWR attachment、busy reuse 不物化） | NEW + REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
 | DELEG-022 delegated expected tool calls | `tests/delegated-tool-estimate.test.mjs`（pure replace/decrement/idempotence/saturation + no scan/mutable）；`tests/delegated-tool-estimate-facts.test.mjs`（durable fold）；`tests/delegation-tool-contract.test.mjs`（五个 surface + no maxSteps）；`tests/fork-tool.test.mjs` `DELEG_022_*`（invalid / replace / omitted retain）；`tests/sync-delegate-tools.test.mjs` `DELEG_022_*`（batch sum / reusable omission retain）；交叉 `requirements/guidance-delivery/tests/pair-calibration.test.mjs` | NEW + REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
+| DELEG-023 委托失败仅在恢复路径耗尽后报告 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_033_*`）；`requirements/delegation/tests/sync-delegate-tools.test.mjs`（`INSPECT/CODER retry`）；`requirements/delegation/tests/assistance-host.test.mjs`（`AGENT_031 consultation child retry`） | REUSE | `node --test requirements/delegation/tests/sync-delegate-runtime.test.mjs requirements/delegation/tests/sync-delegate-tools.test.mjs requirements/delegation/tests/assistance-host.test.mjs` |
 
 ## GAP
 

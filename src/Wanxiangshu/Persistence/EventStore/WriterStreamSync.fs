@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open Wanxiangshu.Enforcer
+open Wanxiangshu.Foundation
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
@@ -10,6 +11,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Text
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 
 /// DURABLE-CONVERGENCE-002/003/007/008.
 /// Sync is deliberately physical: complete WriterId NDJSON files and payload
@@ -104,47 +106,35 @@ module WriterStreamSync =
         (raw: IGitRawStore)
         (snapshot: StoreSnapshot)
         : Task<Result<(string * string) list * (string * byte[]) list, ConvergeError>> =
-        task {
-            match! readRequiredTree raw (RootOid.value snapshot.RootOid) "root" with
-            | Error error -> return Error error
-            | Ok rootEntries ->
-                let writers =
-                    rootEntries
-                    |> List.tryFind (fun entry -> entry.Name = "writers" && entry.Mode = treeMode)
+        taskResult {
+            let! rootEntries = readRequiredTree raw (RootOid.value snapshot.RootOid) "root"
 
-                let payloads =
-                    rootEntries
-                    |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
+            let writers =
+                rootEntries
+                |> List.tryFind (fun entry -> entry.Name = "writers" && entry.Mode = treeMode)
 
-                match writers, payloads with
-                | Some writerTree, Some payloadTree ->
-                    match! readRequiredTree raw writerTree.Oid "writers" with
-                    | Error error -> return Error error
-                    | Ok writerEntries ->
-                        match! readBlobList raw writerEntries with
-                        | Error error -> return Error error
-                        | Ok writerBlobs ->
-                            match! readRequiredTree raw payloadTree.Oid "payloads" with
-                            | Error error -> return Error error
-                            | Ok payloadEntries ->
-                                match! readBlobList raw payloadEntries with
-                                | Error error -> return Error error
-                                | Ok payloadBlobs ->
-                                    let writerTexts =
-                                        writerBlobs
-                                        |> List.map (fun (name, bytes) ->
-                                            if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
-                                                raise (
-                                                    InvalidOperationException(
-                                                        sprintf "invalid writer filename: %s" name
-                                                    )
-                                                )
+            let payloads =
+                rootEntries
+                |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
 
-                                            let writerId = name.Substring(0, name.Length - ".ndjson".Length)
-                                            writerId, Encoding.UTF8.GetString bytes)
+            match writers, payloads with
+            | Some writerTree, Some payloadTree ->
+                let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
+                let! writerBlobs = readBlobList raw writerEntries
+                let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
+                let! payloadBlobs = readBlobList raw payloadEntries
 
-                                    return Ok(writerTexts, payloadBlobs)
-                | _ -> return Error(asStorage "sync root must contain writers/ and payloads/")
+                let writerTexts =
+                    writerBlobs
+                    |> List.map (fun (name, bytes) ->
+                        if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
+                            raise (InvalidOperationException(sprintf "invalid writer filename: %s" name))
+
+                        let writerId = name.Substring(0, name.Length - ".ndjson".Length)
+                        writerId, Encoding.UTF8.GetString bytes)
+
+                return writerTexts, payloadBlobs
+            | _ -> return! Error(asStorage "sync root must contain writers/ and payloads/")
         }
 
     let private decodeRemoteWriters
@@ -206,12 +196,11 @@ module WriterStreamSync =
 
         // Payloads are content-addressed and may be safely imported before facts.
         // Validate the combined k-way history/closure before changing writer truth.
-        match mergePayloads payloads with
-        | Error error -> Error error
-        | Ok() ->
-            match validateUnion commonDir writers with
-            | Error error -> Error error
-            | Ok() -> mergeWriters writers
+        result {
+            do! mergePayloads payloads
+            do! validateUnion commonDir writers
+            return! mergeWriters writers
+        }
 
     /// Merge remote physical truth into local writer files, then materialize the
     /// whole local truth as the candidate remote snapshot. Business integration
@@ -221,24 +210,18 @@ module WriterStreamSync =
         (commonDir: string)
         (remote: StoreSnapshot option)
         : Task<Result<StoreSnapshot, ConvergeError>> =
-        task {
+        taskResult {
             try
                 match remote with
                 | None ->
-                    match validateUnion commonDir [] with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        let! local = materializeLocal raw commonDir
-                        return Ok local
+                    do! validateUnion commonDir []
+                    let! local = materializeLocal raw commonDir |> TaskResultCE.ofTask
+                    return local
                 | Some snapshot ->
-                    match! readRemote raw snapshot with
-                    | Error error -> return Error error
-                    | Ok(writers, payloads) ->
-                        match importRemote commonDir writers payloads with
-                        | Error error -> return Error error
-                        | Ok() ->
-                            let! local = materializeLocal raw commonDir
-                            return Ok local
+                    let! writers, payloads = readRemote raw snapshot
+                    do! importRemote commonDir writers payloads
+                    let! local = materializeLocal raw commonDir |> TaskResultCE.ofTask
+                    return local
             with ex ->
-                return Error(ConvergeError.Transport ex.Message)
+                return! Error(ConvergeError.Transport ex.Message)
         }

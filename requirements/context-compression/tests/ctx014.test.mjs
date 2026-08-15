@@ -170,13 +170,13 @@ test('CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
 })
 
 test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
-  // LOOP-010 allowlist: session_id / operation / effective_character_count /
+  // LOOP-010 allowlist: session_id / operation / weighted_distinct_token_count /
   // detector_step / result (+ duration, provider_error). Full loop body is forbidden.
   const allowed = [
     ['session_id', 'ses_loop'],
     ['result', 'armed'],
     ['detector_step', '120'],
-    ['effective_character_count', '12.5000'],
+    ['weighted_distinct_token_count', '12.5000'],
     ['duration', '3'],
     ['provider_error', 'abort refused'],
   ]
@@ -213,7 +213,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
     'session_id',
     'result',
     'detector_step',
-    'effective_character_count',
+    'weighted_distinct_token_count',
     'duration',
     'provider_error',
   ])
@@ -275,7 +275,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
 
   const sensorPath = path.join(NEXT_DIR, 'OpenCode', 'Host', 'LoopSensor.fs')
   const sensorBody = fs.readFileSync(sensorPath, 'utf8')
-  for (const key of ['session_id', 'result', 'detector_step', 'effective_character_count', 'provider_error']) {
+  for (const key of ['session_id', 'result', 'detector_step', 'weighted_distinct_token_count', 'provider_error']) {
     assert.ok(
       loopKillFieldKeys(sensorBody).includes(key),
       `LoopSensor loop-kill emit must include field ${key}`,
@@ -284,7 +284,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
 
   const diagnosticPath = path.join(NEXT_DIR, 'OpenCode', 'Host', 'Diagnostic.fs')
   const diagnosticBody = fs.readFileSync(diagnosticPath, 'utf8')
-  assert.match(diagnosticBody, /"effective_character_count"/)
+  assert.match(diagnosticBody, /"weighted_distinct_token_count"/)
   assert.match(diagnosticBody, /"detector_step"/)
   assert.match(diagnosticBody, /\/\/ LOOP-010/)
 })

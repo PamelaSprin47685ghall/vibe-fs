@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Sphinx
 
 open System
+open FsToolkit.ErrorHandling
 
 module ObservationCodec =
 

@@ -1,80 +1,66 @@
-// requirements/degeneration-guard/tests/loop-detector-memory.test.mjs
-//
-// LOOP-005: the detector is O(HASH_BUCKETS · K) memory — fixed hash buckets,
-// no structure that grows with the stream. LOOP-003: judgement is a single
-// N_eff threshold crossing with no latch (no continuous-hit requirement, no
-// hysteresis). LOOP-005 lifecycle: a fresh detector per attempt means two
-// detectors never share state.
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
 import { loopDetector } from '../../verification-system/tests/support/domain.mjs'
 
-const { LoopEffectiveThreshold } = await import('../../../dist/Execution/Session/LoopDetector.js')
+const trackedTokenCount = (detector) => Array.from(detector.LastSeenTokenStep).length
 
-const diverse = () => {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}();,.='
-  let body = ''
-  for (let i = 0; i < 2000; i += 1) {
-    const x = Math.sin(i * 12.9898) * 43758.5453
-    body += alphabet[Math.floor((x - Math.floor(x)) * alphabet.length)]
-  }
-  return body
-}
+const diverse = () =>
+  Array.from(
+    { length: 800 },
+    (_, index) =>
+      `let value_${index} = repository_${index % 31}.load("entity-${index}", ${index * 7919}); // owner-${index % 47}`,
+  ).join('\n')
 
-test('LOOP_005_detector_memory_is_bounded_by_fixed_buckets_not_stream_length', () => {
+test('LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
   const detector = loopDetector.create()
-  const sizes = () => ({
-    buckets: detector.Value.length,
-    kernels: detector.Cross.length,
-    totals: detector.Total.length,
-    lastStep: detector.LastStep.length,
-    prefix: detector.Prefix.length,
-  })
+  const text = diverse()
+  const distinct = new Set(encode(text)).size
 
-  const before = sizes()
-  assert.deepEqual(before, { buckets: 4096, kernels: 3, totals: 3, lastStep: 4096, prefix: 4 })
+  loopDetector.pushText(detector, text)
+  assert.equal(trackedTokenCount(detector), distinct)
+  assert.ok(trackedTokenCount(detector) <= loopDetector.tokenizerVocabularySize)
 
-  loopDetector.pushText(detector, 'x'.repeat(200000))
-  const afterSmall = sizes()
-  assert.deepEqual(afterSmall, before, '10^5 characters must not grow any detector structure')
-
-  loopDetector.pushText(detector, 'x'.repeat(200000))
-  assert.deepEqual(sizes(), before, 'stream length must never appear in the memory footprint')
-  assert.ok(detector.Step > 0, 'the step counter advances while memory stays fixed')
+  loopDetector.pushText(detector, text)
+  assert.equal(
+    trackedTokenCount(detector),
+    distinct,
+    'repeating an arbitrarily longer stream cannot grow state past observed token ids',
+  )
 })
 
 test('LOOP_003_threshold_crossing_is_a_single_event_with_no_latch', () => {
-  // Degenerate stream crosses N_eff <= threshold → LOOP.
   const detector = loopDetector.create()
-  const degenerate = loopDetector.pushText(detector, 'x'.repeat(4000))
+  const degenerate = loopDetector.pushText(detector, ' retry'.repeat(1000))
   assert.equal(degenerate.isLoop, true)
-  assert.ok(degenerate.effective <= LoopEffectiveThreshold)
+  assert.ok(degenerate.weightedDistinctTokens <= loopDetector.loopWeightedDistinctThreshold)
 
-  // No hysteresis: the same detector, fed diverse text afterwards, returns to
-  // Normal. The detector judges the current stream, not a latched verdict.
   const recovered = loopDetector.pushText(detector, diverse())
   assert.equal(recovered.isLoop, false)
   assert.equal(recovered.state, 'Normal')
-  assert.ok(recovered.effective > LoopEffectiveThreshold)
+  assert.ok(recovered.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
 })
 
 test('LOOP_003_judgement_does_not_require_consecutive_hits', () => {
-  // Single crossing trips the detector on the very push that crosses the
-  // threshold; there is no "N consecutive hits" window to wait through.
   const detector = loopDetector.create()
-  const crossed = loopDetector.pushText(detector, 'ab'.repeat(3000))
-  assert.equal(crossed.isLoop, true)
+  let result = loopDetector.evaluate(detector)
+
+  for (let index = 0; index < 200 && !result.isLoop; index += 1) {
+    result = loopDetector.pushText(detector, ' retry')
+  }
+
+  assert.equal(result.isLoop, true)
+  assert.ok(result.step < 100, `single-token repetition crossed at step ${result.step}`)
 })
 
 test('LOOP_005_two_detectors_are_independent_attempts', () => {
   const a = loopDetector.create()
   const b = loopDetector.create()
 
-  loopDetector.pushText(a, 'x'.repeat(4000))
+  loopDetector.pushText(a, ' retry'.repeat(1000))
   assert.equal(loopDetector.evaluate(a).isLoop, true)
-  // The second attempt's detector never saw attempt A's stream: still innocent.
   assert.equal(loopDetector.evaluate(b).isLoop, false)
   assert.equal(loopDetector.evaluate(b).state, 'Normal')
+  assert.equal(loopDetector.evaluate(b).step, 0)
 })

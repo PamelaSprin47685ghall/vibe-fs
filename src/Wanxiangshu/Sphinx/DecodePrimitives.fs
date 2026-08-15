@@ -1,15 +1,9 @@
 namespace Wanxiangshu.Sphinx
 
 open Fable.Core
+open FsToolkit.ErrorHandling
 
 module DecodePrimitives =
-
-    type ResultBuilder() =
-        member _.Bind(value, next) = Result.bind next value
-        member _.Return value = Ok value
-        member _.ReturnFrom value = value
-
-    let result = ResultBuilder()
 
     [<Emit("$0 == null")>]
     let isNullish (value: obj) : bool = jsNative

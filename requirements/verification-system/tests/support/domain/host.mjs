@@ -617,21 +617,18 @@ export const diagnostic = (() => {
 // ── docs/what/loop.md: LOOP detector + text-delta codec ────────────────────────────────
 
 /**
- * LOOP-003…005: pure O(1) exponential-mixture 4-gram diversity detector.
- * Whitespace is ignored; physical gate is N_eff. Host abort stays out.
+ * LOOP-003…005: pure exponentially decayed weighted-distinct-token detector.
+ * Tokenization uses gpt-tokenizer/o200k_base; Host abort stays out.
  */
 export const loopDetector = (() => {
   const m = bind(LoopDetectorModule, 'LoopDetector', [
-    'NgramSize',
-    'HashBuckets',
-    'K',
-    'NormalEffectiveCount',
-    'NormalHhi',
-    'GarbageEffectiveCount',
-    'LoopHhi',
-    'LoopEffectiveThreshold',
+    'TokenizerVocabularySize',
+    'HalfLife',
+    'Lambda',
+    'NormalWeightedDistinctCount',
+    'TheoreticalLoopWeightedDistinctCount',
+    'LoopWeightedDistinctThreshold',
     'create',
-    'pushCharacter',
     'pushText',
     'evaluate',
   ])
@@ -639,22 +636,18 @@ export const loopDetector = (() => {
   const read = (evaluation) => ({
     state: caseOf(evaluation.State),
     isLoop: Boolean(evaluation.IsLoop),
-    effective: evaluation.EffectiveCharacterCount,
-    hhi: evaluation.Hhi,
+    weightedDistinctTokens: evaluation.WeightedDistinctTokenCount,
     step: evaluation.Step,
   })
 
   return {
-    ngramSize: m.NgramSize,
-    hashBuckets: m.HashBuckets,
-    k: m.K,
-    normalEffectiveCount: m.NormalEffectiveCount,
-    normalHhi: m.NormalHhi,
-    garbageEffectiveCount: m.GarbageEffectiveCount,
-    loopHhi: m.LoopHhi,
-    loopEffectiveThreshold: m.LoopEffectiveThreshold,
+    tokenizerVocabularySize: m.TokenizerVocabularySize,
+    halfLife: m.HalfLife,
+    lambda: m.Lambda,
+    normalWeightedDistinctCount: m.NormalWeightedDistinctCount,
+    theoreticalLoopWeightedDistinctCount: m.TheoreticalLoopWeightedDistinctCount,
+    loopWeightedDistinctThreshold: m.LoopWeightedDistinctThreshold,
     create: () => m.create(),
-    pushCharacter: (detector, character) => read(m.pushCharacter(detector, character)),
     pushText: (detector, text) => read(m.pushText(detector, text)),
     evaluate: (detector) => read(m.evaluate(detector)),
   }

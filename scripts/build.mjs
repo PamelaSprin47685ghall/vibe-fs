@@ -30,6 +30,7 @@ function removeSources(dir) {
 }
 
 fs.rmSync(dist, { recursive: true, force: true })
+fs.mkdirSync(dist, { recursive: true })
 
 try {
   execFileSync(

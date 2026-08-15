@@ -305,3 +305,25 @@ replace 重置、在 remaining=0 后停止增长。
 
 证据：GAP-012；`requirements/delegation/tests/delegated-tool-estimate.test.mjs`、
 `requirements/delegation/tests/delegation-tool-contract.test.mjs`。
+
+## DELEG-023：委托失败仅在所有恢复路径耗尽后向调用方报告
+
+callee（如 Inspector、Coder、consultation child）在执行委托任务时，若单次 Provider 尝试发生失败
+（`ReconcileProgram.TurnFailed`），属于子会话局部瞬态故障，不得立即向 parent 的工具调用报告失败或提前终止委托；
+必须等待子会话的 AABB / `ProviderRetry` 等恢复路径完全穷尽（达到 `TerminalOutcome.Failed`）或会话确定性终结
+（`TerminalOutcome.Aborted`）后，才向 caller 报告失败。子会话在重试中成功完成（`TurnCompleted`）时，正常交付
+WorkRecord 结果。
+
+含义/动机：如同 Fission 局部失败不直接导致 group 失败，单次 Provider 故障在存在恢复预算时不构成委托失败；
+提早向调用方返回错误会破坏委托会话的恢复契约并丢弃重试产出的合法结果。
+
+边界：底层 AABB / ProviderRetry 恢复机制与预算决策由 `provider-attempt-recovery` 拥有；本包只规定
+委托调用方对子会话失败与恢复的时序观察契约。
+
+证据：REUSE `requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`EXEC_033_sync_delegate_transient_failure_does_not_fail_call_and_returns_after_retry`、
+`EXEC_033_sync_delegate_exhausted_failure_via_terminal_event_fails_call`）、
+`requirements/delegation/tests/sync-delegate-tools.test.mjs`（`INSPECT_transient_failure_retries_and_returns_successful_work_record`、
+`CODER_establish_behavior_transient_failure_retries_and_returns_successful_work_record`、
+`INSPECT_exhausted_failure_via_terminal_event_returns_incomplete_error`）与
+`requirements/delegation/tests/assistance-host.test.mjs`（`AGENT_031_consultation_child_transient_failure_does_not_fail_consultation_and_returns_after_retry`）。
+

@@ -12,6 +12,7 @@
 - 同步委托（SyncDelegate）以普通 completion → bounded WorkRecord 收口，无 `return` 第二出口（DELEG-007..012）。
 - Join / horizon / commission 是委托面的观察与收束语义（DELEG-013..016）。
 - 返回结果只改变 caller 认识，不转移 authority（DELEG-017）；NEEDHELP consultation 是真实 child 委托（DELEG-018/019）。
+- 委托失败仅在所有恢复路径耗尽后向调用方报告（DELEG-023）。
 
 ## HOW 概览
 

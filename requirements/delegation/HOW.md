@@ -78,6 +78,13 @@ when all expected members present:
 WorkRecord → typed `NeedHelpAdvice` continuation 返回原 binding。single-flight + 有限额度（资源策略，
 数值不向 provider 暴露）。sentinel 在 XTrace capture 前剥离。
 
+### 委托失败与恢复时序契约（DELEG-023）
+
+- `SyncDelegateRuntime.HandleTurn` 仅处理 `TurnCompleted`（捕获 terminal + 物化 bounded WorkRecord + 完成 `call.Answer`）。
+- `TurnFailed` / `TurnInProgress` / `TurnNeedsContinuation` 保持 child-local，返回 `false` 且不弹出调用，放行至 `OrdinaryTurnWorkflow` 触发 AABB / ProviderRetry continuation。
+- `SyncDelegateWorkflow.invoke` 通过 `SubscribeTerminal` 监听终端结果：仅在 `TerminalOutcome.Failed`（恢复预算耗尽）或 `TerminalOutcome.Aborted` 时才向调用方返回失败。
+- `AssistanceHost.handleConsultationTurn` 对 `TurnFailed` 返回 `NotAssistance`，放行至普通恢复流程；仅在终端失败时通过 `SubscribeTerminal` 交付失败建议。
+
 ### Join 有界批次（`Session/CompletionMailbox.fs`、`Session/ForkRuntime.fs`）
 
 - `WaitForSignal(interrupt)` / `DrainAgentWakes`（agent 路径仅 Pulse，无 payload）/ `DrainPtyCompletions`。

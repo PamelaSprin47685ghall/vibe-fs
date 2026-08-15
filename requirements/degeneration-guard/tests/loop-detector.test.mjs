@@ -1,121 +1,120 @@
-// tests/unit/Domain/loop-detector.test.mjs — LOOP-003/004/005/011 pure detector.
-//
-// Final design: ignore whitespace + '-', sliding 4-grams, slow exp mixture,
-// normal-code prior (N_eff=256), LOOP when N_eff ≤ 140. Layer 1 only.
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
+
 import { loopDetector, loopEventCodec } from '../../verification-system/tests/support/domain.mjs'
 
-test('LOOP_004_constants_match_the_clause', () => {
-  assert.equal(loopDetector.ngramSize, 4)
-  assert.equal(loopDetector.hashBuckets, 4096)
-  assert.equal(loopDetector.k, 3)
-  assert.equal(loopDetector.normalEffectiveCount, 256)
-  assert.ok(Math.abs(loopDetector.normalHhi - 1 / 256) < 1e-12)
-  assert.equal(loopDetector.garbageEffectiveCount, 24)
-  assert.equal(loopDetector.loopEffectiveThreshold, 140)
-  assert.ok(Math.abs(loopDetector.loopHhi - 1 / 140) < 1e-12)
-  assert.ok(
-    Math.abs(
-      loopDetector.loopEffectiveThreshold -
-        (loopDetector.normalEffectiveCount + loopDetector.garbageEffectiveCount) / 2,
-    ) < 1e-12,
+const close = (actual, expected, tolerance = 1e-9) =>
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
+
+const referenceScore = (text) => {
+  const lastSeen = new Map()
+  let weightedDistinctTokens = loopDetector.normalWeightedDistinctCount
+  let step = 0
+
+  for (const token of encode(text)) {
+    step += 1
+    const previous = lastSeen.get(token)
+    weightedDistinctTokens =
+      loopDetector.lambda * weightedDistinctTokens +
+      1 -
+      (previous === undefined ? 0 : loopDetector.lambda ** (step - previous))
+    lastSeen.set(token, step)
+  }
+
+  return { weightedDistinctTokens, step }
+}
+
+test('LOOP_004_constants_are_token_calibrated', () => {
+  assert.equal(loopDetector.tokenizerVocabularySize, vocabularySize)
+  assert.equal(loopDetector.halfLife, 64)
+  close(loopDetector.lambda, 2 ** (-1 / 64))
+  assert.equal(loopDetector.theoreticalLoopWeightedDistinctCount, 1)
+  close(
+    loopDetector.loopWeightedDistinctThreshold,
+    (loopDetector.normalWeightedDistinctCount + loopDetector.theoreticalLoopWeightedDistinctCount) / 2,
   )
 })
 
-test('LOOP_003_fresh_detector_is_innocent_normal_code_prior', () => {
-  const detector = loopDetector.create()
-  const result = loopDetector.evaluate(detector)
-
+test('LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
+  const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
   assert.equal(result.isLoop, false)
   assert.equal(result.step, 0)
-  assert.ok(Math.abs(result.effective - 256) < 1e-6, `n_eff=${result.effective}`)
-  assert.ok(Math.abs(result.hhi - 1 / 256) < 1e-9, `hhi=${result.hhi}`)
+  close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
 })
 
-test('LOOP_003_fewer_than_four_characters_keeps_prior', () => {
-  const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, 'abc')
+test('LOOP_003_push_text_is_o200k_token_based', () => {
+  const text = 'const π = await repository.load("订单-42");\nreturn { ok: true, revision: 17 };'
+  const expected = referenceScore(text)
+  const result = loopDetector.pushText(loopDetector.create(), text)
 
-  assert.equal(result.state, 'Normal')
-  assert.equal(result.isLoop, false)
-  assert.equal(result.step, 0)
-  assert.ok(Math.abs(result.effective - 256) < 1e-6)
+  assert.equal(result.step, encode(text).length)
+  assert.equal(result.step, expected.step)
+  close(result.weightedDistinctTokens, expected.weightedDistinctTokens)
 })
 
-test('LOOP_003_whitespace_and_minus_are_ignored_and_do_not_advance', () => {
-  const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, ' \n\t\r-'.repeat(500))
-
-  assert.equal(result.step, 0)
-  assert.equal(result.isLoop, false)
-  assert.equal(result.state, 'Normal')
-  assert.ok(Math.abs(result.effective - 256) < 1e-6)
+test('LOOP_003_whitespace_and_punctuation_are_tokens_not_character_exceptions', () => {
+  const text = ' \n\t\r-'.repeat(200)
+  const result = loopDetector.pushText(loopDetector.create(), text)
+  assert.equal(result.step, encode(text).length)
+  assert.ok(result.step > 0)
 })
 
-test('LOOP_003_single_character_long_run_is_loop', () => {
-  // Pure single-character stream collapses 4-grams to one bucket → HHI→1.
-  // Prior dilutes slowly; need enough grams to overcome N_eff=256 seed.
-  const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, 'x'.repeat(4000))
+test('LOOP_003_single_token_repetition_converges_to_theoretical_loop', () => {
+  const unit = ' retry'
+  assert.equal(encode(unit).length, 1, 'fixture must be one o200k token')
 
-  assert.equal(result.isLoop, true, `n_eff=${result.effective} hhi=${result.hhi}`)
+  const result = loopDetector.pushText(loopDetector.create(), unit.repeat(1000))
+  assert.equal(result.isLoop, true, `weightedDistinct=${result.weightedDistinctTokens}`)
   assert.equal(result.state, 'Loop')
-  assert.ok(result.effective <= loopDetector.loopEffectiveThreshold)
-  assert.ok(result.hhi >= loopDetector.loopHhi)
+  assert.ok(result.weightedDistinctTokens <= loopDetector.loopWeightedDistinctThreshold)
+  close(result.weightedDistinctTokens, 1, 1e-3)
 })
 
-test('LOOP_003_diverse_alphabet_stays_normal', () => {
-  // Pseudo-random alnum stream keeps N_eff hundreds under the slow kernel.
-  // Periodic alphabets (period 62 etc.) correctly trip N_eff≤140 — not diverse.
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}();,.='
-  let body = ''
-  for (let i = 0; i < 4000; i++) {
-    const x = Math.sin(i * 12.9898) * 43758.5453
-    body += alphabet[Math.floor((x - Math.floor(x)) * alphabet.length)]
-  }
+test('LOOP_003_diverse_programmatic_text_stays_normal', () => {
+  const body = Array.from(
+    { length: 500 },
+    (_, index) =>
+      `const result_${index} = await shard_${index % 23}.load("entity-${index}", { revision: ${index * 17 + 3}, owner: "worker-${index % 41}" });`,
+  ).join('\n')
+
+  const result = loopDetector.pushText(loopDetector.create(), body)
+  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
+})
+
+test('LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', () => {
+  const body = [
+    '| Component | Owner | Revision | Evidence |',
+    '| --- | --- | ---: | --- |',
+    ...Array.from(
+      { length: 500 },
+      (_, index) =>
+        `| component-${index} | team-${index % 37} | ${1000 + index} | artifact-${index}-${(index * 7919).toString(16)} |`,
+    ),
+  ].join('\n')
+
+  const result = loopDetector.pushText(loopDetector.create(), body)
+  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+})
+
+test('LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', () => {
+  const body = Array.from(
+    { length: 500 },
+    (_, index) =>
+      `[stage_${index}] ----queue_${index % 29}/${100 + index}----> [stage_${index + 1}] status=${['cold', 'warm', 'ready'][index % 3]} owner=worker_${index % 43}`,
+  ).join('\n')
+
+  const result = loopDetector.pushText(loopDetector.create(), body)
+  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+})
+
+test('LOOP_005_empty_push_is_noop', () => {
   const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, body)
-
-  assert.equal(result.isLoop, false, `n_eff=${result.effective} hhi=${result.hhi}`)
-  assert.equal(result.state, 'Normal')
-  assert.ok(result.effective > loopDetector.loopEffectiveThreshold)
-  assert.ok(result.hhi < loopDetector.loopHhi)
-})
-
-test('LOOP_005_streaming_matches_batch_push', () => {
-  const text = 'deadbeef'.repeat(200)
-  const batch = loopDetector.create()
-  const stream = loopDetector.create()
-
-  const batchResult = loopDetector.pushText(batch, text)
-
-  let streamResult
-  for (const character of text) {
-    streamResult = loopDetector.pushCharacter(stream, character)
-  }
-
-  assert.equal(streamResult.step, batchResult.step)
-  assert.equal(streamResult.isLoop, batchResult.isLoop)
-  assert.ok(Math.abs(streamResult.effective - batchResult.effective) < 1e-9)
-  assert.ok(Math.abs(streamResult.hhi - batchResult.hhi) < 1e-12)
-})
-
-test('LOOP_005_ignored_chars_do_not_form_grams_or_dilute_prior', () => {
-  const withIgnored = loopDetector.create()
-  const withoutIgnored = loopDetector.create()
-
-  const ignored = 'a-b c\td\ne\rf-g h'
-  const compact = 'abcdefgh'
-
-  const ignoredResult = loopDetector.pushText(withIgnored, ignored)
-  const compactResult = loopDetector.pushText(withoutIgnored, compact)
-
-  assert.equal(ignoredResult.step, compactResult.step)
-  assert.ok(Math.abs(ignoredResult.effective - compactResult.effective) < 1e-9)
-  assert.ok(Math.abs(ignoredResult.hhi - compactResult.hhi) < 1e-12)
+  const before = loopDetector.evaluate(detector)
+  const after = loopDetector.pushText(detector, '')
+  assert.deepEqual(after, before)
 })
 
 test('LOOP_009_text_delta_decodes_fail_closed', () => {
@@ -153,7 +152,6 @@ test('LOOP_009_text_delta_decodes_fail_closed', () => {
     undefined,
   )
 
-  // LOOP-002 / LOOP-007: any non-text field is fail-closed at the codec.
   for (const field of ['model_thought', 'thinking', 'tool', 'reasoning_content']) {
     assert.equal(
       loopEventCodec.tryDecodeTextDelta({
