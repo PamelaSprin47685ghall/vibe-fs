@@ -13,7 +13,7 @@
 | agent 名解析 | `src/Wanxiangshu/Domain/PromptAuthority.fs` `parseAgentNameTyped` | `fast-ROLE`/`deep-ROLE` → `{Name; Role; Tier; PeerName}`；legacy/未知/畸形三分拒绝 |
 | prompt identity | `PromptAuthority.systemPromptIdFor` | 只依赖 `CanonicalRole`（tier 不参与，PID-005） |
 | profile 组装 | `PromptAuthority.buildAttemptExecutionProfile` + `Domain/AttemptPlanner.fs` | `EffectiveAgent` 随 fallback cursor 动；`SystemPromptId`/Persona 不动 |
-| binding 解析律 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs`、`ChatParamsHook.fs` | `BindingIntent` = Preserve / ExplicitExecutionOverride；managed frozen / user-facing 追最近真实请求 / 不一致 fail-closed（PROMPT-006） |
+| binding 解析律 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs`、`ChatParamsHook.fs` | `BindingIntent` = Preserve / ExplicitExecutionOverride；managed frozen / user-facing 追最近真实 EffectiveAgent；物理 ModelTarget 由 `execution-model-routing` lease 提供（PROMPT-006） |
 | 角色标签持久化 | `src/Wanxiangshu/Session/AgentRoleIdentity.fs` | `roleName` 委托 `ManagedAgentCatalog.roleLabel`，避免 DU 拼写改名破坏 durable string |
 
 关键不变量：任何路径都**不得**在 `buildAttemptExecutionProfile` 之外另造身份字段；tier/EffectiveAgent
@@ -33,7 +33,7 @@
 
 | 内容 | 裁决 | 理由 |
 |------|------|------|
-| AGENT-002「恰好 22 名、非空互异 model 串」 | HOW（runtime contract） | COVERAGE：exact catalog + machine names = implementation vocabulary；「缺一启动失败」是当前 runtime 契约。`catalog.test.mjs` 保留为 runtime-contract proof（`AGENT_002_required_names...`、`MACFG_validate_reports_missing_managed_agent...`） |
+| AGENT-002「恰好 22 名」 | HOW（runtime contract） | COVERAGE：exact catalog + machine names = implementation vocabulary；managed catalog 仍精确覆盖 20 Role×tier + 2 Bookkeeper。旧“每名必须带非空 model 串”已由 `execution-model-routing` 的 lane/TOML 合同取代；model 不再是 agent inventory 字段。 |
 | AGENT-004 非法旧名清单（orchestrator/meditator/student/…） | GARBAGE（migration ratchet） | legacy reject = 迁移证明；`catalog.test.mjs` 的 `AGENT_004_*` 断言保留作 ratchet，新世界基线稳定后可删 |
 | Persona display 名（Integrator/Director/Coordinator/…） | HOW | AGENT-028 表是当前命名；除非命名成为 public contract，否则不构成 WHAT |
 | `SessionPersona` process-local `Dictionary` | HOW | Phase 16 实现；durable journal fact 是未来演进，不改变「bind-once」语义 |

@@ -31,9 +31,7 @@ Strength 从不成为任务正确性的必要条件。
 `ProviderRequestKind.WorkMain`；CanonicalRole ∈ {Coder, Inspector, DevOps, Inquiry}；
 Authority 选择 Deep 且 `EffectiveAgent = SelectedAgent`；不是 fallback B-side、
 InteractionRepair、prefix probe、Reviewer/finality、Attached 或 InternalLeaf；owner 未取消；
-可唯一绑定即将消费输入的 `TargetProviderRun`；存在 same-role fast peer 且 fast/deep model
-binding 不同；EventStore、Host canary 与显式成本模型均健康可用。**任一事实未知或不满足 →
-K0。** Browser、Manager、Orchestrator、Reviewer 第一版不 eligible。
+可唯一绑定即将消费输入的 `TargetProviderRun`；存在 same-role fast peer，且该 replica 的 resolved execution target 经显式成本模型判定仍有正收益；EventStore、Host canary 与成本模型均健康可用。**任一事实未知或不满足 → K0。** 不再以 fast/deep model string 是否不同作为 eligibility 或启动校验。Browser、Manager、Orchestrator、Reviewer 第一版不 eligible。
 
 **含义/动机**：投机只能在「不会改变主路径语义」的窗口内发生。任何不确定都是关闭理由。
 
@@ -59,8 +57,7 @@ completion 终止 speculation，正文永不注入 primary。
 
 **规范陈述**：Replica = `InternalLeaf × Attached(owner, StrengthReplica)`，使用
 `fast-<owner-role>`；**不新增** CanonicalRole/Agent/system prompt。Replica **继承** owner 的
-`SessionPersona` 与 `SessionProviderLanguage`；只换 ExecutionBinding（fast 模型），不换人、
-不换世界语。每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用
+`SessionPersona` 与 `SessionProviderLanguage`；只换 ExecutionBinding 到 fast EffectiveAgent，其物理 ModelTarget 由 `execution-model-routing` lane/lease 解析，不换人、不换世界语。每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用
 transcript。Replica 无 Companion、SyncDelegate、嵌套 StrengthReplica、fork/horizon/join、
 deep fallback 或用户权限交互。provider-visible schema 与 execution gate 必须同源且恰好允许
 `read/glob/grep`；任何其它工具 fail closed。Replica 成败不推进 owner FallbackCursor，不清零

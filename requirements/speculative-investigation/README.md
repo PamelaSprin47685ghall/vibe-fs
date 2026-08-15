@@ -50,7 +50,7 @@ TargetProviderRun 准备 Candidate；显式 DryRun 只启动真实、OpenCode �
 
 ## DEPENDS ON
 
-`repository-investigation`、`participant-identity`、`participant-horizon`、
+`repository-investigation`、`participant-identity`、`execution-model-routing`、`participant-horizon`、
 `provider-projection`、`semantic-trace`（依赖骨架唯一来源：`requirements/INDEX.md`）。
 逐条理由见 HOW.md「依赖」。
 

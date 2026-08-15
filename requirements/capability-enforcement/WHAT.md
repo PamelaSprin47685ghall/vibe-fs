@@ -152,9 +152,7 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 - Role 或 profile 无法确定 → 模型可见插件工具集为空；ToolRegistry `gateExecute` 对 unresolved role
   返回 deny（`Path.DeniedUnestablished`），禁止「role 未定时暂时允许 Inspector」类放行
   （历史 shape/agent 条款 AGENT-007）。
-- Host `config` hook 校验失败（如重复 fast/deep model）仍必须先写入 owned `mode`/`permission`/`prompt`，
-  使 managed agent 不回落 Host 默认（`"*": "allow"` 会把 bash 开放给每个角色）；随后必须
-  `Diagnostic.fatal` 终止整个 OpenCode 进程。配置 gate 的 Error 不得降格为可被 Host 捕获后继续运行的异常。
+- Host `config` hook 校验失败（如 managed catalog/owned-field 投影结构非法；模型 lane/TOML 校验归 `execution-model-routing`）仍必须先写入 owned `mode`/`permission`/`prompt`，使 managed agent 不回落 Host 默认（`"*": "allow"` 会把 bash 开放给每个角色）；随后必须 `Diagnostic.fatal` 终止整个 OpenCode 进程。配置 gate 的 Error 不得降格为可被 Host 捕获后继续运行的异常。
 
 含义/动机：真实回归有两层：校验失败 short-circuit 曾导致权限写失败，bash 对所有 managed role 开放；
 后续仅抛可捕获异常又允许 Host 继续，使缺失可信 inventory 延迟表现为无关的 PROMPT-006 binding failure。
@@ -184,7 +182,7 @@ AGENT-006 语义边界并诱导「工具白名单 = 一切权限」的错心智�
 不进角色矩阵」。
 
 证据：`tests/agent-permission-gate.test.mjs` `AGENT_019_external_directory_overrides_host_default_ask`（MOVE）
-+ `tests/managed-agent-config.test.mjs` `MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model`（MOVE）。
++ `tests/managed-agent-config.test.mjs` 的 owned-field projection 断言（model authority 已迁至 `execution-model-routing` EMR-008，GAP-016）。
 
 ## ENF-012：工具名投影唯一写入口 = CanonicalRole → permission；禁止第二套旧名表/手写矩阵
 

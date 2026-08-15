@@ -138,7 +138,7 @@ Session，FALLBACK-003 去重无法折叠，会把同一次失败记两次。
 
 ## PAR-013：换 Peer = 换执行者，不换身份
 
-Fallback 推进只改写 `AttemptExecutionProfile.EffectiveAgent`（及对应模型绑定）。同一 session /
+Fallback 推进只改写 `AttemptExecutionProfile.EffectiveAgent`；对应物理 ModelTarget 由 `execution-model-routing` 按 `(SessionId, EffectiveAgent)` lease 解析。A/B lease 可以落到同一物理 model，不影响 peer/fallback 本体。同一 session /
 Life 内下列字节与身份**不得**因 Offset / SideA·B / Peer 切换而改变：
 
 ```text

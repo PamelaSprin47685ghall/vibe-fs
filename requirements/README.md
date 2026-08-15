@@ -20,7 +20,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 46 包索引
+## 47 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -46,6 +46,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 | Package | 一句话 WHY |
 |---|---|
 | [participant-identity](participant-identity/README.md) | Role、Persona、ExecutionBinding 分离，换执行者不等于换人。 |
+| [execution-model-routing](execution-model-routing/README.md) | managed EffectiveAgent 经唯一 TOML 的七个容量 lane 解析物理模型；`opencode.json` 不拥有 model authority。 |
 | [office-capability](office-capability/README.md) | office 由有资格产生的后果定义，不由 persona 名或工具白名单定义。 |
 | [capability-enforcement](capability-enforcement/README.md) | provider 看见的与 runtime 真能执行的 capability 同源且不扩大 office entitlement。 |
 | [participant-horizon](participant-horizon/README.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
@@ -122,7 +123,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 87-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 102-edge 骨架一致（0 cycle）。
 
 ## 运行与验证
 

@@ -26,8 +26,7 @@ fail-closed；external_directory 唯一写点。全部命题见 `WHAT.md`（`ENF
 ## proof 概览
 
 - `tests/capability-isomorphism-gate.test.mjs`（自 `tests/unit/verify/` 移入）：四层同构静态 ratchet。
-- `tests/managed-agent-config.test.mjs`（自 `tests/unit/host/` 移入）：Host-final 配置门、owned 字段、
-  binding 校验。
+- `tests/managed-agent-config.test.mjs`（自 `tests/unit/host/` 移入）：Host-final 配置门与 owned 字段；旧 model binding 校验由 `execution-model-routing` 迁移取代。
 - `tests/agent-permission-gate.test.mjs`（自 `tests/unit/plugin/` 移入）：AGENT-006/007/010/019
   矩阵投影 + 双层 fail-closed。
 - REUSE：`requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs`、`requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`、
