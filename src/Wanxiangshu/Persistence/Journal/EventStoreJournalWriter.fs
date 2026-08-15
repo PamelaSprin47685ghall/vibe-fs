@@ -107,8 +107,12 @@ type EventStoreBlobWriter private (store: IEventStore) =
 module JournalPayloadClosure =
 
     let ofFact (fact: Fact) : PayloadRef list =
-        let refOf (ref: BlobRef) = MagicTodoFactCodec.payloadRefOfBlobRef ref |> Option.toList
-        let digestOf (digest: BlobDigest) = MagicTodoFactCodec.payloadRefOfBlobDigest digest |> Option.toList
+        let refOf (ref: BlobRef) =
+            MagicTodoFactCodec.payloadRefOfBlobRef ref |> Option.toList
+
+        let digestOf (digest: BlobDigest) =
+            MagicTodoFactCodec.payloadRefOfBlobDigest digest |> Option.toList
+
         let pair (ref: BlobRef) (digest: BlobDigest) = refOf ref @ digestOf digest
 
         let refs =
@@ -118,41 +122,49 @@ module JournalPayloadClosure =
                 MagicTodoFactCodec.tryDecode payload
                 |> Result.map MagicTodoFactCodec.payloadRefs
                 |> Result.defaultValue []
-            | Fact.Agent (AgentFact.Execution (ExecutionFactCases.HandleCompleted p)) ->
-                (p.CompletionRef |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
-                @ (p.CompletionDigest |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
-            | Fact.Agent (AgentFact.Execution (ExecutionFactCases.HandleFalseCompletionRejected p)) ->
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted p)) ->
+                (p.CompletionRef
+                 |> Option.toList
+                 |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
+                @ (p.CompletionDigest
+                   |> Option.toList
+                   |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleFalseCompletionRejected p)) ->
                 pair p.ExpectedCompletionRef p.ExpectedCompletionDigest
-            | Fact.Agent (AgentFact.Execution (ExecutionFactCases.HandleFalseTerminalReported p)) ->
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleFalseTerminalReported p)) ->
                 pair p.BadCompletionRef p.BadCompletionDigest
-            | Fact.Agent (AgentFact.Execution (ExecutionFactCases.ParentJoinCorrectionRequested p)) ->
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.ParentJoinCorrectionRequested p)) ->
                 digestOf p.BadCompletionDigest
-            | Fact.Agent (AgentFact.Companion (CompanionFactCases.XTracePartAppended p)) -> pair p.TextRef p.TextDigest
-            | Fact.Agent (AgentFact.Companion (CompanionFactCases.TerminalOutputCaptured p)) -> pair p.TextRef p.TextDigest
-            | Fact.Agent (AgentFact.Context (ContextFactCases.BlogObservationCommitted p)) ->
+            | Fact.Agent(AgentFact.Companion(CompanionFactCases.XTracePartAppended p)) -> pair p.TextRef p.TextDigest
+            | Fact.Agent(AgentFact.Companion(CompanionFactCases.TerminalOutputCaptured p)) ->
                 pair p.TextRef p.TextDigest
-                @ (p.EvidenceRef |> Option.toList |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
-            | Fact.Agent (AgentFact.Context (ContextFactCases.BlogObservationsSquashed p)) -> pair p.TextRef p.TextDigest
-            | Fact.Agent (AgentFact.Context (ContextFactCases.BloggerRequestMaterialized p)) ->
+            | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationCommitted p)) ->
+                pair p.TextRef p.TextDigest
+                @ (p.EvidenceRef
+                   |> Option.toList
+                   |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
+            | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationsSquashed p)) -> pair p.TextRef p.TextDigest
+            | Fact.Agent(AgentFact.Context(ContextFactCases.BloggerRequestMaterialized p)) ->
                 pair p.ContextRef p.ContextDigest
                 @ (p.SelectedFrameDigests |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
-            | Fact.Agent (AgentFact.Context (ContextFactCases.PrefixRebaseCommitted p)) ->
+            | Fact.Agent(AgentFact.Context(ContextFactCases.PrefixRebaseCommitted p)) ->
                 pair p.FrozenRecordPrefixRef p.FrozenRecordPrefixDigest
-            | Fact.Agent (AgentFact.Fission (FissionFactCases.FissionAdmitted p)) ->
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionAdmitted p)) ->
                 pair p.OwnerWorkRecordRef p.OwnerWorkRecordDigest
-            | Fact.Agent (AgentFact.Fission (FissionFactCases.FissionLaneMaterialized p)) ->
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionLaneMaterialized p)) ->
                 pair p.WorkRecordRef p.WorkRecordDigest
-            | Fact.Agent (AgentFact.Fission (FissionFactCases.FissionCompletionCaptured p)) ->
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionCompletionCaptured p)) ->
                 pair p.PayloadRef p.PayloadDigest
-            | Fact.Agent (AgentFact.Fission (FissionFactCases.FissionConverged p)) ->
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionConverged p)) ->
                 pair p.AggregateWorkRecordRef p.AggregateWorkRecordDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.LifeOpened p) -> pair p.OpeningTextRef p.OpeningTextDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.FinalityRequested p) -> pair p.LastWordsRef p.LastWordsDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.FinalityRejected p) -> pair p.WorkRecordRef p.WorkRecordDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.FinalitySiblingSteered p) -> pair p.WorkRecordRef p.WorkRecordDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.FinalityBlessed p) ->
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.LifeOpened p) -> pair p.OpeningTextRef p.OpeningTextDigest
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityRequested p) -> pair p.LastWordsRef p.LastWordsDigest
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityRejected p) -> pair p.WorkRecordRef p.WorkRecordDigest
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalitySiblingSteered p) ->
+                pair p.WorkRecordRef p.WorkRecordDigest
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityBlessed p) ->
                 pair p.WorkRecordBundleRef p.WorkRecordBundleDigest
-            | Fact.ManagerLifecycle (ManagerLifecycleFact.LifeCompleted p) -> pair p.TerminalRef p.TerminalDigest
+            | Fact.ManagerLifecycle(ManagerLifecycleFact.LifeCompleted p) -> pair p.TerminalRef p.TerminalDigest
             | _ -> []
 
         PayloadRefs.canonicalize refs
@@ -196,7 +208,9 @@ type EventStoreJournalWriter
                 if List.isEmpty heads then [] else heads
             | _ -> store.TryHead streamId |> Option.toList
 
-        let encoded = EventStoreJournalCodec.encode parents (JournalPayloadClosure.ofFact envelope.Fact) envelope
+        let encoded =
+            EventStoreJournalCodec.encode parents (JournalPayloadClosure.ofFact envelope.Fact) envelope
+
         store.Append [ encoded ]
 
     static member private currentJournalProjection(store: IEventStore) : Result<ProjectionSet, FoldRejection> =

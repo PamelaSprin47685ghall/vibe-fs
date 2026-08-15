@@ -217,12 +217,7 @@ type SyncDelegateRuntime
         store.ObserveProviderToolCall(ownerSessionId, providerRun, role, callId)
 
     member _.TryObservedBatch
-        (
-            ownerSessionId: SessionId,
-            providerRun: ProviderRunIdentity,
-            role: SyncDelegateRole,
-            currentCall: ToolCallId
-        ) =
+        (ownerSessionId: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, currentCall: ToolCallId) =
         store.TryObservedBatch(ownerSessionId, providerRun, role, currentCall)
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)

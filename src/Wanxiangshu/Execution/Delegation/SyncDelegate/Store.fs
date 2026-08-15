@@ -91,7 +91,9 @@ type internal SyncDelegateCallStore() as this =
     let keyOf (scope: ReuseScopeId) role = scopeKey scope, role
     let callKey (callId: ToolCallId) = ToolCallId.value callId
     let providerRunKey (providerRun: ProviderRunIdentity) = ProviderRunIdentity.value providerRun
-    let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) = sessionKey owner, providerRunKey providerRun
+
+    let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) =
+        sessionKey owner, providerRunKey providerRun
 
     let sameCallOrder left right =
         List.map callKey left = List.map callKey right
@@ -118,6 +120,7 @@ type internal SyncDelegateCallStore() as this =
         =
         lock gate (fun () ->
             let key = observedKey owner providerRun
+
             let observed =
                 match observedProviderRuns.TryGetValue key with
                 | true, current -> current
@@ -125,6 +128,7 @@ type internal SyncDelegateCallStore() as this =
                     let created =
                         { Calls = ResizeArray<SyncDelegateRole * ToolCallId>()
                           Seen = HashSet<string>() }
+
                     observedProviderRuns.[key] <- created
                     created
 
@@ -257,7 +261,9 @@ type internal SyncDelegateCallStore() as this =
                 activeBatches.Remove key |> ignore
 
             let observedKeys =
-                observedProviderRuns.Keys |> Seq.filter (fun (owner, _) -> owner = sKey) |> Seq.toList
+                observedProviderRuns.Keys
+                |> Seq.filter (fun (owner, _) -> owner = sKey)
+                |> Seq.toList
 
             for key in observedKeys do
                 observedProviderRuns.Remove key |> ignore

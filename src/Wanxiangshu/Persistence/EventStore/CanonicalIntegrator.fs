@@ -310,7 +310,8 @@ module CanonicalIntegrator =
                             fun () ->
                                 lock gate (fun () ->
                                     if generation <> expectedGeneration then
-                                        failwith "CanonicalIntegrator Current changed between prepare and durable append"
+                                        failwith
+                                            "CanonicalIntegrator Current changed between prepare and durable append"
 
                                     state <- prepared
                                     generation <- generation + 1L)

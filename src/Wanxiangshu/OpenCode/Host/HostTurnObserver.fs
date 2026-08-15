@@ -82,8 +82,7 @@ module HostTurnObserver =
 
             for KeyValue(_, companion) in scope.Sessions.Companions do
                 match companion.BloggerSession with
-                | Some bloggerId when bloggerId = turn.SessionId ->
-                    companion.StartRecoveryOpportunity() |> ignore
+                | Some bloggerId when bloggerId = turn.SessionId -> companion.StartRecoveryOpportunity() |> ignore
                 | _ -> ()
         | _ -> ()
 

@@ -119,7 +119,8 @@ module MagicTodoFactCodec =
     /// content address (lowercase sha256 hex) the store names files by. Anything
     /// else — a test placeholder or malformed data — is not a payload dependency.
     let private payloadRefOfContentAddress (value: string) : PayloadRef option =
-        let isHex c = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+        let isHex c =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
 
         if value.Length = 64 && value |> Seq.forall isHex then
             Some(PayloadRef.create value)
@@ -159,13 +160,9 @@ module MagicTodoFactCodec =
                   payloadRefOfBlobDigest p.WorkRecordDigest
                   payloadRefOfBlobRef p.SettledTodoRef
                   payloadRefOfBlobDigest p.SettledTodoDigest ]
-        | MagicTodoFact.DedicatedTodoReviewerReplaced p ->
-            List.choose id [ payloadRefOfBlobRef p.EvidenceRef ]
+        | MagicTodoFact.DedicatedTodoReviewerReplaced p -> List.choose id [ payloadRefOfBlobRef p.EvidenceRef ]
         | MagicTodoFact.LegacyTodoSeedAdopted p ->
-            List.choose
-                id
-                [ payloadRefOfBlobRef p.SeedTodoRef
-                  payloadRefOfBlobDigest p.SeedTodoDigest ]
+            List.choose id [ payloadRefOfBlobRef p.SeedTodoRef; payloadRefOfBlobDigest p.SeedTodoDigest ]
         | MagicTodoFact.PrefixRebaseCommittedV2 p ->
             List.choose
                 id

@@ -283,6 +283,13 @@ module DedicatedTodoReviewerRuntime =
             | Ok _ -> return Ok()
         }
 
+    let private concludeReview (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) =
+        task {
+            match! TodoProcessReviewProgram.tryConclude journal lifeId writeId with
+            | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
+            | _ -> return Ok()
+        }
+
     /// Assignment + delivery for one unresolved checkpoint (HOST-021).
     ///
     /// Everything happens in one direct CE: the barrier opens once per
@@ -327,11 +334,9 @@ module DedicatedTodoReviewerRuntime =
             match barrierResult with
             | Error reason -> return Error reason
             | Ok() ->
-                let! oldItemsResult =
-                    readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
+                let! oldItemsResult = readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
 
-                let! proposedResult =
-                    readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+                let! proposedResult = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
 
                 match oldItemsResult, proposedResult with
                 | Error reason, _
@@ -343,11 +348,7 @@ module DedicatedTodoReviewerRuntime =
                         let! opening = openingRaw journal managerLife
 
                         let! checkpointLwr =
-                            managerCheckpointLwr
-                                journal
-                                managerSessionId
-                                managerLife
-                                checkpoint.ReviewFrontier
+                            managerCheckpointLwr journal managerSessionId managerLife checkpoint.ReviewFrontier
 
                         let request: ProcessReviewRequest =
                             { TodoReviewId = reviewId
@@ -401,11 +402,7 @@ module DedicatedTodoReviewerRuntime =
                             with
                             | PromptAuthorityLedger.DispatchStatus.Accepted _
                             | PromptAuthorityLedger.DispatchStatus.Pending ->
-                                match!
-                                    TodoProcessReviewProgram.tryConclude journal lifeId writeId
-                                with
-                                | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
-                                | _ -> return Ok()
+                                return! concludeReview journal lifeId writeId
                             | PromptAuthorityLedger.DispatchStatus.Dispatchable ->
                                 let hasActiveProfile =
                                     PromptAuthorityLedger.activeProfile
@@ -456,12 +453,7 @@ module DedicatedTodoReviewerRuntime =
 
                                 match sent with
                                 | Error reason -> return Error reason
-                                | Ok() ->
-                                    match!
-                                        TodoProcessReviewProgram.tryConclude journal lifeId writeId
-                                    with
-                                    | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> return Error reason
-                                    | _ -> return Ok()
+                                | Ok() -> return! concludeReview journal lifeId writeId
         }
 
     let ensureReview

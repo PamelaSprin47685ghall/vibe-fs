@@ -91,7 +91,9 @@ module SyncDelegateBatching =
     let private isPrefix (left: ToolCallId list) (right: ToolCallId list) =
         let leftKeys = left |> List.map callKey
         let rightKeys = right |> List.map callKey
-        leftKeys.Length <= rightKeys.Length && leftKeys = (rightKeys |> List.take leftKeys.Length)
+
+        leftKeys.Length <= rightKeys.Length
+        && leftKeys = (rightKeys |> List.take leftKeys.Length)
 
     let private moreCompleteBatch
         (observed: SyncDelegateBatch option)

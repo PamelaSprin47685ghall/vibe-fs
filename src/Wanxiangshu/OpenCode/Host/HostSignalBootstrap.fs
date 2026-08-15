@@ -75,7 +75,8 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 module HostSignalBootstrap =
 
     let private eventString (value: obj) =
-        if isNull value then None
+        if isNull value then
+            None
         else
             let text = string value
             if String.IsNullOrWhiteSpace text then None else Some text

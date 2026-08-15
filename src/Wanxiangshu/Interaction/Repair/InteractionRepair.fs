@@ -165,7 +165,10 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         : Task =
-        if isFissionReplaced journal context.Turn.SessionId || isRecoveryContinue journal context.Turn then
+        if
+            isFissionReplaced journal context.Turn.SessionId
+            || isRecoveryContinue journal context.Turn
+        then
             AsyncSupport.completedTask ()
         else
             trySendIdleRepair
