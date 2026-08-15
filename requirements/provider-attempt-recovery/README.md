@@ -44,4 +44,4 @@
 
 ## 依赖
 
-DEPENDS ON：`participant-identity`（换执行者 ≠ 换人；身份字节 guarantee 由 identity 包提供）、`execution-model-routing`（EffectiveAgent 对应的 session model lease）、`interaction-authority`（continuation 的 wire/authority 语义）。理由：PAR-013 的「只换 EffectiveAgent，再由 lane/lease 解析物理执行」消费前两者；PAR-014 的「continuation 只在该 Run 内」消费 interaction authority。
+DEPENDS ON：`participant-identity`（换执行者 ≠ 换人；身份字节 guarantee 由 identity 包提供）、`execution-model-routing`（EffectiveAgent 对应的 session model lease）、`interaction-authority`（continuation 的 wire/authority 语义）。理由：PAR-013 的「只换 EffectiveAgent，再由 MJS scheduler/lease 解析物理执行」消费前两者；PAR-014 的「continuation 只在该 Run 内」消费 interaction authority。

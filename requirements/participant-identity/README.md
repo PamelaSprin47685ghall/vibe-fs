@@ -38,5 +38,5 @@
 - provider 看见的与可执行的 capability 同源不扩权 → `capability-enforcement`。
 - session 的 execution class / ownership / attachment → `session-ontology`（本包 DEPENDS ON 它）。
 - attempt 失败后有界换 binding（fallback 算法）→ `provider-attempt-recovery`。
-- EffectiveAgent→lane→ModelTarget、容量与等待 → `execution-model-routing`。
+- EffectiveAgent→MJS scheduler→ModelTarget、lease occupancy 与等待 → `execution-model-routing`。
 - 已呈现前缀字节稳定性 → `prefix-stability`；provider 语言绑定 → `provider-language`。

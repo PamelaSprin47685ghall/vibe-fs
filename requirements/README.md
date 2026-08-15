@@ -46,7 +46,7 @@ tests/      本包拥有的可执行 proof（*.test.mjs）
 | Package | 一句话 WHY |
 |---|---|
 | [participant-identity](participant-identity/README.md) | Role、Persona、ExecutionBinding 分离，换执行者不等于换人。 |
-| [execution-model-routing](execution-model-routing/README.md) | managed EffectiveAgent 经唯一 TOML 的七个容量 lane 解析物理模型；`opencode.json` 不拥有 model authority。 |
+| [execution-model-routing](execution-model-routing/README.md) | 唯一 MJS scheduler 以 `role + running` 决定 ModelTarget；runtime 只维护事件驱动 lease occupancy，`opencode.json` 不拥有 model authority。 |
 | [office-capability](office-capability/README.md) | office 由有资格产生的后果定义，不由 persona 名或工具白名单定义。 |
 | [capability-enforcement](capability-enforcement/README.md) | provider 看见的与 runtime 真能执行的 capability 同源且不扩大 office entitlement。 |
 | [participant-horizon](participant-horizon/README.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |

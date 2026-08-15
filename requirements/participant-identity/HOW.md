@@ -33,7 +33,7 @@
 
 | 内容 | 裁决 | 理由 |
 |------|------|------|
-| AGENT-002「恰好 22 名」 | HOW（runtime contract） | COVERAGE：exact catalog + machine names = implementation vocabulary；managed catalog 仍精确覆盖 20 Role×tier + 2 Bookkeeper。旧“每名必须带非空 model 串”已由 `execution-model-routing` 的 lane/TOML 合同取代；model 不再是 agent inventory 字段。 |
+| AGENT-002「恰好 22 名」 | HOW（runtime contract） | COVERAGE：exact catalog + machine names = implementation vocabulary；managed catalog 仍精确覆盖 20 Role×tier + 2 Bookkeeper。旧“每名必须带非空 model 串”已由 `execution-model-routing` 的 MJS scheduler/lease 合同取代；model 不再是 agent inventory 字段。 |
 | AGENT-004 非法旧名清单（orchestrator/meditator/student/…） | GARBAGE（migration ratchet） | legacy reject = 迁移证明；`catalog.test.mjs` 的 `AGENT_004_*` 断言保留作 ratchet，新世界基线稳定后可删 |
 | Persona display 名（Integrator/Director/Coordinator/…） | HOW | AGENT-028 表是当前命名；除非命名成为 public contract，否则不构成 WHAT |
 | `SessionPersona` process-local `Dictionary` | HOW | Phase 16 实现；durable journal fact 是未来演进，不改变「bind-once」语义 |

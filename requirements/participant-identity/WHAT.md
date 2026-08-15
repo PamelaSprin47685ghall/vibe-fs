@@ -7,7 +7,7 @@
 
 `Role` 是可数个固定 office 身份（`src/Wanxiangshu/Kernel/Roles.fs`：Manager / Orchestrator / Coder /
 Inspector / DevOps / Browser / Inquiry / Reviewer / Distiller / Blogger），`AgentTier` 只有 Fast/Deep。
-Tier **只**改变 ExecutionBinding 的机器档位（EffectiveAgent；具体物理模型由 `execution-model-routing` 的 lane/lease 决定，AGENT-029），不产生新 Role、不改变 Role Law、不改变工具权限。
+Tier **只**改变 ExecutionBinding 的机器档位（EffectiveAgent；具体物理 ModelTarget 由 `execution-model-routing` 的 scheduler/lease 决定，AGENT-029），不产生新 Role、不改变 Role Law、不改变工具权限。
 
 含义/动机：若 tier 参与身份，fast/deep 会演化成两套产品；Peer Fallback 换 tier 时角色漂移。
 
@@ -92,7 +92,7 @@ tier/binding 输入」这个事实。
 
 含义/动机：fallback 消费 peer 的前提是 peer 确实存在；pair 是「同一 office 的另一个执行档」，不是另一身份。物理模型是否相同不参与 peer 本体——A/B 可以最终解析到同一 model。
 
-边界：fallback 何时/如何消费 peer → `provider-attempt-recovery`；EffectiveAgent→lane→ModelTarget 与容量 → `execution-model-routing`；「恰好 22 名」的精确目录是 HOW/GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
+边界：fallback 何时/如何消费 peer → `provider-attempt-recovery`；EffectiveAgent→MJS scheduler→ModelTarget、lease occupancy 与等待 → `execution-model-routing`；「恰好 22 名」的精确目录是 HOW/GARBAGE（见 `HOW.md` 历史与弃权）；本包只拥有配对本体。
 
 证据：`catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric`。
 

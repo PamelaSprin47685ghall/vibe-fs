@@ -152,7 +152,7 @@ eligibility gate → deterministic control bucket → shadow/treatment mode
   repository fact acquisition 的合法输入。
 - `participant-identity`：Replica 继承 owner 的 persona/language、只换 execution binding——
   「换执行者不等于换人」由该包保证。
-- `execution-model-routing`：`fast-<owner-role>` 的实际 ModelTarget、容量 lease 与 process-shared admission 由 lane allocator 保证；Strength 不再读静态 fast/deep model string。
+- `execution-model-routing`：`fast-<owner-role>` 的实际 ModelTarget、lease occupancy 与 process-shared admission 由 MJS scheduler/runtime 保证；Strength 不再读静态 fast/deep model string。scheduler 返回 `null` 时该 optional replica 直接 K0，不进入 required wait queue。
 - `participant-horizon`：Replica 可见面是 owner horizon 的投影；跨 Session 只比语义投影。
 - `provider-projection`：UseStrengthMirror / InsertStrengthFrames 的代数与确定性由该包保证。
 - `semantic-trace`：Promoted 最终进入 XTrace；unpromoted ∉ history 的另一半在该包。

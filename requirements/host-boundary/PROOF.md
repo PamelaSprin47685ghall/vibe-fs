@@ -27,7 +27,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | HOST-BOUNDARY-018 | REUSE `requirements/host-boundary/tests/host-hooks.test.mjs`（ARCH-003 只用现有 Hook/SDK） | REUSE | `node --test requirements/host-boundary/tests/host-hooks.test.mjs` |
 | HOST-BOUNDARY-019 | 本包全部 canary（MOVE/NEW 表）；`tests/host-capability-observation.test.mjs`（HostContractUnsupported 显式失败）；REUSE 本文件 Magic Todo membrane canary 清单（H/A/C 未落地 → GAP，见下）；managed request model mutation + title/compaction model projection canary → `execution-model-routing` GAP-016 | NEW + REUSE + GAP-016 | 见各行 |
 | HOST-BOUNDARY-020 | `tests/session-snapshot-locality.test.mjs`（Ambiguous）、`tests/host001-fragment-events.test.mjs`（codec 丢弃）、`tests/needhelp-sensor.test.mjs`（armed 唯一） | MOVE | 见各行 |
-| HOST-BOUNDARY-021 | `tests/plugin-load-purity.test.mjs`：plugin load graph 禁 Host session API/recovery/workspace mutation；ordinary join 只认 current-process handle/Fission binding；Open Fission/Assistance/JS pending state 保持 broken，不由普通入口恢复 | NEW | `node --test requirements/host-boundary/tests/plugin-load-purity.test.mjs` |
+| HOST-BOUNDARY-021 | `tests/plugin-load-purity.test.mjs`：plugin load graph 禁 Host session API/recovery/workspace mutation；ordinary join 只认 current-process handle/Fission binding；Open Fission/Assistance/JS pending state 保持 broken，不由普通入口恢复；`execution-model-routing` GAP-016 planned bootstrap oracle 证明唯一允许的缺失用户配置 create-if-absent 不覆盖已有文件、不调用 Host | NEW + GAP-016 | `node --test requirements/host-boundary/tests/plugin-load-purity.test.mjs`；bootstrap 部分见 execution-model-routing PROOF |
 
 ## GAP 记录
 

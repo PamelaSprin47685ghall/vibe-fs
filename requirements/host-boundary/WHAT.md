@@ -227,7 +227,7 @@ outcome 完成新 run。
 
 **含义/动机**：身份观察与 Host schema 投影都是边界能力；alias 拒绝防止把非 managed 名当真实角色，单向投影防止 `opencode.json` 反向成为模型 truth。
 
-**边界**：Role 身份规则本体归 `participant-identity`；`external_directory` 允许语义归 `capability-enforcement`（AGENT-019 交叉）；managed model source/lane/capacity 归 `execution-model-routing`；本命题只拥有 Host 观察/投影适配面。
+**边界**：Role 身份规则本体归 `participant-identity`；`external_directory` 允许语义归 `capability-enforcement`（AGENT-019 交叉）；managed model scheduler source/lease occupancy 归 `execution-model-routing`；本命题只拥有 Host 观察/投影适配面。
 
 **证据**：`HostSessionContext.read/roleOf`、`ManagedAgentConfig` owned-field projection；model-authority 迁移见 `execution-model-routing` GAP-016。
 
@@ -263,7 +263,7 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 
 ## HOST-BOUNDARY-021：plugin load/init 不得执行业务语义或反向调用 Host
 
-**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools。禁止在此阶段：
+**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools，以及对**缺失的 Wanxiangshu 用户配置载体**执行无业务语义的 create-if-absent bootstrap（当前为 `~/.config/opencode/wanxiangshu.mjs` 推荐模板；已有文件绝不改写）。禁止在此阶段：
 
 - 调用 `client.session.*`、prompt/abort/create/list 等任何会进入 Host 业务路径的 API；
 - 执行 crash/business recovery、全局 recovery sweep、恢复 session/fission/assistance runtime cache；

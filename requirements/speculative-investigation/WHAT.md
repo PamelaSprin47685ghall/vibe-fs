@@ -57,7 +57,7 @@ completion 终止 speculation，正文永不注入 primary。
 
 **规范陈述**：Replica = `InternalLeaf × Attached(owner, StrengthReplica)`，使用
 `fast-<owner-role>`；**不新增** CanonicalRole/Agent/system prompt。Replica **继承** owner 的
-`SessionPersona` 与 `SessionProviderLanguage`；只换 ExecutionBinding 到 fast EffectiveAgent，其物理 ModelTarget 由 `execution-model-routing` lane/lease 解析，不换人、不换世界语。每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用
+`SessionPersona` 与 `SessionProviderLanguage`；只换 ExecutionBinding 到 fast EffectiveAgent，其物理 ModelTarget 由 `execution-model-routing` 的 MJS scheduler/lease 解析，不换人、不换世界语。每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用
 transcript。Replica 无 Companion、SyncDelegate、嵌套 StrengthReplica、fork/horizon/join、
 deep fallback 或用户权限交互。provider-visible schema 与 execution gate 必须同源且恰好允许
 `read/glob/grep`；任何其它工具 fail closed。Replica 成败不推进 owner FallbackCursor，不清零
