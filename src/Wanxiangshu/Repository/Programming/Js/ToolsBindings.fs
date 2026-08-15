@@ -136,10 +136,7 @@ module JsToolsBindings =
                         "glob"
                         ==> fun (pattern: string) ->
                             match JsGlobFs.glob root pattern with
-                            | Ok listing ->
-                                createObj
-                                    [ "ok" ==> true
-                                      "paths" ==> (List.toArray listing.Paths) ]
+                            | Ok listing -> createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
                             | Error failure -> failureObj failure
                         "grep"
                         ==> fun (needle: obj) (pattern: string) ->
@@ -168,9 +165,7 @@ module JsToolsBindings =
                                                       "column" ==> hit.Column
                                                       "text" ==> hit.Text ])
 
-                                        createObj
-                                            [ "ok" ==> true
-                                              "matches" ==> (List.toArray matches) ]
+                                        createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
                         "edit"
                         ==> fun (path: string) (newText: obj) ->
                             let replacement = string newText

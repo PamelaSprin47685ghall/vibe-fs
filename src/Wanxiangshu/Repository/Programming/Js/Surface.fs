@@ -83,7 +83,11 @@ module JsToolGenerator =
         : string =
         JsCanonicalDescription.render prose roleName (toolNameFor roleName) capabilities
 
-    let renderExamples (_prose: JsCanonicalDescription.Prose) (roleName: string) (capabilities: Set<JsCapability>) : string list =
+    let renderExamples
+        (_prose: JsCanonicalDescription.Prose)
+        (roleName: string)
+        (capabilities: Set<JsCapability>)
+        : string list =
         JsCanonicalDescription.ultraExample roleName capabilities
         |> Option.map (fun example -> [ example.Source ])
         |> Option.defaultValue []
