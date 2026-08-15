@@ -102,3 +102,108 @@ test('failed silent interrupt rolls back lanes; second admission while active is
   release(live.runtime, owner)
   assert.equal(isActive(live.runtime, owner), false)
 })
+
+test('FissionRuntime preserves silent interrupt across multiple checks and is cleared only by clearOwner/clearSilentInterrupt', async () => {
+  const {
+    FissionRuntime_markSilentInterrupt: markSilentInterrupt,
+    FissionRuntime_isSilentInterrupt: isSilentInterrupt,
+    FissionRuntime_tryConsumeSilentInterrupt: tryConsumeSilentInterrupt,
+    FissionRuntime_clearSilentInterrupt: clearSilentInterrupt,
+    FissionRuntime_clearOwner: clearOwner,
+  } = await import('../../../dist/Execution/Fission/Runtime.js')
+
+  const owner = sessionId('retired-owner-1')
+  assert.equal(isSilentInterrupt(owner), false)
+
+  markSilentInterrupt(owner)
+  assert.equal(isSilentInterrupt(owner), true)
+  assert.equal(tryConsumeSilentInterrupt(owner), true)
+  // Must NOT be cleared after consuming once:
+  assert.equal(isSilentInterrupt(owner), true)
+  assert.equal(tryConsumeSilentInterrupt(owner), true)
+
+  clearSilentInterrupt(owner)
+  assert.equal(isSilentInterrupt(owner), false)
+
+  markSilentInterrupt(owner)
+  assert.equal(isSilentInterrupt(owner), true)
+  clearOwner(owner)
+  assert.equal(isSilentInterrupt(owner), false)
+})
+
+test('observeLaneTurn and OrdinaryTurnWorkflow absorb Fission-replaced owner turns without sending continuations', async () => {
+  const {
+    FissionRuntime_markSilentInterrupt: markSilentInterrupt,
+    FissionRuntime_clearOwner: clearOwner,
+  } = await import('../../../dist/Execution/Fission/Runtime.js')
+  const { observeLaneTurn } = await import('../../../dist/Execution/Fission/OpenCode/Host.js')
+  const { observe, observeIdle } = await import('../../../dist/Composition/Turn/OrdinaryTurnWorkflow.js')
+  const { ReconciledTurn, ReconciledTurnContext, ReconciledTurnDelivery } = await import('../../../dist/Composition/Turn/Observation.js')
+  const { PhysicalUserMessageIdModule_create: physicalId, AuthorityRootUserMessageIdModule_create: rootId, ProviderRunIdentityModule_create: runId } = await import('../../../dist/Foundation/Identity.js')
+  const { TurnOutcome, SnapshotObservation } = await import('../../../dist/Composition/Turn/Program.js')
+
+  const owner = sessionId('retired-owner-workflow')
+  markSilentInterrupt(owner)
+
+  try {
+    const turn = new ReconciledTurn(
+      owner,
+      physicalId('msg-1'),
+      rootId('msg-0'),
+      runId('run-1'),
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      TurnOutcome.TurnInProgress,
+      undefined,
+    )
+
+    let continuationSent = false
+    let terminalNotified = false
+
+    const sessionPort = {
+      SendPrompt: async () => {
+        continuationSent = true
+        return { tag: 0, fields: [] }
+      },
+      AbortChildren: async () => {},
+    }
+    const eventPort = {
+      NotifyTerminal: () => {
+        terminalNotified = true
+      },
+    }
+
+    // FissionHost.observeLaneTurn must absorb owner turn (return true)
+    const handled = await observeLaneTurn(sessionPort, eventPort, undefined, new Set(), turn)
+    assert.equal(handled, true, 'Fission owner turn must be handled/absorbed by FissionHost')
+
+    // OrdinaryTurnWorkflow.observe must short-circuit without continuing
+    const context = new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation)
+    await observe(
+      undefined,
+      () => {},
+      sessionPort,
+      eventPort,
+      undefined,
+      new Set(),
+      () => false,
+      new Set(),
+      undefined,
+      undefined,
+      context,
+    )
+    assert.equal(continuationSent, false, 'observe must not send continuations for retired Fission owner')
+    assert.equal(terminalNotified, false, 'observe must not publish terminal for retired Fission owner')
+
+    // OrdinaryTurnWorkflow.observeIdle must also short-circuit
+    const idleContext = new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.IdleRevisit)
+    await observeIdle(undefined, sessionPort, eventPort, undefined, idleContext)
+    assert.equal(continuationSent, false, 'observeIdle must not send continuations for retired Fission owner')
+  } finally {
+    clearOwner(owner)
+  }
+})
