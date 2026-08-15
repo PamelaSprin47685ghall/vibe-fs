@@ -68,32 +68,33 @@ module EventStoreJournalCodec =
         | Child id -> EventStreamId.create ("journal/child/" + ChildId.value id)
         | Process id -> EventStreamId.create ("journal/process/" + ProcessId.value id)
 
+    let private decodeIdSegment
+        (prefix: string)
+        (emptyError: string)
+        (create: string -> 'a)
+        (raw: string)
+        : Result<'a, string> =
+        let id = raw.Substring(prefix.Length)
+
+        if String.IsNullOrEmpty id then
+            Error emptyError
+        else
+            Ok(create id)
+
     let tryDecodeStreamId (streamId: EventStreamId) : Result<StreamId, string> =
         let raw = EventStreamId.value streamId
 
         if raw = "journal/workspace" then
             Ok Workspace
         elif raw.StartsWith("journal/session/", StringComparison.Ordinal) then
-            let id = raw.Substring("journal/session/".Length)
-
-            if String.IsNullOrEmpty id then
-                Error "empty session id in EventStreamId"
-            else
-                Ok(Session(SessionId.create id))
+            decodeIdSegment "journal/session/" "empty session id in EventStreamId" SessionId.create raw
+            |> Result.map Session
         elif raw.StartsWith("journal/child/", StringComparison.Ordinal) then
-            let id = raw.Substring("journal/child/".Length)
-
-            if String.IsNullOrEmpty id then
-                Error "empty child id in EventStreamId"
-            else
-                Ok(Child(ChildId.create id))
+            decodeIdSegment "journal/child/" "empty child id in EventStreamId" ChildId.create raw
+            |> Result.map Child
         elif raw.StartsWith("journal/process/", StringComparison.Ordinal) then
-            let id = raw.Substring("journal/process/".Length)
-
-            if String.IsNullOrEmpty id then
-                Error "empty process id in EventStreamId"
-            else
-                Ok(Process(ProcessId.create id))
+            decodeIdSegment "journal/process/" "empty process id in EventStreamId" ProcessId.create raw
+            |> Result.map Process
         else
             Error(sprintf "unrecognized journal EventStreamId: %s" raw)
 
@@ -124,22 +125,27 @@ module EventStoreJournalCodec =
               Payload = payloadFromEnvelope envelope
               PayloadRefs = payloadRefs }
 
+    let private ensureStreamMatches (stream: StreamId) (decoded: Envelope) =
+        if stream <> decoded.Stream then
+            Error "EventStreamId does not match journal payload Stream"
+        else
+            Ok decoded
+
+    let private ensureStreamId (event: EventEnvelope) (decoded: Envelope) =
+        tryDecodeStreamId event.StreamId
+        |> Result.bind (fun stream -> ensureStreamMatches stream decoded)
+
+    let private validateDecoded (event: EventEnvelope) (decoded: Envelope) =
+        if decoded.EventId <> event.EventId then
+            Error "EventId mismatch between EventEnvelope and journal payload"
+        else
+            ensureStreamId event decoded
+
     /// Decode a Domain EventEnvelope back to a journal Envelope.
     /// Requires EventType = JournalEnvelope; EventId / Stream must agree with payload.
     let tryDecode (event: EventEnvelope) : Result<Envelope, string> =
         if event.EventType <> JournalEnvelopeEventType then
             Error(sprintf "expected EventType %s, got %s" JournalEnvelopeEventType event.EventType)
         else
-            match envelopeFromPayload event.Payload with
-            | Error err -> Error err
-            | Ok decoded ->
-                if decoded.EventId <> event.EventId then
-                    Error "EventId mismatch between EventEnvelope and journal payload"
-                else
-                    match tryDecodeStreamId event.StreamId with
-                    | Error err -> Error err
-                    | Ok stream ->
-                        if stream <> decoded.Stream then
-                            Error "EventStreamId does not match journal payload Stream"
-                        else
-                            Ok decoded
+            envelopeFromPayload event.Payload
+            |> Result.bind (validateDecoded event)

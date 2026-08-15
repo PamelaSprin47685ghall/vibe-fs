@@ -24,6 +24,24 @@ module Policy =
            |> Option.defaultValue 0.0)
         |> min 1.0
 
+    let private ungroundedFindings (state: EpistemicState) =
+        state.Findings
+        |> Map.toList
+        |> List.choose (fun (key, finding) ->
+            if
+                finding.EvidenceKeys
+                |> List.exists (fun evidenceKey -> State.hasEvidenceSemanticKey evidenceKey state)
+            then
+                None
+            else
+                Some("ungrounded-finding:" + key))
+
+    let private probabilisticUncertainty (root: RootContract) (state: EpistemicState) =
+        if probabilisticContractWeight root > 0.2 && state.Bayesian.IsNone then
+            [ "numeric-credence-unqualified" ]
+        else
+            []
+
     let canonicalAnswer reason (state: EpistemicState) =
         match state.RootContract with
         | None ->
@@ -43,24 +61,6 @@ module Policy =
               StopReason = reason
               Revision = state.Revision }
         | Some root ->
-            let ungrounded =
-                state.Findings
-                |> Map.toList
-                |> List.choose (fun (key, finding) ->
-                    if
-                        finding.EvidenceKeys
-                        |> List.exists (fun evidenceKey -> State.hasEvidenceSemanticKey evidenceKey state)
-                    then
-                        None
-                    else
-                        Some("ungrounded-finding:" + key))
-
-            let probabilistic =
-                if probabilisticContractWeight root > 0.2 && state.Bayesian.IsNone then
-                    [ "numeric-credence-unqualified" ]
-                else
-                    []
-
             let synthesisUncertainty =
                 state.Synthesis
                 |> Option.map (fun synthesis -> synthesis.Uncertainties)
@@ -73,7 +73,12 @@ module Policy =
               Hypotheses = state.Hypotheses |> Map.toList |> List.map snd
               Synthesis = state.Synthesis
               Bayesian = state.Bayesian
-              Uncertainties = List.distinct (ungrounded @ probabilistic @ synthesisUncertainty)
+              Uncertainties =
+                List.distinct (
+                    ungroundedFindings state
+                    @ probabilisticUncertainty root state
+                    @ synthesisUncertainty
+                )
               StopReason = reason
               Revision = state.Revision }
 
@@ -90,37 +95,46 @@ module Policy =
         let next = State.withYield request state
         next, InquiryResult.Yield request
 
+    let private exhaustedReason (state: EpistemicState) =
+        if Map.isEmpty state.Findings && Map.isEmpty state.Evidence then
+            "policy-exhausted"
+        elif state.Synthesis.IsSome then
+            "stop-dominates"
+        else
+            "marginal-value-exhausted"
+
+    let private synthesizeSelected (selected: EpistemicState) =
+        match selected.RootContract with
+        | Some root ->
+            let keys = selected.Findings |> Map.toList |> List.map fst
+            yieldRequest (SynthesizeRequest(keys, root)) selected
+        | None -> selected, InquiryResult.Error "root contract missing"
+
+    let private selectAndYield (action: CognitiveAction) (state: EpistemicState) =
+        let selected = markSelected action state
+
+        match action.Kind with
+        | ActionKind.Investigate -> yieldRequest (InvestigateRequest action) selected
+        | ActionKind.Synthesize -> synthesizeSelected selected
+
+    let private decideOpenAction (state: EpistemicState) =
+        match Value.bestOpenAction state with
+        | Some action when not (Value.stopDominates state) -> selectAndYield action state
+        | _ -> state, InquiryResult.Answered(canonicalAnswer (exhaustedReason state) state)
+
+    let private decideWithRoot (root: RootContract) (state: EpistemicState) =
+        if state.NeedsGeneration then
+            yieldRequest (GenerateCandidatesRequest(Methodology.generationMethods state, root)) state
+        else
+            decideOpenAction state
+
     let decide (state: EpistemicState) =
         if not (State.withinBudget state) then
             state, InquiryResult.Answered(canonicalAnswer "budget" state)
         else
             match state.RootContract with
             | None -> yieldRequest (SemanticAssessmentRequest state.RootQuestion) state
-            | Some root when state.NeedsGeneration ->
-                yieldRequest (GenerateCandidatesRequest(Methodology.generationMethods state, root)) state
-            | Some _ ->
-                match Value.bestOpenAction state with
-                | Some action when not (Value.stopDominates state) ->
-                    let selected = markSelected action state
-
-                    match action.Kind with
-                    | ActionKind.Investigate -> yieldRequest (InvestigateRequest action) selected
-                    | ActionKind.Synthesize ->
-                        match state.RootContract with
-                        | Some root ->
-                            let keys = state.Findings |> Map.toList |> List.map fst
-                            yieldRequest (SynthesizeRequest(keys, root)) selected
-                        | None -> selected, InquiryResult.Error "root contract missing"
-                | _ ->
-                    let reason =
-                        if Map.isEmpty state.Findings && Map.isEmpty state.Evidence then
-                            "policy-exhausted"
-                        elif state.Synthesis.IsSome then
-                            "stop-dominates"
-                        else
-                            "marginal-value-exhausted"
-
-                    state, InquiryResult.Answered(canonicalAnswer reason state)
+            | Some root -> decideWithRoot root state
 
     let start (question: string) =
         let text = if isNull question then "" else question.Trim()
@@ -130,10 +144,15 @@ module Policy =
         else
             State.create text |> decide
 
+    let private resumeMatched (state: EpistemicState) (observation: Observation) =
+        Closure.absorbAndClose state observation |> decide
+
+    let private resumeWithRequest (state: EpistemicState) (request: Request) (observation: Observation) =
+        match observationMatches request observation with
+        | Error error -> state, InquiryResult.Error error
+        | Ok() -> resumeMatched state observation
+
     let resume (state: EpistemicState) (observation: Observation) =
         match state.PendingRequest with
         | None -> state, InquiryResult.Error "no pending kernel request"
-        | Some request ->
-            match observationMatches request observation with
-            | Error error -> state, InquiryResult.Error error
-            | Ok() -> Closure.absorbAndClose state observation |> decide
+        | Some request -> resumeWithRequest state request observation

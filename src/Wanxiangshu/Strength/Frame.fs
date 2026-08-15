@@ -72,6 +72,25 @@ module StrengthFrame =
     /// Fable-compatible UTF-8 length. .NET Encoding.GetByteCount is not
     /// available in Fable, while UTF-16 String.Length would undercharge non-ASCII
     /// payloads and make the hard byte fuse platform-dependent.
+    let private isUtf16LowSurrogate (code: int) = code >= 0xDC00 && code <= 0xDFFF
+
+    let private utf8Step (text: string) (index: int) =
+        let code = int text.[index]
+
+        if code <= 0x7F then
+            1, 1
+        elif code <= 0x7FF then
+            2, 1
+        elif
+            code >= 0xD800
+            && code <= 0xDBFF
+            && index + 1 < text.Length
+            && isUtf16LowSurrogate (int text.[index + 1])
+        then
+            4, 2
+        else
+            3, 1
+
     let utf8ByteCount (value: string) =
         let text = if isNull value then "" else value
 
@@ -79,21 +98,8 @@ module StrengthFrame =
             if index >= text.Length then
                 total
             else
-                let code = int text.[index]
-
-                if code <= 0x7F then
-                    loop (index + 1) (total + 1)
-                elif code <= 0x7FF then
-                    loop (index + 1) (total + 2)
-                elif code >= 0xD800 && code <= 0xDBFF && index + 1 < text.Length then
-                    let next = int text.[index + 1]
-
-                    if next >= 0xDC00 && next <= 0xDFFF then
-                        loop (index + 2) (total + 4)
-                    else
-                        loop (index + 1) (total + 3)
-                else
-                    loop (index + 1) (total + 3)
+                let width, advance = utf8Step text index
+                loop (index + advance) (total + width)
 
         loop 0 0
 
@@ -120,6 +126,22 @@ module StrengthFrame =
     let canonicalText (batches: StrengthRequestBatch list) =
         batches |> List.map canonicalBatch |> String.concat "\u001c"
 
+    let private buildValidated
+        (sha256: string -> string)
+        (maxBytes: int)
+        (batches: StrengthRequestBatch list)
+        : Result<StrengthFrameBundle, StrengthFrameError> =
+        let canonical = canonicalText batches
+        let bytes = utf8ByteCount canonical
+
+        if maxBytes < 0 || bytes > maxBytes then
+            Error(StrengthFrameError.ByteLimitExceeded(bytes, maxBytes))
+        else
+            Ok
+                { Batches = batches
+                  Digest = sha256 canonical
+                  ByteLength = bytes }
+
     let tryBuild
         (sha256: string -> string)
         (maxBytes: int)
@@ -132,29 +154,16 @@ module StrengthFrame =
                 Error(StrengthFrameError.InvalidRequestOrdinal(expected, batch.RequestOrdinal))
             | batch :: _ when List.isEmpty batch.Exchanges -> Error(StrengthFrameError.EmptyBatch batch.RequestOrdinal)
             | batch :: tail ->
-                match
-                    batch.Exchanges
-                    |> List.tryFind (fun exchange -> not (isAllowedTool exchange.ToolName))
-                with
-                | Some invalid -> Error(StrengthFrameError.UnsupportedTool invalid.ToolName)
-                | None -> validateBatches (expected + 1) tail
+                batch.Exchanges
+                |> List.tryFind (fun exchange -> not (isAllowedTool exchange.ToolName))
+                |> Option.map (fun invalid -> Error(StrengthFrameError.UnsupportedTool invalid.ToolName))
+                |> Option.defaultWith (fun () -> validateBatches (expected + 1) tail)
 
         match batches with
         | [] -> Error StrengthFrameError.EmptyBundle
         | _ ->
-            match validateBatches 1 batches with
-            | Error error -> Error error
-            | Ok() ->
-                let canonical = canonicalText batches
-                let bytes = utf8ByteCount canonical
-
-                if maxBytes < 0 || bytes > maxBytes then
-                    Error(StrengthFrameError.ByteLimitExceeded(bytes, maxBytes))
-                else
-                    Ok
-                        { Batches = batches
-                          Digest = sha256 canonical
-                          ByteLength = bytes }
+            validateBatches 1 batches
+            |> Result.bind (fun () -> buildValidated sha256 maxBytes batches)
 
     /// STRENGTH-009: strip owner-local tool-call identity while preserving the
     /// exact semantic projection and call/result pairing. The resulting IDs are
@@ -186,29 +195,35 @@ module StrengthFrame =
             match parts with
             | [] -> Ok(List.rev localized, nextOrdinal, idMap)
             | ProviderProjection.WireToolCall(ownerId, name, arguments) :: tail ->
-                let ownerKey = ToolCallId.value ownerId
-
-                if Map.containsKey ownerKey idMap then
-                    Error(StrengthMirrorError.DuplicateToolCallId ownerId)
-                else
-                    let replicaId = localId nextOrdinal
-
-                    localizeParts
-                        tail
-                        (nextOrdinal + 1)
-                        (Map.add ownerKey replicaId idMap)
-                        (ProviderProjection.WireToolCall(replicaId, name, arguments) :: localized)
+                localizeToolCall ownerId name arguments tail nextOrdinal idMap localized
             | ProviderProjection.WireToolResult(ownerId, result) :: tail ->
-                match Map.tryFind (ToolCallId.value ownerId) idMap with
-                | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
-                | Some replicaId ->
-                    localizeParts
-                        tail
-                        nextOrdinal
-                        idMap
-                        (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+                localizeToolResult ownerId result tail nextOrdinal idMap localized
             | ProviderProjection.WireMedia _ :: _ -> Error StrengthMirrorError.MediaCannotCrossSession
             | part :: tail -> localizeParts tail nextOrdinal idMap (part :: localized)
+
+        and localizeToolCall ownerId name arguments tail nextOrdinal idMap localized =
+            let ownerKey = ToolCallId.value ownerId
+
+            if Map.containsKey ownerKey idMap then
+                Error(StrengthMirrorError.DuplicateToolCallId ownerId)
+            else
+                let replicaId = localId nextOrdinal
+
+                localizeParts
+                    tail
+                    (nextOrdinal + 1)
+                    (Map.add ownerKey replicaId idMap)
+                    (ProviderProjection.WireToolCall(replicaId, name, arguments) :: localized)
+
+        and localizeToolResult ownerId result tail nextOrdinal idMap localized =
+            match Map.tryFind (ToolCallId.value ownerId) idMap with
+            | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
+            | Some replicaId ->
+                localizeParts
+                    tail
+                    nextOrdinal
+                    idMap
+                    (ProviderProjection.WireToolResult(replicaId, result) :: localized)
 
         let rec localizeMessages
             (remaining: ProviderProjection.WireMessage list)
@@ -219,13 +234,11 @@ module StrengthFrame =
             match remaining with
             | [] -> Ok(List.rev localized)
             | message :: tail ->
-                match localizeParts message.Parts nextOrdinal idMap [] with
-                | Error error -> Error error
-                | Ok(parts, next, nextMap) ->
-                    localizeMessages tail next nextMap ({ message with Parts = parts } :: localized)
+                localizeParts message.Parts nextOrdinal idMap []
+                |> Result.bind (fun (parts, next, nextMap) ->
+                    localizeMessages tail next nextMap ({ message with Parts = parts } :: localized))
 
         localizeMessages messages 1 Map.empty []
-
     /// Host-only synthetic message identity for one rendered half of a provider
     /// request batch. This identity is stable across replay/restart and is used by
     /// XTrace provenance to recover the exact Traced cursor range. It never enters

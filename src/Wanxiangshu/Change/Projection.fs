@@ -146,12 +146,11 @@ module OrchestratorProjection =
         else
             let wanted = byname.Trim()
 
+            let matchesWanted (job: ManagerJobProjection) =
+                System.String.Equals(job.Byname, wanted, System.StringComparison.OrdinalIgnoreCase)
+
             projection.Jobs
-            |> Map.tryPick (fun _ job ->
-                if System.String.Equals(job.Byname, wanted, System.StringComparison.OrdinalIgnoreCase) then
-                    Some job
-                else
-                    None)
+            |> Map.tryPick (fun _ job -> if matchesWanted job then Some job else None)
 
     let tryWorktreeEffect (identity: WorktreeIdentity) (projection: OrchestratorProjection) =
         Map.tryFind identity projection.WorktreeEffects
@@ -230,6 +229,14 @@ module OrchestratorProjection =
         |> List.map snd
         |> List.filter (fun job -> not (isTerminal job.Progress))
 
+    /// The Byname actually recorded: a blank one degrades to the ManagerAgent
+    /// binding instead of an unnamed road.
+    let private effectiveByname (managerAgent: string) (byname: string) =
+        if System.String.IsNullOrWhiteSpace byname then
+            managerAgent
+        else
+            byname
+
     /// ORCH-003: create a job, once.
     ///
     /// Idempotent for a job that already exists. PERSIST-009's durable-effect
@@ -264,11 +271,7 @@ module OrchestratorProjection =
                         { ManagerJobId = job.ManagerJobId
                           ManagerSessionId = job.ManagerSessionId
                           ManagerAgent = job.ManagerAgent
-                          Byname =
-                            if System.String.IsNullOrWhiteSpace job.Byname then
-                                job.ManagerAgent
-                            else
-                                job.Byname
+                          Byname = effectiveByname job.ManagerAgent job.Byname
                           WorktreeIdentity = job.WorktreeIdentity
                           WorktreePath = job.WorktreePath
                           TargetRef = job.TargetRef
@@ -293,12 +296,46 @@ module OrchestratorProjection =
             { projection with
                 Jobs = Map.add jobId { job with Progress = progress } projection.Jobs }
 
+    /// ORCH-007 decision for a rebased candidate: the target head must still be
+    /// the snapshot the post-rebase witness was reviewed against.
+    let private rebasedCandidateAction
+        (currentHead: CommitHash option)
+        (rebasedCommit: CommitHash)
+        (targetHeadSnapshot: CommitHash)
+        =
+        match currentHead with
+        | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+        | Some head when head = targetHeadSnapshot ->
+            AttemptPublish
+                {| RebasedCommit = rebasedCommit
+                   ExpectedHead = targetHeadSnapshot |}
+        // The target moved while this job held no lock, which ORCH-005
+        // explicitly allows. The post-rebase witness is now for the wrong
+        // base (REVIEW-008), so it must not be reused.
+        | Some _ -> RebaseAndReviewAgain
+
+    /// ORCH-007 decision for a publish claim inside the CAS window. The three
+    /// branches are evaluated in the clause's fixed order: already-published
+    /// first, then unchanged target, then everything else. Order matters —
+    /// checking "unchanged" first would re-attempt an ff that already succeeded.
+    let private publishClaimAction
+        (currentHead: CommitHash option)
+        (rebasedCommit: CommitHash)
+        (expectedHead: CommitHash)
+        =
+        match currentHead with
+        | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+        | Some head when head = rebasedCommit ->
+            BackfillPublished
+                {| RebasedCommit = rebasedCommit
+                   ResultingTargetHead = head |}
+        | Some head when head = expectedHead ->
+            AttemptPublish
+                {| RebasedCommit = rebasedCommit
+                   ExpectedHead = expectedHead |}
+        | Some _ -> RebaseAndReviewAgain
+
     /// ORCH-007. `currentHead` is None when GetTargetHead failed.
-    ///
-    /// The three `PublishClaimed` branches are evaluated in the clause's fixed
-    /// order: already-published first, then unchanged target, then everything
-    /// else. Order matters — checking "unchanged" first would re-attempt an ff
-    /// that already succeeded.
     let recoveryAction (currentHead: CommitHash option) (job: ManagerJobProjection) : JobRecoveryAction =
         match job.Progress with
         | JobProgress.ManagerStarted -> ResumeManager
@@ -311,29 +348,9 @@ module OrchestratorProjection =
                    ConflictFiles = conflict.ConflictFiles |}
 
         | JobProgress.RebasedCandidateReady rebased ->
-            match currentHead with
-            | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
-            | Some head when head = rebased.TargetHeadSnapshot ->
-                AttemptPublish
-                    {| RebasedCommit = rebased.RebasedCommit
-                       ExpectedHead = rebased.TargetHeadSnapshot |}
-            // The target moved while this job held no lock, which ORCH-005
-            // explicitly allows. The post-rebase witness is now for the wrong
-            // base (REVIEW-008), so it must not be reused.
-            | Some _ -> RebaseAndReviewAgain
+            rebasedCandidateAction currentHead rebased.RebasedCommit rebased.TargetHeadSnapshot
 
-        | JobProgress.PublishClaimed claim ->
-            match currentHead with
-            | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
-            | Some head when head = claim.RebasedCommit ->
-                BackfillPublished
-                    {| RebasedCommit = claim.RebasedCommit
-                       ResultingTargetHead = head |}
-            | Some head when head = claim.ExpectedHead ->
-                AttemptPublish
-                    {| RebasedCommit = claim.RebasedCommit
-                       ExpectedHead = claim.ExpectedHead |}
-            | Some _ -> RebaseAndReviewAgain
+        | JobProgress.PublishClaimed claim -> publishClaimAction currentHead claim.RebasedCommit claim.ExpectedHead
 
         | JobProgress.Published _
         | JobProgress.Failed _
