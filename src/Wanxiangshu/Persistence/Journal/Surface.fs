@@ -9,12 +9,9 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 
 /// JS-native semantic surface for workspace journal lifecycle and append.
-/// Keeps F# DU/records/opaque handles inside; tests use plain strings and
-/// opaque capabilities.
 [<RequireQualifiedAccess>]
 module JournalSurface =
 
@@ -44,13 +41,10 @@ module JournalSurface =
         let case = str (value?case)
         let payload = unbox<obj> (value?payload)
 
-        match family with
-        | "Companion" ->
-            match case with
-            | "CompanionBloggerClosed" ->
-                CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
-            | other -> failwith $"JournalSurface: unknown Companion case '{other}'"
-        | other -> failwith $"JournalSurface: unknown AgentFact family '{other}'"
+        match family, case with
+        | "Companion", "CompanionBloggerClosed" ->
+            CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
+        | _ -> failwith $"JournalSurface: unknown AgentFact {family}.{case}"
 
     let private managerLifecycleOfJs (value: obj) : ManagerLifecycleFact =
         let case = str (value?case)
@@ -77,6 +71,23 @@ module JournalSurface =
         | Ok journal -> box {| ok = true; journal = journal |}
         | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
 
+    let private journalOrError (writer: IJournalWriter) (init: Envelope) (projection: ProjectionSet) : obj =
+        match AgentJournal.createFromProjection writer projection with
+        | Ok journal ->
+            box
+                {| ok = true
+                   journal = journal
+                   localSeq = LocalSeq.value init.LocalSeq
+                   filePath = writer.FilePath
+                   release = fun () ->
+                       (journal :> IDisposable).Dispose() |}
+        | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+
+    let private bootResult (result: Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>) : obj =
+        match result with
+        | Ok(writer, init, projection) -> journalOrError writer init projection
+        | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+
     /// Open a workspace journal directly. Returns `{ ok, journal, filePath }`.
     /// `writerId` is used for the underlying NDJSON file name.
     let bootWithWriterId (commonDir: string) (writerId: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
@@ -84,6 +95,7 @@ module JournalSurface =
             let cd = str commonDir
             let integrator = CanonicalIntegrator.create ()
             let store = EventStore.createLocal cd (str writerId) integrator
+
             let! result =
                 EventStoreJournalWriter.resumeOrCreate(
                     RuntimeId.create (str runtimeId),
@@ -92,21 +104,7 @@ module JournalSurface =
                     store
                 )
 
-            return
-                match result with
-                | Ok(writer, init, projection) ->
-                    match AgentJournal.createFromProjection writer projection with
-                    | Ok journal ->
-                        box
-                            {| ok = true
-                               journal = journal
-                               localSeq = LocalSeq.value init.LocalSeq
-                               commonDir = cd
-                               filePath = writer.FilePath
-                               release = fun () ->
-                                   (journal :> IDisposable).Dispose() |}
-                    | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
-                | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+            return bootResult result
         }
 
     /// Open a workspace journal with an anonymous writer. Returns `{ ok, journal }`.
