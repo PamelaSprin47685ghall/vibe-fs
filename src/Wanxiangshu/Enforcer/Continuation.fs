@@ -306,12 +306,15 @@ module EnforcerContinuation =
 
                 return! aabbRepair ctx sessionKey currentCtx live ("nudge-no-port: " + reason)
             | Some send ->
+                let requestId = BloggerRequestContext.requestId live
+
                 let! sent =
                     send
                         ctx.BloggerSessionId
                         EnforcerRepair.RepairInstruction
                         None
                         ctx.Journal
+                        requestId
                         terminalRun
                         "blogger-missing-tool"
 

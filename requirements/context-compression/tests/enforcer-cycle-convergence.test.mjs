@@ -60,8 +60,8 @@ const repairNudgeOf = (sessionPort) => {
   if (typeof send !== 'function') {
     throw new Error('HostSessionNudge.trySendInteractionRepair missing from dist')
   }
-  return (sessionId, prompt, directory, journal, terminalRun, repairKind) =>
-    send(sessionPort, sessionId, prompt, directory, journal, terminalRun, repairKind)
+  return (sessionId, prompt, directory, journal, requestId, terminalRun, repairKind) =>
+    send(sessionPort, sessionId, prompt, directory, journal, requestId, terminalRun, repairKind)
 }
 
 /**

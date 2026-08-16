@@ -37,6 +37,7 @@ type InteractionRepairNudge =
         -> string
         -> string option
         -> AgentJournal option
+        -> BloggerRequestId
         -> ProviderRunIdentity
         -> string
         -> Task<Result<PromptKey, string>>

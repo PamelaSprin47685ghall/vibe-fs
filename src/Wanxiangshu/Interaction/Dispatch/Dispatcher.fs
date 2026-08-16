@@ -303,7 +303,7 @@ module PromptDispatcher =
                 repairKind
                 (this.ProjectionFor profile.SessionId)
 
-        /// FALLBACK-008: has this terminal occasion already spent its one interaction repair.
+        /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one interaction repair.
         ///
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
         /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee
@@ -312,12 +312,14 @@ module PromptDispatcher =
         /// claimed before a crash is still spent after it.
         member this.RepairAlreadyClaimed
             (profile: PromptAuthority.AuthorityExecutionProfile)
+            (requestId: BloggerRequestId)
             (terminalProviderRun: ProviderRunIdentity)
             (repairKind: string)
             : bool =
             PromptAuthority.repairAlreadyClaimed
                 profile.SessionId
                 profile.LogicalRunId
+                requestId
                 terminalProviderRun
                 repairKind
                 (this.ProjectionFor profile.SessionId)

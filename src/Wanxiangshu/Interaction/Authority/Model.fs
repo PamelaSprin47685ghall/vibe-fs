@@ -448,16 +448,26 @@ module PromptAuthority =
     let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) cursor
 
-    /// Terminal-scoped repair identity used only by protocols that must distinguish
-    /// same-terminal re-entry from a NEW invalid terminal (currently Blogger's
-    /// exact-one chronicle nudge→AABB state machine). Ordinary interaction repair
-    /// MUST use `repairFamilyPayloadDigest` below; otherwise each repair response's
-    /// fresh ProviderRunIdentity would mint another automatic repair forever.
+    /// Blogger-request + terminal-scoped repair identity used by the exact-one
+    /// chronicle nudge→AABB state machine. Both axes matter: terminal identity
+    /// makes same-terminal re-entry idempotent, while BloggerRequestId prevents a
+    /// previous request on the same Session/LogicalRun from spending the next
+    /// request's protocol budget.
     ///
-    /// The terminal digest is still durable via ClaimSequences and therefore safe
-    /// for that bounded special state machine; it is no longer the generic budget.
-    let repairPayloadDigest (terminalProviderRun: ProviderRunIdentity) (repairKind: string) =
-        String.Join("\u001f", [| ProviderRunIdentity.value terminalProviderRun; repairKind |])
+    /// Ordinary interaction repair MUST use `repairFamilyPayloadDigest` below;
+    /// otherwise each repair response's fresh ProviderRunIdentity would mint
+    /// another automatic repair forever.
+    let repairPayloadDigest
+        (requestId: BloggerRequestId)
+        (terminalProviderRun: ProviderRunIdentity)
+        (repairKind: string)
+        =
+        String.Join(
+            "\u001f",
+            [| BloggerRequestId.value requestId
+               ProviderRunIdentity.value terminalProviderRun
+               repairKind |]
+        )
 
     /// Ordinary interaction-repair budget identity. The LogicalRunId is already
     /// part of claimScopeDigest, so the repair family name alone makes the budget
@@ -480,18 +490,19 @@ module PromptAuthority =
 
         nextClaimSequence scope projection > 1
 
-    /// FALLBACK-008: has this terminal occasion already spent its one repair.
-    /// Blogger protocol repair deliberately uses this narrower identity because
-    /// it must distinguish same-terminal re-entry from a new invalid terminal
-    /// before advancing to AABB.
+    /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one repair.
+    /// Blogger protocol repair deliberately uses both axes: request identity
+    /// prevents cross-request leakage on a long-lived run, while terminal identity
+    /// distinguishes same-terminal re-entry from a new invalid terminal.
     ///
     /// Derived, not stored. `nextClaimSequence` returns 1 for a scope no claim has
     /// ever used, so anything above 1 means a repair was already claimed for this
-    /// terminal — whether or not it went on to succeed, which is the point:
+    /// request+terminal occasion — whether or not it went on to succeed, which is the point:
     /// a failed repair must not license a second attempt.
     let repairAlreadyClaimed
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
+        (requestId: BloggerRequestId)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
         (projection: PromptAuthorityProjection)
@@ -501,7 +512,7 @@ module PromptAuthority =
                 sessionId
                 (Some logicalRunId)
                 (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
-                (repairPayloadDigest terminalProviderRun repairKind)
+                (repairPayloadDigest requestId terminalProviderRun repairKind)
 
         nextClaimSequence scope projection > 1
 

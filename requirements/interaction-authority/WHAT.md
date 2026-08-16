@@ -140,7 +140,7 @@ B 侧重试 → 下一真人 root 默认 Agent
 
 普通 `missing-final-report` / `incomplete-interaction` repair 的 durable budget = **(SessionId, LogicalRunId, repair family)** 一次；第一次 repair 后若同一 LogicalRun 再次需要同 family，得到 `BudgetExhausted`，不得发送第二个 prompt，并以 bounded recovery exhaustion 收束该业务 run。该 claim 由 `ClaimSequences` 派生，跨 restart 存活；abandon 也不重置预算。
 
-Blogger exact-one chronicle 协议是显式例外：它需要按 terminal ProviderRun 区分“同 terminal 重入”与“nudge 后新的 invalid terminal”，但它自己的状态机严格限制为 `nudge once → AABB once → fatal/exhaust`，不能成为 generic repair 的无界后门。
+Blogger exact-one chronicle 协议是显式例外：它的 durable repair occasion = **(SessionId, LogicalRunId, BloggerRequestId, terminal ProviderRunIdentity, repair kind)**。`BloggerRequestId` 隔离同一长寿命 Blogger run 上的连续 request；terminal id 区分“同 terminal 重入”与“nudge 后新的 invalid terminal”。它自己的状态机严格限制为 `nudge once → AABB once → fatal/exhaust`，不能成为 generic repair 的无界后门。ClaimSequence 只证明该 occasion 曾 claim；feature 恢复“已执行 AABB”还必须结合当前 dispatch lifecycle，Abandoned claim 不得冒充 issued。
 
 Manager idle automatic encouragement 的 durable budget = **Manager Life + business condition（plan commitment 前 / 后）**，不是 trigger ProviderRun；同一 business condition 下后续 terminal 不再赚新 encouragement。JoinGuard/ReviewGuard 也必须由稳定 session/barrier occasion key 去重。
 

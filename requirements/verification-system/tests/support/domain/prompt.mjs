@@ -179,7 +179,7 @@ export const authority = {
     Authority.claimScopeDigest(session, runId, origin, payloadDigest),
   nextClaimSequence: (scope, projection) => Authority.nextClaimSequence(scope, projection),
   derivePromptKey: (...args) => Authority.derivePromptKey(...args),
-  repairPayloadDigest: (run, kind) => Authority.repairPayloadDigest(run, kind),
+  repairPayloadDigest: (request, run, kind) => Authority.repairPayloadDigest(request, run, kind),
   repairAlreadyClaimed: (...args) => Authority.repairAlreadyClaimed(...args),
   systemPromptIdFor: (role) => Authority.systemPromptIdFor(role),
   buildAttemptExecutionProfile: (...args) => Authority.buildAttemptExecutionProfile(...args),
