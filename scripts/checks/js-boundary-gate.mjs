@@ -16,13 +16,20 @@
 // added. A NEW rule firing in a NEW file is RED. The final architecture gate
 // (P11) is absolute prohibition; this ratchet exists only to make the debt
 // monotonic while it is paid down.
+//
+// Package-local *-contract.mjs adapters are FROZEN (PR 3): the four existing
+// product-package support contracts are grandfathered and must only shrink;
+// any NEW product-package *-contract.mjs is RED because it would recreate the
+// "second quarantine" anti-pattern.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { walk } from '../lib/walk.mjs'
 import { scanAll } from '../lib/test-surface-scan.mjs'
 
 const DEFAULT_OUT = join(dirname(fileURLToPath(import.meta.url)), 'js-boundary-baseline.json')
+const FROZEN_CONTRACTS = join(dirname(fileURLToPath(import.meta.url)), 'js-boundary-frozen-contracts.json')
 
 const args = process.argv.slice(2)
 const argValue = (flag) => {
@@ -61,6 +68,17 @@ if (!existsSync(out)) {
 const baseline = JSON.parse(readFileSync(out, 'utf8'))
 const actual = countsByFile(scanAll())
 
+// PR 3 freeze: product-package *-contract.mjs adapters must not be added.
+const frozenSet = new Set(JSON.parse(readFileSync(FROZEN_CONTRACTS, 'utf8')))
+const contracts = walk(join(process.cwd(), 'requirements'), ['-contract.mjs'])
+  .map((p) => p.replace(process.cwd() + '/', '').replace(/\\/g, '/'))
+  .filter((rel) => rel.includes('/tests/support/') && !rel.startsWith('requirements/verification-system/'))
+for (const c of contracts) {
+  if (!frozenSet.has(c)) {
+    actual[c] = { ...(actual[c] ?? {}), 'frozen-contract-added': (actual[c]?.['frozen-contract-added'] ?? 0) + 1 }
+  }
+}
+
 const failures = []
 const baselineFiles = new Set(Object.keys(baseline))
 const actualFiles = new Set(Object.keys(actual))
@@ -82,7 +100,8 @@ for (const file of actualFiles) {
 
 if (failures.length === 0) {
   const debt = [...actualFiles].reduce((sum, f) => sum + Object.values(actual[f]).reduce((a, b) => a + b, 0), 0)
-  console.log(`js-boundary-gate: OK — ${debt} debt line(s) across ${actualFiles.size} file(s), at/below baseline`)
+  const frozen = contracts.filter((c) => frozenSet.has(c)).length
+  console.log(`js-boundary-gate: OK — ${debt} debt line(s) across ${actualFiles.size} file(s), at/below baseline; ${frozen} product-package *-contract.mjs frozen`)
   process.exit(0)
 }
 
