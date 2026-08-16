@@ -65,30 +65,6 @@ module ReviewFactFold =
             |> updateReviewGuard payload.ManagerSessionId startBarrier
             |> Ok
 
-        | ReviewFactCases.PerfectChallengeIssued payload ->
-            let challenge =
-                { BarrierId = payload.BarrierId
-                  GitTreeHash = payload.GitTreeHash
-                  ReviewerSessionId = payload.ReviewerSessionId
-                  FirstProviderRun = payload.FirstProviderRun
-                  FirstToolCallId = payload.FirstToolCallId
-                  ChallengeTextVersion = payload.ChallengeTextVersion
-                  ChallengeContentDigest = payload.ChallengeContentDigest }
-
-            Ok(updateReviewGuard payload.ReviewerSessionId (ReviewProjection.applyChallengeIssued challenge) projection)
-
-        | ReviewFactCases.ProviderInputSealed payload ->
-            let seal =
-                { SessionId = payload.SessionId
-                  ProviderRun = payload.ProviderRun
-                  PhysicalUserMessageId = payload.PhysicalUserMessageId
-                  SealDigest = payload.SealDigest
-                  CanonicalVersion = payload.CanonicalVersion
-                  IncludedToolResultDigests =
-                    payload.IncludedToolResultDigests |> List.map SealDigest.value |> Set.ofList }
-
-            Ok(updateReviewGuard payload.SessionId (ReviewProjection.applySeal seal) projection)
-
         | ReviewFactCases.ReviewVerdictRecorded payload ->
             let attempt =
                 { ReviewBarrierId = payload.BarrierId
@@ -152,8 +128,8 @@ module ReviewFactFold =
                 (fun session ->
                     ReviewProjection.applyConfirmedWitness
                         payload.BarrierId
-                        payload.ChallengeResultDigest
-                        payload.SecondProviderInputDigest
+                        payload.FirstPhysicalUserMessageId
+                        payload.SecondPhysicalUserMessageId
                         first
                         second
                         (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
@@ -179,8 +155,8 @@ module ReviewFactFold =
                         (fun session ->
                             ReviewProjection.applyConfirmedWitness
                                 payload.BarrierId
-                                payload.ChallengeResultDigest
-                                payload.SecondProviderInputDigest
+                                payload.FirstPhysicalUserMessageId
+                                payload.SecondPhysicalUserMessageId
                                 first
                                 second
                                 (Option.defaultValue ReviewProjection.empty session.ReviewGuard)

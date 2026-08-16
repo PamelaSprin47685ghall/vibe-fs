@@ -30,14 +30,14 @@ CommittedPrefix / BlogFrames / TransportMessages / HostReanchor）。
 **边界**：快照字段集与完整目标形态的差距是 HOW 演进空间，不是本包命题。
 **证据**：PROJ-002。
 
-## PROVIDER-PROJECTION-003：输出管线 SemanticEventTree → Semantic → Wire → Seal；Semantic ≠ Wire
+## PROVIDER-PROJECTION-003：输出管线 SemanticEventTree → Semantic → Wire；Semantic ≠ Wire
 
 **规范**：核心输出依次为 `SemanticEventTree → ProviderSemanticProjection →
-ProviderWireProjection → ProviderInputSeal`。`ProviderWireProjection` 与
+ProviderWireProjection`。`ProviderWireProjection` 与
 `ProviderSemanticProjection` 是**不同类型**（VERIFY-007），禁止隐式互转。
 
 **含义**：Semantic 去 ID（语义等价、跨会话可比较、canonical digest 唯一来源）；Wire 含
-ID、字节相等（seal / 前缀缓存 / 本地时间线用）。两者相等键不同，混用必错。
+ID、字节相等（前缀缓存 / 本地时间线用）。两者相等键不同，混用必错。
 **边界**：Wire 补合成 identity（COMPANION-013）的确定性派生属 `prefix-stability` 交叉；
 「不同型」的结构事实归本包。
 **证据**：PROJ-003、历史「投影分层」被拒方案。
@@ -46,7 +46,7 @@ ID、字节相等（seal / 前缀缓存 / 本地时间线用）。两者相等�
 
 **规范**：实现必须分三层：Effectful Coordinator（读 Host、生成不可变快照）、Pure
 Projection Planner（汇总 intent、排序、冲突检查）、Canonical Renderer（渲染 provider
-wire bytes、生成 digest/seal）（历史 shape/projection 条款 PROJ-004）。
+wire bytes / 前缀 digest 所需确定性表示）（历史 shape/projection 条款 PROJ-004）。
 
 **含义**：副作用只发生在 Coordinator；Planner/Renderer 是同入同出的纯函数。
 **边界**：三层是当前实现合同；若未来证明其它分层同样满足本包命题，是 HOW 变化。
@@ -59,7 +59,7 @@ wire bytes、生成 digest/seal）（历史 shape/projection 条款 PROJ-004）�
 ```text
 keepPhysicalPrefix / activatePrefixEpoch / insertBlogFrames / insertRepair /
 useStrengthMirror / insertStrengthFrames / suppressTransportOnly /
-appendReviewChallenge / reanchorAfterCompaction
+reanchorAfterCompaction
 ```
 
 HOST-013 pair-programming marker 不占 intent（wire 级无消息地址，由
@@ -154,10 +154,10 @@ transport-only 字段，COMPANION-012）。canonical digest = SHA-256(规范序�
 (ProviderSemanticProjection(tree)))（COMPANION-007）——禁止 parse TOML/wire 反推正文当
 digest。同语义对话跨 ID 产出同一 digest。
 
-**含义**：digest 是语义的函数，不是字节形状的函数；wire 形状变化（seal 追加、
+**含义**：digest 是语义的函数，不是字节形状的函数；wire 形状变化（例如
 transport-only 剔除）不得改 digest。
-**边界**：CoveredPrefixDigest 的消费点（fail-closed、canary、Review 双 PERFECT）归各
-消费 owner；「digest 从 Semantic 算」的投影侧归本包。
+**边界**：CoveredPrefixDigest 的消费点（fail-closed、canary）归各消费 owner；Finality
+review 不消费 provider-projection digest；「digest 从 Semantic 算」的投影侧归本包。
 **证据**：COMPANION-007/012、历史 how/projection「Canonical digest」。
 
 ## PROVIDER-PROJECTION-012：确定性 renderer：同 semantic 输入同 bytes
@@ -166,7 +166,7 @@ transport-only 剔除）不得改 digest。
 literal 选择由规则决定、文档顺序固定、`byteCount` 按 UTF-8 字节测量。同输入同输出、无
 随机、无时钟、无进程序。
 
-**含义**：确定性是 digest/seal/前缀缓存成立的底座。
+**含义**：确定性是 semantic digest / 前缀缓存成立的底座。
 **边界**：前缀 byte 稳定性跨请求的保证归 `prefix-stability`；单次投影内「同输入同 bytes」
 归本包。
 **证据**：ARCH-010、历史 why/synthetic-toml 条款。

@@ -15,6 +15,7 @@ open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Replica
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
@@ -24,17 +25,37 @@ open Wanxiangshu.Foundation.Identity
 [<Struct>]
 type GitTreePort = { GetTreeHash: unit -> string }
 
-/// Physical reviewer capabilities used by one review barrier drive.
+/// One typed `judge` delivery from the physical provider execution that called it.
+type ReviewJudgement =
+    { ReviewerSessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRun: ProviderRunIdentity
+      ToolCallId: ToolCallId
+      Verdict: ReviewGuardVerdict }
+
+/// One physical `judge` request handed to the Finality CE. The callbacks finish
+/// that exact tool call; they do not encode a review stage or return a workflow opcode.
+type ReviewJudgementDelivery =
+    { Judgement: ReviewJudgement
+      Accept: unit -> unit
+      Challenge: unit -> unit
+      Reject: unit -> unit }
+
+/// One-shot physical rendezvous. Calling `AwaitJudgement` registers the waiter
+/// immediately and returns its Task; CE source order decides when it is called.
+type ReviewJudgementChannel =
+    { AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>
+      Dispose: unit -> unit }
+
 type ReviewHostPort =
-    { ForkReviewer: unit -> Task<Result<SessionId, string>>
+    { StartReview: unit -> Task<Result<unit, string>>
+      AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>
       AwaitReviewer: unit -> Task<Result<unit, string>> }
 
-/// Physical continuation capability for ReviewerWorkflow. Application owns the
-/// semantic decision of when a verdict/challenge must be ensured; Infrastructure
-/// owns transport dedupe and Host delivery.
+/// Physical continuation capability retained for process-review missing-judge
+/// repair. Finality challenge sequencing belongs exclusively to ReviewBarrierWorkflow.
 type ReviewerContinuationPort =
-    { NudgeMissingVerdict: SessionId -> Task<Result<unit, string>>
-      SendPerfectChallenge: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>> }
+    { NudgeMissingVerdict: SessionId -> Task<Result<unit, string>> }
 
 /// HOST-021 / TODO-006: Host-owned process-review ensure and lag-1 wait.
 /// After starts EnsureReview without waiting for ConsumableReview; T(k+1) /

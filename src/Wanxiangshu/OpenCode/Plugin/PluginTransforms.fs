@@ -78,7 +78,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -551,26 +550,6 @@ module PluginTransforms =
         else
             injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
-    let private sealTaskFor
-        (snapshotOpt: ISessionSnapshotPort option)
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (wired: HostSignalBootstrap.WiredSignals)
-        (outObj: obj)
-        : Task =
-        match projectionSessionIdOpt with
-        | None -> Task.FromResult()
-        | Some projectionSessionId ->
-            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-            ReviewSeal.sealTransform
-                snapshotOpt
-                journal
-                (SessionId.create projectionSessionId)
-                (ProviderWireCapture.decodeMessageView rawMessages)
-                (ProviderWireCapture.lastUserMessageId rawMessages)
-                wired.PendingReviewSeals
-
     let private strengthReplicaRuntime
         (projectionSessionIdOpt: string option)
         (scope: PluginRuntimeScope)
@@ -697,16 +676,6 @@ module PluginTransforms =
                 let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                 let sanitized = HostMessageProjection.sanitizeMessages currentMessages
                 HostMessageProjection.replaceMessagesInPlace outObj sanitized
-
-                // REVIEW-010: seal LAST, and only after the Companion rewrite has
-                // mutated `outObj`. The seal must digest the message view the
-                // provider actually receives; sealing before the rewrite would
-                // record bytes the Host never sends.
-                //
-                // Host source awaits every hook in turn (`plugin/index.ts:280-292`),
-                // so returning a Task here makes the SDK read complete before the
-                // provider request is built.
-                do! sealTaskFor snapshotOpt journal projectionSessionIdOpt wired outObj
                 ()
             }
 

@@ -163,6 +163,8 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (reason: PromptAbandonReason)
             : Task<Result<unit, string>> =
+            PromptPhysicalAcceptance.cancel key
+
             PromptFact.PluginPromptAbandoned
                 {| PromptKey = key
                    SessionId = sessionId
@@ -204,7 +206,9 @@ module PromptDispatcher =
                     | Ok() ->
                         match! this.RegisterAuthority profile with
                         | Error error -> return Error error
-                        | Ok() -> return Ok profile
+                        | Ok() ->
+                            PromptPhysicalAcceptance.accepted key physicalMessageId
+                            return Ok profile
                 }
 
         member this.AcceptAgentOwnerRoot
@@ -252,7 +256,9 @@ module PromptDispatcher =
                     |> this.Persist sessionId None
                 with
                 | Error error -> return Error error
-                | Ok() -> return Ok kind
+                | Ok() ->
+                    PromptPhysicalAcceptance.accepted key physicalMessageId
+                    return Ok kind
             }
 
         /// The run a continuation would extend.

@@ -62,7 +62,6 @@ module ReviewHostSurface =
     let reviewBarrierId (value: string) = ReviewBarrierId.create value
     let worktreePath (value: string) = WorktreePath.create value
 
-
     let setSessionDirectory (sessionId: string) (directory: string) =
         SharedState.SessionDirectories.[sessionId] <- directory
 
@@ -123,19 +122,37 @@ module ReviewHostSurface =
             return outcomeView outcome
         }
 
-    let requestPerfectConfirmation
-        (port: obj)
-        (handle: JournalHandle)
+    let deliverJudgement
         (reviewerSession: string)
-        (logicalRun: string)
-        : Task<obj> =
-        task {
-            let! outcome =
-                HostReviewGuard.requestPerfectConfirmation
-                    (sessionPort port)
-                    (Some handle.Journal)
-                    (SessionId.create reviewerSession)
-                    (ProviderRunIdentity.create logicalRun)
+        (physicalUserMessage: string)
+        (providerRun: string)
+        (toolCall: string)
+        (verdictText: string)
+        : Task<obj> option =
+        let verdict =
+            match verdictText with
+            | "REVISE"
+            | "Revise" -> ReviewGuardVerdict.Revise
+            | _ -> ReviewGuardVerdict.Perfect
 
-            return outcomeView outcome
-        }
+        let judgement: ReviewJudgement =
+            { ReviewerSessionId = SessionId.create reviewerSession
+              PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessage
+              ProviderRun = ProviderRunIdentity.create providerRun
+              ToolCallId = ToolCallId.create toolCall
+              Verdict = verdict }
+
+        let tcs = TaskCompletionSource<obj>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let accept () =
+            AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Accepted" |}) |> ignore
+
+        let challenge () =
+            AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Challenge" |}) |> ignore
+
+        let reject () =
+            AsyncSupport.trySetResult tcs (box {| ok = false; effect = "Rejected" |}) |> ignore
+
+        match ReviewJudgementInbox.tryDeliver judgement accept challenge reject with
+        | None -> None
+        | Some() -> Some tcs.Task

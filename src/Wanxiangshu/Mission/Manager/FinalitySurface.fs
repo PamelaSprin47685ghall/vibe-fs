@@ -242,10 +242,12 @@ module FinalitySurface =
                                GitTreeHash = GitTreeHash.create (str (event?gitTreeHash))
                                FirstProviderRun = ProviderRunIdentity.create (str (event?firstProviderRun))
                                FirstToolCallId = ToolCallId.create (str (event?firstToolCallId))
-                               ChallengeResultDigest = SealDigest.create (str (event?challengeResultDigest))
+                               FirstPhysicalUserMessageId =
+                                   PhysicalUserMessageId.create (str (event?firstPhysicalUserMessageId))
                                SecondProviderRun = ProviderRunIdentity.create (str (event?secondProviderRun))
-                               SecondProviderInputDigest = SealDigest.create (str (event?secondProviderInputDigest))
-                               SecondToolCallId = ToolCallId.create (str (event?secondToolCallId)) |}
+                               SecondToolCallId = ToolCallId.create (str (event?secondToolCallId))
+                               SecondPhysicalUserMessageId =
+                                   PhysicalUserMessageId.create (str (event?secondPhysicalUserMessageId)) |}
                     )
                 )
             )

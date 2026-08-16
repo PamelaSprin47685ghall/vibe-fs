@@ -51,6 +51,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -137,13 +138,13 @@ module ReviewerWorkflow =
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, close the carried attempt, and report.
-    /// `confirmedReviewerEmptyTextFallback` covers the confirmed double-PERFECT
-    /// that ends tool-only with empty terminal text.
+    /// `allowToolOnlyFallback` lets an active Finality CE report a tool-only
+    /// judgement terminal without encoding review stage in this observer.
     let private completeReviewer
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (confirmedReviewerEmptyTextFallback: bool)
+        (allowToolOnlyFallback: bool)
         : Task =
         task {
             // COMPANION-003: the terminal text is this turn's formal text plus
@@ -153,17 +154,16 @@ module ReviewerWorkflow =
             let sessionWideText =
                 if not (String.IsNullOrWhiteSpace sessionWide) then
                     sessionWide
-                elif confirmedReviewerEmptyTextFallback then
-                    // A confirmed double-PERFECT often ends on a tool-only frame.
-                    // The witness is already Confirmed, so expose a minimal A rather
-                    // than failing a review that actually succeeded.
-                    "Review confirmed."
+                elif allowToolOnlyFallback then
+                    // Finality judgement turns may be tool-only. The CE consumes
+                    // the typed judge delivery separately, so terminal reporting
+                    // needs only a non-empty physical completion value.
+                    "Review judgement submitted."
                 else
                     sessionWide
 
-            // REVIEW-006: nothing is written here. Confirmation is a fact
-            // VerdictWorkflow already journalled from the seal evidence, so the
-            // completion path only reports the run.
+            // REVIEW-006: nothing is inferred here. Completed confirmation is
+            // written only by the direct Finality CE; this path reports the turn.
             // PROMPT-008: the Role comes from the reconciled turn, and there is no
             // default.
             match turn.Role with
@@ -214,12 +214,7 @@ module ReviewerWorkflow =
         | Error reason -> eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason) |> ignore
         | Ok() -> ()
 
-    /// The single writer deciding what a reconciled reviewer turn needs.
-    ///
-    /// Witness-driven, NOT a program counter: every branch reads a durable
-    /// `ReviewerEvidence` classification. Completion reports the run; continuation
-    /// branches call named Vocabulary and fail closed on a `Failed` send.
-    let observe
+    let private observeProcessReview
         (continuationPort: ReviewerContinuationPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -227,22 +222,7 @@ module ReviewerWorkflow =
         (reviewerKey: string)
         : Task =
         match ReviewerEvidence.classifyNeed journal reviewerKey with
-        | ReviewerEvidence.Need.CompleteConfirmed ->
-            // Confirmed dual-PERFECT often ends tool-only; expose the minimal A.
-            completeReviewer eventPort journal turn true
-        | ReviewerEvidence.Need.EnsurePerfectConfirmed ->
-            task {
-                let! outcome =
-                    ReviewerContinuation.ensurePerfectConfirmed
-                        continuationPort
-                        journal
-                        turn.SessionId
-                        turn.ProviderRun
-                        reviewerKey
-
-                reportContinuationFailure eventPort turn.SessionId outcome
-            }
-            :> Task
+        | ReviewerEvidence.Need.NotProcessReview -> AsyncSupport.completedTask ()
         | ReviewerEvidence.Need.EnsureVerdictSubmitted ->
             task {
                 let! outcome =
@@ -251,4 +231,19 @@ module ReviewerWorkflow =
                 reportContinuationFailure eventPort turn.SessionId outcome
             }
             :> Task
-        | ReviewerEvidence.Need.CompleteRevision -> completeReviewer eventPort journal turn false
+        | ReviewerEvidence.Need.CompleteProcessReview -> completeReviewer eventPort journal turn false
+
+    /// Physical terminal observer. Active Finality reviewers are owned by the
+    /// direct ReviewBarrierWorkflow CE, so this function only reports their turn;
+    /// it never selects challenge/confirmation work from durable state.
+    let observe
+        (continuationPort: ReviewerContinuationPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (reviewerKey: string)
+        : Task =
+        if ReviewJudgementInbox.isOwned turn.SessionId then
+            completeReviewer eventPort journal turn true
+        else
+            observeProcessReview continuationPort eventPort journal turn reviewerKey

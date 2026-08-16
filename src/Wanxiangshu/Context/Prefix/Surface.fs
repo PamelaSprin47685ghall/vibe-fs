@@ -117,12 +117,6 @@ module PrefixSurface =
                    dropLeading = value.DropLeading
                    memoryId = value.SyntheticMessageId
                    memoryText = value.Memory |}
-        | ProjectionIntent.AppendReviewChallenge challenge ->
-            box
-                {| replacesPrefix = false
-                   dropLeading = 0
-                   memoryId = null
-                   memoryText = challenge.Prompt |}
         | _ -> box {| replacesPrefix = false; dropLeading = 0; memoryId = null; memoryText = null |}
 
     let forSnapshot (snapshot: obj) (memoryBody: string) : obj =

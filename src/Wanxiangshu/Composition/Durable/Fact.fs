@@ -24,6 +24,7 @@ module Fact =
                StartedAt: DateTimeOffset |}
 
     /// One journal line for the agent domain: exactly one owned family.
+    /// DSL-class: DurableFact
     [<RequireQualifiedAccess>]
     type AgentFact =
         | Prompt of PromptFactCases
@@ -108,12 +109,6 @@ module Fact =
 
         let inline ReviewAttemptClosed payload =
             AgentFact.Review(ReviewFactCases.ReviewAttemptClosed payload)
-
-        let inline PerfectChallengeIssued payload =
-            AgentFact.Review(ReviewFactCases.PerfectChallengeIssued payload)
-
-        let inline ProviderInputSealed payload =
-            AgentFact.Review(ReviewFactCases.ProviderInputSealed payload)
 
         let inline ConfirmedReviewWitness payload =
             AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)

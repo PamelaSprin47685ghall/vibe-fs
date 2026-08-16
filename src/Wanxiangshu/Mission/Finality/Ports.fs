@@ -24,6 +24,7 @@ open Wanxiangshu.Foundation.Identity
 type FinalityReviewerPort =
     { PrepareSession: FinalityReviewerRequest -> Task<Result<PreparedReviewer, string>>
       StartReview: EnlistedMember -> Task<Result<unit, string>>
+      OpenJudgementChannel: SessionId -> Result<ReviewJudgementChannel, string>
       AwaitTerminal: SessionId -> Task<Result<unit, string>>
       SendRevisionSteer: SessionId -> string -> Task<Result<unit, string>>
       AbortReviewer: SessionId -> unit }

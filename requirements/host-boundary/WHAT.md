@@ -100,19 +100,18 @@ ToolCall` + `ToolParts = Pending`；`state.status = completed|error` → `Parts 
 judgeFirstTurn / nextReanchor）；`HostCompactionGate/Observer`；→ PROOF.md `HOST-BOUNDARY-007`
 （NEW `host-capability-observation`）。
 
-## HOST-BOUNDARY-008：Transform→ProviderRunIdentity 因果读；0/≥2 不写 seal
+## HOST-BOUNDARY-008：Transform→ProviderRunIdentity 因果读；0/≥2 fail closed
 
 **规范**：transform 绑定用因果读：`role=assistant`、`time.completed` 未设、`parentID` 匹配最后一条
-user、`id` 为 session 内 assistant 最大者 → 命中**恰好一个**才绑定；命中 0 或 ≥2 → 不写 seal。
-compaction / summary 路径 → 不写 seal。唯一性前提是单 actor 写 assistant（HOST-010；
+user、`id` 为 session 内 assistant 最大者 → 命中**恰好一个**才绑定；命中 0 或 ≥2 → fail closed。
+compaction / summary 路径 → fail closed。唯一性前提是单 actor 写 assistant（HOST-010；
 历史 how/host 引理 1–4）。
 
-**含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可放弃 seal（REVIEW-010 只见
-PendingIdentity/Rejected），不赌同一身。
+**含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可 fail closed，不赌同一身。
 
-**证据**：`ReviewSeal` / `TurnBinding`（消费因果读）；→ PROOF.md `HOST-BOUNDARY-008`
-（REUSE `review/*` + `host/` 相关 seal 测试；NEW `tests/host010-run-id-equivalence.test.mjs`：
-bindableRun id ≡ ToolContext.messageID encoding；共时 Host 穿线仍由 Long Stroke 物理契约承担）
+**证据**：`ProviderRunBinding` / `TurnBinding`（消费因果读）；→ PROOF.md `HOST-BOUNDARY-008`
+（NEW `tests/host010-run-id-equivalence.test.mjs`：bindableRun id ≡ ToolContext.messageID encoding；
+共时 Host 穿线仍由 Long Stroke 物理契约承担）
 
 ## HOST-BOUNDARY-009：Tool 身份两个半边；缺一 fail closed
 

@@ -7,39 +7,39 @@
 
 - **judgement**：Reviewer 的 `PERFECT | REVISE` 裁决（语义归 `review-judgement`；本包只处理它的消费资格）。
 - **attempt identity**：`(ReviewBarrierId, GitTreeHash, ReviewerSessionId, ProviderRunIdentity, ToolCallId)` 五元组——一次可计数的 verdict 尝试。
-- **challenge**：第一次 PERFECT 作为工具结果发出的 skeptical 句（`resources/provider/review/challenge/`），其 `contentDigest` 必须出现在第二次输入 seal 中才构成因果消费。
-- **ProviderInputSeal**：`messages.transform` 时刻对 canonical provider input 的摘要，绑定到即将消费它的 ProviderRunIdentity（HOST-010）。
-- **witness**：`ReviewWitness` 代数状态（NoReview / RevisionWitness / PerfectPending / Confirmed）；confirmed 只能从证据派生，不是存储标志。
+- **challenge**：第一次 PERFECT 后，Finality review CE 调用该 `judge` delivery 的 `Challenge()` capability，使当前 tool call 返回 skeptical tool result（`resources/provider/review/challenge/`）。它的因果性来自 CE 调用顺序，不来自文案、digest、transcript 形状或额外 user continuation。
+- **judgement delivery**：`judge` 工具把 `{ ReviewerSessionId; PhysicalUserMessageId; ProviderRunIdentity; ToolCallId; Verdict }` 与完成当前 tool call 的 `Accept()/Challenge()/Reject()` capabilities 交给正在等待它的 F# CE；工具不读取 Journal 投影决定“第几次判断”，也不存在业务 `Reply` 代数。
+- **witness**：已经完成的 durable 事实（NoReview / RevisionWitness / Confirmed）；不存在 PerfectPending 之类执行位置。confirmed 只能从完成证据派生，不是存储标志。
 - **ConsumableReview**：`TodoReviewConcluded(k)` —— VerdictKnown ∧ matching `ReviewAttemptClosed`（冻结 record frontier）∧ 同 snapshot 的 canonical ProcessReviewLWR record-ready ∧ 已 append Concluded；下一 TodoWrite / suicide drain 才能消费。
 - **record-ready**：同一 Journal snapshot 下，以全量 origin coverage 物化含 `Chronicle`（及必要 Recent work）的 canonical LWR（request-range bounded，`includeOpening=false`）；frontier 为排他（lastPart+1）。
 
 ---
 
-## REVIEW-ASSURANCE-001：第二次 PERFECT 必须满足九条件；禁止 same-root 确认
+## REVIEW-ASSURANCE-001：第二次 PERFECT 必须由同一 Direct CE 因果取得；禁止 same-root / 文本确认
 
-**规范**：第二次 PERFECT 成立当且仅当同时满足：（1）同一 Reviewer Session；（2）同一 ReviewBarrier；（3）同一 Git tree；（4）不同 ProviderRunIdentity；（5）不同 ToolCallId；（6）第二次 provider input seal **包含**第一次 challenge result；（7）中间没有 REVISE；（8）中间没有 tree 变化；（9）`judge` 工具确实成功执行。禁止仅凭 AuthorityRoot 或 PhysicalMessageId 确认。
+**规范**：Finality 确认只能由一个 F# CE 的调用顺序取得：同一 Reviewer Session / ReviewBarrier / Git tree / PhysicalUserMessageId 下，先得到第一次 `judge(PERFECT)`；durable 记录后，CE **先注册第二 judgement waiter，再调用第一次 delivery 的 `Challenge()` 完成当前 tool call**；只有该 tool result 已返回给 Host 后，第二次 `judge(PERFECT)` 才可能发生。两次 ProviderRunIdentity 与 ToolCallId 都必须不同，PhysicalUserMessageId 必须相同。任一 judgement 为 REVISE、tree/barrier/session/physical prompt 不同，或第二 judgement 重用 first run/call，均不得确认。禁止 AuthorityRoot、文本内容、tool-result digest、provider-input seal、Journal fold 充当因果证明。
 
-**含义/动机**：确认必须是因果证明，不是身份猜测。任一条件缺失，第二次 PERFECT 都不构成确认；REVISE 在投影中清除 pending challenge，正是条件 7 的机制。
+**含义/动机**：确认由 CE 的调用结构本身证明：第二 judgement 的 waiter 在 `Challenge()` 完成第一次 tool call 之前已经存在，而模型只有在该 tool result 返回后才能继续下一 provider iteration。无需从 transcript 反推模型“是否看过某句话”，也无需把执行位置持久化后再积分回来。
 
 **边界**：REVISE 的 cohort 关闭语义（REVIEW-002）归 `finality`；本命题只冻结确认条件的代数与「REVISE 中断确认链」。
 
 **证据**：→ PROOF.md `REVIEW-ASSURANCE-001`。
 
-## REVIEW-ASSURANCE-002：单次 PERFECT 不足；challenge 必须被因果消费
+## REVIEW-ASSURANCE-002：单次 PERFECT 不足；challenge 因果只能由 typed physical identity 建立
 
-**规范**：第一次 PERFECT 只产生 `PerfectChallengeIssued`（pending witness），**不构成确认**。确认要求 seal 的 `IncludedToolResultDigests` 含 challenge digest——即第二次输入的 canonical 视图真实携带了第一次 challenge 的工具结果。ReviewConfirmation prompt 只让 Host 启动下一次 provider request，**不是**确认事实本身。
+**规范**：第一次 PERFECT 只是 CE 的局部值，不产生 `PerfectPending` / `PendingChallenge` / `PerfectChallengeIssued` 之类“执行到一半”业务状态，也不另发 `ReviewConfirmation` user continuation。CE 必须在第一次 judgement durable 后预注册第二 judgement waiter，再调用 first delivery 的 `Challenge()` capability；`JudgeTool` 由该 capability 完成 skeptical tool result。第二 judgement 必须来自同一 `PhysicalUserMessageId`、不同 ProviderRunIdentity / ToolCallId。challenge 文本只负责给 Reviewer 看，任何控制判断都不得解析、hash、扫描或比较该文本。**每一次 judgement waiter 都必须与同一个、在 reviewer start 前已订阅的 terminal task 竞争；Reviewer 提前 terminal 或 timeout 均直接 fail closed，不得残留挂起 waiter 或假绿**。
 
-**含义/动机**：单 PERFECT 可被模型随口同意；只有「第二次输入里真的含有 skeptical challenge 的字节」才把确认从口头变成因果消费证据（历史 why/review 条款）。challenge 是工具结果，seal 必然携带其 digest——第二条哈希路径只会漂移并伪装成 fail-closed。
+**含义/动机**：单 PERFECT 可被模型随口同意；第二次独立 judgement 的价值来自真实的 tool-call completion 因果边，而不是“某段文字恰好出现在 canonical input”这种可被 Host render 细节破坏的启发式。
 
-**边界**：challenge 的文案世代（TextVersion）与装载 → HOW；「ToolResultDigest 怎么算」→ `provider-projection`。
+**边界**：challenge 文案与本地化只归 provider prose；tool result 的 Host delivery 归 Host/tool protocol，本包只拥有 direct CE 调用 judgement delivery capabilities 的顺序。
 
 **证据**：→ PROOF.md `REVIEW-ASSURANCE-002`。
 
 ## REVIEW-ASSURANCE-003：attempt identity 五元组；同 run 额外 PERFECT 不计数
 
-**规范**：`ReviewAttemptIdentity = { ReviewBarrierId; GitTreeHash; ReviewerSessionId; ProviderRun; ToolCallId }`。同一 ProviderRunIdentity（含同 assistant message 内并行/重复 tool call）中的额外 PERFECT **不计数、不写 Journal**。attempt 窗口与 seal 窗口都有界（PERSIST-008），不随历史增长。
+**规范**：`ReviewAttemptIdentity = { ReviewBarrierId; GitTreeHash; ReviewerSessionId; ProviderRun; ToolCallId }`。同一 ProviderRunIdentity（含同 assistant message 内并行/重复 tool call）中的额外 PERFECT **不构成第二次判断**。Finality CE 直接比较第一次与第二次 typed judgement；禁止用 attempt window / counter / Journal 积分来决定“已经第几次”。
 
-**含义/动机**：同一 run 里的两次 PERFECT 是同一次 provider 决策的重复表达，不是第二次独立判断；只有 run 与 call 都不同才可能是独立尝试。窗口有界保证投影不因历史增长退化。
+**含义/动机**：同一 run 里的两次 PERFECT 是同一次 provider 决策的重复表达，不是第二次独立判断。独立性由 CE 当场比较 typed identity；历史存储只记录已经发生的事实，不充当程序计数器。
 
 **边界**：Finality 用完整五元组；TodoProcessReview 只以 run/call 标识 terminal judge（不分配 barrier witness 语义）→ REVIEW-ASSURANCE-011。
 
@@ -47,7 +47,7 @@
 
 ## REVIEW-ASSURANCE-004：confirmed 是派生谓词，禁止存储布尔
 
-**规范**：`confirmed` 只能从 witness 派生（`ReviewWitness.confirmedReviewer`/`IsConfirmed`），禁止旁置「已确认」布尔标志或旁置 reviewer id。记录 PERFECT verdict 本身不产生 pending；challenge 是独立事实。
+**规范**：`confirmed` 只能从已完成的 `ConfirmedReviewWitness` 派生（`ReviewWitness.confirmedReviewer`/`IsConfirmed`），禁止旁置「已确认」布尔标志、旁置 reviewer id，亦禁止 `PerfectPending` / pending challenge 等半程 witness。单次 PERFECT 只存在于运行中的 CE 局部值。
 
 **含义/动机**：存储布尔会与 witness 脱节——一个已确认布尔可以指向一个 NoReview witness。confirmed 是证据的属性，不是旁边的标志；旁置 reviewer id 是同一错误的一步之遥。
 
@@ -57,7 +57,7 @@
 
 ## REVIEW-ASSURANCE-005：witness 自包含；Guard 不依赖外围 Map
 
-**规范**：`ConfirmedReviewWitness` 独立回答：谁审的、为哪个 Job、哪棵 tree、哪两次 provider run、第二次是否真的看过 challenge、属于哪个 barrier。Guard 不得依赖外围 Map 补身份；witness 无 AuthorityRoot 字段（REVIEW-003 禁止 same-root 确认，「携带字段」是它回归的一步之遥）。
+**规范**：`ConfirmedReviewWitness` 独立回答：谁审的、为哪个 Job、哪棵 tree、哪两次 provider run / tool call、first / second judgement 分别由哪个 PhysicalUserMessageId 驱动、属于哪个 barrier。两个 physical id 在写 witness 前必须相等。Guard 不得依赖外围 Map 补身份；witness 无 AuthorityRoot、challenge 文本 digest、provider-input digest 字段。
 
 **含义/动机**：外围 Map 在恢复与并发 Job 下会静默读到别人的确认或空确认。自包含保证 witness 在任意上下文可独立验证。
 
@@ -67,7 +67,7 @@
 
 ## REVIEW-ASSURANCE-006：tree 变化使 witness 失效；不删除历史；新 barrier 需全新双 PERFECT
 
-**规范**：任意 Git tree 变化：pending challenge → 拒绝；confirmed witness → 仍可审计但不再满足 Guard。**不删除**历史 witness；`witness.IsValid(currentBarrier, currentTree)` 是派生谓词。新 barrier（即使 tree hash 碰巧相同）要求全新双 PERFECT；post-rebase 必须重新双 PERFECT 才允许发布（REVIEW-009）。
+**规范**：任意 Git tree 变化后，旧 confirmed witness 仍可审计但不再满足 Guard。运行中的 CE 若发现 tree/barrier 已变化则该调用失败，不把半程执行位置写入 durable state。**不删除**历史 witness；`witness.IsValid(currentBarrier, currentTree)` 是派生谓词。新 barrier（即使 tree hash 碰巧相同）要求新的完整 CE 双 PERFECT；post-rebase 必须重新双 PERFECT 才允许发布（REVIEW-009）。
 
 **含义/动机**：审的是代码状态，不是 Session 情绪；tree 变即 witness 失效。barrier 是 request 身份，跨 request 复用旧确认等于把一次终末证明借给另一次终末。重复进入同一 barrier 幂等；晚到确认不能回卷当前 barrier。
 
@@ -75,19 +75,19 @@
 
 **证据**：→ PROOF.md `REVIEW-ASSURANCE-006`。
 
-## REVIEW-ASSURANCE-007：ProviderInputSeal fail-closed；无法绑定则不确认
+## REVIEW-ASSURANCE-007：physical binding fail-closed；禁止 provider-input seal
 
-**规范**：`ProviderInputSeal` 在 `messages.transform` 时刻生成，绑定到即将消费它的 ProviderRunIdentity。若 Host 无法把 transform 输出可靠绑定到 `ProviderRunIdentity`（无候选 / 多个候选 / 非最新 run / compaction 路径 / 无 physical user message），**必须 fail closed**——不写 seal，第二次 PERFECT 不确认。禁止退回 same-root 或 physical-message 猜测。
+**规范**：`judge` 的 typed delivery 必须带当前 provider execution 已绑定的 exact `PhysicalUserMessageId`；first/second judgement 必须来自同一 physical review prompt。缺任一 physical identity、第二 judgement 来自其它 physical user message、或 run/call 未 fresh，均 fail closed。禁止创建 `ProviderInputSeal`、扫描 provider wire、读取 `WireText`/tool-result 文本、或用 Journal 投影补这个因果缺口。
 
-**含义/动机**：HOST-010 因果读：唯一未完成的 assistant、parent 匹配、最新 id、非 compaction。猜测在 Host 重排消息时会假绿；`bindableRun` 四条件合取，缺一即 admit 错误答案。
+**含义/动机**：Host 已经拥有 `(SessionId, PhysicalUserMessageId)` 这一真实执行身份；再从 canonical 文本推一次“模型应该看到了什么”既更弱又更复杂。物理身份不成立就没有确认。
 
-**边界**：因果读的传输实现（怎么从 Host 读）→ `host-boundary`；seal 的 fail-closed 语义与「只有 reviewer session 被 seal」是本包。
+**边界**：exact execution binding 的实现归 `host-boundary`；review CE 只比较强类型 identity，并以 `AwaitJudgement()` 与 delivery capability 的源码顺序证明 challenge 已先返回。
 
 **证据**：→ PROOF.md `REVIEW-ASSURANCE-007`。
 
 ## REVIEW-ASSURANCE-008：VerdictKnown 与 ConsumableReview 两段式；禁止提前 Concluded
 
-**规范**：`VerdictKnown(k)` = Reviewer 域已有、针对 `TodoProcessReview(k)` 的 durable verdict（PERFECT|REVISE）→ 立即决定业务 outcome/settlement，**不携带 WorkRecordRef，不单独构成可消费报告，不进入 Finality dual-PERFECT witness**。该 verdict 的 `ProviderRunIdentity + ToolCallId` 必须由唯一 Journal 积分器随 `ReviewVerdictRecorded` 一次 fold 为 bounded typed projection evidence；任何消费方禁止扫描/重放 Journal、解析 dedupe string、或从 XTrace `tool_call` 反推 verdict identity。`ConsumableReview(k) ≡ TodoReviewConcluded(k)` = VerdictKnown ∧ 该 verdict frontier 的 canonical ProcessReviewLWR 已 record-ready ∧ 同 snapshot 已 append Concluded。顺序冻结：VerdictKnown → await record-ready → append Concluded → T(k+1)/suicide 可消费。
+**规范**：`VerdictKnown(k)` = Reviewer 域已有、针对 `TodoProcessReview(k)` 的 durable verdict（PERFECT|REVISE）→ 立即决定业务 outcome/settlement，**不携带 WorkRecordRef，不单独构成可消费报告，不进入 Finality dual-PERFECT witness**。该 verdict 的 `ProviderRunIdentity + ToolCallId` 必须由唯一 Journal 积分器随 `ReviewVerdictRecorded` 一次 fold 为 bounded typed projection evidence；任何消费方禁止扫描/重放 Journal、解析 dedupe string、或从 XTrace `tool_call` 反推 verdict identity。`ConsumableReview(k) ≡ TodoReviewConcluded(k)` = VerdictKnown ∧ 该 verdict frontier 的 canonical ProcessReviewLWR 已 record-ready ∧ 同 snapshot 已 append Concluded。顺序冻结：VerdictKnown → record-ready → Concluded → 下一 TodoWrite / suicide drain。禁止提前 append Concluded；禁止用空/占位/旧 frontier LWR 冒充。
 
 **含义/动机**：把「只有判断、尚无 report」挤进同一个 Concluded，恢复路径无法区分「已可 settle」与「已可展示报告」，并诱导提前 append 空壳。两段式让 verdict 先 settle 业务，report 就绪后才解锁消费。
 
@@ -97,7 +97,7 @@
 
 ## REVIEW-ASSURANCE-009：record-ready 同 snapshot、排他 frontier、事件驱动、无轮询、waiter 可恢复
 
-**规范**：record-ready 判定是「能否在**同一 Journal snapshot** 物化有效 canonical LWR」，不是 `coverage >= frontier.Sequence`（frontier 排他 = lastPart+1，真实 coverage 上限只达 lastPart，旧门禁会永远悬挂）。coverage 判定与 LWR materialization 不同 revision 即不成立。等待只经 `AgentJournal.awaitChangeFrom` 事件唤醒；禁止 timer/sleep/wall-clock 轮询。Direct CE 必须先采样 revision，再执行 `tryConclude`/producer 判定，最后 `awaitChangeFrom sampledRevision`，形成 check→subscribe/recheck 等价握手，禁止在判定后才采 revision 造成 lost wakeup。waiter 取消/dispose/崩溃不是 durable abandonment：从 durable assignment / VerdictKnown / 冻结 frontier 重建同一等待；`TodoReviewConcluded` 已在则直接消费。若 process verdict 已 durable，则当前 Host work-unit 的 `CompletedAwaitingJoin` / `Retired` 只说明 reviewer 已结束生成，不证明 record-ready producer 丢失；必须继续等待 XTrace/LWR 收敛。只有尚无 durable verdict 且 reviewer work-unit 已不可继续时才可 fail closed。
+**规范**：record-ready 判定是「能否在**同一 Journal snapshot** 物化有效 canonical LWR」，不是 `coverage >= frontier.Sequence`（frontier 排他 = lastPart+1，真实 coverage 上限只达 lastPart，旧门禁会永远悬挂）。coverage 判定与 LWR materialization 不同 revision 即不成立。等待只经 `AgentJournal.awaitChangeFrom` 事件唤醒；禁止 timer/sleep/wall-clock 轮询。Direct CE 必须先采样 revision，再执行 `tryConclude`/producer 判定，最后 `awaitChangeFrom sampledRevision`，形成 check→subscribe/recheck 等价握手，禁止在判定后才采 revision 造成 lost wakeup。waiter 取消/dispose/崩溃不是 durable abandonment：从 durable assignment / VerdictKnown / 冻结 frontier 重建同名 waiter 继续等。
 
 **含义/动机**：轮询把 Journal 因果等待退化成运气；用较晚 head 替换冻结 frontier 会改变原 REVISE 的记录目标。同 snapshot 保证「判定时就绪」与「物化同一份」不可分。
 

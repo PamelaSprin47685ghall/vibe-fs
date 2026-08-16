@@ -31,21 +31,6 @@ type ReviewFactCases =
            ProviderRun: ProviderRunIdentity
            ToolCallId: ToolCallId
            FrozenFrontierSequence: int64 |}
-    | PerfectChallengeIssued of
-        {| BarrierId: ReviewBarrierId
-           GitTreeHash: GitTreeHash
-           ReviewerSessionId: SessionId
-           FirstProviderRun: ProviderRunIdentity
-           FirstToolCallId: ToolCallId
-           ChallengeTextVersion: int
-           ChallengeContentDigest: SealDigest |}
-    | ProviderInputSealed of
-        {| SessionId: SessionId
-           ProviderRun: ProviderRunIdentity
-           PhysicalUserMessageId: PhysicalUserMessageId
-           SealDigest: SealDigest
-           CanonicalVersion: int
-           IncludedToolResultDigests: SealDigest list |}
     | ConfirmedReviewWitness of
         {| ManagerJobId: ManagerJobId option
            ManagerSessionId: SessionId
@@ -55,7 +40,7 @@ type ReviewFactCases =
            GitTreeHash: GitTreeHash
            FirstProviderRun: ProviderRunIdentity
            FirstToolCallId: ToolCallId
-           ChallengeResultDigest: SealDigest
+           FirstPhysicalUserMessageId: PhysicalUserMessageId
            SecondProviderRun: ProviderRunIdentity
-           SecondProviderInputDigest: SealDigest
-           SecondToolCallId: ToolCallId |}
+           SecondToolCallId: ToolCallId
+           SecondPhysicalUserMessageId: PhysicalUserMessageId |}

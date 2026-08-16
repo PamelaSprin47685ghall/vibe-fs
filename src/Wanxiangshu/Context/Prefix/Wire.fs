@@ -44,7 +44,6 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
@@ -217,7 +216,7 @@ module XWire =
             let assistant =
                 requireOkMapped
                     (fun rejection -> sprintf "StrengthReplica run binding failed: %A" rejection)
-                    (ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages)
+                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
 
             let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
@@ -333,7 +332,7 @@ module XWire =
             let assistant =
                 requireOkMapped
                     (fun rejection -> sprintf "X-wire run binding failed: %A" rejection)
-                    (ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages)
+                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
 
             let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable

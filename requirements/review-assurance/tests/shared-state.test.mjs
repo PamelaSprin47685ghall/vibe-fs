@@ -1,37 +1,19 @@
-// REVIEW-010/013: PendingSeal crosses the Review assurance owner boundary as
-// plain strings and arrays; the SharedState map remains production-owned.
-import assert from 'node:assert/strict'
-import test from 'node:test'
-import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
+// REVIEW-ASSURANCE-007: Finality causality has no shared parked seal state.
 
-const sealValue = review.pendingSeal({
-  SessionId: 'ses_seal',
-  ManagerSessionId: 'ses_manager',
-  BarrierId: 'bar_seal',
-  GitTreeHash: 'tree-seal',
-  PhysicalUserMessageId: 'msg-seal',
-  SealDigest: 'digest-1',
-  CanonicalVersion: 3,
-  IncludedToolResultDigests: ['tool-1', 'tool-2'],
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const read = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8')
+
+test('WHAT[REVIEW-ASSURANCE-007] SHARED_finality_has_no_pending_provider_input_seal_registry', () => {
+  const shared = read('src/Wanxiangshu/OpenCode/Host/SharedState.fs')
+  assert.doesNotMatch(shared, /PendingReviewSeals|PendingSeal|IncludedToolResultDigests|SealDigest/)
 })
 
-test('WHAT[REVIEW-ASSURANCE-007] SHARED_pending_seal_record_carries_the_binding_candidate', () => {
-  assert.deepEqual(sealValue, {
-    SessionId: 'ses_seal',
-    ManagerSessionId: 'ses_manager',
-    BarrierId: 'bar_seal',
-    GitTreeHash: 'tree-seal',
-    PhysicalUserMessageId: 'msg-seal',
-    SealDigest: 'digest-1',
-    CanonicalVersion: 3,
-    IncludedToolResultDigests: ['tool-1', 'tool-2'],
-  })
-
-  const key = 'shared-test-pending-seal'
-  try {
-    review.setPendingSeal(key, sealValue)
-    assert.deepEqual(review.tryGetPendingSeal(key), sealValue, 'the parked candidate round-trips through the shared map')
-  } finally {
-    review.deletePendingSeal(key)
-  }
+test('WHAT[REVIEW-ASSURANCE-002] SHARED_judgement_rendezvous_is_physical_not_a_business_stage', () => {
+  const inbox = read('src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs')
+  assert.match(inbox, /TaskCompletionSource/)
+  assert.match(inbox, /AwaitJudgement/)
+  assert.doesNotMatch(inbox, /FirstPerfect|SecondPerfect|PerfectPending|PendingChallenge|ConfirmedState|Stage|Phase/)
 })

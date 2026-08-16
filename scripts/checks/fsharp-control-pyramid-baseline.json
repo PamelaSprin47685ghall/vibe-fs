@@ -84,7 +84,7 @@
     "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs": 0,
     "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs": 1,
     "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs": 5,
-    "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs": 4,
+    "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs": 3,
     "src/Wanxiangshu/Mission/WorkRecord/Model.fs": 1,
     "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs": 3,
     "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs": 1,

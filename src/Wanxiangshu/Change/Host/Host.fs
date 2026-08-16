@@ -350,12 +350,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     runtime.Children.Remove id |> ignore)
         }
 
-    let sendDeferredThenAwait (reviewerAgentId: string) =
-        taskResult {
-            do! runtime.SendDeferredFirstPrompt reviewerAgentId
-            return! awaitChild reviewerAgentId
-        }
-
     /// One review barrier. A fresh reviewer agent id per barrier, so REVIEW-008's
     /// "fresh dual PERFECT" is structural: a new session's guard starts empty.
     let reverify
@@ -371,7 +365,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             deps.Journal
             (fun _ path prompt ->
                 forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
-            (fun _ -> sendDeferredThenAwait reviewerAgentId)
+            (fun _ -> runtime.SendDeferredFirstPrompt reviewerAgentId)
+            (fun _ -> awaitChild reviewerAgentId)
             jobId
             managerSessionId
             worktree

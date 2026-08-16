@@ -3,7 +3,6 @@ namespace Wanxiangshu.Foundation
 open System
 open System.Threading
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 
 [<RequireQualifiedAccess>]
 module ParallelSurface =
@@ -36,8 +35,8 @@ module ParallelSurface =
                     token :?> TokenHandle
 
             let run item _ =
-                emitJsExpr (action, item, box handle) "$0($1,$2)"
-                |> unbox<Task<obj>>
+                let fn = unbox<obj -> obj -> Task<obj>> action
+                fn item (box handle)
 
             let! results = Parallel.mapBounded maxConcurrency handle.Token run (items |> Array.toList)
             return results |> List.toArray

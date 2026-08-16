@@ -30,10 +30,9 @@ open Wanxiangshu.Strength.Prediction
 /// Prose lives in `resources/provider/runtime/...`. Call sites bind language via
 /// `ProviderProse.documentFor` / `instructionLines`. Domain owns path constants only.
 ///
-/// REVIEW-003 challenge prose is not a runtime nudge path: it lives in
-/// `resources/provider/review/challenge`. `PerfectChallengeIssued` records the
-/// digest of the ARCH-010 Prompt bytes; the second run's input seal is searched
-/// for those same bytes. Language follows the Reviewer session.
+/// REVIEW challenge prose is not a runtime nudge path: it lives in
+/// `resources/provider/review/challenge` and is sent as a PromptAuthority continuation.
+/// Language follows the Reviewer session.
 ///
 /// ARCH-011: repair identity lives in typed `repairKind`, never in payload bytes.
 [<RequireQualifiedAccess>]

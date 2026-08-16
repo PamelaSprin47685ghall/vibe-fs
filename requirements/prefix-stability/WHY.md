@@ -16,7 +16,7 @@ system prompt 被重写——那么即使语义相同，模型看到的也是「
 `ProviderProjection.isAppendOnlyPrefix` 的调用方——只要 append-only prefix law 与合法
 cold-boundary semantics 不变，context-compression / provider-projection / provider-language
 的 WHAT 一行都不用改。反过来，若允许「无业务语义变化时重排历史字节」，所有依赖 prefix
-的机制（KV-cache、ReviewSeal、Pair Hint 重放）同时失真——独立失败域。
+的机制（KV-cache、provider-visible prefix evidence、Pair Hint 重放）同时失真——独立失败域。
 
 ## 3. 失败意义（FAILURE MEANING）
 

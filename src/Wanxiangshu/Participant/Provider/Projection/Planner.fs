@@ -33,7 +33,7 @@ open Wanxiangshu.Foundation.Identity
 module ProjectionPlanner =
 
     /// Canonical rank（how/projection.md）：
-    /// keep/activate/mirror → blog → repair → strengthFrames → suppress → challenge → reanchor
+    /// keep/activate/mirror → blog → repair → strengthFrames → suppress → reanchor
     let private rank (intent: ProjectionIntent) : int =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix
@@ -43,8 +43,7 @@ module ProjectionPlanner =
         | ProjectionIntent.InsertRepair _ -> 2
         | ProjectionIntent.InsertStrengthFrames _ -> 3
         | ProjectionIntent.SuppressTransportOnly -> 4
-        | ProjectionIntent.AppendReviewChallenge _ -> 5
-        | ProjectionIntent.ReanchorAfterCompaction -> 6
+        | ProjectionIntent.ReanchorAfterCompaction -> 5
 
     let private kindKey (intent: ProjectionIntent) : int = rank intent
 
@@ -159,20 +158,6 @@ module ProjectionPlanner =
             requireIdentical ProjectionConflict.ConflictingRepair same first
         | first :: _ -> Ok(Some first)
 
-    let private reduceChallenge (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
-        match items with
-        | [] -> Ok None
-        | [ single ] -> Ok(Some single)
-        | (ProjectionIntent.AppendReviewChallenge head as first) :: rest ->
-            let same =
-                rest
-                |> List.forall (function
-                    | ProjectionIntent.AppendReviewChallenge other -> other = head
-                    | _ -> false)
-
-            requireIdentical ProjectionConflict.ConflictingReviewChallenge same first
-        | first :: _ -> Ok(Some first)
-
     /// 幂等并 1：Suppress / Reanchor（以及任何单例重放型）。
     let private reduceIdempotent (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
         match items with
@@ -266,7 +251,6 @@ module ProjectionPlanner =
         | ProjectionIntent.InsertBlogFrames _ -> reduceBlogFrames items
         | ProjectionIntent.InsertRepair _ -> reduceRepair items
         | ProjectionIntent.InsertStrengthFrames _ -> reduceStrengthFrames items
-        | ProjectionIntent.AppendReviewChallenge _ -> reduceChallenge items
         | ProjectionIntent.SuppressTransportOnly
         | ProjectionIntent.ReanchorAfterCompaction -> reduceIdempotent items
 

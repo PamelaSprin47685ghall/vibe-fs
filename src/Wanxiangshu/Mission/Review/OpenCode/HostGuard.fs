@@ -84,17 +84,14 @@ module HostReviewGuard =
     [<RequireQualifiedAccess>]
     type private GuardNudgeOccasion =
         | MissingVerdict of ReviewBarrierId
-        | PerfectConfirmation of ProviderRunIdentity
 
     let private kindForOccasion =
         function
         | GuardNudgeOccasion.MissingVerdict _ -> PromptAuthority.ContinuationKind.ReviewerGuard
-        | GuardNudgeOccasion.PerfectConfirmation _ -> PromptAuthority.ContinuationKind.ReviewConfirmation
 
     let private occasionIdentity =
         function
         | GuardNudgeOccasion.MissingVerdict barrierId -> "barrier:" + ReviewBarrierId.value barrierId
-        | GuardNudgeOccasion.PerfectConfirmation providerRun -> "perfect-run:" + ProviderRunIdentity.value providerRun
 
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
@@ -221,62 +218,6 @@ module HostReviewGuard =
                             (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
         }
 
-    /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only
-    /// makes the Host start the next provider request; the confirmation itself comes
-    /// from the second run's input seal proving it consumed the challenge.
-    ///
-    /// PROJ-008 Step5：可见字节经 `AppendReviewChallenge` → plan → render 归一，再取
-    /// 尾部正文发送。生产路径与 algebra 必须字节一致；seal 搜索的仍是同一 Prompt digest。
-    let private reviewChallengeVisibleBytes (sessionId: SessionId) : string =
-        let prompt = ProviderProse.documentFor sessionId ReviewChallenge.Path Map.empty
-
-        let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-            { ProviderId = None
-              ModelId = None
-              Variant = None
-              Tools = []
-              System = []
-              Messages = [] }
-
-        let snapshot: ProjectionSnapshot =
-            { CurrentProjection = emptyCurrent
-              CommittedPrefix = None
-              BlogFrames = []
-              TransportMessages = Set.empty
-              HostReanchor = None }
-
-        let intents =
-            [ ProjectionIntent.AppendReviewChallenge
-                  { TextVersion = ReviewChallenge.TextVersion
-                    Prompt = prompt } ]
-
-        match ProjectionPlanner.plan intents with
-        | Error _ -> prompt
-        | Ok ordered ->
-            let wire = ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
-
-            wire
-            |> List.tryLast
-            |> Option.bind (fun msg ->
-                msg.Parts
-                |> List.tryPick (function
-                    | ProviderProjection.WireText t -> Some t
-                    | _ -> None))
-            |> Option.defaultValue prompt
-
-    let requestPerfectConfirmation
-        (sessionPort: ISessionHostPort)
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (triggerProviderRun: ProviderRunIdentity)
-        =
-        sendGuardNudge
-            sessionPort
-            journal
-            sessionId
-            (GuardNudgeOccasion.PerfectConfirmation triggerProviderRun)
-            (reviewChallengeVisibleBytes sessionId)
-
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
     let continuationPort (sessionPort: ISessionHostPort) (journal: AgentJournal option) : ReviewerContinuationPort =
@@ -287,11 +228,4 @@ module HostReviewGuard =
                     // Preserve existing boundary: missing-verdict send failure was
                     // not terminal; the next durable observation may re-enter.
                     return Ok()
-                }
-          SendPerfectChallenge =
-            fun sessionId providerRun ->
-                task {
-                    match! requestPerfectConfirmation sessionPort journal sessionId providerRun with
-                    | GuardNudgeOutcome.Failed reason -> return Error reason
-                    | _ -> return Ok()
                 } }

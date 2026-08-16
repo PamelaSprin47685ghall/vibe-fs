@@ -56,24 +56,6 @@ open Wanxiangshu.Foundation.Identity
 /// OwnedSessions、UserMessageBindings、hook 订阅、每实例 NudgeSent（非 guard）。
 module SharedState =
 
-    /// REVIEW-010: a seal candidate before its provider run exists (see
-    /// `ReviewSeal.bindToRun`). Defined here so the shared dictionary can
-    /// be typed before `ReviewSeal` compiles.
-    ///
-    /// REVIEW-013: the attempt's review scope is frozen here at transform
-    /// time — the manager/barrier/tree this request started under. The judge
-    /// tool submits with this frozen scope, so a barrier opened later can
-    /// never re-identify an old attempt.
-    type PendingSeal =
-        { SessionId: SessionId
-          ManagerSessionId: SessionId
-          BarrierId: ReviewBarrierId
-          GitTreeHash: GitTreeHash
-          PhysicalUserMessageId: PhysicalUserMessageId
-          SealDigest: SealDigest
-          CanonicalVersion: int
-          IncludedToolResultDigests: SealDigest list }
-
     let SessionParents = Dictionary<string, string>()
     let VerdictSessions = HashSet<string>()
     let SessionDirectories = Dictionary<string, string>()
@@ -92,12 +74,6 @@ module SharedState =
     /// Unit-test isolation only: production must not wipe cross-instance reservations.
     let clearReviewGuardNudgesForTests () =
         lock ReviewGuardNudgeGate (fun () -> ReviewGuardNudges.Clear())
-
-    /// REVIEW-010 deferred-binding candidates (challenge requests), shared
-    /// across instances like the other cross-instance state: the transform that
-    /// parks a candidate and the tool that binds it may run under different
-    /// plugin instances (orchestrator worktree).
-    let PendingReviewSeals = Dictionary<string, PendingSeal>()
 
     /// The ROOT workspace, set by whichever plugin instance boots first (the
     /// main workspace loads before the manager worktrees). Worktree instances

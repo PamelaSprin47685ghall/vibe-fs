@@ -67,8 +67,7 @@ module FinalityReviewCohort =
         match guard.Witness with
         | ReviewWitness.Confirmed confirmed -> List.contains confirmed.BarrierId standing.Barriers
         | ReviewWitness.NoReview
-        | ReviewWitness.RevisionWitness _
-        | ReviewWitness.PerfectPending _ -> false
+        | ReviewWitness.RevisionWitness _ -> false
 
     let private sessionGraduates (standing: ReviewerStanding) (session: SessionAgentProjection) =
         match session.ReviewGuard with

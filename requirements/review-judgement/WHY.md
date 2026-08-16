@@ -31,9 +31,9 @@
 
 HANDOFF §6.4 / §7.6 的裁决：`review-protocol` 拆成 `review-judgement` 与 `review-assurance`，因为
 
-> 判断哲学可以整体重写，而 witness/seal/finality 协议不变；反之亦然。
+> 判断哲学可以整体重写，而 witness/finality 因果协议不变；反之亦然。
 
-具体：你可以把 Role Law / Examiner's Ledger 的判断方向整个换成另一套 craft guidance（比如新的 materiality 理论），`ConfirmedReviewWitness`、`ProviderInputSeal`、challenge digest、record-ready 代数一行不用改。反过来，你可以把 dual-PERFECT+seal 换成另一种因果确认协议，判断的 discrimination 语义也不动。两个 failure meaning 完全不同：
+具体：你可以把 Role Law / Examiner's Ledger 的判断方向整个换成另一套 craft guidance（比如新的 materiality 理论），`ConfirmedReviewWitness`、typed physical challenge edge、record-ready 代数一行不用改。反过来，你可以重写 dual-PERFECT 的 CE 因果协议，判断的 discrimination 语义也不动。两个 failure meaning 完全不同：
 
 - `review-judgement` RED = reviewer 可以凭表演/checklist/偏好决定 accept/reject；
 - `review-assurance` RED = 系统可以消费针对旧 tree / 未看 challenge / 缺报告 的 judgement。
@@ -42,7 +42,7 @@ HANDOFF §6.4 / §7.6 的裁决：`review-protocol` 拆成 `review-judgement` �
 
 | 邻近事实 | 真正的 owner | 为什么不归 judgement |
 |---|---|---|
-| 第二次 PERFECT 是否因果成立（9 条件、seal、attempt identity、tree invalidation） | `review-assurance` | 那是「这个判断有没有资格被消费」的证明，不是判断本身的含义 |
+| 第二次 PERFECT 是否因果成立（direct CE、physical identity、attempt identity、tree invalidation） | `review-assurance` | 那是「这个判断有没有资格被消费」的证明，不是判断本身的含义 |
 | 过程评审 1:1 节拍、Rk 义务、lag-1 | `obligation-ledger` | 何时派生评审义务是账本规则；judgement 只回答这一次判断怎么说 |
 | 终末 cohort、rejection/blessing/rest、drain | `finality` | 不可逆结束的资格建立在 obligations + tree + review evidence 上，judgement 不是 finality 本身 |
 | Reviewer 提示词怎么组合（Common Law → Role Law → Ledger） | `cognitive-environment` | 组合权威是认知环境的事；本包拥有的是判断方向的内容 |

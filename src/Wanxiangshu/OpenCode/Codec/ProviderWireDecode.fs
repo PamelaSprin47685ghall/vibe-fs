@@ -106,10 +106,8 @@ module ProviderWireDecode =
                     // carries the call AND its completed result — `{ type:
                     // "tool", tool, callID, state: { status, input, output?,
                     // error? } }`. The result the model saw is `state.output`
-                    // (or `state.error`). REVIEW-010's `IncludedToolResultDigests`
-                    // must contain it — the challenge text lives in the previous
-                    // verdict's tool result — so a completed/errored tool part
-                    // projects as the RESULT, and only a pending call (this
+                    // (or `state.error`). A completed/errored tool part projects
+                    // as the RESULT, while only a pending call (this
                     // request's own previous assistant turn, or a legacy shape
                     // with no state object) projects as the call.
                     let stateObj = readField partObj "state"
@@ -147,11 +145,8 @@ module ProviderWireDecode =
             // Host 1.18.10's assembled tool part: `{ type: "tool-<tool>", state:
             // "output-available"|"output-error", toolCallId, input, output?,
             // errorText? }` (message-v2.ts). The result the model actually saw is
-            // `output` (or `errorText` on failure). Without this case the tool
-            // results in every assembled request projected to an empty
-            // `IncludedToolResultDigests`, so REVIEW-003's challenge proof could
-            // never be satisfied (measured: dual-PERFECT always
-            // `ChallengeUnproven`).
+            // `output` (or `errorText` on failure). Preserve it as typed wire data;
+            // challenge verification is owned by ReviewBarrierWorkflow.
             | kind when kind.StartsWith "tool-" ->
                 let result =
                     firstCanonical partObj [ "output"; "errorText"; "result"; "content" ]

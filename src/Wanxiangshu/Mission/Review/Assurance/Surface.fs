@@ -51,21 +51,10 @@ module ReviewAssuranceSurface =
         let candidate = field value name
         if isNull candidate then false else unbox<bool> candidate
 
-    let private intField (value: obj) (name: string) =
-        let candidate = field value name
-        if isNull candidate then 0 else unbox<int> candidate
-
-    let private stringList (value: obj) : string list =
-        if isNull value then
-            []
-        else
-            let values: obj array = unbox<obj array> value
-            values |> Array.toList |> List.map text
-
     let private optionText (value: obj) =
         if isNull value then None else Some(text value)
 
-    let private sealDigestOf value = SealDigest.create (text value)
+    let private physicalOf value = PhysicalUserMessageId.create (text value)
     let private sessionOf value = SessionId.create (text value)
     let private runOf value = ProviderRunIdentity.create (text value)
     let private callOf value = ToolCallId.create (text value)
@@ -90,8 +79,6 @@ module ReviewAssuranceSurface =
         | ReviewWitness.NoReview -> box {| state = "NoReview" |}
         | ReviewWitness.RevisionWitness revision ->
             box {| state = "RevisionWitness"; report = revision.Report; tree = GitTreeHash.value revision.GitTreeHash |}
-        | ReviewWitness.PerfectPending pending ->
-            box {| state = "PerfectPending"; first = witnessView pending |}
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| state = "Confirmed"
@@ -99,8 +86,8 @@ module ReviewAssuranceSurface =
                    first = witnessView confirmed.First
                    second = witnessView confirmed.Second
                    tree = GitTreeHash.value confirmed.GitTreeHash
-                   challengeResultDigest = SealDigest.value confirmed.ChallengeResultDigest
-                   secondProviderInputDigest = SealDigest.value confirmed.SecondProviderInputDigest |}
+                   firstPhysical = PhysicalUserMessageId.value confirmed.FirstPhysicalUserMessageId
+                   secondPhysical = PhysicalUserMessageId.value confirmed.SecondPhysicalUserMessageId |}
 
     let private reviewWitnessOf (value: obj) : ReviewWitness =
         if isNull value then
@@ -111,15 +98,14 @@ module ReviewAssuranceSurface =
                 ReviewWitness.RevisionWitness
                     {| Report = text (field value "report")
                        GitTreeHash = treeOf (field value "tree") |}
-            | "PerfectPending" -> ReviewWitness.PerfectPending(witnessOf (field value "first"))
             | "Confirmed" ->
                 ReviewWitness.Confirmed
                     {| BarrierId = barrierOf (field value "barrier")
                        First = witnessOf (field value "first")
                        Second = witnessOf (field value "second")
                        GitTreeHash = treeOf (field value "tree")
-                       ChallengeResultDigest = sealDigestOf (field value "challengeResultDigest")
-                       SecondProviderInputDigest = sealDigestOf (field value "secondProviderInputDigest") |}
+                       FirstPhysicalUserMessageId = physicalOf (firstField value [| "FirstPhysicalUserMessageId"; "firstPhysical" |])
+                       SecondPhysicalUserMessageId = physicalOf (firstField value [| "SecondPhysicalUserMessageId"; "secondPhysical" |]) |}
             | _ -> ReviewWitness.NoReview
 
     let private attemptView (attempt: ReviewAttemptIdentity) : obj =
@@ -153,9 +139,7 @@ module ReviewAssuranceSurface =
                tree = tree
                witness = witnessStateView guard.Witness
                observedAttempts = List.length guard.ObservedAttempts
-               closedAttempts = List.length guard.ClosedAttempts
-               hasPendingChallenge = guard.PendingChallenge.IsSome
-               sealCount = Map.count guard.Seals |}
+               closedAttempts = List.length guard.ClosedAttempts |}
 
     let private rejectionName rejection =
         match rejection with
@@ -170,41 +154,9 @@ module ReviewAssuranceSurface =
         | "Perfect" -> ReviewGuardVerdict.Perfect
         | other -> invalidArg "value" $"unknown review verdict '{other}'"
 
-    let private challengeOf (value: obj) : PerfectChallenge =
-        { BarrierId = barrierOf (firstField value [| "BarrierId"; "barrier" |])
-          GitTreeHash = treeOf (firstField value [| "GitTreeHash"; "tree" |])
-          ReviewerSessionId = sessionOf (firstField value [| "ReviewerSessionId"; "reviewer" |])
-          FirstProviderRun = runOf (firstField value [| "FirstProviderRun"; "run" |])
-          FirstToolCallId = callOf (firstField value [| "FirstToolCallId"; "call" |])
-          ChallengeTextVersion = intField value "ChallengeTextVersion"
-          ChallengeContentDigest = sealDigestOf (firstField value [| "ChallengeContentDigest"; "digest" |]) }
-
-    let private sealOf (value: obj) : ProviderInputSeal =
-        { SessionId = sessionOf (firstField value [| "SessionId"; "session" |])
-          ProviderRun = runOf (firstField value [| "ProviderRun"; "run" |])
-          PhysicalUserMessageId = PhysicalUserMessageId.create (text (firstField value [| "PhysicalUserMessageId"; "physical" |]))
-          SealDigest = sealDigestOf (firstField value [| "SealDigest"; "digest" |])
-          CanonicalVersion = intField value "CanonicalVersion"
-          IncludedToolResultDigests =
-            stringList (firstField value [| "IncludedToolResultDigests"; "included" |])
-            |> Set.ofList }
-
-    /// REVIEW-003 challenge path/version and the localized text are owned here;
-    /// bytes still come from ProviderResources through the Provider owner surface.
     let challengePath = ReviewChallenge.Path
-    let challengeTextVersion = ReviewChallenge.TextVersion
     let challengeText (language: string) = ProviderResources.readText (ProviderLanguage.parse language) challengePath
     let challengePrompt (text: string) = ReviewChallenge.promptOf text
-
-    let challengeDigest (sha256: obj) (prompt: obj) : string =
-        let hasher (value: string) = emitJsExpr (sha256, value) "$0($1)"
-        let bytes =
-            if isNull prompt then
-                challengeText "English" |> ReviewChallenge.promptOf
-            else
-                text prompt
-
-        ReviewChallenge.contentDigest hasher bytes |> SealDigest.value
 
     let challengeObject (language: string) : obj =
         let text = challengeText language
@@ -213,31 +165,7 @@ module ReviewAssuranceSurface =
         box
             {| path = challengePath
                text = text
-               textVersion = challengeTextVersion
                prompt = prompt |}
-
-    let issuedChallenge (value: obj) : obj =
-        let challenge = challengeOf value
-
-        box
-            {| BarrierId = ReviewBarrierId.value challenge.BarrierId
-               GitTreeHash = GitTreeHash.value challenge.GitTreeHash
-               ReviewerSessionId = SessionId.value challenge.ReviewerSessionId
-               FirstProviderRun = ProviderRunIdentity.value challenge.FirstProviderRun
-               FirstToolCallId = ToolCallId.value challenge.FirstToolCallId
-               ChallengeTextVersion = challenge.ChallengeTextVersion
-               ChallengeContentDigest = SealDigest.value challenge.ChallengeContentDigest |}
-
-    let providerInputSeal (value: obj) : obj =
-        let seal = sealOf value
-
-        box
-            {| SessionId = SessionId.value seal.SessionId
-               ProviderRun = ProviderRunIdentity.value seal.ProviderRun
-               PhysicalUserMessageId = PhysicalUserMessageId.value seal.PhysicalUserMessageId
-               SealDigest = SealDigest.value seal.SealDigest
-               CanonicalVersion = seal.CanonicalVersion
-               IncludedToolResultDigests = seal.IncludedToolResultDigests |> Set.toArray |}
 
     /// REVIEW-006 self-contained witness. The raw shape deliberately contains
     /// no authority-root field.
@@ -253,40 +181,43 @@ module ReviewAssuranceSurface =
 
     let confirmWitness
         (barrier: string)
-        (challengeDigest: string)
-        (secondInputDigest: string)
+        (firstPhysical: string)
+        (secondPhysical: string)
         (first: obj)
         (second: obj)
         : obj =
         match
             ReviewWitness.confirm
                 (barrierOf (box barrier))
-                (sealDigestOf (box challengeDigest))
-                (sealDigestOf (box secondInputDigest))
+                (physicalOf (box firstPhysical))
+                (physicalOf (box secondPhysical))
                 (witnessOf first)
                 (witnessOf second)
         with
         | None -> null
         | Some witness -> witnessStateView witness
 
-    let isConfirmed (witness: obj) = reviewWitnessOf witness |> ReviewWitness.isConfirmed
-    let isPerfectPending (witness: obj) = reviewWitnessOf witness |> ReviewWitness.isPerfectPending
-    let isRevision (witness: obj) = reviewWitnessOf witness |> ReviewWitness.isRevision
+    let private extractWitness (value: obj) : ReviewWitness =
+        if isNull value then
+            ReviewWitness.NoReview
+        elif value :? GuardHandle then
+            (value :?> GuardHandle).Current.Witness
+        else
+            let inner = field value "Witness"
+            if not (isNull inner) then
+                if inner :? GuardHandle then (inner :?> GuardHandle).Current.Witness
+                else reviewWitnessOf inner
+            else
+                reviewWitnessOf value
+
+    let isConfirmed (witness: obj) = extractWitness witness |> ReviewWitness.isConfirmed
+    let isRevision (witness: obj) = extractWitness witness |> ReviewWitness.isRevision
 
     let private witnessPublicView (witness: ReviewWitness) : obj =
         match witness with
         | ReviewWitness.NoReview -> box {| state = "NoReview" |}
         | ReviewWitness.RevisionWitness revision ->
             box {| state = "RevisionWitness"; report = revision.Report; tree = GitTreeHash.value revision.GitTreeHash |}
-        | ReviewWitness.PerfectPending pending ->
-            box
-                {| state = "PerfectPending"
-                   first =
-                    box
-                        {| run = ProviderRunIdentity.value pending.ProviderRun
-                           call = ToolCallId.value pending.ToolCallId
-                           tree = GitTreeHash.value pending.GitTreeHash
-                           reviewer = SessionId.value pending.ReviewerSessionId |} |}
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| state = "Confirmed"
@@ -304,46 +235,40 @@ module ReviewAssuranceSurface =
                            call = ToolCallId.value confirmed.Second.ToolCallId
                            tree = GitTreeHash.value confirmed.Second.GitTreeHash
                            reviewer = SessionId.value confirmed.Second.ReviewerSessionId |}
-                   challengeResultDigest = SealDigest.value confirmed.ChallengeResultDigest
-                   secondProviderInputDigest = SealDigest.value confirmed.SecondProviderInputDigest |}
+                   firstPhysical = PhysicalUserMessageId.value confirmed.FirstPhysicalUserMessageId
+                   secondPhysical = PhysicalUserMessageId.value confirmed.SecondPhysicalUserMessageId |}
 
     let readWitness (witness: obj) =
-        let value = if isNull witness then null else field witness "Witness"
-        let target = if isNull value then witness else value
-        reviewWitnessOf target |> witnessPublicView
+        extractWitness witness |> witnessPublicView
 
     let confirmedWitnessRecord (witness: obj) =
-        let value = if isNull witness then null else field witness "Witness"
-        let target = if isNull value then witness else value
-
-        match reviewWitnessOf target with
+        match extractWitness witness with
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| BarrierId = ReviewBarrierId.value confirmed.BarrierId
                    First = witnessView confirmed.First
                    Second = witnessView confirmed.Second
                    GitTreeHash = GitTreeHash.value confirmed.GitTreeHash
-                   ChallengeResultDigest = SealDigest.value confirmed.ChallengeResultDigest
-                   SecondProviderInputDigest = SealDigest.value confirmed.SecondProviderInputDigest |}
+                   FirstPhysicalUserMessageId = PhysicalUserMessageId.value confirmed.FirstPhysicalUserMessageId
+                   SecondPhysicalUserMessageId = PhysicalUserMessageId.value confirmed.SecondPhysicalUserMessageId |}
         | _ -> null
 
     let noReview : obj = box {| state = "NoReview" |}
 
     let gitTreeHash (witness: obj) =
-        reviewWitnessOf witness
+        extractWitness witness
         |> ReviewWitness.gitTreeHash
         |> Option.map GitTreeHash.value
         |> Option.toObj
 
-
     let confirmedReviewer (witness: obj) =
-        reviewWitnessOf witness
+        extractWitness witness
         |> ReviewWitness.confirmedReviewer
         |> Option.map SessionId.value
         |> Option.toObj
 
     let isValidForTree (tree: string) (witness: obj) =
-        ReviewWitness.isValidForTree (treeOf (box tree)) (reviewWitnessOf witness)
+        ReviewWitness.isValidForTree (treeOf (box tree)) (extractWitness witness)
 
     let emptyGuard () : obj = GuardHandle.Create ReviewProjection.empty :> obj
 
@@ -357,16 +282,6 @@ module ReviewAssuranceSurface =
 
         GuardHandle.Create next :> obj
 
-    let applyChallengeIssued (challenge: obj) (current: obj) : obj =
-        ReviewProjection.applyChallengeIssued (challengeOf challenge) (guardOf current)
-        |> GuardHandle.Create
-        |> fun handle -> handle :> obj
-
-    let applySeal (seal: obj) (current: obj) : obj =
-        ReviewProjection.applySeal (sealOf seal) (guardOf current)
-        |> GuardHandle.Create
-        |> fun handle -> handle :> obj
-
     let applyVerdict (attempt: obj) (verdict: string) (current: obj) : obj =
         match ReviewProjection.applyVerdict (attemptOf attempt) (verdictOf (box verdict)) (guardOf current) with
         | Ok next -> box {| ok = true; value = GuardHandle.Create next :> obj |}
@@ -374,8 +289,8 @@ module ReviewAssuranceSurface =
 
     let applyConfirmedWitness
         (barrier: string)
-        (challengeDigest: string)
-        (secondInputDigest: string)
+        (firstPhysical: string)
+        (secondPhysical: string)
         (first: obj)
         (second: obj)
         (current: obj)
@@ -383,8 +298,8 @@ module ReviewAssuranceSurface =
         match
             ReviewProjection.applyConfirmedWitness
                 (barrierOf (box barrier))
-                (sealDigestOf (box challengeDigest))
-                (sealDigestOf (box secondInputDigest))
+                (physicalOf (box firstPhysical))
+                (physicalOf (box secondPhysical))
                 (witnessOf first)
                 (witnessOf second)
                 (guardOf current)
@@ -435,7 +350,7 @@ module ReviewAssuranceSurface =
                 |> List.toArray
                lastConfirmedProviderRun = value.LastConfirmedProviderRun |> Option.map ProviderRunIdentity.value |> Option.toObj |}
 
-    /// REVIEW-010 binding result. The raw Host message is adapted once here;
+    /// Provider run binding result. The raw Host message is adapted once here;
     /// SessionMessage never crosses the owner boundary.
     let bindableRun (physicalUser: string) (messages: obj array) : obj =
         let messageOf value : SessionMessage =
@@ -458,55 +373,8 @@ module ReviewAssuranceSurface =
 
         let typedMessages = messages |> Array.toList |> List.map messageOf
 
-        match ReviewSeal.bindableRun physicalUser typedMessages with
+        match ProviderRunBinding.bindableRun physicalUser typedMessages with
         | Ok message -> box {| ok = true; id = message.Id; parentId = message.ParentId |> Option.toObj; completed = message.Completed |}
-        | Error ReviewSeal.SealRejection.NoBindableRun -> box {| ok = false; error = "NoBindableRun" |}
-        | Error(ReviewSeal.SealRejection.AmbiguousRun count) -> box {| ok = false; error = "AmbiguousRun"; count = count |}
-        | Error ReviewSeal.SealRejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}
-        | Error ReviewSeal.SealRejection.NoPhysicalUserMessage -> box {| ok = false; error = "NoPhysicalUserMessage" |}
-        | Error(ReviewSeal.SealRejection.SnapshotUnavailable reason) -> box {| ok = false; error = "SnapshotUnavailable"; reason = reason |}
-        | Error ReviewSeal.SealRejection.JournalUnavailable -> box {| ok = false; error = "JournalUnavailable" |}
-
-    let private pendingSealOf (value: obj) : SharedState.PendingSeal =
-        { SessionId = SessionId.create (text (firstField value [| "SessionId"; "session" |]))
-          ManagerSessionId = SessionId.create (text (firstField value [| "ManagerSessionId"; "manager" |]))
-          BarrierId = ReviewBarrierId.create (text (firstField value [| "BarrierId"; "barrier" |]))
-          GitTreeHash = GitTreeHash.create (text (firstField value [| "GitTreeHash"; "tree" |]))
-          PhysicalUserMessageId = PhysicalUserMessageId.create (text (firstField value [| "PhysicalUserMessageId"; "physical" |]))
-          SealDigest = SealDigest.create (text (firstField value [| "SealDigest"; "digest" |]))
-          CanonicalVersion = intField value "CanonicalVersion"
-          IncludedToolResultDigests = stringList (firstField value [| "IncludedToolResultDigests"; "included" |]) |> List.map SealDigest.create }
-
-    let pendingSeal (value: obj) : obj =
-        let seal = pendingSealOf value
-
-        box
-            {| SessionId = SessionId.value seal.SessionId
-               ManagerSessionId = SessionId.value seal.ManagerSessionId
-               BarrierId = ReviewBarrierId.value seal.BarrierId
-               GitTreeHash = GitTreeHash.value seal.GitTreeHash
-               PhysicalUserMessageId = PhysicalUserMessageId.value seal.PhysicalUserMessageId
-               SealDigest = SealDigest.value seal.SealDigest
-               CanonicalVersion = seal.CanonicalVersion
-               IncludedToolResultDigests = seal.IncludedToolResultDigests |> List.map SealDigest.value |> List.toArray |}
-
-    let setPendingSeal (key: string) (value: obj) : unit =
-        SharedState.PendingReviewSeals.[key] <- pendingSealOf value
-
-    let tryGetPendingSeal (key: string) : obj =
-        match SharedState.PendingReviewSeals.TryGetValue key with
-        | true, value ->
-            box
-                {| SessionId = SessionId.value value.SessionId
-                   ManagerSessionId = SessionId.value value.ManagerSessionId
-                   BarrierId = ReviewBarrierId.value value.BarrierId
-                   GitTreeHash = GitTreeHash.value value.GitTreeHash
-                   PhysicalUserMessageId = PhysicalUserMessageId.value value.PhysicalUserMessageId
-                   SealDigest = SealDigest.value value.SealDigest
-                   CanonicalVersion = value.CanonicalVersion
-                   IncludedToolResultDigests = value.IncludedToolResultDigests |> List.map SealDigest.value |> List.toArray |}
-        | false, _ -> null
-
-    let deletePendingSeal (key: string) : unit =
-        SharedState.PendingReviewSeals.Remove key |> ignore
-
+        | Error ProviderRunBinding.Rejection.NoBindableRun -> box {| ok = false; error = "NoBindableRun" |}
+        | Error(ProviderRunBinding.Rejection.AmbiguousRun count) -> box {| ok = false; error = "AmbiguousRun"; count = count |}
+        | Error ProviderRunBinding.Rejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}

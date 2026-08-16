@@ -239,10 +239,6 @@ module ProjectionSurface =
           Memory = stringOf value?memory
           DropLeading = intOf value?dropLeading }
 
-    let private challengeOf (value: obj) : ChallengeIntent =
-        { TextVersion = intOf value?textVersion
-          Prompt = stringOf value?prompt }
-
     let private strengthExchangeOf (value: obj) : StrengthToolExchange =
         { ToolName = stringOf value?toolName
           CanonicalArguments = stringOf value?canonicalArguments
@@ -306,7 +302,6 @@ module ProjectionSurface =
         | "strength-replica-local" -> strengthIntentOf value
         | "InsertStrengthFrames" -> strengthIntentOf value?payload
         | "SuppressTransportOnly" -> ProjectionIntent.SuppressTransportOnly
-        | "AppendReviewChallenge" -> ProjectionIntent.AppendReviewChallenge(challengeOf value?payload)
         | "ReanchorAfterCompaction" -> ProjectionIntent.ReanchorAfterCompaction
         | other -> failwithf "ProjectionSurface: unknown intent kind %s" other
 
@@ -319,7 +314,6 @@ module ProjectionSurface =
         | ProjectionIntent.UseStrengthMirror _ -> "UseStrengthMirror"
         | ProjectionIntent.InsertStrengthFrames _ -> "InsertStrengthFrames"
         | ProjectionIntent.SuppressTransportOnly -> "SuppressTransportOnly"
-        | ProjectionIntent.AppendReviewChallenge _ -> "AppendReviewChallenge"
         | ProjectionIntent.ReanchorAfterCompaction -> "ReanchorAfterCompaction"
 
     let private activationToJs (activation: PrefixActivation) : obj =
@@ -338,7 +332,6 @@ module ProjectionSurface =
         | ProjectionIntent.UseStrengthMirror _ -> box {| kind = "UseStrengthMirror" |}
         | ProjectionIntent.InsertStrengthFrames _ -> box {| kind = "InsertStrengthFrames" |}
         | ProjectionIntent.SuppressTransportOnly -> box {| kind = "SuppressTransportOnly" |}
-        | ProjectionIntent.AppendReviewChallenge _ -> box {| kind = "AppendReviewChallenge" |}
         | ProjectionIntent.ReanchorAfterCompaction -> box {| kind = "ReanchorAfterCompaction" |}
 
     let private conflictName (conflict: ProjectionConflict) : string =
@@ -346,7 +339,6 @@ module ProjectionSurface =
         | ProjectionConflict.ConflictingPrefixSelection _ -> "ConflictingPrefixSelection"
         | ProjectionConflict.ConflictingBlogFrames -> "ConflictingBlogFrames"
         | ProjectionConflict.ConflictingRepair -> "ConflictingRepair"
-        | ProjectionConflict.ConflictingReviewChallenge -> "ConflictingReviewChallenge"
         | ProjectionConflict.ConflictingPrefixLifecycle -> "ConflictingPrefixLifecycle"
         | ProjectionConflict.ConflictingStrengthFrames _ -> "ConflictingStrengthFrames"
         | ProjectionConflict.StrengthCandidateWrongTarget _ -> "StrengthCandidateWrongTarget"
@@ -421,8 +413,6 @@ module ProjectionSurface =
     let strengthReplicaLocal (payload: obj) : obj = withKind payload "strength-replica-local"
 
     let suppressTransportOnly : obj = box {| kind = "SuppressTransportOnly" |}
-
-    let appendReviewChallenge (payload: obj) : obj = box {| kind = "AppendReviewChallenge"; payload = payload |}
 
     let reanchorAfterCompaction : obj = box {| kind = "ReanchorAfterCompaction" |}
 
@@ -540,16 +530,6 @@ module ProjectionSurface =
     let isAppendOnlyPrefix (previous: obj) (next: obj) : bool =
         ProviderProjection.isAppendOnlyPrefix (wireProjectionOf previous) (wireProjectionOf next)
 
-    /// REVIEW-010: return the canonical provider-input seal as a plain string.
-    let sealDigest (sha256: string -> string) (wire: obj) : string =
-        ProviderProjection.sealDigest sha256 (wireProjectionOf wire)
-        |> SealDigest.value
-
-    /// REVIEW-010: return the digests of text/tool-result evidence as strings.
-    let toolResultDigests (sha256: string -> string) (wire: obj) : string array =
-        ProviderProjection.toolResultDigests sha256 (wireProjectionOf wire)
-        |> List.map SealDigest.value
-        |> List.toArray
     let renderSemantic (projection: obj) : string =
         wireProjectionOf projection |> ProviderProjection.toSemantic |> ProviderProjection.renderSemantic
 
