@@ -43,7 +43,6 @@
     <Compile Include="Sphinx/McpServer.fs"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fs"/>
     <Compile Include="Foundation/Parallel.fs"/>
-    <Compile Include="Foundation/Flow.fs"/>
     <Compile Include="Foundation/AsyncSupport.fs"/>
     <Compile Include="Foundation/FatalProcess.fs"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
@@ -198,6 +197,7 @@
     <Compile Include="Persistence/Journal/SharedAgentJournal.fs"/>
     <Compile Include="Git/Subject.fs"/>
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
+    <Compile Include="Execution/Agent/Errors.fs"/>
     <Compile Include="Execution/Agent/Program.fs"/>
     <Compile Include="Participant/Persona/SessionPersona.fs"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
@@ -256,6 +256,7 @@
     <Compile Include="Git/Gateway.fs"/>
     <Compile Include="Git/Hook/Sync.fs"/>
     <Compile Include="Git/Hook/Dispatcher.fs"/>
+    <Compile Include="Context/Companion/Errors.fs"/>
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
     <Compile Include="Context/Companion/Program.fs"/>

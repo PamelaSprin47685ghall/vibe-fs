@@ -9,16 +9,14 @@ import {
   authority,
   authorityRoot,
   bloggerRequestId,
-  caseOf,
+  FsList,
   hostToolPartId,
   idValue,
   logicalRunId,
-  payloadOf,
   promptKey,
   providerRun,
   sessionId,
   stream,
-  toList,
   toolCallId,
 } from '../../../verification-system/tests/support/domain.mjs'
 
@@ -78,7 +76,7 @@ export const snapshotRejudgeChronicleCardinality = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(root), 'Ok')
+    assert.equal(root.name, 'Ok')
 
     const claimedRun = providerRun('asst-nudge-origin')
     const claim = await AgentJournalModule_appendAgent(
@@ -95,20 +93,20 @@ export const snapshotRejudgeChronicleCardinality = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(claim), 'Ok')
+    assert.equal(claim.name, 'Ok')
 
     const first = chronicle('1')
     const one = rejudge(
       journal,
       blog,
       bloggerRequestId('req-tool-evidence'),
-      toList([assistant('asst-nudge-origin', []), assistant('asst-fixed', [first])]),
+      FsList.ofArray([assistant('asst-nudge-origin', []), assistant('asst-fixed', [first])]),
     )
     const two = rejudge(
       journal,
       blog,
       bloggerRequestId('req-tool-evidence'),
-      toList([
+      FsList.ofArray([
         assistant('asst-nudge-origin', []),
         assistant('asst-invalid-multi', [first, chronicle('2')]),
       ]),
@@ -117,13 +115,13 @@ export const snapshotRejudgeChronicleCardinality = async () => {
       journal,
       blog,
       bloggerRequestId('req-tool-evidence'),
-      toList([
+      FsList.ofArray([
         assistant('asst-nudge-origin', []),
         assistant('asst-invalid-mixed', [first, chronicle('failed', new SnapshotToolPartState(2, ['error']))]),
       ]),
     )
 
-    return { one: caseOf(one), two: caseOf(two), mixed: caseOf(mixed) }
+    return { one: one.name, two: two.name, mixed: mixed.name }
   } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })
@@ -154,7 +152,7 @@ export const repairStateRequestIsolationAndAbandonLifecycle = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(root), 'Ok')
+    assert.equal(root.name, 'Ok')
 
     const nudge = await AgentJournalModule_appendAgent(
       stream.session(blog),
@@ -170,7 +168,7 @@ export const repairStateRequestIsolationAndAbandonLifecycle = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(nudge), 'Ok')
+    assert.equal(nudge.name, 'Ok')
 
     const sameRequest = repairState(journal, blog, 'req-1', providerRun('asst-p2'), [])
     const otherRequestAfterNudge = repairState(journal, blog, 'req-2', providerRun('asst-p2'), [])
@@ -189,7 +187,7 @@ export const repairStateRequestIsolationAndAbandonLifecycle = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(aabb), 'Ok')
+    assert.equal(aabb.name, 'Ok')
     const otherRequestAfterAabb = repairState(journal, blog, 'req-2', providerRun('asst-p3'), [])
 
     const abandoned = await AgentJournalModule_appendAgent(
@@ -202,15 +200,15 @@ export const repairStateRequestIsolationAndAbandonLifecycle = async () => {
       }),
       journal,
     )
-    assert.equal(caseOf(abandoned), 'Ok')
+    assert.equal(abandoned.name, 'Ok')
     const afterAbandonedAabb = repairState(journal, blog, 'req-1', providerRun('asst-p3'), [])
 
     return {
-      sameRequest: caseOf(sameRequest),
-      sameRequestClaimedRun: idValue.providerRun(payloadOf(sameRequest)),
-      otherRequestAfterNudge: caseOf(otherRequestAfterNudge),
-      otherRequestAfterAabb: caseOf(otherRequestAfterAabb),
-      afterAbandonedAabb: caseOf(afterAbandonedAabb),
+      sameRequest: sameRequest.name,
+      sameRequestClaimedRun: idValue.providerRun(sameRequest.toJSON()[1]),
+      otherRequestAfterNudge: otherRequestAfterNudge.name,
+      otherRequestAfterAabb: otherRequestAfterAabb.name,
+      afterAbandonedAabb: afterAbandonedAabb.name,
     }
   } finally {
     created.dispose()

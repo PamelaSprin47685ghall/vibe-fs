@@ -1,8 +1,8 @@
-namespace Wanxiangshu.Foundation
-
-open Wanxiangshu.Foundation.Identity
+namespace Wanxiangshu.Execution.Agent
 
 /// Domain error / context values used by direct CE programs (not a Flow AST).
+/// Moved out of Foundation/Flow.fs (rotation-2): these are Execution/Agent
+/// semantics, not universe-level primitives.
 
 [<RequireQualifiedAccess>]
 type AgentError =
@@ -11,12 +11,5 @@ type AgentError =
     | InvalidFork of string
     | ParentCancelled
 
-[<RequireQualifiedAccess>]
-type CompanionError =
-    | ProjectionFailed of string
-    | BloggerFailed of string
-
 type AgentContext =
     { SessionId: string; AgentName: string }
-
-type CompanionContext = { SessionId: string }
