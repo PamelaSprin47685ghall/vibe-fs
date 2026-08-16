@@ -208,6 +208,17 @@ type HostForkRuntime
     /// barrier had durably opened. Idempotent per agent id: a second call with
     /// nothing pending is a no-op success.
     member this.SendDeferredFirstPrompt(agentId: string) : Task<Result<unit, string>> =
+        let pendingRunForAgent () =
+            lock gate (fun () ->
+                match pendingRuns.TryGetValue agentId with
+                | true, run -> Some run
+                | false, _ -> None)
+
+        let failPendingRun error =
+            match pendingRunForAgent () with
+            | Some run -> this.FailRun(run, error)
+            | None -> Task.FromResult(()) :> Task
+
         task {
             let pendingOpt =
                 lock gate (fun () ->
@@ -219,13 +230,14 @@ type HostForkRuntime
             | None -> return Ok()
             | Some pending ->
                 let! sent =
-                    HostForkAgentOwner.sendFirstPrompt
+                    HostForkAgentOwner.sendFirstPromptObserved
                         this.Sessions
                         this.Journal
                         pending.ChildId
                         pending.AgentName
                         (this.DirectoryOf agentId)
                         pending.Prompt
+                        failPendingRun
 
                 match sent with
                 | Ok _ ->

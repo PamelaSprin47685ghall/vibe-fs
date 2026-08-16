@@ -148,7 +148,7 @@ type SyncDelegateRuntime
                     request.ProviderPrompt
                     call.Agent
                     directory
-                    PromptDispatcher.AwaitMode.Detached
+                    PromptDispatcher.AwaitMode.Await
                     None
                     tools
                     None

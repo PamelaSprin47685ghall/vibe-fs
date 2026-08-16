@@ -183,13 +183,15 @@ module HostReviewGuard =
                         // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
                         // Authority Root's fallback cursor, so it is not passed here.
                         let! sent =
-                            HostSessionNudge.sendContinuation
+                            HostSessionNudge.sendContinuationResult
                                 sessionPort
                                 targetSessionId
                                 prompt
                                 continuationKind
                                 recordedDir
                                 (Some durable)
+                                PromptDispatcher.AwaitMode.Await
+                                None
 
                         match sent with
                         | Ok key -> return GuardNudgeOutcome.Sent key

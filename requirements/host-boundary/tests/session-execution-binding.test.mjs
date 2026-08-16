@@ -9,6 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { physicalUser } from '../../verification-system/tests/support/domain.mjs'
+import { runListenerRefcountScenario } from './support/listener-refcount.mjs'
 
 const previousHome = process.env.HOME
 const previousUserProfile = process.env.USERPROFILE
@@ -106,6 +107,14 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_provider_attempt_keeps_typed_effective_
   assert.match(stale.fields[0], /provider agent drift \(fast-coder -> deep-coder\)/)
 
   binding.drop(sid)
+})
+
+test('WHAT[HOST-BOUNDARY-008] terminal_listener_admission_is_reference_counted_per_session', async () => {
+  const observed = await runListenerRefcountScenario()
+  assert.equal(observed.afterOneDisposeFatal, false, 'disposing one listener must not erase another live listener')
+  assert.equal(observed.afterAllDisposeFatal, true)
+  assert.match(observed.afterAllDisposeMessage, /LISTENER-BEFORE-SEND/)
+  assert.equal(observed.sends, 1, 'no Host send occurs after the final listener is gone')
 })
 
 test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_is_model_free_but_rejects_agent_drift_before_host', async () => {

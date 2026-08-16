@@ -291,13 +291,14 @@ module HostForkAgent =
         : Task<Result<ForkResult, string>> =
         task {
             let! sent =
-                HostForkAgentOwner.sendFirstPrompt
+                HostForkAgentOwner.sendFirstPromptObserved
                     runtime.Sessions
                     runtime.Journal
                     childId
                     agentName
                     (runtime.DirectoryOf agentId)
                     enrichedPrompt
+                    (fun error -> runtime.FailRun(run, error))
 
             match sent with
             | Ok _ -> return Ok result

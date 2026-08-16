@@ -31,13 +31,16 @@
 // to call a hook.
 
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { withPlugin, withPluginClient } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
 const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)
+const FATAL_CHILD = fileURLToPath(new URL('./fixtures/fatal-process-child.fixture.mjs', import.meta.url))
 
 /** AGENT-002/003: the plugin projects every managed catalog name onto Host config. */
 const ROLES = [
@@ -419,6 +422,17 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_m
       'an escaping Wanxiangshu hook exception must emit Diagnostic.fatal before Host sees the rejection',
     )
   })
+})
+
+test('WHAT[HOST-BOUNDARY-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disables_production_fatal', () => {
+  const env = { ...process.env, NODE_TEST_CONTEXT: 'inherited-host-value' }
+  delete env.WANXIANGSHU_NO_FATAL_EXIT
+  const child = spawnSync(process.execPath, [FATAL_CHILD], { env, encoding: 'utf8' })
+
+  assert.notEqual(child.status, 0, 'fatal must terminate the process unless Wanxiangshu explicitly opts out')
+  assert.match(child.stdout, /before-fatal/)
+  assert.doesNotMatch(child.stdout, /after-fatal/, 'execution must not continue after a Wanxiangshu fatal')
+  assert.match(child.stderr, /fixture-fatal/)
 })
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here', async () => {

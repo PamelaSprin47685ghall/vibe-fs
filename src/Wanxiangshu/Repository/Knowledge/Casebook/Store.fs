@@ -202,7 +202,9 @@ module CasebookStore =
             match! store.Append [ envelope ] with
             | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
-                return Error(sprintf "%s semantic cut: %s" eventType cut.Reason)
+                let reason = sprintf "%s semantic cut: %s" eventType cut.Reason
+                FatalProcess.trip "casebook-semantic-cut" reason
+                return Error reason
             | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "%s append failed: %A" eventType err)
         }

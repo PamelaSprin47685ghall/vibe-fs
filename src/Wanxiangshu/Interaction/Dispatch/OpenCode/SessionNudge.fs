@@ -252,7 +252,10 @@ module HostSessionNudge =
                 else
                     let agent = agentForActiveCursor journal sessionId profile
 
-                    // PROMPT-007 Detached: repair does not wait for PhysicalAccepted.
+                    // Blogger repair must know whether Host transport accepted or
+                    // refused this nudge so a hard refusal can immediately advance
+                    // to AABB. Await waits only the SendPrompt transport result; it
+                    // never waits for provider execution/slots.
                     return!
                         rt.SendInteractionRepair
                             sessionPort
@@ -263,7 +266,7 @@ module HostSessionNudge =
                             profile
                             agent
                             (liveDirectory directory)
-                            PromptDispatcher.AwaitMode.Detached
+                            PromptDispatcher.AwaitMode.Await
                             None
         }
 

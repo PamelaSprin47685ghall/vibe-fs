@@ -113,9 +113,10 @@ module HostTurnObserver =
         match result with
         | StrengthDurableAppend.Applied -> ()
         | StrengthDurableAppend.SemanticRejected error ->
-            // Durable cut-tail already isolated this one event. Do not
-            // fuse Strength or poison future attempts.
-            Diagnostic.emit "strength-semantic-cut" [ "result", error ]
+            // DURABLE-EVENTS-021: cut/reset keeps the next process recoverable,
+            // but the process that produced the rejected live fact is no longer
+            // trustworthy. Never continue Strength/turn effects in this process.
+            Diagnostic.fatal "strength-semantic-cut" [ "result", error ]
         | StrengthDurableAppend.StorageFailed error -> failStrengthStorage scope error
 
     let private commitStrengthEvent
@@ -285,7 +286,7 @@ module HostTurnObserver =
                         context
         }
 
-    let observe
+    let private observeBusinessTurn
         (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -359,3 +360,32 @@ module HostTurnObserver =
                         reviewerContinuationPort
                         context
         }
+
+    let observe
+        (recoveryTimerPort: ITimerPort)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (scope: PluginRuntimeScope)
+        (reviewerContinuationPort: ReviewerContinuationPort)
+        (context: ReconciledTurnContext)
+        : Task =
+        let turn = context.Turn
+
+        if ExplicitResumeSuppression.isPhysicalMaterial turn.SessionId turn.PhysicalUserMessageId then
+            // CRASH-018: the /continue provider turn is disclosure-only. Reconcile
+            // may observe it for transport bookkeeping, but Wanxiangshu must not
+            // derive Strength, recovery, fallback, Companion, review, manager-idle
+            // or interaction-repair effects from this physical material.
+            Task.FromResult(()) :> Task
+        else
+            observeBusinessTurn
+                recoveryTimerPort
+                sessionPort
+                eventPort
+                journal
+                strengthDurability
+                scope
+                reviewerContinuationPort
+                context

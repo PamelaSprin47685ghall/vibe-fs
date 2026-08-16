@@ -63,6 +63,82 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_withou
   }
 })
 
+test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_race_chat_message_acceptance', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-physical-'))
+  try {
+    const opened = await agentJournal.create({ directory: base })
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const runtime = promptDispatcher.forJournal(opened.journal)
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: async () => promptDispatcher.admittedWithPhysicalMessage('msg-sdk-early-007'),
+      }
+
+      const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, port, {
+        session: 'ses_007_physical',
+        text: 'detached sdk physical return',
+        agent: 'fast-coder',
+        awaitMode: 'Detached',
+      })
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      await Promise.resolve()
+
+      assert.equal(
+        promptDispatcher.pendingClaimCount(runtime, 'ses_007_physical'),
+        1,
+        'Detached must leave PhysicalAccepted to the real chat.message ingress even if the SDK returns an id early',
+      )
+    } finally {
+      opened.dispose()
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_send_task_never_settles', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-never-'))
+  let release
+  try {
+    const opened = await agentJournal.create({ directory: base })
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const runtime = promptDispatcher.forJournal(opened.journal)
+      let invoked = 0
+      const never = new Promise((resolve) => { release = resolve })
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: () => {
+          invoked += 1
+          return never
+        },
+      }
+
+      const pending = promptDispatcher.sendAgentOwnerRoot(runtime, port, {
+        session: 'ses_007_never',
+        text: 'detached must hand control back after invocation',
+        agent: 'deep-devops',
+        awaitMode: 'Detached',
+      })
+      const result = await Promise.race([
+        pending,
+        new Promise((resolve) => setTimeout(() => resolve({ timedOut: true }), 120)),
+      ])
+
+      assert.equal(result?.timedOut, undefined, 'Detached must not await ISessionHostPort.SendPrompt settlement')
+      assert.equal(result.ok, true, result.ok ? '' : result.error)
+      assert.equal(invoked, 1, 'Detached still invokes the Host enqueue exactly once')
+      assert.equal(promptDispatcher.pendingClaimCount(runtime, 'ses_007_never'), 1)
+    } finally {
+      release?.(promptDispatcher.admittedWithReceipt(transportReceipt('accepted-late-007')))
+      opened.dispose()
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_path', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007c-'))
   try {

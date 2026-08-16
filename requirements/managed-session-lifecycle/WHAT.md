@@ -81,7 +81,10 @@ fork」（EXEC-009）。
 
 **规范**：terminal、send-failure 与 cancel 竞争同一个 completion cell：先到者胜，后来者被拒而非
 覆盖（EXEC-004）；`recordCompletion` 只接受 `JoinableCompletion`（Succeeded | Failed finality），
-raw Aborted / 裸 kind+body 不能占 cell（P0-RECOVERY-JOIN-001）。
+raw Aborted / 裸 kind+body 不能占 cell（P0-RECOVERY-JOIN-001）。AgentOwnerRoot 首发是 Detached：fork
+工具先交还；若 Host send 后来拒绝，detached failure observer 必须先把该 pending run 结算成 durable Failed
+completion，再触发 process fatal。不得为了同步返回 send-failure 而让 fork 等待 Host Promise，也不得 fatal
+前留下永远 pending 的 run。
 
 **含义/动机**：覆盖写 = 同一 handle 两个结局；join 必须只读到稳定唯一的完成事实。
 
@@ -129,7 +132,7 @@ suicide（`distiller-ownership.test.mjs` 头注释回归）。
 
 **规范**：journal 关联的 Host child 永久消失（proven）→ 按该 AttachmentKind 恢复合同 Replacement；lookup failure / ownership conflict / 重复候选 → fail closed（HOST-009/015；REVIEW-019）。不确定时宁可不恢复，不得猜。
 
-对允许 Replacement 的 attachment，状态迁移必须是 `old durable link → Close(old) → Link(new)`；不能把 `Link(new)` 当作覆盖赋值。只有新 child 创建成功且 old association 被合法关闭后，新关联才能提交。失败 ensure 的 single-flight cache 必须失效，避免一次冲突把未来所有 ensure 永久钉在同一个 rejected Task 上。
+对允许 Replacement 的 attachment，状态迁移必须是 `old durable link → Close(old) → Link(new)`；不能把 `Link(new)` 当作覆盖赋值。只有新 child 创建成功且 old association 被合法关闭后，新关联才能提交。**每一次 ensure 都必须重新读取当前 durable association**；构造时捕获的一次性 restored id、进程内 `bloggerId` 或 successful-flight cache 都不能在 cache invalidation / send failure 后取代 durable truth。否则进程缓存一清空就会把仍存在的 old durable link“忘掉”，误走 Created→`Link(new)`，把合法 recovery 变成 COMPANION-002 semantic cut。失败 ensure 的 single-flight cache 必须失效，避免一次冲突把未来所有 ensure 永久钉在同一个 rejected Task 上。
 
 **证据**：`SatelliteRuntime.start/linkLease`（journal-linked child 不在 merged candidates → Replacement；Close→Link；冲突 → Error）；→ PROOF.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
 ## MANAGED-SESSION-012：Child Run 生命周期与父背景记录分离

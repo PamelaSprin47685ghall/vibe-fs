@@ -55,26 +55,20 @@ type SessionQuiescenceGate() =
             serials <- Map.add key serial serials
             activities <- Map.add key (Activity.ProviderAttempt serial) activities)
 
-    /// 收到 `SessionIdle` 时调用。ProviderAttempt(serial) → Idle(serial) 并返回该 serial
-    /// 的 permit；状态 Unknown（还没有任何 attempt）时同样建立当前 serial 的
-    /// idle（规则单点定义）；已 Idle / IdleConsumed 时不回退状态——同一 idle
-    /// occasion 最多一次发送（Q-03）。
+    /// 收到 `SessionIdle` 时调用。只有本进程先观察到
+    /// `BeginProviderAttempt(serial)` 才能转成 Idle(serial) 并得到可消费 permit。
+    /// restart 后的 Unknown/None idle 只是历史 transport observation：返回的
+    /// opaque permit 永远不可消费，不能凭一条迟到 idle 凭空获得发送新 user
+    /// material 的权力。已 Idle / IdleConsumed / Revoked 时也不回退状态。
     member _.ObserveIdle(sessionId: SessionId) : QuiescencePermit =
         lock gate (fun () ->
             let key = SessionId.value sessionId
 
-            let serial =
-                match Map.tryFind key serials with
-                | Some current -> current
-                | None ->
-                    serials <- Map.add key 1L serials
-                    1L
+            let serial = Map.tryFind key serials |> Option.defaultValue 0L
 
             match Map.tryFind key activities with
             | Some(Activity.ProviderAttempt current) when current = serial ->
                 activities <- Map.add key (Activity.Idle serial) activities
-            | Some(Activity.Unknown)
-            | None -> activities <- Map.add key (Activity.Idle serial) activities
             | _ -> ()
 
             QuiescencePermit.create sessionId serial)

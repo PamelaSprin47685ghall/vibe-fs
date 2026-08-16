@@ -10,7 +10,7 @@
 | 003/004 | `Domain/PromptAuthority.fs` → `PromptClaim`（`Receipt: TransportReceipt option`）；`PromptAuthorityRun.submitClaim`；`Kernel/Identity.fs` → `TransportReceipt.isAdmissionShaped` | receipt 只记不解决；admission 形态可判别 |
 | 005/006 | `Domain/PromptAuthority.fs` → `claimScopeDigest`、`nextClaimSequence`、`derivePromptKey`；`PromptDispatcherSend.deriveKey` | 确定性幂等身份；序列在注册时消费 |
 | 007/008 | `Interaction/Dispatch/Recovery.fs` → detached `reconcile` / `reconcileClaim` / `findPhysical`（tail window 内 `role=user` + PromptKey metadata 匹配） | Proven / StillPending(hasReceipt) / Unreadable；普通 plugin lifecycle 不调用 |
-| 009 | `PromptDispatcher.AwaitMode`（Await/Detached）+ `OpenCodePort.SdkClientPort/HttpPort.SendPrompt` async enqueue observer | Detached 在 claim 后调用 `prompt_async` 即返回，不等 model slot / Host Promise / PhysicalAccepted；异步 rejection → process fatal + 不重发 |
+| 009 | `PromptDispatcher.AwaitMode`（Await/Detached）+ `OpenCodePort.SdkClientPort/HttpPort.SendPrompt` async enqueue observer | Detached 在 claim + local invocation receipt 后调用 `prompt_async` 即返回，不等 model slot / Host Promise / PhysicalAccepted；异步 rejection → 先结算调用方拥有的 pending effect（若有），再 process fatal + 不重发。需要在当前协议分支判断 transport refusal 的 guard/repair/sync interaction 使用 Await；Await 只等 `SendPrompt` transport result，不等 provider run/slot/terminal |
 | 010 | `Interaction/Authority/Model.fs` → `AuthorityExecutionProfile` 无 model 字段；`Interaction/Dispatch/Send.fs` 发送 options 恒 `Model = None`；`Sessions.fs` send 栈不 acquire model | Root/dispatch 均不能选 model；`chat.message` execution admission 才 acquire |
 | 011 | `PromptClaim.ClaimedAtRuntimeStartCount` / `RuntimeStartCount` 仅保留历史兼容与审计；restart-count abandon policy 已退役 | 重启次数不再产生业务 terminal |
 

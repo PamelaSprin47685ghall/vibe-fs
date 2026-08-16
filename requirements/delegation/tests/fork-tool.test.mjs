@@ -30,10 +30,17 @@ const {
   ToolHostCodec_factory,
 } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 const { managerSpec, orchestratorSpec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/Tool.js')
-const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const {
+  ToolRuntimeScope,
+  ToolRuntimeScope__DisposeAsync: disposeToolRuntimeScope,
+} = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
 const { nonSettlingForkSessions } = await import('./support/detached-fork-host.mjs')
 const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
-const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents, HostForkRuntime__get_PendingRuns: pendingRunsOf } = hostRuntimeModule
+const {
+  HostForkRuntime,
+  HostForkRuntime__List: listRuntimeAgents,
+  HostForkRuntime__get_PendingRuns: pendingRunsOf,
+} = hostRuntimeModule
 const failRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__FailRun_'))?.[1]
 const agentModule = await import('../../../dist/Execution/Delegation/Fork/Host/Agent.js')
 const forkRuntime = Object.entries(agentModule).find(([k]) => k.includes('HostForkRuntime_Fork_'))?.[1]
@@ -150,7 +157,10 @@ const liveScope = async (behaviour = {}) => {
     runtime,
     sessions,
     journal: opened.journal,
-    cleanup: () => {
+    cleanup: async () => {
+      try {
+        await disposeToolRuntimeScope(scope)
+      } catch {}
       try {
         opened.dispose()
       } catch {}
@@ -209,7 +219,7 @@ test('WHAT[DELEG-022] DELEG_022_expected_tool_calls_rejects_negative_and_fractio
     })
     assert.match(result, /non-negative integer|nonnegative integer|非负整数/i)
     assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
-    live.cleanup()
+    await live.cleanup()
   }
 })
 
@@ -281,7 +291,7 @@ test('WHAT[DELEG-005] FORK_calling_creates_machine_agent_but_returns_only_byname
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'exactly one child session')
   assert.equal(created[0][1].Agent, 'fast-coder', 'calling resolves to Host machine binding')
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-005] FORK_create_session_failure_surfaces_only_public_consequence', async () => {
@@ -290,7 +300,7 @@ test('WHAT[DELEG-005] FORK_create_session_failure_surfaces_only_public_consequen
   const result = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
   assert.match(result, /The charge could not be placed/)
   assert.doesNotMatch(result, /host refused|\berror\s*=/i)
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-005] FORK_unknown_byname_does_not_echo_internal_identity', async () => {
@@ -299,7 +309,7 @@ test('WHAT[DELEG-005] FORK_unknown_byname_does_not_echo_internal_identity', asyn
   const result = await runManager(spec, 'Nobody Here', 'do work')
   assert.match(result, /No continuing person is known by that name/)
   assert.doesNotMatch(result, /agent id|fast-|deep-|\berror\s*=/i)
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-021] DELEG_021_unknown_attachment_is_refused_before_child_creation', async () => {
@@ -310,7 +320,7 @@ test('WHAT[DELEG-021] DELEG_021_unknown_attachment_is_refused_before_child_creat
   assert.match(result, /attachment.*name|known.*attachment/i)
   assert.doesNotMatch(result, /agent id|fast-|deep-|session/i)
   assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-021] DELEG_021_self_attachment_is_refused_before_child_creation', async () => {
@@ -320,7 +330,7 @@ test('WHAT[DELEG-021] DELEG_021_self_attachment_is_refused_before_child_creation
 
   assert.match(result, /cannot.*attach.*itself|cannot.*attach.*own|不能.*附/i)
   assert.equal(live.sessions.calls.filter(([name]) => name === 'CreateChildSession').length, 0)
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-021] DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async () => {
@@ -341,7 +351,7 @@ test('WHAT[DELEG-021] DELEG_021_fresh_fork_materializes_named_person_lwr_as_back
     bobPrompt.indexOf(en.Attachment) < bobPrompt.indexOf('trace the retry path'),
     'the canonical attachment framing precedes the attached LWR',
   )
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-021] DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral', async () => {
@@ -355,13 +365,17 @@ test('WHAT[DELEG-021] DELEG_021_busy_reuse_does_not_materialize_attachment_and_r
   const result = await runManager(spec, 'Bob', 'add this charge too', { attach: 'Ada' })
   const afterCalls = live.sessions.calls.slice(before)
 
-  assert.match(result, /busy.*attachment|attachment.*not.*attach|attachment.*not.*added/i)
+  assert.match(
+    result,
+    /busy.*attachment|attachment.*not.*attach|attachment.*not.*added|cannot take another charge yet/i,
+    'pre-acceptance pending runs may refuse immediately rather than waiting to mint a BusyAgentNudge',
+  )
   const promptTexts = afterCalls
     .filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
     .map((call) => call[2])
   assert.ok(promptTexts.every((text) => !String(text).includes(en.Attachment)))
   assert.ok(promptTexts.every((text) => !String(text).includes('trace the retry path')))
-  live.cleanup()
+  await live.cleanup()
 })
 
 // ── reuse path: create by calling, continue by Byname ───────────────────────
@@ -378,7 +392,7 @@ test('WHAT[DELEG-006] FORK_existing_person_is_resolved_by_byname_not_agent_id', 
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'Byname continuation must not spawn a second session')
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-022] DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', async () => {
@@ -396,15 +410,18 @@ test('WHAT[DELEG-022] DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_
   )
   assert.equal(remaining(), 3)
 
-  assert.match(await runManager(spec, 'Ada', 'continue without recalibration'), /Ada carries/)
+  assert.match(
+    await runManager(spec, 'Ada', 'continue without recalibration'),
+    /Ada carries|cannot take another charge yet/,
+  )
   assert.equal(remaining(), 3, 'omitting expected_tool_calls must retain current remaining')
 
   assert.match(
     await runManager(spec, 'Ada', 'recalibrate current work', { expected_tool_calls: 7 }),
-    /Ada carries/,
+    /Ada carries|cannot take another charge yet/,
   )
   assert.equal(remaining(), 7, 'an explicit estimate replaces the current remaining even on busy reuse')
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-006] FORK_engineer_continuation_keeps_deep_coder', async () => {
@@ -428,7 +445,7 @@ test('WHAT[DELEG-006] FORK_engineer_continuation_keeps_deep_coder', async () => 
   for (const prompt of prompts) {
     assert.equal(prompt[3]?.Agent, 'deep-coder')
   }
-  live.cleanup()
+  await live.cleanup()
 })
 
 test('WHAT[DELEG-006] FORK_same_byname_cannot_be_reborn_with_a_new_calling', async () => {
@@ -442,7 +459,7 @@ test('WHAT[DELEG-006] FORK_same_byname_cannot_be_reborn_with_a_new_calling', asy
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'Byname is not reusable for a different logical person')
-  live.cleanup()
+  await live.cleanup()
 })
 
 // ── orchestrator fork-manager ────────────────────────────────────────────────

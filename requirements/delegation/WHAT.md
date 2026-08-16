@@ -303,8 +303,7 @@ attachment 是 data，不是 assignment：不改变本次 `charge`，不把附�
 不复制附件 person 的 Persona / authority / runtime topology。
 
 边界：`attach` 缺省 = 原行为；unknown Byname → 自然语言拒绝且不得回显机器身份；`attach = target name`
-自附 → 拒绝；retired person 只要 durable LWR 可物化即可附；LWR 不存在则静默省略；busy reuse 只追加
-当前 charge 的 busy nudge，不物化 attachment、不失败，并明确本次 attachment 未附。`keywords` 的
+自附 → 拒绝；retired person 只要 durable LWR 可物化即可附；LWR 不存在则静默省略。若既有 person 已有**物理 accepted 的 ActiveLogicalRun**，busy reuse 只追加当前 charge 的 busy nudge，不物化 attachment，并明确本次 attachment 未附；若首 prompt 已 Detached 交还但 `chat.message` 尚未建立 ActiveLogicalRun，则只能返回“当前还不能接另一 charge”的自然后果，**不得为满足立即 reuse 而等待 PhysicalAccepted 或伪造 active profile**，同样不得物化 attachment。`keywords` 的
 warm-start role gate 不适用于 attachment。V1 只有单个 `attach: string`。`commission` 无 attachment。
 
 含义/动机：附件解决“把另一人的已知工作当背景交给新 witness”而不制造 charge 合并、任务转移或

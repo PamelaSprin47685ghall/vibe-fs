@@ -2,7 +2,7 @@
 // Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
@@ -64,6 +64,26 @@ test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_sa
   } finally {
     local.close()
   }
+})
+
+test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fatal_instead_of_returning_a_normal_error', () => {
+  const root = new URL('../../../src/Wanxiangshu/', import.meta.url)
+  const sources = {
+    agentJournal: readFileSync(new URL('Persistence/Journal/AgentJournal.fs', root), 'utf8'),
+    journalWriter: readFileSync(new URL('Persistence/Journal/EventStoreJournalWriter.fs', root), 'utf8'),
+    casebook: readFileSync(new URL('Repository/Knowledge/Casebook/Store.fs', root), 'utf8'),
+    jsTransactions: readFileSync(new URL('Repository/Programming/Js/TransactionStore.fs', root), 'utf8'),
+    strengthDurability: readFileSync(new URL('Strength/Persistence/Durability.fs', root), 'utf8'),
+    hostTurn: readFileSync(new URL('OpenCode/Host/HostTurnObserver.fs', root), 'utf8'),
+  }
+
+  assert.match(sources.agentJournal, /FatalProcess\.trip\s+"journal-semantic-cut"/)
+  assert.match(sources.journalWriter, /FatalProcess\.trip\s+"runtime-started-semantic-cut"/)
+  assert.match(sources.casebook, /FatalProcess\.trip\s+"casebook-semantic-cut"/)
+  assert.match(sources.jsTransactions, /FatalProcess\.trip\s+"js-transaction-semantic-cut"/)
+  assert.match(sources.strengthDurability, /FatalProcess\.trip\s+"strength-prepared-semantic-cut"/)
+  assert.match(sources.hostTurn, /SemanticRejected error[\s\S]{0,500}Diagnostic\.fatal\s+"strength-semantic-cut"/)
+  assert.doesNotMatch(sources.hostTurn, /SemanticRejected error[\s\S]{0,500}Diagnostic\.emit\s+"strength-semantic-cut"/)
 })
 
 test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_bytes', async () => {

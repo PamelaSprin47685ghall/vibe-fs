@@ -605,6 +605,15 @@ module HostSignalBootstrap =
                         // createHook; this local value only gates routing + join wake.
                         let decoded = PromptIngressCodec.decode input output
 
+                        // CRASH-018: bind the disclosure marker to this exact
+                        // physical user material before any routing/reconcile wake
+                        // can interpret the turn. A later unmarked physical user
+                        // message on the same reusable SessionId clears it here.
+                        match decoded.SessionId, decoded.PhysicalUserMessageId with
+                        | Some sessionId, Some physicalId ->
+                            ExplicitResumeSuppression.observePhysicalMaterial sessionId physicalId output
+                        | _ -> ()
+
                         // EMR-009 / PROMPT-006: route from typed authority evidence.
                         // Keyless external roots use their explicit managed agent;
                         // plugin prompts use PendingClaim.EffectiveAgent. Host message
@@ -615,7 +624,12 @@ module HostSignalBootstrap =
 
                         match durabilityActivation.Value with
                         | Ok() -> ()
-                        | Error error -> Diagnostic.emit "durability-activation-failed" [ "result", error ]
+                        | Error error ->
+                            // Once a live chat.message needs durability, activation
+                            // failure is Wanxiangshu infrastructure failure, not a
+                            // provider/business consequence. Continuing the Host loop
+                            // would execute without its required durable authority.
+                            Diagnostic.fatal "durability-activation-failed" [ "result", error ]
 
                         // Signal even when mid-run UnknownOrigin — not only after
                         // AcceptHumanRoot. physical id + no PromptKey + not compaction

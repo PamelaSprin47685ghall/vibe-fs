@@ -38,27 +38,44 @@ module HostForkAgentOwner =
     /// fallback issued a real prompt with `Metadata = None`, so it carried no
     /// PromptKey: PROMPT-011 had no anchor to recover it by, and PromptIngress
     /// could only ever classify the reply as UnknownOrigin.
-    let sendFirstPrompt
+    let private sendFirstPromptCore
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
         (childId: SessionId)
         (agent: string)
         (directory: string option)
         (prompt: string)
+        (onDetachedFailure: (string -> Task) option)
         : Task<Result<PromptKey, string>> =
-        task {
-            match journal with
-            | None -> return Error "No journal: an AgentOwnerRoot prompt cannot be claimed"
-            | Some durable ->
-                let dispatcher = PromptDispatcher.forJournal durable
+        let sendClaimed (durable: AgentJournal) =
+            let dispatcher = PromptDispatcher.forJournal durable
+
+            match onDetachedFailure with
+            | Some callback ->
+                dispatcher.SendAgentOwnerRootDetachedObserved
+                    sessions
+                    childId
+                    prompt
+                    agent
+                    directory
+                    callback
+            | None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
-                return!
-                    dispatcher.SendAgentOwnerRoot
-                        sessions
-                        childId
-                        prompt
-                        agent
-                        directory
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-        }
+                dispatcher.SendAgentOwnerRoot
+                    sessions
+                    childId
+                    prompt
+                    agent
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+
+        match journal with
+        | None -> Task.FromResult(Error "No journal: an AgentOwnerRoot prompt cannot be claimed")
+        | Some durable -> sendClaimed durable
+
+    let sendFirstPrompt sessions journal childId agent directory prompt =
+        sendFirstPromptCore sessions journal childId agent directory prompt None
+
+    let sendFirstPromptObserved sessions journal childId agent directory prompt onDetachedFailure =
+        sendFirstPromptCore sessions journal childId agent directory prompt (Some onDetachedFailure)

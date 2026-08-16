@@ -161,6 +161,72 @@ module PromptDispatcherSend =
                     return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
             }
 
+        member private this.PersistDetachedInvocation(key: PromptKey, sessionId: SessionId) =
+            // PROMPT-007: this is a local invocation receipt, not a physical
+            // message id and not the eventual SDK Promise result. It is durable
+            // before the Detached caller returns so immediate reuse/recovery sees
+            // the claim as already handed to Host async enqueue.
+            PromptFact.PluginPromptSubmitted
+                {| PromptKey = key
+                   SessionId = sessionId
+                   Receipt = TransportReceipt.create ("accepted-detached-" + PromptKey.value key) |}
+            |> this.Persist sessionId None
+
+        /// PROMPT-007: observe a Host send after a Detached caller has already
+        /// received its PromptKey. Any later non-success is no longer a normal
+        /// tool consequence: the caller cannot safely retract its success or
+        /// decide whether resending would duplicate a physical message, so the
+        /// current process must stop. Submitted is not rewritten here: the local
+        /// invocation receipt was already durable before caller return.
+        member private this.ObserveDetachedSend
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (sendTask: Task<SendOutcome>)
+            (onFailure: (string -> Task) option)
+            : unit =
+            let classifyDetachedOutcome outcome =
+                match outcome with
+                | AdmittedWithReceipt _
+                | AdmittedWithPhysicalMessage _ ->
+                    // Detached never races chat.message by writing
+                    // PhysicalAccepted from an SDK return value. The exact
+                    // Host ingress is the sole physical-identity authority.
+                    Ok()
+                | Retryable error
+                | Fatal error -> Error error
+                | AcceptanceUnknown reason ->
+                    Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
+
+            let settle =
+                task {
+                    try
+                        let! outcome = sendTask
+                        return classifyDetachedOutcome outcome
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            let failDetached error =
+                task {
+                    match onFailure with
+                    | Some callback -> do! callback error
+                    | None -> ()
+
+                    Diagnostic.fatal
+                        "detached-prompt-dispatch-failed"
+                        [ "session_id", SessionId.value sessionId
+                          "result", error ]
+                }
+
+            task {
+                let! settled = settle
+
+                match settled with
+                | Ok() -> ()
+                | Error error -> do! failDetached error
+            }
+            |> ignore
+
         /// PROMPT-002: a plugin-owned Authority Root.
         ///
         /// The root's LogicalRunId and AuthorityRootUserMessageId are both `None` in
@@ -175,6 +241,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onDetachedFailure: (string -> Task) option)
             (tools: Map<string, bool> option)
             (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
@@ -213,13 +280,20 @@ module PromptDispatcherSend =
                       Tools = tools
                       BindingIntent = SessionBindingIntent.Preserve }
 
-                let! outcome = port.SendPrompt(sessionId, text, options) |> TaskResultCE.ofTask
+                let sendTask = port.SendPrompt(sessionId, text, options)
 
                 let acceptFn physicalId =
                     this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
                     |> TaskValue.map (Result.map ignore)
 
-                return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
+                match awaitMode with
+                | PromptDispatcher.AwaitMode.Detached ->
+                    let! _ = this.PersistDetachedInvocation(key, sessionId)
+                    this.ObserveDetachedSend key sessionId sendTask onDetachedFailure
+                    return key
+                | PromptDispatcher.AwaitMode.Await ->
+                    let! outcome = sendTask |> TaskResultCE.ofTask
+                    return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
             }
 
         member this.SendAgentOwnerRoot
@@ -231,7 +305,27 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None None
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None None None
+
+        member this.SendAgentOwnerRootDetachedObserved
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (agent: string)
+            (directory: string option)
+            (onFailure: string -> Task)
+            : Task<Result<PromptKey, string>> =
+            this.SendAgentOwnerRootCore
+                port
+                sessionId
+                text
+                agent
+                directory
+                PromptDispatcher.AwaitMode.Detached
+                None
+                (Some onFailure)
+                None
+                None
 
         member this.SendAgentOwnerRootWithTools
             (port: ISessionHostPort)
@@ -244,7 +338,7 @@ module PromptDispatcherSend =
             (tools: Map<string, bool>)
             (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted (Some tools) model
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None (Some tools) model
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///
@@ -314,13 +408,20 @@ module PromptDispatcherSend =
                       Tools = tools
                       BindingIntent = bindingIntent }
 
-                let! outcome = port.SendPrompt(sessionId, text, options) |> TaskResultCE.ofTask
+                let sendTask = port.SendPrompt(sessionId, text, options)
 
                 let acceptFn physicalId =
                     this.AcceptContinuation key sessionId physicalId
                     |> TaskValue.map (Result.map ignore)
 
-                return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
+                match awaitMode with
+                | PromptDispatcher.AwaitMode.Detached ->
+                    let! _ = this.PersistDetachedInvocation(key, sessionId)
+                    this.ObserveDetachedSend key sessionId sendTask None
+                    return key
+                | PromptDispatcher.AwaitMode.Await ->
+                    let! outcome = sendTask |> TaskResultCE.ofTask
+                    return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
             }
 
         member this.SendContinuation

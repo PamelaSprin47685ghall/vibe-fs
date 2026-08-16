@@ -59,6 +59,7 @@ import {
 } from './interop.mjs'
 import {
   sessionId,
+  physicalUser,
   providerRun,
   bloggerRequestId,
   frameEpochId,
@@ -71,6 +72,25 @@ import {
 import { completionKind, handleAbandonReason, handleOwnership } from './journal.mjs'
 
 const TerminalPolicyModule = await prod('OpenCode/Host/TerminalPolicy')
+const ExplicitResumeSuppressionModule = await prod('OpenCode/Host/ExplicitResumeSuppression')
+
+export const explicitResumeSuppression = {
+  observe: ({ session, physical, marked }) =>
+    ExplicitResumeSuppressionModule.observePhysicalMaterial(
+      sessionId(session),
+      physicalUser(physical),
+      {
+        parts: [{
+          type: 'text',
+          text: marked ? 'restart disclosure' : 'ordinary user material',
+          metadata: marked ? { wanxiangshu_explicit_resume: true } : undefined,
+        }],
+      },
+    ),
+  isPhysical: ({ session, physical }) =>
+    ExplicitResumeSuppressionModule.isPhysicalMaterial(sessionId(session), physicalUser(physical)),
+  drop: (session) => ExplicitResumeSuppressionModule.dropSession(sessionId(session)),
+}
 
 export const terminalPolicy = {
   outstandingBackground: (journal, hasLivePty, role, session) =>

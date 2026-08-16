@@ -28,6 +28,12 @@ import { spec } from 'node:test/reporters'
 
 import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS } from '../e2e/support/time-budget.js'
 
+// Fatal semantics stay physical in production. The verification child opts out
+// explicitly so tests can inspect the fatal classification and durable aftermath
+// without killing the whole test tier. Production code never infers this from
+// NODE_TEST_CONTEXT or any other Host-owned environment variable.
+process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
 const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
 
 if (files.length === 0) {

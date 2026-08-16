@@ -143,7 +143,9 @@ plugin load、workspace open、EventStore acquire、Host signal subscription 都
 
 `/continue` 交给 LLM 的正文必须明确写出：① OpenCode/Wanxiangshu 进程刚刚重启；② 重启前最后一个 tool call 可能中断，保持 transcript 中的坏/未完成状态，不能假定成功；③ 哪些 sub session 仍物理可访问（至少 byname、session id、role/agent、durable lifecycle）；④ 哪些 durable child 已不可访问；⑤ 若要继续，LLM 可用正常 `fork(name=已有 byname, charge=...)`/等价已有复用面选择性复用。禁止把 restart disclosure 放在隐藏日志、system-only side channel 或仅诊断字段里。
 
-`/continue` 自身产生的 provider turn 是 **disclosure-only**：`command.execute.before` 必须给该次 restart briefing 的 Host user part 加专用 typed metadata marker；普通 main transform 只在**当前 trailing user material** 带此 marker 时禁止把 briefing 当成新的 Companion material，从而创建/替换 Blogger、补旧 context-compression work 或间接恢复上一进程工具。该 suppression 不以 SessionId、idle、abort、delete 或“session 是否结束”为生命周期：同一 marked material 的 provider retry 仍受抑制；一旦下一条普通 user material 成为当前请求，即使此前没有任何 end signal，也必须自然恢复正常 Companion 行为。这样显式 resume 只登记/公开，真正业务 effect 来自后续 LLM tool call，而且不会把可复用 session 错当成一次性 execution。
+`/continue` 自身产生的 provider turn 是 **disclosure-only**：`command.execute.before` 必须给该次 restart briefing 的 Host user part 加专用 typed metadata marker；`chat.message` 把该 marker 绑定到**精确的 `(SessionId, PhysicalUserMessageId)`**。同一物理 material 的 messages transform 不得把 briefing 当成新的 Companion material；后续 idle/reconcile 也不得把这一 turn 当成普通业务 turn 去生成 InteractionRepair、Manager idle encouragement、provider fallback、Blogger repair 或任何其它 Wanxiangshu 自动 continuation/effect。`/continue` 的 provider prose 不需要“普通 charge 收尾报告”，因此绝不能因为它自然结束而自我 nudge。
+
+该 suppression 不以 SessionId、idle、abort、delete 或“session 是否结束”为生命周期：同一 marked physical material 的 provider retry 仍受抑制；一旦下一条普通 user material 以新的 PhysicalUserMessageId 成为当前请求，即使此前没有任何 end signal，也必须自然恢复正常 Companion 与业务 turn 行为。这样显式 resume 只登记/公开，真正业务 effect 来自后续 LLM tool call，而且不会把可复用 session 错当成一次性 execution。
 
 `/continue` 重复调用必须幂等：重复发现/登记同一 surviving child 不产生 durable fact，不重复发送 prompt，不改变 child transcript。没有 durable journal、没有 snapshot port、某 child snapshot 查询失败都只影响本次 briefing 的对应条目；command 本身仍返回可见说明，不熔断 future `/continue` 或其它功能。
 

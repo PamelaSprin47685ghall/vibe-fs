@@ -20,6 +20,7 @@ import { join } from 'node:path'
 import {
   agentJournal,
   commitHash,
+  hostEventPort,
   physicalUser,
   resultOf,
   sessionId,
@@ -76,6 +77,16 @@ export const fakeGitPort = (behaviour = {}) => ({
 export const fakeSessions = (behaviour = {}) => {
   const calls = []
   let childSeq = 0
+  const terminalListeners = new Map()
+  const stickyTerminals = new Map()
+
+  const sessionKey = (value) => value?.fields?.[0] ?? value
+  const notifyTerminal = (session, outcome) => {
+    const key = sessionKey(session)
+    stickyTerminals.set(key, outcome)
+    for (const callback of terminalListeners.get(key) ?? []) callback(session, outcome)
+  }
+
   return {
     calls,
     CreateChildSession: async (parentId, options) => {
@@ -92,6 +103,9 @@ export const fakeSessions = (behaviour = {}) => {
       calls.push(['SendPrompt', ...args])
       behaviour.onSendPrompt?.(...args)
       if (behaviour.sendPromptError) return { tag: 4, fields: [behaviour.sendPromptError] }
+      if (behaviour.terminalAfterSend) {
+        queueMicrotask(() => notifyTerminal(args[0], hostEventPort.failed(behaviour.terminalAfterSend)))
+      }
       return { tag: 1, fields: [physicalUser('msg_fake_prompt')] }
     },
     SendPromptAsync: async (...args) => {
@@ -100,7 +114,17 @@ export const fakeSessions = (behaviour = {}) => {
     },
     SubscribeTerminal: (childId, callback) => {
       calls.push(['SubscribeTerminal', childId])
-      return { Dispose: () => {} }
+      const key = sessionKey(childId)
+      if (!terminalListeners.has(key)) terminalListeners.set(key, new Set())
+      terminalListeners.get(key).add(callback)
+      if (stickyTerminals.has(key)) {
+        queueMicrotask(() => callback(childId, stickyTerminals.get(key)))
+      }
+      return {
+        Dispose: () => {
+          terminalListeners.get(key)?.delete(callback)
+        },
+      }
     },
     ListChildren: async () => ({ tag: 0, fields: [toList([])] }),
   }

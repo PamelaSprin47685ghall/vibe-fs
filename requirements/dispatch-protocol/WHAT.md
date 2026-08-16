@@ -98,7 +98,7 @@ delivery，不用时间窗口代替 PromptKey，不把 `accepted-*` 当物理落
 
 `AwaitMode.Detached`（fire-and-forget）仍必须先完成 PromptKey、authority claim 与必要 durable append，但**调用方不得等待 managed model capacity、provider execution、`session.promptAsync` Promise settle 或 PhysicalAccepted**。发送边界同步调用 Host `prompt_async` 成功入栈后即可记录 admission-shaped `PluginPromptSubmitted` receipt 并返回 PromptKey；该 receipt 不是物理 message id，真正 PhysicalAccepted 仍只能由后续 `chat.message` 的 PromptKey 证据建立。禁止独立的 `postPromptFireAndForget` 旁路（PROMPT-007）。
 
-若 Detached 已返回后 `prompt_async` 异步 rejection，则 acceptance 已不可可靠判定：当前进程必须 fatal，claim 保持可审计 pending/unknown，**绝不**自动重发。这样 fork/repair 不会被 child slot/run 阻塞，同时仍保留 at-most-one logical effect。
+若 Detached 已返回后 `prompt_async` 异步 rejection，则 acceptance 已不可可靠判定：当前进程必须 fatal，claim 保持可审计 pending/unknown，**绝不**自动重发。需要在**本次决策内**知道 Host transport 是否拒绝（例如 Blogger nudge 失败后立即转 AABB、JoinGuard/ReviewGuard 失败后释放 reservation、同步 NeedHelp/SyncDelegate 调用）的调用方必须显式选择 `AwaitMode.Await`；这里的 Await 只等待 `ISessionHostPort.SendPrompt` transport 结果，仍不得等待 managed model capacity、provider execution 或 child terminal。只有像 fork AgentOwnerRoot 这种调用方不能以 transport settle 作为返回前置条件的路径才使用 Detached。这样 fork 不被 child slot/run 阻塞，而需要同步决定“发送失败后下一步”的协议仍能拿到确定 transport 结果。
 
 - 含义：Detached 仍返回 PromptKey、仍写 claim/submit；调用方成功只证明本地 dispatch 已交给 Host async enqueue，不证明 provider 已运行或物理消息已落地。
 - 证据：→ PROOF.md R5。

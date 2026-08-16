@@ -325,8 +325,22 @@ type CompanionHost
     let mutable bloggerId: SessionId option = None
     // DSL-MUTABLE: resource — create-failure latch, cleared on retry
     let mutable bloggerCreateFailed = false
-    // DSL-MUTABLE: resource — one-shot restored-blogger id consumption
+    // Constructor seed is used only when no live durable projection is available.
+    // Journal-backed ownership is re-read on every ensure; process cache
+    // invalidation must never make an existing association disappear from recovery authority.
+    // DSL-MUTABLE: resource — one-shot constructor fallback seed
     let mutable restoredBloggerIdOpt = restoredBloggerId
+
+    let currentRestoredBloggerId () =
+        match journal with
+        | Some durable ->
+            (AgentJournal.snapshot durable).AgentProjections.Sessions
+            |> Map.tryFind primaryId
+            |> Option.bind (fun session -> session.Companion)
+            |> Option.bind (fun state -> state.BloggerSessionId)
+            |> Option.map SessionId.value
+            |> Option.orElse restoredBloggerIdOpt
+        | None -> restoredBloggerIdOpt
 
     let ensureBlogger () =
         lock gate (fun () ->
@@ -349,7 +363,7 @@ type CompanionHost
                         primaryId
                         bloggerEffectiveAgent
                         bloggerDirectory
-                        (fun () -> restoredBloggerIdOpt)
+                        currentRestoredBloggerId
                         (fun () -> bloggerId)
                         (fun sid ->
                             bloggerId <- Some sid

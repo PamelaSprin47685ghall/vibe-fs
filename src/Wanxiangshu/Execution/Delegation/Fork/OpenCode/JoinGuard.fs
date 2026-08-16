@@ -134,13 +134,15 @@ module HostJoinGuard =
                             processNudgeKeys.Remove key |> ignore)
 
                     let! sent =
-                        HostSessionNudge.sendContinuation
+                        HostSessionNudge.sendContinuationResult
                             sessionPort
                             sessionId
                             (ProviderProse.documentFor sessionId RuntimeNudge.BackgroundJoin Map.empty)
                             PromptAuthority.ContinuationKind.JoinGuard
                             directory
                             (Some durable)
+                            PromptDispatcher.AwaitMode.Await
+                            None
 
                     match sent with
                     | Ok promptKey -> return JoinGuardNudgeOutcome.Sent promptKey

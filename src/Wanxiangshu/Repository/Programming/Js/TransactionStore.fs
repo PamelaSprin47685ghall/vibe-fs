@@ -152,7 +152,9 @@ module JsToolsTransactionStore =
             match! store.Append [ envelope ] with
             | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
-                return Error("JsTransactionPrepared semantic cut: " + cut.Reason)
+                let reason = "JsTransactionPrepared semantic cut: " + cut.Reason
+                FatalProcess.trip "js-transaction-semantic-cut" reason
+                return Error reason
             | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionPrepared append failed: %A" err)
         }
@@ -175,7 +177,9 @@ module JsToolsTransactionStore =
             match! store.Append [ envelope ] with
             | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
-                return Error("JsTransactionCommitted semantic cut: " + cut.Reason)
+                let reason = "JsTransactionCommitted semantic cut: " + cut.Reason
+                FatalProcess.trip "js-transaction-semantic-cut" reason
+                return Error reason
             | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "JsTransactionCommitted append failed: %A" err)
         }

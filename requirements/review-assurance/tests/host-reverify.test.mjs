@@ -38,7 +38,7 @@ test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async (
           .find(([sid]) => (sid?.fields?.[0] ?? sid) === reviewerKey)?.[1]
         barrierVisibleAtSend = projection?.ReviewGuard != null
       },
-      sendPromptError: 'stop-after-order-probe',
+      terminalAfterSend: 'stop-after-order-probe',
     },
   })
   const worktree = gitDir('rv-order')
@@ -51,7 +51,7 @@ test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async (
         reviewBarrierId('bar_order'),
       ),
     )
-    assert.equal(result.ok, false, 'probe intentionally fails the transport after observing send order')
+    assert.equal(result.ok, false, 'probe terminates the reviewer after observing send order')
     assert.equal(barrierVisibleAtSend, true, 'reviewer provider lane must not start before ReviewBarrierStarted is durable')
     assert.match(reviewPrompt, /judge tool/, 'orchestrator review must use the shared Reviewer opening resource')
     assert.doesNotMatch(reviewPrompt, /verdict tool/, 'orchestrator review must not retain the removed hard-coded tool name')

@@ -7,6 +7,7 @@ import test from 'node:test'
 import {
   agentFact,
   agentJournal,
+  explicitResumeSuppression,
   handleId,
   handleOwnership,
   journalRevision,
@@ -103,6 +104,62 @@ test('WHAT[CRASH-018] CRASH_018_continue_suppression_belongs_to_the_exact_user_m
       'a later ordinary user material in the same SessionId proceeds without waiting for idle/abort/delete',
     )
   })
+})
+
+test('WHAT[CRASH-018] CRASH_018_continue_provider_turn_never_mints_missing_final_report_nudge', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-explicit-continue-no-auto-nudge'
+    await acceptAuthorityRoot(runtime, sessionID, 'fast-coder')
+
+    const commandOutput = { parts: [] }
+    await hooks['command.execute.before']({ command: 'continue', sessionID, arguments: '' }, commandOutput)
+    const physicalId = 'msg-explicit-continue-disclosure'
+    const userMessage = {
+      info: { id: physicalId, role: 'user', sessionID, agent: 'fast-coder' },
+      parts: commandOutput.parts,
+    }
+
+    await hooks['chat.message'](
+      { sessionID, agent: 'fast-coder' },
+      { message: userMessage.info, parts: userMessage.parts },
+    )
+    await hooks['experimental.chat.messages.transform']({}, { messages: [userMessage] })
+
+    runtime.pushHostMessage(sessionID, userMessage)
+    runtime.pushHostMessage(sessionID, {
+      info: {
+        id: 'asst-explicit-continue-disclosure',
+        role: 'assistant',
+        sessionID,
+        agent: 'fast-coder',
+        time: { completed: Date.now() },
+      },
+      parts: [{ type: 'text', text: 'I have read the restart briefing.' }],
+    })
+
+    const sendsBeforeIdle = runtime.prompts.length
+    hooks.event({ type: 'session.idle', properties: { sessionID } })
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    assert.equal(
+      runtime.prompts.length,
+      sendsBeforeIdle,
+      '/continue disclosure material must not trigger InteractionRepair or any automatic continuation',
+    )
+  })
+})
+
+test('WHAT[CRASH-018] CRASH_018_exact_physical_resume_suppression_clears_on_next_ordinary_material_without_lifecycle_signal', () => {
+  const session = 'ses-exact-resume-registry'
+  explicitResumeSuppression.observe({ session, physical: 'msg-resume-1', marked: true })
+  assert.equal(explicitResumeSuppression.isPhysical({ session, physical: 'msg-resume-1' }), true)
+  assert.equal(explicitResumeSuppression.isPhysical({ session, physical: 'msg-other' }), false)
+
+  // Same reusable SessionId, no idle/abort/delete. New ordinary physical user
+  // material is authoritative and immediately clears the prior disclosure marker.
+  explicitResumeSuppression.observe({ session, physical: 'msg-ordinary-2', marked: false })
+  assert.equal(explicitResumeSuppression.isPhysical({ session, physical: 'msg-resume-1' }), false)
+  assert.equal(explicitResumeSuppression.isPhysical({ session, physical: 'msg-ordinary-2' }), false)
 })
 
 test('WHAT[CRASH-018] CRASH_018_config_registers_visible_continue_command', () => {

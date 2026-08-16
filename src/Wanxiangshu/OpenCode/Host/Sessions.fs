@@ -50,7 +50,14 @@ type InjectedSessionPort
         eventPort: IEventObservationPort,
         ?familyParent: SessionId -> SessionId option
     ) =
-    let activeListeners = HashSet<SessionId>()
+    let activeListeners = Dictionary<SessionId, HashSet<Guid>>()
+
+    let removeActiveListenerToken sessionId token =
+        match activeListeners.TryGetValue sessionId with
+        | true, listeners ->
+            listeners.Remove token |> ignore
+            listeners.Count = 0
+        | false, _ -> false
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     let childParents = Dictionary<SessionId, SessionId>()
     let lockObj = obj ()
@@ -224,7 +231,18 @@ type InjectedSessionPort
         member _.AbortChildren(parentId) = abortChildren parentId
 
         member me.SubscribeTerminal(sessionId, listener) =
-            lock lockObj (fun () -> activeListeners.Add(sessionId) |> ignore)
+            let token = Guid.NewGuid()
+
+            lock lockObj (fun () ->
+                let listeners =
+                    match activeListeners.TryGetValue sessionId with
+                    | true, current -> current
+                    | false, _ ->
+                        let created = HashSet<Guid>()
+                        activeListeners.[sessionId] <- created
+                        created
+
+                listeners.Add token |> ignore)
 
             let sub =
                 eventPort.SubscribeTerminalListener(fun sId outcome ->
@@ -234,10 +252,16 @@ type InjectedSessionPort
             { new IDisposable with
                 member _.Dispose() =
                     sub.Dispose()
-                    lock lockObj (fun () -> activeListeners.Remove(sessionId) |> ignore) }
+                    lock lockObj (fun () ->
+                        if removeActiveListenerToken sessionId token then
+                            activeListeners.Remove(sessionId) |> ignore) }
 
         member me.SendPrompt(sessionId, text, opts) =
-            let hasListener = lock lockObj (fun () -> activeListeners.Contains(sessionId))
+            let hasListener =
+                lock lockObj (fun () ->
+                    match activeListeners.TryGetValue sessionId with
+                    | true, listeners -> listeners.Count > 0
+                    | false, _ -> false)
 
             if not hasListener then
                 // Fatal, not Retryable: the listener is registered by the caller

@@ -31,6 +31,22 @@ const { drainFromJournal: JoinDrain_drainFromJournal } = await import('../../../
 
 const PARENT = sessionId('ses_hfa')
 
+const waitFor = async (predicate, message, ms = 1000) => {
+  const deadline = Date.now() + ms
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error(message)
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
+
+const waitForAsync = async (predicate, message, ms = 1000) => {
+  const deadline = Date.now() + ms
+  while (!(await predicate())) {
+    if (Date.now() >= deadline) throw new Error(message)
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
+
 const fakeSessions = (behaviour = {}) => {
   const calls = []
   return {
@@ -147,19 +163,25 @@ test('WHAT[MANAGED-SESSION-002] HFA_fork_linkage_failure_aborts_the_new_child', 
   liveCtx.cleanup()
 })
 
-test('WHAT[MANAGED-SESSION-007] HFA_fork_send_failure_fails_the_pending_run', async () => {
+test('WHAT[MANAGED-SESSION-007] HFA_fork_send_failure_fails_the_pending_run_without_blocking_fork_return', async () => {
   const liveCtx = await live({ sendError: 'prompt rejected' })
   const result = await fork(liveCtx.runtime, 'hf5', Role.Coder, 'fast-coder', 'do work')
 
-  assert.equal(result.tag, 1)
-  assert.equal(result.fields[0], 'prompt rejected')
-  assert.equal(pendingRunCount(liveCtx.runtime), 0, 'the run must be failed, not left pending')
+  assert.equal(result.tag, 0, 'Detached fork returns after durable enqueue invocation, before late Host send settlement')
+  let items = []
+  await waitForAsync(async () => {
+    const drained = await JoinDrain_drainFromJournal(
+      liveCtx.journal,
+      PARENT,
+      5,
+      utcOffset('2024-01-01T00:00:00.000Z'),
+    )
+    assert.equal(drained.tag, 0, drained.tag === 1 ? drained.fields[0] : '')
+    items = listItems(drained.fields[0])
+    return items.length === 1
+  }, 'late detached send failure must durably settle the failed run before process fatal')
 
-  // The failure was written durably: the handle is joinable with a failed item.
-  const drained = await JoinDrain_drainFromJournal(liveCtx.journal, PARENT, 5, utcOffset('2024-01-01T00:00:00.000Z'))
-  assert.equal(drained.tag, 0, drained.tag === 1 ? drained.fields[0] : '')
-  const items = listItems(drained.fields[0])
-  assert.equal(items.length, 1)
+  assert.equal(pendingRunCount(liveCtx.runtime), 0, 'the in-memory run is settled after durable failure commit')
   assert.equal(agentIdOf(items[0]), 'hf5')
   liveCtx.cleanup()
 })

@@ -85,6 +85,7 @@ module HostSessionDeletion =
                 cleanupInspectorDraft (SessionId.value sessionId)
 
             scope.Sessions.Quiescence.DropSession sessionId
+            ExplicitResumeSuppression.dropSession sessionId
             scope.DisposeSession(SessionId.value sessionId)
             signalReconciler signal
         }

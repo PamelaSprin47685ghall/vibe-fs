@@ -16,6 +16,7 @@ import { SatelliteKind } from '../../../dist/Execution/Session/Association.js'
 import { SessionIdModule_create as sessionId, SessionIdModule_value as sessionValue } from '../../../dist/Foundation/Identity.js'
 import { errorResult, okResult, toList } from '../../verification-system/tests/support/domain.mjs'
 import {
+  companionCacheInvalidationRereadsDurableAssociation,
   directCompanionRepointFatal,
   durableCompanionReplacement,
   failedCompanionEnsureRetry,
@@ -93,6 +94,22 @@ test('WHAT[MANAGED-SESSION-011] HOST_015_direct_companion_repoint_trips_process_
   assert.equal(observed.result, 'Error', 'node:test suppresses the physical kill so the typed cut receipt remains assertable')
   assert.ok(observed.recorded.some((line) => line.includes('journal-semantic-cut')), 'semantic cut must trip process fatal')
   assert.ok(observed.recorded.some((line) => line.includes('COMPANION-002')), 'fatal record must preserve the invariant reason')
+})
+
+test('WHAT[MANAGED-SESSION-011] HOST_015_cache_invalidation_rereads_the_live_durable_companion_link', async () => {
+  const observed = await companionCacheInvalidationRereadsDurableAssociation({ oldSurvives: true })
+  assert.equal(observed.secondError, '')
+  assert.equal(observed.first, observed.second)
+  assert.equal(observed.createCalls, 0, 'process-cache invalidation must not forget a still-live durable association')
+  assert.equal(observed.durableBlogger, observed.first)
+})
+
+test('WHAT[MANAGED-SESSION-011] HOST_015_cache_invalidation_then_physical_loss_uses_close_then_replacement', async () => {
+  const observed = await companionCacheInvalidationRereadsDurableAssociation({ oldSurvives: false })
+  assert.equal(observed.secondError, '')
+  assert.notEqual(observed.first, observed.second)
+  assert.equal(observed.createCalls, 1)
+  assert.equal(observed.durableBlogger, observed.second, 'replacement must become the new durable association without repoint cut')
 })
 
 test('WHAT[MANAGED-SESSION-011] HOST_015_companion_replacement_transitions_real_durable_link_without_semantic_cut', async () => {

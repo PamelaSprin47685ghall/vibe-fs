@@ -17,8 +17,8 @@ module FatalProcess =
     /// so they can assert the fatal classification and durable aftermath.
     [<Emit("""(() => {
       if (process.env.WANXIANGSHU_NO_FATAL_EXIT === '1') return;
-      if (process.env.NODE_TEST_CONTEXT != null && process.env.NODE_TEST_CONTEXT !== '') return;
       try { process.kill(process.pid, 'SIGKILL'); } catch (_) { process.exit(1); }
+      throw new Error('WANXIANGSHU_FATAL_PROCESS_DID_NOT_TERMINATE');
     })()""")>]
     let kill () : unit = jsNative
 

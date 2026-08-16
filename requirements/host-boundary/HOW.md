@@ -56,7 +56,7 @@ subscriber sticky replay、listener disposal。
 
 `PluginHostInterop` 先用 `curriedHook` / `pairedHook` 做 Fable→Host arity adapter，再对**已经适配成二参 callable** 的函数套 `fatalHook`。顺序不能反：把 guard 包在原始 F# 函数外会改变 Fable emitted arity，曾实测把 paired hook 变成 curried no-op。guard 同时捕获 synchronous throw 与 returned Promise rejection，调用 `Diagnostic.fatal(operation,result)` 后 rethrow；`config` / `event` 用 `fatalSync`，`dispose` 用 `fatalTask`。`SpikePlugin.initSpikePlugin` 也有 init fatal boundary。
 
-`Diagnostic.fatal` 的物理 kill 下沉到 `Foundation.FatalProcess.kill`，使低层 durable journal 也能使用同一个 process fuse：live `AgentJournal` semantic cut 直接 `FatalProcess.trip("journal-semantic-cut", ...)`，不依赖异常恰好一路冒到 Host hook。node:test / `WANXIANGSHU_NO_FATAL_EXIT=1` 只屏蔽物理 kill，不改变 fatal classification/log。
+`Diagnostic.fatal` 的物理 kill 下沉到 `Foundation.FatalProcess.kill`，使低层 durable journal 也能使用同一个 process fuse：live `AgentJournal` semantic cut 直接 `FatalProcess.trip("journal-semantic-cut", ...)`，不依赖异常恰好一路冒到 Host hook。**只有 Wanxiangshu 测试 harness 显式设置的 `WANXIANGSHU_NO_FATAL_EXIT=1` 可以屏蔽物理 kill**；不得信任 `NODE_TEST_CONTEXT` 或其它宿主/Node/Bun 环境变量，因为它们可能被真实 OpenCode 进程继承并把 production fatal 意外降级成普通异常。未显式 opt-out 时 fatal 必须终止整个进程，而不是把 Error 交还 Host loop 继续执行。
 
 ### 其它
 

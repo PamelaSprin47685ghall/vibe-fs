@@ -14,8 +14,8 @@
 | 007/008/009/017 | `Domain/PromptAuthorityRun.fs` → `resolveKnownOrigin`（accepted → claimed → compaction → AgentOwnerRoot → UnknownOrigin）；`Application/Prompting/PromptIngress.fs` → `resolveOrigin`（唯一可授予 HumanRoot 的边界） | 纯函数永不返回 HumanRoot；ingress 只在 ActiveProfile 缺席 + 显式有效 agent 时授予 |
 | 010 | `Interaction/Authority/Model.fs` → `repairFamilyPayloadDigest/repairFamilyAlreadyClaimed`（ordinary LogicalRun+family）、`repairPayloadDigest/repairAlreadyClaimed`（Blogger terminal-scoped special case）、`idlePayloadDigest/idleAlreadyClaimed`（Manager Life+business condition）；均由 `ClaimSequences` 派生 | 自动 continuation budget durable 且不能由自己产生的新 ProviderRun 扩张 |
 | 011 | `Domain/PromptAuthority.fs` → `AttemptExecutionProfile`、`buildAttemptExecutionProfile`（唯一 builder） | authority 子记录原子携带 |
-| 012/013 | `Domain/PromptAuthority.fs` → `ContinuationKind.NeedHelpEscalation | NeedHelpAdvice`；`Infrastructure/OpenCode/Host/AssistanceHost.fs` | assistance 续推同 run；abort 不推进 fallback |
-| 014 | `Execution/Delegation/Fork/OpenCode/JoinGuard.fs`、`Mission/Manager/Idle.fs`；`ContinuationKind.JoinGuard | ManagerIdleEncouragement` | join/idle 续推 = continuation；Manager idle process key + durable claim 都按 Life + plan-commitment condition |
+| 012/013 | `Domain/PromptAuthority.fs` → `ContinuationKind.NeedHelpEscalation | NeedHelpAdvice`；`Infrastructure/OpenCode/Host/AssistanceHost.fs` | assistance 续推同 run；该同步交互只 Await Host transport result（便于本调用判断拒绝），不等 provider execution/slot；abort 不推进 fallback |
+| 014 | `Execution/Delegation/Fork/OpenCode/JoinGuard.fs`、`Mission/Manager/Idle.fs`；`ContinuationKind.JoinGuard | ManagerIdleEncouragement` | join/idle 续推 = continuation；JoinGuard Await transport result，以便拒绝时释放 reservation；Manager idle process key + durable claim 都按 Life + plan-commitment condition |
 | 015 | `Session/JoinInterruptRegistry.fs`（`UserMessageArrived`）；`PromptIngressCodec`（ExternalUserIngressPulse 候选） | wake 低权限；ingress 不给 authority |
 | 016 | `Domain/PromptAuthorityRun.fs` → `acceptClaim`（root 不入 continuation map） | root ≠ continuation |
 

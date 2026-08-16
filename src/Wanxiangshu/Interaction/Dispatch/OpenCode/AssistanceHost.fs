@@ -304,7 +304,7 @@ type AssistanceHost
                         requester
                         directory
                         journal
-                        PromptDispatcher.AwaitMode.Detached
+                        PromptDispatcher.AwaitMode.Await
         }
 
     let consumeCompleted owner (record: HandleRecord) : Task =

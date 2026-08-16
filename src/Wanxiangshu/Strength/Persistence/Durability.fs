@@ -41,6 +41,9 @@ module StrengthDurability =
                 | Ok _ -> return StrengthPreparedPublish.Published
                 | Error(PublishError.StorageInvalid error) ->
                     return StrengthPreparedPublish.StorageInvalid(sprintf "%A" error)
+                | Error(PublishError.SemanticCut cut) ->
+                    FatalProcess.trip "strength-prepared-semantic-cut" cut.Reason
+                    return StrengthPreparedPublish.Rejected cut.Reason
                 | Error error -> return StrengthPreparedPublish.Rejected(sprintf "%A" error)
             }
 

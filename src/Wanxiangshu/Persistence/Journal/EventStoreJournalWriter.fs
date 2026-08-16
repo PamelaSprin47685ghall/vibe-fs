@@ -296,7 +296,9 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
             match! EventStoreJournalWriter.commitEnvelope store init with
             | Ok receipt when AppendReceipt.cutFor init.EventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor init.EventId receipt |> Option.get
-                return Error("RuntimeStarted semantic cut: " + cut.Reason)
+                let reason = "RuntimeStarted semantic cut: " + cut.Reason
+                FatalProcess.trip "runtime-started-semantic-cut" reason
+                return Error reason
             | Ok _ ->
                 runtimeStartedCommitted <- true
                 return Ok()

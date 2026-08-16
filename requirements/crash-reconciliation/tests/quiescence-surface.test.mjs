@@ -70,6 +70,20 @@ test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
   assert.equal(quiescence.tryConsume(after, oldPermit), false, 'restart must not inherit idle truth')
 })
 
+test('WHAT[CRASH-001] Q08_restart_or_unknown_idle_cannot_mint_new_send_authority', () => {
+  const restarted = quiescence.create()
+  const historicalIdle = quiescence.observeIdle(restarted, S)
+  assert.equal(
+    quiescence.tryConsume(restarted, historicalIdle),
+    false,
+    'SessionIdle without a current-process BeginProviderAttempt is historical observation, not continuation authority',
+  )
+
+  quiescence.beginAttempt(restarted, S)
+  const freshIdle = quiescence.observeIdle(restarted, S)
+  assert.equal(quiescence.tryConsume(restarted, freshIdle), true, 'a real current-process provider attempt restores idle authority')
+})
+
 test('WHAT[CRASH-006] Q10_session_deleted_drops_every_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)

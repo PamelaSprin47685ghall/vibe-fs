@@ -52,8 +52,7 @@ LWR 段标题字面始终是纯文本（`LifecycleWorkRecord.render`）；`# ` �
 `attach` 在 parent `HandleProjection` 以 Byname 定位 sibling/retired child，再调用唯一
 `LifecycleWorkRecord(includeOpening=true)` projector。`ForkChildPayload` 只接收 `Attachment: string option`，
 渲染为 `attached_work_record` 字段（位于 `commissioner_record` 之后、`[[root_requirement]]` 之前）；
-不解析 LWR、不复制 Journal projection。new fork 与 idle reuse 可物化；busy reuse 不物化，只返回自然语言
-deferred 说明。unknown/self 在任何 send 前拒绝。
+不解析 LWR、不复制 Journal projection。new fork 与 idle reuse 可物化；已有 ActiveLogicalRun 的 busy reuse 不物化，只返回自然语言 deferred 说明。若 Detached 首 prompt 已交给 Host 但 `chat.message` 尚未 physical-accept，该 person 只有 pending run、没有可证明的 ActiveLogicalRun：此时直接返回“当前还不能接新 charge”，不等待 acceptance、不发送 busy nudge、也不物化 attachment。unknown/self 在任何 send 前拒绝。
 
 ### delegated tool estimate（DELEG-022）
 
