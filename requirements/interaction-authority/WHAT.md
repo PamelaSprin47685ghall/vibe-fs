@@ -125,22 +125,27 @@ HumanRoot；未证明的消息落 UnknownOrigin 并 fail-closed。已激活的 H
   mid-run 的 UnknownOrigin + 有效 agent **不得**抬成 HumanRoot。
 - 证据：→ PROOF.md R7、R8。
 
-## INTERACTION-AUTHORITY-010 — 禁自激励
+## INTERACTION-AUTHORITY-010 — 禁自激励；自动 continuation 必须有稳定且有界的 authority budget
 
 合成/repair/review/synthetic/重试 不得抬权（PROMPT-010）：
 
 ```text
-零宽 continuation → HumanRoot
-repair continuation → 新的 repair 预算
+零宽/repair continuation → HumanRoot
+repair response 的新 terminal → 又获得同类 generic repair
+Manager idle continuation 的新 terminal → 又获得同 phase encouragement
 Review confirmation → 改 Reviewer SelectedAgent
 synthetic → 重置 Fallback Offset
 B 侧重试 → 下一真人 root 默认 Agent
 ```
 
-- 含义：一个 terminal provider run 至多赚一次 interaction repair（`repairAlreadyClaimed` 由
-  ClaimSequences 派生，跨 restart 存活）；abandon 后也不得再 claim 同一 occasion。
-- 边界：预算数值与机制细节 = HOW；「同一 occasion 不得重复获得 authority 型资源」是 WHAT。
-- 证据：→ PROOF.md R9。
+普通 `missing-final-report` / `incomplete-interaction` repair 的 durable budget = **(SessionId, LogicalRunId, repair family)** 一次；第一次 repair 后若同一 LogicalRun 再次需要同 family，得到 `BudgetExhausted`，不得发送第二个 prompt，并以 bounded recovery exhaustion 收束该业务 run。该 claim 由 `ClaimSequences` 派生，跨 restart 存活；abandon 也不重置预算。
+
+Blogger exact-one chronicle 协议是显式例外：它需要按 terminal ProviderRun 区分“同 terminal 重入”与“nudge 后新的 invalid terminal”，但它自己的状态机严格限制为 `nudge once → AABB once → fatal/exhaust`，不能成为 generic repair 的无界后门。
+
+Manager idle automatic encouragement 的 durable budget = **Manager Life + business condition（plan commitment 前 / 后）**，不是 trigger ProviderRun；同一 business condition 下后续 terminal 不再赚新 encouragement。JoinGuard/ReviewGuard 也必须由稳定 session/barrier occasion key 去重。
+
+- 边界：repair/fallback 的业务结局 → `provider-attempt-recovery` / 各 feature；本包拥有“自动 prompt 不得自我扩张 authority budget”的 claim identity。
+- 证据：→ PROOF.md R9、R12。
 
 ## INTERACTION-AUTHORITY-011 — authority 是原子 profile 内的稳定子记录
 
@@ -182,10 +187,9 @@ system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset Fall
 
 ## INTERACTION-AUTHORITY-014 — Nudge / JoinGuard 是 Continuation
 
-Nudge 与 JoinGuard 都是 Continuation，不创建新 Authority（EXEC-007 / EXEC-016 本包半边）。
-有 join 义务且仍有 outstanding 后台时，本 turn 只发 `JoinGuard` Continuation；finality 处理停放。
+Nudge 与 JoinGuard 都是 Continuation，不创建新 Authority（EXEC-007 / EXEC-016 本包半边）。有 join 义务且仍有 outstanding 后台时，本 turn 只发 `JoinGuard` Continuation；finality 处理停放。Manager idle encouragement 也是 continuation，但按 INTERACTION-AUTHORITY-010 每 Life + plan-commitment condition 至多自动发送一次。
 
-- 含义：idle/join 场景的续推永远走 continuation 通道，不许静默开新 root。
+- 含义：idle/join 场景的续推永远走 continuation 通道，不许静默开新 root，也不许由 continuation 自己的新 terminal 生成无限续推预算。
 - 边界：outstanding-background 的判定（listable handles / active jobs / live PTY）归
   `delegation` / `managed-session-lifecycle`；「只发 JoinGuard continuation」归本包。
 - 证据：→ PROOF.md R12。

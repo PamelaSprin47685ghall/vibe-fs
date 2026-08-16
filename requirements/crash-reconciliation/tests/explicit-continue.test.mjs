@@ -17,6 +17,10 @@ import {
   sessionId,
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
+import {
+  acceptAuthorityRoot,
+  withExecutablePlugin,
+} from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 import { registerCommand, before as continueBefore } from '../../../dist/OpenCode/Host/ExplicitSessionResume.js'
 import {
@@ -53,6 +57,53 @@ const linkChild = async (journal, parent = 'ses_resume_parent', child = 'ses_res
   const result = await agentJournal.appendAgent(stream.session(sessionId(parent)), undefined, fact, journal)
   assert.equal(result.ok, true, JSON.stringify(result.error))
 }
+
+test('WHAT[CRASH-018] CRASH_018_continue_suppression_belongs_to_the_exact_user_material_not_the_session', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses-explicit-continue-material'
+    await acceptAuthorityRoot(runtime, sessionID, 'fast-coder')
+
+    const commandOutput = { parts: [] }
+    await hooks['command.execute.before']({
+      command: 'continue',
+      sessionID,
+      arguments: '',
+    }, commandOutput)
+
+    assert.equal(commandOutput.parts.length, 1)
+    assert.equal(
+      commandOutput.parts[0]?.metadata?.wanxiangshu_explicit_resume,
+      true,
+      'the disclosure marker must ride on the exact Host user material',
+    )
+
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [{
+        info: { id: 'msg-continue-material', role: 'user', sessionID },
+        parts: commandOutput.parts,
+      }],
+    })
+    assert.equal(createdIds.length, 0, '/continue material must not create or replace a Companion')
+
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [
+        {
+          info: { id: 'msg-old-continue-material', role: 'user', sessionID },
+          parts: commandOutput.parts,
+        },
+        {
+          info: { id: 'msg-next-ordinary-material', role: 'user', sessionID },
+          parts: [{ type: 'text', text: 'This is a new ordinary request.' }],
+        },
+      ],
+    })
+    assert.equal(
+      createdIds.length,
+      1,
+      'a later ordinary user material in the same SessionId proceeds without waiting for idle/abort/delete',
+    )
+  })
+})
 
 test('WHAT[CRASH-018] CRASH_018_config_registers_visible_continue_command', () => {
   const config = { command: { existing: { template: 'keep me' } } }

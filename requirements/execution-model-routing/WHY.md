@@ -46,11 +46,11 @@ Wanxiangshu 只维护真实 lease multiset、串行 acquire/release 与 Host 投
 
 required execution 应保持 pending；只有真实 occupancy 变化时才重新求值。这样等待完全事件驱动，没有轮询，没有跨池偷跑，也不会污染 AABB failure budget。可丢弃优化可以按自身合同在 `null` 后放弃，例如 Strength 回到 K0。
 
-## 5. 为什么 managed lease 要稳定到 session retire
+## 5. 为什么 managed lease 要稳定到 physical user execution，而不是 session
 
-若每次 prompt 都重新调用 MJS，同一 participant 会因为短暂负载变化在模型间漂移；`running` 也会退化成瞬时 HTTP 并发，而不是用户想控制的 session 资源占用。
+Session 是可复用容器：业务 completed、handle retired、甚至 Host close 都不能可靠回答“下一次是否还会在这个 SessionId 上执行”。反过来，`PhysicalUserMessageId` 精确命名了 Host 当前正在处理的 user material。若把槽冻结到 session，就会让 idle 后的可复用 session 永久占容量；若按 EffectiveAgent 给同一 session 同时留 A/B 两份 lease，又会把一次物理 execution 双计数。
 
-因此 managed binding 在 `(SessionId, EffectiveAgent)` 首次成功调度后冻结到该 live session retire/delete。两次 prompt 之间仍占一个 occurrence。AABB 切到 peer 时为另一个 EffectiveAgent 单独取得 lease；切回 A 时复用原 lease。
+因此 managed lease 以 `(SessionId, PhysicalUserMessageId)` 为 identity，EffectiveAgent 是该 execution 的稳定属性。同一 physical id 的 provider retry 复用 target；同一 SessionId 出现新 physical id 时，新 material 自身就足以 supersede 旧 lease，不依赖 idle 必达。AABB 切到 peer 只影响**下一条 physical execution**的 EffectiveAgent，不保留一份 session 级 B 槽。
 
 ## 6. 为什么事件驱动状态必须 process-shared
 

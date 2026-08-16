@@ -7,10 +7,14 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 
 /// Process-local execution identity binding. Agent identity is frozen/observed here;
-/// physical model authority lives in ModelRouting and is leased by (SessionId, EffectiveAgent).
+/// physical model authority lives in ModelRouting and is leased by the exact
+/// (SessionId, PhysicalUserMessageId) provider execution.
 module SessionExecutionBinding =
 
-    type private ExpectedBinding = { Agent: string; Model: OpencodeModel }
+    type private ExpectedBinding =
+        { PhysicalUserMessageId: PhysicalUserMessageId
+          Agent: string
+          Model: OpencodeModel }
 
     let private gate = obj ()
     let private parents = Dictionary<string, string>()
@@ -121,9 +125,28 @@ module SessionExecutionBinding =
     /// The caller supplies EffectiveAgent from the still-pending PromptClaim, not
     /// from the Host message. This survives SendPrompt returning, but is addressed
     /// by PromptKey and therefore cannot bless an unrelated later request.
+    let private exactBinding physicalUserMessageId agent model =
+        { PhysicalUserMessageId = physicalUserMessageId
+          Agent = agent
+          Model = model }
+
+    let acceptExternalExecution
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (effectiveAgent: string)
+        (model: OpencodeModel)
+        : unit =
+        match nonEmpty effectiveAgent with
+        | None -> invalidOp "PROMPT-006: accepted external execution has no EffectiveAgent"
+        | Some agent ->
+            lock gate (fun () ->
+                providerAttemptBindings.[SessionId.value sessionId] <-
+                    exactBinding physicalUserMessageId agent model)
+
     let acceptPromptExecution
         (sessionId: SessionId)
         (promptKey: PromptKey)
+        (physicalUserMessageId: PhysicalUserMessageId)
         (effectiveAgent: string)
         (model: OpencodeModel)
         : unit =
@@ -132,42 +155,104 @@ module SessionExecutionBinding =
         | Some agent ->
             lock gate (fun () ->
                 let sessionKey = SessionId.value sessionId
+                let binding = exactBinding physicalUserMessageId agent model
                 clearAcceptedPromptBindingsForSession sessionKey
-                acceptedPromptBindings.[promptBindingKey sessionId promptKey] <- { Agent = agent; Model = model })
+                acceptedPromptBindings.[promptBindingKey sessionId promptKey] <- binding
+                // chat.params is triggered before messages.transform. Keep the
+                // same exact physical binding available immediately, then let the
+                // transform re-prove it from its trailing user message.
+                providerAttemptBindings.[sessionKey] <- binding)
 
-    /// Provider-attempt boundary. A plugin-owned user message must consume the
-    /// execution binding registered for its exact PromptKey. External user roots
-    /// have no PromptKey and intentionally fall back to the session base binding.
+    /// Provider-attempt boundary. The transform must bind the exact trailing
+    /// PhysicalUserMessageId that chat.message admitted. PromptKey is still the
+    /// plugin authority identity, but it can never substitute for physical
+    /// execution identity.
     let private clearProviderAttempt sessionKey =
         lock gate (fun () -> providerAttemptBindings.Remove sessionKey |> ignore)
 
-    let private useAcceptedPromptBinding (sessionId: SessionId) (promptKey: PromptKey) : Result<unit, string> =
+    let private physicalMismatch promptKey expected observed =
+        Error(
+            sprintf
+                "PROMPT-006: provider attempt for PromptKey %s changed physical user message (%s -> %s)"
+                (PromptKey.value promptKey)
+                (PhysicalUserMessageId.value expected)
+                (PhysicalUserMessageId.value observed)
+        )
+
+    let private useAcceptedPromptBinding
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (promptKey: PromptKey)
+        : Result<unit, string> =
         lock gate (fun () ->
             let sessionKey = SessionId.value sessionId
             let bindingKey = promptBindingKey sessionId promptKey
 
-            match acceptedPromptBindings.TryGetValue bindingKey with
-            | true, expected ->
+            match acceptedPromptBindings.TryGetValue bindingKey, physicalUserMessageId with
+            | (true, expected), Some physical when expected.PhysicalUserMessageId = physical ->
                 providerAttemptBindings.[sessionKey] <- expected
                 Ok()
-            | false, _ ->
+            | (true, expected), Some physical -> physicalMismatch promptKey expected.PhysicalUserMessageId physical
+            | (true, _), None ->
+                Error(
+                    sprintf
+                        "PROMPT-006: provider attempt for PromptKey %s has no physical user message id"
+                        (PromptKey.value promptKey)
+                )
+            | (false, _), _ ->
                 Error(
                     sprintf
                         "PROMPT-006: provider attempt for PromptKey %s has no accepted execution binding"
                         (PromptKey.value promptKey)
                 ))
 
-    let private beginExternalProviderAttempt sessionId =
+    let private baseAgent sessionKey =
+        lock gate (fun () ->
+            clearAcceptedPromptBindingsForSession sessionKey
+
+            match agents.TryGetValue sessionKey with
+            | true, agent -> Some agent
+            | false, _ -> None)
+
+    let private rememberExternalAttempt sessionId physical agent target =
         let sessionKey = SessionId.value sessionId
-        lock gate (fun () -> clearAcceptedPromptBindingsForSession sessionKey)
+
+        lock gate (fun () ->
+            providerAttemptBindings.[sessionKey] <-
+                { PhysicalUserMessageId = physical
+                  Agent = agent
+                  Model = ModelRouting.toOpenCodeModel target })
+
         Ok()
 
-    let beginProviderAttempt (sessionId: SessionId) (promptKey: PromptKey option) : Result<unit, string> =
+    let private bindExternalExecutionLease sessionId physical agent =
+        match ModelRouting.tryLease sessionId physical agent with
+        | None ->
+            Error(
+                sprintf
+                    "PROMPT-006: physical provider attempt %s has no model-routing execution lease"
+                    (PhysicalUserMessageId.value physical)
+            )
+        | Some target -> rememberExternalAttempt sessionId physical agent target
+
+    let private beginExternalProviderAttempt sessionId physicalUserMessageId =
+        let sessionKey = SessionId.value sessionId
+
+        match baseAgent sessionKey, physicalUserMessageId with
+        | None, _ -> Ok()
+        | Some _, None -> Error "PROMPT-006: managed provider attempt has no physical user message id"
+        | Some agent, Some physical -> bindExternalExecutionLease sessionId physical agent
+
+    let beginProviderAttempt
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (promptKey: PromptKey option)
+        : Result<unit, string> =
         clearProviderAttempt (SessionId.value sessionId)
 
         match promptKey with
-        | None -> beginExternalProviderAttempt sessionId
-        | Some key -> useAcceptedPromptBinding sessionId key
+        | None -> beginExternalProviderAttempt sessionId physicalUserMessageId
+        | Some key -> useAcceptedPromptBinding sessionId physicalUserMessageId key
 
     let drop (sessionId: SessionId) =
         lock gate (fun () ->
@@ -178,10 +263,10 @@ module SessionExecutionBinding =
 
             clearAcceptedPromptBindingsForSession key)
 
-        ModelRouting.releaseSession sessionId
+        ModelRouting.releaseExecution sessionId
 
     let cancelUnacquired (sessionId: SessionId) =
-        ModelRouting.cancelUnacquiredSession sessionId
+        ModelRouting.cancelUnacquiredExecution sessionId
 
     let requiresProviderBindingProof (sessionId: SessionId) =
         lock gate (fun () ->
@@ -189,9 +274,19 @@ module SessionExecutionBinding =
 
             parents.ContainsKey key || agents.ContainsKey key)
 
-    let private validateLease (sessionId: SessionId) (agent: string) (model: OpencodeModel) =
-        match ModelRouting.tryLease sessionId agent with
-        | None -> Error(sprintf "PROMPT-006: managed provider run '%s' has no model-routing lease" agent)
+    let private validateLease
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (agent: string)
+        (model: OpencodeModel)
+        =
+        match ModelRouting.tryLease sessionId physicalUserMessageId agent with
+        | None ->
+            Error(
+                sprintf
+                    "PROMPT-006: managed provider execution %s has no model-routing lease"
+                    (PhysicalUserMessageId.value physicalUserMessageId)
+            )
         | Some target when ModelRouting.sameTarget target model -> Ok true
         | Some target ->
             let expected = ModelRouting.toOpenCodeModel target
@@ -210,21 +305,16 @@ module SessionExecutionBinding =
     [<RequireQualifiedAccess>]
     type private ProviderExpectation =
         | ExactAttempt of ExpectedBinding
-        | BaseAgent of string
-        | MissingParentBinding
+        | ManagedWithoutAttempt
         | Unbound
 
     let private providerExpectation (sessionId: SessionId) : ProviderExpectation =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-            let attempt = providerAttemptBindings.TryGetValue key
-            let parented = parents.ContainsKey key
-            let baseAgent = agents.TryGetValue key
 
-            match attempt, parented, baseAgent with
-            | (true, expected), _, _ -> ProviderExpectation.ExactAttempt expected
-            | (false, _), true, (false, _) -> ProviderExpectation.MissingParentBinding
-            | (false, _), _, (true, agent) -> ProviderExpectation.BaseAgent agent
+            match providerAttemptBindings.TryGetValue key, parents.ContainsKey key || agents.ContainsKey key with
+            | (true, expected), _ -> ProviderExpectation.ExactAttempt expected
+            | (false, _), true -> ProviderExpectation.ManagedWithoutAttempt
             | _ -> ProviderExpectation.Unbound)
 
     let private validateExactAttempt
@@ -238,22 +328,15 @@ module SessionExecutionBinding =
         elif not (sameModel expected.Model model) then
             Error "PROMPT-006: provider model/reasoning drift from accepted prompt binding"
         else
-            validateLease sessionId observedAgent model
-
-    let private validateBaseAgent (sessionId: SessionId) baseAgent observedAgent model =
-        if baseAgent = observedAgent then
-            validateLease sessionId observedAgent model
-        else
-            Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" baseAgent observedAgent)
+            validateLease sessionId expected.PhysicalUserMessageId observedAgent model
 
     let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         let observedAgent = if isNull agent then "" else agent.Trim()
 
         match providerExpectation sessionId with
         | ProviderExpectation.ExactAttempt expected -> validateExactAttempt sessionId expected observedAgent model
-        | ProviderExpectation.BaseAgent baseAgent -> validateBaseAgent sessionId baseAgent observedAgent model
-        | ProviderExpectation.MissingParentBinding ->
-            Error "PROMPT-006: parented provider run has no frozen agent binding"
+        | ProviderExpectation.ManagedWithoutAttempt ->
+            Error "PROMPT-006: managed provider run has no exact physical execution binding"
         | ProviderExpectation.Unbound -> Ok false
 
     let effectiveAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =
@@ -269,17 +352,6 @@ module SessionExecutionBinding =
         | SessionBindingIntent.ExplicitExecutionOverride, _, None ->
             Error "PROMPT-006: execution override requires an explicit managed agent"
 
-    let private requireRoutedModel (sessionId: SessionId) (agent: string) (opts: OpenCodePromptOptions) =
-        match opts.Model, ModelRouting.tryLease sessionId agent with
-        | None, _ -> Error(sprintf "PROMPT-006: routed send for '%s' has no explicit model" agent)
-        | Some _, None -> Error(sprintf "PROMPT-006: routed send for '%s' has no model-routing lease" agent)
-        | Some requested, Some target when ModelRouting.sameTarget target requested ->
-            Ok
-                { opts with
-                    Agent = Some agent
-                    Model = Some requested }
-        | Some _, Some _ -> Error(sprintf "PROMPT-006: routed send for '%s' does not match its model lease" agent)
-
     let private validateExecutionIntent label baseAgent intent agent : Result<unit, string> =
         match intent with
         | SessionBindingIntent.Preserve when agent <> baseAgent ->
@@ -290,25 +362,32 @@ module SessionExecutionBinding =
             Error(sprintf "PROMPT-006: execution override is not the peer of '%s': %s" baseAgent agent)
         | _ -> Ok()
 
-    let private normalizeForBaseAgent label (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
+    let private prepareForBaseAgent label (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
         result {
             let! agent = effectiveAgent sessionId opts
             do! validateExecutionIntent label baseAgent opts.BindingIntent agent
-            return! requireRoutedModel sessionId agent opts
+            // EMR: dispatching a user message is not provider execution admission.
+            // Model capacity is acquired exactly once later at chat.message, when
+            // the Host is about to execute this physical user message. Keeping the
+            // send model-free prevents fork/repair from waiting on a provider slot.
+            return
+                { opts with
+                    Agent = Some agent
+                    Model = None }
         }
 
     let private requireBaseAgent error sessionId =
         tryAgent sessionId |> Option.bind nonEmpty |> Result.requireSome error
 
-    let normalizeManagedPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
+    let prepareManagedPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         result {
             let! baseAgent = requireBaseAgent "PROMPT-006: parented session has no frozen agent binding" sessionId
-            return! normalizeForBaseAgent "parented session" sessionId baseAgent opts
+            return! prepareForBaseAgent "parented session" sessionId baseAgent opts
         }
 
-    let normalizeUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
+    let prepareUserFacingPrompt (sessionId: SessionId) (opts: OpenCodePromptOptions) =
         result {
             let! baseAgent = requireBaseAgent "PROMPT-006: user-facing session has no observed user binding" sessionId
 
-            return! normalizeForBaseAgent "user-facing session" sessionId baseAgent opts
+            return! prepareForBaseAgent "user-facing session" sessionId baseAgent opts
         }

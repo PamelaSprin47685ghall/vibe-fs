@@ -267,11 +267,81 @@ module HostSessionNudge =
                             None
         }
 
-    /// GLORY-029: one Manager idle encouragement per (Life, trigger ProviderRun).
-    ///
-    /// Budget is durable ClaimSequences, not a session-wide PendingClaims scan:
-    /// Detached keeps A's claim pending until PhysicalAccepted, and that must not
-    /// suppress B's independent occasion.
+    [<RequireQualifiedAccess>]
+    type RepairFamilySendOutcome =
+        | Sent of PromptKey
+        | BudgetExhausted
+        | Retired
+        | Failed of string
+
+    let private sendRepairFamilyWithProfile
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (repairKind: string)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<RepairFamilySendOutcome> =
+        task {
+            let rt = PromptDispatcher.forJournal durable
+
+            if rt.RepairFamilyAlreadyClaimed profile repairKind then
+                return RepairFamilySendOutcome.BudgetExhausted
+            else
+                let agent = agentForActiveCursor journal sessionId profile
+
+                match!
+                    rt.SendRepairFamily
+                        sessionPort
+                        sessionId
+                        prompt
+                        repairKind
+                        profile
+                        agent
+                        (liveDirectory directory)
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                with
+                | Ok key -> return RepairFamilySendOutcome.Sent key
+                | Error error -> return RepairFamilySendOutcome.Failed error
+        }
+
+    /// Ordinary interaction repair is bounded by LogicalRun + repair family.
+    /// This is intentionally different from Blogger's terminal-scoped repair:
+    /// a generic missing-final-report nudge must never be able to nudge its own
+    /// bad response again under a new ProviderRunIdentity.
+    let trySendRepairFamily
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (repairKind: string)
+        : Task<RepairFamilySendOutcome> =
+        task {
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return RepairFamilySendOutcome.Retired
+            | false, None, _ ->
+                return RepairFamilySendOutcome.Failed "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return RepairFamilySendOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendRepairFamilyWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        repairKind
+                        durable
+                        profile
+        }
+
+    /// GLORY-029: one Manager idle encouragement per Life business condition.
+    /// Durable ClaimSequences make the bound survive restart; a new provider
+    /// terminal under the same condition does not mint another automatic nudge.
     let trySendManagerIdleEncouragement
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -279,7 +349,7 @@ module HostSessionNudge =
         (directory: string option)
         (journal: AgentJournal option)
         (lifeId: ManagerLifeId)
-        (triggerProviderRun: ProviderRunIdentity)
+        (conditionKey: string)
         : Task<Result<PromptKey, string>> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
@@ -289,8 +359,8 @@ module HostSessionNudge =
             | false, Some durable, Some profile ->
                 let rt = PromptDispatcher.forJournal durable
 
-                if rt.IdleAlreadyClaimed profile lifeId triggerProviderRun then
-                    return Error "Manager idle encouragement already claimed for this occasion"
+                if rt.IdleAlreadyClaimed profile lifeId conditionKey then
+                    return Error "Manager idle encouragement already claimed for this life condition"
                 else
                     let agent = agentForActiveCursor journal sessionId profile
 
@@ -301,7 +371,7 @@ module HostSessionNudge =
                             sessionId
                             prompt
                             lifeId
-                            triggerProviderRun
+                            conditionKey
                             profile
                             agent
                             (liveDirectory directory)
@@ -355,7 +425,7 @@ module HostSessionNudge =
                 | Error error -> return IdleContinuationOutcome.Failed error
         }
 
-    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with occasion digest.
+    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with Life-condition budget.
     /// Same admission contract as `trySendIdleContinuation` / interaction repair.
     let trySendIdleManagerEncouragement
         (quiescence: SessionQuiescenceGate)
@@ -366,7 +436,7 @@ module HostSessionNudge =
         (directory: string option)
         (journal: AgentJournal option)
         (lifeId: ManagerLifeId)
-        (triggerProviderRun: ProviderRunIdentity)
+        (conditionKey: string)
         : Task<IdleContinuationOutcome> =
         task {
             if not (quiescence.TryConsume permit) then
@@ -380,14 +450,64 @@ module HostSessionNudge =
                         directory
                         journal
                         lifeId
-                        triggerProviderRun
+                        conditionKey
                 with
                 | Ok key -> return IdleContinuationOutcome.Sent key
                 | Error error -> return IdleContinuationOutcome.Failed error
         }
 
-    /// The single idle-derived interaction repair helper (missing-final-report /
-    /// interaction-repair). Same admission contract as `trySendIdleContinuation`.
+    [<RequireQualifiedAccess>]
+    type IdleRepairFamilyOutcome =
+        | Sent of PromptKey
+        | Superseded
+        | BudgetExhausted
+        | Retired
+        | Failed of string
+
+    let private sendIdleRepairFamilyAfterPermit
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (repairKind: string)
+        : Task<IdleRepairFamilyOutcome> =
+        task {
+            match! trySendRepairFamily sessionPort sessionId prompt directory journal repairKind with
+            | RepairFamilySendOutcome.Sent key -> return IdleRepairFamilyOutcome.Sent key
+            | RepairFamilySendOutcome.BudgetExhausted -> return IdleRepairFamilyOutcome.BudgetExhausted
+            | RepairFamilySendOutcome.Retired -> return IdleRepairFamilyOutcome.Retired
+            | RepairFamilySendOutcome.Failed error -> return IdleRepairFamilyOutcome.Failed error
+        }
+
+    /// Ordinary idle-derived repair: one send per LogicalRun + repair family.
+    let trySendIdleRepairFamily
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (repairKind: string)
+        : Task<IdleRepairFamilyOutcome> =
+        task {
+            if not (quiescence.TryConsume permit) then
+                return IdleRepairFamilyOutcome.Superseded
+            else
+                return!
+                    sendIdleRepairFamilyAfterPermit
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        repairKind
+        }
+
+    /// Terminal-scoped idle interaction repair. Blogger uses this narrower
+    /// occasion identity to distinguish same-terminal re-entry from a new bad
+    /// terminal before moving to AABB.
     let trySendIdleInteractionRepair
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)

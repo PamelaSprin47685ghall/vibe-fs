@@ -592,7 +592,10 @@ module PluginTransforms =
         scope.Sessions.Quiescence.BeginProviderAttempt sessionId
 
         match
-            SessionExecutionBinding.beginProviderAttempt sessionId (ProviderWireCapture.lastUserPromptKey rawMessages)
+            SessionExecutionBinding.beginProviderAttempt
+                sessionId
+                (ProviderWireCapture.lastUserMessageId rawMessages)
+                (ProviderWireCapture.lastUserPromptKey rawMessages)
         with
         | Ok() -> ()
         | Error error -> invalidOp error
@@ -610,6 +613,25 @@ module PluginTransforms =
         let wired = host.Wired
         let _workspaceDirectory = boot.WorkspaceDirectory
         let strengthFailFuse = boot.StrengthFailClosed
+
+        let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj =
+            if ExplicitResumeSuppression.isCurrentMaterial outObj then
+                AsyncSupport.completedTask ()
+            else
+                CompanionTransform.handleCompanionTransform
+                    scope.Sessions.Companions
+                    scope.Sessions.CompanionGate
+                    scope
+                    sessionPort
+                    journal
+                    (Some(fun bloggerId ->
+                        // Register ownership + ActiveRun so idle→reconcile
+                        // emits TerminalOutcome.Completed for this child.
+                        wired.RegisterOwned(SessionId.value bloggerId)
+                        wired.BindActiveRun bloggerId Role.Blogger None))
+                    SharedState.RootWorkspace
+                    inObj
+                    outObj
 
         let normalTransform (projectionSessionIdOpt: string option) (inObj: obj) (outObj: obj) : Task<unit> =
             task {
@@ -650,21 +672,7 @@ module PluginTransforms =
                         outObj
                         strengthReplayPlans
 
-                do!
-                    CompanionTransform.handleCompanionTransform
-                        scope.Sessions.Companions
-                        scope.Sessions.CompanionGate
-                        scope
-                        sessionPort
-                        journal
-                        (Some(fun bloggerId ->
-                            // Register ownership + ActiveRun so idle→reconcile
-                            // emits TerminalOutcome.Completed for this child.
-                            wired.RegisterOwned(SessionId.value bloggerId)
-                            wired.BindActiveRun bloggerId Role.Blogger None))
-                        SharedState.RootWorkspace
-                        inObj
-                        outObj
+                do! applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj
 
                 do! XWire.applyTransform snapshotOpt journal scope outObj
 

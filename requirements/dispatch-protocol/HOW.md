@@ -10,8 +10,8 @@
 | 003/004 | `Domain/PromptAuthority.fs` → `PromptClaim`（`Receipt: TransportReceipt option`）；`PromptAuthorityRun.submitClaim`；`Kernel/Identity.fs` → `TransportReceipt.isAdmissionShaped` | receipt 只记不解决；admission 形态可判别 |
 | 005/006 | `Domain/PromptAuthority.fs` → `claimScopeDigest`、`nextClaimSequence`、`derivePromptKey`；`PromptDispatcherSend.deriveKey` | 确定性幂等身份；序列在注册时消费 |
 | 007/008 | `Interaction/Dispatch/Recovery.fs` → detached `reconcile` / `reconcileClaim` / `findPhysical`（tail window 内 `role=user` + PromptKey metadata 匹配） | Proven / StillPending(hasReceipt) / Unreadable；普通 plugin lifecycle 不调用 |
-| 009 | `PromptDispatcher.AwaitMode`（Await/Detached）；`RecordSendOutcome` 的 `acceptanceCallback` 分支 | Detached 不回调；claim/submit 照常 |
-| 010 | `Domain/PromptAuthority.fs` → `AuthorityExecutionProfile` 无 model 字段；`PromptDispatcherSend.fs` 发送 options 恒 `Model = None` | 「Root 不得选 model」结构性不可表达 |
+| 009 | `PromptDispatcher.AwaitMode`（Await/Detached）+ `OpenCodePort.SdkClientPort/HttpPort.SendPrompt` async enqueue observer | Detached 在 claim 后调用 `prompt_async` 即返回，不等 model slot / Host Promise / PhysicalAccepted；异步 rejection → process fatal + 不重发 |
+| 010 | `Interaction/Authority/Model.fs` → `AuthorityExecutionProfile` 无 model 字段；`Interaction/Dispatch/Send.fs` 发送 options 恒 `Model = None`；`Sessions.fs` send 栈不 acquire model | Root/dispatch 均不能选 model；`chat.message` execution admission 才 acquire |
 | 011 | `PromptClaim.ClaimedAtRuntimeStartCount` / `RuntimeStartCount` 仅保留历史兼容与审计；restart-count abandon policy 已退役 | 重启次数不再产生业务 terminal |
 
 事实折叠：`PromptAuthorityLedger.foldPromptClaimed/Submitted/PhysicalAccepted/Abandoned` 是
@@ -28,10 +28,9 @@ Claimed → Abandoned
 Claimed → Submitted               （若 crash 后无法证明，则保持 pending；不由重启自动补 terminal）
 ```
 
-`RecordSendOutcome` 对 `AdmittedWithReceipt` 只写 Submitted（claim 保持 pending，等
-`chat.message`）；`AdmittedWithPhysicalMessage` 写 Submitted 再立刻 Accept；
-`Retryable/Fatal` 写 Abandoned(SendFailed)；`AcceptanceUnknown` **什么都不写**——保持 pending
-让恢复去找，abandon 会许可重发。
+`RecordSendOutcome` 对 `AdmittedWithReceipt` 只写 Submitted（claim 保持 pending，等 `chat.message`）；`AdmittedWithPhysicalMessage` 写 Submitted 再立刻 Accept；`Retryable/Fatal` 写 Abandoned(SendFailed)；`AcceptanceUnknown` **什么都不写**——保持 pending让恢复去找，abandon 会许可重发。
+
+OpenCode `prompt_async` adapter 的 Detached receipt 是**本地 enqueue invocation receipt**，不是 HTTP/SDK Promise 已 settle 的证明。adapter 同步调用 `promptAsync` 后立即返回 receipt，同时旁路观察其 Promise；若 Promise 后来 rejection，调用方已无法安全判断是否部分落地，因此直接 `FatalProcess/Diagnostic.fatal`，保留 pending claim，绝不重发。managed model capacity 完全不在该发送调用栈：物理 user message 到达 `chat.message` 后才进入 scheduler demand。
 
 ### PromptKey 组成（PROMPT-011）
 
@@ -61,6 +60,8 @@ PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
 - 无第二 writer：`Abandon` 是唯一 abandon 写点（recovery 与 send-fail 共用），禁止在
   `RecordSendOutcome` 内另造事实形状。
 - 证据核对只证明或保持 pending，从不 resend、从不因 restart count abandon；`reconcile` 没有发送端口。
+- Detached async enqueue 的 eventual rejection 是 acceptance-unknown invariant，当前进程 fatal；不得降级成 Retryable 后自动第二次发送。
+- `SendPrompt` / fork / repair 不 acquire managed model lease；capacity authority 只在 execution-model-routing 的 `chat.message` admission。
 - 普通 plugin lifecycle 不接 `RecoveryGate`/reconcile；显式 session resume 由 CRASH-018 `/continue` 承担。
 
 ## 历史与弃权

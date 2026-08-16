@@ -31,10 +31,9 @@ Work 处理。
 
 ## MANAGED-SESSION-003：restart 恢复判据 — 匹配则复用，无关联新建，冲突 fail closed
 
-**规范**：restart 恢复 Attached：query family root children（owner ≠ root 时并查 owner children）→
-journal 关联（`RestoredSessionId`）且 id+agent+title 恰好 1 个匹配 → 复用；journal id 不存在 →
-Replacement（新建，物理挂 root）；无 journal 关联 → 不复用任何候选、直接新建；id 匹配但
-agent/title 冲突、多个 id 匹配或查询失败 → fail closed（HOST-009/015；历史 how/host 条款）。
+**规范**：restart 恢复 Attached：query family root children（owner ≠ root 时并查 owner children）→ journal 关联（`RestoredSessionId`）且 id+agent+title 恰好 1 个匹配 → 复用；journal id 不存在 → Replacement（新建，物理挂 root）；无 journal 关联 → 不复用任何候选、直接新建；id 匹配但 agent/title 冲突、多个 id 匹配或查询失败 → fail closed（HOST-009/015；历史 how/host 条款）。
+
+Replacement **不是 direct repoint**：当 durable owner 仍链接旧 child 时，必须先建立新的 physical child，再 durable `Close` 旧 attachment，最后 `Link` 新 child。禁止在旧关联仍存在时直接 append `CompanionBloggerLinked(new)`；该事实按 COMPANION-002 必须 semantic reject。Close 或 Link 任一步失败都 abort 本次 fresh replacement；不得把失败 flight 永久 memoize，下一次显式 material/ensure 必须重新观察 Host + durable truth。
 
 **含义/动机**：恢复必须可证明绑对；猜测 = 收养别人的 child（HOST-015）。REVIEW-019：仅 proven
 loss 后替换，不确定 fail closed。
@@ -126,14 +125,13 @@ suicide（`distiller-ownership.test.mjs` 头注释回归）。
 **证据**：`HandleProjection.parentVisible` + 视图过滤；→ PROOF.md `MANAGED-SESSION-010`
 （MOVE `distiller-ownership.test.mjs`）。
 
-## MANAGED-SESSION-011：proven permanent loss 才有 replacement 资格
+## MANAGED-SESSION-011：proven permanent loss 才有 replacement 资格；replacement 必须显式迁移 durable association
 
-**规范**：journal 关联的 Host child 永久消失（proven）→ 按该 AttachmentKind 恢复合同 Replacement；
-lookup failure / ownership conflict / 重复候选 → fail closed（HOST-009/015；REVIEW-019）。
-不确定时宁可不恢复，不得猜。
+**规范**：journal 关联的 Host child 永久消失（proven）→ 按该 AttachmentKind 恢复合同 Replacement；lookup failure / ownership conflict / 重复候选 → fail closed（HOST-009/015；REVIEW-019）。不确定时宁可不恢复，不得猜。
 
-**证据**：`SatelliteRuntime.start`（journal-linked child 不在 merged candidates →
-Replacement；冲突 → Error）；→ PROOF.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
+对允许 Replacement 的 attachment，状态迁移必须是 `old durable link → Close(old) → Link(new)`；不能把 `Link(new)` 当作覆盖赋值。只有新 child 创建成功且 old association 被合法关闭后，新关联才能提交。失败 ensure 的 single-flight cache 必须失效，避免一次冲突把未来所有 ensure 永久钉在同一个 rejected Task 上。
+
+**证据**：`SatelliteRuntime.start/linkLease`（journal-linked child 不在 merged candidates → Replacement；Close→Link；冲突 → Error）；→ PROOF.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
 ## MANAGED-SESSION-012：Child Run 生命周期与父背景记录分离
 
 **规范**：Child Run 生命周期（active / cancel / completion cell 单赋值 / 物理状态投影

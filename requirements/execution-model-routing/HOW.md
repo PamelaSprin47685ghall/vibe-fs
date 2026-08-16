@@ -122,10 +122,11 @@ Load Phase 允许 mkdir/create/import 这个配置载体，但不调用 Host ses
 
 ```text
 ModelTarget = { Model: string OpenCode model selector; Reasoning: string }
-ModelLeaseKey = SessionId × EffectiveAgent
-Running = ModelTarget list                 // multiset，重复保留
+ExecutionLeaseKey = SessionId × PhysicalUserMessageId
+ExecutionLease = { EffectiveAgent; ModelTarget }
+Running = ModelTarget list                        // active execution multiset，重复保留
 Scheduler = role:string × Running -> ModelTarget option
-PendingDemand = Required | Optional owner metadata + cancellation
+PendingDemand = { ExecutionLeaseKey; EffectiveAgent; cancellation }
 ```
 
 不再有：
@@ -149,25 +150,32 @@ physicalOccupants:Set<SessionId>
 registry 至少维护：
 
 ```text
-managedLeases: (SessionId, EffectiveAgent) → ModelTarget
-pending: arrival-ordered demands
+managedExecutions: SessionId → { PhysicalUserMessageId option; EffectiveAgent; ModelTarget }
+pending: SessionId → latest arrival-ordered physical-execution demand
 ```
 
-`running` 每次调用临时由 managed lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。
+`running` 每次调用临时由 active execution lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。session 是否还可 reuse、handle 是否 retired、业务是否 completed 均不进入该表的生命周期判断。
 
-同一 SessionId 的两个 EffectiveAgent 若都指向同一 target，values 中自然出现两个重复元素。
+同一 SessionId 同时至多一个 current physical execution；不同 SessionId 的并发 execution 若指向同一 target，values 中自然出现重复元素。`PhysicalUserMessageId=None` 只用于 Strength 在 Host 物理 message 创建前的 optional reservation，chat.message 必须把它原位 rebind 成 exact physical id，而不是再占一个 occurrence。
 
 ## 5. 串行事件驱动 acquire/release
 
 模型资源 mutation 通过一个 process-wide serial queue/actor 顺序处理，避免并发 scheduler call 基于同一旧 snapshot 同时提交。
 
-### Acquire managed required
+### Dispatch/enqueue（不 acquire）
 
-1. `(session, agent)` 已有 lease → 直接返回；
-2. 生成当前 `running` snapshot；
-3. 调 `route(agent, running)`；
-4. target → 校验结构，原子写 lease，再返回；
-5. `null` → 把 demand 挂入 pending，不发 provider。
+`fork` / continuation / repair 先经 PromptDispatcher 写 claim/authority，再调用 `prompt_async` enqueue。这里仅验证/freeze EffectiveAgent；`OpenCodePromptOptions.Model = None`，不得调用 scheduler，也不得等待 model capacity。`promptAsync` 的 Promise settle 也不属于 fork/tool completion：同步调用成功后即返回 admission-shaped transport receipt；之后若该异步 dispatch promise rejection，acceptance 已未知，直接 process-fatal，禁止自动重发。
+
+### Acquire managed required（唯一入口 = `chat.message`）
+
+Host 已接收该物理 user message 后：
+
+1. 从 Host message 取得 `PhysicalUserMessageId`；从 PromptKey authority（plugin prompt）或真实外部用户选择解析 EffectiveAgent；任一 managed execution 缺 physical id → fail closed；
+2. 当前 SessionId 已绑定**同一个** PhysicalUserMessageId → 要求 EffectiveAgent 完全一致并直接复用 target；
+3. 当前 SessionId 若绑定旧 physical id / 旧 pending → 原子 retire/cancel；新 physical message 自身就是 supersession 证据，不等待 idle；
+4. 若存在 Strength 的 `PhysicalUserMessageId=None` reservation 且 agent 一致 → 原位 adopt 成当前 physical id，不重调 scheduler、不增加 `running` occurrence；
+5. 否则生成当前 `running` snapshot，调 `route(agent, running)`；
+6. target → 校验结构、原子写 exact execution lease，并把 target 投影到 mutable Host message；`null` → 把 exact demand 挂入 pending。
 
 ### Occupancy changed
 
@@ -180,11 +188,13 @@ pending: arrival-ordered demands
 
 一轮结束后若仍有 pending，不自行再次循环；等待下一次真实 occupancy event。没有 timer/poll。
 
-request/session cancel、retire、plugin shutdown 只需把对应 pending 标为失效/移除。
+`SessionIdle`、typed attempt abort、session delete / scope cleanup、plugin shutdown 释放 current execution lease 并取消对应 pending；此外，新 PhysicalUserMessageId admission 会在同一个串行临界区 supersede 旧 lease/pending。业务 completed/retired/join/finality 不直接操作 occupancy；ProviderRetry/ProviderFailure 若仍引用同一 physical user material 则继续复用。
+
+因此同一 SessionId reopen/reuse 不依赖“是否准确监听到 session end”：新 `chat.message` 的 physical identity 足以切断旧槽。
 
 ### Optional demand
 
-Strength 这类可丢弃优化应走 nonwaiting probe：调用一次 scheduler；`null` 立即 K0，不进入 required pending queue。若获得 target，则先正常 acquire 其 replica session lease，retire 时释放。
+Strength 这类可丢弃优化应走 nonwaiting reservation：调用一次 scheduler；`null` 立即 K0，不进入 required pending queue。若获得 target，先以该 replica SessionId 保存 `PhysicalUserMessageId=None` 的 capacity reservation；之后真实 `chat.message` 必须以相同 agent 将该 reservation 原位 adopt 为 exact physical execution。reservation/physical execution 始终只占一个 occurrence；失败/销毁时按 SessionId 清理。
 
 ## 6. Host config 与 managed prompt 路径
 
@@ -199,20 +209,22 @@ opencode.json agent.model
 新路径：
 
 ```text
-wanxiangshu.mjs default route
-          + process-shared running
-  → ModelRoutingRuntime.acquire(session, effectiveAgent)
-  → OpenCodePromptOptions.Model/Reasoning = explicit lease target
+plugin/tool dispatch
+  → PromptKey + EffectiveAgent + Model=None
+  → Host prompt_async enqueue（fork 不等 slot / provider run）
+  → physical chat.message(id = PhysicalUserMessageId)
+  → ModelRoutingRuntime.acquire(session, physicalUserMessageId, effectiveAgent)
+  → mutable Host message.model = explicit lease target
   → Host provider request
 ```
 
-`OpenCodePort` 不再根据 `Agent` 反查 `ManagedAgentConfig.tryBoundModel`；发送边界只接受上游已经解析好的 explicit target。
+`OpenCodePort` 不再根据 `Agent` 反查 `ManagedAgentConfig.tryBoundModel`，也不接收 send-time model lease。model routing 只发生在物理 `chat.message` admission；`chat.params` 随后只做 observed-provider validation。
 
 `ManagedAgentConfig` 退回 Host projection/guard owner：把 22 个 managed catalog 名投影到 live Host config（缺则创建），并写入 mode/permission/prompt 等 Wanxiangshu-owned 字段，不再把 Host-final `agent.model` 收进 inventory，也不再要求用户在 `opencode.json` 手写 agent map。若 Host schema 强制要求静态 model，应由 Host adapter 选择一个不具 authority 的合法占位/guardrail，真实发送必须被 explicit lease 覆盖；当前 Host `AgentConfig.model` 可选，因此投影不写 model。该能力需 canary 证明。
 
 ## 7. root/user-facing 路径
 
-`chat.message`/等价可变 request hook 先解析真实用户选中的 managed EffectiveAgent，再 acquire `(session, agent)` lease，并把输出 message/request 的 model/reasoning 改成 lease target。`chat.params` 做 observed-provider validation（实际 provider target 必须等于 lease）并统一投影 managed 请求的默认温度 `temperature = 1.0`。
+`chat.message` 是 managed execution 的唯一 required acquisition hook：真实用户 message 先解析用户选中的 EffectiveAgent；plugin synthetic message 则从 PromptKey claim/profile 解析 EffectiveAgent；两者同时必须有 PhysicalUserMessageId。该 hook 先建立 current exact binding，再把输出 message/request 的 model/reasoning 改成 lease target。Host 随后的 `chat.params` 因发生在 messages transform 之前，只验证 chat.message 已记录的 current exact binding；provider-facing transform 再用 trailing PhysicalUserMessageId（以及 plugin PromptKey）重新证明同一个 execution。
 
 这条 Host mutation 能力必须由 `host-boundary` physical canary 证明，不能只测 DTO 被改了。
 
@@ -223,26 +235,26 @@ wanxiangshu.mjs default route
 `AttemptExecutionProfile.EffectiveAgent` 保持 provider-attempt-recovery 的唯一 peer/fallback 输出：
 
 ```text
-A/A → lease(session, SelectedAgent)
-B/B → lease(session, PeerAgent)
+A/A → lease(session, physicalUserMessageId_A, SelectedAgent)
+B/B → lease(session, physicalUserMessageId_B, PeerAgent)
 ```
 
 两个 lease target 完全相同合法。model routing runtime 不比较 fast/deep target，也不参与 FallbackCursor。
 
 Strength 不再读取静态 fast/deep model string。它对 `fast-<owner-role>` 做一次 optional scheduler probe；`null` → K0，不阻塞 owner；target 可用才创建/运行 replica。是否仍有成本收益继续归 speculative-investigation，而不是 model router。
 
-## 9. lifecycle 与进程边界
+## 9. physical execution lifecycle 与进程边界
 
-managed lease 只在 session retire/delete 正常释放；普通 idle/completion 不释放。plugin shutdown 清理当前进程 pending 状态；进程退出自然丢失 process-local lease registry。
+managed execution lease 在 `SessionIdle` / typed abort / session delete / scope cleanup 释放；同 SessionId 新 PhysicalUserMessageId 也会在 admission 内 supersede 旧 execution，因此 correctness 不依赖 end signal 必达。业务 completion/retire/join/finality 不直接释放。plugin shutdown 清理当前进程 pending/active execution 状态；进程退出自然丢失 process-local lease registry。
 
-process restart 重新 import MJS 并开启新 routing epoch。本包当前不把 model lease 写入 durable event history；若未来要求历史 session 跨进程保持完全相同 physical target，应另立 durable binding requirement。
+process restart 重新 import MJS 并开启新 routing epoch。本包当前不把 model execution lease 写入 durable event history；跨进程只保留业务 identity/authority，不承诺历史 session reuse 时继续使用上一进程同一个 physical target。
 
 ## 10. 主要实现影响面
 
 - 新增 MJS loader + process-shared `ModelRoutingRuntime`；不新增 lane/config schema。
 - `ManagedAgentConfig.fs`：删除 Host model inventory authority 与 duplicate-pair-model validation；保留 owned Host fields 投影。
-- `SessionExecutionBinding.fs`：binding 从静态 agent→model 改为 session×EffectiveAgent lease；root model 不再由外部 message 绑定。
+- `SessionExecutionBinding.fs`：拥有 base/override EffectiveAgent + current exact PhysicalUserMessageId binding 的 Host observation validation；synthetic send 保持 model-free，execution lease 由 `chat.message` 获取。
 - `OpenCodePort.fs`：删除 `Agent → ManagedAgentConfig.tryBoundModel` fallback。
 - `ChatParamsHook.fs` + request mutation hook：managed model/reasoning route/validate。
 - `PluginSessionWiring.fs` / Strength：删除静态 inventory model 依赖，optional replica 走 scheduler probe。
-- session dispose/drop/fission cleanup：统一释放对应 managed lease。
+- Host idle / typed execution end / session delete / plugin dispose：统一释放当前 managed execution lease；业务 lifecycle 不直接参与 capacity bookkeeping。

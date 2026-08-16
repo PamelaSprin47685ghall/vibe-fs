@@ -38,10 +38,7 @@ CompletedAwaitingJoin 且 ref+digest 精确匹配才回 Active）、视图（`li
 - **AttachedSessionRuntime**（`Session/AttachedSessionRuntime.fs`）：`Dictionary<(scope, role),
   (childId, agent)>`，`GetOrCreate` 先查后建；`isUsable` 回调把已删 child 视为 absent（安全侧
   重新创建）；`Remove` / `RemoveByDelegateSession` 是唯一解绑。
-- **SatelliteRuntime**（`Session/SatelliteRuntime.fs`）：Companion leaf 的
-  `Ensure(owner, spec)` → `start`：查 root children（+ owner children，兼容扁平前）→ 按
-  `RestoredSessionId` 精确匹配 → `Reused | Replacement | Created`；`Link` 先于首个 prompt；
-  `Retire` → Abort + Close + Invalidate；`Ensure` single-flight（per-kind flight cache）。
+- **SatelliteRuntime**（`Execution/Session/Attachment/SatelliteRuntime.fs`）：Companion leaf 的 `Ensure(owner, spec)` → `start`：查 root children（+ owner children，兼容扁平前）→ 按 `RestoredSessionId` 精确匹配 → `Reused | Replacement | Created`。Created/Reused 在返回前 `Link`；Replacement 则先创建 fresh child，再 `Close(owner)` 旧 durable association，最后 `Link(owner,new)`，任一步失败只 abort fresh lease。`Retire` → Abort + Close + Invalidate；`Ensure` single-flight（per-kind flight cache），上层 ensure 失败必须 Invalidate 该 failed flight 后才允许下一次重试。
 - **HostForkRuntime / ForkRuntime**（`Session/{HostForkRuntime,ForkRuntime}.fs`）：fork child 的
   install → HandleLinked（失败则 abort 新 child）→ SendPrompt（失败则 fail pending run）；
   reuse 不 spawn、沿用已绑 agent；`ForkRuntime` 维护 in-process ChildRun 注册 + 双通道 mailbox。
@@ -53,7 +50,7 @@ CompletedAwaitingJoin 且 ref+digest 精确匹配才回 Active）、视图（`li
 ```text
 query family root children（owner ≠ root 时并查 owner children）
 → journal 关联（RestoredSessionId）且 id+agent+title 恰 1 匹配 → 复用
-→ journal 关联的 id 不存在 → Replacement（新建，物理挂 root）
+→ journal 关联的 id 不存在 → Replacement（新建，物理挂 root；Close old durable link → Link new）
 → 无 journal 关联 → 新建（不收养同 agent/title sibling）
 → id 匹配但 agent/title 冲突 / 多候选 / 查询失败 → fail closed
 ```

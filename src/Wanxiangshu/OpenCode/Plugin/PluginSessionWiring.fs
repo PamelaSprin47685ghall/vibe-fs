@@ -165,9 +165,9 @@ module PluginSessionWiring =
                     ?workspaceDirectory = workspaceDirectory,
                     ?tryAcquireModel =
                         Some(fun sessionId agent ->
-                            ModelRouting.tryAcquireManaged sessionId agent
+                            ModelRouting.tryReserveManaged sessionId agent
                             |> Option.map ModelRouting.toOpenCodeModel),
-                    ?releaseModel = Some(fun sessionId -> ModelRouting.releaseSession sessionId)
+                    ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId)
                 )
 
             scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime

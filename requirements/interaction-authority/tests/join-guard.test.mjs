@@ -18,6 +18,7 @@ import {
 
 const { nudge } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinGuard.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
+const { sendRepairFamilyKind } = await import('./support/repair-family.mjs')
 
 const capturingPort = (captured) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -52,6 +53,41 @@ const openSeeded = async (sid) => {
     rmSync(dir, { recursive: true, force: true })
   } }
 }
+
+test('WHAT[INTERACTION-AUTHORITY-010] PROMPT_010_generic_repair_family_is_bounded_once_per_logical_run', async () => {
+  const sid = sessionId('ses_repair_family')
+  const { opened, cleanup } = await openSeeded(sid)
+  try {
+    const captured = []
+    const port = capturingPort(captured)
+    const first = await sendRepairFamilyKind(
+      port,
+      sid,
+      'finish the ordinary report',
+      undefined,
+      opened.journal,
+      'missing-final-report',
+    )
+    assert.equal(first, 'Sent')
+    assert.equal(captured.length, 1)
+
+    // The repair response would have a different ProviderRunIdentity, but that
+    // identity is deliberately not part of this budget. Same LogicalRun + family
+    // cannot mint another physical nudge.
+    const second = await sendRepairFamilyKind(
+      port,
+      sid,
+      'finish the ordinary report',
+      undefined,
+      opened.journal,
+      'missing-final-report',
+    )
+    assert.equal(second, 'BudgetExhausted')
+    assert.equal(captured.length, 1, 'a repair must never repair its own bad terminal forever')
+  } finally {
+    cleanup()
+  }
+})
 
 test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_fails_closed_without_journal', async () => {
   const outcome = await nudge(capturingPort([]), null, new Set(), sessionId('ses_jg'), undefined)

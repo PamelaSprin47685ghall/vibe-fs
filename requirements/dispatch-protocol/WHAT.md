@@ -94,20 +94,20 @@ delivery，不用时间窗口代替 PromptKey，不把 `accepted-*` 当物理落
 - 含义：unknown 宁可挂起也不重复；预算耗尽时放弃（Abandoned），而非伪装成功。
 - 证据：→ PROOF.md R3、R4。
 
-## DISPATCH-PROTOCOL-009 — fire-and-forget 只改变调用方等待
+## DISPATCH-PROTOCOL-009 — Detached 在 durable claim 后立即交还控制；不得等待槽、Host run 或 PhysicalAccepted
 
-`AwaitMode.Detached`（fire-and-forget）只表示调用方不等待 PhysicalAccepted；claim、authority、
-持久化、幂等与错误记录**全部照跑**。禁止独立的 `postPromptFireAndForget` 旁路（PROMPT-007）。
+`AwaitMode.Detached`（fire-and-forget）仍必须先完成 PromptKey、authority claim 与必要 durable append，但**调用方不得等待 managed model capacity、provider execution、`session.promptAsync` Promise settle 或 PhysicalAccepted**。发送边界同步调用 Host `prompt_async` 成功入栈后即可记录 admission-shaped `PluginPromptSubmitted` receipt 并返回 PromptKey；该 receipt 不是物理 message id，真正 PhysicalAccepted 仍只能由后续 `chat.message` 的 PromptKey 证据建立。禁止独立的 `postPromptFireAndForget` 旁路（PROMPT-007）。
 
-- 含义：Detached 仍返回 PromptKey、仍写 claim/submit；调用方成功不要求物理落地。
+若 Detached 已返回后 `prompt_async` 异步 rejection，则 acceptance 已不可可靠判定：当前进程必须 fatal，claim 保持可审计 pending/unknown，**绝不**自动重发。这样 fork/repair 不会被 child slot/run 阻塞，同时仍保留 at-most-one logical effect。
+
+- 含义：Detached 仍返回 PromptKey、仍写 claim/submit；调用方成功只证明本地 dispatch 已交给 Host async enqueue，不证明 provider 已运行或物理消息已落地。
 - 证据：→ PROOF.md R5。
 
-## DISPATCH-PROTOCOL-010 — Root 不得选择/覆盖 model
+## DISPATCH-PROTOCOL-010 — Root / dispatch 不得选择、等待或覆盖 model
 
-发送恒 `Model = None`；`AuthorityExecutionProfile` 没有 model 字段，「Authority Root 覆盖 model」
-结构性不可表达（PROMPT-002 的 dispatch 半边）。
+发送恒 `Model = None`；`AuthorityExecutionProfile` 没有 model 字段，「Authority Root 覆盖 model」结构性不可表达（PROMPT-002 的 dispatch 半边）。`SendPrompt` 也不得为了补 model 调 scheduler；managed physical model 只在 Host `chat.message` execution admission 由 `execution-model-routing` 解析。
 
-- 含义：model 由 Host-final managed binding 解析；root 抬不了 model。
+- 含义：root 抬不了 model，fork/continuation dispatch 也不因 model capacity 阻塞。
 - 证据：→ PROOF.md R2。
 
 ## DISPATCH-PROTOCOL-011 — 插件 user-shaped message 一律经 PROMPT-005

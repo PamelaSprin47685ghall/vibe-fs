@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 
 /// CTX-014 / HOST-007 runtime diagnostics — two severities only:
 ///
@@ -60,15 +61,6 @@ module Diagnostic =
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
-    /// Kill this process hard. Gated off under node:test and WANXIANGSHU_NO_FATAL_EXIT=1
-    /// so unit/canary harnesses can assert the fatal path without dying.
-    [<Emit("""(() => {
-      if (process.env.WANXIANGSHU_NO_FATAL_EXIT === '1') return;
-      if (process.env.NODE_TEST_CONTEXT != null && process.env.NODE_TEST_CONTEXT !== '') return;
-      try { process.kill(process.pid, 'SIGKILL'); } catch (_) { process.exit(1); }
-    })()""")>]
-    let private killSelf () : unit = jsNative
-
     let private validate (fields: (string * string) list) : unit =
         let illegal =
             fields
@@ -110,4 +102,4 @@ module Diagnostic =
     let fatal (operation: string) (fields: (string * string) list) : unit =
         validate fields
         error (stringify (payload operation fields))
-        killSelf ()
+        FatalProcess.kill ()

@@ -281,14 +281,12 @@ REVISE 直接返回 work-record prompt；Blessing 返回 minor-work continuation
 
 **规范**：删除 Manager completion 对 `HostReviewGuard`、`ManagerGuard` continuation、review
 nudge 的引用；ManagerWorkflow 只判 join / finality / planning / handedOff（REVIEW-007/GLORY-070）。
-Manager 普通 idle 仅发送 FINALITY 之外的四行鼓励 continuation；它不读取或解释隐藏 Reviewer。
-checkpoint 过程评审结论只经 todowrite / suicide 协议面交付，不经 idle。open finality 或
-completed Life 不发送 idle（GLORY-005/029/070）。
+Manager 普通 idle 仅发送 FINALITY 之外的四行鼓励 continuation；它不读取或解释隐藏 Reviewer。automatic encouragement 必须按当前 Manager Life 的业务条件有界：尚无 plan commitment 时最多一次、已有 plan commitment 后最多再一次；同一条件下新的 ProviderRun / idle 不能重新赚预算。checkpoint 过程评审结论只经 todowrite / suicide 协议面交付，不经 idle。open finality 或 completed Life 不发送 idle（GLORY-005/029/070）。
 
 **含义 / 动机**：Review Guard 只保留 Reviewer 面；Manager 面的 nudge/guard 会让评审重新变成
 显式 checklist（GLORY-070 语义）。
 
-**边界**：idle continuation 的 occasion 去重属 interaction-authority。
+**边界**：idle continuation 的 durable authority budget / business-condition claim identity 属 interaction-authority；本包只定义 Manager 的 plan-commitment 条件与何时允许鼓励。
 
 **证据** → PROOF.md 行 F-19。
 

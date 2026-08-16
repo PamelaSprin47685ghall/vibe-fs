@@ -45,6 +45,7 @@
     <Compile Include="Foundation/Parallel.fs"/>
     <Compile Include="Foundation/Flow.fs"/>
     <Compile Include="Foundation/AsyncSupport.fs"/>
+    <Compile Include="Foundation/FatalProcess.fs"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Ownership.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
@@ -412,6 +413,7 @@
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>
     <Compile Include="OpenCode/Host/HostSessionDeletion.fs"/>
+    <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fs"/>
     <Compile Include="OpenCode/Tools/Distillation.fs"/>

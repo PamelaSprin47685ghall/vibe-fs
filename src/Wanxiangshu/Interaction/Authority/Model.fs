@@ -448,21 +448,42 @@ module PromptAuthority =
     let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) cursor
 
-    /// FALLBACK-008: the payload digest of an interaction repair.
+    /// Terminal-scoped repair identity used only by protocols that must distinguish
+    /// same-terminal re-entry from a NEW invalid terminal (currently Blogger's
+    /// exact-one chronicle nudge→AABB state machine). Ordinary interaction repair
+    /// MUST use `repairFamilyPayloadDigest` below; otherwise each repair response's
+    /// fresh ProviderRunIdentity would mint another automatic repair forever.
     ///
-    /// A repair's prompt text is fixed per kind, so digesting the text would make
-    /// every repair of that kind one logical act. The occasion is what the clause
-    /// bounds — one terminal provider run earns one repair — so the run is what
-    /// the digest names.
-    ///
-    /// Using the payload digest for this is what makes the budget durable without
-    /// a new fact: the digest enters the claim scope, so `ClaimSequences` already
-    /// counts repairs per occasion. The previous design kept a `RepairClaims` set
-    /// that no fact wrote, so the guarantee died with the process.
+    /// The terminal digest is still durable via ClaimSequences and therefore safe
+    /// for that bounded special state machine; it is no longer the generic budget.
     let repairPayloadDigest (terminalProviderRun: ProviderRunIdentity) (repairKind: string) =
         String.Join("\u001f", [| ProviderRunIdentity.value terminalProviderRun; repairKind |])
 
-    /// FALLBACK-008: has this occasion already spent its one repair.
+    /// Ordinary interaction-repair budget identity. The LogicalRunId is already
+    /// part of claimScopeDigest, so the repair family name alone makes the budget
+    /// one-per-logical-run instead of one-per-terminal. This prevents a repair
+    /// prompt's own bad terminal from minting another repair forever.
+    let repairFamilyPayloadDigest (repairKind: string) = repairKind
+
+    let repairFamilyAlreadyClaimed
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (repairKind: string)
+        (projection: PromptAuthorityProjection)
+        =
+        let scope =
+            claimScopeDigest
+                sessionId
+                (Some logicalRunId)
+                (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
+                (repairFamilyPayloadDigest repairKind)
+
+        nextClaimSequence scope projection > 1
+
+    /// FALLBACK-008: has this terminal occasion already spent its one repair.
+    /// Blogger protocol repair deliberately uses this narrower identity because
+    /// it must distinguish same-terminal re-entry from a new invalid terminal
+    /// before advancing to AABB.
     ///
     /// Derived, not stored. `nextClaimSequence` returns 1 for a scope no claim has
     /// ever used, so anything above 1 means a repair was already claimed for this
@@ -486,26 +507,22 @@ module PromptAuthority =
 
     /// GLORY-029: the payload digest of a Manager idle encouragement.
     ///
-    /// IdleEncouragement text is constant, so digesting the prompt would collapse
-    /// every idle into one session-wide act. The occasion is Session + Life +
-    /// trigger ProviderRun — one terminal earns one encouragement — so the digest
-    /// names that pair. ClaimSequences then makes the budget durable across
-    /// restarts without a new fact kind.
-    let idlePayloadDigest (lifeId: ManagerLifeId) (triggerProviderRun: ProviderRunIdentity) =
-        String.Join("\u001f", [| ManagerLifeId.value lifeId; ProviderRunIdentity.value triggerProviderRun |])
+    /// The budget is one automatic encouragement per Manager Life business
+    /// condition, not per provider terminal. A continuation that itself ends idle
+    /// therefore cannot manufacture another encouragement forever. The condition
+    /// key is business-owned (currently before/after plan commitment); Interaction
+    /// Authority only makes it durable.
+    let idlePayloadDigest (lifeId: ManagerLifeId) (conditionKey: string) =
+        String.Join("\u001f", [| ManagerLifeId.value lifeId; conditionKey |])
 
-    /// GLORY-029: has this idle occasion already spent its one encouragement.
-    ///
-    /// Derived from ClaimSequences, not PendingClaims. A Detached send keeps its
-    /// claim pending until PhysicalAccepted; scanning pending ManagerIdle claims
-    /// session-wide would suppress ProviderRun B while A's claim is still open.
-    /// `nextClaimSequence > 1` means this exact (session, run, life, trigger)
-    /// occasion already claimed once — whether or not acceptance completed.
+    /// GLORY-029: has this Life condition already used its one encouragement.
+    /// Derived from ClaimSequences, not process memory, so restart cannot reset
+    /// the automatic nudge budget.
     let idleAlreadyClaimed
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
         (lifeId: ManagerLifeId)
-        (triggerProviderRun: ProviderRunIdentity)
+        (conditionKey: string)
         (projection: PromptAuthorityProjection)
         =
         let scope =
@@ -513,7 +530,7 @@ module PromptAuthority =
                 sessionId
                 (Some logicalRunId)
                 (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
-                (idlePayloadDigest lifeId triggerProviderRun)
+                (idlePayloadDigest lifeId conditionKey)
 
         nextClaimSequence scope projection > 1
 

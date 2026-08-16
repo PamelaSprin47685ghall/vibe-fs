@@ -79,15 +79,15 @@ module HostSignalBootstrap =
     [<RequireQualifiedAccess>]
     type private ChatExecutionAdmission =
         | NoRoute
-        | ExternalManaged of SessionId * string
-        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * string
+        | ExternalManaged of SessionId * PhysicalUserMessageId * string
+        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * PhysicalUserMessageId * string
         | Rejected of string
 
     [<RequireQualifiedAccess>]
     type private RoutedChatExecution =
         | NoRoute
-        | ExternalManaged of SessionId * string * OpencodeModel
-        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * string * OpencodeModel
+        | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
+        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * PhysicalUserMessageId * string * OpencodeModel
 
     let private managedAgent (value: string option) =
         value
@@ -105,30 +105,41 @@ module HostSignalBootstrap =
             string message?sessionID
             |> fun value -> value.Trim() |> SessionId.create |> Some
 
-    let private externalAdmission sessionId explicitAgent =
-        match managedAgent explicitAgent with
-        | Some agent -> ChatExecutionAdmission.ExternalManaged(sessionId, agent)
-        | None -> ChatExecutionAdmission.NoRoute
+    let private externalAdmission sessionId physicalUserMessageId explicitAgent =
+        match managedAgent explicitAgent, physicalUserMessageId with
+        | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
+        | Some _, None -> ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
+        | None, _ -> ChatExecutionAdmission.NoRoute
 
-    let private agentManagedOfClaim (runtime: PromptDispatcher.Runtime) (claim: PromptAuthority.PromptClaim) =
-        match managedAgent claim.EffectiveAgent with
-        | Some agent -> ChatExecutionAdmission.PluginManaged(runtime, claim, agent)
-        | None ->
+    let private agentManagedOfClaim
+        (runtime: PromptDispatcher.Runtime)
+        (claim: PromptAuthority.PromptClaim)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        =
+        match managedAgent claim.EffectiveAgent, physicalUserMessageId with
+        | Some agent, Some physical -> ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent)
+        | Some _, None ->
+            ChatExecutionAdmission.Rejected(
+                sprintf
+                    "EMR-009: managed PromptKey %s has no physical user message id"
+                    (PromptKey.value claim.PromptKey)
+            )
+        | None, _ ->
             ChatExecutionAdmission.Rejected(
                 sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value claim.PromptKey)
             )
 
-    let private pendingAdmission durable sessionId promptKey =
+    let private pendingAdmission durable sessionId physicalUserMessageId promptKey =
         let runtime = PromptDispatcher.forJournal durable
 
         match runtime.PendingClaim(sessionId, promptKey) with
         | None -> ChatExecutionAdmission.NoRoute
-        | Some claim -> agentManagedOfClaim runtime claim
+        | Some claim -> agentManagedOfClaim runtime claim physicalUserMessageId
 
-    let private pluginAdmission journal sessionId promptKey =
+    let private pluginAdmission journal sessionId physicalUserMessageId promptKey =
         match journal with
         | None -> ChatExecutionAdmission.NoRoute
-        | Some durable -> pendingAdmission durable sessionId promptKey
+        | Some durable -> pendingAdmission durable sessionId physicalUserMessageId promptKey
 
     let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) output =
         let sessionId =
@@ -136,8 +147,9 @@ module HostSignalBootstrap =
 
         match decoded.IsHostCompaction, sessionId, decoded.PromptKey with
         | true, _, _ -> ChatExecutionAdmission.NoRoute
-        | false, Some sid, Some promptKey -> pluginAdmission journal sid promptKey
-        | false, Some sid, None -> externalAdmission sid decoded.ExplicitAgent
+        | false, Some sid, Some promptKey ->
+            pluginAdmission journal sid decoded.PhysicalUserMessageId promptKey
+        | false, Some sid, None -> externalAdmission sid decoded.PhysicalUserMessageId decoded.ExplicitAgent
         | _ -> ChatExecutionAdmission.NoRoute
 
     let private routeChatExecution (scope: PluginRuntimeScope) admission =
@@ -145,24 +157,39 @@ module HostSignalBootstrap =
             match admission with
             | ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
             | ChatExecutionAdmission.Rejected error -> return invalidOp error
-            | ChatExecutionAdmission.ExternalManaged(sessionId, agent) ->
+            | ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
                 let sessionText = SessionId.value sessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
                 SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                let! target = ModelRouting.acquireManaged sessionId agent
-                return RoutedChatExecution.ExternalManaged(sessionId, agent, ModelRouting.toOpenCodeModel target)
-            | ChatExecutionAdmission.PluginManaged(runtime, claim, agent) ->
+                let! target = ModelRouting.acquireManagedExecution sessionId physical agent
+
+                return
+                    RoutedChatExecution.ExternalManaged(
+                        sessionId,
+                        physical,
+                        agent,
+                        ModelRouting.toOpenCodeModel target
+                    )
+            | ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent) ->
                 let sessionText = SessionId.value claim.SessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
-                let! target = ModelRouting.acquireManaged claim.SessionId agent
-                return RoutedChatExecution.PluginManaged(runtime, claim, agent, ModelRouting.toOpenCodeModel target)
+                let! target = ModelRouting.acquireManagedExecution claim.SessionId physical agent
+
+                return
+                    RoutedChatExecution.PluginManaged(
+                        runtime,
+                        claim,
+                        physical,
+                        agent,
+                        ModelRouting.toOpenCodeModel target
+                    )
         }
 
     let private routedModel =
         function
         | RoutedChatExecution.NoRoute -> None
-        | RoutedChatExecution.ExternalManaged(_, _, model)
-        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
+        | RoutedChatExecution.ExternalManaged(_, _, _, model)
+        | RoutedChatExecution.PluginManaged(_, _, _, _, model) -> Some model
 
     let private requireOutputMessage output =
         let message = if isNull output then null else output?message
@@ -183,11 +210,17 @@ module HostSignalBootstrap =
     let private acceptPluginExecution
         (runtime: PromptDispatcher.Runtime)
         (claim: PromptAuthority.PromptClaim)
+        (physicalUserMessageId: PhysicalUserMessageId)
         (agent: string)
         (model: OpencodeModel)
         =
         if runtime.DispatchAccepted(claim.SessionId, claim) then
-            SessionExecutionBinding.acceptPromptExecution claim.SessionId claim.PromptKey agent model
+            SessionExecutionBinding.acceptPromptExecution
+                claim.SessionId
+                claim.PromptKey
+                physicalUserMessageId
+                agent
+                model
         else
             invalidOp (
                 sprintf
@@ -197,10 +230,11 @@ module HostSignalBootstrap =
 
     let private commitExecutionCapability =
         function
-        | RoutedChatExecution.PluginManaged(runtime, claim, agent, model) ->
-            acceptPluginExecution runtime claim agent model
-        | RoutedChatExecution.NoRoute
-        | RoutedChatExecution.ExternalManaged _ -> ()
+        | RoutedChatExecution.PluginManaged(runtime, claim, physical, agent, model) ->
+            acceptPluginExecution runtime claim physical agent model
+        | RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model) ->
+            SessionExecutionBinding.acceptExternalExecution sessionId physical agent model
+        | RoutedChatExecution.NoRoute -> ()
 
     let private eventString (value: obj) =
         if isNull value then
@@ -351,6 +385,12 @@ module HostSignalBootstrap =
             let onSignal (signal: HostSignal) =
                 match signal with
                 | SessionIdle sessionId ->
+                    // EMR: idle is the physical execution boundary. Capacity is
+                    // not tied to business completion or session lifetime; the
+                    // same SessionId may later receive another charge and acquire
+                    // a fresh execution lease at chat.message.
+                    ModelRouting.releaseExecution sessionId
+
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
                     // LoopKillArmed must stay until OrdinaryTurnWorkflow bridges TurnAborted
                     // (ResetDetector deliberately does not clear it; LOOP-006).
@@ -367,6 +407,10 @@ module HostSignalBootstrap =
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
+                    // Abort ends the current physical execution even though the
+                    // reusable session container may survive.
+                    ModelRouting.releaseExecution sessionId
+
                     // Fission retires only the replaced physical present. It is not
                     // an owner cancellation: do not revoke owner resources or cancel
                     // speculation/children here. Revoke the physical attempt's idle

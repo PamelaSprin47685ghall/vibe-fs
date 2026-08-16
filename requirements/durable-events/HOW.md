@@ -157,7 +157,7 @@ Git pack/delta 是 Git 内部优化；sync 每次可以为增长后的 writer fi
 EventStoreJournalWriter：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
                          boot projection 直接读取 CanonicalIntegrator.Current.Journal
 Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.rule、读取自己的 Current 槽位
-AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则本次返回 `FactRejected`，但 journal 不 poison、后续 append 继续可用
+AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则先 `FatalProcess.trip("journal-semantic-cut", ...)` 再返回 typed `FactRejected`（仅 node:test 能继续观察）；durable writer 不 poison，但生产当前进程不得继续 append/effect
 ```
 
 Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`（EventStoreJournalWriter.fs）
@@ -170,7 +170,7 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
 
 ## Business fold 不变量与 cut-tail（PERSIST-010）
 
-不变量权威由 WHAT 015/021 承接；逐 fact 校验仍在 `Composition/Durable/Fold.fs` + 各 domain fold。区别是拒绝不再把整个 journal 变成 unfoldable：functional reducer 在错误前没有修改 Current，Integrator 记录该 rule faulted，并由业务 rule 生成最小 reset 参数持久化 `ProjectionCutTail`。当前调用看到 cut receipt 失败，future invocation 不继承 poison。
+不变量权威由 WHAT 015/021 承接；逐 fact 校验仍在 `Composition/Durable/Fold.fs` + 各 domain fold。区别是拒绝不再把 durable history 变成 unfoldable：functional reducer 在错误前没有修改 Current，Integrator 记录该 rule faulted，并由业务 rule 生成最小 reset 参数持久化 `ProjectionCutTail`。但 live `AgentJournal` 收到 cut receipt 后立即 trip process fatal；只有**下一进程** replay bad fact + cut/reset 后才可从 reset Current 继续。测试可屏蔽 kill 以检查 typed receipt，不代表生产允许 same-process continuation。
 
 ## 已知边界与相关实现
 

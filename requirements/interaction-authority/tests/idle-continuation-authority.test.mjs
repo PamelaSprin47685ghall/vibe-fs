@@ -15,7 +15,6 @@ import {
   logicalRunId,
   managerLifeId,
   promptDispatcher,
-  providerRun,
   sessionId,
   stream,
   transportReceipt,
@@ -83,7 +82,7 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       undefined,
       created.journal,
       managerLifeId('life-idle'),
-      providerRun('provider-idle'),
+      'pre-t1',
     )
     assert.equal(caseOf(first), 'Sent')
     assert.equal(sends.length, 1, 'fresh idle occasion sends exactly once')
@@ -97,10 +96,40 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       undefined,
       created.journal,
       managerLifeId('life-idle'),
-      providerRun('provider-idle'),
+      'pre-t1',
     )
     assert.equal(caseOf(second), 'Superseded')
     assert.equal(sends.length, 1, 'consumed permit never performs a second transport send')
+
+    beginAttempt(gate, sid)
+    const newTerminalPermit = observeIdle(gate, sid)
+    const samePhase = await HostSessionNudge.trySendIdleManagerEncouragement(
+      gate,
+      newTerminalPermit,
+      port,
+      sid,
+      '# You can continue.\n',
+      undefined,
+      created.journal,
+      managerLifeId('life-idle'),
+      'pre-t1',
+    )
+    assert.equal(sends.length, 1, 'a new ProviderRun/idle under the same plan-commitment condition cannot mint another encouragement')
+
+    beginAttempt(gate, sid)
+    const nextPhasePermit = observeIdle(gate, sid)
+    const postT1 = await HostSessionNudge.trySendIdleManagerEncouragement(
+      gate,
+      nextPhasePermit,
+      port,
+      sid,
+      '# You can continue after T1.\n',
+      undefined,
+      created.journal,
+      managerLifeId('life-idle'),
+      'post-t1',
+    )
+    assert.equal(sends.length, 2, 'a genuine business phase change owns a distinct bounded encouragement')
   } finally {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })

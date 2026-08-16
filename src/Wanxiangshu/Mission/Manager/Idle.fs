@@ -72,10 +72,15 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
-/// GLORY-029: Manager idle → phase-aware encouragement (§7.4.6).
+/// GLORY-029: Manager idle → business-condition-aware encouragement (§7.4.6).
 module ManagerIdle =
 
-    let private idleEncouragement (journal: AgentJournal option) (sessionId: SessionId) (life: LifeProjection) =
+    [<RequireQualifiedAccess>]
+    type private IdleEncouragementKind =
+        | BeforePlanCommitment
+        | AfterPlanCommitment
+
+    let private encouragementKind (journal: AgentJournal option) (life: LifeProjection) =
         let preT1 =
             match journal with
             | None -> true
@@ -86,11 +91,18 @@ module ManagerIdle =
                 |> Option.map (MagicTodoProjection.isPlanCommitted >> not)
                 |> Option.defaultValue true
 
+        if preT1 then IdleEncouragementKind.BeforePlanCommitment else IdleEncouragementKind.AfterPlanCommitment
+
+    let private encouragementKey =
+        function
+        | IdleEncouragementKind.BeforePlanCommitment -> "pre-t1"
+        | IdleEncouragementKind.AfterPlanCommitment -> "post-t1"
+
+    let private idleEncouragement (sessionId: SessionId) kind =
         let path =
-            if preT1 then
-                ManagerLifecyclePrompt.Path.IdleEncouragementPreT1
-            else
-                ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
+            match kind with
+            | IdleEncouragementKind.BeforePlanCommitment -> ManagerLifecyclePrompt.Path.IdleEncouragementPreT1
+            | IdleEncouragementKind.AfterPlanCommitment -> ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
 
         ProviderProse.documentFor sessionId path Map.empty
 
@@ -105,22 +117,24 @@ module ManagerIdle =
         : Task =
         let turn = context.Turn
         let sessionKey = SessionId.value turn.SessionId
+        let kind = encouragementKind journal life
+        let kindKey = encouragementKey kind
 
-        let encouragementKey =
-            sprintf "manager-idle:%s:%s" sessionKey (ProviderRunIdentity.value turn.ProviderRun)
+        let processKey =
+            sprintf "manager-idle:%s:%s:%s" sessionKey (ManagerLifeId.value life.LifeId) kindKey
 
         match context.Quiescence with
-        | Some permit when not (nudgeSent.Contains encouragementKey) ->
+        | Some permit when not (nudgeSent.Contains processKey) ->
             let idleAlreadyClaimed =
                 match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
                 | Some durable, Some profile ->
-                    PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId turn.ProviderRun
+                    PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey
                 | _ -> false
 
             if idleAlreadyClaimed then
                 AsyncSupport.completedTask ()
             else
-                nudgeSent.Add encouragementKey |> ignore
+                nudgeSent.Add processKey |> ignore
 
                 task {
                     match!
@@ -129,11 +143,11 @@ module ManagerIdle =
                             permit
                             sessionPort
                             turn.SessionId
-                            (idleEncouragement journal turn.SessionId life)
+                            (idleEncouragement turn.SessionId kind)
                             turn.Directory
                             journal
                             life.LifeId
-                            turn.ProviderRun
+                            kindKey
                     with
                     | HostSessionNudge.IdleContinuationOutcome.Sent _
                     | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()

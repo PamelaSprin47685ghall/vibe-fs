@@ -116,10 +116,9 @@ blob 先于事实（PERSIST-007）；fold 拒绝第二次 claim。`ChildRecovery
 
 ## CRASH-015：Attached restore 复用/替换/fail-closed
 
-重启后 Attached 创建：有 journal 关联（`RestoredSessionId`）且恰好 1 个 id+agent+title 匹配 →
-复用；关联 id 不存在 → Replacement（新建）；无关联 → 不复用任何候选直接新建；id 匹配但
-agent/title 冲突、多个匹配或查询失败 → fail closed。登记顺序：先写 `SessionAssociation`，再发
-首个 prompt（HOST-009）。
+重启后 Attached 创建：有 journal 关联（`RestoredSessionId`）且恰好 1 个 id+agent+title 匹配 → 复用；关联 id 不存在 → Replacement（新建）；无关联 → 不复用任何候选直接新建；id 匹配但 agent/title 冲突、多个匹配或查询失败 → fail closed。登记顺序：先写 `SessionAssociation`，再发首个 prompt（HOST-009）。
+
+Replacement 不得把新的 attached child 直接覆盖到仍然存在的 durable association 上：physical old child 被证明永久消失后，必须 `create fresh → Close(old durable association) → Link(new)`。对 Companion 而言，旧 `CompanionBloggerLinked(old)` 尚存在时直接 append `CompanionBloggerLinked(new)` 按 COMPANION-002 必须拒绝；正确 recovery 不能靠 semantic-cut“帮忙重置”。
 
 ## CRASH-016：Blogger 崩溃窗口按 durable + snapshot 分类
 
@@ -143,6 +142,8 @@ plugin load、workspace open、EventStore acquire、Host signal subscription 都
 用户在已有 session 中显式执行 `/continue` 时，Wanxiangshu 才可查询该 session 的 durable child linkage 与 Host physical session snapshot，并把仍可访问的 sub session **仅重新登记到当前进程 runtime** 供后续显式复用。`/continue` 自身不得补写旧 tool terminal、不得把 Active/Completed/Retired handle 偷偷改成成功、不得发送新 charge、不得自动 join/abort/replay；真正的新业务 effect 必须来自 LLM 在看到 resume briefing 后作出的后续 tool call。
 
 `/continue` 交给 LLM 的正文必须明确写出：① OpenCode/Wanxiangshu 进程刚刚重启；② 重启前最后一个 tool call 可能中断，保持 transcript 中的坏/未完成状态，不能假定成功；③ 哪些 sub session 仍物理可访问（至少 byname、session id、role/agent、durable lifecycle）；④ 哪些 durable child 已不可访问；⑤ 若要继续，LLM 可用正常 `fork(name=已有 byname, charge=...)`/等价已有复用面选择性复用。禁止把 restart disclosure 放在隐藏日志、system-only side channel 或仅诊断字段里。
+
+`/continue` 自身产生的 provider turn 是 **disclosure-only**：`command.execute.before` 必须给该次 restart briefing 的 Host user part 加专用 typed metadata marker；普通 main transform 只在**当前 trailing user material** 带此 marker 时禁止把 briefing 当成新的 Companion material，从而创建/替换 Blogger、补旧 context-compression work 或间接恢复上一进程工具。该 suppression 不以 SessionId、idle、abort、delete 或“session 是否结束”为生命周期：同一 marked material 的 provider retry 仍受抑制；一旦下一条普通 user material 成为当前请求，即使此前没有任何 end signal，也必须自然恢复正常 Companion 行为。这样显式 resume 只登记/公开，真正业务 effect 来自后续 LLM tool call，而且不会把可复用 session 错当成一次性 execution。
 
 `/continue` 重复调用必须幂等：重复发现/登记同一 surviving child 不产生 durable fact，不重复发送 prompt，不改变 child transcript。没有 durable journal、没有 snapshot port、某 child snapshot 查询失败都只影响本次 briefing 的对应条目；command 本身仍返回可见说明，不熔断 future `/continue` 或其它功能。
 

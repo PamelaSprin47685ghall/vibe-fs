@@ -29,15 +29,19 @@ export default function route(role, running) {
 
 Wanxiangshu 不向 scheduler 暴露 SessionId、transcript、prompt、Host client 或业务状态。模型策略只以当前角色和 occupancy 为输入。
 
-## EMR-003：`running` 是 lease multiset；重复次数就是占用次数，并跨 root/worktree 插件实例共享
+## EMR-003：`running` 是**当前物理 provider execution** 的 lease multiset；不是 live-session 计数
 
-managed `(SessionId, EffectiveAgent)` 每成功取得一个稳定 model lease，就向 `running` 贡献一个 `{model, reasoning}` 元素，直到该 lease 被释放。同一 SessionId 的两个 EffectiveAgent 即使取得完全相同 target，也贡献两个重复元素；runtime 不去重。
+managed provider execution 在 `chat.message` admission 以 **`(SessionId, PhysicalUserMessageId)`** 取得一个 model lease 后，向 `running` 贡献一个 `{model, reasoning}` 元素。`SessionId` 只是可复用容器，不是 occupancy 生命周期；同一 session 同时最多有一个 current physical execution。该 execution 在 idle/abort/delete 时释放，**或在同一 SessionId 出现新的 PhysicalUserMessageId 时被新 execution 原子 supersede**。因此正确性不得依赖 Host 一定先发 idle：新物理 user material 本身就是旧 execution 不再拥有 capacity 的证据。
+
+同一 `PhysicalUserMessageId` 的 Host/provider retry 必须复用同一 target；同一 physical id 若观察到不同 EffectiveAgent，fail closed。不同 session 的并发 physical execution 即使取得完全相同 target，仍各贡献一个重复元素；runtime 不按 target 去重。
 
 occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth：root workspace 与 worktree 虽产生不同 plugin instance，必须观察同一 multiset。不同 OS/OpenCode 进程不共享本地 occupancy。
 
-## EMR-004：required demand 由 occupancy 事件驱动重试；`null` = 等待，不是失败
+## EMR-004：required execution demand 只在 `chat.message` 物理执行准入产生；`null` = 等待，不是失败
 
-第一次需要新 lease 时，runtime 以当下 `running` 快照调用 scheduler。若返回 target，必须先原子记录该 lease/occupancy，再允许下一次调度决策观察状态；并发调用不得让两个决策看见同一旧快照后同时提交。
+**发送/排队不是 execution admission。** `fork`、repair、continuation 等 synthetic user message 的 dispatch 必须先完成 PromptKey/claim 并异步 enqueue；不得在 `SendPrompt`、tool 调用栈或 `promptAsync` settle 前抢 model slot。唯一 required managed demand owner 是 Host 已经接收该物理 user message 后的 `chat.message` 路由边界。
+
+该边界第一次需要新 execution lease 时，runtime 以当下 `running` 快照调用 scheduler。若返回 target，必须先原子记录该 lease/occupancy，再允许下一次调度决策观察状态；并发调用不得让两个决策看见同一旧快照后同时提交。
 
 若 required execution 返回 `null`：
 
@@ -47,7 +51,7 @@ occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth�
 - 不 busy-loop、timer poll 或跨模型自行降级；
 - demand 保持 pending，直到 occupancy acquire/release 事件改变 `running`，再事件驱动重新调用 scheduler。
 
-pending demand 必须可由 request cancellation、session abort/retire 或 plugin shutdown 移除。每次 occupancy 变化后，runtime 按 pending 到达顺序各重试一次；某个较早 demand 仍返回 `null` 不得阻止后续不同 role 获得 scheduler 当前允许的 target。
+pending demand 必须可由 execution cancellation / abort、session delete、plugin shutdown，或**同 SessionId 更晚的 PhysicalUserMessageId**移除；被 supersede 的旧 pending demand 必须取消，不能日后抢到槽并复活旧请求。**业务 retire/completion 本身不是 capacity 证据**。每次 occupancy 变化后，runtime 按 pending 到达顺序各重试一次；某个较早 demand 仍返回 `null` 不得阻止后续不同 role 获得 scheduler 当前允许的 target。
 
 可丢弃优化若其 owner 明确规定“不等待”（例如 Strength K0），可以在 `null` 后放弃该 optional demand；这不是 required execution 的降级。
 
@@ -64,21 +68,21 @@ Wanxiangshu runtime 只拥有：scheduler 加载、ABI 校验、process-shared o
 
 runtime 不得重建“七个 lane”、`max_sessions` schema、first-free candidate、模型能力分类或其它第二套调度算法。MJS 返回非 `null` target 后，runtime 只做结构校验并接受该选择。
 
-## EMR-006：managed lease 绑定 `(SessionId, EffectiveAgent)`；AABB/peer 只换 EffectiveAgent
+## EMR-006：managed lease 只在一个物理 execution 内稳定；session reopen 必须重新调度
 
-成功分配后，`(SessionId, EffectiveAgent) → ModelTarget` 在当前 OpenCode process epoch 内、该 session live 生命周期中稳定。普通 continuation/prompt 不得重新调用 scheduler 换 target；只有该 key 尚无 lease 时才产生新 demand。
+成功分配后，当前 execution 的 **`(SessionId, PhysicalUserMessageId) → {EffectiveAgent, ModelTarget}`** 在该 physical user material 内稳定；Host/provider retry 若仍引用同一 physical id，继续使用同一 lease，且 EffectiveAgent 不得漂移。新的 PhysicalUserMessageId 即使没有先看到 idle，也必须原子 retire 旧 lease / cancel 旧 pending，再为新 execution 调度；因此后续同一 SessionId、同一 EffectiveAgent 也允许依据新的 occupancy 选择不同 target。禁止把上一 execution 的 target 当成“session 永久模型”。
 
-AABB 保持原代数：A/A 使用当前 SelectedAgent，B/B 使用其 peer。切到 peer 后只是在同一 SessionId 下首次取得/复用另一个 EffectiveAgent 的 lease。A 与 B 的 `{model, reasoning}` 可以完全相同，也可以不同；不得以物理 target 是否相同判断 peer 是否成立。
+AABB 保持原代数：A/A 使用当前 SelectedAgent，B/B 使用其 peer。peer/tier 选择仍属于 authority/fallback；scheduler 只在每个物理 execution admission 时把当时 EffectiveAgent 映射到 target。A 与 B 的 `{model, reasoning}` 可以完全相同，也可以不同；不得以物理 target 是否相同判断 peer 是否成立。
 
 Strength/assistance/fallback 改档仍通过既有 EffectiveAgent authority；scheduler 不自行发起 tier/peer 切换。
 
-## EMR-007：lease release 是 occupancy 事件；释放幂等并触发 pending demand 重算
+## EMR-007：physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
-managed/user-facing session 明确 retire/delete 时，runtime 必须释放该 SessionId 持有的全部 `(SessionId, EffectiveAgent)` lease；每个 lease 删除一个 `running` occurrence。重复 cleanup 幂等。
+`SessionIdle`、typed `AttemptAborted`、`SessionDeleted`/scope cleanup 与 plugin shutdown 是当前 managed execution 的显式释放边界；此外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 end signal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
 
-每次真实 occupancy 变化都触发 EMR-004 的 pending-demand 重试流程。
+业务层的 handle completed/retired/join/finality、Companion close 等**不得直接决定槽是否释放**：它们描述工作语义，不证明 provider execution 的物理状态。反过来，释放槽也不表示 session 永久结束；同一 SessionId 可继续 reuse/reopen。
 
-仅切换 A/B、单次 provider failure、普通 idle/completion 不释放 live managed session 的稳定 lease。
+Host `ProviderRetry` / `ProviderFailure` 若仍处于同一物理 user execution，不提前释放；否则一次 upstream retry 会被误当成新 execution 并与旧 attempt 重叠计数。
 
 ## EMR-008：`opencode.json` model 不再具有 authority；不校验 fast/deep model 互异
 
@@ -86,8 +90,10 @@ Wanxiangshu 可以向 Host managed-agent config 投影必要的 mode/permission/
 
 启动配置不再执行 `fast-X.model <> deep-X.model` 校验，也不因两个 EffectiveAgent 最终取得相同 `{model, reasoning}` 而失败。peer existence/对称性仍由 `participant-identity` 保证。
 
-## EMR-009：user-facing model 字段不是 managed model authority
+## EMR-009：`chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
 
-真实外部用户请求仍可决定 managed EffectiveAgent/档位；但其 Host message/request 携带的 `model` / reasoning 字段不得成为 Wanxiangshu managed binding authority。进入 provider 前，managed request 必须使用 `(SessionId, EffectiveAgent)` 已取得的 MJS lease；Host 观察到的实际 provider model/reasoning 必须与该 lease 一致，否则 fail closed。
+真实外部用户请求仍可决定 managed EffectiveAgent/档位；plugin synthetic prompt 则由 PromptAuthority 决定 EffectiveAgent。两者在发送/排队阶段都不得把 Host `model` / reasoning 字段当成 managed binding authority，也不得提前占 capacity：plugin dispatch 的 `OpenCodePromptOptions.Model` 必须保持 `None`。
+
+Host 接收物理 user message 后，`chat.message` 是唯一 required managed model admission owner：它必须同时取得 `PhysicalUserMessageId` 与合法 EffectiveAgent，以 `(SessionId, PhysicalUserMessageId)` 调用/复用 MJS execution lease，并把 `{providerID, modelID, variant}` 写入 Host mutable message。`chat.params` 只验证刚由 chat.message 记录的 current exact binding；随后 messages transform 再以 trailing physical user id + PromptKey（若有）二次核对同一 execution。缺失 physical id 的 managed admission fail closed。发送栈与 `chat.message` 同时 required-acquire 属重复 authority，禁止。
 
 非 managed Host 会话不受本包接管。

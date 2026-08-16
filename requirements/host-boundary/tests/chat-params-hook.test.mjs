@@ -7,6 +7,7 @@ import test from 'node:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { physicalUser, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const previousHome = process.env.HOME
 const previousUserProfile = process.env.USERPROFILE
@@ -26,7 +27,6 @@ process.env.USERPROFILE = home
 const routing = await import('../../../dist/OpenCode/Host/ModelRouting.js')
 const binding = await import('../../../dist/OpenCode/Host/SessionExecutionBinding.js')
 const { create } = await import('../../../dist/OpenCode/Host/ChatParamsHook.js')
-const { SessionIdModule_create: sessionId } = await import('../../../dist/Foundation/Identity.js')
 await routing.ModelRouting_initialize()
 
 const hook = create()
@@ -69,8 +69,11 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_managed_provider_run_without_execution
 
 test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', async () => {
   const sid = sessionId('ses_exact')
+  const physical = physicalUser('msg-exact')
+  const model = { providerID: 'provider', modelID: 'deep-coder-model', variant: 'none' }
   binding.observeUserFacingAgent(sid, 'deep-coder')
-  await routing.ModelRouting_acquireManaged(sid, 'deep-coder')
+  await routing.ModelRouting_acquireManagedExecution(sid, physical, 'deep-coder')
+  binding.acceptExternalExecution(sid, physical, 'deep-coder', model)
 
   const output = outputSeed()
   assert.doesNotThrow(() => applyHook(managedInput('ses_exact', 'deep-coder'), output))
@@ -81,8 +84,11 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_exact_managed_lease_is_accepted_withou
 
 test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_reasoning_variant_drift_fails_closed', async () => {
   const sid = sessionId('ses_variant_drift')
+  const physical = physicalUser('msg-variant-drift')
+  const model = { providerID: 'provider', modelID: 'fast-coder-model', variant: 'none' }
   binding.observeUserFacingAgent(sid, 'fast-coder')
-  await routing.ModelRouting_acquireManaged(sid, 'fast-coder')
+  await routing.ModelRouting_acquireManagedExecution(sid, physical, 'fast-coder')
+  binding.acceptExternalExecution(sid, physical, 'fast-coder', model)
 
   assert.throws(
     () => applyHook(managedInput('ses_variant_drift', 'fast-coder', 'default'), outputSeed()),

@@ -17,6 +17,7 @@
 | `src/Wanxiangshu/Application/Finality/LifecycleWorkRecordProjection.fs` | canonical LWR 物化（process/Finality 共用；`includeOpening=false`；→ work-record） | 016/017 |
 | `src/Wanxiangshu/Application/Manager/ManagerFinality.fs` | `classifyEnding` / `admitLabor`（纯 disposition 代数） | 004-007/014/016-018 |
 | `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | Manager terminal sequencing：只判 join / finality / planning / handedOff | 019 |
+| `src/Wanxiangshu/Mission/Manager/Idle.fs` | ordinary idle encouragement：从 MagicTodo plan commitment 派生 before/after commitment kind；process key + durable continuation claim 都按 Life+business condition，不按 ProviderRun | 019 |
 | `src/Wanxiangshu/Application/Manager/ManagerLifeWorkflow.fs` | `ensureOpening` / `completeBlessedLife`（rest 路径） | 017/022 |
 | `src/Wanxiangshu/Domain/FinalityPrompt.fs` | rejection / blessed / steer / undecided 文案（SyntheticToml 唯一渲染） | 012/013/026 |
 | `src/Wanxiangshu/Domain/MagicTodoFinalityCohort.fs` | Dedicated 首次 enlist 的 roster 输入 | 009 |
@@ -49,6 +50,10 @@ resolved 历史 request（Rejected/Blessed/Undecided）不阻塞劳动。
 append `FinalityRequested` → 启动 `FinalityController` cohort CE（`rosterOf` 选员）。
 tool result 由 `FinalityOutcome` 映射三种经验（Rejected / Blessed / Undecided）。
 Blessed Life 再 suicide → 先 drain，再 `completeBlessedLife`（at rest）。
+
+### Manager ordinary idle（FINALITY-019 / GLORY-029）
+
+`ManagerIdle.encourageLabor` 先由 current Life + MagicTodo plan commitment 派生 encouragement kind：未 commit plan = before commitment，已 commit = after commitment。相同 Life/business condition 的 process reservation key 与 `PromptAuthority.ManagerIdleEncouragement` durable claim 使用同一个 condition identity；ProviderRun 只表示本次物理 terminal，不进入 budget。因而鼓励自己的 response 再 idle 时，同 condition claim 已存在，不会自激励。真正获得 plan commitment 后可获得新的、仍然有界的一次 encouragement。open finality / completed Life / join outstanding 仍由 ManagerWorkflow 在此之前拦截。
 
 ### Cohort 收束（GLORY-044/059/060）
 

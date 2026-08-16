@@ -31,8 +31,9 @@ type JournalAppendFailure =
     /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
     /// landed is unknown, so the runtime must fail closed and reconcile.
     | WriteUnknown of EventId * JournalFailure
-    /// The fact and its ProjectionCutTail reset are both durable. This invocation
-    /// failed semantically, but the journal remains usable for later work.
+    /// The fact and its ProjectionCutTail reset are both durable. The writer may
+    /// be reusable after restart, but the current process is no longer trusted:
+    /// live append admission trips the process-level invariant fuse immediately.
     | FactRejected of EventId * FoldRejection
 
 module JournalAppendFailure =
@@ -47,7 +48,8 @@ module JournalAppendFailure =
     /// text would drift with the compiler rather than with the domain.
     ///
     /// The two cases read differently on purpose. `WriteUnknown` is a physical
-    /// uncertainty; `FactRejected` is a durable, self-limited semantic cut.
+    /// uncertainty; `FactRejected` is a durable semantic cut and is fatal to the
+    /// current process at the append boundary.
     let describe (failure: JournalAppendFailure) : string =
         match failure with
         | WriteUnknown(eventId, WriteFailed reason) ->
@@ -84,7 +86,8 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member _.RuntimeId = writer.RuntimeId
     member _.WriteBlob(content: string) : Task<Result<BlobWriteReceipt, string>> = writer.BlobWriter.Write content
 
-    /// Physical write uncertainty may poison the process writer. Semantic cuts do not.
+    /// Physical write uncertainty may poison the writer. A semantic cut does not
+    /// poison persisted bytes, but it separately trips FatalProcess for this process.
     member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned)
 
     member private _.CanonicalProjection: ProjectionSet =
@@ -216,15 +219,21 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
                     match! writer.Append stream providerRun fact with
                     | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure)), []
                     | Rejected(eventId, reason) ->
-                        return
-                            Error(
-                                FactRejected(
-                                    eventId,
-                                    { Fact = "semantic-cut"
-                                      Reason = reason }
-                                )
-                            ),
-                            []
+                        let failure =
+                            FactRejected(
+                                eventId,
+                                { Fact = "semantic-cut"
+                                  Reason = reason }
+                            )
+
+                        // A durable cut-tail makes the history recoverable; it does
+                        // NOT make the current in-memory runtime trustworthy. The
+                        // exact bug class that produced the cut may already have
+                        // mutated process-local ownership, caches or pending tasks.
+                        // Kill now rather than letting a caller downgrade this to a
+                        // tool consequence and continue emitting effects.
+                        FatalProcess.trip "journal-semantic-cut" (JournalAppendFailure.describe failure)
+                        return Error failure, []
                     | Committed envelope ->
                         return
                             lock gate (fun () ->

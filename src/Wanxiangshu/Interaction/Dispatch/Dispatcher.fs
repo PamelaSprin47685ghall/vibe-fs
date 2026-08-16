@@ -290,7 +290,20 @@ module PromptDispatcher =
             | Some accepted when accepted.PromptKey = claim.PromptKey -> true
             | _ -> false
 
-        /// FALLBACK-008: has this occasion already spent its one interaction repair.
+        /// Ordinary missing-final/incomplete repair is bounded by the LogicalRun +
+        /// repair family, not by each terminal. Otherwise every repair response
+        /// would create a fresh terminal and legally mint the same nudge forever.
+        member this.RepairFamilyAlreadyClaimed
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (repairKind: string)
+            : bool =
+            PromptAuthority.repairFamilyAlreadyClaimed
+                profile.SessionId
+                profile.LogicalRunId
+                repairKind
+                (this.ProjectionFor profile.SessionId)
+
+        /// FALLBACK-008: has this terminal occasion already spent its one interaction repair.
         ///
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
         /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee
@@ -309,18 +322,18 @@ module PromptDispatcher =
                 repairKind
                 (this.ProjectionFor profile.SessionId)
 
-        /// GLORY-029: has this Manager idle occasion already spent its one
-        /// encouragement. Durable via ClaimSequences (see PromptAuthority.idleAlreadyClaimed).
+        /// GLORY-029: has this Manager Life business condition already used its one
+        /// automatic encouragement. Durable via ClaimSequences.
         member this.IdleAlreadyClaimed
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (lifeId: ManagerLifeId)
-            (triggerProviderRun: ProviderRunIdentity)
+            (conditionKey: string)
             : bool =
             PromptAuthority.idleAlreadyClaimed
                 profile.SessionId
                 profile.LogicalRunId
                 lifeId
-                triggerProviderRun
+                conditionKey
                 (this.ProjectionFor profile.SessionId)
 
         member internal _.Metadata (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) =

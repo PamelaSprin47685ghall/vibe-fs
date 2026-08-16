@@ -69,8 +69,9 @@ open Wanxiangshu.Strength
 /// time → zero physical prompt, zero claim, zero terminal.
 module InteractionRepairWorkflow =
 
-    /// FALLBACK-008: one repair per unusable terminal, gated on a fresh idle
-    /// permit (HOST-004).
+    /// Generic repair is bounded by LogicalRun + repair family, gated on a fresh
+    /// idle permit (HOST-004). A repair response is still part of the same logical
+    /// run, so a new ProviderRunIdentity must not mint the same nudge again.
     ///
     /// The task is awaited rather than discarded. `|> ignore` on the task also
     /// discarded the claim/abandon bookkeeping inside it, so a failed repair left
@@ -90,7 +91,7 @@ module InteractionRepairWorkflow =
         : Task =
         task {
             let! outcome =
-                HostSessionNudge.trySendIdleInteractionRepair
+                HostSessionNudge.trySendIdleRepairFamily
                     quiescence
                     permit
                     sessionPort
@@ -98,14 +99,31 @@ module InteractionRepairWorkflow =
                     prompt
                     turn.Directory
                     journal
-                    turn.ProviderRun
                     repairKind
 
             match outcome with
-            | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
-            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
-            | HostSessionNudge.IdleContinuationOutcome.Failed _ ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+            | HostSessionNudge.IdleRepairFamilyOutcome.Sent _
+            | HostSessionNudge.IdleRepairFamilyOutcome.Superseded
+            | HostSessionNudge.IdleRepairFamilyOutcome.Retired -> ()
+            | HostSessionNudge.IdleRepairFamilyOutcome.BudgetExhausted ->
+                // The one bounded repair already ran and this LogicalRun is still
+                // unusable. This is now a proved recovery exhaustion, not another
+                // invitation to synthesize user input.
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed "INTERACTION_REPAIR_EXHAUSTED")
+                |> ignore
+            | HostSessionNudge.IdleRepairFamilyOutcome.Failed error ->
+                // Journal/authority/transport failures are Wanxiangshu invariant
+                // failures, not model behavior. In production fatal kills the
+                // process; the terminal signal keeps node:test fail-closed too.
+                Diagnostic.fatal
+                    "interaction-repair-infrastructure-failed"
+                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
+
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed("WANXIANGSHU_FATAL: " + error))
                 |> ignore
         }
         :> Task

@@ -187,11 +187,9 @@ abort cause 分离归 `degeneration-guard`；consultation child 归 `delegation`
 
 ## HOST-BOUNDARY-014：不修改 OpenCode 本体；只用现有 Hook/SDK（ARCH-003）
 
-**规范**：仅使用现有 Hook/SDK：`chat.message`、`experimental.chat.messages.transform`、
-`tool.definition / tool.execute.before / tool.execute.after`、
-`experimental.session.compacting / experimental.compaction.autocontinue`、`event`、
-`client.session.* / prompt_async / session.messages`。禁止要求新 Hook、改 Host 源码、依赖未公开
-API（ARCH-003）。
+**规范**：仅使用现有 Hook/SDK：`chat.message`、`experimental.chat.messages.transform`、`tool.definition / tool.execute.before / tool.execute.after`、`experimental.session.compacting / experimental.compaction.autocontinue`、`event`、`client.session.* / prompt_async / session.messages`。禁止要求新 Hook、改 Host 源码、依赖未公开 API（ARCH-003）。
+
+所有交给 OpenCode 的 Wanxiangshu hook callable 必须经过统一 **fatal membrane**：hook 内同步 throw 或返回 Promise rejection 时，先 `Diagnostic.fatal` 再 rethrow。不能只把异常交给 Host `Plugin.trigger`，因为 Host 可记录错误后继续 session loop，使已经失去 invariant 的 Wanxiangshu runtime 继续响应 idle/nudge/tool。`config` / `event` / `dispose` 等非二参 hook 同样遵守；plugin factory/init 若在 hooks 完整建立前异常，也必须 fatal，禁止“半初始化 plugin”继续 Host。业务/Provider 可预期拒绝应以 typed consequence/Result 表达，不得靠抛内部异常冒充。
 
 **含义/动机**：修改 Host core = 每次升级维护 fork；依赖未公开 API = 无声漂移。
 
@@ -270,7 +268,7 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 - 修改 workspace/Git 配置/hooks/refspec、回滚 transaction、发 prompt、abort session；
 - 追加会改变业务 projection 的 durable fact（包括仅用于 recovery budget 的 runtime watermark）。
 
-业务 projection 的解释进入 **Activation Phase**，但普通 tool/hook 入口不得自动恢复上一进程的未完成 tool。tool crash 只产生“上一执行已中断”的历史事实；任何 abort/send/rollback/replay/补 terminal 都必须有新的显式业务意图。未来若存在 session `/continue`，它是独立、用户显式的 resume 入口，不属于 plugin load，也不得隐藏重启断点。持久化字节若结构不可读可拒绝对应 workspace capability；已有 durable fact 的业务语义冲突不得把 OpenCode 本体卡在 plugin init。
+业务 projection 的解释进入 **Activation Phase**，但普通 tool/hook 入口不得自动恢复上一进程的未完成 tool。tool crash 只产生“上一执行已中断”的历史事实；任何 abort/send/rollback/replay/补 terminal 都必须有新的显式业务意图。未来若存在 session `/continue`，它是独立、用户显式的 resume 入口，不属于 plugin load，也不得隐藏重启断点。持久化字节若结构不可读可拒绝对应 workspace capability；**历史上已经 durable 且已有 cut/reset 的 semantic conflict 不得在 plugin init 重新炸 Host**。但 Activation Phase 的**新 live append**若产生 semantic cut，按 DURABLE-EVENTS-021 必须 fatal 当前进程，不能用“load purity”误解成可继续。
 
 **含义/动机**：Host 在等待 plugin init 时，plugin 反调同一 Host 会形成自举环；把 recovery 藏进 constructor 还会让一个 feature 的历史状态劫持整个 Host 启动。Load/Activation 分界把「能加载」与「某项业务能恢复」彻底解耦。
 

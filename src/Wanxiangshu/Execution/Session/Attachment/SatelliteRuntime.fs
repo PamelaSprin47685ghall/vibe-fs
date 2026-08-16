@@ -133,15 +133,44 @@ module private SatelliteLeaseFlow =
         | Some restored -> resolveRestored sessions owner spec merged candidates restored
         | None -> createChild sessions owner spec Created
 
+    let private abortFreshLease (sessions: ISessionHostPort) (lease: SatelliteLease) =
+        match lease.Origin with
+        | Reused -> Task.FromResult(Ok())
+        | Created
+        | Replacement -> sessions.AbortSession lease.SessionId
+
+    let private closeReplacedAssociation (spec: SatelliteSpec) owner (lease: SatelliteLease) =
+        match lease.Origin, spec.RestoredSessionId with
+        | Replacement, Some _ -> spec.Close owner
+        | _ -> Task.FromResult(Ok())
+
+    let private keepFreshLeaseOnlyOnSuccess
+        (sessions: ISessionHostPort)
+        (lease: SatelliteLease)
+        (operation: Task<Result<unit, string>>)
+        : Task<Result<unit, string>> =
+        task {
+            match! operation with
+            | Ok() -> return Ok()
+            | Error error ->
+                let! _ = abortFreshLease sessions lease
+                return Error error
+        }
+
     let linkLease (sessions: ISessionHostPort) (spec: SatelliteSpec) owner (lease: SatelliteLease) =
         taskResult {
-            let! linkOutcome = spec.Link owner lease.SessionId spec.Agent |> TaskResultCE.ofTask
+            // A replacement is a real durable state transition, not a repoint.
+            // CompanionBloggerLinked deliberately rejects old→new in one step;
+            // close the vanished attachment first, then establish the new one.
+            do!
+                closeReplacedAssociation spec owner lease
+                |> keepFreshLeaseOnlyOnSuccess sessions lease
 
-            match linkOutcome with
-            | Ok() -> return lease
-            | Error error ->
-                let! _ = sessions.AbortSession lease.SessionId |> TaskResultCE.ofTask
-                return! Error error
+            do!
+                spec.Link owner lease.SessionId spec.Agent
+                |> keepFreshLeaseOnlyOnSuccess sessions lease
+
+            return lease
         }
 
     let start (sessions: ISessionHostPort) (owner: SessionId) (spec: SatelliteSpec) =

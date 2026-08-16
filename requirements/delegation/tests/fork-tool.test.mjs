@@ -31,6 +31,7 @@ const {
 } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 const { managerSpec, orchestratorSpec } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/Tool.js')
 const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
+const { nonSettlingForkSessions } = await import('./support/detached-fork-host.mjs')
 const hostRuntimeModule = await import('../../../dist/Execution/Delegation/Fork/Host/Runtime.js')
 const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents, HostForkRuntime__get_PendingRuns: pendingRunsOf } = hostRuntimeModule
 const failRun = Object.entries(hostRuntimeModule).find(([k]) => k.startsWith('HostForkRuntime__FailRun_'))?.[1]
@@ -213,6 +214,61 @@ test('WHAT[DELEG-022] DELEG_022_expected_tool_calls_rejects_negative_and_fractio
 })
 
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
+
+test('WHAT[DELEG-005] FORK_deep_devops_returns_after_enqueue_even_when_host_prompt_promise_never_settles', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-fork-detached-'))
+  const opened = await agentJournal.create({ directory: dir })
+  assert.equal(opened.ok, true, 'journal must open')
+
+  const detachedHost = nonSettlingForkSessions()
+  const sessions = detachedHost.sessions
+  const noneRecord = async () => undefined
+  const runtime = new HostForkRuntime(
+    PARENT,
+    sessions,
+    opened.journal,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    noneRecord,
+    noneRecord,
+    undefined,
+    undefined,
+  )
+
+  try {
+    const pending = forkRuntime(
+      runtime,
+      'deep-devops-handle',
+      Role.DevOps,
+      'deep-devops',
+      'diagnose the deployment',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'Operator',
+      undefined,
+    )
+
+    const result = await Promise.race([
+      pending,
+      new Promise((resolve) => setTimeout(() => resolve('blocked-on-host-run'), 250)),
+    ])
+
+    assert.notEqual(result, 'blocked-on-host-run', 'fork must not wait for child provider execution or Host prompt promise')
+    assert.equal(detachedHost.sent.length, 1, 'fork still enqueues exactly one physical child prompt')
+    assert.equal(detachedHost.sent[0]?.agent ?? detachedHost.sent[0]?.body?.agent, 'deep-devops')
+    assert.equal(detachedHost.sent[0]?.model ?? detachedHost.sent[0]?.body?.model, undefined, 'enqueue is model/capacity free')
+  } finally {
+    detachedHost.release()
+    opened.dispose()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[DELEG-005] FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
   const live = await liveScope()

@@ -8,6 +8,7 @@ import test from 'node:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { physicalUser } from '../../verification-system/tests/support/domain.mjs'
 
 const previousHome = process.env.HOME
 const previousUserProfile = process.env.USERPROFILE
@@ -66,16 +67,17 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_production_wires_prompt_acceptance_to_t
 test('WHAT[HOST-BOUNDARY-008] PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_stack_returns', async () => {
   const sid = sessionId('ses_binding_async_override')
   const promptKey = { fields: ['prompt-deep-continuation'] }
+  const physical = physicalUser('msg-deep-continuation')
   const deepModel = { providerID: 'provider', modelID: 'deep-coder-leased', variant: 'none' }
 
   binding.observeUserFacingAgent(sid, 'fast-coder')
-  await routing.ModelRouting_acquireManaged(sid, 'deep-coder')
+  await routing.ModelRouting_acquireManagedExecution(sid, physical, 'deep-coder')
 
   // Physical chat.message acceptance hands the typed continuation binding to the
   // provider-attempt boundary. The SendPrompt call stack is already gone when
   // chat.params eventually validates the provider request.
-  binding.acceptPromptExecution(sid, promptKey, 'deep-coder', deepModel)
-  const began = binding.beginProviderAttempt(sid, promptKey)
+  binding.acceptPromptExecution(sid, promptKey, physical, 'deep-coder', deepModel)
+  const began = binding.beginProviderAttempt(sid, physical, promptKey)
   assert.equal(began.tag, 0, 'accepted PromptKey must bind the concrete provider attempt')
 
   const allowed = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
@@ -84,15 +86,20 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_provider_attempt_keeps_typed_effective_
 
   // One physical user prompt can drive several provider attempts across tool
   // calls. The exact same PromptKey remains execution authority for that turn.
-  const resumed = binding.beginProviderAttempt(sid, promptKey)
+  const resumed = binding.beginProviderAttempt(sid, physical, promptKey)
   assert.equal(resumed.tag, 0, resumed.tag === 0 ? '' : resumed.fields?.[0])
   const resumedAllowed = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
   assert.equal(resumedAllowed.tag, 0, resumedAllowed.tag === 0 ? '' : resumedAllowed.fields?.[0])
   assert.equal(resumedAllowed.fields[0], true)
 
-  // The override is not session authority. A later provider attempt with no
-  // matching PromptKey falls back to the root/base binding and must reject deep.
-  const next = binding.beginProviderAttempt(sid, undefined)
+  // The override is not session authority. A later physical user message is a
+  // new execution identity; chat.message routes it from the root/base agent and
+  // atomically supersedes the deep continuation lease even without idle.
+  const nextPhysical = physicalUser('msg-next-root')
+  const fastModel = { providerID: 'provider', modelID: 'fast-coder-leased', variant: 'none' }
+  await routing.ModelRouting_acquireManagedExecution(sid, nextPhysical, 'fast-coder')
+  binding.acceptExternalExecution(sid, nextPhysical, 'fast-coder', fastModel)
+  const next = binding.beginProviderAttempt(sid, nextPhysical, undefined)
   assert.equal(next.tag, 0)
   const stale = binding.validateObservedProvider(sid, 'deep-coder', deepModel)
   assert.equal(stale.tag, 1)
@@ -101,7 +108,7 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_provider_attempt_keeps_typed_effective_
   binding.drop(sid)
 })
 
-test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_overrides_model_but_rejects_agent_drift_before_host', async () => {
+test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_is_model_free_but_rejects_agent_drift_before_host', async () => {
   const child = sessionId('ses_binding_child')
   const sends = []
   const port = createPort(
@@ -126,9 +133,8 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_overrides_model_but_rejec
       sendOptions('deep-coder', { providerID: 'host-placeholder', modelID: 'wrong-model' }),
     )
     assert.equal(accepted.tag, 0)
-    assert.equal(sends[0].options.Model.providerID, 'provider')
-    assert.equal(sends[0].options.Model.modelID, 'deep-coder-leased')
-    assert.equal(sends[0].options.Model.variant, 'none')
+    assert.equal(sends[0].options.Agent, 'deep-coder')
+    assert.equal(sends[0].options.Model, undefined, 'enqueue must not acquire or project a provider model')
 
     const stillLeased = await port.SendPrompt(
       child,
@@ -136,7 +142,8 @@ test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_overrides_model_but_rejec
       sendOptions('deep-coder', { providerID: 'another-placeholder', modelID: 'also-wrong' }),
     )
     assert.equal(stillLeased.tag, 0)
-    assert.equal(sends[1].options.Model.modelID, 'deep-coder-leased')
+    assert.equal(sends[1].options.Agent, 'deep-coder')
+    assert.equal(sends[1].options.Model, undefined)
 
     const wrongAgent = await port.SendPrompt(
       child,

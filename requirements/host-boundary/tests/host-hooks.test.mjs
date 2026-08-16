@@ -342,6 +342,85 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS
   })
 })
 
+test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_new_physical_material_supersedes_old_capacity_without_idle', async () => {
+  const sessionID = 'ses_model_route_supersede_probe'
+  globalThis.__wanxiangshu_test_routing_seen = []
+
+  try {
+    await withPlugin(async (hooks) => {
+      const first = {
+        message: {
+          id: 'msg_route_a',
+          role: 'user',
+          sessionID,
+          agent: 'fast-coder',
+          model: { providerID: 'host-placeholder', modelID: 'wrong-a' },
+        },
+        parts: [],
+      }
+      await hooks['chat.message']({ sessionID, agent: 'fast-coder' }, first)
+
+      const second = {
+        message: {
+          id: 'msg_route_b',
+          role: 'user',
+          sessionID,
+          agent: 'deep-coder',
+          model: { providerID: 'host-placeholder', modelID: 'wrong-b' },
+        },
+        parts: [],
+      }
+      // Deliberately no session.idle / abort / delete between the two physical
+      // user messages. The new PhysicalUserMessageId itself supersedes A.
+      await hooks['chat.message']({ sessionID, agent: 'deep-coder' }, second)
+
+      assert.equal(first.message.model.modelID, 'fast-coder-model')
+      assert.equal(second.message.model.modelID, 'deep-coder-model')
+      assert.deepEqual(
+        globalThis.__wanxiangshu_test_routing_seen.map(({ role, running }) => ({ role, running })),
+        [
+          { role: 'fast-coder', running: [] },
+          { role: 'deep-coder', running: [] },
+        ],
+        'the second physical message must schedule after removing the first execution occurrence',
+      )
+    })
+  } finally {
+    delete globalThis.__wanxiangshu_test_routing_seen
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_membrane_before_rethrow', async () => {
+  await withPlugin(async (hooks) => {
+    const recorded = []
+    const originalError = console.error
+    console.error = (value) => recorded.push(String(value))
+    {
+      try {
+        await hooks['chat.params'](
+          {
+            sessionID: 'ses_unbound_managed_fatal_probe',
+            agent: 'deep-coder',
+            model: { providerID: 'provider', modelID: 'deep-coder-model' },
+            message: { model: { providerID: 'provider', modelID: 'deep-coder-model', variant: 'none' } },
+          },
+          {},
+        )
+        assert.fail('managed invariant probe must throw')
+      } catch (error) {
+        assert.match(error?.message ?? String(error), /not recognized as a bound session|no model-routing lease/)
+      } finally {
+        console.error = originalError
+      }
+    }
+
+    assert.ok(
+      recorded.some((line) => line.includes('plugin-hook-chat-params-failed')),
+      'an escaping Wanxiangshu hook exception must emit Diagnostic.fatal before Host sees the rejection',
+    )
+  })
+})
+
 test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here', async () => {
   // The completeness gate. Without it a newly registered hook would be silently
   // uncovered, which is exactly how the transform family went unchecked.

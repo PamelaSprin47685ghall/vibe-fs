@@ -166,6 +166,34 @@ module OpenCodePort =
     [<Emit("fetch($0, $1)")>]
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
+    /// `prompt_async` is an enqueue boundary, not the lifetime of the child run.
+    /// Observe its eventual transport failure without making the caller await it.
+    /// Once a Detached caller has returned, an asynchronous rejection is an
+    /// acceptance-unknown invariant: fail the process rather than continue and
+    /// risk a second logical send.
+    let private observeSdkPromptDispatch (sessionId: SessionId) (work: Task<obj>) =
+        task {
+            try
+                let! _ = work
+                return ()
+            with ex ->
+                Diagnostic.fatal
+                    "prompt-async-dispatch-failed"
+                    [ "session_id", SessionId.value sessionId; "result", ex.Message ]
+        }
+        |> ignore
+
+    let private observeHttpPromptDispatch (sessionId: SessionId) (work: Task<Result<obj, string>>) =
+        task {
+            match! work with
+            | Ok _ -> ()
+            | Error error ->
+                Diagnostic.fatal
+                    "prompt-async-dispatch-failed"
+                    [ "session_id", SessionId.value sessionId; "result", error ]
+        }
+        |> ignore
+
     type SdkClientPort(client: obj, workspaceDirectory: string option) =
         let headersObj (directory: string option) =
             match directory |> Option.orElse workspaceDirectory with
@@ -227,13 +255,15 @@ module OpenCodePort =
                     try
                         let sessObj = client?session
                         let promptFn = sessObj?promptAsync
-                        let! _ = unbox<Task<obj>> (promptFn?call (sessObj, payload))
-                        // PROMPT-005: this endpoint admits the request and returns no
-                        // message identity. The receipt is a transport token, and its
-                        // own type is what stops it becoming an Authority Root.
+                        let pending = unbox<Task<obj>> (promptFn?call (sessObj, payload))
+                        observeSdkPromptDispatch sessionId pending
+                        // The SDK contract for promptAsync is enqueue-and-return.
+                        // Do not await the Promise: OpenCode may keep it pending
+                        // through scheduler/hooks/provider execution. Physical
+                        // acceptance is established later by chat.message/PromptKey.
                         return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                     with ex ->
-                        return Retryable ex.Message
+                        return Fatal ex.Message
                 }
 
             member _.AbortSession(sessionId: SessionId) =
@@ -443,15 +473,12 @@ module OpenCodePort =
                                  ) ])
                            |> Option.defaultValue [])
 
-                    let! res = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)
+                    observeHttpPromptDispatch sessionId (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
 
-                    // Many Host versions answer 2xx with an empty body. That is
-                    // admission, not a message identity — PROMPT-005 keeps the two
-                    // apart, so an empty body cannot be reported as delivery.
-                    match Result.map tryMessageId res with
-                    | Ok(Some id) -> return AdmittedWithPhysicalMessage id
-                    | Ok None -> return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
-                    | Error err -> return Retryable err
+                    // HTTP prompt_async has the same enqueue semantics as the SDK
+                    // surface. Never hold a fork/repair tool open on the response;
+                    // chat.message is the later physical-acceptance boundary.
+                    return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                 }
 
             member _.AbortSession(sessionId: SessionId) =

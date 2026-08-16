@@ -13,7 +13,7 @@
 | agent 名解析 | `src/Wanxiangshu/Domain/PromptAuthority.fs` `parseAgentNameTyped` | `fast-ROLE`/`deep-ROLE` → `{Name; Role; Tier; PeerName}`；legacy/未知/畸形三分拒绝 |
 | prompt identity | `PromptAuthority.systemPromptIdFor` | 只依赖 `CanonicalRole`（tier 不参与，PID-005） |
 | profile 组装 | `PromptAuthority.buildAttemptExecutionProfile` + `Domain/AttemptPlanner.fs` | `EffectiveAgent` 随 fallback cursor 动；`SystemPromptId`/Persona 不动 |
-| binding 解析律 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs`、`ChatParamsHook.fs` | `BindingIntent` = Preserve / ExplicitExecutionOverride；managed frozen / user-facing 追最近真实 EffectiveAgent；物理 ModelTarget 由 `execution-model-routing` lease 提供（PROMPT-006） |
+| binding 解析律 | `src/Wanxiangshu/OpenCode/Host/Sessions.fs`、`HostSignalBootstrap.fs`、`ChatParamsHook.fs` | `BindingIntent` = Preserve / ExplicitExecutionOverride；managed frozen / user-facing 追最近真实 EffectiveAgent；SendPrompt 只保留 agent 且 `Model=None`，物理 `chat.message` 以 `(SessionId, PhysicalUserMessageId)` 取得 current execution lease；`chat.params` 验证 chat.message 已记录的 exact binding，messages transform 再用 trailing physical id 复核（PROMPT-006） |
 | 角色标签持久化 | `src/Wanxiangshu/Session/AgentRoleIdentity.fs` | `roleName` 委托 `ManagedAgentCatalog.roleLabel`，避免 DU 拼写改名破坏 durable string |
 
 关键不变量：任何路径都**不得**在 `buildAttemptExecutionProfile` 之外另造身份字段；tier/EffectiveAgent

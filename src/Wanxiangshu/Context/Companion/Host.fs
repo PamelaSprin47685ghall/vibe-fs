@@ -185,6 +185,10 @@ module private CompanionHostDecisions =
 
             match outcome with
             | Error error ->
+                // SatelliteRuntime caches successful leases, but a failed ensure
+                // must never become a permanent poisoned single-flight. The next
+                // material/retry is allowed to re-observe Host + durable state.
+                runtime.Invalidate(primaryId, SatelliteKind.Companion)
                 onFailed ()
                 return raise (InvalidOperationException error)
             | Ok lease ->

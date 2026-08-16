@@ -138,23 +138,14 @@ type InjectedSessionPort
         }
 
     let routeSendOptions (sessionId: SessionId) (opts: SessionPromptOptions) =
-        taskResult {
-            let! effectiveAgent = SessionExecutionBinding.effectiveAgent sessionId opts
-            // EMR-004/006: required execution waits on the scheduler rather than
-            // turning capacity backpressure into a provider/business failure.
-            let! target = ModelRouting.acquireManaged sessionId effectiveAgent |> TaskResultCE.ofTask
-
-            let routed =
-                { opts with
-                    Agent = Some effectiveAgent
-                    Model = Some(ModelRouting.toOpenCodeModel target) }
-
-            return!
-                if managedChild sessionId then
-                    SessionExecutionBinding.normalizeManagedPrompt sessionId routed
-                else
-                    SessionExecutionBinding.normalizeUserFacingPrompt sessionId routed
-        }
+        // Dispatch admission is intentionally capacity-free. A session is a
+        // reusable container, and the async prompt enqueue must never wait for a
+        // provider slot. The sole model/capacity owner is chat.message, where the
+        // Host is actually preparing this physical user message for execution.
+        if managedChild sessionId then
+            SessionExecutionBinding.prepareManagedPrompt sessionId opts
+        else
+            SessionExecutionBinding.prepareUserFacingPrompt sessionId opts
 
     let sendThroughPort
         (port: IOpenCodePort)
@@ -173,11 +164,9 @@ type InjectedSessionPort
         | None -> Task.FromResult(Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port")
 
     let sendRoutedPrompt sessionId text opts =
-        task {
-            match! routeSendOptions sessionId opts with
-            | Error error -> return Fatal error
-            | Ok sendOptions -> return! sendAvailablePort sessionId text sendOptions
-        }
+        match routeSendOptions sessionId opts with
+        | Error error -> Task.FromResult(Fatal error)
+        | Ok sendOptions -> sendAvailablePort sessionId text sendOptions
 
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
         taskResult {

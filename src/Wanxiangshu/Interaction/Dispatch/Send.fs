@@ -372,7 +372,34 @@ module PromptDispatcherSend =
                 onAccepted
                 (Some tools)
 
-        /// FALLBACK-008: the one interaction repair an unusable terminal earns.
+        /// Ordinary missing-final/incomplete repair: one prompt per LogicalRun +
+        /// repair family. A second unusable terminal produced by the repair itself
+        /// must terminate/fallback, not mint an unbounded chain of nudges.
+        member this.SendRepairFamily
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (repairKind: string)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            : Task<Result<PromptKey, string>> =
+            this.SendContinuationWithDigest
+                port
+                sessionId
+                text
+                (PromptAuthority.repairFamilyPayloadDigest repairKind)
+                PromptAuthority.ContinuationKind.InteractionRepair
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                None
+
+        /// FALLBACK-008: the one terminal-scoped interaction repair an unusable terminal earns.
         ///
         /// Its payload digest names the occasion (terminal provider run + repair
         /// kind), not the prompt text. Repair prompts are fixed per kind, so
@@ -407,18 +434,15 @@ module PromptDispatcherSend =
                 onAccepted
                 None
 
-        /// GLORY-029: one Manager idle encouragement per occasion.
-        ///
-        /// Its payload digest names the occasion (Life + trigger ProviderRun), not
-        /// the constant IdleEncouragement text. Digesting the text would collapse
-        /// every idle into one claim scope and make a pending Detached send for A
-        /// suppress B's encouragement.
+        /// GLORY-029: one Manager idle encouragement per Life business condition.
+        /// The condition key, not the triggering ProviderRun, is the durable budget
+        /// identity so an encouragement cannot recursively earn another one.
         member this.SendManagerIdleEncouragement
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
             (lifeId: ManagerLifeId)
-            (triggerProviderRun: ProviderRunIdentity)
+            (conditionKey: string)
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
@@ -429,7 +453,7 @@ module PromptDispatcherSend =
                 port
                 sessionId
                 text
-                (PromptAuthority.idlePayloadDigest lifeId triggerProviderRun)
+                (PromptAuthority.idlePayloadDigest lifeId conditionKey)
                 PromptAuthority.ContinuationKind.ManagerIdleEncouragement
                 profile
                 effectiveAgent

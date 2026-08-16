@@ -86,10 +86,7 @@ FallbackExhausted 之后同一 (LogicalRunId, AuthorityRoot) 再收 Advanced →
 
 ## PAR-008：空 / XML-only terminal 不计入推进
 
-空 terminal 或 XML-only terminal 不是已确认失败：至多允许一次 Interaction Repair continuation，
-**不得**因此推进 cursor 或消耗预算。terminal validity 已 resolve 进 `AttemptOutcome`：
-`CompletedInvalid` 与 `Failed` 分开（`Domain/RecoverySlot.fs`），因为前者是「回应完整但不可用」，
-后者才是「请求失败」。
+空 terminal 或 XML-only terminal 不是已确认 provider failure：可以进入一次有界 Interaction Repair，但**不得**因此推进 provider fallback cursor 或消耗 provider failure budget。ordinary repair 的 authority budget 由 interaction-authority 定义为同一 LogicalRun + repair family 一次；repair 后仍无可用 terminal 时以 `INTERACTION_REPAIR_EXHAUSTED` 收束该业务 run，而不是继续生成 repair。Blogger exact-one 协议保留自己的 terminal-scoped nudge→AABB→exhaust 状态机。terminal validity 已 resolve 进 `AttemptOutcome`：`CompletedInvalid` 与 `Failed` 分开（`Participant/Provider/Attempt/RecoverySlot.fs`），因为前者是「回应完整但不可用」，后者才是「provider request 已确认失败」。
 
 ## PAR-009：Host Attempt 不是领域计数
 
@@ -138,7 +135,7 @@ Session，FALLBACK-003 去重无法折叠，会把同一次失败记两次。
 
 ## PAR-013：换 Peer = 换执行者，不换身份
 
-Fallback 推进只改写 `AttemptExecutionProfile.EffectiveAgent`；对应物理 ModelTarget 由 `execution-model-routing` 按 `(SessionId, EffectiveAgent)` lease 解析。A/B lease 可以落到同一物理 model，不影响 peer/fallback 本体。同一 session /
+Fallback 推进只改写下一次 `AttemptExecutionProfile.EffectiveAgent`；对应物理 ModelTarget 由 `execution-model-routing` 在下一条 physical user execution 的 `(SessionId, PhysicalUserMessageId)` admission 中按该 EffectiveAgent 解析。A/B execution 可以落到同一物理 model，不影响 peer/fallback 本体；不得为同一可复用 session 常驻保留 A/B 两个 capacity lease。同一 session /
 Life 内下列字节与身份**不得**因 Offset / SideA·B / Peer 切换而改变：
 
 ```text

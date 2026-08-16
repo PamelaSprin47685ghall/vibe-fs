@@ -12,10 +12,10 @@
 | 005 | `Domain/PromptAuthority.fs` → `PromptOrigin`、`RootAuthorityKind`、`ContinuationKind`、`originLabel`、`tryParseContinuationKind` | 闭世界枚举 |
 | 006 | `Domain/PromptAuthority.fs` → `parseAgentNameTyped` / `AgentNameRejection`；`Domain/ManagedAgentCatalog.fs` → `legacyAgentNames`、`peerNameOf` | 显式 agent 才可成 root |
 | 007/008/009/017 | `Domain/PromptAuthorityRun.fs` → `resolveKnownOrigin`（accepted → claimed → compaction → AgentOwnerRoot → UnknownOrigin）；`Application/Prompting/PromptIngress.fs` → `resolveOrigin`（唯一可授予 HumanRoot 的边界） | 纯函数永不返回 HumanRoot；ingress 只在 ActiveProfile 缺席 + 显式有效 agent 时授予 |
-| 010 | `Domain/PromptAuthority.fs` → `repairPayloadDigest`、`repairAlreadyClaimed`（由 `ClaimSequences` 派生） | repair 预算 durable：claim scope 计数，不靠进程内存 |
+| 010 | `Interaction/Authority/Model.fs` → `repairFamilyPayloadDigest/repairFamilyAlreadyClaimed`（ordinary LogicalRun+family）、`repairPayloadDigest/repairAlreadyClaimed`（Blogger terminal-scoped special case）、`idlePayloadDigest/idleAlreadyClaimed`（Manager Life+business condition）；均由 `ClaimSequences` 派生 | 自动 continuation budget durable 且不能由自己产生的新 ProviderRun 扩张 |
 | 011 | `Domain/PromptAuthority.fs` → `AttemptExecutionProfile`、`buildAttemptExecutionProfile`（唯一 builder） | authority 子记录原子携带 |
 | 012/013 | `Domain/PromptAuthority.fs` → `ContinuationKind.NeedHelpEscalation | NeedHelpAdvice`；`Infrastructure/OpenCode/Host/AssistanceHost.fs` | assistance 续推同 run；abort 不推进 fallback |
-| 014 | `Infrastructure/OpenCode/Host/HostJoinGuard.fs`；`ContinuationKind.JoinGuard` | join 续推 = continuation |
+| 014 | `Execution/Delegation/Fork/OpenCode/JoinGuard.fs`、`Mission/Manager/Idle.fs`；`ContinuationKind.JoinGuard | ManagerIdleEncouragement` | join/idle 续推 = continuation；Manager idle process key + durable claim 都按 Life + plan-commitment condition |
 | 015 | `Session/JoinInterruptRegistry.fs`（`UserMessageArrived`）；`PromptIngressCodec`（ExternalUserIngressPulse 候选） | wake 低权限；ingress 不给 authority |
 | 016 | `Domain/PromptAuthorityRun.fs` → `acceptClaim`（root 不入 continuation map） | root ≠ continuation |
 
@@ -45,8 +45,9 @@ resolveOrigin（journal 已知 provenance）
 - `PromptDispatcher.Runtime` 不持有 authority 状态：防内存拷贝与 journal 分叉（PROMPT-005 的
   durability 前提）。
 - continuation 归属只读 `ActiveLogicalRun`（不回退 `LastAuthorityProfile`）。
-- root 的 `registerAuthority` 清空 run-scoped 映射（PendingClaims/AcceptedContinuationIds/
-  ClaimSequences），使 PERSIST-008 有界。
+- root 的 `registerAuthority` 清空 run-scoped 映射（PendingClaims/AcceptedContinuationIds/ClaimSequences），使 PERSIST-008 有界。
+- ordinary repair 的 claim scope payload 只含 repair family；LogicalRunId 已是 scope 组件，所以同 run 后续 terminal 不会重置预算。Blogger 仅因 exact-one 协议需要 terminal identity 而保留 terminal-scoped digest，并由 nudge→AABB→exhaust 状态机单独限界。
+- Manager idle digest = `LifeId + conditionKey`；condition 由 Manager 是否已有 plan commitment 决定，ProviderRunIdentity 不参与自动 encouragement budget。
 
 ## 历史与弃权
 
@@ -60,7 +61,6 @@ resolveOrigin（journal 已知 provenance）
   `ContinuationKind` 成员（可解析），但不再作为新发送的 origin。
 - **PROMPT-012（Student/Teacher）**：GARBAGE——编号永久空缺，无 alias、无 deprecated 路径。
   「插件 user-shaped message 仍经 PROMPT-005」保留给 `dispatch-protocol`。
-- **QuiescencePermit 资格机制**：`cache.md` 的 idle-only auto-continue 资格（SessionQuiescenceGate）
-  归 `causal-wait`（HOST-004 分片）；本包只拥有「idle 续推是 continuation、同一 occasion 一次」。
+- **QuiescencePermit 资格机制**：`cache.md` 的 idle-only auto-continue 资格（SessionQuiescenceGate）归 `causal-wait`（HOST-004 分片）；本包只拥有「idle 续推是 continuation、自动预算必须稳定有界」。permit 只防同一次 idle race，不替代跨 terminal/restart 的 durable budget。
 - **`AttemptExecutionProfile` record 字段集**：HOW（HANDOFF §18.4 integration structure），
   不是未来 WHAT；「字段不可从碎片拼装」才是 WHAT（INTERACTION-AUTHORITY-011）。

@@ -21,14 +21,27 @@ test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_autho
   assert.doesNotMatch(strengthScope, /ManagedAgentInventory|RecordManagedAgentInventory/)
 })
 
-test('WHAT[EMR-009] EMR_009_chat_message_mutates_managed_user_model_from_model_routing_lease', async () => {
+test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const params = await source('src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs')
 
-  assert.match(host, /ModelRouting\.acquireManaged/)
+  assert.match(host, /decoded\.PhysicalUserMessageId/)
+  assert.match(host, /ModelRouting\.acquireManagedExecution/)
+  assert.doesNotMatch(sessions, /ModelRouting\.acquireManagedExecution/, 'fork/send enqueue must never wait for model capacity')
   assert.match(host, /message\?model\s*<-\s*box routed/)
   assert.match(params, /validateObservedProvider/)
   assert.doesNotMatch(params, /observeUserFacing\s/)
+})
+
+test('WHAT[EMR-007] EMR_007_physical_idle_and_abort_release_execution_not_business_completion', async () => {
+  const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
+
+  assert.match(host, /SessionIdle sessionId[\s\S]*ModelRouting\.releaseExecution sessionId/)
+  assert.match(host, /AttemptAborted sessionId[\s\S]*ModelRouting\.releaseExecution sessionId/)
+  assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
+    'application completion/finality must not own physical capacity release')
 })
 
 test('WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {

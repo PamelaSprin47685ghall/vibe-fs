@@ -79,7 +79,7 @@ module ExplicitSessionResume =
             detail
 
     let private textPart text =
-        createObj [ "type" ==> "text"; "text" ==> text ]
+        ExplicitResumeSuppression.markedTextPart text
 
     let private existingParts (output: obj) : obj array =
         if isNull output || isNull output?parts then
@@ -223,7 +223,11 @@ module ExplicitSessionResume =
 
             Task.FromResult(())
         else
-            resumeSession journal snapshot adopt (SessionId.create session) (argumentTextRaw input) output
+            let sessionId = SessionId.create session
+            // The visible briefing part itself carries the disclosure-only marker.
+            // No SessionId-scoped latch is created: the next ordinary user material
+            // can proceed even if this command never reaches a provider end signal.
+            resumeSession journal snapshot adopt sessionId (argumentTextRaw input) output
 
     let before
         (journal: AgentJournal option)

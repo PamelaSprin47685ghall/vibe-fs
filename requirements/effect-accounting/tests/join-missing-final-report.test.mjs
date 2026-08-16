@@ -187,6 +187,27 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_empty_Completed_keeps_run_pending_no
 
 // ── genuine failures still settle the run ────────────────────────────────────
 
+test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_interaction_repair_exhausted_settles_the_run', async () => {
+  const { Dictionary, comparer } = await loadDictionary()
+  const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
+  const gate = {}
+  const agentId = 'agent-repair-exhausted'
+  const child = sessionId('ses_repair_exhausted_child')
+  const parent = sessionId('ses_repair_exhausted_parent')
+  const run = makeRun(agentId, child)
+  makePendingRuns(pendingRuns, run)
+
+  const exhausted = await failedOutcome('INTERACTION_REPAIR_EXHAUSTED')
+  pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, exhausted, undefined)
+
+  assert.equal(run.Finished, true, 'bounded repair exhaustion is a terminal failure, not another repair opportunity')
+  assert.equal(pendingRuns.has(agentId), false)
+  await Promise.race([
+    run.Source.get_Task(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Source never completed')), 1000)),
+  ])
+})
+
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()

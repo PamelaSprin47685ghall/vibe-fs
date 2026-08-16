@@ -98,6 +98,23 @@ open PluginHostInterop
 
 module PluginHooks =
 
+    let private fatalSync operation (action: unit -> unit) =
+        try
+            action ()
+        with ex ->
+            Diagnostic.fatal operation [ "result", ex.Message ]
+            raise ex
+
+    let private fatalTask operation (work: unit -> Task) : Task =
+        task {
+            try
+                do! work ()
+            with ex ->
+                Diagnostic.fatal operation [ "result", ex.Message ]
+                return raise ex
+        }
+        :> Task
+
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -185,11 +202,12 @@ module PluginHooks =
             // directly through `dist`.
             let hooks =
                 createObj
-                    [ "chat.message", box (curriedHook wired.ChatMessageHook)
+                    [ "chat.message",
+                      box (fatalHook "plugin-hook-chat-message-failed" (curriedHook wired.ChatMessageHook))
                       // Pin the request agent's bound model. Host retry reuses
                       // the same user message; without this pin an agent-less
                       // retry can resolve to the default build / Fast model.
-                      "chat.params", box (curriedHook chatParams)
+                      "chat.params", box (fatalHook "plugin-hook-chat-params-failed" (curriedHook chatParams))
                       // ONE transform registration.
                       //
                       // Both `chat.transform` and this key used to point at the
@@ -201,11 +219,13 @@ module PluginHooks =
                       // registration of one hook, and every provider step ran the
                       // Companion rewrite and the REVIEW-010 seal twice over the
                       // same message array.
-                      "experimental.chat.messages.transform", box (curriedHook (box transform))
+                      "experimental.chat.messages.transform",
+                      box (fatalHook "plugin-hook-messages-transform-failed" (curriedHook (box transform)))
                       // HOST-026 / PROMPT-017: session-bound ProviderLanguage
                       // replaces only the Wanxiangshu-owned agent system segment.
                       // Host/AGENTS/system additions remain byte-identical.
-                      "experimental.chat.system.transform", box (pairedHook (box systemTransform))
+                      "experimental.chat.system.transform",
+                      box (fatalHook "plugin-hook-system-transform-failed" (pairedHook (box systemTransform)))
                       // HOST-006 prevention layer. The config hook is the only
                       // place the plugin can reach the compaction settings: the
                       // Host hands over the live instance-state object and runs
@@ -219,39 +239,51 @@ module PluginHooks =
                       // would report the symptom without the observation.
                       "config",
                       box (fun (config: obj) ->
-                          ManagerConfig.configureManager config |> ignore
-                          scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                          ExplicitSessionResume.registerCommand config)
+                          fatalSync "plugin-hook-config-failed" (fun () ->
+                              ManagerConfig.configureManager config |> ignore
+                              scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                              ExplicitSessionResume.registerCommand config))
                       // HOST-006: this hook cannot refuse a compaction — its output
                       // has no cancel field (`plugin/index.ts:305`) and
                       // `plugin.trigger` discards the return value. Registered
                       // anyway so the containment layer has a same-turn signal, and
                       // so the absence of a veto is documented at the boundary
                       // rather than inferred from silence.
-                      "experimental.session.compacting", box (pairedHook (box HostCompactionGate.onSessionCompacting))
+                      "experimental.session.compacting",
+                      box
+                          (fatalHook
+                              "plugin-hook-session-compacting-failed"
+                              (pairedHook (box HostCompactionGate.onSessionCompacting)))
                       // HOST-006: always `enabled = false`. `compaction.auto=false`
                       // already makes the replay branch unreachable, but this is the
                       // one vetoable synthetic-turn injection point, and leaving it
                       // unanswered relies on an upstream default staying harmless.
                       "experimental.compaction.autocontinue",
-                      box (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+                      box
+                          (fatalHook
+                              "plugin-hook-compaction-autocontinue-failed"
+                              (pairedHook (box HostCompactionGate.onCompactionAutoContinue)))
                       // Magic Todo definition/before/after are one V1 Host
                       // membrane. Definition must replace both schema surfaces;
                       // before mutates the original args object in place.
-                      "tool.definition", box (pairedHook (box toolDefinition))
-                      "tool.execute.before", box (pairedHook (box toolBefore))
+                      "tool.definition",
+                      box (fatalHook "plugin-hook-tool-definition-failed" (pairedHook (box toolDefinition)))
+                      "tool.execute.before",
+                      box (fatalHook "plugin-hook-tool-before-failed" (pairedHook (box toolBefore)))
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then
                       // sees the exact provider-visible result bytes.
-                      "tool.execute.after", box (pairedHook (box toolAfter)) ]
+                      "tool.execute.after",
+                      box (fatalHook "plugin-hook-tool-after-failed" (pairedHook (box toolAfter))) ]
 
-            hooks?event <- box wired.ObserveEvent
+            hooks?event <-
+                box (fun raw -> fatalSync "plugin-hook-event-failed" (fun () -> wired.ObserveEvent raw))
 
             // HOST-009 dispose: cancel owned Tasks, kill PTYs/processes, dispose
             // sessions. `scope.Dispose` owns all of it, and the Host awaits this
             // hook (`plugin/index.ts:266`), so teardown completes before shutdown
             // proceeds.
-            hooks?dispose <- box (fun () -> scope.DisposeAsync())
+            hooks?dispose <- box (fun () -> fatalTask "plugin-hook-dispose-failed" (fun () -> scope.DisposeAsync()))
 
             let client = if isNull input then null else input?client
 
@@ -310,7 +342,9 @@ module PluginHooks =
                         toolRegistration.Runtime.AdoptExistingChild(parent, record)
 
                     hooks?``command.execute.before`` <-
-                        pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting))
+                        fatalHook
+                            "plugin-hook-command-before-failed"
+                            (pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting)))
                 with ex ->
                     raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 

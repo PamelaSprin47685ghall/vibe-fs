@@ -21,9 +21,9 @@ intent）与 Accepted/Created/Published（已确认物理发生）。它们是�
 
 ## EFFECT-ACCOUNTING-002 —— Requested-only = outcome unknown
 
-**规范陈述**：只有 Request/Claim、没有 Accepted → **结局未知**：不等于效果不存在
-（不得当未发生而盲重试），也不等于成功（不得跳过 reconcile 宣称完成）。Requested
-状态必须被投影如实表达，不得被静默抹除或提升。
+**规范陈述**：只有 Request/Claim、没有 Accepted → **结局未知**：不等于效果不存在（不得当未发生而盲重试），也不等于成功（不得跳过 reconcile 宣称完成）。Requested 状态必须被投影如实表达，不得被静默抹除或提升。
+
+同理，agent 的 `MISSING_FINAL_REPORT` / empty completed terminal 只是“本次 terminal 不足以证明完成/失败”，在有 repair 资格时保持 pending；但一旦 interaction-authority 已证明同 LogicalRun 的 ordinary repair budget **耗尽**，`INTERACTION_REPAIR_EXHAUSTED` 是新的、明确的 terminal failure，必须 settle pending child run。不能继续把它当 `MISSING_FINAL_REPORT` observation-only，否则“有界 repair”会退化成永远 Active 的 hang。
 
 **含义/动机**：未知是第三种状态，不是「未发生」或「成功」的别名。
 **边界**：未知后的重试政策见 005；「未知 ≠ failure」的另一实例（agent completion）见 007。

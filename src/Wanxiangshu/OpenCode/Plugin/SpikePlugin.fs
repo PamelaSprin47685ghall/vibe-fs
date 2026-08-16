@@ -12,9 +12,16 @@ module SpikePlugin =
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
-            let! boot = PluginBoot.create input
-            let! host = PluginHostWiring.create boot
-            PluginSessionWiring.attach boot host
-            let transform = PluginTransforms.create boot host
-            return! PluginHooks.create boot host transform
+            try
+                let! boot = PluginBoot.create input
+                let! host = PluginHostWiring.create boot
+                PluginSessionWiring.attach boot host
+                let transform = PluginTransforms.create boot host
+                return! PluginHooks.create boot host transform
+            with ex ->
+                // A partially initialized Wanxiangshu instance is not a degraded
+                // mode. OpenCode may otherwise keep running after a plugin-load
+                // rejection with only half the runtime owners installed.
+                Diagnostic.fatal "plugin-initialization-failed" [ "result", ex.Message ]
+                return raise ex
         }

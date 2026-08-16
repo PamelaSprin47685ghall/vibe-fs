@@ -580,8 +580,11 @@ export const withPluginClient = async (client, body) => {
   mkdirSync(routingDir, { recursive: true })
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
-    `export default function route(role) {
+    `export default function route(role, running) {
   if (!/^(fast|deep)-/.test(role)) throw new Error('unexpected managed role: ' + role)
+  if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
+    globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
+  }
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }\n`,
     'utf8',

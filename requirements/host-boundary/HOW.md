@@ -52,6 +52,12 @@ generation 隔离（HOST-004）。`maxCausalRereads = 3`；`maxConsecutiveErrors
 `Events_HostEventPort`：per-provider-run Completed dedupe、非 Completed 不 dedupe、late
 subscriber sticky replay、listener disposal。
 
+### Hook fatal membrane
+
+`PluginHostInterop` 先用 `curriedHook` / `pairedHook` 做 Fable→Host arity adapter，再对**已经适配成二参 callable** 的函数套 `fatalHook`。顺序不能反：把 guard 包在原始 F# 函数外会改变 Fable emitted arity，曾实测把 paired hook 变成 curried no-op。guard 同时捕获 synchronous throw 与 returned Promise rejection，调用 `Diagnostic.fatal(operation,result)` 后 rethrow；`config` / `event` 用 `fatalSync`，`dispose` 用 `fatalTask`。`SpikePlugin.initSpikePlugin` 也有 init fatal boundary。
+
+`Diagnostic.fatal` 的物理 kill 下沉到 `Foundation.FatalProcess.kill`，使低层 durable journal 也能使用同一个 process fuse：live `AgentJournal` semantic cut 直接 `FatalProcess.trip("journal-semantic-cut", ...)`，不依赖异常恰好一路冒到 Host hook。node:test / `WANXIANGSHU_NO_FATAL_EXIT=1` 只屏蔽物理 kill，不改变 fatal classification/log。
+
 ### 其它
 
 - `HostMessageProjection.sanitizeMessages`（HOST-016）在 PairProgrammingThought 之后、
@@ -67,7 +73,7 @@ subscriber sticky replay、listener disposal。
 
 `server(input)` 返回 hooks 之前只组装 capability。该路径不得访问 Host session API，不做 durable semantic recovery，不修改 workspace/Git，不产生业务 durable fact。
 
-Load Phase 可以检查模块、静态资源、配置与 durable bytes 的结构可读性；结构合法但业务语义无法解释时，最多让对应 capability 在使用时失败。普通 hook/tool 也不得承担“上一进程工具恢复”：Fission/Assistance/js-* 等未完成执行保持坏记录。未来 session resume 必须由显式 `/continue` 进入并把 restart/broken-tool 事实公开给 LLM。
+Load Phase 可以检查模块、静态资源、配置与 durable bytes 的结构可读性；历史中已经有 canonical cut/reset 的坏 fact 由 replay 正常积分，不应在 init 再触发新 fatal。普通 hook/tool 也不得承担“上一进程工具恢复”：Fission/Assistance/js-* 等未完成执行保持坏记录。未来 session resume 必须由显式 `/continue` 进入并把 restart/broken-tool 事实公开给 LLM。Activation Phase 若**新 live append**产生 semantic cut，则 durable-events 的 process fuse 立即 fatal；这不是 startup recovery，也不是“feature 可降级”。
 
 ## 历史与弃权
 

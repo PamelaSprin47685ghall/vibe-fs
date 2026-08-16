@@ -100,8 +100,8 @@ tier/binding 输入」这个事实。
 
 - 有 parent 的 managed session：创建时冻结 base EffectiveAgent；hook / prompt / continuation 必须保持该 agent，除 typed override 外请求字段与 Host default 都不能重绑。
 - 无 parent 的 user-facing session：base EffectiveAgent 由最近一次真实外部用户请求决定；插件自产 prompt / hook / continuation 不是用户重绑证据；普通 `Preserve` 沿用最近观测到的 agent。
-- 物理 model 不由 Host/user message 决定。`(SessionId, EffectiveAgent)` 的 ModelTarget 由 `execution-model-routing` 获取并在 live session 内稳定；Host 实际 provider model 与 lease 不一致 → fail closed。
-- 显式换档（Fallback / Assistance）只允许经 typed `ExplicitExecutionOverride` 做**单次** EffectiveAgent override；override 不改变 frozen base，下一次普通发送恢复 base。override 对应的 ModelTarget 由目标 EffectiveAgent 的 lane lease 解析（PROMPT-006）。
+- 物理 model 不由 Host/user message 的 model 字段决定。synthetic `SendPrompt` 只冻结/校验 EffectiveAgent，保持 `Model=None`；Host `chat.message` 执行准入时才由 `execution-model-routing` 以 **`(SessionId, PhysicalUserMessageId)`** 为当前 provider execution 取得 ModelTarget。相同 physical id 的 retry 必须保持 EffectiveAgent/target；同 SessionId 新 physical id 即使未先见 idle 也必须 supersede 旧 execution 并重新调度。Host 实际 provider model 与该 exact lease 不一致 → fail closed。
+- 显式换档（Fallback / Assistance）只允许经 typed `ExplicitExecutionOverride` 做**单次** EffectiveAgent override；override 不改变 frozen base，下一次普通发送恢复 base。override 的物理 ModelTarget 在对应 message 的 `chat.message` execution admission 由目标 EffectiveAgent 重新解析（PROMPT-006），发送栈本身不占槽。
 
 含义/动机：execution binding 是身份轴的一部分（PID-002）；外部用户可以选择 managed agent/tier，但不能用 Host model 字段绕过 Wanxiangshu 的资源路由。内部路径也不能用 model 漂移冒充换档。
 

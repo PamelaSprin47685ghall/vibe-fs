@@ -83,8 +83,7 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
 ## GARBAGE / 弃权裁决
 
 - **startup sweep / lazy tool recovery**：均已裁决为非法。CRASH-017 不允许把自动恢复从 startup 挪到普通 tool/hook；旧 tool crash 保持失败。
-- **显式 `/continue`（CRASH-018）**：config 注册 command；`command.execute.before` 只在 command=`continue` 时读取 parent 的 durable handles，逐 child 用 `ISessionSnapshotPort.GetMessages` 判 physical 可访问；可访问 child 只调用 process-local adopt（Restore + BindChildSession + parent map），不 append fact、不 send prompt。hook 把 restart/broken-tool disclosure + surviving/unavailable child 清单作为 visible text part 交给 LLM。真正 reopen handle/发送 charge 留给后续普通 fork reuse，因此 resume discovery 与业务 effect 分离。
-- **各 domain 的恢复规则**（ORCH-007、magic-todo settle、managed-session replacement、
-  publish reconcile）：归各 domain owner，本包只引用为本地应用示例。
+- **显式 `/continue`（CRASH-018）**：config 注册 command；`command.execute.before` 只在 command=`continue` 时读取 parent 的 durable handles，逐 child 用 `ISessionSnapshotPort.GetMessages` 判 physical 可访问；可访问 child 只调用 process-local adopt（Restore + BindChildSession + parent map），不 append fact、不 send prompt。hook 把 restart/broken-tool disclosure + surviving/unavailable child 清单作为带 `wanxiangshu_explicit_resume=true` metadata 的 visible text part 交给 LLM。messages transform 只检查 trailing user material 上这个 marker；不维护 SessionId suppression latch，因此同 material retry 仍 disclosure-only，而下一条普通 user material 不依赖 idle/abort/delete 就恢复正常。真正 reopen handle/发送 charge 留给后续普通 fork reuse，因此 resume discovery 与业务 effect 分离。
+- **各 domain 的恢复规则**（ORCH-007、magic-todo settle、managed-session replacement、publish reconcile）：归各 domain owner，本包只引用为本地应用示例。Attached replacement 的共享恢复纪律是：proven old physical loss 后 create fresh，再由 domain 的 `Close(old)` / `Link(new)` 显式迁移 durable association；不得把 Link 当覆盖赋值。Companion 的动态证明见 managed-session-lifecycle `satellite-runtime.test.mjs`。
 - **recoveryAction 的领域语义**（`requirements/change-integration/tests/job.test.mjs`）：归
   `change-integration`；本包 REUSE 其「从最后事实决定唯一动作」作为 CRASH-002 的域内实例。
