@@ -26,7 +26,17 @@ const life = managerLifeId('manager-life')
 const firstCall = toolCallId('first-call')
 const secondCall = toolCallId('second-call')
 
-test('TODO-002 canonical obligation wire has only name/work and stable digest input', () => {
+test('WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state (no id/status/priority/reviewing)', () => {
+  const items = toList([
+    obligation('implementation', 'Implement the requested behavior.'),
+    obligation('verification', 'Verify the behavior with evidence.'),
+  ])
+
+  const wire = magicTodo.canonicalObligationListWire(items)
+  assert.doesNotMatch(wire, /"id"|"status"|"priority"|reviewing/)
+})
+
+test('WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/work with stable digest input', () => {
   const items = toList([
     obligation('implementation', 'Implement the requested behavior.'),
     obligation('verification', 'Verify the behavior with evidence.'),
@@ -38,10 +48,9 @@ test('TODO-002 canonical obligation wire has only name/work and stable digest in
     '[{"name":"implementation","work":"Implement the requested behavior."},{"name":"verification","work":"Verify the behavior with evidence."}]',
   )
   assert.equal(magicTodo.obligationListDigest(sha256, items), `digest:${wire}`)
-  assert.doesNotMatch(wire, /"id"|"status"|"priority"|reviewing/)
 })
 
-test('TODO-002 rejects blank and duplicate obligation names as call syntax', () => {
+test('WHAT[OBLIGATION-LEDGER-006] rejects blank and duplicate obligation names as call syntax', () => {
   const blank = error(magicTodo.validateObligations(toList([obligation('   ', 'work')])))
   const duplicate = error(
     magicTodo.validateObligations(
@@ -56,7 +65,7 @@ test('TODO-002 rejects blank and duplicate obligation names as call syntax', () 
   assert.equal(duplicate.cases()[duplicate.tag], 'DuplicateObligationName')
 })
 
-test('TODO-004 rejects different todowrite calls in one assistant message as syntax/protocol error', () => {
+test('WHAT[OBLIGATION-LEDGER-007] rejects different todowrite calls in one assistant message as syntax/protocol error', () => {
   const rejected = error(magicTodo.admitTodowriteBatch(toList([firstCall, secondCall])))
   const replay = ok(magicTodo.admitTodowriteBatch(toList([firstCall, firstCall])))
 
@@ -64,7 +73,7 @@ test('TODO-004 rejects different todowrite calls in one assistant message as syn
   assert.equal(replay, undefined)
 })
 
-test('TODO-004 pure replay identity checker detects corruption for the Host fatal boundary', () => {
+test('WHAT[OBLIGATION-LEDGER-008] pure replay identity checker detects corruption for the Host fatal boundary', () => {
   const expected = new magicTodo.PreparedIdentity(life, 'provider-a', 'base-a', 3)
   const matching = new magicTodo.PreparedIdentity(life, 'provider-a', 'base-a', 3)
   const changed = new magicTodo.PreparedIdentity(life, 'provider-b', 'base-a', 3)
@@ -75,7 +84,7 @@ test('TODO-004 pure replay identity checker detects corruption for the Host fata
   assert.equal(rejected.fields[0], 'ProviderInputDigest')
 })
 
-test('TODO-004 replays an identical obligation checkpoint even while its review is outstanding', () => {
+test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint even while its review is outstanding (no new review from replay)', () => {
   const current = toList([obligation('implementation', 'Implement the requested behavior.')])
   const write = magicTodo.todoWriteId(sha256, life, firstCall)
   const existing = new magicTodoAdmission.ExistingPrepared(
@@ -102,7 +111,7 @@ test('TODO-004 replays an identical obligation checkpoint even while its review 
   assert.equal(caseOf(outcome), 'IdempotentReplay')
 })
 
-test('TODO-005 fresh admission freezes Base and Submitted without a merge preview', () => {
+test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted without a merge preview', () => {
   const current = toList([obligation('implementation', 'Implement the requested behavior.')])
   const submitted = toList([
     obligation('implementation', 'Implement the requested behavior.'),
@@ -134,7 +143,7 @@ test('TODO-005 fresh admission freezes Base and Submitted without a merge previe
   assert.equal(prepared.ProposedDigest, magicTodo.obligationListDigest(sha256, submitted))
 })
 
-test('OBLIGATION-LEDGER-022 blocks Finality until plan commitment, not merely until any checkpoint', () => {
+test('WHAT[OBLIGATION-LEDGER-022] blocks Finality until plan commitment, not merely until any checkpoint', () => {
   const missing = error(magicTodo.requirePlanCommitmentBeforeFirstSuicide(false))
   assert.equal(missing.cases()[missing.tag], 'FirstSuicideWithoutCheckpoint')
   assert.equal(ok(magicTodo.requirePlanCommitmentBeforeFirstSuicide(true)), undefined)

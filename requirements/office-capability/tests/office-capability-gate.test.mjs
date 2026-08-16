@@ -69,7 +69,7 @@ const writeOfficeFixture = (fx, overlay = {}) => {
   fx.writePair('tool/fork/description', texts.forkEn, texts.forkZh)
 }
 
-test('gate_f_catalog_names_five_forkable_offices', () => {
+test('WHAT[OFF-005] gate_f_catalog_names_five_forkable_offices', () => {
   assert.deepEqual(Object.keys(OFFICE_CAPABILITY_ANCHORS).sort(), [
     'browser',
     'coder',
@@ -84,7 +84,7 @@ test('gate_f_catalog_names_five_forkable_offices', () => {
   assert.equal(OFFICE_CAPABILITY_ANCHORS.inquiry.id, 'inquiry-reasoning')
 })
 
-test('gate_f_office_capability_fixture_is_green', () => {
+test('WHAT[OFF-005] gate_f_office_capability_fixture_is_green', () => {
   const fx = makeProviderFixture()
   try {
     writeOfficeFixture(fx)
@@ -94,7 +94,7 @@ test('gate_f_office_capability_fixture_is_green', () => {
   }
 })
 
-test('gate_f_missing_locale_leaf_is_red', () => {
+test('WHAT[OFF-005] gate_f_missing_locale_leaf_is_red', () => {
   const fx = makeProviderFixture()
   try {
     const violations = scanOfficeCapabilityIntegrity(fx.providerAbs)
@@ -105,7 +105,7 @@ test('gate_f_missing_locale_leaf_is_red', () => {
   }
 })
 
-test('gate_f_missing_manager_coder_projection_is_red', () => {
+test('WHAT[OFF-005] gate_f_missing_manager_coder_projection_is_red', () => {
   const fx = makeProviderFixture()
   try {
     writeOfficeFixture(fx, {
@@ -125,7 +125,7 @@ test('gate_f_missing_manager_coder_projection_is_red', () => {
   }
 })
 
-test('gate_f_manager_must_forbid_interchangeable_offices', () => {
+test('WHAT[OFF-006] gate_f_manager_must_forbid_interchangeable_offices', () => {
   const fx = makeProviderFixture()
   try {
     writeOfficeFixture(fx, {
@@ -148,7 +148,7 @@ test('gate_f_manager_must_forbid_interchangeable_offices', () => {
   }
 })
 
-test('gate_f_fork_must_not_commission_another_witness', () => {
+test('WHAT[OFF-006] gate_f_fork_must_not_commission_another_witness', () => {
   const fx = makeProviderFixture()
   try {
     writeOfficeFixture(fx, {

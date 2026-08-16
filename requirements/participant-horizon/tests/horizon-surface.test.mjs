@@ -178,7 +178,7 @@ const runtimeWithAgent = () => {
   return runtime
 }
 
-test('EXEC_005_horizon_description_says_work_record_and_pull_only_without_Y_jargon', () => {
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_description_says_work_record_and_pull_only_without_Y_jargon', () => {
   const description = spec(scopeFor(fakeJournal(handleProjection.empty), runtimeWithAgent())).Description
   assert.match(description, /latest work record/i)
   assert.match(description, /pull-only/i)
@@ -186,7 +186,7 @@ test('EXEC_005_horizon_description_says_work_record_and_pull_only_without_Y_jarg
   assert.doesNotMatch(description, /\bY\s+work record\b/i)
 })
 
-test('HORIZON_SURFACE_has_no_legacy_roster_dto', async () => {
+test('WHAT[PARTICIPANT-HORIZON-004] HORIZON_SURFACE_has_no_legacy_roster_dto', async () => {
   const handles = handleProjection.link(
     handleId.agent('ag-1'),
     sessionId('child-1'),
@@ -200,7 +200,7 @@ test('HORIZON_SURFACE_has_no_legacy_roster_dto', async () => {
   assert.ok(!FORBIDDEN.test(text), text)
 })
 
-test('EXEC_005_horizon_shows_only_each_visible_subagent_latest_work_record', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_shows_only_each_visible_subagent_latest_work_record', async () => {
   const firstBody = 'Investigated the parser and found the old edge case.'
   const latestBody = 'Patched the parser and the focused regression is green.'
   const secondBody = 'Mapped the release boundary and found no remaining blocker.'
@@ -249,7 +249,7 @@ test('EXEC_005_horizon_shows_only_each_visible_subagent_latest_work_record', asy
   assert.doesNotMatch(text, /Investigated the parser and found the old edge case\./)
 })
 
-test('EXEC_005_horizon_says_when_visible_subagent_has_no_work_record', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_says_when_visible_subagent_has_no_work_record', async () => {
   const handles = handleProjection.link(
     handleId.agent('ag-1'),
     sessionId('child-1'),
@@ -262,7 +262,7 @@ test('EXEC_005_horizon_says_when_visible_subagent_has_no_work_record', async () 
   assert.match(text, /fast-coder has no work record yet\./i)
 })
 
-test('EXEC_005_horizon_does_not_fall_back_when_latest_work_record_is_unreadable', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_does_not_fall_back_when_latest_work_record_is_unreadable', async () => {
   const oldBody = 'Old record that must not masquerade as current progress.'
   const latestBody = 'Newest record whose blob is unavailable.'
   const blog = yState([
@@ -284,7 +284,7 @@ test('EXEC_005_horizon_does_not_fall_back_when_latest_work_record_is_unreadable'
   assert.doesNotMatch(text, /Old record that must not masquerade as current progress\./)
 })
 
-test('EXEC_005_horizon_has_no_polling_or_background_wait_primitive', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_has_no_polling_or_background_wait_primitive', async () => {
   const source = await readFile(HORIZON_SOURCE, 'utf8')
   assert.doesNotMatch(source, /AwaitChangeFrom|Task\.Delay|setInterval|setTimeout|System\.Timers|PeriodicTimer/)
 })

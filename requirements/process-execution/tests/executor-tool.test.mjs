@@ -76,7 +76,7 @@ const parseToml = (text) =>
 
 const run = (runtimeScope, args, ctx = context()) => runSpec(factory, runtimeScope).Execute(makeArgs(args), ctx)
 
-test('RUN_spec_exposes_command_and_budget_arguments', () => {
+test('WHAT[PROC-011] RUN_spec_exposes_command_and_budget_arguments', () => {
   const tool = runSpec(factory, scope())
   assert.equal(tool.Name, 'run')
   assert.match(tool.Description, /deadline_seconds and output_budget_bytes/)
@@ -84,26 +84,26 @@ test('RUN_spec_exposes_command_and_budget_arguments', () => {
   assert.deepEqual(args, ['command', 'deadline_seconds', 'output_budget_bytes', 'world_lock'])
 })
 
-test('RUN_missing_command_is_rejected_before_spawn', async () => {
+test('WHAT[PROC-011] RUN_missing_command_is_rejected_before_spawn', async () => {
   const result = await run(scope(), {})
   assert.doesNotMatch(result, /\berror\s*=/)
   assert.match(result, /# Missing command/)
 })
 
-test('RUN_blank_command_is_rejected_before_spawn', async () => {
+test('WHAT[PROC-011] RUN_blank_command_is_rejected_before_spawn', async () => {
   const result = await run(scope(), { command: '   ' })
   assert.doesNotMatch(result, /\berror\s*=/)
   assert.match(result, /# Missing command/)
 })
 
-test('RUN_non_positive_deadline_is_rejected', async () => {
+test('WHAT[PROC-005] RUN_non_positive_deadline_is_rejected', async () => {
   for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
     const result = await run(scope(), { command: 'true', deadline_seconds: value })
     assert.match(result, /deadline_seconds must be a finite positive number/, `value=${value}`)
   }
 })
 
-test('RUN_invalid_output_budget_is_rejected', async () => {
+test('WHAT[PROC-005] RUN_invalid_output_budget_is_rejected', async () => {
   const negative = await run(scope(), { command: 'true', output_budget_bytes: -1 })
   assert.match(negative, /output_budget_bytes must be a finite non-negative integer/)
 
@@ -114,13 +114,13 @@ test('RUN_invalid_output_budget_is_rejected', async () => {
   assert.match(nan, /output_budget_bytes must be a finite non-negative integer/)
 })
 
-test('RUN_blank_session_surfaces_natural_execution_consequence_before_spawn', async () => {
+test('WHAT[PROC-011] RUN_blank_session_surfaces_natural_execution_consequence_before_spawn', async () => {
   const result = await run(scope(), { command: 'true' }, context(''))
   assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
   assert.match(result, /cannot run from this execution context/i)
 })
 
-test('RUN_completed_command_reports_exit_code_and_streams', async () => {
+test('WHAT[PROC-010] RUN_completed_command_reports_exit_code_and_streams', async () => {
   const result = parseToml(
     await run(scope(), { command: "printf 'hello-stdout'; printf 'hello-stderr' >&2" }),
   )
@@ -129,18 +129,18 @@ test('RUN_completed_command_reports_exit_code_and_streams', async () => {
   assert.equal(result.stderr, 'hello-stderr')
 })
 
-test('RUN_nonzero_exit_is_reported_not_thrown', async () => {
+test('WHAT[PROC-010] RUN_nonzero_exit_is_reported_not_thrown', async () => {
   const result = parseToml(await run(scope(), { command: 'exit 3' }))
   assert.equal(result.exit_code, '3')
 })
 
-test('RUN_deadline_overrun_returns_the_fixed_timeout_consequence', async () => {
+test('WHAT[PROC-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence', async () => {
   const result = await run(scope(), { command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 })
   assert.doesNotMatch(result, /TimeoutExceeded|\berror\s*=/)
   assert.match(result, /The command was still running when its allowed time ended, so it was stopped\./)
 })
 
-test('RUN_world_lock_is_accepted', async () => {
+test('WHAT[PROC-011] RUN_world_lock_is_accepted', async () => {
   const result = parseToml(await run(scope(), { command: "printf 'ok'", world_lock: true }))
   assert.equal(result.exit_code, '0')
   assert.equal(result.stdout, 'ok')
@@ -151,13 +151,13 @@ test('RUN_world_lock_is_accepted', async () => {
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('RUN_spooled_request_without_authority_fails_before_execution_without_identity_leak', async () => {
+test('WHAT[PROC-011] RUN_spooled_request_without_authority_fails_before_execution_without_identity_leak', async () => {
   const result = await run(scope(), SPOOL_BUDGET, context(''))
   assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
   assert.match(result, /cannot run from this execution context/i)
 })
 
-test('RUN_spooled_output_family_blocked_surfaces_recovery_consequence', async () => {
+test('WHAT[PROC-011] RUN_spooled_output_family_blocked_surfaces_recovery_consequence', async () => {
   const runtimeScope = scope()
   attachFamilyRecovery(
     runtimeScope,

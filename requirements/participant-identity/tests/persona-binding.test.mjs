@@ -13,7 +13,7 @@ import * as PersonaCatalog from '../../../dist/Participant/Persona/Catalog.js'
 import * as SessionPersona from '../../../dist/Participant/Persona/SessionPersona.js'
 import { resultOf, sessionId, unwrapOption } from '../../verification-system/tests/support/domain.mjs'
 
-test('PROMPT_STABILITY_persona_binds_once_and_never_rewrites', () => {
+test('WHAT[PID-003] persona_binds_once_and_never_rewrites', () => {
   SessionPersona.clearAllForTests()
   const owner = sessionId('ses_gate_d')
 
@@ -37,7 +37,7 @@ test('PROMPT_STABILITY_persona_binds_once_and_never_rewrites', () => {
   assert.match(rewrite.error, /already bound/)
 })
 
-test('PROMPT_STABILITY_persona_frozen_across_gate_d_events', () => {
+test('WHAT[PID-004] persona_frozen_across_gate_d_events', () => {
   // The Gate D t1/review/reanchor scenario (byte half in prefix-stability)
   // re-checks the persona at every gate; the persona half pins the same
   // bind-once law observed after the scenario.

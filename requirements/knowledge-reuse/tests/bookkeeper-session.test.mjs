@@ -68,7 +68,7 @@ export const scriptedBookkeeperPort = () => {
 
 const record = (session, q, a, observations) => ({ SessionId: session, Q: q, A: a, Observations: toList(observations), LastAccessOrder: 0 })
 
-test('CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))
   const local = createLocalEventStore()
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
@@ -93,7 +93,7 @@ test('CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   }
 })
 
-test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-fin-'))
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
@@ -128,7 +128,7 @@ test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', asy
   }
 })
 
-test('CASE006_missing_session_port_keeps_old_case', async () => {
+test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_session_port_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-noport-'))
   const local = createLocalEventStore()
   try {

@@ -55,7 +55,7 @@ const withJournal = async (facts, fn) => {
   }
 }
 
-test('TPOL_sessionDead_false_without_journal_or_on_fresh_journal', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_sessionDead_false_without_journal_or_on_fresh_journal', async () => {
   assert.equal(sessionDead(null, MAIN), false)
   assert.equal(sessionDead(undefined, MAIN), false)
   await withJournal([], async (journal) => {
@@ -63,7 +63,7 @@ test('TPOL_sessionDead_false_without_journal_or_on_fresh_journal', async () => {
   })
 })
 
-test('TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', async () => {
+test('WHAT[MANAGED-SESSION-015] TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', async () => {
   await withJournal([[MAIN, linkFact()]], async (journal) => {
     const record = tryLinkedChild(journal, 'ses_child')
     assert.ok(record, 'linked child must be findable')
@@ -75,19 +75,19 @@ test('TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', async () =
   })
 })
 
-test('TPOL_tryLinkedChild_without_journal_returns_none', () => {
+test('WHAT[MANAGED-SESSION-015] TPOL_tryLinkedChild_without_journal_returns_none', () => {
   assert.equal(tryLinkedChild(null, 'ses_child'), undefined)
   assert.equal(isLinkedChild(undefined, 'ses_child'), false)
 })
 
-test('TPOL_mainSealedForBlogger_false_without_journal_or_unlinked_main', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_mainSealedForBlogger_false_without_journal_or_unlinked_main', async () => {
   assert.equal(mainSealedForBlogger(null, MAIN), false)
   await withJournal([], async (journal) => {
     assert.equal(mainSealedForBlogger(journal, MAIN), false)
   })
 })
 
-test('TPOL_mainSealedForBlogger_retired_handle_seals_main', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_mainSealedForBlogger_retired_handle_seals_main', async () => {
   const completed = agentFact('HandleCompleted', {
     ParentSessionId: MAIN,
     Handle: handleId.agent('h1'),
@@ -107,7 +107,7 @@ test('TPOL_mainSealedForBlogger_retired_handle_seals_main', async () => {
   })
 })
 
-test('TPOL_outstandingBackground_manager_has_listable_handles', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_manager_has_listable_handles', async () => {
   await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.Manager, MAIN), true)
     assert.equal(outstandingBackground(journal, () => false, Role.Manager, OTHER), false)
@@ -115,7 +115,7 @@ test('TPOL_outstandingBackground_manager_has_listable_handles', async () => {
   assert.equal(outstandingBackground(null, () => false, Role.Manager, MAIN), false)
 })
 
-test('TPOL_outstandingBackground_devops_checks_durable_then_live_pty', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_devops_checks_durable_then_live_pty', async () => {
   await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => false, Role.DevOps, MAIN), true, 'durable handle counts')
   })
@@ -125,7 +125,7 @@ test('TPOL_outstandingBackground_devops_checks_durable_then_live_pty', async () 
   })
 })
 
-test('TPOL_outstandingBackground_orchestrator_active_jobs', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_orchestrator_active_jobs', async () => {
   const created = agentFact('ManagerJobCreated', {
     ManagerJobId: managerJobId('job_1'),
     ManagerSessionId: CHILD,
@@ -145,7 +145,7 @@ test('TPOL_outstandingBackground_orchestrator_active_jobs', async () => {
   assert.equal(outstandingBackground(null, () => false, Role.Orchestrator, MAIN), false)
 })
 
-test('TPOL_outstandingBackground_other_roles_never_outstanding', async () => {
+test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_other_roles_never_outstanding', async () => {
   await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(outstandingBackground(journal, () => true, Role.Coder, MAIN), false)
     assert.equal(outstandingBackground(journal, () => true, null, MAIN), false)

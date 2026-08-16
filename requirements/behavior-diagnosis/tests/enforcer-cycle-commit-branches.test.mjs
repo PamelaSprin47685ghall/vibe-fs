@@ -207,7 +207,7 @@ const manualCtx = (overrides = {}) =>
 
 // ── PERSIST-010 prechecks: staged coverage disagrees with the projection ────
 
-test('ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
+test('WHAT[BD-013] ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
     // First window commits (ingest 0→3 when 3 XTrace turns exist).
@@ -243,7 +243,7 @@ test('ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
   )
 })
 
-test('ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
+test('WHAT[BD-013] ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession }) => {
     await primeCycle(scope, journal)
     await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
@@ -273,7 +273,7 @@ test('ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
   )
 })
 
-test('ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
+test('WHAT[BD-013] ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession, blogSession }) => {
     await primeCycle(scope, journal)
@@ -322,7 +322,7 @@ test('ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
 
 // ── DU metadata surfaces (reflection / cases) ──────────────────────────────
 
-test('ENFORCER_du_reflection_surfaces_are_constructible', () => {
+test('WHAT[BD-013] ENFORCER_du_reflection_surfaces_are_constructible', () => {
   assert.equal(typeof CycleCommitOutcome_$reflection, 'function')
   assert.equal(typeof CycleDisposition_$reflection, 'function')
   assert.equal(typeof ContinuationOutcome_$reflection, 'function')

@@ -32,14 +32,14 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 
 // ── the initial state and the retired state are one state ───────────────────
 
-test('COMPANION_009_initial_epoch_has_no_snapshot', () => {
+test('WHAT[PREFIX-STABILITY-002] COMPANION_009_initial_epoch_has_no_snapshot', () => {
   assert.equal(prefix.epochOf(prefix.empty), 0n)
   assert.equal(prefix.hasSnapshot(prefix.empty), false)
 })
 
 // ── rebase: promote a probe's candidate ─────────────────────────────────────
 
-test('CTX_012_successful_probe_promotes_its_candidate_verbatim', () => {
+test('WHAT[PREFIX-STABILITY-002] CTX_012_successful_probe_promotes_its_candidate_verbatim', () => {
   const result = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 4, seal: 'seal-P1' })
 
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -53,7 +53,7 @@ test('CTX_012_successful_probe_promotes_its_candidate_verbatim', () => {
   assert.deepEqual(result.value.Snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
 
-test('CTX_011_promoted_cutoff_may_not_retreat', () => {
+test('WHAT[PREFIX-STABILITY-004] CTX_011_promoted_cutoff_may_not_retreat', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 6 }).value
 
   const backwards = rebase(committed, { previousEpoch: 1, nextEpoch: 2, cutoff: 3 })
@@ -63,7 +63,7 @@ test('CTX_011_promoted_cutoff_may_not_retreat', () => {
   assert.equal(forwards.ok, true, forwards.ok ? '' : forwards.error)
 })
 
-test('CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
+test('WHAT[PREFIX-STABILITY-004] CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
   // A Y squash makes B more compact without covering more X turns. Equal cutoff
   // plus a different FrozenRecordPrefix digest is therefore a legitimate promotion — this is
   // the case a naive "cutoff must increase" rule would wrongly reject.
@@ -81,7 +81,7 @@ test('CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
   assert.equal(prefix.epochOf(tighter.value), 2n)
 })
 
-test('CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
+test('WHAT[PREFIX-STABILITY-004] CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
   // Identity is (cutoff, prefix digest, FrozenRecordPrefix digest). CTX-011 already refuses
   // to BUILD such a probe, so a line carrying one is a replay. The projection
   // reports it rather than silently applying: promoting would spend an epoch and
@@ -98,7 +98,7 @@ test('CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
   assert.equal(prefix.epochOf(committed), 1n)
 })
 
-test('PERSIST_010_rebase_epoch_must_be_the_successor', () => {
+test('WHAT[PREFIX-STABILITY-004] PERSIST_010_rebase_epoch_must_be_the_successor', () => {
   for (const nextEpoch of [0, 2, 5]) {
     assert.deepEqual(
       rebase(prefix.empty, { previousEpoch: 0, nextEpoch, cutoff: 3 }),
@@ -108,7 +108,7 @@ test('PERSIST_010_rebase_epoch_must_be_the_successor', () => {
   }
 })
 
-test('CTX_012_a_replayed_rebase_is_reported_as_stale', () => {
+test('WHAT[PREFIX-STABILITY-005] CTX_012_a_replayed_rebase_is_reported_as_stale', () => {
   // CTX-012's recovery path re-attempts the commit after a restart: it cannot
   // know whether the append landed before the crash. The second attempt carries
   // the epoch it expected, which the projection has left.
@@ -125,7 +125,7 @@ test('CTX_012_a_replayed_rebase_is_reported_as_stale', () => {
   assert.deepEqual(once.Snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
 
-test('CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
+test('WHAT[PREFIX-STABILITY-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
   // There is no rollback operation to test, and that absence IS the clause: a
   // discarded candidate never became a fact. The projection a failed probe leaves
   // behind is byte-identical to the one before it.
@@ -149,7 +149,7 @@ test('CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
 
   const result = reanchor(committed, { previousEpoch: 1, nextEpoch: 2 })
@@ -172,7 +172,7 @@ test('HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
   assert.deepEqual(prefix.reanchoredRuns(result.value), ['msg_compaction'])
 })
 
-test('HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => {
   // A manual /compact on a session with no committed snapshot. Nothing to retire,
   // but the cold boundary is just as real, and the epoch is what the frame
   // projection's coverage reset is paired with under one fact.
@@ -183,7 +183,7 @@ test('HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => 
   assert.equal(prefix.hasSnapshot(result.value), false)
 })
 
-test('PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
+test('WHAT[PREFIX-STABILITY-006] PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
   for (const nextEpoch of [0, 3, 9]) {
     assert.deepEqual(
       reanchor(prefix.empty, { previousEpoch: 0, nextEpoch }),
@@ -193,7 +193,7 @@ test('PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
   }
 })
 
-test('HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
   // Two observations of one pseudo-run must produce one retirement.
   const once = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1 }).value
 
@@ -203,7 +203,7 @@ test('HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
   assert.equal(prefix.epochOf(once), 1n, 'the epoch did not move twice')
 })
 
-test('HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', () => {
   // The failure the recorded-run set exists for, and the reason the epoch check alone
   // is not enough.
   //
@@ -226,7 +226,7 @@ test('HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', ()
   assert.equal(prefix.hasSnapshot(promoted), true)
 })
 
-test('CTX_012_probe_capability_returns_after_a_reanchor', () => {
+test('WHAT[PREFIX-STABILITY-002] CTX_012_probe_capability_returns_after_a_reanchor', () => {
   // The reanchor is not a permanent shutdown. Once the Companion rebuilds
   // coverage in the new numbering, a probe promotes normally — from cutoff 1,
   // because the retired snapshot no longer imposes a floor.
@@ -243,7 +243,7 @@ test('CTX_012_probe_capability_returns_after_a_reanchor', () => {
   assert.deepEqual(prefix.reanchoredRuns(rebuilt.value), ['msg_compaction'])
 })
 
-test('HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
   // A second, different pseudo-run on an already-reanchored session. It must be
   // accepted, or a second manual /compact would leave the session pointing at a
   // numbering the transcript no longer has.
@@ -258,4 +258,35 @@ test('HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
   assert.equal(prefix.isReanchored('msg_c1', second.value), true)
   assert.equal(prefix.isReanchored('msg_c2', second.value), true)
   assert.equal(prefix.isReanchored('msg_c3', second.value), false)
+})
+
+test('WHAT[PREFIX-STABILITY-012] PREFIX_STABILITY_committed_reanchor_survives_subsequent_failure', () => {
+  // CTX-015 / HOST-006：已提交的 reanchor（ContextReanchored）与 rebase
+  // （PrefixRebaseCommitted）不因后续 provider failure 回滚。投影层没有
+  // provider 结局输入；「失败后回滚」在类别上不存在（同 CTX-010 的
+  // 无 rollback 断言模式），且失败的重试（refusal）不触碰已提交状态。
+  const rollbackShaped = Object.keys(prefix).filter((key) => /rollback|revert|undo|restore|clear|discard/i.test(key))
+  assert.deepEqual(rollbackShaped, [], 'no rollback category exists on the epoch projection')
+
+  const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
+  const reanchored = reanchor(committed, { previousEpoch: 1, nextEpoch: 2, observedRun: 'msg_c1' }).value
+
+  // A subsequent, ill-formed attempt (stale epoch / non-successor / replay of
+  // the same compaction) is refused — and the committed reanchor stays exactly
+  // as it was: epoch advanced once, snapshot retired, run recorded.
+  assert.deepEqual(
+    rebase(reanchored, { previousEpoch: 1, nextEpoch: 2, cutoff: 9 }),
+    { ok: false, error: 'StalePrefixEpoch' },
+  )
+  assert.deepEqual(
+    reanchor(reanchored, { previousEpoch: 2, nextEpoch: 3, observedRun: 'msg_c1' }),
+    { ok: false, error: 'CompactionAlreadyReanchored' },
+  )
+  assert.deepEqual(
+    rebase(reanchored, { previousEpoch: 2, nextEpoch: 4, cutoff: 9 }),
+    { ok: false, error: 'NonSequentialPrefixEpoch' },
+  )
+  assert.equal(prefix.epochOf(reanchored), 2n)
+  assert.equal(prefix.hasSnapshot(reanchored), false)
+  assert.deepEqual(prefix.reanchoredRuns(reanchored), ['msg_c1'])
 })

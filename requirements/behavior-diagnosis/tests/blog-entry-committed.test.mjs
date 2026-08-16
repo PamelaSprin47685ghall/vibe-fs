@@ -87,7 +87,7 @@ const foldErr = (envelopes) => {
 
 // ── ENFORCER-045: one fact, two projections ─────────────────────────────────
 
-test('ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
+test('WHAT[BD-012] ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
   const s = foldOk([
     entryWithEnforcement({
       from: 0,
@@ -106,7 +106,7 @@ test('ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
   assert.equal(s.Blog.Coverage.CoverableTurnCutoffExclusive, 1)
 })
 
-test('ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
+test('WHAT[BD-012] ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
   const s = foldOk([
     entryWithEnforcement({
       from: 0,
@@ -131,7 +131,7 @@ test('ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
   assert.equal(record.CycleScoreRef, undefined, 'ScoreVectorRef path deleted')
 })
 
-test('ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => {
+test('WHAT[BD-014] ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => {
   const error = foldErr([
     entryWithEnforcement({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, run: 'msg_dup' }),
     entryWithEnforcement({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, run: 'msg_dup' }),
@@ -139,7 +139,7 @@ test('ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => {
   assert.ok(error, 'duplicate ProviderRun must be rejected')
 })
 
-test('ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
+test('WHAT[BD-013] ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
   const error = foldErr([
     entryWithEnforcement({ from: 0, to: 2, cutoffFrom: 0, cutoffTo: 1, n: 1, run: 'msg_a' }),
     // Previous=0 but projection is at 2 — a correct writer cannot produce this.
@@ -148,7 +148,7 @@ test('ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
   assert.ok(error, 'stale previous ingest cursor must be rejected')
 })
 
-test('ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
+test('WHAT[BD-012] ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
   // The AgentFact union no longer contains the case; building it must fail.
   assert.throws(
     () =>

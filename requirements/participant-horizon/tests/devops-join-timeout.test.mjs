@@ -10,14 +10,14 @@ import { joinResultRenderer } from '../../verification-system/tests/support/doma
 import { ForkError } from '../../../dist/Execution/Delegation/Fork/Model.js'
 import { JoinInterruptReason } from '../../../dist/Execution/Session/Wait/CompletionMailbox.js'
 
-test('devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
   const wire = joinResultRenderer.renderInterrupted(JoinInterruptReason.DeadlineExpired)
   assert.match(wire, /No return reached you before your waiting ended/)
   assert.equal(parseToml(wire).status, undefined)
   assert.equal(parseToml(wire).error, undefined)
 })
 
-test('devops_join_timed_out_fork_error_also_natural_language', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] devops_join_timed_out_fork_error_also_natural_language', () => {
   const wire = joinResultRenderer.renderForkError(ForkError.TimedOut)
   assert.match(wire, /No return reached you before your waiting ended/)
   assert.equal(parseToml(wire).status, undefined)

@@ -34,7 +34,7 @@ const buildTool = async (dir, store) => {
 const record = (session, q, a, obs) => ({ SessionId: session, Q: q, A: a, Observations: toList(obs), LastAccessOrder: 0 })
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
-test('CASE004_fetch_uses_shelfmark_and_natural_fresh_refreshed_no_case_consequences', async () => {
+test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_refreshing', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   try {
@@ -48,7 +48,6 @@ test('CASE004_fetch_uses_shelfmark_and_natural_fresh_refreshed_no_case_consequen
 
     const fresh = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.match(fresh, /No change was found in the evidence this answer depended on/)
-    assert.match(fresh, /answer = "A1"/)
     assertNoMachineFreshness(fresh)
     assert.equal(fresh.includes('s1'), false)
 
@@ -72,7 +71,25 @@ test('CASE004_fetch_uses_shelfmark_and_natural_fresh_refreshed_no_case_consequen
   }
 })
 
-test('CASE009_fetch_never_writes_the_subject', async () => {
+test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async () => {
+  const { dir, cleanup } = sandbox()
+  const local = createLocalEventStore()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', hash('hello'))])
+    assert.equal(resultOf(await archive(local.store, caseRec)).ok, true)
+    const tool = await buildTool(dir, local.store)
+    const shelfmark = shelfmarkFor('s1', caseRec.Q)
+
+    const fresh = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
+    assert.match(fresh, /answer = "A1"/)
+  } finally {
+    local.close()
+    cleanup()
+  }
+})
+
+test('WHAT[KNOWLEDGE-REUSE-001] CASE009_fetch_never_writes_the_subject', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   try {
@@ -87,7 +104,7 @@ test('CASE009_fetch_never_writes_the_subject', async () => {
   }
 })
 
-test('CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
+test('WHAT[KNOWLEDGE-REUSE-011] CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   try {

@@ -35,7 +35,7 @@ const failingPort = () => {
 }
 const record = (session, q, a, obs) => ({ SessionId: session, Q: q, A: a, Observations: toList(obs), LastAccessOrder: 0 })
 
-test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-err-'))
   const local = createLocalEventStore()
   const { port } = failingPort()
@@ -58,7 +58,7 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
   }
 })
 
-test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-once-'))
   const local = createLocalEventStore()
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
@@ -79,7 +79,7 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   }
 })
 
-test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-fin-'))
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
@@ -115,7 +115,7 @@ test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
   }
 })
 
-test('CASE010_cleanup_never_synthesizes', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] CASE010_cleanup_never_synthesizes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-cleanup-'))
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {

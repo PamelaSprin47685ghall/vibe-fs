@@ -152,7 +152,7 @@ const manualCtx = (overrides = {}) =>
 
 // ── lastAssistantStep shape variants (direct, exported) ────────────────────
 
-test('ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
+test('WHAT[BD-017] ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
   assert.equal(lastAssistantStep(toList([null])), undefined, 'null message skipped')
   assert.equal(
     lastAssistantStep(toList([{ info: { id: 'x', role: 'user' } }])),
@@ -188,7 +188,7 @@ test('ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
 
 // ── extractCalls / validateCycle through the continuation ──────────────────
 
-test('ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', async () => {
+test('WHAT[BD-017] ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // Completed blog part whose input fails tip re-validation: the call is a
@@ -204,7 +204,7 @@ test('ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', async () => {
   })
 })
 
-test('ENFORCER_whitespace_message_id_fails_cycle_validation', async () => {
+test('WHAT[BD-010] ENFORCER_whitespace_message_id_fails_cycle_validation', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const out = await run(
@@ -224,7 +224,7 @@ test('ENFORCER_whitespace_message_id_fails_cycle_validation', async () => {
   })
 })
 
-test('ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => {
+test('WHAT[BD-010] ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep, mainSession }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
@@ -248,7 +248,7 @@ test('ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => 
 
 // ── blog-part status predicates ────────────────────────────────────────────
 
-test('ENFORCER_completed_blog_part_in_empty_arm_rebuilds', async () => {
+test('WHAT[BD-017] ENFORCER_completed_blog_part_in_empty_arm_rebuilds', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // A completed part that fails decode AND a text part: hasFailedBlogAttempt
@@ -265,7 +265,7 @@ test('ENFORCER_completed_blog_part_in_empty_arm_rebuilds', async () => {
   })
 })
 
-test('ENFORCER_interrupted_statusless_blog_part_aabbs', async () => {
+test('WHAT[BD-017] ENFORCER_interrupted_statusless_blog_part_aabbs', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // Abort cleanup can leave a blog part with no status but
@@ -293,7 +293,7 @@ const outcomeMessagesOf = (outcome) => {
   return []
 }
 
-test('ENFORCER_uninterrupted_statusless_blog_part_rebuilds', async () => {
+test('WHAT[BD-017] ENFORCER_uninterrupted_statusless_blog_part_rebuilds', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const out = await run(
@@ -307,7 +307,7 @@ test('ENFORCER_uninterrupted_statusless_blog_part_rebuilds', async () => {
   })
 })
 
-test('ENFORCER_running_blog_part_projects_raw', async () => {
+test('WHAT[BD-017] ENFORCER_running_blog_part_projects_raw', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const out = await run(
@@ -320,7 +320,7 @@ test('ENFORCER_running_blog_part_projects_raw', async () => {
   })
 })
 
-test('ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', async () => {
+test('WHAT[BD-017] ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // A status outside the known vocabulary is not completed/error/pending/
@@ -336,7 +336,7 @@ test('ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', async () => {
   })
 })
 
-test('ENFORCER_stateless_blog_part_has_no_status', async () => {
+test('WHAT[BD-017] ENFORCER_stateless_blog_part_has_no_status', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // Blog tool part with no `state` at all: blogPartStatus is None.
@@ -348,7 +348,7 @@ test('ENFORCER_stateless_blog_part_has_no_status', async () => {
   })
 })
 
-test('ENFORCER_statusless_blog_part_is_not_incomplete', async () => {
+test('WHAT[BD-017] ENFORCER_statusless_blog_part_is_not_incomplete', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // state present but no status: not pending/running (hasIncomplete=false),
@@ -363,7 +363,7 @@ test('ENFORCER_statusless_blog_part_is_not_incomplete', async () => {
   })
 })
 
-test('ENFORCER_null_part_in_transcript_is_ignored', async () => {
+test('WHAT[BD-017] ENFORCER_null_part_in_transcript_is_ignored', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // A null part is not a blog tool; a completed assistant with no blog parts

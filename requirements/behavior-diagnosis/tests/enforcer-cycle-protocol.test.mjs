@@ -483,7 +483,7 @@ const isNoRecovery = (journal, messages) =>
 
 // ── BlogTool execute gate (ENFORCER-061) ────────────────────────────────────
 
-test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
+test('WHAT[BD-017] ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
   assert.equal(typeof BlogTool.EmptyTextError, 'string')
   assert.match(BlogTool.EmptyTextError, /CHRONICLE_EMPTY_ENFORCER_061/)
 
@@ -501,7 +501,7 @@ test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
 
 // ── empty text cycle → real one-shot InteractionRepair (live tool-loop) ─────
 
-test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
+test('WHAT[BD-017] ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
   await withHarness(async ({ scope, fatals, run }) => {
     const out = await run(liveBlog('asst-1', 'c1', { text: '' }))
 
@@ -513,7 +513,7 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
   })
 })
 
-test('ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
+test('WHAT[BD-017] ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
   await withHarness(async ({ scope, fatals, lastFatal, run }) => {
     await run(liveBlog('asst-1', 'c1', { text: '' }))
     const out = await run(liveBlog('asst-2', 'c2', { text: '   ' }))
@@ -527,7 +527,7 @@ test('ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
   })
 })
 
-test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ignore', async () => {
+test('WHAT[BD-017] ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ignore', async () => {
   // Real Host sets time.completed before the next transform. Ownership is
   // live CurrentRequest, not the completed flag. Empty text still AABB once.
   await withHarness(async ({ scope, fatals, run }) => {
@@ -540,7 +540,7 @@ test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ign
   })
 })
 
-test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
+test('WHAT[BD-017] ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
 
@@ -555,7 +555,7 @@ test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
 
 // ── no blog pure prose (ENFORCER-060 / 064..068) ────────────────────────────
 
-test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(pureProse('asst-p', 'I refuse tools'))
 
@@ -569,7 +569,7 @@ test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async ()
   })
 })
 
-test('ENFORCER_060_pure_prose_same_terminal_reentry_does_not_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_060_pure_prose_same_terminal_reentry_does_not_aabb', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     await run(pureProse('asst-same', 'no tools'))
     assert.equal(capturedSends.length, 1)
@@ -585,7 +585,7 @@ test('ENFORCER_060_pure_prose_same_terminal_reentry_does_not_aabb', async () => 
   })
 })
 
-test('ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send', async () => {
+test('WHAT[BD-017] ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send', async () => {
   // ENFORCER-067 / defect 3: durable claim already exists for this terminal.
   // Pure prose re-entry must NOT AABB, must set InteractionNudgeIssued, must not
   // re-dispatch InteractionRepair.
@@ -630,7 +630,7 @@ test('ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send',
   })
 })
 
-test('ENFORCER_060_pure_prose_second_terminal_triggers_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_060_pure_prose_second_terminal_triggers_aabb', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     await run(pureProse('asst-p1', 'no tools'))
     assert.equal(capturedSends.length, 1)
@@ -646,7 +646,7 @@ test('ENFORCER_060_pure_prose_second_terminal_triggers_aabb', async () => {
   })
 })
 
-test('ENFORCER_042_multi_call_first_terminal_issues_one_nudge_and_does_not_commit', async () => {
+test('WHAT[BD-009] ENFORCER_042_multi_call_first_terminal_issues_one_nudge_and_does_not_commit', async () => {
   await withHarness(async ({ journal, scope, fatals, runWithImmediatePark, capturedSends }) => {
     const out = await runWithImmediatePark(multiChronicle('asst-multi-1'))
     const main = fold.session(AgentJournalModule_snapshot(journal), MAIN)
@@ -660,7 +660,7 @@ test('ENFORCER_042_multi_call_first_terminal_issues_one_nudge_and_does_not_commi
   })
 })
 
-test('ENFORCER_042_multi_call_same_terminal_reentry_is_idempotent', async () => {
+test('WHAT[BD-009] ENFORCER_042_multi_call_same_terminal_reentry_is_idempotent', async () => {
   await withHarness(async ({ scope, fatals, runWithImmediatePark, capturedSends }) => {
     await runWithImmediatePark(multiChronicle('asst-multi-same'))
     const out = await runWithImmediatePark(multiChronicle('asst-multi-same'))
@@ -672,7 +672,7 @@ test('ENFORCER_042_multi_call_same_terminal_reentry_is_idempotent', async () => 
   })
 })
 
-test('ENFORCER_042_second_multi_call_terminal_after_nudge_triggers_aabb', async () => {
+test('WHAT[BD-009] ENFORCER_042_second_multi_call_terminal_after_nudge_triggers_aabb', async () => {
   await withHarness(async ({ journal, scope, fatals, runWithImmediatePark, capturedSends }) => {
     await runWithImmediatePark(multiChronicle('asst-multi-a'))
     const out = await runWithImmediatePark(multiChronicle('asst-multi-b', 'c-c', 'c-d'))
@@ -687,7 +687,7 @@ test('ENFORCER_042_second_multi_call_terminal_after_nudge_triggers_aabb', async 
   })
 })
 
-test('ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
+test('WHAT[BD-017] ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
   await withHarness(async ({ journal, scope, fatals, lastFatal, run, blog }) => {
     const out1 = await run(pureProse('asst-p1', 'no tools'))
     const out2 = await run(pureProse('asst-p2', 'still no')) // AABB
@@ -702,7 +702,7 @@ test('ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
   })
 })
 
-test('ENFORCER_060_nudge_dispatch_hard_fail_triggers_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_060_nudge_dispatch_hard_fail_triggers_aabb', async () => {
   await withHarness(
     async ({ scope, fatals, run }) => {
       const out = await run(pureProse('asst-fail-nudge', 'prose'))
@@ -715,7 +715,7 @@ test('ENFORCER_060_nudge_dispatch_hard_fail_triggers_aabb', async () => {
   )
 })
 
-test('ENFORCER_060_nudge_without_session_port_triggers_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_060_nudge_without_session_port_triggers_aabb', async () => {
   await withHarness(
     async ({ scope, fatals, run }) => {
       const out = await run(pureProse('asst-no-port', 'prose'))
@@ -727,7 +727,7 @@ test('ENFORCER_060_nudge_without_session_port_triggers_aabb', async () => {
   )
 })
 
-test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
+test('WHAT[BD-017] ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(pendingBlog('asst-pend', 'cp'))
 
@@ -739,7 +739,7 @@ test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
   })
 })
 
-test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
+test('WHAT[BD-017] ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(outboundShell('asst-outbound'))
 
@@ -757,7 +757,7 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
   })
 })
 
-test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () => {
+test('WHAT[BD-017] ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(interruptedBlog('asst-killed', 'blog-hang'))
 
@@ -770,7 +770,7 @@ test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () 
   })
 })
 
-test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', async () => {
+test('WHAT[BD-017] ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     // Harness starts InFlight. A completed interrupted blog part is Host abort cleanup:
     // AABB once (refresh + repair), not pure-prose nudge.
@@ -786,7 +786,7 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
   })
 })
 
-test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () => {
+test('WHAT[BD-017] ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(hasFlight(scope), false)
@@ -805,7 +805,7 @@ test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () =
   })
 })
 
-test('ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async () => {
+test('WHAT[BD-017] ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     // P0 AbortSession residue: interrupted blog parts remain after stop, but CurrentRequest
     // is gone. Must not re-derive durable open and inject # Protocol repair.
@@ -829,14 +829,14 @@ test('ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async
 // message on the transcript. Those evidence paths are asserted by the turn
 // trajectory tests above; flight ownership is hasFlight / CurrentRequest only.
 
-test('ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
+test('WHAT[BD-017] ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
   assert.match(RepairInstruction, /Protocol repair/)
   assert.match(RepairInstruction, /chronicle tool exactly once/)
   assert.equal(RepairInstruction.includes('{{'), false, 'no dynamic template')
   assert.equal(RepairInstruction.includes('toml'), false)
 })
 
-test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', async () => {
+test('WHAT[BD-017] ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', async () => {
   await withHarness(async ({ journal, scope, fatals, lastFatal, run, main, blog }) => {
     // FALLBACK-001: an accepted primary root creates the primary cursor (Fork0).
     // PromptDispatcher.Runtime__AcceptHumanRoot is the proven seed (loop-sensor
@@ -875,7 +875,7 @@ test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', asyn
   })
 })
 
-test('ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
+test('WHAT[BD-017] ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
   await withHarness(
     async ({ journal, scope, fatals, run, main }) => {
       // FALLBACK-001: an accepted primary root creates the primary cursor.
@@ -901,7 +901,7 @@ test('ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
   )
 })
 
-test('LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async () => {
+test('WHAT[BD-017] LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async () => {
   await withHarness(async ({ journal, fatals, run, main }) => {
     // FALLBACK-001: an accepted primary root creates the primary cursor (Fork0).
     const runtime = promptDispatcher.forJournal(journal)
@@ -924,7 +924,7 @@ test('LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async
   })
 })
 
-test('ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once', async () => {
+test('WHAT[BD-017] ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once', async () => {
   await withHarness(async ({ journal, fatals, run, main }) => {
     const runtime = promptDispatcher.forJournal(journal)
     const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')

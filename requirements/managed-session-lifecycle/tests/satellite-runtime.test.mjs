@@ -57,7 +57,7 @@ const host = (children, created = []) => ({
   FamilyRootOf: () => sessionId('root'),
 })
 
-test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
   const linked = []
   const created = []
   // Physical parent is 'root', not the owner — reuse must not depend on parentID.
@@ -72,7 +72,7 @@ test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_fl
   assert.deepEqual(linked, [['work', 'blogger-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_companion_satellite_recovery_closes_old_durable_link_before_linking_replacement', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_closes_old_durable_link_before_linking_replacement', async () => {
   const linked = []
   const closed = []
   const created = []
@@ -88,14 +88,14 @@ test('HOST_015_companion_satellite_recovery_closes_old_durable_link_before_linki
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_direct_companion_repoint_trips_process_fatal_on_semantic_cut', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_015_direct_companion_repoint_trips_process_fatal_on_semantic_cut', async () => {
   const observed = await directCompanionRepointFatal()
   assert.equal(observed.result, 'Error', 'node:test suppresses the physical kill so the typed cut receipt remains assertable')
   assert.ok(observed.recorded.some((line) => line.includes('journal-semantic-cut')), 'semantic cut must trip process fatal')
   assert.ok(observed.recorded.some((line) => line.includes('COMPANION-002')), 'fatal record must preserve the invariant reason')
 })
 
-test('HOST_015_companion_replacement_transitions_real_durable_link_without_semantic_cut', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_015_companion_replacement_transitions_real_durable_link_without_semantic_cut', async () => {
   const observed = await durableCompanionReplacement()
   assert.equal(observed.ok, true, observed.error ?? '')
   assert.equal(observed.origin, 'Replacement')
@@ -103,7 +103,7 @@ test('HOST_015_companion_replacement_transitions_real_durable_link_without_seman
   assert.equal(observed.bloggerId, 'created-1')
 })
 
-test('HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
   const linked = []
   const created = []
   // Journal links blogger-1, but the Host child with that id carries a
@@ -118,7 +118,7 @@ test('HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_chi
   assert.deepEqual(linked, [])
 })
 
-test('HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
   const linked = []
   const created = []
   // A same-agent/title child sits under the shared flat root (it belongs to
@@ -135,7 +135,7 @@ test('HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_with
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
   const linked = []
   const closed = []
   const created = []
@@ -154,7 +154,7 @@ test('HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_014_failed_companion_ensure_invalidates_satellite_flight_before_retry', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_014_failed_companion_ensure_invalidates_satellite_flight_before_retry', async () => {
   const observed = await failedCompanionEnsureRetry()
   assert.match(observed.firstError, /temporary host snapshot failure/)
   assert.equal(observed.recoveredId, 'retry-created-1')
@@ -162,7 +162,7 @@ test('HOST_014_failed_companion_ensure_invalidates_satellite_flight_before_retry
   assert.equal(observed.createCalls, 1)
 })
 
-test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
+test('WHAT[MANAGED-SESSION-002] HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
   const created = []
   let createCalls = 0
   let releaseCreate
@@ -193,7 +193,7 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
   assert.deepEqual(created, ['created-1'])
 })
 
-test('HOST_014_children_query_failure_does_not_guess_or_create', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_014_children_query_failure_does_not_guess_or_create', async () => {
   const created = []
   const sessions = host([], created)
   sessions.ListChildren = async () => errorResult('children unavailable')

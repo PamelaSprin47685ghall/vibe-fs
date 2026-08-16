@@ -86,7 +86,7 @@ const fallbackOf = (projection) => fallbackProjection.read(fold.session(projecti
 
 // ── FALLBACK-002: the two quantities, and what each operation moves ──────────
 
-test('FALLBACK_002_a_fresh_cursor_starts_at_offset_zero_with_no_budget_spent', () => {
+test('WHAT[PAR-002] FALLBACK_002_a_fresh_cursor_starts_at_offset_zero_with_no_budget_spent', () => {
   assert.deepEqual(cursor.read(cursor.initial), { offset: 0, failures: 0 })
 
   // FALLBACK-001 expresses "a new root starts fresh" as a constructor, not a
@@ -101,7 +101,7 @@ test('FALLBACK_002_a_fresh_cursor_starts_at_offset_zero_with_no_budget_spent', (
   })
 })
 
-test('FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing', () => {
+test('WHAT[PAR-002] FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing', () => {
   assert.deepEqual([0, 1, 2, 3].map(cursor.advance), [1, 2, 3, 0])
 
   // Twelve failures walk the cycle three times. The cycle itself has no terminal
@@ -117,7 +117,7 @@ test('FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing', () => {
   assert.equal(value.ConsecutiveFailureCount, 12)
 })
 
-test('FALLBACK_002_each_offset_maps_to_a_fixed_side_and_a_fixed_agent', () => {
+test('WHAT[PAR-002] FALLBACK_002_each_offset_maps_to_a_fixed_side_and_a_fixed_agent', () => {
   assert.deepEqual([0, 1, 2, 3].map(cursor.side), ['SideA', 'SideA', 'SideB', 'SideB'])
 
   // A/A/B/B: the agent is a function of the offset alone, which is what makes
@@ -128,7 +128,7 @@ test('FALLBACK_002_each_offset_maps_to_a_fixed_side_and_a_fixed_agent', () => {
   )
 })
 
-test('FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor_position', () => {
+test('WHAT[PAR-002] FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor_position', () => {
   // Fail loudly rather than defaulting to SideA. A cursor holding 4 came from a
   // corrupt journal line, and answering "SideA" would send the attempt to a model
   // chosen by an arithmetic accident.
@@ -137,7 +137,7 @@ test('FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor_position', ()
   }
 })
 
-test('FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction', () => {
+test('WHAT[PAR-006] FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction', () => {
   // The clause states the table for the first attempts; the property is that it
   // repeats forever rather than stopping at the fourth.
   assert.deepEqual(cursor.sideSequence(0), [])
@@ -154,7 +154,7 @@ test('FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction', () => 
 
 // ── FALLBACK-004: success clears the budget and leaves the offset alone ──────
 
-test('FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget', () => {
+test('WHAT[PAR-004] FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget', () => {
   assert.deepEqual(cursor.read(cursor.recordFailure({ Offset: 0, ConsecutiveFailureCount: 0 })), {
     offset: 1,
     failures: 1,
@@ -168,7 +168,7 @@ test('FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget', (
   })
 })
 
-test('FALLBACK_004_success_resets_the_budget_but_NOT_the_offset', () => {
+test('WHAT[PAR-004] FALLBACK_004_success_resets_the_budget_but_NOT_the_offset', () => {
   // The clause's own example: fail once, succeed once, and the cursor parks at
   // offset 1. Resetting it would send the next failure back to the side that
   // already failed — VERIFY-006 names this exact regression.
@@ -181,7 +181,7 @@ test('FALLBACK_004_success_resets_the_budget_but_NOT_the_offset', () => {
   assert.deepEqual(cursor.read(cursor.recordFailure(afterSuccess)), { offset: 2, failures: 1 })
 })
 
-test('FALLBACK_004_success_leaves_a_parked_odd_offset_in_place', () => {
+test('WHAT[PAR-004] FALLBACK_004_success_leaves_a_parked_odd_offset_in_place', () => {
   // Consequence worth pinning separately, because FALLBACK-012 depends on it: a
   // parked cursor can sit on an odd offset, which is why arming may not be
   // derived from parity alone.
@@ -194,14 +194,14 @@ test('FALLBACK_004_success_leaves_a_parked_odd_offset_in_place', () => {
 
 // ── FALLBACK-005: the budget is finite, and judged after the failure ─────────
 
-test('FALLBACK_005_the_default_automatic_recovery_budget_is_twelve', () => {
+test('WHAT[PAR-005] FALLBACK_005_the_default_automatic_recovery_budget_is_twelve', () => {
   // Readable from a layer 1 test on purpose: a clause constant no test can assert
   // is a clause with no gate. (`[<Literal>]` would be inlined by Fable and
   // exported nowhere.)
   assert.equal(cursor.defaultBudget, 12)
 })
 
-test('FALLBACK_005_the_verdict_is_taken_after_the_failure_so_the_twelfth_is_final', () => {
+test('WHAT[PAR-005] FALLBACK_005_the_verdict_is_taken_after_the_failure_so_the_twelfth_is_final', () => {
   // The clause's sequence: the 12th failure lands on offset 3, advances to 0, and
   // is immediately final. There is no automatic 13th attempt.
   let value = cursor.initial
@@ -217,7 +217,7 @@ test('FALLBACK_005_the_verdict_is_taken_after_the_failure_so_the_twelfth_is_fina
   assert.equal(verdicts[11], 'Exhausted')
 })
 
-test('FALLBACK_005_a_configured_budget_is_honoured_and_never_infinite', () => {
+test('WHAT[PAR-005] FALLBACK_005_a_configured_budget_is_honoured_and_never_infinite', () => {
   const at = (count) => ({ Offset: 0, ConsecutiveFailureCount: count })
 
   assert.deepEqual(
@@ -232,7 +232,7 @@ test('FALLBACK_005_a_configured_budget_is_honoured_and_never_infinite', () => {
 
 // ── FALLBACK-007: the fold validates every advance ──────────────────────────
 
-test('FALLBACK_007_a_valid_advance_moves_the_durable_cursor', () => {
+test('WHAT[PAR-007] FALLBACK_007_a_valid_advance_moves_the_durable_cursor', () => {
   const before = fallbackProjection.forAuthority(RUN, ROOT)
   const applied = fallbackProjection.applyAdvance(identityFor('run_1'), 0, 1, 1, before)
 
@@ -247,7 +247,7 @@ test('FALLBACK_007_a_valid_advance_moves_the_durable_cursor', () => {
   })
 })
 
-test('FALLBACK_007_the_next_offset_must_be_the_modulo_four_successor', () => {
+test('WHAT[PAR-007] FALLBACK_007_the_next_offset_must_be_the_modulo_four_successor', () => {
   assert.deepEqual(
     [
       [0, 1],
@@ -269,7 +269,7 @@ test('FALLBACK_007_the_next_offset_must_be_the_modulo_four_successor', () => {
   }
 })
 
-test('FALLBACK_007_the_count_must_advance_by_exactly_one_or_restart_at_one_after_success', () => {
+test('WHAT[PAR-007] FALLBACK_007_the_count_must_advance_by_exactly_one_or_restart_at_one_after_success', () => {
   // Continuing streak: exactly +1
   assert.equal(cursor.isValidAdvance(0, 1, 4, 5), true)
   assert.equal(cursor.isValidAdvance(1, 2, 0, 1), true)
@@ -290,7 +290,7 @@ test('FALLBACK_007_the_count_must_advance_by_exactly_one_or_restart_at_one_after
   }
 })
 
-test('FALLBACK_007_each_rejection_names_a_different_cause', () => {
+test('WHAT[PAR-007] FALLBACK_007_each_rejection_names_a_different_cause', () => {
   const base = fallbackProjection.applyAdvance(identityFor('run_1'), 0, 1, 1, fallbackProjection.forAuthority(RUN, ROOT))
   assert.equal(base.ok, true)
   const current = base.value
@@ -323,7 +323,7 @@ test('FALLBACK_007_each_rejection_names_a_different_cause', () => {
   )
 })
 
-test('FALLBACK_007_a_stale_previous_offset_is_refused_even_when_the_step_is_valid', () => {
+test('WHAT[PAR-007] FALLBACK_007_a_stale_previous_offset_is_refused_even_when_the_step_is_valid', () => {
   // `1 → 2` is a legal step, but the cursor is at 0. Accepting it would apply an
   // advance computed against a state the journal never reached.
   const current = fallbackProjection.forAuthority(RUN, ROOT)
@@ -332,7 +332,7 @@ test('FALLBACK_007_a_stale_previous_offset_is_refused_even_when_the_step_is_vali
   assert.deepEqual(applied, { ok: false, error: 'InvalidTransition' })
 })
 
-test('FALLBACK_003_the_same_attempt_observed_twice_advances_the_cursor_once', () => {
+test('WHAT[PAR-003] FALLBACK_003_the_same_attempt_observed_twice_advances_the_cursor_once', () => {
   // The concrete case the clause is about: one failure seen by both a retry
   // signal and an idle reconcile. Deduped on ProviderRunIdentity, so the second
   // observation cannot move the cursor.
@@ -352,7 +352,7 @@ test('FALLBACK_003_the_same_attempt_observed_twice_advances_the_cursor_once', ()
   assert.equal(fallbackProjection.read(second.value).offset, 2)
 })
 
-test('FALLBACK_003_the_dedupe_window_is_bounded_so_the_projection_cannot_grow_with_history', () => {
+test('WHAT[PAR-003] FALLBACK_003_the_dedupe_window_is_bounded_so_the_projection_cannot_grow_with_history', () => {
   // PERSIST-008. A failed attempt is re-observed within a few signals or not at
   // all, so an unbounded set would only accumulate.
   let current = fallbackProjection.forAuthority(RUN, ROOT)
@@ -374,7 +374,7 @@ test('FALLBACK_003_the_dedupe_window_is_bounded_so_the_projection_cannot_grow_wi
   assert.equal(state.dedupeKeys, 32, 'the window is capped regardless of how many failures preceded it')
 })
 
-test('FALLBACK_004_recording_success_clears_the_dedupe_window_too', () => {
+test('WHAT[PAR-004] FALLBACK_004_recording_success_clears_the_dedupe_window_too', () => {
   // A later failure is a new attempt. Keeping stale keys would let it be mistaken
   // for a replay and silently not advance the cursor.
   const advanced = fallbackProjection.applyAdvance(identityFor('run_1'), 0, 1, 1, fallbackProjection.forAuthority(RUN, ROOT))
@@ -395,7 +395,7 @@ test('FALLBACK_004_recording_success_clears_the_dedupe_window_too', () => {
   assert.equal(again.ok, true)
 })
 
-test('ENFORCER_063_success_clears_failures_after_multiple_advances_without_touching_offset', () => {
+test('WHAT[PAR-004] ENFORCER_063_success_clears_failures_after_multiple_advances_without_touching_offset', () => {
   // BlogObservationCommitted is BloggerMain business success: zero the budget, park the
   // offset. Multi-failure path proves the clear is not a one-shot edge case.
   let current = fallbackProjection.forAuthority(RUN, ROOT)
@@ -421,7 +421,7 @@ test('ENFORCER_063_success_clears_failures_after_multiple_advances_without_touch
   assert.equal(state.offset, before.offset)
 })
 
-test('FALLBACK_005_exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
+test('WHAT[PAR-005] FALLBACK_005_exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
   // The fold must be able to refuse a late advance without knowing the configured
   // budget, so the terminal state is durable rather than computed.
   const advanced = fallbackProjection.applyAdvance(identityFor('run_1'), 0, 1, 1, fallbackProjection.forAuthority(RUN, ROOT))
@@ -435,7 +435,7 @@ test('FALLBACK_005_exhaustion_is_stored_rather_than_re_derived_from_the_count', 
   assert.equal(fallbackProjection.mayContinue(9999, exhausted), false)
 })
 
-test('FALLBACK_005_may_continue_answers_the_projection_level_question', () => {
+test('WHAT[PAR-005] FALLBACK_005_may_continue_answers_the_projection_level_question', () => {
   let current = fallbackProjection.forAuthority(RUN, ROOT)
   assert.equal(fallbackProjection.mayContinue(3, current), true)
 
@@ -451,7 +451,7 @@ test('FALLBACK_005_may_continue_answers_the_projection_level_question', () => {
 
 // ── FALLBACK-010: the Host's attempt number is not the domain count ──────────
 
-test('FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failure', () => {
+test('WHAT[PAR-009] FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failure', () => {
   // The clause's prohibition is structural here: nothing in the cursor API takes
   // an attempt number. `recordFailure` has one input — the cursor — so a Host
   // `Attempt` value has no way in.
@@ -469,7 +469,7 @@ test('FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failur
   })
 })
 
-test('FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_the_attempt', () => {
+test('WHAT[PAR-009] FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_the_attempt', () => {
   // Four components. A missing one would merge distinct attempts: without
   // ProviderRun every failure in a run would be "the same attempt", so the cursor
   // would advance once and then never again.
@@ -506,7 +506,7 @@ test('FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_the_attempt', 
 
 // ── the fold: which refusals are absorbed and which stop the journal ─────────
 
-test('FALLBACK_001_the_authority_root_fact_is_what_creates_the_cursor', () => {
+test('WHAT[PAR-001] FALLBACK_001_the_authority_root_fact_is_what_creates_the_cursor', () => {
   const folded = foldFacts([rootFact()])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -520,7 +520,7 @@ test('FALLBACK_001_the_authority_root_fact_is_what_creates_the_cursor', () => {
   })
 })
 
-test('FALLBACK_001_an_advance_with_no_accepted_root_stops_the_replay', () => {
+test('WHAT[PAR-001] FALLBACK_001_an_advance_with_no_accepted_root_stops_the_replay', () => {
   // The cursor's absence means the root fact is missing from the journal, so the
   // history is incomplete rather than merely odd. The diagnostic must say that
   // and not blame the offsets, which are perfectly valid on this line.
@@ -534,7 +534,7 @@ test('FALLBACK_001_an_advance_with_no_accepted_root_stops_the_replay', () => {
   )
 })
 
-test('FALLBACK_007_a_replayed_journal_reaches_the_same_cursor', () => {
+test('WHAT[PAR-007] FALLBACK_007_a_replayed_journal_reaches_the_same_cursor', () => {
   const folded = foldFacts([
     rootFact(),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
@@ -547,7 +547,7 @@ test('FALLBACK_007_a_replayed_journal_reaches_the_same_cursor', () => {
   assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 3, failures: 3 })
 })
 
-test('FALLBACK_007_a_replayed_journal_with_intervening_success_streak_restart_reaches_the_same_cursor', () => {
+test('WHAT[PAR-007] FALLBACK_007_a_replayed_journal_with_intervening_success_streak_restart_reaches_the_same_cursor', () => {
   // Intervening success reset failure streak to 0; subsequent failure advances offset from 2 to 3 with count 1
   const folded = foldFacts([
     rootFact(),
@@ -561,7 +561,7 @@ test('FALLBACK_007_a_replayed_journal_with_intervening_success_streak_restart_re
   assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 3, failures: 1 })
 })
 
-test('FALLBACK_003_a_duplicate_line_is_absorbed_because_replay_produces_it', () => {
+test('WHAT[PAR-003] FALLBACK_003_a_duplicate_line_is_absorbed_because_replay_produces_it', () => {
   // Expected on replay, so the fold continues with the projection unchanged. This
   // is the one refusal class that must NOT stop startup.
   const folded = foldFacts([
@@ -575,7 +575,7 @@ test('FALLBACK_003_a_duplicate_line_is_absorbed_because_replay_produces_it', () 
   assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 1, failures: 1 })
 })
 
-test('FALLBACK_007_a_corrupt_transition_stops_the_replay_instead_of_being_absorbed', () => {
+test('WHAT[PAR-007] FALLBACK_007_a_corrupt_transition_stops_the_replay_instead_of_being_absorbed', () => {
   // A correct writer cannot produce this line, so absorbing it would replay the
   // journal into a state the domain forbids.
   const folded = foldFacts([rootFact(), advanceFact({ run: 'run_1', previous: 0, next: 2, count: 1 })])
@@ -590,7 +590,7 @@ test('FALLBACK_007_a_corrupt_transition_stops_the_replay_instead_of_being_absorb
   assert.notEqual(missingRoot.error.Reason, folded.error.Reason)
 })
 
-test('FALLBACK_005_an_advance_after_exhaustion_is_absorbed_not_applied', () => {
+test('WHAT[PAR-005] FALLBACK_005_an_advance_after_exhaustion_is_absorbed_not_applied', () => {
   const folded = foldFacts([
     rootFact(),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
@@ -607,7 +607,7 @@ test('FALLBACK_005_an_advance_after_exhaustion_is_absorbed_not_applied', () => {
   )
 })
 
-test('FALLBACK_001_a_new_authority_root_replaces_the_cursor_entirely', () => {
+test('WHAT[PAR-001] FALLBACK_001_a_new_authority_root_replaces_the_cursor_entirely', () => {
   const folded = foldFacts([
     rootFact(),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
@@ -626,7 +626,7 @@ test('FALLBACK_001_a_new_authority_root_replaces_the_cursor_entirely', () => {
   })
 })
 
-test('FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_applied', () => {
+test('WHAT[PAR-007] FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_applied', () => {
   // Absorbed rather than fatal: a line for a superseded run is what a journal
   // written across an Authority Root change looks like.
   const folded = foldFacts([
@@ -644,7 +644,7 @@ test('FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_applied', () =>
   })
 })
 
-test('FALLBACK_007_success_writes_no_fact_so_no_journal_line_zeroes_the_count', () => {
+test('WHAT[PAR-004] FALLBACK_007_success_writes_no_fact_so_no_journal_line_zeroes_the_count', () => {
   // The clause is explicit: `ConsecutiveFailureCount = 0` is derived from a
   // successful provider attempt proven by the Host snapshot (HOST-004), not
   // persisted. A success fact would be a second writer for the cursor, which

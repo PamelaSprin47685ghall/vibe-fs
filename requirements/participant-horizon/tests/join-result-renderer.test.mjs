@@ -45,7 +45,7 @@ const failedPayload = (over = {}) =>
 const agentItem = (item) => new JoinItem(0, [item])
 const ptyItem = (item) => new JoinItem(1, [item])
 
-test('MISC_join_render_batch_agent_completed_natural_language_and_work_record', () => {
+test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_completed_natural_language_and_work_record', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(0, [completedPayload({ workRecord: 'did the thing' })])), toList([]))
   const wire = renderJoinItemBatch(lang, () => 'fast-coder', batch)
   assert.match(wire, /# fast-coder has returned\./)
@@ -54,7 +54,7 @@ test('MISC_join_render_batch_agent_completed_natural_language_and_work_record', 
   assert.ok(!wire.includes('work_record ='))
 })
 
-test('MISC_join_render_batch_agent_failed_natural_language_consequence', () => {
+test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_failed_natural_language_consequence', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(1, [failedPayload({ message: 'no' })])), toList([]))
   const wire = renderJoinItemBatch(lang, () => 'deep-reviewer', batch)
   assert.match(wire, /# deep-reviewer could not complete the charge\./)
@@ -62,25 +62,33 @@ test('MISC_join_render_batch_agent_failed_natural_language_consequence', () => {
   assert.ok(!LEGACY_DTO.test(wire))
 })
 
-test('MISC_join_render_batch_agent_abandoned_natural_language', () => {
+test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_abandoned_natural_language', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(2, ['a1', 'operator abort'])), toList([]))
   const wire = renderJoinItemBatch(lang, () => 'deep-reviewer', batch)
   assert.match(wire, /# deep-reviewer did not return from this charge\./)
   assert.ok(!LEGACY_DTO.test(wire))
 })
 
-test('MISC_join_render_batch_pty_exited_failed_aborted', () => {
+test('WHAT[PARTICIPANT-HORIZON-005] MISC_join_render_batch_pty_exit_code_observation', () => {
   const terminal = (ptyId) => (id) => (id === ptyId ? 'npm test' : 'Terminal')
 
   const exited = renderJoinItemBatch(lang, () => '', batchOf(ptyItem(new PtyJoinItem(0, [new PtyExit('pty-1', 'exit 0', true)])), toList([])), terminal('pty-1'))
   assert.match(exited, /# npm test has ended\./)
   assert.match(exited, /exit_code = 0/)
   assert.ok(!exited.includes('pty_id'))
+})
+
+test('WHAT[PARTICIPANT-HORIZON-005] MISC_join_render_batch_pty_failure_output_observation', () => {
+  const terminal = (ptyId) => (id) => (id === ptyId ? 'npm test' : 'Terminal')
 
   const failed = renderJoinItemBatch(lang, () => '', batchOf(ptyItem(new PtyJoinItem(1, [new PtyFailure('pty-2', 'crash', false, 'RC', 'kaboom')])), toList([])), terminal('pty-2'))
   assert.match(failed, /# npm test has ended\./)
   assert.match(failed, /output = "kaboom"/)
   assert.ok(!failed.includes('code ='))
+})
+
+test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_batch_pty_aborted_natural_language', () => {
+  const terminal = (ptyId) => (id) => (id === ptyId ? 'npm test' : 'Terminal')
 
   const aborted = renderJoinItemBatch(lang, () => '', batchOf(ptyItem(new PtyJoinItem(2, [new PtyAbort('pty-3', 'interrupted', false, 'AB', 'esc')])), toList([])), terminal('pty-3'))
   assert.match(aborted, /# npm test was interrupted\./)
@@ -88,7 +96,7 @@ test('MISC_join_render_batch_pty_exited_failed_aborted', () => {
   assert.ok(!aborted.includes('pty_id'))
 })
 
-test('MISC_join_render_batch_multiple_items_stable_order', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_batch_multiple_items_stable_order', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(1, [failedPayload()])), toList([
     ptyItem(new PtyJoinItem(2, [new PtyAbort('p', 'x', false, 'C', 'm')])),
     agentItem(new AgentJoinItem(0, [completedPayload()])),
@@ -100,7 +108,7 @@ test('MISC_join_render_batch_multiple_items_stable_order', () => {
   assert.ok(!LEGACY_DTO.test(wire))
 })
 
-test('MISC_join_render_interrupted_natural_language', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_interrupted_natural_language', () => {
   const operatorWire = renderInterrupted(lang, JoinInterruptReason.OperatorAbort)
   assert.match(operatorWire, /# Your waiting was interrupted\./)
   assert.ok(!LEGACY_DTO.test(operatorWire))
@@ -114,7 +122,7 @@ test('MISC_join_render_interrupted_natural_language', () => {
   assert.ok(!LEGACY_DTO.test(deadlineWire))
 })
 
-test('MISC_join_render_fork_error_natural_language', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_fork_error_natural_language', () => {
   const cases = [
     [new ForkError(0, []), /nothing away to receive/],
     [new ForkError(1, []), /nothing away to receive/],
@@ -133,7 +141,7 @@ test('MISC_join_render_fork_error_natural_language', () => {
   }
 })
 
-test('MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
+test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
   const completion = (agentName) =>
     new RunCompletion('run-1', agentName, Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
   const viaName = renderCompletedBatch(lang, () => false, () => '', batchOf(completion('fast-coder'), toList([])))
@@ -146,7 +154,7 @@ test('MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
   assert.match(rawResolve, /# weird raw name has returned\./)
 })
 
-test('MISC_join_render_completed_pty_aborted_round_trip', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_completed_pty_aborted_round_trip', () => {
   const run = new RunCompletion('pty-9', '', Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
   const wire = renderCompletedBatch(lang, (runId) => runId === 'pty-9', () => '', batchOf(run, toList([])), (id) => (id === 'pty-9' ? 'shell' : 'Terminal'))
   assert.match(wire, /# shell has ended\./)

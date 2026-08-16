@@ -23,7 +23,7 @@ const withTimeout = (promise, ms, label) =>
 /** Budget already exhausted relative to wall clock (awaitExitOrDeadline → DeadlineReached). */
 const expiredDeadline = () => deadline.ofBudget(utcOffset('2000-01-01T00:00:00Z'), 1)
 
-test('EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill', async () => {
+test('WHAT[PROC-003] EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill', async () => {
   const { child, killCount, exit } = processWait.mockChild()
   const dl = deadline.ofBudget(nowIso(), 5_000)
   const wait = processWait.waitForExit(child, dl, liveToken())
@@ -36,7 +36,7 @@ test('EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill', async 
   assert.equal(killCount(), 0, 'natural exit must not Kill')
 })
 
-test('EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
+test('WHAT[PROC-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
   let mock
   mock = processWait.mockChild({
     onKill: () => {
@@ -53,7 +53,7 @@ test('EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
 })
 
 test(
-  'EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
+  'WHAT[PROC-004] EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
   { timeout: 15_000 },
   async () => {
     // Never exit after Kill. Production KillAckGraceMs (5s) must still finish
@@ -72,7 +72,7 @@ test(
   },
 )
 
-test('EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
+test('WHAT[PROC-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
   const { child, killCount } = processWait.mockChild()
   // Long budget so the race is only cancellation vs (never-arriving) exit.
   const dl = deadline.ofBudget(nowIso(), 60_000)

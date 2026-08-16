@@ -33,14 +33,14 @@ const refreshed = (sessionId, q, a, observations) => event('CaseRefreshed', [ses
 const accessed = (sessionId) => event('CaseAccessed', [sessionId])
 const evicted = (sessionId) => event('CaseEvicted', [sessionId])
 
-test('CASE003_normalize_dedupes_and_orders_observations', () => {
+test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
   const normalized = listItems(normalize(toList(obs)))
   // same identity → one entry; glob paths order-insensitive
   assert.equal(normalized.length, 2)
 })
 
-test('CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
+test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
   const stored = [read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y'])]
   // exact replay (order-insensitive glob) → Fresh
   assert.equal(caseOf(classifyReplay(toList(stored), toList([glob('**/*.fs', ['y', 'x']), read('a.txt', 'h1')]))), 'Fresh')
@@ -52,25 +52,35 @@ test('CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
   assert.equal(caseOf(classifyReplay(toList(stored), toList([read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y', 'z'])]))), 'Stale')
 })
 
-test('CASE002_008_fold_captured_refreshed_accessed_evicted', () => {
+test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
   const cases = fold(
     toList([
       captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
       captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
       refreshed('s1', 'Q1b', 'A1b', [read('a.txt', 'h1'), read('c.txt', 'h3')]),
-      accessed('s2'),
     ]),
   )
   assert.equal(mapEntries(cases).length, 2)
   const s1 = mapEntries(cases).find(([k]) => k === 's1')[1]
   assert.equal(s1.A, 'A1b')
   assert.equal(listItems(s1.Observations).length, 2)
+})
+
+test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
+  const cases = fold(
+    toList([
+      captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
+      captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
+      accessed('s2'),
+    ]),
+  )
+  assert.equal(mapEntries(cases).length, 2)
   // Evicted removes the Case (captured+evicted in one fold)
   const combined = fold(toList([captured('s2', 'Q2', 'A2', []), evicted('s2')]))
   assert.equal(mapEntries(combined).length, 0)
 })
 
-test('CASE008_lru_evict_keeps_most_recently_accessed', () => {
+test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
   const cases = fold(
     toList([captured('s1', 'Q1', 'A1', []), captured('s2', 'Q2', 'A2', []), captured('s3', 'Q3', 'A3', []), accessed('s1')]),
   )

@@ -197,7 +197,7 @@ const withHarness = async (fn) => {
   }
 }
 
-test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
   await withHarness(async ({ dir, runtime, createCalls, prompts }) => {
     const owner = 'ses_meditator_g6'
     const inspectorRole = roles.of('Inspector')

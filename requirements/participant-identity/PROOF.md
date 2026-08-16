@@ -7,27 +7,29 @@
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |------|--------------------------------------|------|----------|
-| PID-001 | `tests/catalog.test.mjs` `AGENT_001_catalog_has_exactly_ten_canonical_roles_and_two_tiers` | MOVE | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-002 | `tests/catalog.test.mjs`（Role/Tier）+ `tests/session-persona.test.mjs`（Persona）+ `requirements/prefix-stability/tests/system-prompt-stability.test.mjs` `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes` | MOVE+REUSE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
-| PID-003 | `tests/session-persona.test.mjs` `AGENT_028_SessionPersona_bind_once_and_inherit`（`bindOnce` 异值拒绝 `/already bound/`） | MOVE | 同上 |
-| PID-004 | `requirements/prefix-stability/tests/system-prompt-stability.test.mjs` `PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_bytes` | REUSE（SPLIT：prompt-stability 三方 owner = participant-identity + prefix-stability + provider-language；Persona 断言归本包） | `node --test requirements/prefix-stability/tests/system-prompt-stability.test.mjs` |
-| PID-005 | `tests/session-persona.test.mjs` `FALLBACK_014_system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 值 `doesNotMatch /fast\|deep/i`） | MOVE | `node --test requirements/participant-identity/tests/session-persona.test.mjs` |
-| PID-006 | `tests/session-persona.test.mjs` `FALLBACK_014_...`（prompt identity 不含 binding 名）；horizon 侧拦截由 `participant-horizon` Gate B 承担（交叉引用） | MOVE | 同上 |
-| PID-007 | `tests/catalog.test.mjs` `AGENT_003_peer_is_same_role_opposite_tier_and_symmetric` | MOVE；旧 pair-model 互异 proof 已废弃，model equality 归 `execution-model-routing` EMR-008 | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs` 证明 EffectiveAgent preserve/override、synthetic SendPrompt 保持 `Model=None`、物理 `(SessionId, PhysicalUserMessageId)` execution admission 才取得 base/peer lease；managed model authority/supersession/释放语义由 `execution-model-routing` EMR-006/007/009 接管 | REUSE + GAP-016 | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs`；model 部分见 execution-model-routing PROOF |
-| PID-009 | `tests/catalog.test.mjs`（`AGENT_001` public/internal 划分、`AGENT_002` bookkeeper 名/peer）+ `tests/session-persona.test.mjs`（`bookkeeperPersona` = Clerk/Curator） | MOVE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
-| PID-010 | `tests/session-persona.test.mjs` `AGENT_028_SessionPersona_bind_once_and_inherit`（`inheritFromOwner` 后 replica = 'Engineer'） | MOVE | 同上 |
+| PID-001 | `tests/catalog.test.mjs` `WHAT[PID-001] catalog_has_exactly_ten_canonical_roles_and_two_tiers` + `WHAT[PID-001] required_names_are_exactly_ten_roles_times_two_tiers` | MOVE | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
+| PID-002 | `tests/catalog.test.mjs`（`WHAT[PID-002] all_legacy_bare_names_are_rejected`、`WHAT[PID-002] rejection_prose_is_version_agnostic`，legacy 合一名拒绝 = 三轴分离 ratchet）+ `tests/session-persona.test.mjs` `WHAT[PID-002] persona_matrix_is_an_independent_axis_from_role_and_binding` | MOVE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
+| PID-003 | `tests/session-persona.test.mjs` `WHAT[PID-003] SessionPersona_binds_once_same_value_idempotent_different_value_rejected` + `tests/persona-binding.test.mjs` `WHAT[PID-003] persona_binds_once_and_never_rewrites` | MOVE | `node --test requirements/participant-identity/tests/{session-persona,persona-binding}.test.mjs` |
+| PID-004 | `tests/persona-binding.test.mjs` `WHAT[PID-004] persona_frozen_across_gate_d_events`（Gate D 场景后 persona 冻结 = 换执行者不换人；字节半在 prefix-stability） | MOVE | `node --test requirements/participant-identity/tests/persona-binding.test.mjs` |
+| PID-005 | `tests/session-persona.test.mjs` `WHAT[PID-005] system_prompt_id_follows_canonical_role_not_effective_agent_tier`（identity 值 `doesNotMatch /fast\|deep/i`） | MOVE | `node --test requirements/participant-identity/tests/session-persona.test.mjs` |
+| PID-006 | `tests/session-persona.test.mjs` `WHAT[PID-006] binding_wire_names_are_machine_routing_identity_not_persona_self_claim`（persona 值非 wire 名、不含 `fast-`/`deep-` 前缀；prompt identity 不含 binding 名）；horizon 侧拦截由 `participant-horizon` Gate B 承担（交叉引用） | MOVE | 同上 |
+| PID-007 | `tests/catalog.test.mjs` `WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric`；Bookkeeper pair 同律见 `WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role` | MOVE；旧 pair-model 互异 proof 已废弃，model equality 归 `execution-model-routing` EMR-008 | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
+| PID-008 | `tests/session-execution-binding.test.mjs` `WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned`、`WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only`、`WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease`（证明 EffectiveAgent preserve/override、synthetic SendPrompt 保持 `Model=None`、物理 `(SessionId, PhysicalUserMessageId)` execution admission 才取得 base/peer lease；managed model authority/supersession/释放语义由 `execution-model-routing` EMR-006/007/009 接管） | REUSE + GAP-016 | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs`；model 部分见 execution-model-routing PROOF |
+| PID-009 | `tests/catalog.test.mjs` `WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role`（机器身份 + 无 public Role）+ `tests/session-persona.test.mjs` `WHAT[PID-009] bookkeeperPersona_is_clerk_or_curator_machine_persona` | MOVE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
+| PID-010 | `tests/session-persona.test.mjs` `WHAT[PID-010] child_session_persona_inherits_owner_persona`（`inheritFromOwner` 后 replica = 'Engineer'） | MOVE | 同上 |
 
 ## 移动文件
 
 | 源 | 目标 | 结果 |
 |----|------|------|
-| `requirements/participant-identity/tests/catalog.test.mjs` | `requirements/participant-identity/tests/catalog.test.mjs` | 5 pass / 0 fail |
-| `requirements/participant-identity/tests/session-persona.test.mjs` | `requirements/participant-identity/tests/session-persona.test.mjs` | 3 pass / 0 fail |
+| `requirements/participant-identity/tests/catalog.test.mjs` | `requirements/participant-identity/tests/catalog.test.mjs` | 6 pass / 0 fail |
+| `requirements/participant-identity/tests/session-persona.test.mjs` | `requirements/participant-identity/tests/session-persona.test.mjs` | 6 pass / 0 fail |
+| `requirements/participant-identity/tests/persona-binding.test.mjs` | `requirements/participant-identity/tests/persona-binding.test.mjs` | 2 pass / 0 fail |
 
 ## 计数
 
-WHAT 命题 10；identity 本体落点仍 10；PID-008 的 model-routing 交叉证明等待 `execution-model-routing` GAP-016。
+WHAT 命题 10；active test 16（catalog 6 + session-persona 6 + persona-binding 2 + session-execution-binding 3，
+拆分后每个 test 恰一个 primary WHAT）；PID-008 的 model-routing 交叉证明等待 `execution-model-routing` GAP-016。
 
 ## semantic anchor id 清单（`scripts/checks/semantic-anchors.mjs`）
 

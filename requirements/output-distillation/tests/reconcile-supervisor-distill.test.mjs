@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { distillationRuntime } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_distillation_cancel_owned_on_failure', async () => {
+test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
   const spoolPath = join(dir, 'spool.bin')
    // One small chunk → one map agent; Join NotFound → map failure → cancelOwned.

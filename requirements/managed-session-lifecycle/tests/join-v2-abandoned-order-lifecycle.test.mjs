@@ -93,7 +93,7 @@ const linkDurable = async (j, agentId, child, targetAgent = 'fast-coder') => {
 
 // ── EXEC-009: HandleController.consume Abandoned → Retired, second = AlreadyRetired ─
 
-test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', async () => {
+test('WHAT[MANAGED-SESSION-008] EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'h1', 'ses_c', 'fast-coder')
     const abandoned = await handleController.recordAbandon(
@@ -129,7 +129,7 @@ test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', as
 
 // ── EXEC-018: CreationOrder from HandleLinked fold order ─────────────────────
 
-test('EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
+test('WHAT[MANAGED-SESSION-015] EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
   let p = handleProjection.empty
   p = link(p, 'later-id-zzz', 'ses_z', 'zebra-agent')
   p = link(p, 'earlier-id-aaa', 'ses_a', 'alpha-agent')
@@ -143,7 +143,7 @@ test('EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
 
 // ── EXEC-009: Abandoned single-report via retire after reportable ────────────
 
-test('EXEC_009_abandoned_retire_clears_reportable_single_report', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_abandoned_retire_clears_reportable_single_report', () => {
   let p = link(handleProjection.empty, 'h1', 'ses_c')
   const abandoned = handleProjection.abandon(handleId.agent('h1'), 'ParentCancelled', p)
   assert.equal(abandoned.ok, true)

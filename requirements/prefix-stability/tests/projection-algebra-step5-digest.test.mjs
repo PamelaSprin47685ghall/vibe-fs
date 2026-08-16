@@ -16,7 +16,7 @@ const stage2Snapshot = (raw, committed = undefined) => ({
   CommittedPrefix: committed,
 })
 
-test('CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
+test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
   const snapshot = stage2Snapshot([
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
     { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'second' }] },
@@ -42,7 +42,7 @@ test('CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
   assert.equal(projectionAlgebra.cutoffDigest(sha256, snapshot, 99), sha256(full))
 })
 
-test('CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_a_stale_closure', () => {
+test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_a_stale_closure', () => {
   // The digest must be recomputed from X's CURRENT projection each attempt —
   // a closure captured once would re-prove yesterday's numbering (COMPANION-011).
   const before = stage2Snapshot([

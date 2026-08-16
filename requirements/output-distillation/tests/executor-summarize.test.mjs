@@ -46,26 +46,26 @@ function completedOk(agentId) {
   )
 }
 
-test('DISTILLATION_distill_fragment_prompt_is_plain_intent', () => {
+test('WHAT[DISTILL-001] DISTILLATION_distill_fragment_prompt_is_plain_intent', () => {
   assert.equal(
     distillation.distillFragmentPrompt(providerLanguage.english),
     'Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code.',
   )
 })
 
-test('DISTILLATION_merge_distillations_prompt_is_plain_intent', () => {
+test('WHAT[DISTILL-004] DISTILLATION_merge_distillations_prompt_is_plain_intent', () => {
   assert.equal(
     distillation.mergeDistillationsPrompt(providerLanguage.english),
     'Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code.',
   )
 })
 
-test('DISTILLATION_prompts_carry_no_chunk_index_or_level', () => {
+test('WHAT[DISTILL-013] DISTILLATION_prompts_carry_no_chunk_index_or_level', () => {
   assert.ok(!/\bchunk\b/i.test(distillation.distillFragmentPrompt(providerLanguage.english)))
   assert.ok(!/\blevel-\d/i.test(distillation.mergeDistillationsPrompt(providerLanguage.english)))
 })
 
-test('EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () => {
+test('WHAT[DISTILL-007] EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
@@ -98,7 +98,7 @@ test('EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () =
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent', async () => {
+test('WHAT[DISTILL-007] EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
@@ -135,7 +135,7 @@ test('EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent', async (
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
+test('WHAT[DISTILL-007] EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
@@ -181,7 +181,7 @@ test('EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_distill_spool_await_not_found_hard_fail_collects_failure', async () => {
+test('WHAT[DISTILL-006] EXEC_distill_spool_await_not_found_hard_fail_collects_failure', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(2)
   const forked = []
   const awaitCalls = []
@@ -215,7 +215,7 @@ test('EXEC_distill_spool_await_not_found_hard_fail_collects_failure', async () =
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
+test('WHAT[DISTILL-008] EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(1)
   const awaitCalls = []
   const callOrder = []
@@ -267,7 +267,7 @@ test('EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_per
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_distill_spool_family_waiting_timed_out_not_reported_as_success', async () => {
+test('WHAT[DISTILL-006] EXEC_distill_spool_family_waiting_timed_out_not_reported_as_success', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(2)
   const awaitCalls = []
 

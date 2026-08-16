@@ -5,7 +5,7 @@ import {
   magicTodoHost,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('OBLIGATION-LEDGER-002 decodes required planComplete plus obligations', () => {
+test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete plus obligations', () => {
   const decoded = magicTodoHost.decodeInput({
     planComplete: false,
     obligations: [
@@ -49,7 +49,7 @@ test('OBLIGATION-LEDGER-002 decodes required planComplete plus obligations', () 
   assert.equal(duplicateName.error, "todowrite duplicate obligation name 'same'")
 })
 
-test('TODO-007 projects obligations into a non-enumerable V1 compatibility view', () => {
+test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 compatibility view', () => {
   const args = { planComplete: false, obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }] }
   const output = { args }
   magicTodoHost.replaceCompatibilityArgs(output, [
@@ -67,7 +67,7 @@ test('TODO-007 projects obligations into a non-enumerable V1 compatibility view'
   ])
 })
 
-test('OBLIGATION-LEDGER-024 advertises planComplete in description, parameters, and jsonSchema', () => {
+test('WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema', () => {
   const output = { description: '', parameters: {}, jsonSchema: {} }
   magicTodoHost.applyDefinition(output)
 

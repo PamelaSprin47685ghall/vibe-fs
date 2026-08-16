@@ -34,7 +34,7 @@ const CALL = 'call_magic_todo_1'
 
 // ── Canary B — definition schema ────────────────────────────────────────────
 
-test('MAGIC_TODO_CANARY_B_definition_replaces_description_parameters_jsonSchema_original_decoder_unchanged', async () => {
+test('WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, and jsonSchema while the original decoder stays the execute-path decoder', async () => {
   const hooks = createMagicTodoContractHooks()
   const seed = v1TodoWriteToolSeed()
   const advertised = sampleObligationTodoWriteAdvertisement()
@@ -76,7 +76,7 @@ test('MAGIC_TODO_CANARY_B_definition_replaces_description_parameters_jsonSchema_
   assert.deepEqual(decoded.value.todos[0], v1Row.todos[0])
 })
 
-test('MAGIC_TODO_CANARY_B_definition_jsonSchema_ternary_keeps_schema_when_both_replaced', async () => {
+test('WHAT[OBLIGATION-LEDGER-024] jsonSchema ternary: both parameters and jsonSchema are replaced together', async () => {
   // registry.ts ternary:
   //   output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
   //     ? output.jsonSchema : undefined
@@ -105,7 +105,7 @@ test('MAGIC_TODO_CANARY_B_definition_jsonSchema_ternary_keeps_schema_when_both_r
 
 // ── Canary C — obligation account → compatibility sink ─────────────────────
 
-test('MAGIC_TODO_CANARY_C_obligations_project_to_original_v1_decoder_shape', async () => {
+test('WHAT[OBLIGATION-LEDGER-015] obligations project to the original V1 decoder shape', async () => {
   const hooks = createMagicTodoContractHooks()
   const raw = sampleObligationTodoWriteArgs()
 
@@ -135,7 +135,7 @@ test('MAGIC_TODO_CANARY_C_obligations_project_to_original_v1_decoder_shape', asy
   )
 })
 
-test('MAGIC_TODO_CANARY_C_projection_helper_mutates_original_args_in_place', () => {
+test('WHAT[OBLIGATION-LEDGER-015] projection helper mutates original args in place', () => {
   const args = sampleObligationTodoWriteArgs()
   const originalArgs = args
   const originalObligations = args.obligations
@@ -150,7 +150,7 @@ test('MAGIC_TODO_CANARY_C_projection_helper_mutates_original_args_in_place', () 
 
 // ── Canary F — after failure path ───────────────────────────────────────────
 
-test('MAGIC_TODO_CANARY_F_after_does_not_run_when_executor_throws', async () => {
+test('WHAT[OBLIGATION-LEDGER-026] after does not run when executor throws', async () => {
   const hooks = createMagicTodoContractHooks()
   let afterCalls = 0
   const after = async () => {
@@ -177,7 +177,7 @@ test('MAGIC_TODO_CANARY_F_after_does_not_run_when_executor_throws', async () => 
   assert.equal(afterCalls, 0, 'F: after hook body never invoked on throw')
 })
 
-test('MAGIC_TODO_CANARY_F_after_runs_when_executor_succeeds', async () => {
+test('WHAT[OBLIGATION-LEDGER-026] after runs when executor succeeds', async () => {
   // Control: same path with success must invoke after (proves the freeze is path-sensitive).
   const hooks = createMagicTodoContractHooks()
   let afterCalls = 0

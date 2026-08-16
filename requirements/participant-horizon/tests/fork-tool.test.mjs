@@ -60,21 +60,21 @@ const bareScope = ({ orchestratorHost } = {}) => {
 const runManager = (spec, name, charge, extra = {}) =>
   spec.Execute(makeArgs({ name, charge, ...extra }), context())
 
-test('FORK_unavailable_calling_is_denied_generically', async () => {
+test('WHAT[PARTICIPANT-HORIZON-009] FORK_unavailable_calling_is_denied_generically', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = await runManager(spec, 'Rhea', 'review this', { calling: 'examiner' })
   assert.match(result, /Unknown or unavailable calling/)
   assert.doesNotMatch(result, /Reviewer|fast-|deep-|\berror\s*=/i)
 })
 
-test('FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async () => {
+test('WHAT[PARTICIPANT-HORIZON-014] FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = await runManager(spec, 'Ada', 'do work', { calling: 'wizard' })
   assert.match(result, /Unknown or unavailable calling/)
   assert.doesNotMatch(result, /fast-|deep-|\berror\s*=/i)
 })
 
-test('FORK_orchestrator_rejects_unknown_calling_without_binding_names', async () => {
+test('WHAT[PARTICIPANT-HORIZON-009] FORK_orchestrator_rejects_unknown_calling_without_binding_names', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   const result = await spec.Execute(makeArgs({ calling: 'coder', name: 'Road', charge: 'x' }), context())
   assert.match(result, /Unknown or unavailable calling/)

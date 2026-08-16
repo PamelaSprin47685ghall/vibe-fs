@@ -24,7 +24,7 @@ const toolPath = (tool, locale) => join(root, 'resources/provider/tool', tool, '
 const readRole = (role, locale) => readFileSync(rolePath(role, locale), 'utf8')
 const readTool = (tool, locale) => readFileSync(toolPath(tool, locale), 'utf8')
 
-test('PROMPT_depth_office_capability_catalog_covers_five_offices', () => {
+test('WHAT[OFF-002] PROMPT_depth_office_capability_catalog_covers_five_offices', () => {
   assert.deepEqual(Object.keys(OFFICE_CAPABILITY_ANCHORS).sort(), [
     'browser',
     'coder',
@@ -34,7 +34,7 @@ test('PROMPT_depth_office_capability_catalog_covers_five_offices', () => {
   ])
 })
 
-test('PROMPT_depth_office_capability_hits_manager_and_fork', () => {
+test('WHAT[OFF-005] PROMPT_depth_office_capability_hits_manager_and_fork', () => {
   const managerEn = readRole('manager', 'en.md')
   const managerZh = readRole('manager', 'zh-CN.md')
   const forkEn = readTool('fork', 'en.md')

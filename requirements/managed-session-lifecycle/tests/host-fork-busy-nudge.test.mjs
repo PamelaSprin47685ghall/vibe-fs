@@ -105,7 +105,7 @@ const withChild = async (fn) => {
   }
 }
 
-test('BUSY_NUDGE_keeps_deep_handle_when_fallback_cursor_is_on_fast_peer', async () => {
+test('WHAT[MANAGED-SESSION-005] BUSY_NUDGE_keeps_deep_handle_when_fallback_cursor_is_on_fast_peer', async () => {
   await withChild(async ({ journal, parent, child }) => {
     await advanceToPeer(journal, child)
     const sends = []
@@ -128,7 +128,7 @@ test('BUSY_NUDGE_keeps_deep_handle_when_fallback_cursor_is_on_fast_peer', async 
   })
 })
 
-test('BUSY_NUDGE_empty_agent_keeps_selected_deep_not_peer', async () => {
+test('WHAT[MANAGED-SESSION-005] BUSY_NUDGE_empty_agent_keeps_selected_deep_not_peer', async () => {
   await withChild(async ({ journal, parent, child }) => {
     await advanceToPeer(journal, child)
     const sends = []
@@ -140,7 +140,7 @@ test('BUSY_NUDGE_empty_agent_keeps_selected_deep_not_peer', async () => {
   })
 })
 
-test('BUSY_NUDGE_explicit_peer_is_still_honored', async () => {
+test('WHAT[MANAGED-SESSION-005] BUSY_NUDGE_explicit_peer_is_still_honored', async () => {
   await withChild(async ({ journal, parent, child }) => {
     const sends = []
     const sent = resultOf(

@@ -14,7 +14,7 @@ const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(
 const fileRead = (path, hash) => new Observation(obsIndex('FileRead'), [path, hash])
 const caseRec = (sessionId, q, a, observations = []) => ({ SessionId: sessionId, Q: q, A: a, Observations: toList(observations), LastAccessOrder: 0 })
 
-test('CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () => {
+test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () => {
   const local = createLocalEventStore()
   try {
     const question = 'Persistence after restart'
@@ -39,7 +39,7 @@ test('CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () =>
   }
 })
 
-test('CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
+test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
   const first = shelfmarkFor('private-session-a', '## Restart behavior\nfull canonical question')
   const again = shelfmarkFor('private-session-a', '## Restart behavior\nfull canonical question')
   const other = shelfmarkFor('private-session-b', '## Restart behavior\nfull canonical question')
@@ -49,7 +49,7 @@ test('CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
   assert.equal(first.includes('private-session-a'), false)
 })
 
-test('CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
+test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
   const local = createLocalEventStore()
   try {
     resultOf(await archive(local.store, caseRec('idx-s2', 'Q', 'A')))
@@ -64,7 +64,7 @@ test('CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
   }
 })
 
-test('CASEBOOK_visible_set_change_advances_epoch', async () => {
+test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_visible_set_change_advances_epoch', async () => {
   const local = createLocalEventStore()
   try {
     const empty = await refresh(local.store, 10)

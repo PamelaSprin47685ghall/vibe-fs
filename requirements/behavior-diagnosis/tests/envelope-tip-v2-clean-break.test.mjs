@@ -26,7 +26,7 @@ import {
 
 const SESSION = sessionId('ses_a')
 
-test('ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
+test('WHAT[BD-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
   // Boot reads envelopes, not FactCodec alone. Without this check Thoth fails
   // opaquely, Boot truncates mid-stream, and fold invents "already has open request".
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
@@ -57,7 +57,7 @@ test('ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_d
   }
 })
 
-test('ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
+test('WHAT[BD-008] ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = JSON.stringify({
       RuntimeId: ['RuntimeId', 'rt1'],
@@ -84,7 +84,7 @@ test('ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () =
   }
 })
 
-test('PERSIST_005_envelope_dual_decodes_legacy_observation_tags', () => {
+test('WHAT[BD-012] PERSIST_005_envelope_dual_decodes_legacy_observation_tags', () => {
   const observation = fact('BlogObservationCommitted', {
     SessionId: SESSION,
     BloggerSessionId: sessionId('ses_b'),

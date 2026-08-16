@@ -42,7 +42,7 @@ const packageTipNames = () =>
 
 // ── 1. catalog exactly 120 valid rules ──────────────────────────────────────
 
-test('ENFORCER_TIP_01_catalog_has_exactly_120_valid_rules', () => {
+test('WHAT[BD-001] ENFORCER_TIP_01_catalog_has_exactly_120_valid_rules', () => {
   assert.equal(enforcer.ruleCount, 120)
   assert.equal(packageTipNames().length, 120)
   assert.equal(enforcer.fieldNames().length, 120)
@@ -51,7 +51,7 @@ test('ENFORCER_TIP_01_catalog_has_exactly_120_valid_rules', () => {
 
 // ── 2 / 16. tip.enum = directory TipName set; package = runtime ─────────────
 
-test('ENFORCER_TIP_02_and_16_tip_enum_equals_catalog_fields_and_package', () => {
+test('WHAT[BD-001] ENFORCER_TIP_02_and_16_tip_enum_equals_catalog_fields_and_package', () => {
   const runtimeFields = enforcer.fieldNames()
   const packageFields = packageTipNames()
 
@@ -62,7 +62,7 @@ test('ENFORCER_TIP_02_and_16_tip_enum_equals_catalog_fields_and_package', () => 
 
 // ── 3 / 4 schema-level: required tip; no 120 numerics (integration also) ────
 
-test('ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
+test('WHAT[BD-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
   // Unit facade cannot open Host zod; pin codec + catalog contract here.
   // Integration manager-tool-contract asserts Host schema required/optional.
   const sample = enforcer.decodeCall({ text: 'x', tip: enforcer.fieldNames()[0] })
@@ -77,19 +77,19 @@ test('ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
 
 // ── 5 / 6 / 7 codec ─────────────────────────────────────────────────────────
 
-test('ENFORCER_TIP_05_missing_tip_fails', () => {
+test('WHAT[BD-006] ENFORCER_TIP_05_missing_tip_fails', () => {
   const r = enforcer.decodeCall({ text: 'entry' })
   assert.equal(r.ok, false)
   assert.equal(r.error, 'missing required argument: tip')
 })
 
-test('ENFORCER_TIP_06_unknown_tip_fails', () => {
+test('WHAT[BD-007] ENFORCER_TIP_06_unknown_tip_fails', () => {
   const r = enforcer.decodeCall({ text: 'entry', tip: 'totally-unknown-field' })
   assert.equal(r.ok, false)
   assert.match(r.error, /UnknownTip totally-unknown-field/)
 })
 
-test('ENFORCER_TIP_07_valid_field_maps_rule_id_exactly', () => {
+test('WHAT[BD-007] ENFORCER_TIP_07_valid_field_maps_rule_id_exactly', () => {
   const field = 'primitive-obsession'
   const rule = enforcer.tryFindByField(field)
   assert.ok(rule)
@@ -115,7 +115,7 @@ const cycleRecord = (n, field) => {
   })
 }
 
-test('ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
+test('WHAT[BD-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
   let state = enf.empty
   const field = enforcer.fieldNames()[0]
   const applied = enf.applyFromEntry(state, cycleRecord(1, field))
@@ -132,7 +132,7 @@ test('ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
   assert.equal(enf.fieldNameAtCommitOf(record), field)
 })
 
-test('ENFORCER_TIP_09_replay_preserves_tip', () => {
+test('WHAT[BD-014] ENFORCER_TIP_09_replay_preserves_tip', () => {
   const field = enforcer.fieldNames()[2]
   const first = enf.applyFromEntry(enf.empty, cycleRecord(1, field))
   assert.equal(first.ok, true)
@@ -150,7 +150,7 @@ test('ENFORCER_TIP_09_replay_preserves_tip', () => {
   ])
 })
 
-test('ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
+test('WHAT[BD-014] ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
   let state = enf.empty
   const fields = enforcer.fieldNames()
   for (let n = 1; n <= 12; n++) {
@@ -166,7 +166,7 @@ test('ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
   assert.equal(tips[7].cycleId, 'msg_tip_12')
 })
 
-test('ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
+test('WHAT[BD-014] ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
   let state = enf.empty
   const fields = enforcer.fieldNames()
   for (let n = 1; n <= 3; n++) {
@@ -183,7 +183,7 @@ test('ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
 
 // ── 12. squash co-truncates RecentTips with covered frames ──────────────────
 
-test('ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
+test('WHAT[BD-016] ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
   // 1:1 assumption: each Entry appends one tip. Squash of oldest K frames drops
   // oldest min(K, tips) tips on the same main session (observation co-move).
   let state = enf.empty

@@ -157,7 +157,7 @@ const blogCall = (callId, input) => ({
 
 // ── merged text > 512 KiB UTF-8 → fail closed ────────────────────────────────
 
-test('ENFORCER_043_canonical_text_over_512KiB_fails_closed', async () => {
+test('WHAT[BD-011] ENFORCER_043_canonical_text_over_512KiB_fails_closed', async () => {
   const bigText = 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) // 524289 bytes, > 512 KiB
   const parts = [blogCall('c-text', { text: bigText })]
   await withHarness(parts, async ({ fatals, lastFatal }) => {
@@ -169,7 +169,7 @@ test('ENFORCER_043_canonical_text_over_512KiB_fails_closed', async () => {
 
 // ── merged evidence > 128 KiB UTF-8 → fail closed ────────────────────────────
 
-test('ENFORCER_043_canonical_evidence_over_128KiB_fails_closed', async () => {
+test('WHAT[BD-011] ENFORCER_043_canonical_evidence_over_128KiB_fails_closed', async () => {
   const bigEvidence = 'b'.repeat(MAX_EVIDENCE_BYTES + 1) // 131073 bytes, > 128 KiB
   const parts = [blogCall('c-evidence', { text: 'work', evidence: bigEvidence })]
   await withHarness(parts, async ({ fatals, lastFatal }) => {
@@ -183,7 +183,7 @@ test('ENFORCER_043_canonical_evidence_over_128KiB_fails_closed', async () => {
 // Locks the production constants against the byte size the comparator reads, so a
 // future drift in the cap value or in byteCount's encoding is caught at the source.
 
-test('ENFORCER_042_bound_constants_match_utf8_byte_thresholds', () => {
+test('WHAT[BD-011] ENFORCER_042_bound_constants_match_utf8_byte_thresholds', () => {
   // At the exact cap: NOT over (gate uses strict >). UTF-8 single-byte ASCII.
   assert.equal(tomlByteCount('a'.repeat(MAX_BLOG_TEXT_BYTES)), MAX_BLOG_TEXT_BYTES)
   assert.equal(tomlByteCount('b'.repeat(MAX_EVIDENCE_BYTES)), MAX_EVIDENCE_BYTES)

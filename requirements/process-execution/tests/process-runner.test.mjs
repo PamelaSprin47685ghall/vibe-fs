@@ -33,7 +33,7 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_cmd, _ct) 
 
 // ── happy path ───────────────────────────────────────────────────────────────
 
-test('EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
+test('WHAT[PROC-010] EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
   const result = await runWithLauncher(okLauncher(0, 'the output', ''), cmd, estimate(), CTX, liveToken())
   assert.equal(caseOf(result), 'Ok')
   const outcome = payloadOf(result)
@@ -43,7 +43,7 @@ test('EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
   assert.equal(stdout, 'the output')
 })
 
-test('EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
+test('WHAT[PROC-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
   const result = await runWithLauncher(okLauncher(3, '', 'boom'), cmd, estimate(), CTX, liveToken())
   assert.equal(caseOf(result), 'Ok')
   const outcome = payloadOf(result)
@@ -53,7 +53,7 @@ test('EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
 
 // ── timeout ──────────────────────────────────────────────────────────────────
 
-test('EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
+test('WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
   // The launcher never finishes until its token is cancelled (the runner kills it).
   const hangingLauncher = (_cmd, ct) =>
     new Promise((resolve) => {
@@ -71,7 +71,7 @@ test('EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
 
 // ── spawn failure / cancellation ─────────────────────────────────────────────
 
-test('EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
+test('WHAT[PROC-004] EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
   const failingHost = async () => ({ tag: 1, fields: ['ENOENT: no such binary'] })
   const result = await runWithHost(failingHost, cmd, estimate(), CTX, liveToken())
 
@@ -80,7 +80,7 @@ test('EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
   assert.match(String(payloadOf(payloadOf(result))), /ENOENT/)
 })
 
-test('EXEC_011_throwing_host_maps_to_execution_failed', async () => {
+test('WHAT[PROC-004] EXEC_011_throwing_host_maps_to_execution_failed', async () => {
   const explodingHost = async () => {
     throw new Error('host exploded')
   }
@@ -91,7 +91,7 @@ test('EXEC_011_throwing_host_maps_to_execution_failed', async () => {
   assert.match(String(payloadOf(payloadOf(result))), /host exploded/)
 })
 
-test('EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled', async () => {
+test('WHAT[PROC-006] EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled', async () => {
   const explodingHost = async () => {
     throw new Error('host exploded')
   }

@@ -15,16 +15,16 @@ const runtimeSource = join(
   '../../../src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
 )
 
-test('HOST-021 first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {
+test('WHAT[OBLIGATION-LEDGER-026] first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {
   assert.equal(caseOf(assignmentDelivery(false)), 'OwnerRoot')
   assert.equal(assignmentDelivery(false), AssignmentDelivery.OwnerRoot)
 })
 
-test('HOST-021 later checkpoint assignment continues the dedicated reviewer', () => {
+test('WHAT[OBLIGATION-LEDGER-020] later checkpoint assignment continues the dedicated reviewer', () => {
   assert.equal(caseOf(assignmentDelivery(true)), 'Continuation')
 })
 
-test('HOST-021 reentry decides resend from durable dispatch evidence, never an XTrace head watermark', () => {
+test('WHAT[OBLIGATION-LEDGER-026] reentry decides resend from durable dispatch evidence, never an XTrace head watermark', () => {
   // AwaitHead is gone: XTrace append order is not request causal order, so a
   // head watermark can neither prove nor disprove that THIS assignment was
   // delivered (REVIEW-018). The runtime must admit the physical send from
@@ -35,7 +35,7 @@ test('HOST-021 reentry decides resend from durable dispatch evidence, never an X
   assert.match(source, /DispatchStatus/, 'resend admission reads dispatch evidence')
 })
 
-test('HOST-021 first assignment must not second-Fork onto a deferSend pending run', () => {
+test('WHAT[OBLIGATION-LEDGER-020] first assignment must not second-Fork onto a deferSend pending run', () => {
   const source = readFileSync(runtimeSource, 'utf8')
   assert.equal(
     source.includes('renderedPrompt = assignmentText'),
@@ -46,7 +46,7 @@ test('HOST-021 first assignment must not second-Fork onto a deferSend pending ru
   assert.match(source, /assignmentDelivery/)
 })
 
-test('HOST-021 the assignment is durable before the physical send freezes the reviewer frontier', () => {
+test('WHAT[OBLIGATION-LEDGER-026] the assignment is durable before the physical send freezes the reviewer frontier', () => {
   const source = readFileSync(runtimeSource, 'utf8')
   // The CALL passes the pre-send frozen head; the definition's parameter is
   // `reviewWorkStart`, so this pattern only matches the call site.
@@ -60,7 +60,7 @@ test('HOST-021 the assignment is durable before the physical send freezes the re
   )
 })
 
-test('OBLIGATION-LEDGER-020 a new checkpoint reactivates a retired reviewer work-unit without replacing the logical reviewer', () => {
+test('WHAT[OBLIGATION-LEDGER-020] a new checkpoint reactivates a retired reviewer work-unit without replacing the logical reviewer', () => {
   const source = readFileSync(runtimeSource, 'utf8')
   assert.match(source, /ensureReusableReviewerWorkUnit/, 'runtime must name the work-unit reactivation promise')
   assert.match(source, /HandleLifecycle\.Retired/, 'retired previous work-unit is a handled reuse case')

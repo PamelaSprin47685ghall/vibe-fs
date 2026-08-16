@@ -49,7 +49,7 @@ const workActivated = () =>
 
 const life = (session) => fold.session(session, 'ses_a')?.ManagerLife
 
-test('GLORY_021_WorkActivated_fixes_the_protected_prefix_end_once', () => {
+test('WHAT[OBLIGATION-LEDGER-017] WorkActivated is an inert legacy fact: it fixes ProtectedPrefixEnd once but never re-decides work eligibility', () => {
   const once = fold.apply(fold.empty, [lifecycleEnv(lifeOpened()), lifecycleEnv(workActivated())])
   assert.equal(once.ok, true, JSON.stringify(once.error))
   const end = life(once.value).CurrentLife.ProtectedPrefixEnd
@@ -61,7 +61,7 @@ test('GLORY_021_WorkActivated_fixes_the_protected_prefix_end_once', () => {
   assert.equal(Number(life(replay.value).CurrentLife.ProtectedPrefixEnd.Sequence), 42)
 })
 
-test('GLORY_074_t1_revelation_hook', async () => {
+test('WHAT[OBLIGATION-LEDGER-016] T1 revelation hook wraps the accepted result with entrustment', async () => {
   const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
   const wrapped = managerNarrative.wrapT1AcceptedResult('checkpoint body')
   assert.ok(wrapped.startsWith('# The account has been accepted.'))

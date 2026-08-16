@@ -118,7 +118,7 @@ const handlesOf = (projection) => fold.session(projection, OWNER).Handles
 // Durable half: HandleLinked alone → Active → not joinable; JoinDrain has no
 // harvest candidate for that handle.
 
-test('THEOREM_join_blocked_while_handle_active', () => {
+test('WHAT[MANAGED-SESSION-006] THEOREM_join_blocked_while_handle_active', () => {
   let projection = handleProjection.empty
   const linked = handleProjection.link(
     HANDLE,
@@ -149,7 +149,7 @@ test('THEOREM_join_blocked_while_handle_active', () => {
 // Causal awaken = durable completion cell lands → CompletedAwaitingJoin enters
 // joinable + orderedCandidates. No scheduler; the fact itself is the wake.
 
-test('THEOREM_handle_completed_causally_awakens_joinable', () => {
+test('WHAT[MANAGED-SESSION-007] THEOREM_handle_completed_causally_awakens_joinable', () => {
   let projection = handleProjection.empty
   projection = handleProjection.link(
     HANDLE,
@@ -199,7 +199,7 @@ test('THEOREM_handle_completed_causally_awakens_joinable', () => {
 //   WorkActivated ≥ 1 ∧ HandleCompleted ≥ 1
 // Explicit blocked→awakened stages on one durable fold trail.
 
-test('THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
+test('WHAT[MANAGED-SESSION-007] THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
   // Stage A — Activation without child: no join candidates.
   const afterActivation = fold.apply(fold.empty, [env(1, lifeOpened()), env(2, workActivated())])
   assert.equal(afterActivation.ok, true, afterActivation.ok ? '' : JSON.stringify(afterActivation.error))
@@ -245,7 +245,7 @@ test('THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
 // interleaving after LifeOpened must leave the same join-blocked projection
 // (Active, not joinable). Race is algebra, not scheduler lottery.
 
-test('THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => {
+test('WHAT[MANAGED-SESSION-006] THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => {
   const prefix = [env(1, lifeOpened())]
   const activation = [env(2, workActivated())]
   const link = [env(3, handleLinked())]
@@ -282,7 +282,7 @@ test('THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => 
 // HandleCompleted. Duplicate complete absorbs; complete;retire and
 // complete;complete;retire end Retired with empty candidates.
 
-test('THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
+test('WHAT[MANAGED-SESSION-008] THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
   const blockedPrefix = [
     env(1, lifeOpened()),
     env(2, workActivated()),
@@ -329,7 +329,7 @@ test('THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
 // JoinDrain candidate reads. Pins the production read path HostForkRuntime
 // uses (joinable + orderedCandidates), not a test-only tryJoin.
 
-test('THEOREM_projection_steps_enumerate_blocked_then_awakened_then_clear', () => {
+test('WHAT[MANAGED-SESSION-006] THEOREM_projection_steps_enumerate_blocked_then_awakened_then_clear', () => {
   const steps = []
   let projection = handleProjection.empty
   steps.push({ stage: 'empty', views: views(projection), candidates: candidateHandles(projection) })

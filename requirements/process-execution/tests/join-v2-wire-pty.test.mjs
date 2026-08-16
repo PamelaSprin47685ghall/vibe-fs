@@ -11,7 +11,7 @@ import {
   nonEmptyBatch,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_004_pty_completion_is_natural_language_plus_exit_code', () => {
+test('WHAT[PROC-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code', () => {
   const run = agentCompletion.completedRun({
     runId: 'pty-9',
     agentId: 'pty-9',

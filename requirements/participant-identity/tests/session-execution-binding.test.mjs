@@ -77,7 +77,7 @@ after(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-test('PROMPT_006_root_requires_external_agent_proof_then_model_is_scheduler_owned', async () => {
+test('WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned', async () => {
   const root = sessionId('ses_binding_root')
   const sends = []
   const hook = createChatParams()
@@ -121,7 +121,7 @@ test('PROMPT_006_root_requires_external_agent_proof_then_model_is_scheduler_owne
   }
 })
 
-test('PROMPT_006_parented_session_uses_stable_agent_lease_and_authorized_peer_only', async () => {
+test('WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only', async () => {
   const parent = sessionId('ses_parent')
   const child = sessionId('ses_child')
   const sends = []
@@ -159,7 +159,7 @@ test('PROMPT_006_parented_session_uses_stable_agent_lease_and_authorized_peer_on
   }
 })
 
-test('PROMPT_006_provider_reasoning_variant_must_match_the_exact_lease', async () => {
+test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
   const child = sessionId('ses_variant_exact')
   binding.bind(sessionId('ses_variant_parent'), child, 'deep-distiller')
   const physicalID = 'msg-variant-exact'

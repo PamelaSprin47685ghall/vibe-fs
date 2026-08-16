@@ -15,7 +15,7 @@ const {
   ToolSpec,
 } = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
 
-test('CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result', async () => {
+test('WHAT[DISTILL-012] CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result', async () => {
   const registrations = []
   const fakeTool = (definition) => {
     registrations.push(definition)

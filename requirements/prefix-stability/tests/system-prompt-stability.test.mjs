@@ -46,14 +46,14 @@ const assertSystemFrozen = ({ catalog, managerPromptId, reviewerPromptId }) => {
   assert.equal(promptIdValue(systemPromptIdFor(Role.Reviewer)), reviewerPromptId)
 }
 
-test('PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
+test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
   const what = readFileSync(new URL('../WHAT.md', import.meta.url), 'utf8')
   assert.match(what, /system-prompt-stability\.test\.mjs/)
   assert.match(what, /byte-identical/)
   assert.match(what, /Peer Fallback/)
 })
 
-test('PROMPT_STABILITY_fallback_peer_switch_keeps_system_prompt_bytes', () => {
+test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_fallback_peer_switch_keeps_system_prompt_bytes', () => {
   const managerBytes = promptResources.load().ManagerSystemPrompt
   assert.ok(managerBytes.length > 0)
 
@@ -118,7 +118,7 @@ test('PROMPT_STABILITY_fallback_peer_switch_keeps_system_prompt_bytes', () => {
   assert.notEqual(coderProfiles[0].effectiveAgent, coderProfiles[1].effectiveAgent)
 })
 
-test('PROMPT_STABILITY_t1_review_reanchor_keep_system_prompt_bytes', async () => {
+test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_t1_review_reanchor_keep_system_prompt_bytes', async () => {
   const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
 
   const catalogBefore = roleCatalogBytes(promptResources.load())

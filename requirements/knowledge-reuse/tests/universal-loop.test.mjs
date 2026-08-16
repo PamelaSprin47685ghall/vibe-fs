@@ -25,7 +25,7 @@ const obsIndex = (n) => Object.create(Observation.prototype).cases().indexOf(n)
 const fileRead = (p, h) => new Observation(obsIndex('FileRead'), [p, h])
 const record = (session, q, a, obs) => ({ SessionId: session, Q: q, A: a, Observations: toList(obs), LastAccessOrder: 0 })
 
-test('G6_G_universal_loop_archive_finalize_fetch', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-'))
   const local = createLocalEventStore()
   try {
@@ -40,7 +40,7 @@ test('G6_G_universal_loop_archive_finalize_fetch', async () => {
   }
 })
 
-test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-life-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
@@ -83,7 +83,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
   }
 })
 
-test('G6_G_cancel_session_cleanup_no_publication', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] G6_G_cancel_session_cleanup_no_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-cancel-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])

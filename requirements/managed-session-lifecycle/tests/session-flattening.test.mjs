@@ -34,7 +34,7 @@ const openCodePort = (createdParents, aborts) => ({
   },
 })
 
-test('HOST_015_abort_children_cascade_stays_keyed_on_family_root', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_abort_children_cascade_stays_keyed_on_family_root', async () => {
   const createdParents = []
   const aborts = []
   const port = createPort(openCodePort(createdParents, aborts), eventPort)

@@ -71,7 +71,7 @@ const withJournal = async (fn) => {
   }
 }
 
-test('EXEC_009_HandleAbandoned_serializes_round_trip', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_HandleAbandoned_serializes_round_trip', () => {
   const value = fact('HandleAbandoned', {
     ParentSessionId: PARENT,
     Handle: HANDLE,
@@ -92,7 +92,7 @@ test('EXEC_009_HandleAbandoned_serializes_round_trip', () => {
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
-test('EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
   const abandoned = abandonOn(linkOn(handleProjection.empty))
   assert.deepEqual(stateOf(abandoned), {
     handle: 'agent:h1',
@@ -113,7 +113,7 @@ test('EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
   assert.equal(handleProjection.reportableAbandoned(abandoned).length, 1)
 })
 
-test('EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
   const abandoned = abandonOn(completeOn(linkOn(handleProjection.empty)), { reason: 'DeadlineExceeded' })
   assert.equal(stateOf(abandoned).lifecycle, 'Abandoned')
   assert.equal(stateOf(abandoned).abandonReason, 'DeadlineExceeded')
@@ -121,7 +121,7 @@ test('EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
   assert.equal(handleProjection.reportableAbandoned(abandoned).length, 1)
 })
 
-test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
   const abandoned = abandonOn(linkOn(handleProjection.empty))
   assert.deepEqual(
     handleProjection.complete(HANDLE, handleProjection.completionOf('Terminal'), abandoned),
@@ -143,7 +143,7 @@ test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
   assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(HANDLE, reopened.value)), 'Active')
 })
 
-test('EXEC_009_recordAbandon_CAS_first_wins', async () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async () => {
   await withJournal(async (j) => {
     const linked = await handleController.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
@@ -174,7 +174,7 @@ test('EXEC_009_recordAbandon_CAS_first_wins', async () => {
   })
 })
 
-test('EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
   const linked = fact('HandleLinked', {
     ParentSessionId: PARENT,
     ChildSessionId: CHILD,
@@ -201,7 +201,7 @@ test('EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
   assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
 })
 
-test('EXEC_009_retire_tombstone_unaffected_by_abandon_path', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_retire_tombstone_unaffected_by_abandon_path', () => {
   const retired = (() => {
     let p = linkOn(handleProjection.empty)
     p = completeOn(p)
@@ -217,7 +217,7 @@ test('EXEC_009_retire_tombstone_unaffected_by_abandon_path', () => {
   })
 })
 
-test('EXEC_009_projection_CAS_duplicate_abandon_refused', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_projection_CAS_duplicate_abandon_refused', () => {
   const abandoned = abandonOn(linkOn(handleProjection.empty))
   assert.deepEqual(handleProjection.abandon(HANDLE, 'DeadlineExceeded', abandoned), {
     ok: false,

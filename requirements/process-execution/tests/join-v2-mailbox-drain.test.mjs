@@ -21,7 +21,7 @@ const run = (id) =>
 
 // ── 4: two completions drained in one batch ──────────────────────────────────
 
-test('EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
+test('WHAT[PROC-008] EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
   const box = completionMailbox.create()
   completionMailbox.publish(box, run('a'))
   completionMailbox.publish(box, run('b'))

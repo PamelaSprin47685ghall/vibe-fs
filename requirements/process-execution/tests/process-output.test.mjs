@@ -45,7 +45,7 @@ const text = (value) => new TextEncoder().encode(value)
 
 // ── OutputCollector ──────────────────────────────────────────────────────────
 
-test('EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
+test('WHAT[PROC-009] EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
   const collector = create(estimate(10, 1000n))
   addStdout(collector, text('hello '))
   addStderr(collector, text('warn\n'))
@@ -59,7 +59,7 @@ test('EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
   assert.equal(spooled, false)
 })
 
-test('EXEC_011_collector_ignores_empty_chunks', () => {
+test('WHAT[PROC-009] EXEC_011_collector_ignores_empty_chunks', () => {
   const collector = create(estimate(10, 1000n))
   addStdout(collector, new Uint8Array(0))
   addStdout(collector, undefined)
@@ -69,7 +69,7 @@ test('EXEC_011_collector_ignores_empty_chunks', () => {
   assert.equal(outcome.fields[1], '')
 })
 
-test('EXEC_011_collector_spools_when_byte_count_crosses_threshold', () => {
+test('WHAT[PROC-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold', () => {
   // Threshold = 2 × 3 = 6 bytes. Seven bytes cross it.
   const collector = create(estimate(10, 2n))
   addStdout(collector, text('abcdefg'))
@@ -89,7 +89,7 @@ test('EXEC_011_collector_spools_when_byte_count_crosses_threshold', () => {
   spoolDelete(spoolPath)
 })
 
-test('EXEC_011_collector_spool_accumulates_later_chunks', () => {
+test('WHAT[PROC-009] EXEC_011_collector_spool_accumulates_later_chunks', () => {
   const collector = create(estimate(10, 2n))
   addStdout(collector, text('abcdefg')) // 7 bytes → spool started
   addStderr(collector, text('x')) // appended to the same spool file
@@ -107,7 +107,7 @@ test('EXEC_011_collector_spool_accumulates_later_chunks', () => {
   spoolDelete(spoolPath)
 })
 
-test('EXEC_011_collector_spooled_buffers_are_cleared', () => {
+test('WHAT[PROC-009] EXEC_011_collector_spooled_buffers_are_cleared', () => {
   const collector = create(estimate(10, 2n))
   addStdout(collector, text('abcdefg'))
   assert.equal(collector.Stdout.length, 0)
@@ -116,14 +116,14 @@ test('EXEC_011_collector_spooled_buffers_are_cleared', () => {
 
 // ── Spool primitives ─────────────────────────────────────────────────────────
 
-test('EXEC_011_spool_chunk_count_rounds_up', () => {
+test('WHAT[PROC-009] EXEC_011_spool_chunk_count_rounds_up', () => {
   assert.equal(chunkCount(0n), 0)
   assert.equal(chunkCount(1n), 1)
   assert.equal(chunkCount(BigInt(CHUNK_SIZE_BYTES)), 1)
   assert.equal(chunkCount(BigInt(CHUNK_SIZE_BYTES) + 1n), 2)
 })
 
-test('EXEC_011_spool_chunk_bytes_splits_at_chunk_size', () => {
+test('WHAT[PROC-009] EXEC_011_spool_chunk_bytes_splits_at_chunk_size', () => {
   assert.deepEqual(chunkBytes(3, new Uint8Array(0)), [])
   assert.deepEqual(chunkBytes(3, undefined), [])
   const parts = chunkBytes(3, new Uint8Array([1, 2, 3, 4, 5]))
@@ -132,7 +132,7 @@ test('EXEC_011_spool_chunk_bytes_splits_at_chunk_size', () => {
   assert.deepEqual(parts[1], new Uint8Array([4, 5]))
 })
 
-test('EXEC_011_spool_round_trips_bytes_through_temp_file', () => {
+test('WHAT[PROC-009] EXEC_011_spool_round_trips_bytes_through_temp_file', () => {
   const [path, totalBytes, chunks] = spoolBytesToTempFile(text('0123456789'))
   assert.equal(totalBytes, 10n)
   assert.equal(chunks, 1)
@@ -144,7 +144,7 @@ test('EXEC_011_spool_round_trips_bytes_through_temp_file', () => {
   spoolDelete(path)
 })
 
-test('EXEC_011_spool_append_tracks_bytes_written', () => {
+test('WHAT[PROC-009] EXEC_011_spool_append_tracks_bytes_written', () => {
   const spool = startStreamingSpool()
   appendStreamingSpool(spool, text('ab'))
   appendStreamingSpool(spool, new Uint8Array(0)) // empty → no-op

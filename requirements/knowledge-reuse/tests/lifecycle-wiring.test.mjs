@@ -25,7 +25,7 @@ const sandbox = () => {
 }
 const currentCases = (store) => store.TryCurrent('Casebook')?.Cases ?? new Map()
 
-test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
+test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
@@ -58,7 +58,7 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () =
   }
 })
 
-test('lifecycle_cleanupInspector_never_publishes_case', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_cleanupInspector_never_publishes_case', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
@@ -80,7 +80,7 @@ test('lifecycle_cleanupInspector_never_publishes_case', async () => {
   }
 })
 
-test('lifecycle_missing_answer_is_noop_finalize', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_missing_answer_is_noop_finalize', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
@@ -94,7 +94,7 @@ test('lifecycle_missing_answer_is_noop_finalize', async () => {
   }
 })
 
-test('lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
+test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
@@ -119,7 +119,7 @@ test('lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order'
   }
 })
 
-test('lifecycle_disabled_marker_skips_publication', async () => {
+test('WHAT[KNOWLEDGE-REUSE-009] lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])

@@ -76,7 +76,7 @@ const views = (projection) => ({
 
 // ── EXEC-009: typed handles are distinct identities ──────────────────────────
 
-test('EXEC_009_agent_pty_and_manager_job_handles_are_separate_identities', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_agent_pty_and_manager_job_handles_are_separate_identities', () => {
   // The same string in three handle kinds must be three map keys. Collapsing them
   // to the raw string would let retiring an agent handle retire the PTY that
   // happens to share its id.
@@ -104,7 +104,7 @@ test('EXEC_009_agent_pty_and_manager_job_handles_are_separate_identities', () =>
   assert.equal(stateOf(retired, handleId.pty('x')).lifecycle, 'Active')
 })
 
-test('EXEC_009_only_an_agent_handle_answers_the_agent_question', () => {
+test('WHAT[MANAGED-SESSION-015] EXEC_009_only_an_agent_handle_answers_the_agent_question', () => {
   // `tryAgent` exists so a caller that needs an AgentHandleId cannot silently
   // accept a PTY handle by string coercion.
   assert.equal(isSome(handleId.tryAgent(handleId.agent('h1'))), true)
@@ -118,7 +118,7 @@ test('EXEC_009_only_an_agent_handle_answers_the_agent_question', () => {
   )
 })
 
-test('EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
+test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
   // The field this pins was missing until package F: `HandleLinked` carried no
   // child SessionId, so eight consumers could not get from a handle to its child
   // and every read side of EXEC-009 was dangling.
@@ -140,7 +140,7 @@ test('EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
 
 // ── EXEC-004: the completion cell is single-assignment ───────────────────────
 
-test('EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
   // Terminal, send-failure and cancel race for one cell. The loser must be
   // REFUSED rather than overwrite the winner, or a cancelled child could report
   // the terminal it never reached.
@@ -158,7 +158,7 @@ test('EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
   assert.equal(stateOf(completed).completion, 'Terminal', 'the winner is unchanged')
 })
 
-test('EXEC_004_each_completion_kind_survives_into_the_state', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_004_each_completion_kind_survives_into_the_state', () => {
   // EXEC-005 requires `list` to say WHICH completion landed, so the kind is part
   // of the lifecycle state rather than a boolean beside it.
   for (const kind of ['Terminal', 'SendFailure', 'Cancelled']) {
@@ -170,7 +170,7 @@ test('EXEC_004_each_completion_kind_survives_into_the_state', () => {
   }
 })
 
-test('EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
   const projection = linkOn(handleProjection.empty)
 
   assert.deepEqual(handleProjection.complete(handleId.agent('never'), handleProjection.completionOf('Terminal'), projection), {
@@ -179,7 +179,7 @@ test('EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
   })
 })
 
-test('EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
+test('WHAT[MANAGED-SESSION-008] EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
   // `retire` IS join's write. Retiring an active handle would discard a child
   // that is still running and leave its completion with nowhere to land.
   const active = linkOn(handleProjection.empty)
@@ -190,7 +190,7 @@ test('EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
 
 // ── EXEC-005: the three derived views, and what each excludes ────────────────
 
-test('EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => {
   const active = linkOn(handleProjection.empty)
   const completed = completeOn(active)
   const retired = retireOn(completed)
@@ -207,7 +207,7 @@ test('EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => 
   assert.deepEqual(views(retired), { listable: [], joinable: [], active: [] })
 })
 
-test('EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
   // "Cancel every owned physical resource individually" is only expressible if
   // the caller gets the ids. A count would force it to guess which ones.
   let projection = linkOn(handleProjection.empty, { handle: handleId.agent('a'), child: sessionId('ses_1') })
@@ -222,7 +222,7 @@ test('EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
 
 // ── EXEC-009: the tombstone is permanent ────────────────────────────────────
 
-test('EXEC_009_a_retired_handle_answers_retired_forever', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_forever', () => {
   const retired = retireOn(completeOn(linkOn(handleProjection.empty)))
 
   assert.equal(handleProjection.isRetired(HANDLE, retired), true)
@@ -243,7 +243,7 @@ test('EXEC_009_a_retired_handle_answers_retired_forever', () => {
   assert.deepEqual(reopened.ok ? handleProjection.read(handleProjection.tryFind(HANDLE, reopened.value)).lifecycle : null, 'Active')
 })
 
-test('EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
   // The exact confusion the tombstone prevents. If the record were deleted on
   // retire, these two lookups would be identical and `fork` would treat a spent
   // handle id as an agent name.
@@ -261,7 +261,7 @@ test('EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () 
   )
 })
 
-test('EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
   // "Is this session one of mine" must answer yes for a child that already
   // finished — otherwise a late event from it looks like it came from a stranger.
   const retired = retireOn(completeOn(linkOn(handleProjection.empty)))
@@ -272,7 +272,7 @@ test('EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
   assert.equal(isSome(handleProjection.tryFindByChildSession(sessionId('ses_other'), retired)), false)
 })
 
-test('EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating', () => {
+test('WHAT[MANAGED-SESSION-015] EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating', () => {
   // Restart recovery re-links the same handle id to the same session. That must
   // be idempotent for a live handle — and refused only once retired.
   const projection = linkOn(handleProjection.empty)
@@ -282,7 +282,7 @@ test('EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating', () =
   assert.deepEqual(stateOf(relinked), stateOf(projection))
 })
 
-test('EXEC_009_linked_children_lists_every_child_ever_linked', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {
   // Replaces the old live-only `LinkedChildren` map, which forced restart
   // recovery and the retired-handle check to use two different structures.
   let projection = linkOn(handleProjection.empty, { handle: handleId.agent('a'), child: sessionId('ses_1') })
@@ -330,7 +330,7 @@ const foldFacts = (facts) =>
     facts.map((value, index) => envelope({ seq: index + 1, stream: stream.session(PARENT), fact: value })),
   )
 
-test('EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completed, handleFact.retired])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -351,7 +351,7 @@ test('EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
   assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
 })
 
-test('EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
+test('WHAT[MANAGED-SESSION-008] EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
   // The tombstone makes both idempotent, and a journal written across a restart
   // contains exactly these repeats. Rejecting them would refuse to boot.
   const folded = foldFacts([
@@ -367,7 +367,7 @@ test('EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
   assert.equal(handleProjection.read(handleProjection.tryFind(HANDLE, handles)).lifecycle, 'Retired')
 })
 
-test('EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay', () => {
+test('WHAT[MANAGED-SESSION-015] EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay', () => {
   // No correct writer produces this: the link is what creates the handle. The
   // journal is incomplete, so booting from it would build state on absent facts.
   const folded = foldFacts([handleFact.completed])
@@ -377,7 +377,7 @@ test('EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay'
   assert.equal(folded.error.Reason, 'handle completion or retirement for a handle that was never linked')
 })
 
-test('EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
+test('WHAT[MANAGED-SESSION-008] EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
   // `retire` is join's write, and join consumes a completion. A tombstone with no
   // completion means a handle was discarded while its child was still running.
   const folded = foldFacts([handleFact.linked, handleFact.retired])
@@ -393,7 +393,7 @@ test('EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
 
 // ── EXEC-001: fork creates a child run and list / join show its lifecycle ─────
 
-test('EXEC_001_fork_creates_a_child_run', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
   const active = linkOn(handleProjection.empty)
 
   assert.deepEqual(views(active), { listable: ['agent:h1'], joinable: [], active: ['agent:h1'] })
@@ -420,7 +420,7 @@ test('EXEC_001_fork_creates_a_child_run', () => {
 
 // ── EXEC-007: a nudge to an active handle does not create a second run ─────────
 
-test('EXEC_007_nudge_is_fire_and_forget', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_007_nudge_is_fire_and_forget', () => {
   const active = linkOn(handleProjection.empty)
   const nudged = linkOn(active, { child: CHILD, agent: 'fast-coder', role: 'Coder' })
 
@@ -433,7 +433,7 @@ test('EXEC_007_nudge_is_fire_and_forget', () => {
 
 // ── EXEC-009: durable completion payload on the lifecycle ────────────────────
 
-test('EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
   const completed = completeOn(linkOn(handleProjection.empty), {
     kind: 'Terminal',
     ref: blobRef('blobs/completion-h1'),
@@ -455,7 +455,7 @@ test('EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
   assert.deepEqual(views(completed).joinable, ['agent:h1'])
 })
 
-test('EXEC_009_cancelled_completion_has_no_blob', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_009_cancelled_completion_has_no_blob', () => {
   const cancelled = completeOn(linkOn(handleProjection.empty), { kind: 'Cancelled' })
   assert.deepEqual(
     {
@@ -473,7 +473,7 @@ test('EXEC_009_cancelled_completion_has_no_blob', () => {
   )
 })
 
-test('EXEC_009_fold_replays_completion_blob_refs', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_009_fold_replays_completion_blob_refs', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completedWithBlob])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   const handles = fold.session(folded.value, 'ses_p').Handles
@@ -491,7 +491,7 @@ test('EXEC_009_fold_replays_completion_blob_refs', () => {
   })
 })
 
-test('EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () => {
   // 0.5.1 lines lack CompletionRef/CompletionDigest. Decode must inject None rather
   // than refuse the journal — forward-compat for in-flight 0.5.1 runtimes.
   const modern = fact('HandleCompleted', {

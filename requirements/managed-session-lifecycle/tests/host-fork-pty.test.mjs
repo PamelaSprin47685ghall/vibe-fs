@@ -88,7 +88,7 @@ const okId = (result) => {
 
 // ── ForkPty ──────────────────────────────────────────────────────────────────
 
-test('HFP_fork_pty_blank_command_is_refused', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_fork_pty_blank_command_is_refused', async () => {
   const liveCtx = await live()
   const result = await forkPty(liveCtx.runtime, '   ', AGENT)
   assert.equal(result.tag, 1)
@@ -97,7 +97,7 @@ test('HFP_fork_pty_blank_command_is_refused', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
   const liveCtx = await live()
   const result = await forkPty(liveCtx.runtime, 'ls -la', AGENT)
   const id = okId(result)
@@ -123,7 +123,7 @@ test('HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_fork_pty_port_exception_untracks_and_errors', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_fork_pty_port_exception_untracks_and_errors', async () => {
   const liveCtx = await live({ forkError: 'pty spawn exploded' })
   const result = await forkPty(liveCtx.runtime, 'ls', AGENT)
   assert.equal(result.tag, 1)
@@ -134,14 +134,14 @@ test('HFP_fork_pty_port_exception_untracks_and_errors', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_try_pty_unknown_string_id_is_none', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_try_pty_unknown_string_id_is_none', async () => {
   const liveCtx = await live()
   okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   assert.equal(tryPty(liveCtx.runtime, 'no-such-pty'), undefined)
   liveCtx.cleanup()
 })
 
-test('HFP_try_pty_owned_but_unknown_to_port_is_none', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_try_pty_owned_but_unknown_to_port_is_none', async () => {
   const liveCtx = await live()
   const id = ptyIdValue(okId(await forkPty(liveCtx.runtime, 'ls', AGENT)))
   // Forget the pty on the port side (simulated backend loss): owned by the
@@ -154,7 +154,7 @@ test('HFP_try_pty_owned_but_unknown_to_port_is_none', async () => {
 
 // ── SendPty ──────────────────────────────────────────────────────────────────
 
-test('HFP_send_pty_unowned_id_is_unknown', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_unowned_id_is_unknown', async () => {
   const liveCtx = await live()
   const result = await sendPty(liveCtx.runtime, ptyIdOf('foreign'), 'echo hi', undefined)
   assert.equal(result.tag, 1)
@@ -162,7 +162,7 @@ test('HFP_send_pty_unowned_id_is_unknown', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_send_pty_owned_but_missing_on_port_is_unknown', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_owned_but_missing_on_port_is_unknown', async () => {
   const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   // Simulated backend loss: pty no longer Exists on the port.
@@ -174,7 +174,7 @@ test('HFP_send_pty_owned_but_missing_on_port_is_unknown', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_send_pty_signal_forwards_signal_command', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_signal_forwards_signal_command', async () => {
   const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, undefined, PtySignal.Interrupt)
@@ -189,7 +189,7 @@ test('HFP_send_pty_signal_forwards_signal_command', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_send_pty_write_forwards_write_command', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_write_forwards_write_command', async () => {
   const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, 'echo hi', undefined)
@@ -201,7 +201,7 @@ test('HFP_send_pty_write_forwards_write_command', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_send_pty_read_with_empty_prompt', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_read_with_empty_prompt', async () => {
   const liveCtx = await live()
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
 
@@ -219,7 +219,7 @@ test('HFP_send_pty_read_with_empty_prompt', async () => {
   liveCtx.cleanup()
 })
 
-test('HFP_send_pty_port_error_propagates', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_send_pty_port_error_propagates', async () => {
   const liveCtx = await live({ sendError: 'pty session ended' })
   const id = okId(await forkPty(liveCtx.runtime, 'ls', AGENT))
   const result = await sendPty(liveCtx.runtime, id, 'echo hi', undefined)
@@ -230,7 +230,7 @@ test('HFP_send_pty_port_error_propagates', async () => {
 
 // ── low-level tracking ───────────────────────────────────────────────────────
 
-test('HFP_track_untrack_pty_run_round_trip', async () => {
+test('WHAT[MANAGED-SESSION-012] HFP_track_untrack_pty_run_round_trip', async () => {
   const liveCtx = await live()
   const id = ptyIdOf('tracked-1')
   trackPtyRun(liveCtx.runtime, id)

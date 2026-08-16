@@ -20,7 +20,7 @@ const {
 
 // ── PtySignal.tryParse ───────────────────────────────────────────────────────
 
-test('PTY_TYPES_tryParse_accepts_every_supported_signal_name', () => {
+test('WHAT[PROC-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name', () => {
   const expected = [
     ['TERM', 'Terminate'],
     ['KILL', 'Kill'],
@@ -37,7 +37,7 @@ test('PTY_TYPES_tryParse_accepts_every_supported_signal_name', () => {
   }
 })
 
-test('PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () => {
+test('WHAT[PROC-001] PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () => {
   for (const bad of ['SIGTERM', 'term', '', 'SIGKILL', 'STOP']) {
     const parsed = resultOf(PtySignalModule_tryParse(bad))
     assert.equal(parsed.ok, false, bad)
@@ -46,7 +46,7 @@ test('PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () => {
   }
 })
 
-test('PTY_TYPES_tryParse_returns_the_canonical_static_cases', () => {
+test('WHAT[PROC-001] PTY_TYPES_tryParse_returns_the_canonical_static_cases', () => {
   // The static singletons are what Signal commands carry; the codec must produce them.
   assert.equal(payloadOf(PtySignalModule_tryParse('TERM')), PtySignal.Terminate)
   assert.equal(payloadOf(PtySignalModule_tryParse('KILL')), PtySignal.Kill)
@@ -59,7 +59,7 @@ test('PTY_TYPES_tryParse_returns_the_canonical_static_cases', () => {
 
 // ── PtyId ────────────────────────────────────────────────────────────────────
 
-test('PTY_TYPES_pty_id_roundtrips_its_value', () => {
+test('WHAT[PROC-001] PTY_TYPES_pty_id_roundtrips_its_value', () => {
   const id = PtyId_Create_Z721C83C5('pty-deadbeef')
   assert.equal(PtyId__get_Value(id), 'pty-deadbeef')
   assert.equal(caseOf(id), 'PtyId')
@@ -67,7 +67,7 @@ test('PTY_TYPES_pty_id_roundtrips_its_value', () => {
 
 // ── PtyCommand / PtyHandle / PtyRead / ReadPlan shapes ───────────────────────
 
-test('PTY_TYPES_pty_command_cases_carry_their_fields', () => {
+test('WHAT[PROC-001] PTY_TYPES_pty_command_cases_carry_their_fields', () => {
   const spawn = new PtyCommand(0, ['sh -c ls', '/tmp'])
   assert.equal(caseOf(spawn), 'Spawn')
   assert.deepEqual(payloadOf(spawn), ['sh -c ls', '/tmp'])
@@ -88,7 +88,7 @@ test('PTY_TYPES_pty_command_cases_carry_their_fields', () => {
   assert.deepEqual(payloadOf(resize), [120, 40])
 })
 
-test('PTY_TYPES_pty_handle_and_read_records_expose_fields', () => {
+test('WHAT[PROC-001] PTY_TYPES_pty_handle_and_read_records_expose_fields', () => {
   const agent = { Name: 'fast-distiller' }
   const id = PtyId_Create_Z721C83C5('pty-1')
   const handle = new PtyHandle(id, 'sleep 1', new Date(), agent)
@@ -101,7 +101,7 @@ test('PTY_TYPES_pty_handle_and_read_records_expose_fields', () => {
   assert.equal(read.Closed, true)
 })
 
-test('PTY_TYPES_read_plan_cases_exist_for_buffered_read', () => {
+test('WHAT[PROC-001] PTY_TYPES_read_plan_cases_exist_for_buffered_read', () => {
   assert.equal(caseOf(new ReadPlan(0, ['no such id'])), 'Unknown')
   assert.equal(caseOf(new ReadPlan(1, [])), 'AlreadyInProgress')
   assert.equal(caseOf(new ReadPlan(2, [])), 'ClosedImmediate')

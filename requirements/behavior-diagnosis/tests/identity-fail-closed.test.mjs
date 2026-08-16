@@ -174,7 +174,7 @@ const blogCall = (callId, input) => ({
 
 // ── empty / missing messageId → fail closed (ENFORCER-043) ───────────────────
 
-test('ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
+test('WHAT[BD-010] ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
   // Empty provider messageId: there is no provable provider run, so the cycle must
   // fail closed even though the blog call itself is well-formed.
   const parts = [blogCall('c1', { text: 'work' })]
