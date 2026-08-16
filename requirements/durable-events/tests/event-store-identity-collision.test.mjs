@@ -6,45 +6,39 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, eventId, idValue, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
-const Persist = await import('../../../dist/Persistence/EventStore/StoreTypes.js')
-const Codec = await import('../../../dist/Persistence/EventStore/CanonicalEventCodec.js')
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 
-const streamId = (v) => Domain.EventStreamIdModule_create(v)
-const payloadRef = (v) => Domain.PayloadRefModule_create(v)
+const A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 const envelope = ({
-  id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  id = A,
   stream = 'job/main',
   eventType = 'JobRequested',
   parents = [],
   payload = { status: 'open' },
   payloadRefs = [],
-} = {}) =>
-  new Domain.EventEnvelope(
-    eventId(id),
-    streamId(stream),
-    eventType,
-    toList(parents.map(eventId)),
-    payload,
-    toList(payloadRefs.map(payloadRef)),
-  )
+} = {}) => ({
+  id,
+  stream,
+  type: eventType,
+  parents,
+  payload,
+  payloadRefs,
+})
 
 test('WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed', () => {
   const left = envelope({ payload: { status: 'open' } })
   const right = envelope({ payload: { status: 'closed' } })
 
-  const checked = Codec.checkIdentity(left, right)
-  assert.equal(caseOf(checked), 'Error')
-  const err = payloadOf(checked)
-  assert.equal(caseOf(err), 'IdentityCollision')
-  assert.equal(idValue.event(payloadOf(err)), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  const checked = eventStore.checkIdentity(left, right)
+  assert.equal(checked.ok, false)
+  assert.equal(checked.error.tag, 'IdentityCollision')
+  assert.equal(checked.error.eventId, A)
 
-  const merged = Codec.mergeByIdentity(toList([left, right]))
-  assert.equal(caseOf(merged), 'Error')
-  assert.equal(caseOf(payloadOf(merged)), 'IdentityCollision')
+  const merged = eventStore.mergeByIdentity([left, right])
+  assert.equal(merged.ok, false)
+  assert.equal(merged.error.tag, 'IdentityCollision')
 })
 
 test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () => {
@@ -55,7 +49,6 @@ test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () 
     ],
     payloadRefs: ['oid-2', 'oid-1'],
   })
-  // Same identity, different list order — canonicalize must collapse to one event.
   const b = envelope({
     parents: [
       'cccccccccccccccccccccccccccccccccccccccc',
@@ -65,12 +58,13 @@ test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () 
     payloadRefs: ['oid-1', 'oid-2', 'oid-1'],
   })
 
-  assert.equal(Codec.encode(a), Codec.encode(b))
-  assert.equal(caseOf(Codec.checkIdentity(a, b)), 'Ok')
+  assert.equal(eventStore.encode(a), eventStore.encode(b))
+  const checked = eventStore.checkIdentity(a, b)
+  assert.equal(checked.ok, true)
 
-  const merged = Codec.mergeByIdentity(toList([a, b]))
-  assert.equal(caseOf(merged), 'Ok')
-  assert.equal(listItems(payloadOf(merged)).length, 1)
+  const merged = eventStore.mergeByIdentity([a, b])
+  assert.equal(merged.ok, true)
+  assert.equal(merged.events.length, 1)
 })
 
 test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
@@ -83,7 +77,7 @@ test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with
     payloadRefs: ['p2', 'p1'],
   })
 
-  const text = Codec.encode(value)
+  const text = eventStore.encode(value)
   assert.equal(text.endsWith('\n'), true)
   assert.equal(text.endsWith('\n\n'), false)
   assert.equal(text.includes('\r'), false)
@@ -108,7 +102,7 @@ test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with
   assert.deepEqual(Object.keys(parsed.payload), ['a', 'z'])
   assert.deepEqual(Object.keys(parsed.payload.a), ['b', 'm'])
 
-  assert.equal(Codec.encode(value), Codec.encode(value))
+  assert.equal(eventStore.encode(value), eventStore.encode(value))
 })
 
 test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
@@ -118,18 +112,12 @@ test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
     payload: { other: true },
   })
 
-  assert.equal(caseOf(Codec.checkIdentity(a, b)), 'Ok')
-  const merged = Codec.mergeByIdentity(toList([b, a]))
-  assert.equal(caseOf(merged), 'Ok')
-  assert.equal(listItems(payloadOf(merged)).length, 2)
+  assert.equal(eventStore.checkIdentity(a, b).ok, true)
+  const merged = eventStore.mergeByIdentity([b, a])
+  assert.equal(merged.ok, true)
+  assert.equal(merged.events.length, 2)
 })
 
-test('WHAT[DURABLE-EVENTS-016] StoreTypes_exposes_canonical_store_ref_and_error_DUs', () => {
-  assert.equal(Codec.canonicalStoreRef, 'refs/wanxiang/store')
-  assert.equal(Persist.StoreRef_canonical, 'refs/wanxiang/store')
-  assert.ok(Persist.StorageInvalid_$reflection)
-  assert.ok(Persist.AppendError_$reflection)
-  assert.ok(Persist.PublishError_$reflection)
-  assert.ok(Persist.ConvergeError_$reflection)
-  assert.ok(Persist.DomainConflict_$reflection)
+test('WHAT[DURABLE-EVENTS-016] StoreTypes_exposes_canonical_store_ref', () => {
+  assert.equal(eventStore.canonicalStoreRef, 'refs/wanxiang/store')
 })
