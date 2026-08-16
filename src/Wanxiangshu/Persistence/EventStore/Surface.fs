@@ -53,8 +53,30 @@ module EventStoreSurface =
             {| commonDir = commonDir
                store = EventStore.createLocal commonDir writerId integrator |}
 
+    let private envelopeToJs (envelope: EventEnvelope) : obj =
+        let payloadObject =
+            CanonicalEventCodec.encode envelope
+            |> (fun s -> s.TrimEnd('\n'))
+            |> JS.JSON.parse
+
+        box
+            {| id = EventId.value envelope.EventId
+               stream = EventStreamId.value envelope.StreamId
+               ``type`` = envelope.EventType
+               parents = envelope.Parents |> List.map EventId.value |> List.toArray
+               payload = payloadObject
+               payloadRefs = envelope.PayloadRefs |> List.map PayloadRef.value |> List.toArray |}
+
+    let private cutToJs (cut: SemanticCut) : obj =
+        box
+            {| failedEventId = EventId.value cut.FailedEventId
+               rule = cut.Rule
+               cutEventId = EventId.value cut.CutEventId
+               reason = cut.Reason |}
+
     /// Append JS-shaped events to a local store.
-    /// Returns `{ ok: true }` or `{ ok: false, error: string }`.
+    /// Returns `{ ok: true, cuts: [...] }` or `{ ok: false, error: string }`.
+    /// Cuts are the semantic-cut tail-reset events the integrator appended.
     let append (store: IEventStore) (events: obj array) : System.Threading.Tasks.Task<obj> =
         task {
             let parsed = events |> Array.toList |> List.map eventOfJs
@@ -62,6 +84,16 @@ module EventStoreSurface =
             let! (result: Result<AppendReceipt, AppendError>) = store.Append(parsed)
 
             match result with
-            | Ok _ -> return box {| ok = true |}
+            | Ok receipt ->
+                return
+                    box
+                        {| ok = true
+                           cuts = receipt.Cuts |> List.map cutToJs |> List.toArray |}
             | Error e -> return box {| ok = false; error = e.ToString() |}
         }
+
+    /// Try to read one event by id. Returns the JS-shaped envelope or null.
+    let tryEvent (store: IEventStore) (eventId: string) : obj =
+        match store.TryEvent(EventId.create eventId) with
+        | None -> null
+        | Some envelope -> envelopeToJs envelope
