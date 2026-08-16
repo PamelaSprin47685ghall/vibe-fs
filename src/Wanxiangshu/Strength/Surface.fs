@@ -347,6 +347,19 @@ module StrengthSurface =
     let capabilities (role: string) : string array =
         readonlyCapabilities role "strength-replica"
 
+    let exactReadonlyHostToolMap: obj array =
+        StrengthReplicaTools.exactReadonlyHostToolMap
+        |> Map.toList
+        |> List.map (fun (tool, allowed) -> box {| tool = tool; allowed = allowed |})
+        |> List.toArray
+
+    let isAllowedTool (tool: string) : bool =
+        match tool with
+        | "read"
+        | "glob"
+        | "grep" -> true
+        | _ -> false
+
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     let systemPromptIdForRole (role: string) : string =
         PromptAuthority.systemPromptIdFor (roleOf (box role)) |> SystemPromptId.value
@@ -1051,7 +1064,7 @@ module StrengthSurface =
                 aborted.Add(SessionId.value sessionId)
                 Task.FromResult(Ok())
             member _.InterruptSessionOnly(_) = Task.FromResult(Ok())
-            member _.AbortChildren(_) = Task.CompletedTask
+            member _.AbortChildren(_) = AsyncSupport.completedTask ()
             member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
             member _.TryGetParentSession(_) = Task.FromResult(Ok None)
             member _.CreateChildSession(_, _) = Task.FromResult(Error "unused")

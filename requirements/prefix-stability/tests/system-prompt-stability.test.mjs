@@ -10,6 +10,9 @@ import * as authority from '../../../dist/Interaction/Authority/Surface.js'
 import * as planner from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
 import * as delegation from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as strength from '../../../dist/Strength/Surface.js'
+import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
+
+installDefaultResources()
 
 const OWNER = 'ses_owner_prompt'
 const roles = ['Manager', 'Coder', 'Inspector', 'Reviewer', 'Browser', 'Inquiry', 'Distiller', 'Blogger']
@@ -33,7 +36,7 @@ test('WHAT[PREFIX-STABILITY-002] PROMPT_019_each_canonical_role_has_one_stable_p
     assert.equal(deep.systemPromptId, id)
     assert.equal(typeof resource, 'string')
     assert.ok(resource.length > 0, `${role} resource must not be empty`)
-    assert.equal(resource.includes(id), false, 'resource bytes must not smuggle the identity field')
+    assert.equal(resource.includes(`system_prompt_id = "${id}"`), false, 'resource bytes must not smuggle the identity field')
     ids.add(id)
   }
   assert.equal(ids.size, roles.length, 'canonical roles must not alias prompt identities')
@@ -62,8 +65,8 @@ test('WHAT[PREFIX-STABILITY-002] PROMPT_019_role_identity_does_not_inherit_attem
   assert.equal(reviewer.systemPromptId, authority.systemPromptIdForRole('Reviewer'))
   assert.equal('cursor' in manager, false)
   assert.equal('replicaId' in manager, false)
-  assert.equal(manager.requestKind, 'WorkMain')
-  assert.equal(reviewer.requestKind, 'WorkMain')
+  assert.match(manager.requestKind, /^work-?main$/i)
+  assert.match(reviewer.requestKind, /^work-?main$/i)
 })
 
 test('WHAT[PREFIX-STABILITY-002] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {

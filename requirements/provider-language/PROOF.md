@@ -24,7 +24,7 @@
 
 | 源 → 目标 | 适配 | 验证 |
 |---|---|---|
-| `requirements/provider-language/tests/provider-language.test.mjs` → `requirements/provider-language/tests/provider-language.test.mjs` | `../support/domain.mjs` → `../../../requirements/verification-system/tests/support/domain.mjs` | `node --test` 6/6 绿 |
+| `requirements/provider-language/tests/provider-language.test.mjs` → `requirements/provider-language/tests/provider-language.test.mjs` | 直接引入所有者模块 | `node --test` 6/6 绿 |
 | `requirements/provider-language/tests/provider-prose-ownership.test.mjs` → `requirements/provider-language/tests/provider-prose-ownership.test.mjs` | import 深度不变（同级） | `node --test` 8/8 绿 |
 
 ## SPLIT@cutover（REUSE 项拆 owner 计划）

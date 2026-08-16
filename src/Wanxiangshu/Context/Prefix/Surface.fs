@@ -104,6 +104,9 @@ module PrefixSurface =
     let reanchoredRuns (state: obj) : string array =
         (stateOfJs state).ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value
 
+    let isReanchored (run: string) (state: obj) : bool =
+        PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
+
     let private intentToJs (intent: ProjectionIntent) : obj =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix ->

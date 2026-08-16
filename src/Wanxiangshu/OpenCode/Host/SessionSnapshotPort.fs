@@ -156,7 +156,7 @@ module SessionSnapshotPort =
             |> Option.orElse (readString part?callId)
 
         let toolName = readString part?tool |> Option.orElse (readString part?name)
-        let hostToolPartId = readString part?id
+        let hostToolPartId = readString part?id |> Option.orElse callId
 
         match hostToolPartId, callId, toolName with
         | Some partId, Some call, Some name -> Some(sessionToolPartOf partId call name part state)

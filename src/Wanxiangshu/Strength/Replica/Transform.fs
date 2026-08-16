@@ -75,8 +75,8 @@ type StrengthReplicaTransformOutcome =
 [<RequireQualifiedAccess>]
 module StrengthReplicaTransform =
 
-    let private providerResultsByCallId (rawMessage: obj) =
-        ProviderWireCapture.decodeMessageView [ rawMessage ]
+    let private providerResultsByCallId (rawMessages: obj list) =
+        ProviderWireCapture.decodeMessageView rawMessages
         |> fun view -> view.Messages
         |> List.collect (fun message -> message.Parts)
         |> List.choose (function
@@ -106,19 +106,17 @@ module StrengthReplicaTransform =
         | Take of StrengthRequestBatch
 
     let private classifyAssistantBatch
+        (results: Map<string, string>)
         (requestOrdinal: int)
         (rawMessage: obj)
         (message: SessionMessage)
         : HostBatchStep =
         let toolParts = message.ToolParts |> Array.toList
-        let results = providerResultsByCallId rawMessage
         let exchanges = toolParts |> List.choose (exchangeOfPart results)
 
         if List.isEmpty toolParts then
             HostBatchStep.Stop
         elif hasPendingTool toolParts then
-            HostBatchStep.Stop
-        elif Map.count results <> List.length toolParts then
             HostBatchStep.Stop
         elif List.length exchanges <> List.length toolParts then
             HostBatchStep.Stop
@@ -127,34 +125,37 @@ module StrengthReplicaTransform =
                 { RequestOrdinal = requestOrdinal + 1
                   Exchanges = exchanges }
 
-    let private classifyHostMessage (requestOrdinal: int) (rawMessage: obj) : HostBatchStep =
+    let private classifyHostMessage (results: Map<string, string>) (requestOrdinal: int) (rawMessage: obj) : HostBatchStep =
         match SessionSnapshotPort.projectMessage rawMessage with
         | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
-            classifyAssistantBatch requestOrdinal rawMessage message
+            classifyAssistantBatch results requestOrdinal rawMessage message
         | _ -> HostBatchStep.Skip
 
     let rec private continueHostBatch
+        (results: Map<string, string>)
         (remaining: obj list)
         (requestOrdinal: int)
         (collected: StrengthRequestBatch list)
         : StrengthRequestBatch list =
         match remaining with
         | [] -> List.rev collected
-        | rawMessage :: tail -> stepHostBatch tail requestOrdinal collected rawMessage
+        | rawMessage :: tail -> stepHostBatch results tail requestOrdinal collected rawMessage
 
     and private stepHostBatch
+        (results: Map<string, string>)
         (tail: obj list)
         (requestOrdinal: int)
         (collected: StrengthRequestBatch list)
         (rawMessage: obj)
         : StrengthRequestBatch list =
-        match classifyHostMessage requestOrdinal rawMessage with
-        | HostBatchStep.Skip -> continueHostBatch tail requestOrdinal collected
+        match classifyHostMessage results requestOrdinal rawMessage with
+        | HostBatchStep.Skip -> continueHostBatch results tail requestOrdinal collected
         | HostBatchStep.Stop -> List.rev collected
-        | HostBatchStep.Take batch -> continueHostBatch tail batch.RequestOrdinal (batch :: collected)
+        | HostBatchStep.Take batch -> continueHostBatch results tail batch.RequestOrdinal (batch :: collected)
 
     let private collectHostCompleteBatches (rawMessages: obj list) : StrengthRequestBatch list =
-        continueHostBatch rawMessages 0 []
+        let results = providerResultsByCallId rawMessages
+        continueHostBatch results rawMessages 0 []
 
     let private snapshotOf wire =
         { CurrentProjection = ProviderProjection.toSemantic wire
@@ -164,12 +165,12 @@ module StrengthReplicaTransform =
           HostReanchor = None }
 
     let private batchesForReplica (rawMessages: obj list) (currentWire: ProviderProjection.ProviderWireProjection) =
-        let hostBatches = collectHostCompleteBatches rawMessages
+        let wireBatches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
 
-        if List.isEmpty hostBatches then
-            StrengthBatchCollector.collectCompleteBatches currentWire.Messages
+        if not (List.isEmpty wireBatches) then
+            wireBatches
         else
-            hostBatches
+            collectHostCompleteBatches rawMessages
 
     let private localFrameOf
         (sha256: string -> string)

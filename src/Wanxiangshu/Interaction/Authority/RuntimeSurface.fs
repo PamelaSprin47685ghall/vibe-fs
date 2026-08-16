@@ -105,36 +105,39 @@ module RuntimeSurface =
         if isNull value then None else Some(profileOf value)
 
     let private projectionOf (value: obj) : PromptAuthority.PromptAuthorityProjection =
-        let pending =
-            arrayOf value?pendingClaims
-            |> Array.fold
-                (fun current claim ->
-                    let typed = claimOf claim
-                    Map.add typed.PromptKey typed current)
-                Map.empty
+        if isNull value then
+            PromptAuthority.empty
+        else
+            let pending =
+                arrayOf value?pendingClaims
+                |> Array.fold
+                    (fun current claim ->
+                        let typed = claimOf claim
+                        Map.add typed.PromptKey typed current)
+                    Map.empty
 
-        let accepted =
-            arrayOf value?acceptedContinuations
-            |> Array.fold
-                (fun current item ->
-                    Map.add
-                        (PhysicalUserMessageId.create (text item?physical))
-                        (continuationKindOf (text item?kind))
-                        current)
-                Map.empty
+            let accepted =
+                arrayOf value?acceptedContinuations
+                |> Array.fold
+                    (fun current item ->
+                        Map.add
+                            (PhysicalUserMessageId.create (text item?physical))
+                            (continuationKindOf (text item?kind))
+                            current)
+                    Map.empty
 
-        let sequences =
-            arrayOf value?claimSequences
-            |> Array.fold
-                (fun current item -> Map.add (text item?scope) (int (text item?count)) current)
-                Map.empty
+            let sequences =
+                arrayOf value?claimSequences
+                |> Array.fold
+                    (fun current item -> Map.add (text item?scope) (int (text item?count)) current)
+                    Map.empty
 
-        { LastAuthorityProfile = profileOption value?lastAuthorityProfile
-          ActiveLogicalRun = profileOption value?activeLogicalRun
-          PendingClaims = pending
-          AcceptedDispatches = Map.empty
-          AcceptedContinuationIds = accepted
-          ClaimSequences = sequences }
+            { LastAuthorityProfile = profileOption value?lastAuthorityProfile
+              ActiveLogicalRun = profileOption value?activeLogicalRun
+              PendingClaims = pending
+              AcceptedDispatches = Map.empty
+              AcceptedContinuationIds = accepted
+              ClaimSequences = sequences }
 
     let private projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
         box

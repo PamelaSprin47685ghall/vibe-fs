@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
+import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
+
+installDefaultResources()
 
 const eligibleOpportunity = {
   isRootWork: true,

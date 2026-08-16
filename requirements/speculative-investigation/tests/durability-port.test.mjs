@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const H = (text) => `H(${text})`
+const H = (text) => createHash('sha256').update(text).digest('hex')
 const frame = (toolName = 'read', args = '{"filePath":"a"}', result = 'alpha') => Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName, canonicalArguments: args, canonicalResult: result }] }]).value
 const publishRequest = (bundle, replica = 'replica-1') => ({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'run-1', replicaSessionId: replica, budget: 'K1', anchorDigest: 'anchor-a', bundle })
 

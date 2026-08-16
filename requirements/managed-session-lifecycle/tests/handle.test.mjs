@@ -340,7 +340,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_termina
     role: 'Coder',
     lifecycle: 'Retired',
     creationOrder: 0,
-    completion: undefined,
+    completion: 'Terminal',
     completionRef: undefined,
     completionDigest: undefined,
     abandonReason: undefined,

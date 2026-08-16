@@ -24,10 +24,6 @@ const names = (permissions) => permissions
 const READ_TOOLS = ['read', 'glob', 'grep']
 const READ_PERMISSIONS = ['Read', 'Glob', 'Grep']
 
-test.before(() => {
-  runtimeResources.installFromPackage()
-})
-
 test('WHAT[ENF-006] Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
   const allowed = rolePermissions('inquiry')
   assert.deepEqual(allowed, ['Fission', 'Inspect', 'Sphinx'])

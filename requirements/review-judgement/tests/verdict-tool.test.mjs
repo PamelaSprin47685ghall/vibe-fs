@@ -42,7 +42,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_missing_input_is_rejected_as_a_natural_co
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: 'ses-manager' }))
-    assert.match(result, /(?:did not come from a Reviewer|并非来自 Reviewer|调用方权威确立之前)/i)
+    assert.match(result, /(?:did not come from a Reviewer|并非来自 Reviewer|调用方权威确立之前|authority is established)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
 })

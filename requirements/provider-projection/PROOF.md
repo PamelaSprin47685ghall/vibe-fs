@@ -25,7 +25,7 @@
 
 | 源 → 目标 | 适配 | 验证 |
 |---|---|---|
-| `requirements/provider-projection/tests/synthetic-toml.test.mjs` → `requirements/provider-projection/tests/synthetic-toml.test.mjs` | `../support/domain.mjs` → `../../../requirements/verification-system/tests/support/domain.mjs`；追加 `ARCH_011_renderer_exposes_no_parser` | `node --test` 25/25 绿 |
+| `requirements/provider-projection/tests/synthetic-toml.test.mjs` → `requirements/provider-projection/tests/synthetic-toml.test.mjs` | 直接引入所有者模块；追加 `ARCH_011_renderer_exposes_no_parser` | `node --test` 25/25 绿 |
 
 ## SPLIT@cutover（REUSE 项拆 owner 计划）
 

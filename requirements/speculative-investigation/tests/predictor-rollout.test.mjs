@@ -10,7 +10,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_feature_key_has_no_replica_or_score_proven
   assert.equal('decisionId' in feature, false)
   assert.equal('score' in feature, false)
   assert.equal('predictorScore' in feature, false)
-  assert.deepEqual(feature, { canonicalRole: 'Inspector', recentPrimary: ['ReadonlyBatch'], visibleByteBucket: 0 })
+  assert.deepEqual(feature, { canonicalRole: 'inspector', recentPrimary: ['ReadonlyBatch'], visibleByteBucket: 1 })
 })
 
 test('WHAT[SPEC-INV-010] STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {

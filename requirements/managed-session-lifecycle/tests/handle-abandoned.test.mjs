@@ -85,8 +85,8 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_HandleAbandoned_serializes_round_trip',
   const decoded = journal.deserializeFact(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
   // DSL-003: Fact → Agent dispatch → Execution family dispatch → payload.
-  assert.equal(agentFactCaseOf(readPayload(decoded.value)), 'HandleAbandoned')
-  const payload = readPayload(readPayload(readPayload(decoded.value)))
+  assert.equal(agentFactCaseOf(decoded.value), 'HandleAbandoned')
+  const payload = readPayload(readPayload(decoded.value))
   assert.equal(handleId.describe(payload.Handle), 'agent:h1')
   assert.equal(caseNameOf(payload.Reason), 'ParentCancelled')
   assert.equal(journal.serializeFact(decoded.value), line)

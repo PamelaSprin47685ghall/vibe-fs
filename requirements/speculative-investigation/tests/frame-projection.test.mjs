@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
 
+const H = (text) => `H(${text})`
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: resultText })
 const exchange = (toolName, canonicalArguments, canonicalResult) => ({ toolName, canonicalArguments, canonicalResult })

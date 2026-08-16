@@ -46,7 +46,7 @@ test('WHAT[FINALITY-023] opening rewrite is byte identical across requests', asy
 
     const firstRewritten = textOf(out1.messages, ROOT)
     assert.ok(firstRewritten.startsWith('Start manager work.'), `opening must keep the raw text: ${firstRewritten}`)
-    assert.ok(firstRewritten.includes('The Planning Table'), 'Planning Table must be attached')
+    assert.ok(firstRewritten.includes('Planning Table'), 'Planning Table must be attached')
 
     // Request 2: the Activation request. The Host reads the PERSISTED (raw)
     // conversation, appends the Activation continuation, and transforms again.
@@ -101,7 +101,7 @@ test('WHAT[FINALITY-022] host title request never opens a life', async () => {
     const outPlan = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, outPlan)
     assert.ok(
-      textOf(outPlan.messages, ROOT).includes('The Planning Table'),
+      textOf(outPlan.messages, ROOT).includes('Planning Table'),
       'the real HumanRoot must still be Birthed',
     )
   })

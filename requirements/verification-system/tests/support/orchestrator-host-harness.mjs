@@ -36,7 +36,7 @@ export const fakeSessions = (behaviour = {}) => {
   const terminalListeners = new Map()
   const stickyTerminals = new Map()
 
-  const sessionKey = (value) => value
+  const sessionKey = (value) => (typeof value === 'object' && value !== null ? (value.fields?.[0] ?? value.value ?? String(value)) : String(value))
   const notifyTerminal = (session, outcome) => {
     const key = sessionKey(session)
     stickyTerminals.set(key, outcome)

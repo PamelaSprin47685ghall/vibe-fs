@@ -52,7 +52,7 @@ test('WHAT[PROC-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out'
 })
 
 test(
-  'EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
+  'WHAT[PROC-004] EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
   { timeout: 15_000 },
   async () => {
     assert.equal(killAckGraceMs, 1_000)

@@ -74,6 +74,7 @@ test('WHAT[SPEC-INV-008] STRENGTH_008_compaction_does_not_retire_raw_replay_with
   const plan = (await Strength.lifecycleReplayPlans('owner', [{ id: 'user-1' }, { id: 'run-1' }], value, projection)).value[0]
   assert.equal(Strength.lifecycleNeedsRawReplay(null, plan), true)
   assert.equal(Strength.lifecycleNeedsRawReplay(42n, plan), true)
+})
 
 test('WHAT[SPEC-INV-008] STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
   const value = frame()
