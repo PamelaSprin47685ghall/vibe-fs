@@ -1,38 +1,24 @@
-// Split from tests/unit/execution/join-completion.test.mjs (cutover Wave 2a);
-// owner: host-boundary. HostEventPort 观察可靠性（HOST-BOUNDARY-016）：sticky
-// terminal 对 late subscriber 重放一次；无 provider run 的 Failed outcome 不去重。
-// Join mailbox / 立即 claim 断言 → delegation。
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, hostEventPort, sessionId } from '../../verification-system/tests/support/domain.mjs'
+import * as EventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
 
-// ── sticky terminal ──────────────────────────────────────────────────────────
+const notify = (port, sessionId, outcome) => EventsSurface.notify(port, sessionId, outcome.kind, outcome.providerRun ?? '', outcome.value ?? outcome.error ?? '')
 
 test('WHAT[HOST-BOUNDARY-016] EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
-  const port = hostEventPort.create()
-  const child = sessionId('ses_sticky_child')
+  const port = EventsSurface.create()
+  notify(port, 'ses_sticky_child', { kind: 'Completed', providerRun: 'run-1', value: 'done' })
   const seen = []
-
-  const delivered = hostEventPort.notify(port, child, hostEventPort.failed('early-terminal'))
-  assert.equal(delivered, false, 'hasListeners=false when nobody subscribed yet')
-
-  hostEventPort.subscribe(port, (_sid, outcome) => {
-    seen.push(caseOf(outcome))
-  })
-
-  assert.equal(seen.length, 1, 'late subscriber must receive sticky terminal once')
-  assert.equal(seen[0], 'Failed')
+  EventsSurface.subscribe(port, (sessionId, outcome) => seen.push({ sessionId, outcome }))
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].sessionId, 'ses_sticky_child')
+  assert.equal(seen[0].outcome.text, 'done')
 })
 
 test('WHAT[HOST-BOUNDARY-016] EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
-  const port = hostEventPort.create()
-  const child = sessionId('ses_dedupe')
+  const port = EventsSurface.create()
   let count = 0
-  hostEventPort.subscribe(port, () => {
-    count += 1
-  })
-  hostEventPort.notify(port, child, hostEventPort.failed('a'))
-  hostEventPort.notify(port, child, hostEventPort.failed('b'))
+  EventsSurface.subscribe(port, () => { count += 1 })
+  notify(port, 'ses_dedupe', { kind: 'Failed', providerRun: 'run-1', error: 'first' })
+  notify(port, 'ses_dedupe', { kind: 'Failed', providerRun: 'run-1', error: 'second' })
   assert.equal(count, 2)
 })

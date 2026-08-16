@@ -8,7 +8,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { caseOf } from '../../verification-system/tests/support/domain.mjs'
+import * as crash from '../../../dist/Context/Companion/Blogger/BloggerCrashSurface.js'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
@@ -33,18 +33,6 @@ const probeModuleSrc = readFileSync(
   'utf8',
 )
 
-const loadRecovery = async () => {
-  // ENFORCER-153 derivation lives in BloggerRecoveryProbe; the crash window
-  // classify/restore stays in BloggerCrashRecovery.
-  const crash = await import(
-    new URL('../../../dist/Context/Companion/Blogger/BloggerCrashRecovery.js', import.meta.url).pathname
-  )
-  const probe = await import(
-    new URL('../../../dist/Enforcer/Cycle/BloggerProbe.js', import.meta.url).pathname
-  )
-  return { crash, probe }
-}
-
 test('WHAT[CRASH-016] C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /module BloggerCrashRecovery/)
   assert.match(recoverySrc, /AbandonedUnsent/)
@@ -63,39 +51,16 @@ test('WHAT[CRASH-017] C5_crash_recovery_library_is_not_wired_into_ordinary_plugi
   assert.match(interpreterSrc, /BloggerCrashRecovery\.reconcile/, 'recovery library may remain for future explicit /continue')
 })
 
-test('WHAT[CRASH-016] C5_classify_open_request_window_A_unsent', async () => {
-  const { crash: mod } = await loadRecovery()
-  const classify =
-    mod.BloggerCrashRecovery_classifyOpenRequest ||
-    mod.classifyOpenRequest ||
-    Object.values(mod).find((v) => typeof v === 'function' && v.length === 3)
-
-  assert.ok(classify, 'classifyOpenRequest export present')
-  const a = classify(false, false, false)
-  assert.ok(a, 'window A decision')
-  assert.equal(caseOf(a), 'AbandonedUnsent')
+test('WHAT[CRASH-016] C5_classify_open_request_window_A_unsent', () => {
+  assert.equal(crash.classifyOpenRequest(false, false, false), 'AbandonedUnsent')
 })
 
-test('WHAT[CRASH-016] C5_classify_open_request_window_C_tool_present', async () => {
-  const { crash: mod } = await loadRecovery()
-  const classify =
-    mod.BloggerCrashRecovery_classifyOpenRequest ||
-    mod.classifyOpenRequest ||
-    Object.values(mod).find((v) => typeof v === 'function' && v.length === 3)
-
-  const c = classify(true, true, false)
-  assert.equal(caseOf(c), 'Recommitted')
+test('WHAT[CRASH-016] C5_classify_open_request_window_C_tool_present', () => {
+  assert.equal(crash.classifyOpenRequest(true, true, false), 'Recommitted')
 })
 
-test('WHAT[CRASH-016] C5_classify_open_request_window_B_inflight', async () => {
-  const { crash: mod } = await loadRecovery()
-  const classify =
-    mod.BloggerCrashRecovery_classifyOpenRequest ||
-    mod.classifyOpenRequest ||
-    Object.values(mod).find((v) => typeof v === 'function' && v.length === 3)
-
-  const b = classify(true, false, false)
-  assert.equal(caseOf(b), 'RestoredInFlight')
+test('WHAT[CRASH-016] C5_classify_open_request_window_B_inflight', () => {
+  assert.equal(crash.classifyOpenRequest(true, false, false), 'RestoredInFlight')
 })
 
 test('WHAT[CRASH-016] C5_window_D_never_forces_parked_without_a_waiter', () => {

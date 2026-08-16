@@ -1,172 +1,67 @@
-// requirements/durable-events/tests/integration/persist/object-identity.test.mjs
-// The ODB write path must produce byte-identical Git objects.
-//
-// `GitObjectDatabase` writes loose objects itself (sha1 + zlib + objects/xx/yyyy) instead of
-// spawning `git hash-object` / `git mktree` per object — measured 24 spawns / ~60ms per
-// single-event append against 2 spawns / ~7.5ms, with the spawns blocking the Host event loop.
-// The whole safety of that swap is one claim: OUR oid IS GIT'S OID, and git can read what we
-// wrote. Both halves are pinned here against the real binary, because a comment asserting
-// "this is the documented format" is not evidence.
+// Canonical EventStore identity is the durable boundary; Git object identity is
+// deliberately outside the runtime store after the shock cut.
 
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
-import { isSome, listItems, toList } from '../../../../verification-system/tests/support/domain.mjs'
 
-const Persist = await import('../../../../../dist/Persistence/EventStore/StoreTypes.js')
-const Odb = await import('../../../../../dist/Persistence/EventStore/GitObjectDatabase.js')
+import * as codec from '../../../../../dist/Persistence/EventStore/CodecSurface.js'
 
-const oidText = (oid) => Persist.GitObjectIdModule_value(oid)
-const gitObjectId = (text) => Persist.GitObjectIdModule_create(text)
+const event = (overrides = {}) => ({
+  id: 'a'.repeat(40),
+  stream: 'identity/proof',
+  type: 'JobRequested',
+  parents: [],
+  payload: { answer: 42, nested: { b: 2, a: 1 } },
+  payloadRefs: [],
+  ...overrides,
+})
 
-const withRepo = async (fn) => {
-  const dir = mkdtempSync(join(tmpdir(), 'odb-identity-'))
-  try {
-    execFileSync('git', ['init', '--quiet', dir], { encoding: 'utf8' })
-    const git = (args, options = {}) =>
-      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', ...options }).trim()
-    const objects = git(['rev-parse', '--git-path', 'objects'])
-    await fn({ dir, git, objects: objects.startsWith('/') ? objects : join(dir, objects) })
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
+test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_are_stable_under_object_and_set_order', () => {
+  const left = event({
+    parents: ['c'.repeat(40), 'b'.repeat(40), 'c'.repeat(40)],
+    payloadRefs: ['ref-z', 'ref-a', 'ref-z'],
+  })
+  const right = event({
+    parents: ['b'.repeat(40), 'c'.repeat(40)],
+    payloadRefs: ['ref-a', 'ref-z'],
+    payload: { nested: { a: 1, b: 2 }, answer: 42 },
+  })
 
-const BODIES = [
-  '',
-  'a',
-  'plain ascii line\n',
-  '{"event_id":"' + 'a'.repeat(32) + '","payload":{"k":1}}\n',
-  '多字节 UTF-8 内容\n',
-  Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n'),
-]
+  const bytes = codec.encode(left)
+  assert.equal(bytes.endsWith('\n'), true)
+  assert.equal(bytes.endsWith('\n\n'), false)
+  assert.equal(codec.encode(right), bytes)
+  assert.equal(codec.checkIdentity(left, right).ok, true)
+})
 
-test('ODB blob oid equals git hash-object, and git can read the object', async () => {
-  await withRepo(async ({ git, objects, dir }) => {
-    for (const body of BODIES) {
-      const ours = await Odb.writeBlob(objects, Buffer.from(body, 'utf8'))
+test('WHAT[DURABLE-EVENTS-003] same_event_id_different_canonical_bytes_is_identity_collision', () => {
+  const result = codec.checkIdentity(event(), event({ payload: { answer: 43 } }))
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'IdentityCollision')
+  assert.equal(result.error.eventId, 'a'.repeat(40))
+})
 
-      const input = join(dir, 'input.bin')
-      writeFileSync(input, body)
-      const theirs = git(['hash-object', '--', input])
-
-      assert.equal(ours, theirs, `blob oid must match git for ${JSON.stringify(body.slice(0, 24))}`)
-      assert.equal(git(['cat-file', '-t', ours]), 'blob', 'git must recognise our object as a blob')
-      assert.equal(
-        execFileSync('git', ['-C', dir, 'cat-file', 'blob', ours], { encoding: 'utf8' }),
-        body,
-        'git must read back exactly the bytes we wrote',
-      )
-    }
+test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_decode_to_the_same_plain_event', () => {
+  const original = event({
+    id: 'b'.repeat(40),
+    parents: ['d'.repeat(40), 'c'.repeat(40)],
+    payloadRefs: ['payload-z', 'payload-a'],
+  })
+  const decoded = codec.decode(codec.encode(original))
+  assert.equal(decoded.ok, true, JSON.stringify(decoded.error))
+  assert.deepEqual(decoded.event, {
+    ...original,
+    parents: ['c'.repeat(40), 'd'.repeat(40)],
+    payloadRefs: ['payload-a', 'payload-z'],
   })
 })
 
-test('ODB tree oid equals git mktree, including nested trees and name ordering', async () => {
-  await withRepo(async ({ git, objects }) => {
-    const blobA = await Odb.writeBlob(objects, Buffer.from('A\n', 'utf8'))
-    const blobB = await Odb.writeBlob(objects, Buffer.from('B\n', 'utf8'))
+test('WHAT[DURABLE-EVENTS-003] merge_by_identity_dedupes_equal_bytes_and_rejects_collisions', () => {
+  const same = codec.mergeByIdentity([event(), event()])
+  assert.equal(same.ok, true)
+  assert.equal(same.events.length, 1)
 
-    const entry = (mode, name, oid) => new Persist.TreeEntry(mode, name, gitObjectId(oid))
-    const leaf = [entry('100644', 'b.jsonl', blobB), entry('100644', 'a.jsonl', blobA)]
-    const leafOid = await Odb.writeTree(objects, toList(leaf))
-
-    // `mktree` reads the same records from stdin; sorting is ours to get right.
-    const mktree = (rows) =>
-      execFileSync('git', ['-C', git(['rev-parse', '--show-toplevel']) || '.', 'mktree'], {
-        encoding: 'utf8',
-        input: rows.join('\n') + '\n',
-      }).trim()
-
-    assert.equal(
-      leafOid,
-      mktree([`100644 blob ${blobA}\ta.jsonl`, `100644 blob ${blobB}\tb.jsonl`]),
-      'flat tree oid must match git mktree',
-    )
-
-    // A directory entry sorts as `name/`, which is why `events` must precede `events.meta`.
-    const nested = [
-      entry('040000', 'events', leafOid),
-      entry('100644', 'events.meta', blobA),
-    ]
-    const nestedOid = await Odb.writeTree(objects, toList(nested))
-    assert.equal(
-      nestedOid,
-      mktree([`040000 tree ${leafOid}\tevents`, `100644 blob ${blobA}\tevents.meta`]),
-      'nested tree oid must match git mktree',
-    )
-    assert.equal(git(['cat-file', '-t', nestedOid]), 'tree', 'git must recognise our tree')
-    assert.match(
-      execFileSync('git', ['-C', git(['rev-parse', '--show-toplevel']), 'ls-tree', nestedOid], {
-        encoding: 'utf8',
-      }),
-      /events\.meta/,
-      'git must list the entries we wrote',
-    )
-  })
-})
-
-test('ODB reads back its own trees; a packed object is reported absent, not guessed', async () => {
-  await withRepo(async ({ git, objects }) => {
-    const blob = await Odb.writeBlob(objects, Buffer.from('payload\n', 'utf8'))
-    const entry = new Persist.TreeEntry('100644', 'x.jsonl', gitObjectId(blob))
-    const treeOid = await Odb.writeTree(objects, toList([entry]))
-
-    const read = await Odb.tryReadTree(objects, treeOid)
-    assert.equal(isSome(read), true, 'loose tree must be readable in-process')
-    const entries = listItems(read)
-    assert.equal(entries.length, 1)
-    assert.equal(entries[0].Name, 'x.jsonl')
-    assert.equal(oidText(entries[0].Oid), blob)
-
-    const body = await Odb.tryReadObject(objects, blob)
-    assert.equal(isSome(body), true, 'loose blob must be readable in-process')
-    assert.equal(Buffer.from(body).toString('utf8'), 'payload\n')
-
-    // Absent is None — never a fabricated empty object; the store falls back to the CLI.
-    assert.equal(await Odb.tryReadObject(objects, '0'.repeat(40)), undefined)
-    assert.equal(git(['cat-file', '-t', treeOid]), 'tree')
-  })
-})
-
-test('ODB ref write is git-visible, and CAS refuses a stale expectation or a held lock', async () => {
-  await withRepo(async ({ git, objects, dir }) => {
-    const ref = 'refs/wanxiang/store'
-    const gitDir = join(dir, '.git')
-    const first = await Odb.writeTree(objects, toList([]))
-    const second = await Odb.writeBlob(objects, Buffer.from('second\n', 'utf8'))
-
-    // Absent → create. Expectation is "no ref", spelled as None.
-    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, undefined, first), true, 'create must succeed')
-    assert.equal(git(['rev-parse', '--verify', ref]), first, 'git must resolve the ref we wrote')
-    assert.equal(await Odb.tryReadRef(gitDir, ref), first, 'our reader must agree with git')
-
-    // Stale expectation → refused, ref unchanged. This is the lease that makes concurrent
-    // appends safe; a silent overwrite here would lose an event.
-    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, second, second), false, 'stale CAS must refuse')
-    assert.equal(git(['rev-parse', '--verify', ref]), first, 'refused CAS must not move the ref')
-
-    // Current expectation → swap, and git sees the new value.
-    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, first, second), true, 'matching CAS must swap')
-    assert.equal(git(['rev-parse', '--verify', ref]), second)
-
-    // A lock held by anyone else (git itself uses the same path) → refused, not overwritten.
-    writeFileSync(join(gitDir, ref + '.lock'), '')
-    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, second, first), false, 'held lock must refuse')
-    assert.equal(git(['rev-parse', '--verify', ref]), second, 'a refused CAS leaves the ref alone')
-  })
-})
-
-test('ODB ref reader resolves a packed ref after git pack-refs', async () => {
-  await withRepo(async ({ git, objects, dir }) => {
-    const ref = 'refs/wanxiang/store'
-    const gitDir = join(dir, '.git')
-    const oid = await Odb.writeBlob(objects, Buffer.from('packed\n', 'utf8'))
-    assert.equal(await Odb.compareAndSwapRef(gitDir, ref, undefined, oid), true)
-
-    git(['pack-refs', '--all'])
-    assert.equal(await Odb.tryReadRef(gitDir, ref), oid, 'a packed ref must still resolve')
-  })
+  const collision = codec.mergeByIdentity([event(), event({ payload: { answer: 99 } })])
+  assert.equal(collision.ok, false)
+  assert.equal(collision.error.code, 'IdentityCollision')
 })

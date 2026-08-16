@@ -22,7 +22,10 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cancelledToken, liveToken, parallel } from '../../verification-system/tests/support/domain.mjs'
+import * as parallel from '../../../dist/Foundation/ParallelSurface.js'
+
+const liveToken = parallel.liveToken
+const cancelledToken = parallel.cancelledToken
 
 /** Short enough to stay well inside the runner's 1000ms per-test ceiling. */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))

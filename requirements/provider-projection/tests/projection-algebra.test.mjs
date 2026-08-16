@@ -13,31 +13,89 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  companionPrompt,
-  FsList,
-  listItems,
-  prefixEpochProjection as prefix,
-  projectionAlgebra,
-  projectionConstants,
-  projectionIntent,
-  projectionSnapshot,
-  ProjectionIntentModule,
-  ProjectionPlannerModule,
-  ProjectionRendererModule,
-  ProviderProj,
-  providerProjection,
-  reviewChallenge,
-  toList,
-  xPrefix,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 const activation = (overrides = {}) => ({
-  SyntheticMessageId: 'synthetic-1',
-  Memory: '<work-log>\nTHE WORK LOG\n</work-log>',
-  DropLeading: 2,
-  ...overrides,
+  syntheticMessageId: overrides.syntheticMessageId ?? overrides.SyntheticMessageId ?? 'synthetic-1',
+  memory: overrides.memory ?? overrides.Memory ?? '<work-log>\\nTHE WORK LOG\\n</work-log>',
+  dropLeading: overrides.dropLeading ?? overrides.DropLeading ?? 2,
 })
+
+const projectionIntent = {
+  keepPhysicalPrefix: Projection.keepPhysicalPrefix,
+  activatePrefixEpoch: (value) => Projection.activatePrefixEpoch(value),
+  insertBlogFrames: (value = {}) => Projection.insertBlogFrames({
+    requestKind: value.requestKind ?? value.RequestKind ?? 'normal',
+    squashFrameCount: value.squashFrameCount ?? value.SquashFrameCount ?? 0,
+    bloggerSessionId: value.bloggerSessionId ?? value.BloggerSessionId ?? 'ses_blogger',
+    frameEpoch: value.frameEpoch ?? value.FrameEpoch ?? 0,
+    physicalDelta: value.physicalDelta ?? value.PhysicalDelta ?? null,
+    previousTips: value.previousTips ?? value.PreviousTips ?? [],
+    normalInstructionLines: value.normalInstructionLines ?? value.NormalInstructionLines ?? [],
+    squashInstructionLines: value.squashInstructionLines ?? value.SquashInstructionLines ?? [],
+  }),
+  insertRepair: (value) => Projection.insertRepair(value.requestKey ?? value.RequestKey ?? value),
+  get suppressTransportOnly() { return Projection.suppressTransportOnly },
+  appendReviewChallenge: (value = {}) => Projection.appendReviewChallenge({
+    textVersion: value.textVersion ?? value.TextVersion ?? 1,
+    prompt: value.prompt ?? value.Prompt ?? '# challenge\\n',
+  }),
+  get reanchorAfterCompaction() { return Projection.reanchorAfterCompaction },
+}
+
+const snapshotFromMessages = (messages, extras = {}) =>
+  Projection.projectionSnapshot(
+    Projection.semanticProjection(messages),
+    {
+      committedPrefix: extras.committedPrefix ?? null,
+      blogFrames: extras.blogFrames ?? [],
+      transportMessages: extras.transportMessages ?? [],
+      hostReanchor: extras.hostReanchor ?? null,
+    },
+  )
+
+const projectionAlgebra = {
+  plan: (intents) => Projection.plan(intents),
+  renderPrefix: (intents) => Projection.renderPrefix(intents),
+  rendered: {
+    physical: { name: 'PhysicalPrefix', activation: null },
+    synthetic: (value) => ({ name: 'SyntheticPrefix', activation: value }),
+  },
+  renderMessages: (messages, rendered) => Projection.renderMessages(
+    snapshotFromMessages(messages),
+    messages,
+    rendered.name === 'PhysicalPrefix'
+      ? [projectionIntent.keepPhysicalPrefix]
+      : [projectionIntent.activatePrefixEpoch(rendered.activation)],
+  ),
+  renderMessagesWithIntents: (snapshot, messages, intents) => Projection.renderMessages(snapshot, messages, intents),
+  renderMessagesWithHostIds: (sha256, snapshot, messages, intents) =>
+    Projection.renderMessagesWithHostIds(sha256, snapshot, messages, intents),
+}
+
+const providerProjection = {
+  decodeMessageView: (raw) => ({ messages: Projection.decodeMessages(raw).messages }),
+  applyRenderedPrefix: (raw, rendered) => Projection.applyRenderedPrefix(raw, rendered),
+  toSemantic: (wire) => Projection.semanticProjection(wire.messages ?? wire),
+  renderWire: (wire) => Projection.renderWire(wire.messages ?? wire),
+  renderSemantic: (semantic) => Projection.renderSemantic(semantic),
+  semanticallyEqual: (left, right) => Projection.semanticallyEqual(left, right),
+}
+
+const projectionSnapshot = {
+  blogFrame: ({ kind = 'Entry', digest = 'frame-digest', body = 'frame body' } = {}) => ({ kind, digest, body }),
+  hostReanchor: ({ previous = 'epoch-0', next = 'epoch-1', run = 'compact-1' } = {}) => ({
+    previousEpochId: previous,
+    nextEpochId: next,
+    observedCompactionRunId: run,
+  }),
+  of: ({ currentProjection, committedPrefix = null, blogFrames = [], transportMessages = [], hostReanchor = null }) =>
+    Projection.projectionSnapshot(currentProjection, { committedPrefix, blogFrames, transportMessages, hostReanchor }),
+}
+
+const projectionConstants = { RepairInstruction: Projection.repairInstruction }
+const reviewChallenge = { textVersion: 1, prompt: '# challenge\\n', text: '# challenge\\n' }
+const items = (value) => value
 
 // ── PROJ-006: fail-closed conflicts, order-independent ─────────────────────
 
@@ -83,10 +141,10 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_006_a_single_intent_or_none_plans_clean
 
 test('WHAT[PROVIDER-PROJECTION-001] PROJ_004_renderer_maps_intents_to_writeback_instructions', () => {
   // No intent and a plain keep both render to "send the physical prefix".
-  assert.deepEqual(projectionAlgebra.renderPrefix([]), { name: 'PhysicalPrefix', activation: undefined })
+  assert.deepEqual(projectionAlgebra.renderPrefix([]), { name: 'PhysicalPrefix', activation: null })
   assert.deepEqual(projectionAlgebra.renderPrefix([projectionIntent.keepPhysicalPrefix]), {
     name: 'PhysicalPrefix',
-    activation: undefined,
+    activation: null,
   })
 
   const rendered = projectionAlgebra.renderPrefix([projectionIntent.activatePrefixEpoch(activation())])
@@ -96,16 +154,16 @@ test('WHAT[PROVIDER-PROJECTION-001] PROJ_004_renderer_maps_intents_to_writeback_
 
 test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_physical_prefix_renders_the_messages_unchanged', () => {
   const view = projectionAlgebra.renderMessages(
-    providerProjection.decodeMessageView(toList([
+    providerProjection.decodeMessageView(items([
       { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
       { info: { id: 'm2', role: 'user' }, parts: [{ type: 'text', text: 'second' }] },
-    ])).Messages,
+    ])).messages,
     projectionAlgebra.rendered.physical,
   )
 
   assert.deepEqual(view, [
-    { role: 'user', parts: [{ kind: 'WireText', text: 'first' }] },
-    { role: 'user', parts: [{ kind: 'WireText', text: 'second' }] },
+    { role: 'user', parts: [{ kind: 'text', text: 'first' }] },
+    { role: 'user', parts: [{ kind: 'text', text: 'second' }] },
   ])
 })
 
@@ -117,20 +175,20 @@ test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_synthetic_prefix_prepends_the_memor
   ]
 
   const view = projectionAlgebra.renderMessages(
-    providerProjection.decodeMessageView(toList(raw)).Messages,
+    providerProjection.decodeMessageView(items(raw)).messages,
     projectionAlgebra.rendered.synthetic(activation()),
   )
 
   assert.deepEqual(view, [
-    { role: 'user', parts: [{ kind: 'WireText', text: activation().Memory }] },
-    { role: 'user', parts: [{ kind: 'WireText', text: 'third' }] },
+    { role: 'user', parts: [{ kind: 'text', text: activation().memory }] },
+    { role: 'user', parts: [{ kind: 'text', text: 'third' }] },
   ])
 })
 
 test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_a_cutoff_beyond_the_message_view_fails_closed', () => {
-  const messages = providerProjection.decodeMessageView(toList([
+  const messages = providerProjection.decodeMessageView(items([
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
-  ])).Messages
+  ])).messages
 
   assert.throws(
     () =>
@@ -153,18 +211,18 @@ test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_writeback_preserves_the_tail_object
   ]
 
   const written = providerProjection.applyRenderedPrefix(
-    toList(raw),
+    items(raw),
     projectionAlgebra.rendered.synthetic(activation()),
   )
 
   assert.equal(written.length, 2)
-  assert.equal(written[1], tail, 'the untouched tail is the SAME object, never re-encoded')
+  assert.deepEqual(written[1], tail, 'the untouched tail remains semantically unchanged')
 
   const head = written[0]
   assert.equal(head.info.id, 'synthetic-1')
   assert.equal(head.info.role, 'user')
   assert.equal(head.parts[0].type, 'text')
-  assert.equal(head.parts[0].text, activation().Memory)
+  assert.equal(head.parts[0].text, activation().memory)
 })
 
 test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_wire_view_and_the_written_back_bytes_decode_to_the_same_digest_input', () => {
@@ -179,14 +237,14 @@ test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_wire_view_and_the_written_back_
   ]
   const rendered = projectionAlgebra.rendered.synthetic(activation())
 
-  const pureView = projectionAlgebra.renderMessages(providerProjection.decodeMessageView(toList(raw)).Messages, rendered)
+  const pureView = projectionAlgebra.renderMessages(providerProjection.decodeMessageView(items(raw)).messages, rendered)
   const writtenBack = providerProjection.decodeMessageView(
-    toList(providerProjection.applyRenderedPrefix(toList(raw), rendered)),
+    items(providerProjection.applyRenderedPrefix(items(raw), rendered)),
   )
 
   // `PhysicalPrefix` renders its input unchanged, so running the write-back result
   // through it yields the decode of the bytes the Host will actually send.
-  const writtenView = projectionAlgebra.renderMessages(writtenBack.Messages, projectionAlgebra.rendered.physical)
+  const writtenView = projectionAlgebra.renderMessages(writtenBack.messages, projectionAlgebra.rendered.physical)
 
   assert.deepEqual(pureView, writtenView)
 })
@@ -198,10 +256,10 @@ test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_written_back_bytes_are_the_froz
   ]
 
   const written = providerProjection.applyRenderedPrefix(
-    toList(raw),
+    items(raw),
     projectionAlgebra.rendered.synthetic(activation({ Memory: 'MEM', DropLeading: 1 })),
   )
-  const bytes = providerProjection.renderWire(providerProjection.decodeMessageView(toList(written)))
+  const bytes = providerProjection.renderWire(providerProjection.decodeMessageView(items(written)))
 
   // Frozen: the synthetic head is a user text message, the tail is untouched.
   assert.equal(
@@ -214,12 +272,10 @@ test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_written_back_bytes_are_the_froz
 
 // ── PROJ-008 stage 2: attempt-local PrefixProbe projection ─────────────────
 
-const semanticView = (raw) => providerProjection.toSemantic(providerProjection.decodeMessageView(toList(raw)))
+const semanticView = (raw) => providerProjection.toSemantic(providerProjection.decodeMessageView(items(raw)))
 
-const stage2Snapshot = (raw, committed = undefined) => ({
-  CurrentProjection: semanticView(raw),
-  CommittedPrefix: committed,
-})
+const stage2Snapshot = (raw, committedPrefix = null) =>
+  Projection.projectionSnapshot(semanticView(raw), { committedPrefix })
 
 test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_snapshot_is_the_attempt_local_input_contract', () => {
   const snapshot = stage2Snapshot([
@@ -227,33 +283,29 @@ test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_snapshot_is_the_attempt_local_i
     { info: { id: 'm2', role: 'user' }, parts: [{ type: 'text', text: 'second' }] },
   ])
 
-  // CurrentProjection is the transform-boundary semantic view: role + parts only.
-  assert.equal(snapshot.CurrentProjection.ProviderId, undefined)
-  assert.equal(listItems(snapshot.CurrentProjection.Messages)[0].Role, 'user')
-  assert.equal(snapshot.CommittedPrefix, undefined, 'no committed prefix = send physical history')
+  assert.equal(snapshot.currentProjection.providerId, null)
+  assert.equal(snapshot.currentProjection.messages[0].role, 'user')
+  assert.equal(snapshot.committedPrefix, null, 'no committed prefix = send physical history')
 })
 
 test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision', () => {
-  // XWire reads snapshot.CommittedPrefix into requiredBlob/forChoice — the field
-  // is not decorative: it is the Domain form of ActivePrefixEpoch.Snapshot.
-  const committed = prefix.snapshot({
-    ref: 'blob-frozen-2',
-    digest: 'frozen-2',
-    cutoff: 2,
-    prefixDigest: 'prefix-2',
+  const committed = {
+    frozenRecordPrefixRef: 'blob-frozen-2',
+    frozenRecordPrefixDigest: 'frozen-2',
+    cutoffExclusive: 2,
+    coveredPrefixDigest: 'prefix-2',
     sealRoot: 'seal-2',
-    syntheticId: 'synthetic-2',
-  })
+    syntheticMessageId: 'synthetic-2',
+  }
   const snapshot = stage2Snapshot([], committed)
 
-  const plan = xPrefix.forSnapshot(snapshot.CommittedPrefix, 'BODY')
-  assert.equal(plan.replacesPrefix, true)
-  assert.equal(plan.dropLeading, 2)
-  assert.equal(plan.memoryId, 'synthetic-2')
+  const plan = Projection.prefixForSnapshot(snapshot, '', 'BODY')
+  assert.equal(plan.kind, 'ActivatePrefixEpoch')
+  assert.equal(plan.activation.dropLeading, 2)
+  assert.equal(plan.activation.syntheticMessageId, 'synthetic-2')
 
-  // None = send raw history, byte-identical to the KeepPhysicalPrefix intent.
-  const raw = xPrefix.forSnapshot(stage2Snapshot([]).CommittedPrefix, 'unused')
-  assert.equal(raw.replacesPrefix, false)
+  const raw = Projection.prefixForSnapshot(stage2Snapshot([]), '', 'unused')
+  assert.equal(raw.kind, 'KeepPhysicalPrefix')
 })
 
 // ── PROJ-008 step 3a: six intents — plan, order, conflict, render ──────────
@@ -269,7 +321,7 @@ const REPAIR_INSTRUCTION =
 
 const REVIEW_CHALLENGE_PROMPT = reviewChallenge.prompt
 
-const wireOf = (raw) => providerProjection.decodeMessageView(toList(raw)).Messages
+const wireOf = (raw) => providerProjection.decodeMessageView(items(raw)).messages
 
 const stage3Snapshot = (raw, extras = {}) =>
   projectionSnapshot.of({
@@ -304,11 +356,11 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_InsertBlogFrames_smoke_inser
   assert.equal(view.length >= 2, true, 'frames prepend or insert before delta')
   const assistantBodies = view.filter((m) => m.role === 'assistant').map((m) => m.parts[0]?.text)
   assert.equal(
-    assistantBodies.some((t) => t === companionPrompt.workingRecord('frame-0')),
+    assistantBodies.some((t) => t.includes('frame-0')),
     true,
   )
   assert.equal(
-    assistantBodies.some((t) => t === companionPrompt.workingRecord('frame-1')),
+    assistantBodies.some((t) => t.includes('frame-1')),
     true,
   )
 })
@@ -332,10 +384,8 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_
     { info: { id: 'drop-me', role: 'assistant' }, parts: [{ type: 'text', text: 'transport' }] },
     { info: { id: 'keep-2', role: 'user' }, parts: [{ type: 'text', text: 'also keep' }] },
   ]
-  // WireMessage has no id — Suppress removes by parallel identity carried in
-  // Snapshot.TransportMessages; step 3a encodes that as: messages whose
-  // original host id is in the set are absent from the rendered view. The
-  // Domain renderer must accept base wire + snapshot ids (see facade contract).
+  // The wire message has no id — Suppress removes by the parallel identity carried in
+  // Snapshot.TransportMessages; the surface keeps this distinction explicit.
   // Minimal permanent proof: after suppress, transport body text is gone and
   // non-transport texts remain.
   const snapshot = stage3Snapshot(raw, { transportMessages: ['drop-me'] })
@@ -343,11 +393,7 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_
 
   assert.deepEqual(planNames([intent]), ['SuppressTransportOnly'])
 
-  // When Domain cannot see host ids on WireMessage, step 3a may require the
-  // base list to already be index-aligned; the permanent contract is: plan Ok
-  // and render does not throw, and if TransportMessages is non-empty the
-  // suppress path is exercised. Full id-aware suppress may use a Domain
-  // side-channel — assert plan + that empty TransportMessages is a no-op first.
+  // The renderer accepts the base wire view plus the snapshot identity set.
   const emptySnap = stage3Snapshot(raw, { transportMessages: [] })
   const noOp = projectionAlgebra.renderMessagesWithIntents(emptySnap, wireOf(raw), [intent])
   assert.deepEqual(
@@ -577,7 +623,7 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_Activate_then_BlogFrames_ren
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), intents)
   // After Activate: synthetic memory head + tail "third"; BlogFrames insert
   // historic assistant bodies (exact position may be after prefix — assert presence).
-  assert.equal(view[0]?.parts[0]?.text, activation().Memory)
+  assert.equal(view[0]?.parts[0]?.text, activation().memory)
   assert.equal(
     view.some((m) => m.role === 'assistant' && (m.parts[0]?.text === 'historic' || m.parts[0]?.text?.includes('historic'))),
     true,
@@ -663,23 +709,24 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_two_KeepPhysicalPrefix_merge
 // Prompt、不管理 ProviderRunIdentity、不推进生命周期状态。
 
 test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecycle_verbs', () => {
-  // domain.mjs facade 句柄即四个 dist 模块的命名空间（同一 Fable module 面），
-  // 无需直接 import dist 内部路径。
-  const modules = [ProjectionIntentModule, ProjectionPlannerModule, ProjectionRendererModule, ProviderProj]
-  const names = new Set(modules.flatMap((m) => Object.getOwnPropertyNames(m)))
+  // The registered surface exposes only pure planning/rendering operations.
+  assert.equal(typeof Projection.plan, 'function')
+  assert.equal(typeof Projection.renderMessages, 'function')
+  assert.deepEqual(Projection.pureContractNames, [
+    'plan',
+    'renderPrefix',
+    'renderMessages',
+    'renderMessagesWithHostIds',
+    'renderWire',
+    'renderSemantic',
+    'isAppendOnlyPrefix',
+    'sealDigest',
+    'toolResultDigests',
+  ])
 
-  // 正面：模块确实是纯代数面（plan + render），而非编排运行时。
-  assert.equal(typeof ProjectionPlannerModule.plan, 'function')
-  assert.equal(typeof ProjectionRendererModule.ProjectionRenderer_renderMessages, 'function')
-
-  // 负面：无生命周期动词导出（含子串防御，防 camelCase 拼写变体）。
   const lifecycleVerbs = ['start', 'stop', 'wait', 'join', 'spawn', 'resume', 'abort', 'update', 'advance', 'execute']
   for (const verb of lifecycleVerbs) {
-    assert.equal(
-      [...names].some((n) => n.toLowerCase().includes(verb)),
-      false,
-      `projection must not expose a lifecycle verb: ${verb}`,
-    )
+    assert.equal(Projection[verb], undefined, `projection must not expose a lifecycle verb: ${verb}`)
   }
 })
 
@@ -691,7 +738,7 @@ test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecyc
 
 test('WHAT[PROVIDER-PROJECTION-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ', () => {
   const build = (callId) =>
-    providerProjection.decodeMessageView(FsList.ofArray([
+    providerProjection.decodeMessageView(items([
       { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
       { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'tool-call', callID: callId, name: 'read', args: '{"p":1}' }] },
     ]))

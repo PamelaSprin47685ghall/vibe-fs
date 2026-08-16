@@ -1,7 +1,4 @@
-// tests/unit/git/integration-gate.test.mjs — VERIFY-009 coverage: publish lock.
-//
-// Real proper-lockfile over per-test temp files: lockPath stability, acquire/release,
-// and the cross-instance mutual exclusion the gate exists for.
+// CHGINT-004 — the integration gate serializes only the ref mutation window.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -9,11 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-const {
-  IntegrationGateModule_acquire,
-  IntegrationGateModule_lockPath,
-  IntegrationGate__Release,
-} = await import('../../../dist/Git/IntegrationGate.js')
+const change = await import('../../../dist/Change/Surface.js')
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-gate-'))
@@ -21,10 +14,10 @@ const sandbox = () => {
 }
 
 test('WHAT[CHGINT-004] GATE_lock_path_is_stable_per_repo_and_branch', () => {
-  const first = IntegrationGateModule_lockPath('/repo/a', 'main')
-  const second = IntegrationGateModule_lockPath('/repo/a', 'main')
-  const otherBranch = IntegrationGateModule_lockPath('/repo/a', 'dev')
-  const otherRepo = IntegrationGateModule_lockPath('/repo/b', 'main')
+  const first = change.lockPath('/repo/a', 'main')
+  const second = change.lockPath('/repo/a', 'main')
+  const otherBranch = change.lockPath('/repo/a', 'dev')
+  const otherRepo = change.lockPath('/repo/b', 'main')
 
   assert.equal(first, second, 'same repo+branch must map to the same lock file')
   assert.notEqual(first, otherBranch)
@@ -37,13 +30,12 @@ test('WHAT[CHGINT-004] GATE_acquire_and_release_round_trips', async () => {
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
 
-  const gate = await IntegrationGateModule_acquire(lockTarget)
-  await IntegrationGate__Release(gate)
-  await IntegrationGate__Release(gate) // idempotent
+  const gate = await change.acquireGate(lockTarget)
+  await change.releaseGate(gate)
+  await change.releaseGate(gate)
 
-  // After release the same path can be locked again immediately.
-  const second = await IntegrationGateModule_acquire(lockTarget)
-  await IntegrationGate__Release(second)
+  const second = await change.acquireGate(lockTarget)
+  await change.releaseGate(second)
   cleanup()
 })
 
@@ -52,11 +44,11 @@ test('WHAT[CHGINT-004] GATE_dispose_releases_the_lock', async () => {
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
 
-  const gate = await IntegrationGateModule_acquire(lockTarget)
-  await gate['System.IAsyncDisposable.DisposeAsync']()
+  const gate = await change.acquireGate(lockTarget)
+  await change.disposeGate(gate)
 
-  const second = await IntegrationGateModule_acquire(lockTarget)
-  await IntegrationGate__Release(second)
+  const second = await change.acquireGate(lockTarget)
+  await change.releaseGate(second)
   cleanup()
 })
 
@@ -65,13 +57,9 @@ test('WHAT[CHGINT-004] GATE_second_acquire_on_held_lock_eventually_fails', async
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
 
-  const gate = await IntegrationGateModule_acquire(lockTarget)
-
-  // proper-lockfile retries (50 × ≤500ms) — a competing acquire must not succeed
-  // while the first holder keeps the lock. We only assert it does NOT resolve
-  // quickly with success.
+  const gate = await change.acquireGate(lockTarget)
   let settled = false
-  const competing = IntegrationGateModule_acquire(lockTarget).then(
+  const competing = change.acquireGate(lockTarget).then(
     () => {
       settled = 'acquired'
     },
@@ -83,7 +71,7 @@ test('WHAT[CHGINT-004] GATE_second_acquire_on_held_lock_eventually_fails', async
   await new Promise((resolve) => setTimeout(resolve, 300))
   assert.equal(settled, false, 'a held lock must not be acquired concurrently')
 
-  await IntegrationGate__Release(gate)
+  await change.releaseGate(gate)
   await competing.catch(() => {})
   cleanup()
 })

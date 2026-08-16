@@ -8,60 +8,57 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, prefixEpochId, idValue, listItems } from '../../verification-system/tests/support/domain.mjs'
-
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
+import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
 const SESSION = 'ses_survive'
-const session = sessionId(SESSION)
 
 let seq = 0
-const next = (factValue, run) => envelope({ seq: (seq += 1), stream: stream.session(session), run, fact: factValue })
+const next = (factValue, run) => xTrace.envelope({ seq: (seq += 1), session: SESSION, run, fact: factValue })
 
 const openingFact = ({ assignment = 'first task', requirements = ['r1'], run = 'msg_o1' } = {}) =>
   next(
-    fact('OpeningPromptCaptured', {
-      SessionId: session,
-      AssignmentText: assignment,
-      AuthoritativeRequirements: requirements,
-      ProviderRun: providerRun(run),
+    xTrace.fact('OpeningPromptCaptured', {
+      sessionId: SESSION,
+      assignmentText: assignment,
+      authoritativeRequirements: requirements,
+      providerRun: run,
     }),
     run,
   )
 
 const partFact = ({ sequence, role = 'user', turn = 0, partIndex = 0, kind = 'text', run = `msg_p${sequence}` } = {}) =>
   next(
-    fact('XTracePartAppended', {
-      SessionId: session,
-      CursorSequence: BigInt(sequence),
-      Role: role,
-      Turn: turn,
-      PartIndex: partIndex,
-      Kind: kind,
-      ToolName: undefined,
-      TextRef: blobRef(`blob-p${sequence}`),
-      TextDigest: blobDigest(`sha-p${sequence}`),
-      Provenance: `g:0/turn:${turn}/part:${partIndex}`,
-      ProviderRun: providerRun(run),
+    xTrace.fact('XTracePartAppended', {
+      sessionId: SESSION,
+      sequence,
+      role,
+      turn,
+      partIndex,
+      kind,
+      toolName: undefined,
+      textRef: `blob-p${sequence}`,
+      textDigest: `sha-p${sequence}`,
+      provenance: `g:0/turn:${turn}/part:${partIndex}`,
+      providerRun: run,
     }),
     run,
   )
 
 const reanchorFact = ({ previousEpoch = 0, nextEpoch = 1, run = 'msg_compaction' } = {}) =>
   next(
-    fact('ContextReanchored', {
-      SessionId: session,
-      PreviousEpochId: prefixEpochId(previousEpoch),
-      NextEpochId: prefixEpochId(nextEpoch),
-      ObservedCompactionRun: providerRun(run),
+    xTrace.fact('ContextReanchored', {
+      sessionId: SESSION,
+      previousEpochId: previousEpoch,
+      nextEpochId: nextEpoch,
+      observedCompactionRun: run,
     }),
     run,
   )
 
 const foldOk = (envelopes) => {
-  const result = fold.apply(fold.empty, envelopes)
+  const result = xTrace.fold(envelopes)
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-  return fold.session(result.value, SESSION)
+  return xTrace.session(result.value, SESSION)
 }
 
 test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_preserves_xtrace_parts_and_opening', () => {
@@ -71,13 +68,13 @@ test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_preserves_xtrace_parts_an
   const after = foldOk([...base, reanchorFact()])
 
   // The prefix half moved (that is the point of the fact) …
-  assert.equal(after.PrefixEpoch.Snapshot, undefined)
-  assert.equal(idValue.prefixEpoch(after.PrefixEpoch.EpochId), 1n)
+  assert.equal(after.prefixEpoch.snapshot, null)
+  assert.equal(after.prefixEpoch.epochId, 1)
 
   // … but the trace is untouched: same part refs, same opening, same coverage base.
-  assert.deepEqual(listItems(xTraceParts(after.XTrace)), listItems(xTraceParts(before.XTrace)), 'XTrace parts must survive reanchor')
-  assert.equal(after.XTrace.Opening.AssignmentText, 'first task')
-  assert.deepEqual(after.XTrace.Opening.AuthoritativeRequirements, ['r1'])
+  assert.deepEqual(xTrace.parts(after.xTrace), xTrace.parts(before.xTrace), 'XTrace parts must survive reanchor')
+  assert.equal(after.xTrace.opening.assignmentText, 'first task')
+  assert.deepEqual(after.xTrace.opening.authoritativeRequirements, ['r1'])
 })
 
 test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_does_not_reset_the_cursor_sequence', () => {
@@ -88,9 +85,9 @@ test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_does_not_reset_the_cursor
     partFact({ sequence: 3, run: 'msg_post' }),
   ])
 
-  const parts = listItems(xTraceParts(s.XTrace))
+  const parts = xTrace.parts(s.xTrace)
   assert.deepEqual(
-    parts.map((p) => Number(p.Cursor.Sequence)),
+    parts.map((p) => p.cursor.sequence),
     [1, 2, 3],
     'cursor keeps counting across the reanchor; Host turn indices are the only thing that restart',
   )

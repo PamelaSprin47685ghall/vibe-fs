@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { blogProjection as blog, listItems } from '../../verification-system/tests/support/domain.mjs'
+import * as blog from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
 
 const entryFrame = (n) => blog.frame({ kind: 'Entry', digest: `sha-entry-${n}`, ref: `blob-entry-${n}` })
 const squashFrame = (n) => blog.frame({ kind: 'Squash', digest: `sha-squash-${n}`, ref: `blob-squash-${n}` })
@@ -70,9 +70,9 @@ test('WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advanc
   // FrozenRecordPrefix from it.
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Entry'])
 
-  const [stamped] = listItems(blog.frames(result.value))
-  assert.equal(stamped.CoveredFromSequence, 0n)
-  assert.equal(stamped.CoveredThroughSequence, 1n)
+  const [stamped] = blog.frames(result.value)
+  assert.equal(stamped.coveredFrom, 0n)
+  assert.equal(stamped.coveredThrough, 1n)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_entry_that_consumed_nothing_is_refused', () => {
@@ -194,9 +194,9 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_an
   assert.equal(after.coverableFrames, 3)
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Squash', 'Entry', 'Entry'])
 
-  const [merged] = listItems(blog.frames(result.value))
-  assert.equal(merged.CoveredFromSequence, 0n)
-  assert.equal(merged.CoveredThroughSequence, 2n, 'squash unions the replaced frames\' coverage interval')
+  const [merged] = blog.frames(result.value)
+  assert.equal(merged.coveredFrom, 0)
+  assert.equal(merged.coveredThrough, 2, 'squash unions the replaced frames\' coverage interval')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {

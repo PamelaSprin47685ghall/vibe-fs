@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
 const fission = await import('../../../dist/Execution/Fission/Surface.js')
 
 const mustOk = (result) => {
+  assertJsData(result, 'Fission operation result')
   assert.equal(result.ok, true, JSON.stringify(result))
   return result
 }
@@ -30,9 +32,12 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical parser normalizes only n
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-006] pre-fission completion broadcasts to every lane exactly once with idempotent delivery', () => {
+  const emptyDelivery = fission.deliveryEmpty(3)
+  assertJsData(emptyDelivery, 'deliveryEmpty')
+  assert.deepEqual(emptyDelivery, { laneCount: 3, deliveries: [] })
   assert.deepEqual(fission.completionTargets(4, { kind: 'pre-fission' }), [0, 1, 2, 3])
 
-  let delivery = fission.deliveryEmpty(3)
+  let delivery = emptyDelivery
   delivery = mustOk(fission.deliveryMark('child-A', 0, delivery)).delivery
   delivery = mustOk(fission.deliveryMark('child-A', 0, delivery)).delivery // idempotent
   delivery = mustOk(fission.deliveryMark('child-A', 2, delivery)).delivery
@@ -45,6 +50,8 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-007] post-fission completion has exactl
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-008] keyed work bundle is idempotent and rejects conflicting records for one lane', () => {
   const empty = fission.workBundleEmpty
+  assertJsData(empty, 'workBundleEmpty')
+  assert.deepEqual(empty, { entries: [] })
   const a = mustOk(fission.workBundleAdd(2, 'ref-c', empty)).bundle
   const b = mustOk(fission.workBundleAdd(0, 'ref-a', a)).bundle
   const same = mustOk(fission.workBundleAdd(0, 'ref-a', b)).bundle
@@ -76,8 +83,10 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane reco
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
   const lane = fission.startedLane(1, 'lane-session-1', 'lane input')
+  assertJsData(lane, 'started lane')
   assert.equal(lane.index, 1)
   assert.equal(lane.prompt, 'lane input')
+  assert.equal('sessionId' in lane, false, 'physical lane session identity must stay inside Host')
   assert.equal(lane.hasAgentId, false, 'lane record must not expose a provider-visible AgentId')
   assert.equal(lane.hasHandle, false, 'lane record must not expose a provider-visible handle')
   assert.equal(lane.hasParent, false, 'lane record must not add a parent join obligation of its own')

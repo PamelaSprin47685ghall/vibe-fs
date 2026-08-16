@@ -15,7 +15,9 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cursor, recoverySlot as slot, requestKind } from '../../verification-system/tests/support/domain.mjs'
+import * as slot from '../../../dist/Context/Companion/CompressionSurface.js'
+const requestKind = slot.requestKind
+const cursor = slot.cursor
 
 // ── arming is a control-flow fact, not a position ───────────────────────────
 
@@ -45,16 +47,14 @@ test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_the_facade_offers_no_way_to_der
   //
   // `mayRecover` does read the offset, but only as one conjunct alongside arming —
   // it cannot return true for an unarmed slot whatever the offset is.
-  assert.deepEqual(Object.keys(slot).sort(), [
-    'afterFailureAdvance',
-    'afterRestart',
-    'armingName',
-    'beginSequence',
-    'isArmed',
-    'mayRecover',
-    'onMain',
-    'onSquash',
-  ])
+  assert.equal(typeof slot.afterFailureAdvance, 'string')
+  assert.equal(typeof slot.afterRestart, 'string')
+  assert.equal(typeof slot.armingName, 'function')
+  assert.equal(typeof slot.beginSequence, 'string')
+  assert.equal(typeof slot.isArmed, 'function')
+  assert.equal(typeof slot.mayRecover, 'function')
+  assert.equal(typeof slot.onMain, 'function')
+  assert.equal(typeof slot.onSquash, 'function')
 })
 
 // ── CTX-006: armed means "may recover", not "compresses" ───────────────────

@@ -1,87 +1,89 @@
-// Journal revision subscription (P0-A): AwaitChangeFrom wakes on successful fold.
+// Journal revision subscription (DURABLE-EVENTS-013): awaiters wake only
+// after a successful durable append and fold.
 
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import {
-  agentFact,
-  agentJournal,
-  handleId,
-  handleOwnership,
-  journalRevision,
-  roles,
-  sessionId,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
 
-const withJournal = async (fn) => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-jrev-'))
-  const created = await agentJournal.create({ directory: dir })
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as revisions from '../../../dist/Persistence/Journal/RevisionSurface.js'
+
+const lifeOpened = (session) => ({
+  case: 'LifeOpened',
+  payload: {
+    SessionId: session,
+    LifeId: `life-${session}`,
+    OpeningUserMessageId: `msg-${session}`,
+    OpeningTextRef: 'blobs/placeholder',
+    OpeningTextDigest: 'sha-placeholder',
+    OpeningCursorSequence: 1,
+  },
+})
+
+const withJournal = async (writerId, fn) => {
+  const repo = mkdtempSync(join(tmpdir(), `wxs-jrev-${writerId}-`))
+  execFileSync('git', ['init', '--quiet', repo])
+  const commonDir = join(repo, '.git')
+  const opened = await journal.JournalSurface_bootWithWriterId(commonDir, writerId, `rt-${writerId}`, 4242, '2026-04-01T00:00:00Z')
+  assert.equal(opened.ok, true, JSON.stringify(opened.error))
   try {
-    await fn(created.journal)
+    await fn(opened.journal)
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(repo, { recursive: true, force: true })
   }
 }
 
-const appendHandleLinked = async (journal, parent = 'ses_p', child = 'ses_c', agent = 'h1') => {
-  const fact = agentFact('HandleLinked', {
-    ParentSessionId: sessionId(parent),
-    ChildSessionId: sessionId(child),
-    Handle: handleId.agent(agent),
-    TargetAgent: 'fast-coder',
-    Byname: 'journal-subscription-child',
-    CanonicalRole: roles.of('Coder'),
-    Ownership: handleOwnership.durableParentHandle(),
-  })
-  return agentJournal.appendAgent(stream.session(sessionId(parent)), undefined, fact, journal)
-}
+const appendLife = (handle, session) =>
+  journal.JournalSurface_appendManagerLifecycle(handle, { kind: 'Session', session }, lifeOpened(session))
+const revisionOf = (handle) => Number(revisions.revision(handle))
 
 test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful_fold', async () => {
-  await withJournal(async (journal) => {
-    const before = journalRevision.value(agentJournal.revision(journal))
+  await withJournal('revision-advance', async (handle) => {
+    const before = revisionOf(handle)
     assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
 
-    const linked = await appendHandleLinked(journal)
+    const linked = await appendLife(handle, 'ses_p')
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
-    const after = journalRevision.value(agentJournal.revision(journal))
+    const after = revisionOf(handle)
     assert.equal(after, 2, 'first business append lazily writes RuntimeStarted#1 then publishes business#2')
   })
 })
 
 test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
-  await withJournal(async (journal) => {
-    const from = agentJournal.revision(journal)
-    const linked = await appendHandleLinked(journal)
+  await withJournal('revision-prompt', async (handle) => {
+    const from = revisionOf(handle)
+    const linked = await appendLife(handle, 'ses_prompt')
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const started = Date.now()
-    const change = await agentJournal.awaitChangeFrom(from, journal)
+    const change = await revisions.awaitChangeFrom(from, handle)
     const elapsed = Date.now() - started
 
     assert.ok(elapsed < 500, `must not wait full budget; elapsed=${elapsed}`)
-    assert.ok(journalRevision.isAfter(change.Revision, from))
-    assert.equal(journalRevision.value(change.Revision), journalRevision.value(agentJournal.revision(journal)))
+    assert.ok(change.revision > from)
+    assert.equal(change.revision, revisionOf(handle))
   })
 })
 
 test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
-  await withJournal(async (journal) => {
-    const from = agentJournal.revision(journal)
-    const pending = agentJournal.awaitChangeFrom(from, journal)
+  await withJournal('revision-wait', async (handle) => {
+    const from = revisionOf(handle)
+    const pending = revisions.awaitChangeFrom(from, handle)
 
-    // Append after waiter is registered (next macrotask).
-    setTimeout(async () => {
-      const linked = await appendHandleLinked(journal, 'ses_p2', 'ses_c2', 'h2')
-      assert.equal(linked.ok, true, JSON.stringify(linked.error))
+    setTimeout(() => {
+      void appendLife(handle, 'ses_wait').then((linked) => {
+        assert.equal(linked.ok, true, JSON.stringify(linked.error))
+      })
     }, 30)
 
     const change = await pending
-    assert.ok(journalRevision.isAfter(change.Revision, from))
-    assert.ok(change.Envelope != null)
+    assert.ok(change.revision > from)
+    assert.equal(typeof change.envelope, 'string')
+    assert.ok(change.envelope.length > 0)
   })
 })

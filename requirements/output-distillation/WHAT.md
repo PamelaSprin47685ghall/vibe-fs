@@ -112,7 +112,7 @@ map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面
 边界：隐藏 handle 的生命周期管理 → `managed-session-lifecycle`；Assignment 字段的 horizon 过滤 →
 `participant-horizon`。
 
-证据：REUSE `requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（`EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible`）。
+证据：REUSE `requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（`EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible`）；`tests/distiller-role-contract.test.mjs` 通过 `OpenCode/Tools/DistillationSurface.fs` 观察私有角色合同。
 
 ## DISTILL-010：Distiller 不执行、不改变世界、不裁决
 
@@ -123,7 +123,8 @@ map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面
 把二者合一 = 蒸馏者自己制造自己总结的证据。
 
 证据：anchor `no-execution`（distiller Role Law 双语命中，与 `process-execution` 边界互证）；
-REUSE `requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
+`tests/distiller-role-contract.test.mjs` 通过 `OpenCode/Tools/DistillationSurface.fs` 断言零权限与唯一 `run` 执行面；REUSE
+`requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
 `process-execution` PROOF.md）。
 
 ## DISTILL-011：Large Gate 与输出预算合同一致；禁无界缓冲

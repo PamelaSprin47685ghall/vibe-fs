@@ -1,21 +1,16 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Fable.Core
+open System
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// JS-native semantic surface for fork child payload (P3 pilot).
-///
-/// Input is JSON-shaped: the anonymous record compiles to a plain JS object
-/// (Assignment string, optional strings, RootRequirements string array), so a
-/// JS test constructs ordinary data and never touches Fable representation.
-/// Translation JS representation → F# types happens here, at the owner
-/// boundary (JS-SEMANTIC-SURFACE-003/005); the F# core keeps its records.
 module ForkChildPayloadSurface =
 
-    /// Guard for JS absent fields. Written explicitly (not just isNull) so the
-    /// undefined case is visible at the surface; isNull alone would cover it
-    /// via loose equality, but the double check documents the JS contract.
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
@@ -30,8 +25,6 @@ module ForkChildPayloadSurface =
           Attachment = ProviderProse.render l ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render l ForkChildPayload.RequirementsPath Map.empty }
 
-    /// The four localized instruction fragments (JSON-shaped). Base keeps
-    /// blank lines as "" so SyntheticToml.document preserves paragraph breaks.
     let instructions
         (lang: string)
         : {| Base: string array
@@ -46,8 +39,13 @@ module ForkChildPayloadSurface =
            Attachment = p.Attachment
            Requirements = p.Requirements |}
 
+    /// Render unknown/unavailable calling prose without exposing binding names.
+    let unavailableCalling (lang: string) (orchestrator: bool) : string =
+        let language = languageOf lang
+        let path = if orchestrator then "tool/commission/unknown-calling" else "tool/fork/unknown-calling"
+        ProviderProse.render language path Map.empty
+
     /// Render one fork child payload document from JSON-shaped input.
-    /// Absent fields are `undefined` in JS and decode as F# `None` / `[]`.
     let render
         (lang: string)
         (input:
@@ -78,3 +76,59 @@ module ForkChildPayloadSurface =
               Attachment = input.Attachment
               RootRequirements = requirements
               Payload = input.Payload }
+
+    let private nonEmpty value =
+        if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+
+    let chooseRoad (calling: string) (byname: string) (charge: string) : obj =
+        let road = nonEmpty calling
+        let name = nonEmpty byname
+        let task = nonEmpty charge
+        match road, name, task with
+        | Some callingName, Some logicalName, Some assignment ->
+            box
+                {| ok = true
+                   road = "Independent"
+                   calling = callingName
+                   byname = logicalName
+                   charge = assignment
+                   authorityTransferred = false |}
+        | None, Some logicalName, Some assignment ->
+            box
+                {| ok = true
+                   road = "Continuation"
+                   calling = null
+                   byname = logicalName
+                   charge = assignment
+                   authorityTransferred = false |}
+        | _ -> box {| ok = false; error = "charge, byname and calling (for a new road) must be non-empty" |}
+
+    let reuseBinding (byname: string) (boundAgent: string) (requestedAgent: string) (tier: string) (charge: string) : obj =
+        match nonEmpty byname, nonEmpty boundAgent, nonEmpty charge with
+        | Some logicalName, Some bound, Some assignment ->
+            let handle = HandleId.Agent(AgentHandleId.create "surface-binding")
+            let projection =
+                HandleProjection.linkNamed
+                    handle
+                    (SessionId.create "surface-child")
+                    bound
+                    logicalName
+                    Role.Coder
+                    HandleOwnership.DurableParentHandle
+                    HandleProjection.empty
+            match projection with
+            | Error error -> box {| ok = false; error = error.ToString() |}
+            | Ok linked ->
+                match HandleProjection.tryFindByByname logicalName linked with
+                | None -> box {| ok = false; error = "continuation binding was not found" |}
+                | Some record ->
+                    box
+                        {| ok = true
+                           road = "Continuation"
+                           byname = logicalName
+                           managedAgent = record.TargetAgent
+                           requestedAgent = requestedAgent
+                           tier = tier
+                           charge = assignment
+                           authorityTransferred = false |}
+        | _ -> box {| ok = false; error = "continuation requires a bound Byname and managed agent" |}

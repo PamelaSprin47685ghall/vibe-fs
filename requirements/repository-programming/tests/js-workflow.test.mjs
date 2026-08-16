@@ -1,53 +1,44 @@
-// tests/unit/js-tools/js-workflow.test.mjs — G5 Phase B-4.5: the full js-*
-// tool invocation workflow (sandbox → staging → preflight → commit).
-//
-// JS-085: result validation happens before commit; the commit is
-// all-or-nothing; success return is coupled to commit (JS-067).
+// JS-085: sandbox → staging → preflight → commit is one owner-managed
+// workflow. Result validation precedes commit and success is coupled to commit.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
-import { JsToolWorkflow_run as workflowRun, JsToolsResult_render as render } from '../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
-import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
-import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
-import { ToolPermission } from '../../../dist/Foundation/Roles.js'
-import { FsSet } from '../../verification-system/tests/support/domain.mjs'
 import { parse as parseToml } from 'smol-toml'
-import { caseOf, listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-import { JsTransactionProjectionModule_pending as pendingTransactions } from '../../../dist/Repository/Programming/Js/Transaction.js'
-import { JsToolsTransactionStore_createPersistence as createPersistence } from '../../../dist/Repository/Programming/Js/TransactionStore.js'
+import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import {
+  run,
+  caseName,
+  rewritten,
+  created,
+  failureCode,
+  render,
+} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
+import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
-const jsProse = () => loadJsProse(ProviderLanguage.English)
-const coderCaps = FsSet.ofArray(
-  [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
-  permissionComparer,
-)
-
-const runWorkflow = async (dir, program, { deadlineMs = 2000 } = {}) => {
-  const surface = generate('Coder', coderCaps, jsProse())
-  const outcome = await workflowRun(
-    dir,
-    surface.BaseClassSource,
-    program,
-    deadlineMs,
-    Date.now() + 60_000,
-    1 << 20,
-  )
-  return { outcome, surface }
+const localStore = () => {
+  const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
+  const commonDir = join(owned, '.git')
+  mkdirSync(commonDir, { recursive: true })
+  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 
-const caseName = (outcome) => caseOf(outcome)
+const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
+const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
+  outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
+  surface: coderSurface(),
+})
 
 test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_reads_and_commits_rewrite', async () => {
   const { dir, cleanup } = sandbox()
@@ -62,8 +53,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_reads_and_commits_rewrite'
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(listItems(outcome.fields[1]), ['a.txt']) // rewritten
-    assert.deepEqual(listItems(outcome.fields[2]), []) // created
+    assert.deepEqual(rewritten(outcome), ['a.txt'])
+    assert.deepEqual(created(outcome), [])
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
   } finally {
     cleanup()
@@ -81,8 +72,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_commits_create_and_reports
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(listItems(outcome.fields[1]), []) // written
-    assert.deepEqual(listItems(outcome.fields[2]), ['new.txt']) // created
+    assert.deepEqual(rewritten(outcome), [])
+    assert.deepEqual(created(outcome), ['new.txt'])
     assert.equal(readFileSync(join(dir, 'new.txt'), 'utf8'), 'fresh')
   } finally {
     cleanup()
@@ -110,8 +101,6 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_preflight_blocks_stale_rew
 test('WHAT[REPOSITORY-PROGRAMMING-018] JS085_workflow_file_missing_fails_the_program', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    // a missing target is a typed result the program can inspect (JS-019:
-    // foreseeable failures are not exceptions)
     const program = `class Js extends JsProgram {
   async run() {
     await this.file('missing.txt');
@@ -137,7 +126,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_program_error_fails_withou
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
-    assert.equal(outcome.fields[0].tag, 1) // ProgramFailed
+    assert.equal(failureCode(outcome), 'PROGRAM_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old', 'no commit on program failure')
   } finally {
     cleanup()
@@ -146,11 +135,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_program_error_fails_withou
 
 test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_workflow_with_store_persists_prepare_and_commit', async () => {
   const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+  const local = localStore()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const store = local.store
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
@@ -158,12 +145,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_workflow_with_store_persists_prepar
     return { done: true };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, createPersistence(store))
+    const { outcome } = await runWorkflow(dir, program, { store: local.handle })
     assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
-
-    const projection = store.TryCurrent('JsTransaction')
-    assert.deepEqual(listItems(pendingTransactions(projection)), [], 'no uncommitted transaction remains in Integrator Current')
+    assert.deepEqual(pending(local.handle), [], 'no uncommitted transaction remains in Integrator Current')
   } finally {
     local.close()
     cleanup()
@@ -174,7 +159,6 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes',
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
@@ -182,7 +166,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes',
     return { before: 'x' };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const toml = render(outcome)
     assert.equal(toml.startsWith('# ok\n'), true)
     assert.equal(/(?:^|\n)status =/m.test(toml), false)
@@ -192,9 +176,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes',
     assert.equal(doc.data.before, 'x')
     assert.deepEqual(doc.fs.rewritten, ['a.txt'])
     assert.equal(doc.fs.created, undefined)
-    const failing = await workflowRun(dir, surface.BaseClassSource, `class Js extends JsProgram {
+    const failing = await run(dir, 'Coder', 'en', `class Js extends JsProgram {
   async run() { throw new Error('boom'); }
-}`, 2000, Date.now() + 60_000, 1 << 20)
+}`, 2000, Date.now() + 60_000, 1 << 20, null)
     const failedToml = render(failing)
     assert.equal(failedToml.startsWith('# failed\n'), true)
     assert.equal(failedToml.includes('status ='), false)
@@ -212,14 +196,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes',
 test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_query_object_has_data_and_no_fs', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
-  async run() {
-    return { paths: ['a.txt'] }
-  }
+  async run() { return { paths: ['a.txt'] } }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const toml = render(outcome)
     const doc = parseToml(toml)
     assert.deepEqual(doc.data.paths, ['a.txt'])
@@ -234,11 +214,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_query_object_has_data_and_no_fs
 test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_primitive_return_uses_data_field', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const surface = generate('Coder', coderCaps, jsProse())
-    const program = `class Js extends JsProgram {
+    const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {
   async run() { return 42 }
-}`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+}`)
     const toml = render(outcome)
     assert.equal(parseToml(toml).data, 42)
   } finally {
@@ -249,18 +227,15 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_primitive_return_uses_data_fiel
 test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_array_null_is_invalid_return_value', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     this.rewrite('a.txt', 'new')
     return [null]
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
-    const failed = parseToml(render(outcome))
-    assert.equal(failed.code, 'INVALID_RETURN_VALUE')
+    assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
   } finally {
     cleanup()
   }
@@ -270,14 +245,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS019_invalid_return_value_commits_nothin
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     this.rewrite('a.txt', 'new')
     return [null]
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
   } finally {
@@ -288,11 +262,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS019_invalid_return_value_commits_nothin
 test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_mixed_object_array_is_invalid', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const surface = generate('Coder', coderCaps, jsProse())
-    const program = `class Js extends JsProgram {
+    const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {
   async run() { return [1, { a: 1 }] }
-}`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+}`)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
   } finally {
@@ -304,14 +276,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_missing_anchor_uses_stable_code', a
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
     return { ok: true };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
   } finally {
@@ -323,14 +294,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_missing_anchor_reason_names_declara
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
     return { ok: true };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const failed = parseToml(render(outcome))
     assert.equal(failed.reason.includes('anchor 1'), true)
     assert.equal(failed.reason.includes('a.txt'), true)
@@ -344,7 +314,6 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_anchor_clips_to_closed_file_
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['h', 'hend', 'hello']]);
@@ -357,7 +326,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_anchor_clips_to_closed_file_
     };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.window, 'hello ')
     assert.equal(doc.data.before, 'hello')
@@ -373,7 +342,6 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_N_is_string_index_not_line_n
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'ab\ncd\nef', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt');
@@ -383,7 +351,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_N_is_string_index_not_line_n
     };
   }
 }`
-    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { outcome } = await runWorkflow(dir, program)
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.twoUnits, 'ab')
     assert.equal(doc.data.threeLen, 3)

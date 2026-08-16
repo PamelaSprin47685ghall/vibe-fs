@@ -19,7 +19,7 @@
 
 ## TIME-002：deadline 与 elapsed 有 typed 表达，不散落为裸时刻比较
 
-**规范陈述**：截止时间必须由 `Process/Deadline.fs` 的 `Deadline` 类型表达（私有构造 `Deadline of expiresAt`，只能经 `Deadline.ofBudget now budget` 构造），通过 `Deadline.remaining` / `Deadline.isExpired` / `Deadline.nextWaitMs` 消费；已耗时间经注入时钟采样（如 `CompletionMailbox` 的 join 等待用 `clock.UtcNow()` 采样 `PtyJoinItem.toRunCompletion`）。业务代码不得持有裸 `DateTimeOffset` 手写「现在是否超时」。
+**规范陈述**：截止时间必须由 `Process/Deadline.fs` 的 `Deadline` 类型表达（私有构造 `Deadline of expiresAt`，只能经 `Deadline.ofBudget now budget` 构造），通过 `Deadline.remaining` / `Deadline.isExpired` / `Deadline.nextWaitMs` 消费；已耗时间经注入时钟采样（如 `HostForkJoin` 的 durable join drain 使用 `runtime.Clock.UtcNow()`）。业务代码不得持有裸 `DateTimeOffset` 手写「现在是否超时」。
 
 **含义/动机**：typed deadline 把「有界」写进类型：无法从外部读出 `expiresAt` 再自行解释；所有判定必须经注入时钟的纯函数。这同时消灭溢出（`ofBudget` 对 `DateTimeOffset.MaxValue` 截断）与 JS timer Int32 上限问题（`nextWaitMs` 封顶 `MaxTimerWaitMs = 0x7FFFFFFF`，长预算分段等待）。
 

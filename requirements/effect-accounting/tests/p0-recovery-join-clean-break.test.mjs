@@ -154,7 +154,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_production_sources_are_g
     'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs',
     'src/Wanxiangshu/Execution/Delegation/Join.fs',
     'src/Wanxiangshu/Execution/Session/Recovery/Model.fs',
-    'src/Wanxiangshu/Composition/Durable/Fact.fs',
+    'src/Wanxiangshu/Execution/Delegation/Facts.fs',
     'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
     'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
     'src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs',
@@ -180,7 +180,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_production_sources_are_g
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
   const agent = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/AgentCompletion.fs'), 'utf8')
   const codec = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs'), 'utf8')
-  const fact = readFileSync(join(ROOT, 'src/Wanxiangshu/Composition/Durable/Fact.fs'), 'utf8')
+  const fact = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Facts.fs'), 'utf8')
 
   for (const [file, text, ids] of [
     ['AgentCompletion.fs', agent, [

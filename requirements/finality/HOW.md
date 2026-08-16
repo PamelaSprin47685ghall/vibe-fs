@@ -6,9 +6,11 @@
 
 | 模块 | 职责 | 命题 |
 |---|---|---|
-| `src/Wanxiangshu/Domain/ManagerLifecycle.fs` | `ManagerLifecycleFact` 类型（`LifeOpened` / `FinalityRequested` / `FinalityReviewerEnlisted` / `FinalityRejected` / `FinalitySiblingSteered` / `FinalityBlessed` / `FinalityUndecided` / `LifeCompleted`；`WorkActivated` 仅 legacy decode） | 008/021/025 |
+| `src/Wanxiangshu/Mission/Manager/Life/Facts.fs` | `ManagerLifecycleFact` 类型（`LifeOpened` / `FinalityRequested` / `FinalityReviewerEnlisted` / `FinalityRejected` / `FinalitySiblingSteered` / `FinalityBlessed` / `FinalityUndecided` / `LifeCompleted`；`WorkActivated` 仅 legacy decode） | 008/021/025 |
 | `src/Wanxiangshu/Mission/Manager/Life/Projection.fs` | `LifeProjection` / `FinalityRequestProjection` fold：ActiveFinality、EnlistedReviewers、LastBlessing、Completed、Resolution（Open/Rejected/Blessed/Undecided） | 008-017/021/022 |
 | `src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs` | `rosterOf` / `graduatedReviewer`（纯函数） | 009/010 |
+| `src/Wanxiangshu/Mission/Manager/FinalitySurface.fs` | JS-native owner boundary: lifecycle/history fold, Life/cohort views, ending/labor decisions, background obligation and ManagerJob projection | 001-010/016-028 |
+| `src/Wanxiangshu/Mission/Finality/PromptSurface.fs` | JS-native owner boundary: Manager narrative projections, lifecycle/finality prompt documents, and role prompt resource text | 004/012/013/019/020/022/024 |
 | `src/Wanxiangshu/Application/Finality/FinalityWorkflow.fs` | 终结 CE：start / resume / undecided 收束 | 008/012/026 |
 | `src/Wanxiangshu/Application/Finality/CohortWorkflow.fs` | cohort 并发驱动（`concurrentAllOrShortCircuit`） | 008/011 |
 | `src/Wanxiangshu/Application/Finality/BlessingWorkflow.fs` | `blessIfTreeUnchanged`（tree 重读 + stable-ordinal bundle + `FinalityBlessed`） | 016 |
@@ -23,7 +25,21 @@
 | `src/Wanxiangshu/Domain/MagicTodoFinalityCohort.fs` | Dedicated 首次 enlist 的 roster 输入 | 009 |
 | `src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs` | `suicide` 唯一入口：前置条件 + drain + FinalityOutcome 映射 | 001/003-008 |
 
-## 2. 关键算法（非 normative 摘要）
+## 2. JS semantic boundary
+
+`FinalitySurface` is the single production owner for the Finality semantic test
+zone. Plain lifecycle, review, handle, and ManagerJob history enters through
+`project` / `jobProjection`; typed facts, durable projections, and cohort
+algebra remain private to production. Life and cohort views, ending/labor
+classification, background obligations, and ManagerJob recovery are emitted as
+JSON-shaped objects/arrays. `World` is an opaque capability: tests create it,
+pass it back, and never inspect it. Prompt-language assertions enter the
+separate production-owned `Mission/Finality/PromptSurface` boundary, whose
+narrative parts are arrays and whose prompt/resource APIs return strings. No
+package-local support module re-exports compiled Fable internals.
+
+
+## 3. 关键算法（非 normative 摘要）
 
 ### classifyEnding（FINALITY-004/007/014/016/017）
 
@@ -69,13 +85,13 @@ Blessed Life 再 suicide → 先 drain，再 `completeBlessedLife`（at rest）�
 不读 tree / 不建 Reviewer / 不检查 witness；写 last_words → `LifeCompleted` → NotifyTerminal →
 at-rest 经验。输出逐字等于 last_words。
 
-## 3. 历史与弃权
+## 4. 历史与弃权
 
 ### GARBAGE —— 不进入 WHAT 的历史沉积
 
 | 内容 | 裁决理由 |
 |---|---|
-| 生产 `ManagerWorkActivation` / `WorkActivated` 资格门、`PlanningTail`、Birth/Labor floor、Activation-only suicide gate | planning→Activation 两阶段删除；`WorkActivated` 仅 inert legacy decode，不得决定工作/压缩/Finality（GLORY-014/016..021）。不在本包 WHAT 中写成命题 |
+| 生产 Activation 资格门、`WorkActivated` 资格门、`PlanningTail`、Birth/Labor floor、Activation-only suicide gate | planning→Activation 两阶段删除；`WorkActivated` 仅 inert legacy decode，不得决定工作/压缩/Finality（GLORY-014/016..021）。不在本包 WHAT 中写成命题 |
 | `status="already_completed"` / `"already_received"` 与 `Work log N` ordinal | 三种经验分型删除这些枚举（GLORY-076）；idempotent replay 重放原 result |
 | 旧 `HostReviewGuard` 的 Manager 面（missingTree/nudgeManager/ManagerGuard） | 删除；ManagerWorkflow 只判 join/finality/planning/handedOff（GLORY-070/REVIEW-007） |
 | 结构化 `FinalityFinding` schema / 固定 report DTO | 第二事实源 + 摘要漂移；反馈 = canonical LWR（GLORY-004/049/050） |

@@ -3,7 +3,18 @@
 > 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `PROOF.md`）。
 > 边界（DOES NOT OWN）写在各条「边界」；更完整的弃权记录在 `HOW.md` §历史与弃权。
 
-## KNOWLEDGE-REUSE-001 — Case 是 best-effort semantic cache 单元
+## Semantic owner boundary
+
+Casebook semantic operations are owned by the registered Casebook owner surfaces under
+`src/Wanxiangshu/Repository/Knowledge/Casebook/`: `Surface.fs` for pure laws/capture and durable
+Case operations, `IndexSurface.fs` for provider shelfmarks, `BookkeeperSurface.fs` for staged
+maintenance, `LifecycleSurface.fs` for draft/finalize wiring, and `FetchSurface.fs` for the
+provider fetch tool. Delegation's registered `SyncDelegateSurface.fs` owns the reusable host
+runtime used by the G6 integration path. Every boundary accepts only plain JS values plus
+opaque EventStore/session capabilities and returns JS-native observations/results; F# model,
+workflow, collection, result, Host codec, Journal, and runtime representations do not cross.
+The contracts are proved by the package tests named in `PROOF.md`.
+
 
 **规范陈述**：Inspector Casebook 是 best-effort semantic cache：每个 Case 保存 Q&A 与可重放的 repository observations；后续 Inspector 可 fetch 并按当前 worktree 重放。不建立知识数据库，不引入 commit history / feature Git history，不保证历史 Q/A 可追溯为产品 API，不用 timestamp 判断 freshness 或 merge winner，不改变 subject worktree。
 

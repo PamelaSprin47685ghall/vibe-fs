@@ -1,5 +1,4 @@
-// tests/unit/process/pty-api.test.mjs — Pty byte/id helpers and the
-// cross-runtime parent-abort registry.
+// Process owner API: UTF-8 PTY ids and parent-abort lifecycle.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -7,34 +6,27 @@ import test from 'node:test'
 const {
   bytes,
   newId,
+  ptyIdView,
   registerParentAbort,
   unregisterParentAbort,
   abortParent,
-} = await import('../../../dist/Process/PtyApi.js')
-
-const { PtyId__get_Value } = await import('../../../dist/Process/PtyTypes.js')
-
-// ── bytes / newId ────────────────────────────────────────────────────────────
+} = await import('../../../dist/Process/Surface.js')
 
 test('WHAT[PROC-001] PTY_API_bytes_encodes_utf8', () => {
-  assert.deepEqual([...bytes('abc')], [97, 98, 99])
-  // Multi-byte UTF-8: 'é' is two bytes, '雪' is three.
-  assert.deepEqual([...bytes('é')], [0xc3, 0xa9])
-  assert.deepEqual([...bytes('雪')], [0xe9, 0x9b, 0xaa])
-  assert.deepEqual([...bytes('')], [])
+  assert.deepEqual(bytes('abc'), [97, 98, 99])
+  assert.deepEqual(bytes('é'), [0xc3, 0xa9])
+  assert.deepEqual(bytes('雪'), [0xe9, 0x9b, 0xaa])
+  assert.deepEqual(bytes(''), [])
 })
 
 test('WHAT[PROC-001] PTY_API_new_id_has_pty_prefix_and_eight_hex_chars', () => {
-  const id = PtyId__get_Value(newId())
-  assert.match(id, /^pty-[0-9a-f]{8}$/)
+  assert.match(ptyIdView(newId()), /^pty-[0-9a-f]{8}$/)
 })
 
 test('WHAT[PROC-001] PTY_API_new_id_is_unique_per_call', () => {
-  const seen = new Set(Array.from({ length: 64 }, () => PtyId__get_Value(newId())))
+  const seen = new Set(Array.from({ length: 64 }, () => ptyIdView(newId())))
   assert.equal(seen.size, 64)
 })
-
-// ── parent abort registry ────────────────────────────────────────────────────
 
 test('WHAT[PROC-006] PTY_API_abort_parent_invokes_every_registered_callback', () => {
   const parent = 'parent-all'
@@ -45,7 +37,6 @@ test('WHAT[PROC-006] PTY_API_abort_parent_invokes_every_registered_callback', ()
   abortParent(parent)
   assert.deepEqual(calls.sort(), ['a', 'b'])
 
-  // Aborting does NOT clear the registry: a second abort fires them again.
   abortParent(parent)
   assert.equal(calls.length, 4)
 })
@@ -80,6 +71,7 @@ test('WHAT[PROC-006] PTY_API_unregister_with_unknown_parent_or_token_is_a_noop',
   const parent = 'parent-mismatch'
   registerParentAbort(parent, () => {})
   unregisterParentAbort(parent, 99999)
+  abortParent(parent)
 })
 
 test('WHAT[PROC-006] PTY_API_tokens_are_monotonic_across_parents', () => {

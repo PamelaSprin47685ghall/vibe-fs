@@ -12,18 +12,12 @@ import { rmSync } from 'node:fs'
 import test from 'node:test'
 
 import {
-  agentJournal,
-  managerJobId,
-  mapEntries,
-  resultOf,
-  sessionId,
-  reviewBarrierId,
-  worktreePath,
-} from '../../verification-system/tests/support/domain.mjs'
-import {
   gitDir,
   liveOrchestrator,
 } from '../../verification-system/tests/support/orchestrator-host-harness.mjs'
+import * as hostSurface from '../../../dist/Change/Host/Surface.js'
+import * as reviewHost from '../../../dist/Mission/Review/OpenCode/ReviewHostSurface.js'
+import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 
 test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
   let live
@@ -33,23 +27,20 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_firs
     sessionBehaviour: {
       onSendPrompt: (reviewerId, prompt) => {
         reviewPrompt = prompt
-        const reviewerKey = reviewerId?.fields?.[0] ?? reviewerId
-        const projection = mapEntries(agentJournal.snapshot(live.journal).AgentProjections.Sessions)
-          .find(([sid]) => (sid?.fields?.[0] ?? sid) === reviewerKey)?.[1]
-        barrierVisibleAtSend = projection?.ReviewGuard != null
+        const projection = reviewJournal.sessionViewRaw(live.journal, reviewerId)
+        barrierVisibleAtSend = projection?.barrier != null
       },
       terminalAfterSend: 'stop-after-order-probe',
     },
   })
   const worktree = gitDir('rv-order')
   try {
-    const result = resultOf(
-      await live.host.managerPort.Reverify(
-        managerJobId('hostfw-order'),
-        sessionId('ses_mgr_order'),
-        worktreePath(worktree),
-        reviewBarrierId('bar_order'),
-      ),
+    const result = await reviewHost.reverify(
+      hostSurface.managerPort(live.host),
+      'hostfw-order',
+      'ses_mgr_order',
+      worktree,
+      'bar_order',
     )
     assert.equal(result.ok, false, 'probe terminates the reviewer after observing send order')
     assert.equal(barrierVisibleAtSend, true, 'reviewer provider lane must not start before ReviewBarrierStarted is durable')
@@ -65,13 +56,12 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_forks_a_deep_reviewer_and_fails_c
   const live = await liveOrchestrator({ journal: false })
   const worktree = gitDir('rvf')
   try {
-    const result = resultOf(
-      await live.host.managerPort.Reverify(
-        managerJobId('hostfw14'),
-        sessionId('ses_mgr14'),
-        worktreePath(worktree),
-        reviewBarrierId('bar_14'),
-      ),
+    const result = await reviewHost.reverify(
+      hostSurface.managerPort(live.host),
+      'hostfw14',
+      'ses_mgr14',
+      worktree,
+      'bar_14',
     )
     assert.equal(result.ok, false)
     assert.match(result.error, /Cannot open review barrier.*AgentJournal/, 'reverify without a journal fails closed before lane start')
@@ -79,7 +69,7 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_forks_a_deep_reviewer_and_fails_c
     const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
     assert.ok(created.length >= 1, 'a reviewer child session was prepared')
     assert.equal(live.sessions.calls.filter(([name]) => name === 'SendPrompt').length, 0, 'no reviewer prompt is sent before a durable barrier exists')
-    assert.equal(live.host.runtime.children.has('hostfw14-reviewer-bar_14'), true)
+    assert.equal(hostSurface.hasChild(live.host, 'hostfw14-reviewer-bar_14'), true)
   } finally {
     live.cleanup()
     rmSync(worktree, { recursive: true, force: true })

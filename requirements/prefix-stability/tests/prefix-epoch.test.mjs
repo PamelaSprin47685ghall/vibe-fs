@@ -12,12 +12,12 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { prefixEpochProjection as prefix } from '../../verification-system/tests/support/domain.mjs'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
 const candidate = ({ cutoff, prefixDigest = `prefix-${cutoff}`, digest = `frozen-${cutoff}`, seal = `seal-${cutoff}` }) =>
   prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
-    digest,
+    frozenDigest: digest,
     cutoff,
     prefixDigest,
     sealRoot: seal,
@@ -50,7 +50,7 @@ test('WHAT[PREFIX-STABILITY-002] CTX_012_successful_probe_promotes_its_candidate
   // used. Regenerating it would put a cold boundary between the request that
   // worked and the next one, which is the whole reason the candidate is passed
   // whole rather than field by field.
-  assert.deepEqual(result.value.Snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
+  assert.deepEqual(result.value.snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
 
 test('WHAT[PREFIX-STABILITY-004] CTX_011_promoted_cutoff_may_not_retreat', () => {
@@ -122,7 +122,7 @@ test('WHAT[PREFIX-STABILITY-005] CTX_012_a_replayed_rebase_is_reported_as_stale'
   assert.deepEqual(replay, { ok: false, error: 'StalePrefixEpoch' })
 
   assert.equal(prefix.epochOf(once), 1n)
-  assert.deepEqual(once.Snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
+  assert.deepEqual(once.snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
 
 test('WHAT[PREFIX-STABILITY-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
@@ -135,13 +135,12 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo'
   // pattern rather than by enumerating every key. An enumeration breaks whenever an
   // unrelated accessor is added — it did, when `isReanchored` arrived — and each such
   // break teaches the reader to update the list rather than to think about the rule.
-  const rollbackShaped = prefix.forbiddenApiFragments(['rollback', 'revert', 'undo', 'restore', 'clear', 'discard'])
+  for (const forbidden of ['rollback', 'revert', 'undo', 'restore', 'clear', 'discard']) {
+    assert.equal(typeof prefix[forbidden], 'undefined', `${forbidden} must not be an epoch API`)
+  }
 
-  assert.deepEqual(rollbackShaped, [], 'CTX-010 forbids a rollback: a failed probe was never committed')
-
-  // The next slot after a discarded probe reads the same committed epoch.
   assert.equal(prefix.epochOf(committed), 1n)
-  assert.deepEqual(committed.Snapshot, candidate({ cutoff: 4 }))
+  assert.deepEqual(committed.snapshot, candidate({ cutoff: 4 }))
 })
 
 // ── reanchor: retire, do not replace ───────────────────────────────────────
@@ -160,7 +159,7 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchor_retires_the_snapshot_and_adva
   // numbering and the Companion may have been behind the Host when compaction
   // happened.
   assert.equal(prefix.hasSnapshot(result.value), false)
-  assert.equal(result.value.Snapshot, undefined)
+  assert.equal(result.value.snapshot, null)
 
   // The epoch still advances. This is a real cold boundary — the provider-visible
   // prefix changed and the seal barrier broke — and COMPANION-009's byte-stability
@@ -237,7 +236,7 @@ test('WHAT[PREFIX-STABILITY-002] CTX_012_probe_capability_returns_after_a_reanch
 
   assert.equal(rebuilt.ok, true, rebuilt.ok ? '' : rebuilt.error)
   assert.equal(prefix.epochOf(rebuilt.value), 3n)
-  assert.deepEqual(rebuilt.value.Snapshot, candidate({ cutoff: 1, seal: 'seal-new' }))
+  assert.deepEqual(rebuilt.value.snapshot, candidate({ cutoff: 1, seal: 'seal-new' }))
 
   // A rebase does not disturb the recorded compactions.
   assert.deepEqual(prefix.reanchoredRuns(rebuilt.value), ['msg_compaction'])
@@ -265,8 +264,9 @@ test('WHAT[PREFIX-STABILITY-012] PREFIX_STABILITY_committed_reanchor_survives_su
   // （PrefixRebaseCommitted）不因后续 provider failure 回滚。投影层没有
   // provider 结局输入；「失败后回滚」在类别上不存在（同 CTX-010 的
   // 无 rollback 断言模式），且失败的重试（refusal）不触碰已提交状态。
-  const rollbackShaped = prefix.forbiddenApiFragments(['rollback', 'revert', 'undo', 'restore', 'clear', 'discard'])
-  assert.deepEqual(rollbackShaped, [], 'no rollback category exists on the epoch projection')
+  for (const forbidden of ['rollback', 'revert', 'undo', 'restore', 'clear', 'discard']) {
+    assert.equal(typeof prefix[forbidden], 'undefined', `${forbidden} must not be an epoch API`)
+  }
 
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
   const reanchored = reanchor(committed, { previousEpoch: 1, nextEpoch: 2, observedRun: 'msg_c1' }).value

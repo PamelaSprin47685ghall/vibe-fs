@@ -239,8 +239,16 @@ type SyncDelegateRuntime
 
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
-            match store.TryPopCallByDelegate turn.SessionId with
-            | Some call -> return! handleCompletedCall turn call
+            match store.TryPeekCallByDelegate turn.SessionId with
+            | Some call when call.Invocations |> List.exists (fun invocation -> invocation.StartCursor.IsNone) ->
+                // The provider prompt owns the opening capture and cursor
+                // assignment. A synthetic or early completion observation must
+                // not consume the call before that bounded range exists.
+                return false
+            | Some _ ->
+                match store.TryPopCallByDelegate turn.SessionId with
+                | Some call -> return! handleCompletedCall turn call
+                | None -> return false
             | None -> return false
         }
 

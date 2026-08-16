@@ -45,7 +45,7 @@ export const budgetCases = [
       };
 
       const actual = Object.fromEntries(
-        Object.entries(budget).filter(([, value]) => typeof value === 'number'),
+        Object.entries({ ...budget }).filter(([, value]) => typeof value === 'number'),
       );
 
       const canonical = (table) =>

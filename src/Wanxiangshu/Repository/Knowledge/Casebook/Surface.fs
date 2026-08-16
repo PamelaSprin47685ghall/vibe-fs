@@ -23,9 +23,12 @@ open Wanxiangshu.Persistence.EventStore
 ///
 /// The F# `Observation` / `CasebookEvent` / `Case` unions stay inside the
 /// surface; translation happens at the owner boundary
-/// (JS-SEMANTIC-SURFACE-002/003/005). `store` is the opaque IEventStore
-/// handle the test obtains from its fixture — passed back, never inspected.
+/// (JS-SEMANTIC-SURFACE-002/003/005). `store` is the opaque EventStoreHandle
+/// created by EventStoreSurface — passed back, never inspected by JS.
 module CasebookSurface =
+
+    let private storeOf (value: obj) : IEventStore =
+        (unbox<EventStoreHandle> value).Store
 
     // ── Observation translation (JS ↔ F#) ────────────────────────────────────
 
@@ -51,6 +54,24 @@ module CasebookSurface =
                 {| kind = "grep-result"
                    pattern = pattern
                    matches = flat |}
+
+    /// Stable SHA-256 fingerprint for a JS-native FileRead observation.
+    let contentHash (text: string) : string =
+        CasebookCapture.contentHash text
+
+    /// Capture a typed observation from a tool execution. An unrecognized or
+    /// incomplete execution returns `null`, not an F# option.
+    let capture (toolName: string) (args: obj) (output: string) : obj =
+        match CasebookCapture.capture toolName args output with
+        | None -> null
+        | Some observation -> observationToJs observation
+
+    /// Parse a typed executor read command. Unsupported shell forms return
+    /// `null`; the parser never exposes its F# option representation.
+    let ofExecCommand (command: string) : obj =
+        match CasebookCapture.ofExecCommand command with
+        | None -> null
+        | Some observation -> observationToJs observation
 
     let private observationOfJs (value: obj) : Result<Observation, string> =
         let kind = string (value?kind)
@@ -105,7 +126,7 @@ module CasebookSurface =
             { SessionId = string (value?sessionId)
               Q = string (value?q)
               A = string (value?a)
-              Observations = List.rev obs
+              Observations = Observations.normalize (List.rev obs)
               LastAccessOrder = int64 (value?lastAccessOrder) })
 
     // ── CASE-003: normalize — dedupe by identity, canonical order ────────────
@@ -238,10 +259,82 @@ module CasebookSurface =
         | Error message -> System.Threading.Tasks.Task.FromResult(box {| ok = false; error = message |})
         | Ok parsed -> runWorkflowTask workflow store parsed
 
+    let private runUnitResult (operation: System.Threading.Tasks.Task<Result<unit, string>>) : System.Threading.Tasks.Task<obj> =
+        task {
+            match! operation with
+            | Ok() -> return box {| ok = true |}
+            | Error message -> return box {| ok = false; error = message |}
+        }
+
+    /// Read one Case from the durable Current projection. The store is an
+    /// opaque capability; both the result envelope and Case are JS-native.
+    let fetchCase (store: obj) (capacity: int) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+
+        task {
+            match! CasebookWorkflow.fetchCase internalStore capacity sessionId with
+            | Error message -> return box {| ok = false; error = message |}
+            | Ok None ->
+                let value: obj = null
+                return box {| ok = true; value = value |}
+            | Ok(Some case) -> return box {| ok = true; value = caseToJs case |}
+        }
+
+    /// Append a Refreshed event after translating observations at the owner
+    /// boundary.
+    let refresh
+        (store: obj)
+        (sessionId: string)
+        (q: string)
+        (a: string)
+        (observations: obj array)
+        : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+
+        match observationsOfJs (box observations) with
+        | Error message -> System.Threading.Tasks.Task.FromResult(box {| ok = false; error = message |})
+        | Ok parsed -> runUnitResult (CasebookWorkflow.refreshCase internalStore sessionId q a parsed)
+
+    /// Report whether replay against the current worktree requires refresh.
+    let needsRefresh
+        (store: obj)
+        (capacity: int)
+        (sessionId: string)
+        (root: string)
+        : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+
+        task {
+            match! CasebookWorkflow.needsRefresh internalStore capacity sessionId root with
+            | Ok value -> return box {| ok = true; value = value |}
+            | Error message -> return box {| ok = false; error = message |}
+        }
+
+    /// Append a CaseAccessed event through the Casebook workflow owner.
+    let touchAccess (store: obj) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+        runUnitResult (CasebookWorkflow.touchCaseAccess internalStore sessionId)
+
+    /// Append an eviction tombstone through the durable Casebook store owner.
+    let evictCase (store: obj) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+
+        task {
+            match! CasebookStore.appendEvicted internalStore sessionId with
+            | Ok _ -> return box {| ok = true |}
+            | Error message -> return box {| ok = false; error = message |}
+        }
+
+    /// Feature marker gate exposed without leaking the workflow module.
+    let featureEnabled (workspaceRoot: string) : bool =
+        CasebookFeature.isEnabled workspaceRoot
+
     /// CASE-010 exactly-once finalize. `{ ok: true } | { ok: false, error }`.
-    let finalize (store: IEventStore) (case: obj) : System.Threading.Tasks.Task<obj> =
-        runStoreWorkflow CasebookWorkflow.finalizeCase store case
+    let finalize (store: obj) (case: obj) : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+        runStoreWorkflow CasebookWorkflow.finalizeCase internalStore case
 
     /// Archive one Inspector result. `{ ok: true } | { ok: false, error }`.
-    let archive (store: IEventStore) (case: obj) : System.Threading.Tasks.Task<obj> =
-        runStoreWorkflow CasebookWorkflow.archiveInspectorResult store case
+    let archive (store: obj) (case: obj) : System.Threading.Tasks.Task<obj> =
+        let internalStore = storeOf store
+        runStoreWorkflow CasebookWorkflow.archiveInspectorResult internalStore case

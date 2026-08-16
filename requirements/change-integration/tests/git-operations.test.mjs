@@ -1,24 +1,15 @@
-// tests/unit/git/git-operations.test.mjs — VERIFY-009 coverage: typed Git verbs.
-//
-// Every verb is exercised against a fake `runner` (Command -> Task<int*string*string>),
-// so command construction, output classification and the ff-only CAS ladder are pinned
-// without spawning git.
+// CHGINT-002/003/005/008 — typed Git verbs through the owner surface.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { commitHash, listItems, managerJobId, resultOf, targetRef, worktreeIdentity, worktreePath } from '../../verification-system/tests/support/domain.mjs'
+const change = await import('../../../dist/Change/Surface.js')
 
-const { createWithRepo, createWithRunner } = await import('../../../dist/Git/Operations.js')
-
-/** Fake process host: script answers by (file, args) and records every command.
- *  A response entry of `[tripleA, tripleB, ...]` (array of triples) is consumed in
- *  order — the first match shifts; the last triple stays sticky. */
 const fakeRunner = (answers) => {
   const calls = []
   const runner = (command) => {
-    const args = listItems(command.Arguments)
-    calls.push({ file: command.FileName, args, cwd: command.WorkingDirectory })
+    const args = command.args
+    calls.push({ file: command.fileName, args, cwd: command.workingDirectory })
     const key = args.join(' ')
     for (const [prefix, response] of answers) {
       if (!key.startsWith(prefix)) continue
@@ -35,32 +26,29 @@ const fakeRunner = (answers) => {
 
 const REPO = '/repo'
 const WORKTREE = '/repo/.worktrees/job-1'
+const git = (runner) => change.createGit(REPO, runner)
+const ok = (result) => {
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.value
+}
 
 // ── FreezeTargetBranch ───────────────────────────────────────────────────────
 
 test('WHAT[CHGINT-008] GIT_freeze_target_branch_reads_symbolic_ref', async () => {
-  const { runner } = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(await port.FreezeTargetBranch())
-  assert.equal(result.ok, true)
-  assert.equal(result.value.fields[0], 'main')
+  const port = git(fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]]).runner)
+  assert.equal((await change.gitFreezeTargetBranch(port)).value, 'main')
 })
 
 test('WHAT[CHGINT-008] GIT_freeze_target_branch_refuses_detached_head', async () => {
-  const { runner } = fakeRunner([['symbolic-ref --short HEAD', [128, '', 'fatal: ref HEAD is not a symbolic ref']]])
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(await port.FreezeTargetBranch())
+  const port = git(fakeRunner([['symbolic-ref --short HEAD', [128, '', 'fatal: ref HEAD is not a symbolic ref']]]).runner)
+  const result = await change.gitFreezeTargetBranch(port)
   assert.equal(result.ok, false)
   assert.match(result.error, /fatal: ref HEAD is not a symbolic ref/)
 })
 
 test('WHAT[CHGINT-008] GIT_freeze_target_branch_blank_stdout_is_detached', async () => {
-  const { runner } = fakeRunner([['symbolic-ref --short HEAD', [0, '  \n', '']]])
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(await port.FreezeTargetBranch())
+  const port = git(fakeRunner([['symbolic-ref --short HEAD', [0, '  \n', '']]]).runner)
+  const result = await change.gitFreezeTargetBranch(port)
   assert.equal(result.ok, false)
   assert.match(result.error, /detached/)
 })
@@ -68,31 +56,22 @@ test('WHAT[CHGINT-008] GIT_freeze_target_branch_blank_stdout_is_detached', async
 // ── IsDirty ──────────────────────────────────────────────────────────────────
 
 test('WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
-  const { runner: dirtyRunner } = fakeRunner([['status --porcelain', [0, ' M file.fs\n', '']]])
-  assert.equal(await createWithRepo(REPO, dirtyRunner).IsDirty(worktreePath(WORKTREE)), true)
-
-  const { runner: cleanRunner } = fakeRunner([['status --porcelain', [0, '', '']]])
-  assert.equal(await createWithRepo(REPO, cleanRunner).IsDirty(worktreePath(WORKTREE)), false)
-
-  const { runner: failingRunner } = fakeRunner([['status --porcelain', [1, '', 'boom']]])
-  assert.equal(await createWithRepo(REPO, failingRunner).IsDirty(worktreePath(WORKTREE)), false)
+  assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, ' M file.fs\n', '']]]).runner), WORKTREE), true)
+  assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, '', '']]]).runner), WORKTREE), false)
+  assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [1, '', 'boom']]]).runner), WORKTREE), false)
 })
 
 // ── Rebase / ConflictedFiles / HasRebaseHead ─────────────────────────────────
 
 test('WHAT[CHGINT-003] GIT_rebase_ok_on_zero_exit', async () => {
-  // No rebase-merge / rebase-apply directories → fresh rebase path.
-  const { runner } = fakeRunner([['rebase main', [0, '', '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
+  const result = await change.gitRebase(git(fakeRunner([['rebase main', [0, '', '']]]).runner), WORKTREE, 'main')
   assert.equal(result.ok, true)
 })
 
 test('WHAT[CHGINT-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
-  const { runner, calls } = fakeRunner([])
-  await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main'))
-
-  const sequence = calls.map((call) => call.args.join(' '))
-  assert.deepEqual(sequence, [
+  const fake = fakeRunner([])
+  await change.gitRebase(git(fake.runner), WORKTREE, 'main')
+  assert.deepEqual(fake.calls.map((call) => call.args.join(' ')), [
     'rev-parse --git-path rebase-merge',
     'rev-parse --git-path rebase-apply',
     'update-ref -d REBASE_HEAD',
@@ -105,13 +84,10 @@ test('WHAT[CHGINT-003] GIT_rebase_in_progress_stages_and_continues', async () =>
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-'))
-
-  const { runner, calls } = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
-
+  const fake = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]])
+  const result = await change.gitRebase(git(fake.runner), WORKTREE, 'main')
   assert.equal(result.ok, true)
-  const sequence = calls.map((call) => call.args.join(' '))
-  assert.deepEqual(sequence, [
+  assert.deepEqual(fake.calls.map((call) => call.args.join(' ')), [
     'rev-parse --git-path rebase-merge',
     'rev-parse --git-path rebase-apply',
     'add -A',
@@ -125,13 +101,11 @@ test('WHAT[CHGINT-003] GIT_rebase_continue_failure_surfaces_stderr', async () =>
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-fail-'))
-
-  const { runner } = fakeRunner([
+  const fake = fakeRunner([
     ['rev-parse --git-path rebase-apply', [0, `${dir}\n`, '']],
     ['-c core.editor=true rebase --continue', [1, '', 'conflict remains']],
   ])
-  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
-
+  const result = await change.gitRebase(git(fake.runner), WORKTREE, 'main')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'conflict remains')
   rmSync(dir, { recursive: true, force: true })
@@ -142,35 +116,29 @@ test('WHAT[CHGINT-003] GIT_rebase_stage_failure_is_an_error', async () => {
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-stage-'))
-
-  const { runner } = fakeRunner([
+  const fake = fakeRunner([
     ['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']],
     ['add -A', [1, '', 'index locked']],
   ])
-  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
-
+  const result = await change.gitRebase(git(fake.runner), WORKTREE, 'main')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'index locked')
   rmSync(dir, { recursive: true, force: true })
 })
 
 test('WHAT[CHGINT-003] GIT_rebase_surfaces_stderr_on_failure', async () => {
-  const { runner } = fakeRunner([['rebase main', [1, 'stdout-noise', 'CONFLICT (content)']]])
-  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
+  const result = await change.gitRebase(git(fakeRunner([['rebase main', [1, 'stdout-noise', 'CONFLICT (content)']]]).runner), WORKTREE, 'main')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CONFLICT (content)')
 })
 
 test('WHAT[CHGINT-005] GIT_conflicted_files_parses_lines', async () => {
-  const { runner } = fakeRunner([['diff --name-only --diff-filter=U', [0, 'a.fs\nb.fs\n', '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).ConflictedFiles(worktreePath(WORKTREE)))
-  assert.equal(result.ok, true)
-  assert.deepEqual(listItems(result.value), ['a.fs', 'b.fs'])
+  const result = await change.gitConflictedFiles(git(fakeRunner([['diff --name-only --diff-filter=U', [0, 'a.fs\nb.fs\n', '']]]).runner), WORKTREE)
+  assert.deepEqual(ok(result), ['a.fs', 'b.fs'])
 })
 
 test('WHAT[CHGINT-005] GIT_conflicted_files_error_propagates', async () => {
-  const { runner } = fakeRunner([['diff --name-only --diff-filter=U', [1, '', 'not a repo']]])
-  const result = resultOf(await createWithRepo(REPO, runner).ConflictedFiles(worktreePath(WORKTREE)))
+  const result = await change.gitConflictedFiles(git(fakeRunner([['diff --name-only --diff-filter=U', [1, '', 'not a repo']]]).runner), WORKTREE)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'not a repo')
 })
@@ -180,48 +148,30 @@ test('WHAT[CHGINT-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists', 
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-head-'))
-
-  const port = createWithRepo(
-    REPO,
-    fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]]).runner,
-  )
-  assert.equal(await port.HasRebaseHead(worktreePath(WORKTREE)), true)
-
-  // A missing directory is NOT an in-progress rebase even when rev-parse answers.
-  const { runner: missing } = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]])
-  assert.equal(await createWithRepo(REPO, missing).HasRebaseHead(worktreePath(WORKTREE)), false)
-
-  // No rebase-merge / rebase-apply at all → false.
-  const { runner: none } = fakeRunner([])
-  assert.equal(await createWithRepo(REPO, none).HasRebaseHead(worktreePath(WORKTREE)), false)
-
+  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]]).runner), WORKTREE), true)
+  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]]).runner), WORKTREE), false)
+  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([]).runner), WORKTREE), false)
   rmSync(dir, { recursive: true, force: true })
 })
 
 // ── ReadHead / GetTargetHead ─────────────────────────────────────────────────
 
 test('WHAT[CHGINT-008] GIT_read_head_returns_commit_hash', async () => {
-  const { runner } = fakeRunner([['rev-parse HEAD', [0, 'deadbeef\n', '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).ReadHead(worktreePath(WORKTREE)))
-  assert.equal(result.ok, true)
-  assert.equal(result.value.fields[0], 'deadbeef')
+  const result = await change.gitReadHead(git(fakeRunner([['rev-parse HEAD', [0, 'deadbeef\n', '']]]).runner), WORKTREE)
+  assert.equal(ok(result), 'deadbeef')
 })
 
 test('WHAT[CHGINT-008] GIT_read_head_empty_stdout_is_missing', async () => {
-  const { runner } = fakeRunner([['rev-parse HEAD', [0, '  \n', '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).ReadHead(worktreePath(WORKTREE)))
+  const result = await change.gitReadHead(git(fakeRunner([['rev-parse HEAD', [0, '  \n', '']]]).runner), WORKTREE)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'HEAD is empty')
 })
 
 test('WHAT[CHGINT-008] GIT_get_target_head_missing_branch', async () => {
-  const { runner } = fakeRunner([['rev-parse refs/heads/main', [128, '', '']]])
-  const result = resultOf(await createWithRepo(REPO, runner).GetTargetHead(targetRef('main')))
+  const result = await change.gitGetTargetHead(git(fakeRunner([['rev-parse refs/heads/main', [128, '', '']]]).runner), 'main')
   assert.equal(result.ok, false)
   assert.match(result.error, /target branch not found: main/)
 })
-
-// ── FfMerge (the ORCH-005 CAS ladder) ────────────────────────────────────────
 
 const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main' } = {}) => [
   ['symbolic-ref --short HEAD', [0, `${branch}\n`, '']],
@@ -232,164 +182,87 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
   ['merge --ff-only', [0, '', '']],
 ]
 
+const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02')
+
 test('WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate', async () => {
-  const { runner, calls } = fakeRunner(ffAnswers())
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
-  assert.equal(result.ok, true)
-  assert.equal(result.value.fields[0], 'cafe01')
-  const sequence = calls.map((call) => call.args[0])
-  assert.deepEqual(sequence, [
-    'rev-parse', // candidate HEAD in the worktree
-    'symbolic-ref', // frozen branch check
-    'rev-parse', // current target head
-    'merge-base',
-    'status', // verifyClean
-    'merge',
-    'rev-parse', // verifyHead
-  ])
+  const fake = fakeRunner(ffAnswers())
+  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02')
+  assert.equal(ok(result), 'cafe01')
+  assert.deepEqual(fake.calls.map((call) => call.args[0]), ['rev-parse', 'symbolic-ref', 'rev-parse', 'merge-base', 'status', 'merge', 'rev-parse'])
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_refuses_when_repo_on_wrong_branch', async () => {
-  const { runner } = fakeRunner(ffAnswers({ branch: 'feature' }))
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const result = await ff(ffAnswers({ branch: 'feature' }))
   assert.equal(result.ok, false)
   assert.match(result.error, /publish branch mismatch: target repo is on 'feature' but publish is frozen to 'main'/)
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_refuses_detached_with_placeholder', async () => {
-  const { runner } = fakeRunner([['rev-parse HEAD', [0, 'cafe01\n', '']], ['symbolic-ref --short HEAD', [128, '', '']]])
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const result = await ff([
+    ['rev-parse HEAD', [0, 'cafe01\n', '']],
+    ['symbolic-ref --short HEAD', [128, '', '']],
+  ])
   assert.equal(result.ok, false)
   assert.match(result.error, /<detached HEAD>/)
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_refuses_when_target_moved_since_head_read', async () => {
-  const { runner } = fakeRunner(ffAnswers({ targetHead: 'other9' }))
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const result = await ff(ffAnswers({ targetHead: 'other9' }))
   assert.equal(result.ok, false)
   assert.equal(result.error, 'target ref moved')
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_refuses_non_fast_forward_candidate', async () => {
-  const answers = ffAnswers().map(([prefix, response]) =>
-    prefix === 'merge-base --is-ancestor' ? [prefix, [1, '', '']] : [prefix, response],
-  )
-  const { runner } = fakeRunner(answers)
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'merge-base --is-ancestor' ? [prefix, [1, '', '']] : [prefix, response])
+  const result = await ff(answers)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'candidate is not a fast-forward of the target branch')
 })
 
 test('WHAT[CHGINT-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
-  const answers = ffAnswers().map(([prefix, response]) =>
-    prefix === 'status --porcelain' ? [prefix, [0, ' M dirty.fs\n', '']] : [prefix, response],
-  )
-  const { runner } = fakeRunner(answers)
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'status --porcelain' ? [prefix, [0, ' M dirty.fs\n', '']] : [prefix, response])
+  const result = await ff(answers)
   assert.equal(result.ok, false)
   assert.match(result.error, /target worktree is dirty; refusing ff-only merge/)
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_ref_moved_lock_diagnostic_maps_to_cas_error', async () => {
-  const answers = ffAnswers().map(([prefix, response]) =>
-    prefix === 'merge --ff-only'
-      ? [prefix, [1, '', 'error: cannot lock ref refs/heads/main: is at x but expected y']]
-      : [prefix, response],
-  )
-  const { runner } = fakeRunner(answers)
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'merge --ff-only' ? [prefix, [1, '', 'error: cannot lock ref refs/heads/main: is at x but expected y']] : [prefix, response])
+  const result = await ff(answers)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'target ref moved')
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_generic_merge_failure_surfaces_message', async () => {
-  const answers = ffAnswers().map(([prefix, response]) =>
-    prefix === 'merge --ff-only' ? [prefix, [1, '', 'merge exploded']] : [prefix, response],
-  )
-  const { runner } = fakeRunner(answers)
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'merge --ff-only' ? [prefix, [1, '', 'merge exploded']] : [prefix, response])
+  const result = await ff(answers)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'merge exploded')
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_empty_candidate_head_is_an_error', async () => {
-  const { runner } = fakeRunner([['rev-parse HEAD', [0, ' \n', '']]])
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  const result = await ff([['rev-parse HEAD', [0, ' \n', '']]])
   assert.equal(result.ok, false)
   assert.equal(result.error, 'candidate HEAD is empty')
 })
 
 test('WHAT[CHGINT-008] GIT_ff_merge_verify_head_mismatch_reports_actual', async () => {
-  // The candidate read returns cafe01; the post-merge verify read returns wrong00.
-  const answers = [
+  const fake = fakeRunner([
     ['symbolic-ref --short HEAD', [0, 'main\n', '']],
     ['merge-base --is-ancestor', [0, '', '']],
     ['status --porcelain', [0, '', '']],
     ['merge --ff-only', [0, '', '']],
     ['rev-parse refs/heads/main', [0, 'beef02\n', '']],
     ['rev-parse HEAD', [[0, 'cafe01\n', ''], [0, 'wrong00\n', '']]],
-  ]
-  const { runner } = fakeRunner(answers)
-  const port = createWithRepo(REPO, runner)
-
-  const result = resultOf(
-    await port.FfMerge(worktreePath(WORKTREE), targetRef('main'), commitHash('beef02')),
-  )
-
+  ])
+  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02')
   assert.equal(result.ok, false)
   assert.match(result.error, /ff-only merge did not advance HEAD to candidate cafe01 \(got wrong00\)/)
 })
 
 test('WHAT[CHGINT-008] GIT_create_with_runner_binds_dot_repo', async () => {
-  const { runner, calls } = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
-  const port = createWithRunner(runner)
-
-  const result = resultOf(await port.FreezeTargetBranch())
-  assert.equal(result.ok, true)
-  assert.equal(calls[0].cwd, '.')
+  const fake = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
+  const port = change.createGit('.', fake.runner)
+  assert.equal((await change.gitFreezeTargetBranch(port)).ok, true)
+  assert.equal(fake.calls[0].cwd, '.')
 })

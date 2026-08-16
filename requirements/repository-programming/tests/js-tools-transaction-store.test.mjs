@@ -3,69 +3,71 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
+import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
 import {
-  JsToolsTransactionStore_appendPrepared as appendPrepared,
-  JsToolsTransactionStore_appendCommitted as appendCommitted,
-} from '../../../dist/Repository/Programming/Js/TransactionStore.js'
-import {
-  JsTransactionIdModule_create as txId,
-  JsTransactionProjectionModule_pending as pending,
-} from '../../../dist/Repository/Programming/Js/Transaction.js'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
+  appendPrepared,
+  appendCommitted,
+  pending,
+} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-txstore-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
+const localStore = (commonDir) => {
+  const owned = commonDir ?? mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
+  const gitCommonDir = join(owned, '.git')
+  mkdirSync(gitCommonDir, { recursive: true })
+  const handle = createEventStore(gitCommonDir, randomUUID().replaceAll('-', ''))
+  return { handle, owned, close: () => { disposeEventStore(handle); if (!commonDir) rmSync(owned, { recursive: true, force: true }) } }
+}
+
 const unwrap = (result) => {
-  const r = resultOf(result)
-  assert.equal(r.ok, true, `expected Ok, got ${JSON.stringify(r.error)}`)
-  return r.value
+  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
+  return result
 }
 
 const mutation = (path, originalText, newText) => ({
-  Path: path,
-  OriginalText: originalText === null ? undefined : originalText,
-  NewText: newText,
+  path,
+  originalText,
+  newText,
 })
 
 const prepared = (id, root, mutations) => ({
-  TransactionId: txId(id),
-  WorkspaceRoot: root,
-  Mutations: toList(mutations),
+  transactionId: id,
+  workspaceRoot: root,
+  mutations,
 })
 
-const current = (store) => store.TryCurrent('JsTransaction')
-
 test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
-  const local = createLocalEventStore()
+  const local = localStore()
   try {
     const p = prepared('tx-1', '/ws', [mutation('a.txt', 'old', 'new')])
-    unwrap(await appendPrepared(local.store, p))
-    assert.equal(listItems(pending(current(local.store))).length, 1)
+    unwrap(await appendPrepared(local.handle, p))
+    assert.equal(pending(local.handle).length, 1)
 
-    unwrap(await appendCommitted(local.store, txId('tx-1')))
-    assert.deepEqual(listItems(pending(current(local.store))), [])
+    unwrap(await appendCommitted(local.handle, 'tx-1'))
+    assert.deepEqual(pending(local.handle), [])
   } finally {
     local.close()
   }
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
-  const local = createLocalEventStore()
+  const local = localStore()
   try {
     const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
-    unwrap(await appendPrepared(local.store, p))
-    const waiting = listItems(pending(current(local.store)))
+    unwrap(await appendPrepared(local.handle, p))
+    const waiting = pending(local.handle)
     assert.equal(waiting.length, 1)
-    assert.equal(waiting[0].WorkspaceRoot, '/ws')
-    assert.equal(listItems(waiting[0].Mutations).length, 2)
+    assert.equal(waiting[0].workspaceRoot, '/ws')
+    assert.equal(waiting[0].mutations.length, 2)
   } finally {
     local.close()
   }
@@ -76,17 +78,17 @@ test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_reopening_store_never_undoes_an_int
   const common = mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
   try {
     writeFileSync(join(dir, 'a.txt'), 'new', 'utf8')
-    const first = createLocalEventStore({ commonDir: common, writerId: 'before-crash' })
+    const first = localStore(common)
     try {
-      unwrap(await appendPrepared(first.store, prepared('tx-3', dir, [mutation('a.txt', 'old', 'new')])))
+      unwrap(await appendPrepared(first.handle, prepared('tx-3', dir, [mutation('a.txt', 'old', 'new')])))
     } finally {
       first.close()
     }
 
-    const reopened = createLocalEventStore({ commonDir: common, writerId: 'after-crash' })
+    const reopened = localStore(common)
     try {
       assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new')
-      assert.equal(listItems(pending(current(reopened.store))).length, 1)
+      assert.equal(pending(reopened.handle).length, 1)
     } finally {
       reopened.close()
     }

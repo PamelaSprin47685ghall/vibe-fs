@@ -1,6 +1,6 @@
-// tests/unit/js-tools/js-tool-host.test.mjs — builtin coexistence + generated
-// js-* tool spec. Primitive filesystem tools remain normal fallbacks: no
-// DEPRECATED annotation. Intent-level preference lives in the js-* description.
+// Builtin coexistence plus the generated js-* registered Host tool. Primitive
+// filesystem tools remain normal fallbacks; intent-level preference is only in
+// the generated description.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -9,36 +9,36 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
-  BuiltinToolDescriptionHook_annotate as annotate,
-  BuiltinToolDescriptionHook_validateRecommendation as validateRecommendation,
-  BuiltinToolDescriptionHook_BuiltinFilesystemTools as builtinTools,
-  JsDescriptionAssets_load as loadJsProse,
-  JsToolSpec_create as createSpec,
-} from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
-import { ToolHostCodec_factory as codecFactory, ToolHostCodec_register as codecRegister } from '../../../dist/OpenCode/Codec/ToolHostCodec.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
-import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
-import { ToolPermission } from '../../../dist/Foundation/Roles.js'
-import { FsSet } from '../../verification-system/tests/support/domain.mjs'
-import { resultOf, stringSet } from '../../verification-system/tests/support/domain.mjs'
+  annotate,
+  validateRecommendation,
+  builtinTools,
+  createRegistered,
+  name,
+  description,
+  execute,
+} from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
-const jsProse = () => loadJsProse(ProviderLanguage.English)
-const coderCaps = FsSet.ofArray(
-  [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
-  permissionComparer,
-)
+const toolModule = () => {
+  const tool = (definition) => definition
+  tool.schema = {
+    string: () => ({
+      type: 'string',
+      describe: (description) => ({ type: 'string', description }),
+    }),
+  }
+  return { tool }
+}
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_builtin_fallback_descriptions_are_left_untouched', () => {
-  assert.deepEqual([...builtinTools].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
-  for (const name of builtinTools) {
-    const original = `${name} primitive fallback`
-    const visible = annotate(name, original, 'js-coder')
+  assert.deepEqual([...builtinTools()].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
+  for (const builtinName of builtinTools()) {
+    const original = `${builtinName} primitive fallback`
+    const visible = annotate(builtinName, original, 'js-coder')
     assert.equal(visible, original)
     assert.doesNotMatch(visible, /DEPRECATED|js-coder/i)
   }
@@ -46,32 +46,20 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_builtin_fallback_descriptions_are_l
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_hook_must_not_recommend_invisible_tools', () => {
-  assert.equal(resultOf(validateRecommendation('js-coder', stringSet(['js-coder', 'read']))).ok, true)
-  const denied = resultOf(validateRecommendation('js-coder', stringSet(['read'])))
+  assert.equal(validateRecommendation('js-coder', ['js-coder', 'read']).ok, true)
+  const denied = validateRecommendation('js-coder', ['read'])
   assert.equal(denied.ok, false)
   assert.equal(denied.error.includes('not provider-visible'), true)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS073_spec_carries_generated_name_and_honest_description', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS073_spec_carries_generated_name_and_honest_description', () => {
   const { dir, cleanup } = sandbox()
   try {
-    const surface = generate('Coder', coderCaps, jsProse())
-    // Build the spec with the real Host tool factory, like ToolRegistry does.
-    const tool = (definition) => definition
-    tool.schema = {
-      string: () => ({
-        type: 'string',
-        describe: (description) => ({ type: 'string', description }),
-      }),
-    }
-    const factory = codecFactory({ tool })
-    const spec = createSpec(factory, surface, dir, undefined)
-    const registered = codecRegister(factory, spec)
-
-    assert.equal(spec.Name, 'js-coder')
-    assert.equal(spec.Description.includes('class JsProgram'), true)
-    assert.equal(spec.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
-    assert.equal(spec.Description.includes('_api'), false)
+    const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
+    assert.equal(name(registered), 'js-coder')
+    assert.equal(description(registered).includes('class JsProgram'), true)
+    assert.equal(description(registered).includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+    assert.equal(description(registered).includes('_api'), false)
   } finally {
     cleanup()
   }
@@ -81,18 +69,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_r
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps, jsProse())
-    // Build the spec with the real Host tool factory, like ToolRegistry does.
-    const tool = (definition) => definition
-    tool.schema = {
-      string: () => ({
-        type: 'string',
-        describe: (description) => ({ type: 'string', description }),
-      }),
-    }
-    const factory = codecFactory({ tool })
-    const spec = createSpec(factory, surface, dir, undefined)
-    const registered = codecRegister(factory, spec)
+    const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
 
     const program = `class Js extends JsProgram {
   async run() {
@@ -101,14 +78,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_r
     return { before: view.text() };
   }
 }`
-    const result = await registered.execute({ program }, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const result = await execute(registered, { program }, { sessionID: 'ses-test', agent: 'fast-coder' })
     assert.equal(result.startsWith('# ok\n'), true)
     assert.equal(result.includes('[data]'), true)
     assert.equal(result.includes('before'), true)
     assert.equal(result.includes('[fs]'), true)
     assert.equal(result.includes('status ='), false)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed via workflow')
-    const missing = await registered.execute({}, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const missing = await execute(registered, {}, { sessionID: 'ses-test', agent: 'fast-coder' })
     assert.equal(missing.includes('error'), true)
     assert.equal(missing.includes("missing 'program' argument"), true)
   } finally {

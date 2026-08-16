@@ -1,34 +1,19 @@
-// Split from tests/unit/temporal/fallback-aabb-confluence.test.mjs (cutover Wave 2a);
-// owner: verification-system (MECHANISM — shared temporal harness contract tests)
+// Shared temporal harness contract tests.
 //
-// The G4R-1 temporal kernel harness moved to support/temporal-harness.mjs because
-// ≥2 target packages consume it (finality / change-integration / managed-session-
-// lifecycle / effect-accounting / provider-attempt-recovery). These tests pin the
-// harness's own deterministic primitives: explicit race enumeration, explicit
-// completion order, durable runTrace composition, recorded provider replay.
-// The virtual-clock contract tests moved to time-capability
-// (temporal-virtual-clock.test.mjs); the fallback theorems moved to
-// provider-attempt-recovery (fallback-aabb-confluence.test.mjs).
+// The production TemporalSurface owns timer/clock and durable trace translation;
+// this suite pins only deterministic ordering, completion, persistence, and
+// recorded-provider behavior.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFact,
-  agentJournal,
-  authorityRoot,
-  fallbackProjection,
-  fold,
-  logicalRunId,
-  providerRun,
-  sessionId,
-  stream,
-} from './support/domain.mjs'
+
+import * as temporal from '../../../dist/Verification/TemporalSurface.js'
 import {
   DeterministicCompletionSource,
   DeterministicEventQueue,
   DurableTraceEvents,
+  createDurableWorld,
   createRecordedProviderPort,
-  createVirtualClock,
   runTrace,
 } from './support/temporal-harness.mjs'
 
@@ -38,91 +23,90 @@ test('WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explici
   const a = ['A1', 'A2']
   const b = ['B1']
   const interleavings = DeterministicEventQueue.interleavings(a, b)
-  // 3 choose 1 = 3 interleavings.
   assert.equal(interleavings.length, 3)
-  const serialized = interleavings.map((xs) => xs.join(',')).sort()
+  const serialized = interleavings.map((items) => items.join(',')).sort()
   assert.deepEqual(serialized, ['A1,A2,B1', 'A1,B1,A2', 'B1,A1,A2'].sort())
 
-  const perms = DeterministicEventQueue.permutations(['A', 'B', 'C'])
-  assert.equal(perms.length, 6)
-  // Every permutation contains same elements.
-  for (const p of perms) assert.deepEqual([...p].sort(), ['A', 'B', 'C'])
+  const permutations = DeterministicEventQueue.permutations(['A', 'B', 'C'])
+  assert.equal(permutations.length, 6)
+  for (const permutation of permutations) assert.deepEqual([...permutation].sort(), ['A', 'B', 'C'])
 })
 
 // ── DeterministicCompletionSource resolves in explicit order ────────────────
 
 test('WHAT[VERIFICATION-SYSTEM-007] completion source order is explicit', async () => {
-  const src = new DeterministicCompletionSource()
-  const e1 = src.enqueue()
-  const e2 = src.enqueue()
-  assert.equal(src.pendingCount, 2)
-  // Resolve out of order by id — proves order is algebra, not queue lottery.
-  src.resolveId(e2.id, 'second')
-  src.resolveId(e1.id, 'first')
-  const [first, second] = await Promise.all([e1.promise, e2.promise])
+  const source = new DeterministicCompletionSource()
+  const firstEntry = source.enqueue()
+  const secondEntry = source.enqueue()
+  assert.equal(source.pendingCount, 2)
+  source.resolveId(secondEntry.id, 'second')
+  source.resolveId(firstEntry.id, 'first')
+  const [first, second] = await Promise.all([firstEntry.promise, secondEntry.promise])
   assert.equal(first, 'first')
   assert.equal(second, 'second')
-  assert.equal(src.pendingCount, 0)
+  assert.equal(source.pendingCount, 0)
 })
 
-// ── runTrace composes VirtualClock + durable port ───────────────────────────
+// ── runTrace composes virtual time + durable owner ──────────────────────────
 
-const SES_A = 'ses_a'
-const SESSION_A = sessionId(SES_A)
+const SESSION_A = 'ses_a'
+const streamA = { kind: 'Session', session: SESSION_A }
 
-const rootAgentFact = () =>
-  agentFact('AuthorityRootAccepted', {
+const rootAgentFact = () => ({
+  family: 'Prompt',
+  case: 'AuthorityRootAccepted',
+  payload: {
     SessionId: SESSION_A,
-    LogicalRunId: logicalRunId('run_L'),
-    AuthorityRootUserMessageId: authorityRoot('msg_u1'),
+    LogicalRunId: 'run_L',
+    AuthorityRootUserMessageId: 'msg_u1',
     AuthorityKind: 'HumanRoot',
     SelectedAgent: 'fast-coder',
     PeerAgent: 'deep-coder',
     CanonicalRole: 'coder',
     SelectedTier: 'fast',
-  })
+  },
+})
 
-const advanceAgentFact = (run, previous, next, count) =>
-  agentFact('FallbackCursorAdvanced', {
+const advanceAgentFact = (run, previous, next, count) => ({
+  family: 'Fallback',
+  case: 'FallbackCursorAdvanced',
+  payload: {
     SessionId: SESSION_A,
-    LogicalRunId: logicalRunId('run_L'),
-    AuthorityRootUserMessageId: authorityRoot('msg_u1'),
-    ProviderRun: providerRun(run),
+    LogicalRunId: 'run_L',
+    AuthorityRootUserMessageId: 'msg_u1',
+    ProviderRun: run,
     PreviousOffset: previous,
     NextOffset: next,
     ConsecutiveFailureCount: count,
     Reason: 'provider_error',
-  })
+  },
+})
 
-const fallbackOf = (projection) => fallbackProjection.read(fold.session(projection, SES_A).Fallback)
+const fallbackOf = (projection) => projection?.sessions?.[SESSION_A]?.fallback
 
 test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably', async () => {
-  const vt = createVirtualClock()
-  const dir = `temporal-runtrace-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const created = await agentJournal.create({ directory: dir, runtime: 'rt_trace', pid: 4242 })
-  assert.equal(created.ok, true)
-  const world = { vt, journal: created.journal, raw: created.raw, directory: dir, dispose: created.dispose }
+  const world = await createDurableWorld({ directory: 'temporal-runtrace', runtime: 'rt_trace', pid: 4242 })
 
   let fired = 0
-  const handle = vt.port.delay(50)
+  const handle = world.vt.port.delay(50)
   handle.delay().then(() => {
     fired += 1
   })
 
-  const streamA = stream.session(SESSION_A)
   const events = [
     DurableTraceEvents.appendAgentFact(streamA, undefined, rootAgentFact()),
     DurableTraceEvents.advanceClock(30),
-    DurableTraceEvents.appendAgentFact(streamA, providerRun('run_1'), advanceAgentFact('run_1', 0, 1, 1)),
+    DurableTraceEvents.appendAgentFact(streamA, 'run_1', advanceAgentFact('run_1', 0, 1, 1)),
     DurableTraceEvents.advanceClock(20),
   ]
   await runTrace(world, events)
   await handle.delay()
   assert.equal(fired, 1, '50ms timer must fire after two advances totalling 50ms')
-  const snap = agentJournal.snapshot(world.journal)
-  const f = fallbackOf(snap)
-  assert.ok(f, 'fallback must exist after runTrace appends')
-  assert.equal(f.failures, 1)
+
+  const snapshot = temporal.journalSnapshot(world.journal)
+  const fallback = fallbackOf(snapshot)
+  assert.ok(fallback, 'fallback must exist after runTrace appends')
+  assert.equal(fallback.failures, 1)
   world.dispose()
 })
 

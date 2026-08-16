@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const Store = await import('../../../../dist/Persistence/EventStore/Store.js')
-const Integrator = await import('../../../../dist/Persistence/EventStore/CanonicalIntegrator.js')
+const EventStore = await import('../../../../dist/Persistence/EventStore/Surface.js')
 
-/** Test-only production-shape EventStore: temp git common-dir + one WriterId NDJSON. */
+/** Test-only production-shape EventStore: temp git common-dir + one WriterId NDJSON.
+ * EventStoreSurface owns append locking, payload closure, Current integration, and replay.
+ */
 export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
   let ownedBase = null
   let gitCommonDir = commonDir
@@ -17,14 +18,13 @@ export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
   }
 
   mkdirSync(gitCommonDir, { recursive: true })
-  const integrator = Integrator.CanonicalIntegrator_create()
-  const store = Store.EventStore_createLocal(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''), integrator)
+  const store = EventStore.EventStoreSurface_create(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''))
 
   return {
     commonDir: gitCommonDir,
-    integrator,
     store,
     close: () => {
+      EventStore.EventStoreSurface_dispose(store)
       if (ownedBase) rmSync(ownedBase, { recursive: true, force: true })
     },
   }

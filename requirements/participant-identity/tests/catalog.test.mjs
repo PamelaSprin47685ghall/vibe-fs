@@ -1,31 +1,26 @@
-// requirements/participant-identity/tests/catalog.test.mjs — AGENT-001/002/003/004
-// direct catalog tests (C5), moved from tests/unit/agent/.
+// requirements/participant-identity/tests/catalog.test.mjs
 //
-// ManagedAgentCatalog is the sole identity directory (AGENT-001…004):
-//   - 10 canonical roles × 2 tiers → exactly 20 required names (AGENT-002)
-//   - peer = same role, opposite tier, symmetric for every name (AGENT-003)
-//   - legacy bare names rejected, version-agnostic prose (AGENT-004)
-//
-// These are layer-1 tests against the published build: the Fable names are
-// absorbed by the facade (VERIFY-008), so a renamed member fails at load time.
+// AGENT-001/002/003/004: managed identity is exercised through the
+// Participant/Persona JS-native surface. Role, tier, and legacy rejection are
+// semantic vocabulary; their F# DU representation is not a test contract.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { authority, caseOf, managedAgentCatalog, roles } from '../../verification-system/tests/support/domain.mjs'
+import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
-const TIER_NAMES = ['Fast', 'Deep']
+const identity = await import('../../../dist/Participant/Persona/Surface.js')
 
 const EXPECTED_ROLES = [
-  'Manager',
-  'Orchestrator',
-  'Coder',
-  'Inspector',
-  'Browser',
-  'Inquiry',
-  'Reviewer',
-  'DevOps',
-  'Distiller',
-  'Blogger',
+  'manager',
+  'orchestrator',
+  'coder',
+  'inspector',
+  'browser',
+  'inquiry',
+  'reviewer',
+  'devops',
+  'distiller',
+  'blogger',
 ]
 
 const EXPECTED_LEGACY = [
@@ -50,177 +45,92 @@ const EXPECTED_LEGACY = [
   'deep',
 ]
 
-const PROSE = 'Managed agents require explicit fast-/deep- names.'
-
-/** Split a managed name into (AgentTier, Role) through the catalog parsers. */
-const tierAndRoleOf = (name) => {
-  const [wireTier, ...rest] = name.split('-')
-  const tier = managedAgentCatalog.tryParseTier(wireTier)
-  const role = managedAgentCatalog.tryParseRole(rest.join('-'))
-  assert.ok(tier !== undefined && role !== undefined, `catalog must parse its own name '${name}'`)
-  return { tier, role }
-}
-
-// ── AGENT-001: Canonical Role and Agent Tier ─────────────────────────────────
+const roleNames = () => identity.requiredNames.filter((name) => !name.endsWith('-bookkeeper'))
 
 test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
-  const all = managedAgentCatalog.allRoles()
-  assert.equal(all.length, 10)
-  assert.deepEqual(new Set(all), new Set(EXPECTED_ROLES))
-
-  // public + internal partition covers all 10 without overlap
-  const publicRoles = managedAgentCatalog.allPublicRoles()
-  const internalRoles = managedAgentCatalog.allInternalRoles()
-  assert.equal(publicRoles.length + internalRoles.length, 10)
-  for (const role of publicRoles) assert.equal(internalRoles.includes(role), false)
-
-  // every canonical role round-trips label → parse → label
-  for (const role of EXPECTED_ROLES) {
-    const label = managedAgentCatalog.roleLabel(roles.of(role))
-    assert.equal(label, role.toLowerCase())
-    assert.equal(managedAgentCatalog.roleLabel(managedAgentCatalog.tryParseRole(label)), label)
-  }
-
-  // both tiers, both spellings, peer flips the tier
-  for (const tierName of TIER_NAMES) {
-    const tier = roles.tier(tierName)
-    assert.equal(managedAgentCatalog.tierLabel(tier), tierName)
-    assert.equal(managedAgentCatalog.wireTierLabel(tier), tierName.toLowerCase())
-    assert.equal(caseOf(managedAgentCatalog.peerTier(tier)), tierName === 'Fast' ? 'Deep' : 'Fast')
-  }
+  assertJsData(identity.allRoleLabels, 'allRoleLabels')
+  assert.deepEqual([...identity.allRoleLabels].sort(), [...EXPECTED_ROLES].sort())
+  assert.equal(identity.allRoleLabels.length, 10)
+  assert.equal(identity.allPublicRoleLabels.length + identity.allInternalRoleLabels.length, 10)
+  assert.deepEqual(
+    [...identity.allPublicRoleLabels, ...identity.allInternalRoleLabels].sort(),
+    [...EXPECTED_ROLES].sort(),
+  )
+  assert.deepEqual(identity.peerTierLabel('Fast'), 'Deep')
+  assert.deepEqual(identity.peerTierLabel('Deep'), 'Fast')
+  assert.equal(identity.peerTierLabel('unknown'), '')
 })
 
-// ── AGENT-002: the 22 required agents ────────────────────────────────────────
-
 test('WHAT[PID-001] required_names_are_exactly_ten_roles_times_two_tiers', () => {
-  const names = managedAgentCatalog.requiredNames()
-  assert.equal(names.length, 22)
-  assert.equal(new Set(names).size, 22)
+  assertJsData(identity.requiredNames, 'requiredNames')
+  assert.equal(identity.requiredNames.length, 22)
+  assert.equal(new Set(identity.requiredNames).size, 22)
 
-  const roleNames = names.filter((n) => !n.endsWith('-bookkeeper'))
-  assert.equal(roleNames.length, 20)
-
-  // two names per role label (one fast, one deep)
+  const names = roleNames()
+  assert.equal(names.length, 20)
   const byRole = new Map()
-  for (const name of roleNames) {
+  for (const name of names) {
     assert.match(name, /^(fast|deep)-[a-z]+$/)
     const role = name.slice(name.indexOf('-') + 1)
     byRole.set(role, (byRole.get(role) ?? 0) + 1)
+    assert.equal(identity.isManagedName(name), true)
   }
   assert.equal(byRole.size, 10)
-  for (const [role, count] of byRole) {
-    assert.equal(count, 2, `role '${role}' must have fast- and deep- variants`)
-  }
+  for (const count of byRole.values()) assert.equal(count, 2)
 
-  // every Role-based required name is a valid managed agent at the authority boundary
-  for (const name of roleNames) {
-    const parsed = authority.parseAgentName(name)
-    assert.equal(parsed.ok, true, `'${name}' must parse as a managed agent`)
-  }
-
-  // Role names are catalog formulas, not a separate table
   const derived = []
-  for (const tierName of TIER_NAMES) {
-    for (const role of managedAgentCatalog.allRoles()) {
-      derived.push(managedAgentCatalog.nameOf(roles.tier(tierName), roles.of(role)))
-    }
+  for (const tier of ['fast', 'deep']) {
+    for (const role of EXPECTED_ROLES) derived.push(identity.nameOf(tier, role))
   }
-  assert.deepEqual(new Set(roleNames), new Set(derived))
+  assert.deepEqual(new Set(names), new Set(derived))
 })
 
 test('WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role', () => {
-  const names = managedAgentCatalog.requiredNames()
-  const bookkeeperNames = names.filter((n) => n.endsWith('-bookkeeper'))
-  assert.deepEqual(new Set(bookkeeperNames), new Set(['fast-bookkeeper', 'deep-bookkeeper']))
-
-  // Bookkeeper pair is catalog-only: it is not among the 10 canonical roles
-  // and never enters the public Role DU (PID-009 identity side).
-  const allRoles = managedAgentCatalog.allRoles()
-  assert.equal(allRoles.includes('Bookkeeper'), false)
-  assert.equal(managedAgentCatalog.allPublicRoles().includes('Bookkeeper'), false)
-
-  // Bookkeeper names are catalog formulas, not a separate table
-  const derivedBookkeepers = TIER_NAMES.map((tierName) =>
-    managedAgentCatalog.bookkeeperNameOf(roles.tier(tierName)),
-  )
-  assert.deepEqual(new Set(bookkeeperNames), new Set(derivedBookkeepers))
-
-  // Bookkeeper pair still has a symmetric peer (PID-007 same law)
-  for (const name of bookkeeperNames) {
-    const peer = managedAgentCatalog.bookkeeperPeerName(name)
-    assert.ok(peer, `'${name}' must have a bookkeeper peer`)
-    assert.equal(bookkeeperNames.includes(peer), true)
-    assert.equal(managedAgentCatalog.bookkeeperPeerName(peer), name)
+  const bookkeepers = identity.requiredNames.filter((name) => name.endsWith('-bookkeeper'))
+  assert.deepEqual(new Set(bookkeepers), new Set(['fast-bookkeeper', 'deep-bookkeeper']))
+  assert.equal(identity.allRoleLabels.includes('bookkeeper'), false)
+  for (const name of bookkeepers) {
+    const peer = identity.peerName(name)
+    assert.equal(bookkeepers.includes(peer), true)
+    assert.equal(identity.peerName(peer), name)
+    assert.equal(identity.isManagedName(name), true)
   }
 })
 
-// ── AGENT-003: Peer computation ──────────────────────────────────────────────
-
 test('WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric', () => {
-  const names = managedAgentCatalog.requiredNames()
-  const nameSet = new Set(names)
-  const peerOf = (name) => {
-    if (managedAgentCatalog.isBookkeeperName(name)) {
-      return managedAgentCatalog.bookkeeperPeerName(name)
-    }
-    const { tier, role } = tierAndRoleOf(name)
-    return managedAgentCatalog.peerNameOf(tier, role)
-  }
-
+  const names = new Set(identity.requiredNames)
   for (const name of names) {
-    const peer = peerOf(name)
-
-    // the peer must exist among the required names (proved at startup)
-    assert.equal(nameSet.has(peer), true, `peer '${peer}' of '${name}' must be a required name`)
-
-    // peer is the same role with the opposite tier
+    const peer = identity.peerName(name)
+    assert.equal(names.has(peer), true, `peer '${peer}' must be required`)
+    assert.equal(identity.peerName(peer), name)
     const expected = name.startsWith('fast-')
       ? `deep-${name.slice('fast-'.length)}`
       : `fast-${name.slice('deep-'.length)}`
     assert.equal(peer, expected)
-
-    // symmetry: peer(peer(x)) = x
-    assert.equal(peerOf(peer), name)
   }
 })
 
-// ── AGENT-004: legacy names are refused ──────────────────────────────────────
-
 test('WHAT[PID-002] all_legacy_bare_names_are_rejected', () => {
-  const legacy = managedAgentCatalog.legacyAgentNames()
-  assert.deepEqual(new Set(legacy), new Set(EXPECTED_LEGACY))
-
+  assert.deepEqual(new Set(identity.legacyNames), new Set(EXPECTED_LEGACY))
   for (const bare of EXPECTED_LEGACY) {
-    assert.equal(managedAgentCatalog.isLegacyAgentName(bare), true, `'${bare}' must be a legacy name`)
-    const parsed = authority.parseAgentName(bare)
-    assert.equal(parsed.ok, false, `'${bare}' must not parse`)
-    assert.equal(caseOf(parsed.error), 'LegacyAgentName')
+    assert.equal(identity.isLegacyName(bare), true, `'${bare}' must be legacy`)
+    assert.equal(identity.isManagedName(bare), false, `'${bare}' must not parse as managed`)
   }
-
-  // forbidden shapes, not just the exact list (no alias, no autocomplete)
   for (const shape of ['reviewer-fast', 'fast_reviewer']) {
-    assert.equal(managedAgentCatalog.isLegacyAgentName(shape), true, `'${shape}' must be a legacy shape`)
-    const parsed = authority.parseAgentName(shape)
-    assert.equal(parsed.ok, false, `'${shape}' must not parse`)
-    assert.equal(caseOf(parsed.error), 'LegacyAgentName')
+    assert.equal(identity.isLegacyName(shape), true)
+    assert.equal(identity.isManagedName(shape), false)
   }
-
-  // a managed name is never a legacy name
-  for (const name of managedAgentCatalog.requiredNames()) {
-    assert.equal(managedAgentCatalog.isLegacyAgentName(name), false, `'${name}' must not be legacy`)
-  }
+  for (const name of identity.requiredNames) assert.equal(identity.isLegacyName(name), false)
 })
 
 test('WHAT[PID-002] rejection_prose_is_version_agnostic', () => {
-  const supported = managedAgentCatalog.formatLegacyNameNotSupported('coder')
-  const inConfig = managedAgentCatalog.formatLegacyNameInConfig('coder')
-
+  const supported = identity.formatLegacyNameNotSupported('coder')
+  const inConfig = identity.formatLegacyNameInConfig('coder')
   for (const text of [supported, inConfig]) {
-    assert.equal(/0\.5\.\d/.test(text), false, 'no version marker in rejection prose')
-    assert.equal(/Wanxiangshu\s+0\.5\.0/.test(text), false)
-    assert.equal(text.includes(PROSE), true)
+    assert.doesNotMatch(text, /0\.5\.\d/)
+    assert.doesNotMatch(text, /Wanxiangshu\s+0\.5\.0/)
+    assert.match(text, /Managed agents require explicit fast-\/deep- names\./)
   }
-
   assert.equal(
     supported,
     "Legacy agent name 'coder' is not supported. Managed agents require explicit fast-/deep- names.",
@@ -229,9 +139,4 @@ test('WHAT[PID-002] rejection_prose_is_version_agnostic', () => {
     inConfig,
     "Legacy agent name 'coder' is present in opencode.json. Managed agents require explicit fast-/deep- names.",
   )
-
-  // the authority path surfaces the same typed rejection (single emission point)
-  const parsed = authority.parseAgentName('coder')
-  assert.equal(parsed.ok, false)
-  assert.equal(caseOf(parsed.error), 'LegacyAgentName')
 })

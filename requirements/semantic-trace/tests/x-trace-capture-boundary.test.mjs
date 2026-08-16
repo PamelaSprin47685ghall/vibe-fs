@@ -11,38 +11,35 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems, idValue } from '../../verification-system/tests/support/domain.mjs'
-
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
+import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
 const SESSION = 'ses_boundary'
-const session = sessionId(SESSION)
 
 let seq = 0
-const next = (factValue, run) => envelope({ seq: (seq += 1), stream: stream.session(session), run, fact: factValue })
+const next = (factValue, run) => xTrace.envelope({ seq: (seq += 1), session: SESSION, run, fact: factValue })
 
 const partFact = ({ sequence, role = 'user', turn = 0, partIndex = 0, kind = 'text', toolName = undefined, run = `msg_p${sequence}` } = {}) =>
   next(
-    fact('XTracePartAppended', {
-      SessionId: session,
-      CursorSequence: BigInt(sequence),
-      Role: role,
-      Turn: turn,
-      PartIndex: partIndex,
-      Kind: kind,
-      ToolName: toolName,
-      TextRef: blobRef(`blob-p${sequence}`),
-      TextDigest: blobDigest(`sha-p${sequence}`),
-      Provenance: `g:0/turn:${turn}/part:${partIndex}`,
-      ProviderRun: providerRun(run),
+    xTrace.fact('XTracePartAppended', {
+      sessionId: SESSION,
+      sequence,
+      role,
+      turn,
+      partIndex,
+      kind,
+      toolName,
+      textRef: `blob-p${sequence}`,
+      textDigest: `sha-p${sequence}`,
+      provenance: `g:0/turn:${turn}/part:${partIndex}`,
+      providerRun: run,
     }),
     run,
   )
 
 const foldOk = (envelopes) => {
-  const result = fold.apply(fold.empty, envelopes)
+  const result = xTrace.fold(envelopes)
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-  return fold.session(result.value, SESSION)
+  return xTrace.session(result.value, SESSION)
 }
 
 test('WHAT[SEMANTIC-TRACE-002] SEMANTIC_TRACE_capture_boundary_excludes_transport_metadata', () => {
@@ -51,7 +48,7 @@ test('WHAT[SEMANTIC-TRACE-002] SEMANTIC_TRACE_capture_boundary_excludes_transpor
     partFact({ sequence: 2, kind: 'tool_call', toolName: 'todowrite' }),
   ])
 
-  const parts = listItems(xTraceParts(s.XTrace))
+  const parts = xTrace.parts(s.xTrace)
   assert.equal(parts.length, 2)
 
   const keys = new Set(Object.keys(parts[0]))
@@ -60,22 +57,31 @@ test('WHAT[SEMANTIC-TRACE-002] SEMANTIC_TRACE_capture_boundary_excludes_transpor
   // ride along as history — HOST-005's exclusion list.
   for (const forbidden of [
     'Usage',
+    'usage',
     'Cost',
+    'cost',
     'Timestamp',
+    'timestamp',
     'Elapsed',
+    'elapsed',
     'Directory',
+    'directory',
     'FinishReason',
+    'finishReason',
     'RuntimeId',
+    'runtimeId',
     'Tokens',
+    'tokens',
     'UiDelta',
+    'uiDelta',
   ]) {
     assert.ok(!keys.has(forbidden), `XTrace part ref must not carry ${forbidden}`)
   }
 
   // Provenance and provider run are the transport identity, kept for proof/locating
   // only — and they must survive the fold so a consumer can locate the run.
-  assert.equal(idValue.providerRun(parts[0].ProviderRun), 'msg_p1')
-  assert.equal(parts[1].ToolName, 'todowrite')
+  assert.equal(parts[0].providerRun, 'msg_p1')
+  assert.equal(parts[1].toolName, 'todowrite')
 })
 
 test('WHAT[SEMANTIC-TRACE-008] SEMANTIC_TRACE_appendable_xtrace_facts_are_exactly_three', () => {
@@ -104,19 +110,16 @@ test('WHAT[SEMANTIC-TRACE-008] SEMANTIC_TRACE_unknown_or_speculative_facts_leave
   // A folded fact that is not one of the three capture facts must not create or
   // mutate XTrace state. Fold an unrelated Companion/Context fact (opening link
   // machinery) and assert the trace stays empty.
-  const result = fold.apply(
-    fold.empty,
-    [
-      next(
-        fact('CompanionBloggerLinked', {
-          SessionId: session,
-          BloggerSessionId: sessionId('ses_other'),
-        }),
-        'msg_link',
-      ),
-    ],
-  )
+  const result = xTrace.fold([
+    next(
+      xTrace.fact('CompanionBloggerLinked', {
+        sessionId: SESSION,
+        bloggerSessionId: 'ses_other',
+      }),
+      'msg_link',
+    ),
+  ])
   assert.equal(result.ok, true)
-  const s = fold.session(result.value, SESSION)
-  assert.equal(s.XTrace, undefined, 'no XTrace state may be created by a non-capture fact')
+  const s = xTrace.session(result.value, SESSION)
+  assert.equal(s.xTrace, null, 'no XTrace state may be created by a non-capture fact')
 })

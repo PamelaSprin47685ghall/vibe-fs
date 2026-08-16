@@ -27,7 +27,7 @@ const compile = (source) => {
 /** A runtime with `fast-manager` already bound, which is what the driver does on session create. */
 const runtimeOf = (source, alias = 'fast-manager') => {
   const runtime = new ScenarioRuntime(compile(source));
-  runtime.bind(alias, SESSION);
+  runtime['bind'](alias, SESSION);
   return runtime;
 };
 
@@ -501,7 +501,7 @@ user = "Run the command and report if it timed out."
   respond = { type = "title", text = "E2E Test Session" }
 `;
       const runtime = runtimeOf(INLINE_RUNTIME, 'fast-inspector');
-      runtime.bind('inspector-title', SESSION);
+      runtime['bind']('inspector-title', SESSION);
       const prompt = 'Run the command and report if it timed out.';
 
       const step0 = deliver(runtime, request([user(prompt)], { tools: [{ name: 'executor' }] }));

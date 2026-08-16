@@ -8,14 +8,11 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sessionId } from '../../verification-system/tests/support/domain.mjs'
+import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 
-const Companion = await import('../../../dist/Context/Companion/Runtime.js')
-
-const make = () => Object.entries(Companion).find(([k]) => k.startsWith('Companion_$ctor'))?.[1](undefined, undefined, sessionId('ses-main'))
-
-const startOpportunity = (c) => Companion.Companion__StartRecoveryOpportunity(c)
-const offerMaterial = (c) => Companion.Companion__OfferRecoveryMaterial(c)
+const make = () => runtime.createCompanion('ses-main')
+const startOpportunity = (c) => runtime.startRecoveryOpportunity(c)
+const offerMaterial = (c) => runtime.offerRecoveryMaterial(c)
 
 test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_fresh_companion_has_no_recovery_opportunity', () => {
   const c = make()

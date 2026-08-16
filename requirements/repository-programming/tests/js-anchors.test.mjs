@@ -9,56 +9,46 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  AnchorRules_validateDeclaration as validateDeclaration,
-  AnchorRules_validateOccurrence as validateOccurrence,
-  AnchorSpec,
-} from '../../../dist/Repository/Programming/Js/Anchor.js'
-import {
-  JsFailure,
-  JsFailureModule_code as failureCode,
-  JsFailureModule_reason as failureReason,
-} from '../../../dist/Repository/Programming/Js/Failure.js'
-import { resultOf } from '../../verification-system/tests/support/domain.mjs'
+  failureCatalog,
+  validateAnchorDeclaration as validateDeclaration,
+  validateAnchorOccurrence as validateOccurrence,
+} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
-const declaration = (spec, occurrence) => ({ Spec: spec, Occurrence: occurrence })
-const ok = (result) => resultOf(result).ok
-// resolve case ordinals from the emitted cases() at load time, never by hand
-const anchorCaseIndex = (name) => Object.create(AnchorSpec.prototype).cases().indexOf(name)
-const exact = (text) => new AnchorSpec(anchorCaseIndex('Exact'), [text])
-const regex = (pattern) => new AnchorSpec(anchorCaseIndex('Regex'), [pattern])
-const failureOf = (name, payload) => {
-  const index = Object.create(JsFailure.prototype).cases().indexOf(name)
-  return new JsFailure(index, payload === undefined ? [] : [payload])
-}
+const declaration = (spec, occurrence) => ({ ...spec, occurrence })
+const ok = (result) => result.ok
+const exact = (text) => ({ kind: 'exact', text })
+const regex = (text) => ({ kind: 'regex', text })
 
 test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_failure_codes_are_stable_and_unique', () => {
-  const cases = [
-    [failureOf('InvalidProgram'), 'INVALID_PROGRAM'],
-    [failureOf('ProgramFailed', ''), 'PROGRAM_FAILED'],
-    [failureOf('ProgramTimeout'), 'PROGRAM_TIMEOUT'],
-    [failureOf('ProgramResourceLimit'), 'PROGRAM_RESOURCE_LIMIT'],
-    [failureOf('FileNotFound', 'a'), 'FILE_NOT_FOUND'],
-    [failureOf('FileAlreadyExists', 'a'), 'FILE_ALREADY_EXISTS'],
-    [failureOf('InvalidUtf8', 'a'), 'INVALID_UTF8'],
-    [failureOf('AnchorNotFound', 'missing'), 'ANCHOR_NOT_FOUND'],
-    [failureOf('AnchorNotUnique'), 'ANCHOR_NOT_UNIQUE'],
-    [failureOf('DuplicateMutationTarget', 'a'), 'DUPLICATE_MUTATION_TARGET'],
-    [failureOf('ResultTooLarge', undefined), 'RESULT_TOO_LARGE'],
-    [failureOf('InvalidReturnValue'), 'INVALID_RETURN_VALUE'],
-    [failureOf('FileChanged', 'a'), 'FILE_CHANGED'],
-    [failureOf('TransactionPrepareFailed'), 'TRANSACTION_PREPARE_FAILED'],
-    [failureOf('TransactionCommitFailed'), 'TRANSACTION_COMMIT_FAILED'],
-    [failureOf('TransactionRecoveryRequired'), 'TRANSACTION_RECOVERY_REQUIRED'],
-    [failureOf('UnknownMember'), 'UNKNOWN_MEMBER'],
+  const expectedCodes = [
+    'INVALID_PROGRAM',
+    'PROGRAM_FAILED',
+    'PROGRAM_TIMEOUT',
+    'PROGRAM_RESOURCE_LIMIT',
+    'FILE_NOT_FOUND',
+    'FILE_ALREADY_EXISTS',
+    'INVALID_UTF8',
+    'ANCHOR_NOT_FOUND',
+    'ANCHOR_NOT_UNIQUE',
+    'DUPLICATE_MUTATION_TARGET',
+    'RESULT_TOO_LARGE',
+    'INVALID_RETURN_VALUE',
+    'FILE_CHANGED',
+    'TRANSACTION_PREPARE_FAILED',
+    'TRANSACTION_COMMIT_FAILED',
+    'TRANSACTION_RECOVERY_REQUIRED',
+    'UNKNOWN_MEMBER',
   ]
+  const cases = failureCatalog()
+  assert.equal(cases.length, expectedCodes.length)
   const seen = new Set()
-  for (const [failure, expected] of cases) {
-    const code = failureCode(failure)
-    assert.equal(code, expected)
-    assert.equal(seen.has(code), false, `duplicate code ${code}`)
-    seen.add(code)
-    assert.equal(typeof failureReason(failure), 'string')
-    assert.ok(failureReason(failure).length > 0)
+  for (const expected of expectedCodes) {
+    const entry = cases.find(({ code }) => code === expected)
+    assert.ok(entry, `missing code ${expected}`)
+    assert.equal(seen.has(entry.code), false, `duplicate code ${entry.code}`)
+    seen.add(entry.code)
+    assert.equal(typeof entry.reason, 'string')
+    assert.ok(entry.reason.length > 0)
   }
 })
 

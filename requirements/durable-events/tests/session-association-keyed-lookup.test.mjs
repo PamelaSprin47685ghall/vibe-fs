@@ -1,13 +1,9 @@
-// Split from tests/unit/context/session-association.test.mjs (cutover Wave 2a); owner: durable-events.
-//
-// PERSIST-008: the SessionAssociationProjection answers both directions
-// (`isCompanion` and `bloggerOf`) from one map via keyed lookups, without a scan
-// — the two questions the transform boundary asks on every request cannot be
-// answered from a reverse index that could disagree with the forward one.
+// PERSIST-008: one keyed association map answers both directions without a scan.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sessionAssociation as assoc } from '../../verification-system/tests/support/domain.mjs'
+
+import * as assoc from '../../../dist/Execution/Session/AssociationSurface.js'
 
 const linked = (pairs, start = assoc.empty) =>
   pairs.reduce((current, pair) => {

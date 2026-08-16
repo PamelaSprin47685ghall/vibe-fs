@@ -4,7 +4,8 @@
 // 恰一个 primary WHAT）；每个 test 只回答一个问题。
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
@@ -33,6 +34,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.
     "test.todo('WHAT[B-002] todo is not proof', () => {})",
     "t.test('WHAT[B-003] nested counts', () => {})",
     "t.test.skip('WHAT[B-004] nested skip counts', () => {})",
+    "test.only('WHAT[B-005] only remains executable', () => {})",
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.deepEqual(
@@ -42,6 +44,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.
       ['WHAT[B-002] todo is not proof', 'todo'],
       ['WHAT[B-003] nested counts', 'active'],
       ['WHAT[B-004] nested skip counts', 'skip'],
+      ['WHAT[B-005] only remains executable', 'active'],
     ],
   )
 })
@@ -57,6 +60,41 @@ test('WHAT[REQUIREMENT-SYSTEM-018] template titles with ${} nesting are parsed',
   assert.equal(calls.length, 1)
   assert.equal(calls[0].dynamic, true)
   assert.deepEqual(calls[0].whatIds, ['C-001'])
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner rejects duplicate, non-leading, and missing primary tags', () => {
+  const src = [
+    "test('WHAT[E-001] one WHAT[E-001] duplicate', () => {})",
+    "test('prose WHAT[E-002] is not a declaration', () => {})",
+    'test(dynamicTitle, () => {})',
+    "test.beforeEach('WHAT[E-003] hook is not a test case', () => {})",
+    "it('WHAT[E-004] alias is outside the test()/t.test() contract', () => {})",
+  ].join('\n')
+  const calls = scanTestSource('<virtual>', src)
+  assert.deepEqual(
+    calls.map((call) => [call.title, call.whatIds]),
+    [
+      ['WHAT[E-001] one WHAT[E-001] duplicate', ['E-001', 'E-001']],
+      ['prose WHAT[E-002] is not a declaration', []],
+      [null, []],
+    ],
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees nested test calls in template expressions', () => {
+  const src = [
+    'test(`WHAT[F-001] outer ${t.test(\'WHAT[F-002] inner\', () => {})}`, () => {})',
+    "const notCode = /t\\.test\\('WHAT[F-003] regex'\\)/",
+    "/* t.test('WHAT[F-004] block comment') */",
+  ].join('\n')
+  const calls = scanTestSource('<virtual>', src)
+  assert.deepEqual(
+    calls.map((call) => [call.title, call.whatIds, call.state]),
+    [
+      ['WHAT[F-001] outer ${}', ['F-001'], 'active'],
+      ['WHAT[F-002] inner', ['F-002'], 'active'],
+    ],
+  )
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-018] whatHeadings extracts PREFIX-NNN with title and line', () => {
@@ -89,13 +127,50 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips regex literals containing quote
   )
 })
 
+test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const tests = join(packageRoot, 'tests')
+  const testFile = join(tests, 'case.test.mjs')
+  const whatFile = join(packageRoot, 'WHAT.md')
+  const proofFile = join(packageRoot, 'PROOF.md')
+  mkdirSync(packageRoot, { recursive: true })
+  mkdirSync(tests, { recursive: true })
+  try {
+    writeFileSync(whatFile, '# WHAT\n\n## FIXTURE-PACKAGE-001：contract\n')
+    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+    writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] exact anchor` |\n')
+    const closed = buildTraceGraph(requirements)
+    assert.equal(closed.danglingProof.length, 0)
+    assert.equal(closed.proofEdges.length, 1)
+    assert.deepEqual(
+      {
+        line: closed.proofEdges[0].line,
+        title: closed.proofEdges[0].title,
+        state: closed.proofEdges[0].state,
+        whatId: closed.proofEdges[0].whatId,
+      },
+      { line: 1, title: 'WHAT[FIXTURE-PACKAGE-001] exact anchor', state: 'active', whatId: 'FIXTURE-PACKAGE-001' },
+    )
+
+    writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] removed anchor` |\n')
+    const dangling = buildTraceGraph(requirements)
+    assert.equal(dangling.danglingProof.length, 1)
+    assert.equal(dangling.danglingProof[0].state, 'dangling')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+
 test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown / multi-primary / unproved', () => {
   const graph = buildTraceGraph(ROOT)
   assert.ok(graph.whats.size > 0, 'requirements tree must define WHAT propositions')
   assert.ok(graph.tests.length > 0, 'requirements tree must contain tests')
   for (const t of graph.tests) {
     for (const id of t.whatIds) {
-      assert.match(id, /^[A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?$/, `tag ${id} must be a well-formed WHAT ID`)
+      assert.match(id, /^[A-Z][A-Z0-9-]*-\d{3}$/, `tag ${id} must be a well-formed WHAT ID`)
     }
   }
   // multi-primary is only ever produced by the scanner, never by this suite.

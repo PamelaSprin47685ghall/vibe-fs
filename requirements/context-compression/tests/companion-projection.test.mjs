@@ -6,12 +6,11 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  bloggerToml as toml,
-  companionIdentity as ident,
-  companionPrompt as prompt,
-  companionProjection as proj,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as toml from '../../../dist/Context/Companion/Blogger/TomlSurface.js'
+import * as owner from '../../../dist/Context/Companion/ProjectionSurface.js'
+const ident = owner
+const prompt = owner
+const proj = owner
 
 const spy = (input) => `«${input}»`
 

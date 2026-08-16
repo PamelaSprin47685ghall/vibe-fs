@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
-import { loopDetector } from '../../verification-system/tests/support/domain.mjs'
+import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 
-const trackedTokenCount = (detector) => Array.from(detector.LastSeenTokenStep).length
+const trackedTokenCount = (detector) => loopDetector.trackedTokenCount(detector)
 
 const diverse = () =>
   Array.from(

@@ -126,7 +126,7 @@ function freezeSinkStrategy(observations) {
 
 // ── Canary D: TodoTable / todo.updated / API model ───────────────────────────
 
-test('HOST_023_canary_D_reviewing_sink_table_event_api_model', () => {
+test('WHAT[OBLIGATION-LEDGER-015] HOST_023_canary_D_reviewing_sink_table_event_api_model', () => {
   assert.ok(OPENCODE_ROOT, 'OpenCode source checkout required (set OPENCODE_SRC or sibling ../opencode)')
 
   const schemaSrc = readOc('packages/schema/src/session-todo.ts')
@@ -209,7 +209,7 @@ test('HOST_023_canary_D_reviewing_sink_table_event_api_model', () => {
 
 // ── Canary I: fifth-status consumers + deterministic sink freeze ─────────────
 
-test('HOST_023_canary_I_reviewing_fifth_status_consumers_and_sink_freeze', () => {
+test('WHAT[OBLIGATION-LEDGER-015] HOST_023_canary_I_reviewing_fifth_status_consumers_and_sink_freeze', () => {
   assert.ok(OPENCODE_ROOT, 'OpenCode source checkout required (set OPENCODE_SRC or sibling ../opencode)')
 
   const scrollbackSrc = readOc('packages/opencode/src/cli/cmd/run/scrollback.writer.tsx')

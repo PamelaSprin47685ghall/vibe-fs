@@ -2,7 +2,7 @@
 // requirement-trace.mjs — REQUIREMENT-SYSTEM-018 closure gate (TASK.md trace roadmap).
 //
 // Modes:
-//   node scripts/checks/requirement-trace.mjs              strict: all six counts zero
+//   node scripts/checks/requirement-trace.mjs              strict: all findings fail
 //   node scripts/checks/requirement-trace.mjs --report     report-only inventory table
 //   node scripts/checks/requirement-trace.mjs --package=<pkg>   trace one package
 //   node scripts/checks/requirement-trace.mjs --explain=<file:line>  explain one test
@@ -14,14 +14,10 @@
 // in its title. Historic IDs, path-implicit ownership and comment prose do not
 // count. skip/todo may carry a tag but never prove a WHAT.
 
-import { readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildTraceGraph, packageOf, scanTestSource } from '../lib/requirement-trace.mjs'
-import { walk } from '../lib/walk.mjs'
-
-const walkProofFiles = (root) => walk(root, ['.md']).filter((f) => f.endsWith('/PROOF.md'))
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const REQUIREMENTS = join(ROOT, 'requirements')
@@ -37,25 +33,25 @@ const argValue = (flag) => {
 const report = args.includes('--report')
 const explain = argValue('--explain')
 const packageFilter = argValue('--package')
+const strictFilter = argValue('--strict')
+const strictPackages = (packageFilter ?? strictFilter)?.split(',').filter(Boolean) ?? null
+
+const inScope = (fileOrPackage) => {
+  if (!strictPackages) return true
+  const packageName = typeof fileOrPackage === 'string' && fileOrPackage.includes('/') ? packageOf(fileOrPackage) : fileOrPackage
+  return strictPackages.includes(packageName)
+}
 
 const rel = (p) => relative(ROOT, p).replace(/\\/g, '/')
 
 const graph = buildTraceGraph(REQUIREMENTS)
 
 const print = (msg) => console.log(msg)
-const byPackage = (nodes) => {
-  const out = new Map()
-  for (const n of nodes) {
-    const pkg = packageOf(n.file)
-    if (packageFilter && pkg !== packageFilter) continue
-    if (!out.has(pkg)) out.set(pkg, [])
-    out.get(pkg).push(n)
-  }
-  return out
-}
 
 if (explain) {
-  const [filePart, linePart] = explain.split(':')
+  const separator = explain.lastIndexOf(':')
+  const filePart = separator >= 0 ? explain.slice(0, separator) : explain
+  const linePart = separator >= 0 ? explain.slice(separator + 1) : ''
   const file = resolve(ROOT, filePart)
   const targetLine = Number(linePart)
   const hits = scanTestSource(file).filter((t) => t.line === targetLine)
@@ -64,21 +60,33 @@ if (explain) {
     print(`test\n  ${rel(file)}:${targetLine}\n\nnot a test call site`)
     process.exit(1)
   }
-  print(`test\n  ${rel(file)}:${test.line}\n  ${test.title}`)
+  print(`test\n  ${rel(file)}:${test.line}\n  ${test.title ?? '(dynamic or missing title)'}\n  state: ${test.state}`)
   if (test.whatIds.length === 0) {
     print('\nproves\n  (no WHAT[<ID>] owner declared)')
     process.exit(1)
   }
+  let failed = false
   for (const id of test.whatIds) {
     const w = graph.whats.get(id)
     if (!w) {
       print(`\nproves\n  WHAT[${id}]  — UNKNOWN proposition`)
-      process.exit(1)
+      failed = true
+      continue
     }
     print(`\nproves\n  WHAT[${id}]\n\nnormative source\n  ${rel(w.file)}:${w.line}\n  ${w.heading}`)
-    print(`\nproof index\n  ${rel(join(dirname(w.file), 'PROOF.md'))}`)
+    const edges = graph.proofEdges.filter((edge) => edge.file === test.file && edge.line === test.line && edge.whatId === id)
+    if (edges.length === 0) {
+      print(`\nproof edges\n  (none — PROOF.md has no exact anchor for this test)`)
+      failed = true
+    } else {
+      print('\nproof edges')
+      for (const edge of edges) {
+        print(`  ${rel(edge.proofFile)}:${edge.proofLine} → ${rel(edge.file)}:${edge.line} ${edge.title ?? ''}${edge.reason ? ` [${edge.reason}]` : ''}`)
+        if (edge.reason || edge.state !== 'active') failed = true
+      }
+    }
   }
-  process.exit(0)
+  process.exit(failed ? 1 : 0)
 }
 
 // ── findings ─────────────────────────────────────────────────────────────────
@@ -86,77 +94,55 @@ if (explain) {
 const failures = []
 const add = (file, line, code, msg) => failures.push({ file, line, code, msg })
 
-const activeTests = graph.tests.filter((t) => t.state === 'active')
-
-// orphan: active test with no WHAT tag
-for (const t of graph.tests) {
-  if (packageFilter && packageOf(t.file) !== packageFilter) continue
-  if (t.whatIds.length === 0 && t.state === 'active') {
-    add(rel(t.file), t.line, 'TRACE_ORPHAN_TEST', `"${t.title}" has no WHAT[<ID>] owner`)
+// Every actual call site is a proof declaration, including skip/todo calls.
+// Their state changes whether they can prove a WHAT, not whether they need an
+// owner tag.
+for (const test of graph.tests) {
+  if (!inScope(test.file)) continue
+  if (test.whatIds.length === 0) {
+    add(rel(test.file), test.line, 'TRACE_ORPHAN_TEST', `"${test.title ?? '(missing title)'}" has no WHAT[<ID>] owner`)
   }
 }
 
 // unknown WHAT
 for (const id of graph.unknownWhat) {
-  const refs = graph.tests.filter((t) => t.whatIds.includes(id))
-  for (const t of refs) {
-    add(rel(t.file), t.line, 'TRACE_UNKNOWN_WHAT', `references WHAT[${id}], but that proposition does not exist`)
+  const refs = graph.tests.filter((test) => inScope(test.file) && test.whatIds.includes(id))
+  for (const test of refs) {
+    add(rel(test.file), test.line, 'TRACE_UNKNOWN_WHAT', `references WHAT[${id}], but that proposition does not exist`)
   }
 }
 
-// multi primary
-for (const { test: t, whats } of graph.multiPrimary) {
-  add(rel(t.file), t.line, 'TRACE_MULTI_PRIMARY', `declares more than one primary WHAT: ${whats.join(', ')}`)
+// A title carrying two tags is ambiguous even when both tags happen to be the
+// same ID. Duplicate declarations are not a second proof edge.
+for (const { test, whats } of graph.multiPrimary) {
+  if (!inScope(test.file)) continue
+  add(rel(test.file), test.line, 'TRACE_MULTI_PRIMARY', `declares more than one primary WHAT: ${whats.join(', ')}`)
 }
 
-// unproved WHAT
-for (const w of graph.unproved) {
-  if (w.deleted) continue
-  if (packageFilter && w.package !== packageFilter) continue
-  add(rel(w.file), w.line, 'TRACE_UNPROVED_WHAT', `${w.id} has zero active executable tests`)
+// unproved WHAT: only one current, active executable declaration proves it.
+for (const what of graph.unproved) {
+  if (what.deleted || !inScope(what.package)) continue
+  add(rel(what.file), what.line, 'TRACE_UNPROVED_WHAT', `${what.id} has zero active executable tests`)
 }
 
-// PROOF exact-anchor closure: the PROOF row naming a file must name a live test.
-// (structural — meta-verifier already owns the WHAT→file existence direction)
-// ID matching mirrors meta-verifier: full ID in cell 1 or 2 (tokenized for
-// `A-002/003` merges), bare number in cell 1 only (`| 011 |`).
-const proofIds = new Set()
-for (const file of walkProofFiles(REQUIREMENTS)) {
-  const text = readFileSync(file, 'utf8')
-  const pkg = file.split('/').slice(-2)[0]
-  // Bare numbers in cell 1 refer to propositions of this package; resolve
-  // them against the package's own WHAT.md ids so `| 011 |` and `| 006/007 |`
-  // match WORK-RECORD-011 / COGNITIVE-ENVIRONMENT-006/007. Cell 2 carries
-  // full IDs plus merged tails (`DISPATCH-PROTOCOL-002/003/004`).
-  const pkgIds = [...readFileSync(join(dirname(file), 'WHAT.md'), 'utf8').matchAll(/^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3})\b/gm)].map((m) => m[1])
-  const byTail = new Map()
-  for (const id of pkgIds) byTail.set(id.slice(-3), id)
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('|')) continue
-    const cells = line.split('|')
-    // Strip code spans so `CONTEXT-COMPRESSION-001（…）` and `` `KNOWLEDGE-REUSE-001` `` parse.
-    const cell1 = (cells[1] ?? '').replace(/`/g, '')
-    const cell2 = (cells[2] ?? '').replace(/`/g, '')
-    for (const t of cell1.split(/[\s,、/–—]+/).filter(Boolean)) {
-      const full = /^([A-Z][A-Z0-9-]*-\d{3})/.exec(t)
-      if (full) proofIds.add(`${pkg}:${full[1]}`)
-      else if (/^\d{3}$/.test(t) && byTail.has(t)) proofIds.add(`${pkg}:${byTail.get(t)}`)
-    }
-    for (const m of cell2.matchAll(/\b([A-Z][A-Z0-9-]*-\d{3})((?:\/\d{3})+)?\b/g)) {
-      proofIds.add(`${pkg}:${m[1]}`)
-      for (const tail of (m[2] ?? '').split('/').filter(Boolean)) {
-        const id = byTail.get(tail)
-        if (id) proofIds.add(`${pkg}:${id}`)
-      }
-    }
-  }
+for (const what of graph.proofMissing) {
+  if (what.deleted || !inScope(what.package)) continue
+  add(rel(what.file), what.line, 'TRACE_PROOF_MISSING', `${what.id} has no PROOF.md row in ${what.package}`)
 }
-for (const w of graph.whats.values()) {
-  if (w.deleted) continue
-  if (!proofIds.has(`${w.package}:${w.id}`)) {
-    if (packageFilter && w.package !== packageFilter) continue
-    add(rel(w.file), w.line, 'TRACE_PROOF_MISSING', `${w.id} has no PROOF.md row in ${w.package}`)
-  }
+
+// An explicit PROOF anchor is an executable edge, not a file existence claim.
+// A stale, ambiguous, state-ineligible, or WHAT-mismatched anchor is a hard
+// failure. Bare file references remain structural evidence for meta-verifier;
+// they do not create an invented test edge.
+for (const edge of graph.danglingProof) {
+  const packageName = edge.whatId ? graph.whats.get(edge.whatId)?.package : packageOf(edge.file)
+  if (!inScope(packageName)) continue
+  add(
+    rel(edge.proofFile),
+    edge.proofLine,
+    'TRACE_DANGLING_PROOF',
+    `${edge.whatId ? `${edge.whatId} ` : ''}PROOF anchor ${edge.anchor ?? '(unnamed)'} does not resolve to an active matching test (${edge.reason})`,
+  )
 }
 
 // ── output ───────────────────────────────────────────────────────────────────
@@ -165,31 +151,34 @@ const sorted = [...failures].sort((a, b) => a.file.localeCompare(b.file) || a.li
 
 if (report) {
   const perPackage = new Map()
-  for (const t of graph.tests) {
-    const pkg = packageOf(t.file)
-    if (!perPackage.has(pkg)) perPackage.set(pkg, { active: 0, tagged: 0, orphan: 0, unproved: 0 })
+  for (const test of graph.tests) {
+    const pkg = packageOf(test.file)
+    if (!inScope(pkg)) continue
+    if (!perPackage.has(pkg)) perPackage.set(pkg, { active: 0, skipped: 0, todo: 0, tagged: 0, orphan: 0, unproved: 0 })
     const row = perPackage.get(pkg)
-    row.active++
-    if (t.whatIds.length > 0) row.tagged++
-    if (t.whatIds.length === 0 && t.state === 'active') row.orphan++
+    if (test.state === 'active') row.active++
+    else if (test.state === 'skip') row.skipped++
+    else row.todo++
+    if (test.whatIds.length === 1) row.tagged++
+    if (test.whatIds.length === 0) row.orphan++
   }
-  for (const w of graph.unproved) {
-    if (w.deleted) continue
-    const row = perPackage.get(w.package) ?? { active: 0, tagged: 0, orphan: 0, unproved: 0 }
+  for (const what of graph.unproved) {
+    if (what.deleted || !inScope(what.package)) continue
+    const row = perPackage.get(what.package) ?? { active: 0, skipped: 0, todo: 0, tagged: 0, orphan: 0, unproved: 0 }
     row.unproved++
-    perPackage.set(w.package, row)
+    perPackage.set(what.package, row)
   }
-  print('package                   WHAT   active tests   tagged   orphan tests   unproved WHAT')
+  print('package                   WHAT   active tests   tagged   skipped   todo   orphan calls   unproved WHAT')
   for (const [pkg, row] of [...perPackage.entries()].sort()) {
-    const whats = [...graph.whats.values()].filter((w) => w.package === pkg).length
+    const whats = [...graph.whats.values()].filter((what) => what.package === pkg && !what.deleted).length
     print(
-      `${pkg.padEnd(25)} ${String(whats).padStart(4)} ${String(row.active).padStart(12)} ${String(row.tagged).padStart(7)} ${String(row.orphan).padStart(13)} ${String(row.unproved).padStart(13)}`,
+      `${pkg.padEnd(25)} ${String(whats).padStart(4)} ${String(row.active).padStart(12)} ${String(row.tagged).padStart(7)} ${String(row.skipped).padStart(9)} ${String(row.todo).padStart(6)} ${String(row.orphan).padStart(14)} ${String(row.unproved).padStart(13)}`,
     )
   }
   print('')
-  print(`totals: ${graph.whats.size} WHAT / ${graph.tests.length} tests / ${sorted.length} findings`)
-  for (const f of sorted) print(`  ${f.code} ${f.file}:${f.line} ${f.msg}`)
-  process.exit(sorted.length === 0 ? 0 : 0)
+  print(`totals: ${graph.whats.size} WHAT / ${graph.tests.length} test calls / ${graph.proofEdges.length} exact proof edges / ${sorted.length} findings`)
+  for (const failure of sorted) print(`  ${failure.code} ${failure.file}:${failure.line} ${failure.msg}`)
+  process.exit(0)
 }
 
 if (sorted.length === 0) {

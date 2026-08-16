@@ -8,129 +8,165 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { collector, setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cleanupInspector, touchAccess } from '../../../dist/Repository/Knowledge/Casebook/Lifecycle.js'
-import { CasebookWorkflow_fetchCase as fetchCase, CasebookWorkflow_touchCaseAccess as touchCaseAccess } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
-import { ObservationCollector__Collect_Z15AE2BE0 as collect, ObservationCollector__Count_Z721C83C5 as count } from '../../../dist/Enforcer/ObservationCollector.js'
-import { acquire } from '../../../dist/OpenCode/Host/WorkspaceEventStore.js'
-import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+  const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'lifecycle-wiring')
+  return {
+    dir,
+    handle,
+    reopen: (writerId) => eventStore.EventStoreSurface_create(join(dir, '.git'), writerId),
+    cleanup: () => {
+      eventStore.EventStoreSurface_dispose(handle)
+      rmSync(dir, { recursive: true, force: true })
+    },
+  }
 }
-const currentCases = (store) => store.TryCurrent('Casebook')?.Cases ?? new Map()
 
 test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
-  const { dir, cleanup } = sandbox()
+  const { dir, reopen, cleanup } = sandbox()
   try {
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const { port } = scriptedBookkeeperPort()
-    setSessionPort(port)
+    bookkeeper.setSessionPort(port)
     const key = 'insp-finalize-1'
-    notePrompt(key, 'What owns PromptAuthority?')
-    collect(collector, key, 'read', { path: 'a.txt' }, 'hello')
+    lifecycle.notePrompt(key, 'What owns PromptAuthority?')
+    lifecycle.collect(key, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'PromptAuthority is owned by the Host.'
-    noteAnswer(key, rawA)
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    lifecycle.noteAnswer(key, rawA)
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
 
-    const store = acquire(gitCommonDir(dir))
-    const fetched = resultOf(await fetchCase(store, 10, key))
-    assert.equal(fetched.value.Q, CANONICAL_Q)
-    assert.notEqual(fetched.value.A, rawA)
-    assert.equal(fetched.value.A, CANONICAL_A)
-    assert.equal(listItems(fetched.value.Observations).length, 1)
-    const publishedA = fetched.value.A
-    notePrompt(key, 'Q2')
-    noteAnswer(key, 'A2')
-    const second = resultOf(await tryFinalizeInspector(dir, key))
-    assert.equal(second.ok, false)
-    assert.match(String(second.error), /already finalized/)
-    assert.equal(resultOf(await fetchCase(store, 10, key)).value.A, publishedA)
+    const handle = reopen('lifecycle-finalize-read')
+    try {
+      const fetched = await casebook.fetchCase(handle, 10, key)
+      assert.equal(fetched.ok, true)
+      assert.equal(fetched.value.q, CANONICAL_Q)
+      assert.notEqual(fetched.value.a, rawA)
+      assert.equal(fetched.value.a, CANONICAL_A)
+      assert.equal(fetched.value.observations.length, 1)
+      const publishedA = fetched.value.a
+      lifecycle.notePrompt(key, 'Q2')
+      lifecycle.noteAnswer(key, 'A2')
+      const second = await lifecycle.tryFinalize(dir, key)
+      assert.equal(second.ok, false)
+      assert.match(String(second.error), /already finalized/)
+      assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
+    } finally {
+      eventStore.EventStoreSurface_dispose(handle)
+    }
   } finally {
-    resetSessionPort()
-    setEnabled(undefined)
+    bookkeeper.resetSessionPort()
+    lifecycle.disable()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_cleanupInspector_never_publishes_case', async () => {
-  const { dir, cleanup } = sandbox()
+  const { dir, handle, cleanup } = sandbox()
   try {
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const key = 'insp-cleanup-1'
-    notePrompt(key, 'Q cleanup')
-    collect(collector, key, 'read', { path: 'b.txt' }, 'body')
-    noteAnswer(key, 'A cleanup')
-    assert.equal(count(collector, key) > 0, true)
-    cleanupInspector(key)
-    assert.equal(count(collector, key), 0)
-    const store = acquire(gitCommonDir(dir))
-    assert.equal(currentCases(store).size, 0)
-    assert.equal(resultOf(await fetchCase(store, 10, key)).value == null, true)
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
-    assert.equal(currentCases(store).size, 0)
+    lifecycle.notePrompt(key, 'Q cleanup')
+    lifecycle.collect(key, 'read', { path: 'b.txt' }, 'body')
+    lifecycle.noteAnswer(key, 'A cleanup')
+    assert.ok(lifecycle.observationCount(key) > 0)
+    lifecycle.cleanup(key)
+    assert.equal(lifecycle.observationCount(key), 0)
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
   } finally {
-    setEnabled(undefined)
+    lifecycle.disable()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_missing_answer_is_noop_finalize', async () => {
-  const { dir, cleanup } = sandbox()
+  const { dir, handle, cleanup } = sandbox()
   try {
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const key = 'insp-no-a'
-    notePrompt(key, 'Q only')
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
-    assert.equal(currentCases(acquire(gitCommonDir(dir))).size, 0)
+    lifecycle.notePrompt(key, 'Q only')
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
   } finally {
-    setEnabled(undefined)
+    lifecycle.disable()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
-  const { dir, cleanup } = sandbox()
+  const { dir, reopen, cleanup } = sandbox()
   try {
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const { port } = scriptedBookkeeperPort()
-    setSessionPort(port)
+    bookkeeper.setSessionPort(port)
     const key = 'insp-access-1'
-    notePrompt(key, 'Q')
-    noteAnswer(key, 'A')
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
-    const store = acquire(gitCommonDir(dir))
-    const initial = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
-    assert.equal(resultOf(await touchCaseAccess(store, key)).ok, true)
-    const direct = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
+    lifecycle.notePrompt(key, 'Q')
+    lifecycle.noteAnswer(key, 'A')
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
+
+    const initialHandle = reopen('lifecycle-access-initial')
+    let initial
+    try {
+      const initialResult = await casebook.fetchCase(initialHandle, 10, key)
+      assert.equal(initialResult.ok, true)
+      initial = initialResult.value.lastAccessOrder
+    } finally {
+      eventStore.EventStoreSurface_dispose(initialHandle)
+    }
+
+    const directHandle = reopen('lifecycle-access-direct')
+    let direct
+    try {
+      assert.equal((await casebook.touchAccess(directHandle, key)).ok, true)
+      const directResult = await casebook.fetchCase(directHandle, 10, key)
+      assert.equal(directResult.ok, true)
+      direct = directResult.value.lastAccessOrder
+    } finally {
+      eventStore.EventStoreSurface_dispose(directHandle)
+    }
     assert.ok(direct >= initial)
-    await touchAccess(dir, key)
-    const host = resultOf(await fetchCase(store, 10, key)).value.LastAccessOrder
+
+    await lifecycle.touchAccess(dir, key)
+    const hostHandle = reopen('lifecycle-access-host')
+    let host
+    try {
+      const hostResult = await casebook.fetchCase(hostHandle, 10, key)
+      assert.equal(hostResult.ok, true)
+      host = hostResult.value.lastAccessOrder
+    } finally {
+      eventStore.EventStoreSurface_dispose(hostHandle)
+    }
     assert.ok(host >= direct)
   } finally {
-    resetSessionPort()
-    setEnabled(undefined)
+    bookkeeper.resetSessionPort()
+    lifecycle.disable()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-009] lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
+  execFileSync('git', ['init', '--quiet', dir])
+  const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'lifecycle-off')
   try {
-    execFileSync('git', ['init', '--quiet', dir])
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const key = 'insp-off'
-    notePrompt(key, 'Q')
-    noteAnswer(key, 'A')
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
-    assert.equal(currentCases(acquire(gitCommonDir(dir))).size, 0)
+    lifecycle.notePrompt(key, 'Q')
+    lifecycle.noteAnswer(key, 'A')
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
   } finally {
-    setEnabled(undefined)
+    lifecycle.disable()
+    eventStore.EventStoreSurface_dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })

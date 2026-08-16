@@ -63,6 +63,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
+open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources

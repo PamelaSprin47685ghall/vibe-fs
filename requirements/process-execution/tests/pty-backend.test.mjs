@@ -1,141 +1,121 @@
-// tests/unit/process/pty-backend.test.mjs — PtyBackend.createPort under plain
-// node: bun-pty cannot load, so every Fork takes the spawn-failure path
-// (register exit, fail parked reads, drop the session, publish PtyFailed).
+// Process owner API: the backend port's spawn-failure contract.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, payloadOf, resultOf } from '../../verification-system/tests/support/domain.mjs'
-
-const { createPort } = await import('../../../dist/Process/PtyBackend.js')
-
 const {
-  PtyPort__AddMailboxSender_6A484C48,
-  PtyPort__Fork_515E235E,
-  PtyPort__Exists_Z33F80F6F,
-  PtyPort__Known_Z33F80F6F,
-  PtyPort__Send_Z13021A56,
-  PtyPort__Read_Z33F80F6F,
-  PtyPort__CloseAll_71136F3F,
-} = await import('../../../dist/Process/Pty.js')
+  backendCreatePort,
+  ptyId,
+  ptyIdView,
+  ptyCommandWrite,
+  ptyCommandSignal,
+  portAddMailboxSender,
+  portFork,
+  portExists,
+  portKnown,
+  portSend,
+  portRead,
+  portCloseAll,
+} = await import('../../../dist/Process/Surface.js')
 
-const { PtyId_Create_Z721C83C5, PtyId__get_Value, PtyCommand, PtySignal } = await import(
-  '../../../dist/Process/PtyTypes.js'
-)
-
-const id = (v) => PtyId_Create_Z721C83C5(v)
-const agent = { Name: 'fast-distiller' }
-const write = new PtyCommand(1, [new TextEncoder().encode('x')])
-
-// The spawn failure is delivered through the async handler; let the task run.
-const settle = () => new Promise((r) => setImmediate(r))
+const write = ptyCommandWrite(new TextEncoder().encode('x'))
+const signal = ptyCommandSignal('KILL')
+const settle = () => new Promise((resolve) => setImmediate(resolve))
+const failure = (error) => ({ ok: false, error })
 
 test('WHAT[PROC-001] BACKEND_createPort_returns_a_working_port', () => {
-  const port = createPort()
+  const port = backendCreatePort()
   assert.ok(port, 'port exists')
-  assert.equal(PtyPort__Exists_Z33F80F6F(port, id('pty-b')), false)
+  assert.equal(portExists(port, ptyId('pty-b')), false)
 })
 
 test('WHAT[PROC-003] BACKEND_fork_without_bun_pty_fails_spawn_and_publishes_failed', async () => {
-  const port = createPort()
+  const port = backendCreatePort()
   const got = []
-  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-sf'))
+  portAddMailboxSender(port, (item) => got.push(item))
+  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-sf'), undefined)
   await settle()
 
-  assert.equal(PtyId__get_Value(pid), 'pty-sf')
+  assert.equal(ptyIdView(pid), 'pty-sf')
   assert.equal(got.length, 1, 'one completion published')
   const item = got[0]
-  assert.equal(caseOf(item), 'PtyFailed')
-  const info = payloadOf(item)
-  assert.equal(info.PtyId, 'pty-sf')
-  assert.equal(info.Code, 'ERROR')
-  assert.match(info.Message, /^PTY spawn failed: /)
-  assert.equal(info.Closed, true)
+  assert.equal(item.kind, 'PtyFailed')
+  assert.equal(item.ptyId, 'pty-sf')
+  assert.equal(item.code, 'ERROR')
+  assert.match(item.message, /^PTY spawn failed: /)
+  assert.equal(item.closed, true)
 })
 
 test('WHAT[PROC-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed', async () => {
-  const port = createPort()
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-fa'))
+  const port = backendCreatePort()
+  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-fa'), undefined)
   await settle()
-  assert.equal(PtyPort__Exists_Z33F80F6F(port, pid), false)
-  assert.equal(PtyPort__Known_Z33F80F6F(port, pid), true)
+  assert.equal(portExists(port, pid), false)
+  assert.equal(portKnown(port, pid), true)
 })
 
 test('WHAT[PROC-001] BACKEND_generated_id_also_fails_cleanly', async () => {
-  const port = createPort()
+  const port = backendCreatePort()
   const got = []
-  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent)
+  portAddMailboxSender(port, (item) => got.push(item))
+  const pid = portFork(port, 'echo hi', 'fast-distiller', undefined, undefined)
   await settle()
-  assert.match(PtyId__get_Value(pid), /^pty-[0-9a-f]{8}$/)
-  assert.equal(payloadOf(got[0]).PtyId, PtyId__get_Value(pid))
+  assert.match(ptyIdView(pid), /^pty-[0-9a-f]{8}$/)
+  assert.equal(got[0].ptyId, ptyIdView(pid))
 })
 
 test('WHAT[PROC-001] BACKEND_send_after_failed_fork_reports_closed', async () => {
-  const port = createPort()
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-wc'))
+  const port = backendCreatePort()
+  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-wc'), undefined)
   await settle()
-  const r = resultOf(await PtyPort__Send_Z13021A56(port, pid, write))
-  assert.equal(r.ok, false)
-  assert.equal(r.error, 'PTY closed')
+  assert.deepEqual(await portSend(port, pid, write), failure('PTY closed'))
 })
 
 test('WHAT[PROC-001] BACKEND_send_on_never_forked_id_is_unknown', async () => {
-  const port = createPort()
-  const r = resultOf(await PtyPort__Send_Z13021A56(port, id('pty-uk'), write))
-  assert.equal(r.ok, false)
-  assert.equal(r.error, 'Unknown PTY id: pty-uk')
+  const port = backendCreatePort()
+  assert.deepEqual(await portSend(port, ptyId('pty-uk'), write), failure('Unknown PTY id: pty-uk'))
 })
 
 test('WHAT[PROC-001] BACKEND_read_after_failed_fork_returns_empty_closed', async () => {
-  const port = createPort()
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-rf'))
+  const port = backendCreatePort()
+  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-rf'), undefined)
   await settle()
-  const r = resultOf(await PtyPort__Read_Z33F80F6F(port, pid))
-  assert.deepEqual([r.ok, r.value], [true, ['', true]])
+  assert.deepEqual(await portRead(port, pid), { ok: true, value: { output: '', closed: true } })
 })
 
 test('WHAT[PROC-001] BACKEND_read_never_forked_is_an_error', async () => {
-  const port = createPort()
-  const r = resultOf(await PtyPort__Read_Z33F80F6F(port, id('pty-rn')))
-  assert.equal(r.ok, false)
-  assert.equal(r.error, 'Unknown PTY id: pty-rn')
+  const port = backendCreatePort()
+  assert.deepEqual(await portRead(port, ptyId('pty-rn')), failure('Unknown PTY id: pty-rn'))
 })
 
 test('WHAT[PROC-001] BACKEND_close_all_with_nothing_active_resolves', async () => {
-  const port = createPort()
-  await PtyPort__CloseAll_71136F3F(port, 0)
+  await portCloseAll(backendCreatePort(), 0)
 })
 
 test('WHAT[PROC-001] BACKEND_ports_are_isolated_from_each_other', async () => {
-  const a = createPort()
-  const b = createPort()
-  const pid = PtyPort__Fork_515E235E(a, 'echo hi', agent, id('pty-iso'))
+  const a = backendCreatePort()
+  const b = backendCreatePort()
+  const pid = portFork(a, 'echo hi', 'fast-distiller', ptyId('pty-iso'), undefined)
   await settle()
-  assert.equal(PtyPort__Known_Z33F80F6F(a, pid), true)
-  assert.equal(PtyPort__Known_Z33F80F6F(b, pid), false)
-  const r = resultOf(await PtyPort__Send_Z13021A56(b, pid, write))
-  assert.equal(r.error, 'Unknown PTY id: pty-iso')
+  assert.equal(portKnown(a, pid), true)
+  assert.equal(portKnown(b, pid), false)
+  assert.deepEqual(await portSend(b, pid, write), failure('Unknown PTY id: pty-iso'))
 })
 
 test('WHAT[PROC-003] BACKEND_concurrent_failed_forks_each_publish_one_completion', async () => {
-  const port = createPort()
+  const port = backendCreatePort()
   const got = []
-  PtyPort__AddMailboxSender_6A484C48(port, (item) => got.push(item))
-  PtyPort__Fork_515E235E(port, 'cmd one', agent, id('pty-f1'))
-  PtyPort__Fork_515E235E(port, 'cmd two', agent, id('pty-f2'))
+  portAddMailboxSender(port, (item) => got.push(item))
+  portFork(port, 'cmd one', 'fast-distiller', ptyId('pty-f1'), undefined)
+  portFork(port, 'cmd two', 'fast-distiller', ptyId('pty-f2'), undefined)
   await settle()
   await settle()
-  const messages = got.map(payloadOf).map((x) => x.PtyId).sort()
-  assert.deepEqual(messages, ['pty-f1', 'pty-f2'])
+  assert.deepEqual(got.map((item) => item.ptyId).sort(), ['pty-f1', 'pty-f2'])
 })
 
 test('WHAT[PROC-001] BACKEND_signal_on_failed_id_is_rejected_as_closed', async () => {
-  const port = createPort()
-  const pid = PtyPort__Fork_515E235E(port, 'echo hi', agent, id('pty-sg'))
+  const port = backendCreatePort()
+  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-sg'), undefined)
   await settle()
-  const r = resultOf(await PtyPort__Send_Z13021A56(port, pid, new PtyCommand(3, [PtySignal.Kill])))
-  assert.equal(r.ok, false)
-  assert.equal(r.error, 'PTY closed')
+  assert.deepEqual(await portSend(port, pid, signal), failure('PTY closed'))
 })

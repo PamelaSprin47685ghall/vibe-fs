@@ -55,7 +55,7 @@ Distiller 映射子会话：`distillerAgent = ManagedAgent.nameOf AgentTier.Fast
 ## 物理落点（CURRENT EVIDENCE）
 
 - Resource：`resources/provider/role/distiller/`（fragment humility 散文）。
-- Wiring：`Agent/AgentProgram.fs`（distill tool）、`Infrastructure/OpenCode/Tools/{Distillation,DistillationRuntime,ExecutorTool}.fs`。
+- Semantic owner surface: `OpenCode/Tools/DistillationSurface.fs` translates the fixed Distiller role, private-target rule, empty permission catalog, and `run` execution verb to JS-native strings/booleans/arrays. Tests consume this surface; they do not reconstruct Role/ToolSpec values.
 - Failure：`Process/LargeGate.fs`、`Domain/ToolResultBound.fs`。
 - Tests：包内 `tests/executor-summarize.test.mjs`（MOVE）、`tests/distiller-fragment-humility.test.mjs`（NEW）。
 

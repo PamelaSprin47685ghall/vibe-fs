@@ -7,41 +7,47 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { attemptPlanner as planner, requestKind } from '../../verification-system/tests/support/domain.mjs'
+import { plan } from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
 
 // ── PROMPT-008: everything derivable is derived ────────────────────────────
 
 test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
-  // The caller supplies an authority profile and a cursor. It cannot supply a role that
-  // disagrees with the agent name, or a tool set that disagrees with the role, because
-  // neither is a parameter.
-  const plan = planner.plan({ kind: requestKind.workMain })
+  // The caller supplies only the canonical role, tier and request kind. The
+  // owner surface constructs the profile through AttemptPlanner.plan.
+  const planned = plan({ role: 'coder', tier: 'fast', kind: 'work-main' })
 
-  assert.equal(plan.canonicalRole, 'Coder')
-  assert.equal(plan.systemPromptId, 'coder', 'AGENT-001: derived from the role alone')
-  assert.deepEqual(plan.toolCapabilities, ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write'])
+  assert.equal(planned.ok, true, planned.error)
+  assert.equal(planned.canonicalRole, 'coder')
+  assert.equal(planned.systemPromptId, 'coder', 'AGENT-001: derived from the role alone')
+  assert.deepEqual(planned.toolCapabilities, [
+    'BashHoneypot',
+    'Edit',
+    'Fetch',
+    'Fission',
+    'Glob',
+    'Grep',
+    'Inspect',
+    'Move',
+    'Read',
+    'Remove',
+    'Write',
+  ])
 })
 
 test('WHAT[ENF-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
-  // `permissions(fast-coder) = permissions(deep-coder)` must be structurally true, not
-  // a coincidence of two lookup tables agreeing.
-  const fast = planner.plan({
-    authorityProfile: planner.authority({ selected: 'fast-coder', peer: 'deep-coder', tier: 'Fast' }),
-    kind: requestKind.workMain,
-  })
+  const fast = plan({ role: 'coder', tier: 'fast', kind: 'work-main' })
+  const deep = plan({ role: 'coder', tier: 'deep', kind: 'work-main' })
 
-  const deep = planner.plan({
-    authorityProfile: planner.authority({ selected: 'deep-coder', peer: 'fast-coder', tier: 'Deep' }),
-    kind: requestKind.workMain,
-  })
-
+  assert.equal(fast.ok, true, fast.error)
+  assert.equal(deep.ok, true, deep.error)
   assert.equal(fast.systemPromptId, deep.systemPromptId)
   assert.deepEqual(fast.toolCapabilities, deep.toolCapabilities)
 })
 
 test('WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred', () => {
-  for (const kind of requestKind.all) {
-    const plan = planner.plan({ kind })
-    assert.equal(plan.requestKind, requestKind.nameOf(kind))
+  for (const kind of ['work-main', 'blogger-main', 'blogger-squash', 'interaction-repair']) {
+    const planned = plan({ role: 'coder', tier: 'fast', kind })
+    assert.equal(planned.ok, true, planned.error)
+    assert.equal(planned.requestKind, kind)
   }
 })

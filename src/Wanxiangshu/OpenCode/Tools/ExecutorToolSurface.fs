@@ -1,11 +1,105 @@
 namespace Wanxiangshu.OpenCode
 
+open System
+open System.Collections.Generic
+open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Foundation.Identity
+
 /// JS-native semantic surface for the provider execution verb (PROC-011 /
 /// DISTILL-010). The name is a string constant; distillation is invoked
 /// inside `run` and is never a separate provider tool. A JS test never
-/// constructs `runSpec` or a ToolHostCodec factory
-/// (JS-SEMANTIC-SURFACE-003/005).
+/// constructs `runSpec`, a ToolHostCodec factory, ToolRuntimeScope or a
+/// recovery union: those remain owner-private here.
 module ExecutorToolSurface =
 
     /// Provider-visible execution verb. Distillation is not a provider tool.
     let runToolName: string = ExecutorTool.RunToolName
+
+    type private SurfaceScope(scope: ToolRuntimeScope) =
+        member _.Value = scope
+
+    let private scopeOf (value: obj) = (value :?> SurfaceScope).Value
+
+    let private rawField (raw: obj) (name: string) : obj =
+        if isNull raw then null else raw?(name)
+
+    let private rawString (raw: obj) (name: string) : string option =
+        let value = rawField raw name
+        if isNull value then None else Some(string value)
+
+    let private createScope (sessionsRaw: obj) (workspaceDirectory: string option) : obj =
+        let sessions: ISessionHostPort =
+            if isNull sessionsRaw then
+                Unchecked.defaultof<ISessionHostPort>
+            else
+                unbox<ISessionHostPort> sessionsRaw
+
+        let scope =
+            new ToolRuntimeScope(
+                sessions,
+                None,
+                None,
+                workspaceDirectory,
+                Dictionary<string, string>(),
+                (fun _ -> None),
+                HashSet<string>(),
+                Dictionary<string, string>(),
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+
+        SurfaceScope(scope) :> obj
+
+    let private recoveryOf (root: SessionId) (mode: string) : FamilyRecovery =
+        match mode with
+        | "ready" -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root 0L)
+        | "waiting" ->
+            FamilyRecovery.FamilyWaiting(
+                SessionRecovery.NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+            )
+        | _ ->
+            FamilyRecovery.FamilyBlocked(
+                SessionRecovery.NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+            )
+
+    let private attachRecovery (scope: ToolRuntimeScope) (mode: string) =
+        scope.AttachFamilyRecovery(fun root -> Task.FromResult(recoveryOf root mode))
+
+    /// Plain metadata for the provider-visible run contract.
+    let describeRun (toolModule: obj) : obj =
+        let factory = ToolHostCodec.factory toolModule
+        let spec = ExecutorTool.runSpec factory (createScope null None |> scopeOf)
+        box
+            {| name = spec.Name
+               description = spec.Description
+               arguments = spec.Arguments |> List.map fst |> List.toArray |}
+
+    /// Execute the provider-visible run contract. `toolModule` is the Host's
+    /// schema module, `sessions` is an opaque Host session capability, `args`
+    /// and `context` are plain Host objects, and `recovery` is the owner-owned
+    /// recovery mode used by tests/canaries ("blocked", "waiting", or "ready").
+    let run
+        (toolModule: obj)
+        (sessions: obj)
+        (args: obj)
+        (context: obj)
+        (recovery: string)
+        : Task<string> =
+        let factory = ToolHostCodec.factory toolModule
+        let scopeHandle = createScope sessions (rawString context "workspaceDirectory")
+        let scope = scopeOf scopeHandle
+
+        if not (String.IsNullOrWhiteSpace recovery) then
+            attachRecovery scope recovery
+
+        let spec = ExecutorTool.runSpec factory scope
+        let hostArgs = HostToolArguments args
+        let hostContext = ToolHostCodec.decodeContext context
+        spec.Execute hostArgs hostContext

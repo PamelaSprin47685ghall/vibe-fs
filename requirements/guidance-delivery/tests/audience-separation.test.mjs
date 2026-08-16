@@ -11,10 +11,7 @@ import test from 'node:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  enforcer,
-  enforcerCatalogResource,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const RULEBOOK = join(ROOT, 'resources/enforcer')
@@ -26,7 +23,7 @@ const tipNames = () =>
     .sort()
 
 test('WHAT[GD-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
-  const composed = enforcerCatalogResource.composeBloggerSystemPrompt('base', enforcer.rules)
+  const composed = enforcer.composeBloggerSystemPrompt('base', 'en')
 
   // `## What To Do Now` is the main.md-only remediation section (0/120
   // enforcer.md contain it). The Blogger system must never see it.

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { assertJsData, assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
 
 const fission = await import('../../../dist/Execution/Fission/Surface.js')
 const fissionHost = await import('../../../dist/OpenCode/Host/FissionHostSurface.js')
@@ -42,9 +43,19 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input', async () => {
   const { events, runtime } = harness()
+  assertOpaque(runtime, 'Fission admission runtime')
   const owner = 'old-caller'
   const result = await fission.admit(runtime, owner, parsed())
+  assertJsData(result, 'Fission admission result')
   assert.equal(result.ok, true, JSON.stringify(result))
+
+  assert.deepEqual(result.lanes, [
+    { index: 0, prompt: ' lane A  ' },
+    { index: 1, prompt: 'lane B' },
+  ])
+  assert.equal('ownerSessionId' in result, false)
+  assert.equal('parentSessionId' in result, false)
+  assert.equal('sessionId' in result.lanes[0], false)
 
   const creates = events.filter(([kind]) => kind === 'create')
   assert.deepEqual(
@@ -147,9 +158,12 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] observeLaneTurn and OrdinaryTurnWo
 
   try {
     const observed = await fissionHost.observeReplacedOwner(owner)
-    assert.equal(observed.handled, true, 'Fission owner turn must be handled/absorbed by FissionHost')
-    assert.equal(observed.continuationSent, false, 'observe must not send continuations for retired Fission owner')
-    assert.equal(observed.terminalNotified, false, 'observe must not publish terminal for retired Fission owner')
+    assertJsData(observed, 'Fission host observation')
+    assert.deepEqual(observed, {
+      handled: true,
+      continuationSent: false,
+      terminalNotified: false,
+    })
   } finally {
     fission.clearOwner(owner)
   }

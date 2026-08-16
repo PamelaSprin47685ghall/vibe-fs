@@ -148,10 +148,10 @@ type ToolRuntimeScope
 
     let resumableAgentId (record: HandleRecord) =
         match record.Ownership, HandleId.tryAgent record.Handle with
-        | Fact.HandleOwnership.HostOwnedHidden, _ ->
+        | HandleOwnership.HostOwnedHidden, _ ->
             Error "host-owned hidden child is not resumable by the user session"
-        | Fact.HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
-        | Fact.HandleOwnership.DurableParentHandle, Some handleId -> Ok(AgentHandleId.value handleId)
+        | HandleOwnership.DurableParentHandle, None -> Error "non-agent durable handle is not resumable"
+        | HandleOwnership.DurableParentHandle, Some handleId -> Ok(AgentHandleId.value handleId)
 
     let adoptExistingIntoRuntime (parentSessionId: SessionId) (record: HandleRecord) agentId =
         getOrCreateRuntime (SessionId.value parentSessionId)

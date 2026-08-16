@@ -4,7 +4,9 @@
 // Blogger parking / PendingOffer / physical flight ownership (convergence lifecycle).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bloggerRequestContext as ctx, parkedTransform } from '../../verification-system/tests/support/domain.mjs'
+import * as owner from '../../../dist/Context/Companion/RuntimeSurface.js'
+const ctx = owner
+const parkedTransform = owner
 
 const SHORT_LIFETIME_MS = 200
 const main = (toml = 'delta-1') => ctx.main({ toml })

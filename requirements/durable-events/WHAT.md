@@ -4,6 +4,23 @@
 来源：历史五层 persist 条款（PERSIST-001..010）、
 历史 change（storage）（§1–§48）、历史 COVERAGE persist 小节。
 
+## Semantic boundary（本包 JS contract）
+
+语义测试只观察 JS-native values；它们不导入 `domain.mjs`、Fable emitted internals 或测试侧
+interop facade。持久资源由 opaque capability 句柄承载，并必须显式 `dispose`：
+
+| owner surface | laws | production source | representation |
+|---|---|---|---|
+| `Persistence/EventStore/CodecSurface.js` | canonical bytes, decode-only compatibility, identity collision | `src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs` | plain event/result objects and strings |
+| `Persistence/EventStore/MergeSurface.js` | writer-stream k-way order and identity union | `src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs` | arrays of plain events/results |
+| `Persistence/EventStore/Surface.js` | local append/read/heads and resource lifecycle | `src/Wanxiangshu/Persistence/EventStore/Store.fs`, `ProcessEventLog.fs` | opaque `EventStoreHandle`; plain receipts/events |
+| `Persistence/Journal/CodecSurface.js`, `FactCodecSurface.js` | journal envelope/fact bytes and decode-only compatibility | `src/Wanxiangshu/Persistence/Journal/EventStoreJournalCodec.fs`, `FactCodec.fs` | plain envelope/fact descriptors and byte results |
+| `Persistence/Journal/Surface.js` | journal boot, append, payload resource and projection summary | `src/Wanxiangshu/Persistence/Journal/AgentJournal.fs`, `EventStoreJournalWriter.fs` | opaque `JournalHandle`; plain projection/receipt objects |
+
+The F# production internals may retain domain types; only these owner surfaces translate them at
+JS boundaries. A semantic law must name one owner, its source, representation, and proof anchor in
+`PROOF.md`; a monolithic test helper that imports multiple domain owners is not a contract surface.
+
 ## DURABLE-EVENTS-001 —— Event 是唯一 durable truth；append-only
 
 **规范陈述**：任何动态业务状态只以不可变 event 表达；修改 = append 新 event，删除 =

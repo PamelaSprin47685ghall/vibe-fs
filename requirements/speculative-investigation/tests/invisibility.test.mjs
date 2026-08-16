@@ -1,61 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
+import * as Strength from '../../../dist/Strength/Surface.js'
 
-import * as Intent from '../../../dist/Participant/Provider/Projection/Intent.js'
-import * as Renderer from '../../../dist/Participant/Provider/Projection/Renderer.js'
-import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
-import * as Frame from '../../../dist/Strength/Frame.js'
-import * as Id from '../../../dist/Foundation/Identity.js'
-import { toList } from '../../verification-system/tests/support/domain.mjs'
-
-const P = { ...Intent, ...Renderer }
 const H = (text) => `H(${text})`
-const resultOf = (value) => value.tag === 0
-  ? { ok: true, value: value.fields[0] }
-  : { ok: false, error: value.fields[0] }
-const session = (value) => Id.SessionIdModule_create(value)
-const run = (value) => Id.ProviderRunIdentityModule_create(value)
-const decision = (value) => Id.StrengthDecisionIdModule_create(value)
-const textPart = (text) => new Provider.WirePart(0, [text])
-const message = (role, parts) => ({ Role: role, Parts: toList(parts) })
-const snapshot = new P.ProjectionSnapshot(
-  { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: toList([]) },
-  undefined,
-  toList([]),
-  undefined,
-  undefined,
-)
-const bundle = resultOf(Frame.StrengthFrame_tryBuild(
-  H,
-  10000,
-  toList([{ RequestOrdinal: 1, Exchanges: toList([
-    { ToolName: 'read', CanonicalArguments: '{"filePath":"a"}', CanonicalResult: 'alpha' },
-  ]) }]),
-)).value
+const bundle = Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+const base = [
+  { role: 'user', parts: [{ kind: 'text', text: 'inspect the file' }] },
+  { role: 'assistant', parts: [{ kind: 'text', text: 'primary output' }] },
+]
+const snapshot = () => Projection.projectionSnapshot(Projection.semanticProjection(base), { committedPrefix: null, blogFrames: [], transportMessages: [], hostReanchor: null })
 
 test('WHAT[SPEC-INV-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
-  const base = toList([
-    message('user', [textPart('inspect the file')]),
-    message('assistant', [textPart('primary output')]),
-  ])
-  const candidate = P.ProjectionIntentModule_strengthCandidate(
-    session('owner'), decision('d1'), run('target-1'), run('target-1'), bundle,
-  )
-  const promoted = P.ProjectionIntentModule_strengthPromoted(
-    session('owner'), decision('d1'), run('target-1'), 1, false, bundle,
-  )
-
+  const candidate = Projection.strengthCandidate({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', currentProviderRun: 'target-1', bundle })
+  const promoted = Projection.strengthPromoted({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle })
   for (const intent of [candidate, promoted]) {
-    const rendered = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([intent]))
-    const wire = {
-      ProviderId: undefined,
-      ModelId: undefined,
-      Variant: undefined,
-      Tools: toList([]),
-      System: toList([]),
-      Messages: rendered.Messages,
-    }
-    const visible = `${Provider.renderWire(wire)}\n${Provider.renderSemantic(Provider.toSemantic(wire))}`
+    const rendered = Projection.renderMessagesWithHostIds(H, snapshot(), base, [intent])
+    const visible = `${Projection.renderWire(rendered.messages)}\n${Projection.renderSemantic(Projection.semanticProjection(rendered.messages))}`
     assert.doesNotMatch(visible, /prefetch|weak model|confidence|prediction|source=sidecar/i)
     assert.doesNotMatch(visible, /\breplica\b/i)
     assert.doesNotMatch(visible, /strength-replica|strengthreplica/i)

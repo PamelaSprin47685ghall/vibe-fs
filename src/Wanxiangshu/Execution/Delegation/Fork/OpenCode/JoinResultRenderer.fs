@@ -348,17 +348,6 @@ module JoinResultRenderer =
             renderAgentJoinItem lang resolveAgentName nameStub agentItem
         | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
 
-    let private renderCompletionItem
-        (lang: ProviderLanguage)
-        (isPtyRun: string -> bool)
-        (resolveAgentName: string -> string)
-        (resolveTerminalLabel: string -> string)
-        (completion: RunCompletion)
-        : string =
-        match JoinItem.ofRunCompletion (isPtyRun completion.RunId) completion with
-        | AgentItem agentItem -> renderAgentJoinItem lang resolveAgentName completion agentItem
-        | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
-
     /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).
     let renderJoinItemBatch
         (lang: ProviderLanguage)
@@ -368,18 +357,6 @@ module JoinResultRenderer =
         : string =
         NonEmptyBatch.toList batch
         |> List.map (renderJoinItem lang resolveAgentName resolveTerminalLabel)
-        |> joinBlocks
-
-    /// EXEC-004 / EXEC-018: compat surface for tests / ofRunCompletion path.
-    let renderCompletedBatch
-        (lang: ProviderLanguage)
-        (isPtyRun: string -> bool)
-        (resolveAgentName: string -> string)
-        (batch: NonEmptyBatch<RunCompletion>)
-        (resolveTerminalLabel: string -> string)
-        : string =
-        NonEmptyBatch.toList batch
-        |> List.map (renderCompletionItem lang isPtyRun resolveAgentName resolveTerminalLabel)
         |> joinBlocks
 
     let private orchestratorLine (lang: ProviderLanguage) (verdict: OrchestratorVerdict) : string =

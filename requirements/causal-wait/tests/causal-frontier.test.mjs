@@ -1,86 +1,76 @@
-// DSL-012 causal frontier algorithm (RED-5..RED-7 + empty snapshot).
-// Pure diagnostic explanation of the first unsatisfied consumer→producer edge.
+// CAUSAL-007 — pure frontier explanations over plain diagnostic descriptors.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { causalWait, listItems } from '../../verification-system/tests/support/domain.mjs'
 
-const flow = (id) => causalWait.owner('flow', [['id', id]])
+const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
+const flow = (id) => causal.owner('flow', { id })
 const waitWorkflow = (ownerId, producerOwnerId) =>
-  causalWait.create({
+  causal.createWait({
     waitKind: 'workflow',
     owner: flow(ownerId),
-    subject: [['producer', producerOwnerId]],
-    producer: causalWait.workflowProducer(flow(producerOwnerId)),
+    subject: { producer: producerOwnerId },
+    producer: causal.workflowProducer(flow(producerOwnerId)),
+    escapes: [causal.escape('processLifetime')],
     source: 'causal-frontier.test',
   })
-
 const waitExternal = (ownerId, externalId) =>
-  causalWait.create({
+  causal.createWait({
     waitKind: 'external',
     owner: flow(ownerId),
-    subject: [['producer', externalId]],
-    producer: causalWait.externalProducer('ext', [['id', externalId]]),
+    subject: { producer: externalId },
+    producer: causal.externalProducer('ext', { id: externalId }),
+    escapes: [causal.escape('processLifetime')],
     source: 'causal-frontier.test',
   })
 
-const viewFrontiers = (active) => {
-  const snapshot = causalWait.snapshotOf({ active, history: [], sequence: 1n })
-  return causalWait.frontiersOf(snapshot).map((frontier) => ({
-    kind: frontier.Kind.name,
-    chainKeys: listItems(frontier.Chain).map((node) => causalWait.ownerKey(node.Owner)),
-    cycleKeys: listItems(frontier.Cycle).map((owner) => causalWait.ownerKey(owner)),
-    producerKey:
-      frontier.FrontierProducer == null ? undefined : causalWait.producerKey(frontier.FrontierProducer),
-    detail: frontier.Detail,
-  }))
-}
-
 test('WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier', () => {
-  // A waits B; B waits External C  →  A → B → C
-  const frontiers = viewFrontiers([waitWorkflow('A', 'B'), waitExternal('B', 'C')])
+  const frontiers = causal.frontiers([waitWorkflow('A', 'B'), waitExternal('B', 'C')])
 
   assert.equal(frontiers.length, 1)
   assert.equal(frontiers[0].kind, 'ExternalProducerFrontier')
-  assert.deepEqual(frontiers[0].chainKeys, ['flow:id=A', 'flow:id=B'])
-  assert.equal(frontiers[0].producerKey, 'external:ext:id=C')
+  assert.deepEqual(
+    frontiers[0].chain.map((node) => causal.ownerKey(node.owner)),
+    ['flow:id=A', 'flow:id=B'],
+  )
+  assert.equal(causal.producerKey(frontiers[0].producer), 'external:ext:id=C')
   assert.match(frontiers[0].detail, /FRONTIER: waiting for external producer/)
 })
 
 test('WHAT[CAUSAL-007] RED_6_missing_producer_reports_broken_causal_edge', () => {
-  // A waits B; B has no active wait
-  const frontiers = viewFrontiers([waitWorkflow('A', 'B')])
+  const frontiers = causal.frontiers([waitWorkflow('A', 'B')])
 
   assert.equal(frontiers.length, 1)
   assert.equal(frontiers[0].kind, 'BrokenCausalEdge')
-  assert.deepEqual(frontiers[0].chainKeys, ['flow:id=A', 'flow:id=B'])
+  assert.deepEqual(
+    frontiers[0].chain.map((node) => causal.ownerKey(node.owner)),
+    ['flow:id=A', 'flow:id=B'],
+  )
   assert.match(frontiers[0].detail, /BROKEN CAUSAL EDGE/)
 })
 
 test('WHAT[CAUSAL-007] RED_7_cycle_reports_without_hanging', () => {
-  // A → B → C → A
-  const frontiers = viewFrontiers([
+  const frontiers = causal.frontiers([
     waitWorkflow('A', 'B'),
     waitWorkflow('B', 'C'),
     waitWorkflow('C', 'A'),
   ])
 
   assert.ok(frontiers.length >= 1)
-  assert.ok(frontiers.every((f) => f.kind === 'CausalWaitCycle'))
+  assert.ok(frontiers.every((frontier) => frontier.kind === 'CausalWaitCycle'))
   const cycle = frontiers[0]
   assert.match(cycle.detail, /CAUSAL WAIT CYCLE/)
-  assert.ok(cycle.cycleKeys.length >= 1, 'cycle list must be non-empty')
-  // Walk chain carries the full loop path; Cycle marks the re-entry.
+  assert.ok(cycle.cycle.length >= 1, 'cycle list must be non-empty')
   for (const key of ['flow:id=A', 'flow:id=B', 'flow:id=C']) {
-    assert.ok(cycle.chainKeys.includes(key), `chain should include ${key}`)
+    assert.ok(cycle.chain.some((node) => causal.ownerKey(node.owner) === key), `chain should include ${key}`)
   }
 })
 
 test('WHAT[CAUSAL-007] empty_snapshot_yields_empty_frontier', () => {
-  const frontiers = viewFrontiers([])
+  const frontiers = causal.frontiers([])
   assert.equal(frontiers.length, 1)
   assert.equal(frontiers[0].kind, 'Empty')
-  assert.deepEqual(frontiers[0].chainKeys, [])
+  assert.deepEqual(frontiers[0].chain, [])
   assert.match(frontiers[0].detail, /no active waits/)
 })

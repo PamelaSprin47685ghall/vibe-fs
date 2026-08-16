@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { promptResources } from '../../verification-system/tests/support/domain.mjs'
+import * as promptResources from '../../../dist/Resources/PromptSurface.js'
 import { ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')

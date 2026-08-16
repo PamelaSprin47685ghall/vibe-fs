@@ -22,22 +22,19 @@ import test from 'node:test'
 import {
   blobDigest,
   blobRef,
-  caseOf,
-  clockAt,
   completionKind,
-  envelope,
   fact,
   fold,
+  envelope,
   handleId,
   handleOwnership,
   handleProjection,
   isSome,
   journal,
-  payloadOf,
   roles,
   sessionId,
   stream,
-} from '../../verification-system/tests/support/domain.mjs'
+} from './support/managed-surface.mjs'
 
 const PARENT = sessionId('ses_p')
 const CHILD = sessionId('ses_c')

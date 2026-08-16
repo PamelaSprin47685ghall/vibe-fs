@@ -7,9 +7,33 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { xTrace, lifecycleWorkRecord, magicTodo } from '../../verification-system/tests/support/domain.mjs'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
+import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
 
-const opening = (assignment, requirements = []) => lifecycleWorkRecord.opening({ assignment, requirements })
+const xTrace = {
+  item: ({ sequence, role, part }) => workRecord.item(sequence, role, part),
+  text: workRecord.textPart,
+  reasoning: workRecord.reasoningPart,
+  toolCall: workRecord.toolCallPart,
+  toolResult: workRecord.toolResultPart,
+}
+const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
+const materialize = (
+  openingValue,
+  frames,
+  trace,
+  coverage,
+  openingEnd = { Sequence: 0 },
+  includeOpening = true,
+) =>
+  workRecord.materialize(
+    openingValue,
+    frames,
+    trace,
+    Number(coverage.Sequence),
+    Number(openingEnd.Sequence),
+    includeOpening,
+  )
 
 // 公共 fixture：trace 中 cursor 0 是 opening（Y 起点在 opening 之后，方案 4.1）
 const OPENING_END = { Sequence: 1 }
@@ -18,7 +42,7 @@ test('WHAT[WORK-RECORD-008] LWR_opening_prompt_is_byte_exact_and_appears_exactly
   const assignment = 'Rewrite the fallback controller.\nKeep it typed.'
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text(assignment) })]
 
-  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], trace, { Sequence: 1 }, OPENING_END)
+  const rendered = materialize(opening(assignment), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.equal(rendered.includes('Opening'), true)
   assert.equal(rendered.includes('Opening task'), false)
@@ -37,7 +61,7 @@ test('WHAT[WORK-RECORD-003] LWR_y_frames_cover_prefix_and_x_supplies_only_suffix
   ]
 
   // Y 已消化到 cursor 3：gap 只剩 [3, 4)
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['frame one'], trace, { Sequence: 3 }, OPENING_END)
+  const rendered = materialize(opening('task'), ['frame one'], trace, { Sequence: 3 }, OPENING_END)
 
   assert.match(rendered, /Chronicle\nframe one/)
   assert.match(rendered, /Recent work\nassistant: work c/)
@@ -56,7 +80,7 @@ test('WHAT[WORK-RECORD-003] LWR_no_y_frames_means_opening_plus_raw_gap_not_alter
 
   // Y 从未成功：coverage 在 origin(0)，但 gap 仍从 openingEnd 开始——同一物化
   // 算法，无「无 B 则整个 A」的旁路分支（EXEC-008、方案 4.4）
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
+  const rendered = materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
 
   assert.match(rendered, /Recent work\nassistant: work a/)
   assert.equal(rendered.includes('Chronicle'), false)
@@ -70,7 +94,7 @@ test('WHAT[WORK-RECORD-011] LWR_last_assistant_text_is_in_recent_work_not_a_clos
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
+  const rendered = materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.match(rendered, /Recent work\nassistant: Final summary with detail/)
   assert.equal(rendered.includes('Closing report'), false)
@@ -85,15 +109,15 @@ test('WHAT[WORK-RECORD-010] LWR_materialization_is_deterministic', () => {
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work') }),
   ]
 
-  const first = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
-  const second = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
+  const first = materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
+  const second = materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
   assert.equal(first, second)
 })
 
 test('WHAT[WORK-RECORD-011] LWR_empty_sections_are_omitted', () => {
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
+  const rendered = materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
   // gap 空、无 frames → 只有 Opening
   assert.equal(rendered.includes('Chronicle'), false)
   assert.equal(rendered.includes('Recent work'), false)
@@ -107,7 +131,7 @@ test('WHAT[WORK-RECORD-006] LWR_child_opening_excludes_parent_work_record_envelo
   const assignment = 'child task'
   const parentEnvelope = '# commissioner_record ...'
 
-  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], [], { Sequence: 0 }, OPENING_END)
+  const rendered = materialize(opening(assignment), [], [], { Sequence: 0 }, OPENING_END)
 
   assert.equal(rendered.includes(parentEnvelope), false)
   assert.equal(rendered.includes(assignment), true)
@@ -116,7 +140,7 @@ test('WHAT[WORK-RECORD-006] LWR_child_opening_excludes_parent_work_record_envelo
 test('WHAT[WORK-RECORD-008] LWR_reviewer_opening_preserves_authoritative_requirement_order', () => {
   const requirements = ['requirement one', 'requirement two', 'requirement three']
 
-  const rendered = lifecycleWorkRecord.materialize(opening('review task', requirements), [], [], { Sequence: 0 }, OPENING_END)
+  const rendered = materialize(opening('review task', requirements), [], [], { Sequence: 0 }, OPENING_END)
 
   const oneIndex = rendered.indexOf('1. requirement one')
   const twoIndex = rendered.indexOf('2. requirement two')
@@ -134,7 +158,7 @@ test('WHAT[WORK-RECORD-005] LWR_gap_starts_at_record_coverage_not_prefix_cutoff'
   ]
 
   // IngestedThrough 可落在 turn 中间（cursor 2）；gap 从 max(IngestedThrough, openingEnd)=2 起，不含 work a
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
+  const rendered = materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
   assert.match(rendered, /assistant: work b/)
   assert.equal(rendered.includes('work a'), false)
 })
@@ -149,7 +173,7 @@ test('WHAT[WORK-RECORD-014] LWR_gap_never_uses_prefix_cutoff', () => {
   // WORK-RECORD-014：LWR gap 只消费 RecordCoverage（XTrace 游标，可落 turn 中间），
   // 绝不取 PrefixCoverage（完整 Host turn 边界）定位。cursor 1 之后是完整 turn 边界，
   // 若误用 prefix 量纲 gap 会含 work a；实际 gap 从 cursor 2 起——RecordCoverage 独一量纲。
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
+  const rendered = materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
   assert.match(rendered, /assistant: work b/)
   assert.equal(rendered.includes('work a'), false)
 })
@@ -165,7 +189,7 @@ test('WHAT[WORK-RECORD-013] LWR_gap_excludes_raw_tool_call_and_result_but_keeps_
     xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.text('summarized outcome') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
+  const rendered = materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
 
   assert.match(rendered, /plan next step/)
   assert.match(rendered, /assistant: summarized outcome/)
@@ -185,7 +209,7 @@ test('WHAT[WORK-RECORD-013] LWR_recent_work_excludes_raw_tool_parts_and_keeps_la
     xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.reasoning('closing thought') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
+  const rendered = materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.match(rendered, /Recent work/)
   assert.match(rendered, /Final summary with detail/)
@@ -199,7 +223,7 @@ test('WHAT[WORK-RECORD-013] LWR_recent_work_excludes_raw_tool_parts_and_keeps_la
 
 test('WHAT[WORK-RECORD-007] LWR_parent_to_child_includes_opening', () => {
   // EXEC-006: parent → child background keeps Opening (includeOpening default true).
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('assigned task'),
     ['did work'],
     [],
@@ -216,7 +240,7 @@ test('WHAT[WORK-RECORD-007] LWR_parent_to_child_includes_opening', () => {
 
 test('WHAT[WORK-RECORD-007] LWR_child_to_parent_omits_opening', () => {
   // EXEC-006: child → parent join omits Opening — assigner already knows the task.
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('assigned task'),
     ['did work'],
     [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary') })],
@@ -241,8 +265,8 @@ test('WHAT[WORK-RECORD-001] LWR_same_record_projected_two_ways_shares_work_facts
   const frames = ['did work']
   const trace = [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary') })]
 
-  const withOpening = lifecycleWorkRecord.materialize(openingValue, frames, trace, { Sequence: 0 }, OPENING_END, true)
-  const withoutOpening = lifecycleWorkRecord.materialize(openingValue, frames, trace, { Sequence: 0 }, OPENING_END, false)
+  const withOpening = materialize(openingValue, frames, trace, { Sequence: 0 }, OPENING_END, true)
+  const withoutOpening = materialize(openingValue, frames, trace, { Sequence: 0 }, OPENING_END, false)
 
   // 两投影共享 Chronicle 与 Recent work —— 同一段 work 的官方说法只有一份
   assert.match(withOpening, /Chronicle\ndid work/)
@@ -260,9 +284,9 @@ test('WHAT[WORK-RECORD-009] LWR_t1_commitment_call_result_is_constitutive_openin
   // 不得当 incidental tool 滤入 Recent work（XTrace.forOpening 保留 raw）。
   const t1Call = xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.toolCall('todowrite', '{"planComplete":true}') })
   const t1Result = xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.toolResult('accepted') })
-  const openingWithT1 = lifecycleWorkRecord.withConstitutive(opening('charge'), [t1Call, t1Result])
+  const openingWithT1 = workRecord.withConstitutive(opening('charge'), [t1Call, t1Result])
 
-  const rendered = lifecycleWorkRecord.materialize(openingWithT1, [], [], { Sequence: 0 }, OPENING_END)
+  const rendered = materialize(openingWithT1, [], [], { Sequence: 0 }, OPENING_END)
 
   // T1 call/result 保留在 Opening（constitutive body），不因 forWorkRecord 被滤除
   assert.equal(rendered.includes('[tool call] todowrite'), true)
@@ -275,15 +299,15 @@ test('WHAT[WORK-RECORD-015] LWR_work_record_start_is_structural_floor_not_stage'
   // TODO-001 / GLORY-006：WorkRecordStart = OpeningBoundary = Opening exclusive end，
   // 由 XTrace Opening cursor 纯推导（结构性 floor），不是 Stage fact，不读 WorkActivated。
   // opening cursor 0 → floor 1（exclusive）。
-  assert.equal(magicTodo.workRecordStart(0), 1)
+  assert.equal(todo.workRecordStart(0), 1)
 
   // Post-T1：floor = constitutive T1 call+result 之后的 exclusive 边界（结构性推导）
   const parts = [
     { sequence: 1, kind: 'tool_call', toolCallId: 't1' },
     { sequence: 2, kind: 'tool_result', toolCallId: 't1' },
   ]
-  assert.equal(magicTodo.effectiveOpeningFloor(true, true, 0, 1, 't1', 9, parts), 3)
+  assert.equal(todo.effectiveOpeningFloor(true, true, 0, 1, 't1', 9, parts), 3)
 
   // Pre-T1：Opening 未关闭，floor 是动态 XTrace head（仍结构性，非 Stage）
-  assert.equal(magicTodo.effectiveOpeningFloor(true, false, 0, null, null, 7, []), 7)
+  assert.equal(todo.effectiveOpeningFloor(true, false, 0, null, null, 7, []), 7)
 })

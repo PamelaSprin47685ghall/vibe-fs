@@ -1,49 +1,36 @@
-// Split from tests/unit/temporal/until-signal-or-deadline.test.mjs (cutover Wave 2a); owner: time-capability
-//
-// TIME-006 — deadline is a causal-wait optional escape: IDeadlineHandle as the
-// wait escape. Without material, the deadline verdict is WaitTimedOut; the
-// CausalAwait vocabulary assertions moved to causal-wait (CAUSAL-005).
+// TIME-006 — a deadline escape produces a plain timeout reason.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  causalAwait,
-  causalWait,
-  CausalWaitRegistry,
-  caseOf,
-  listItems,
-  timerPort,
-} from '../../verification-system/tests/support/domain.mjs'
 
-const owner = () => causalWait.owner('test-workflow', [['id', 'until-signal']])
+const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
+const process = await import('../../../dist/Process/Surface.js')
 
 const descriptor = () =>
-  causalWait.create({
+  causal.createWait({
     waitKind: 'until-signal-or-deadline',
-    owner: owner(),
-    subject: [['name', 'coverage']],
-    producer: causalWait.externalProducer('journal', [['rev', 'n']]),
-    escapes: [causalWait.escape.openEndedExternal()],
+    owner: causal.owner('test-workflow', { id: 'until-signal' }),
+    subject: { name: 'coverage' },
+    producer: causal.externalProducer('journal', { rev: 'n' }),
+    escapes: [causal.escape('openEndedExternal')],
     source: 'until-signal-or-deadline.test',
   })
 
-const activeCount = (registry) => listItems(registry.Snapshot().Active).length
-
 test('WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut', async () => {
-  const registry = new CausalWaitRegistry()
-  const { rawPort, advance } = timerPort.createVirtual()
-  const handle = rawPort.Delay(100)
-  const pending = causalAwait.untilSignalOrDeadline(
+  const registry = causal.createRegistry()
+  const timer = process.createVirtualTimer()
+  const handle = process.timerDelay(timer, 100)
+  const pending = causal.untilSignalOrDeadline(
     registry,
     descriptor(),
     handle,
     () => null,
     () => new Promise(() => {}),
   )
-  await new Promise((r) => setImmediate(r))
-  advance(100)
-  const result = await pending
-  assert.equal(caseOf(result), 'Error')
-  assert.equal(caseOf(result.fields[0]), 'WaitTimedOut')
-  assert.equal(activeCount(registry), 0)
+
+  await new Promise((resolve) => setImmediate(resolve))
+  process.timerAdvance(timer, 100)
+  assert.deepEqual(await pending, { ok: false, reason: 'WaitTimedOut' })
+  assert.equal(causal.snapshot(registry).active.length, 0)
+  process.timerDispose(timer)
 })

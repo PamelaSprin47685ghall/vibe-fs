@@ -8,7 +8,8 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { distillationRuntime } from '../../verification-system/tests/support/domain.mjs'
+
+const { distillSpool } = await import('../../../dist/OpenCode/Tools/DistillationSurface.js')
 
 test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
@@ -17,15 +18,18 @@ test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => 
   writeFileSync(spoolPath, Buffer.from('chunk-body-for-summarize'))
 
   const forked = []
-  const { runtime, cancelled } = distillationRuntime.fake({
+  const cancelled = []
+  const runtime = {
     fork: (agentId) => {
       forked.push(agentId)
-      return distillationRuntime.forkOk(agentId)
+      return { ok: true, agentId }
     },
-     join: () => distillationRuntime.notFound(),
-  })
+    awaitAgent: () => ({ ok: false, kind: 'not-found', error: 'join-not-found' }),
+    awaitRecoveryReadiness: () => undefined,
+    cancel: (agentId) => cancelled.push(agentId),
+  }
 
-  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
+  const summary = await distillSpool(runtime, spoolPath, 'en')
   assert.ok(typeof summary === 'string', 'distillSpool returns partial text, not throw')
   assert.ok(forked.length >= 1, 'at least one map agent forked')
   assert.ok(

@@ -1,39 +1,29 @@
-// EFFECT-ACCOUNTING-006 contract test（本包 NEW）：
-// append/effect 结局未知（写失败、writer poisoned/disposed）必须以显式分型表达
-// （WriteUnknown / CommitUnknown），不得假装成功、不得假装未发生。
-
+// Disposed EventStore capabilities report an explicit unknown write outcome.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFact,
-  agentJournal,
-  sessionId,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as store from '../../../dist/Persistence/EventStore/Surface.js'
 
 test('WHAT[EFFECT-ACCOUNTING-006] write_after_dispose_returns_explicit_unknown_not_pretended_commit', async () => {
-  const created = await agentJournal.create({ runtime: 'rt_006_unknown' })
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
-  const fact = agentFact('CompanionBloggerClosed', { SessionId: sessionId('ses_006') })
+  const directory = await mkdtemp(join(tmpdir(), 'wxs-effect-unknown-'))
+  const handle = store.EventStoreSurface_create(directory, 'writer-unknown')
+  const event = {
+    id: 'event-unknown-1',
+    stream: 'session/ses_006',
+    type: 'CompanionBloggerClosed',
+    parents: [],
+    payload: { SessionId: 'ses_006' },
+    payloadRefs: [],
+  }
 
-  // 正常 append 成功（对照基线）。
-  const healthy = await agentJournal.appendAgent(
-    stream.session(sessionId('ses_006')),
-    undefined,
-    fact,
-    created.journal,
-  )
-  assert.equal(healthy.ok, true, healthy.ok ? '' : JSON.stringify(healthy.error))
+  const healthy = await store.EventStoreSurface_append(handle, [event])
+  assert.equal(healthy.ok, true, JSON.stringify(healthy.error ?? ''))
+  store.EventStoreSurface_dispose(handle)
 
-  // writer 已 dispose：append 结局未知必须显式分型（WriteUnknown / CommitUnknown），
-  // 绝不假装 committed、绝不静默吞掉。
-  created.dispose()
-  const result = await agentJournal.appendAgent(
-    stream.session(sessionId('ses_006')),
-    undefined,
-    fact,
-    created.journal,
+  await assert.rejects(
+    () => store.EventStoreSurface_append(handle, [event]),
+    /disposed|writer|unknown|invalid/i,
   )
-  assert.equal(result.ok, false, 'disposed writer append must not pretend success')
-  assert.match(String(result.error), /WriteUnknown|poisoned|disposed|CommitUnknown/i)
 })

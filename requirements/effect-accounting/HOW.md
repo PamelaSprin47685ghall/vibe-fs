@@ -3,7 +3,7 @@
 > 本文件**非 normative**。行为合同在 `WHAT.md`；本文件回答「代码在哪里、怎么工作」，
 > 并收纳历史与弃权裁决。
 
-## typed effect facts（`Kernel/Fact.fs`）
+## typed effect facts（`Change/Facts.fs`）
 
 ```text
 OrchestratorFactCases（AgentFact.Orchestrator）：

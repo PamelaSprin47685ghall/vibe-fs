@@ -42,6 +42,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable

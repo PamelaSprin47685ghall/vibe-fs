@@ -1,86 +1,100 @@
-// tests/unit/domain.meta.test.mjs — the facade's own contract.
+// VERIFY-008 owner-surface contract checks.
 //
-// VERIFY-008 states that mjs tests may only enter through the contract surface
-// and that Fable's output shape is confined to domain.mjs. That makes the
-// facade itself load-bearing: if it hands back a subtly wrong value, every
-// test built on it passes while describing an implementation that is broken.
-//
-// Three hazards below are not hypothetical. Each was observed while probing
-// the Fable output, and each fails SILENTLY — no exception, no type error,
-// just a wrong answer. They are locked here so a facade regression is loud.
+// This file is intentionally about compiled production contracts, not compiler
+// representation. Each assertion enters through the registered owner that owns
+// the fact: Process owns deadlines, Persistence/Journal owns the line codec,
+// Context owns context recovery folds, and Provider/Attempt/Fallback owns the
+// cursor projection. No Fable union, collection, or emitted-name helper crosses
+// this test boundary.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as domain from './support/domain.mjs'
 
-const {
-  utcOffset,
-  clockAt,
-  deadline,
-  toList,
-  listItems,
-  fold,
-  journal,
-  envelope,
-  stream,
-  fact,
-  agentFact,
-  asFact,
-  caseOf,
-  payloadOf,
-  cursor,
-  sessionId,
-  logicalRunId,
-  authorityRoot,
-  providerRun,
-  idValue,
-  agentFactCaseNames,
-  agentFactCaseOf,
-} = domain
+import * as deadline from '../../../dist/Process/DeadlineSurface.js'
+import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
+import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.js'
+import * as contextFold from '../../../dist/Context/Companion/FoldSurface.js'
+import * as fallback from '../../../dist/Participant/Provider/Attempt/Fallback/Surface.js'
 
-// ── hazard 1: DateTimeOffset without an offset ──────────────────────────────
-// Fable's compareDates branches on `"offset" in x`. A bare `new Date(iso)` has
-// no offset, so it takes the DateTime branch and adds the LOCAL timezone
-// offset. Under a non-UTC TZ every comparison shifts, and Deadline.isExpired
-// reports true for a deadline that has not passed.
+const SESSION = 'ses_meta'
 
-test('WHAT[VERIFICATION-SYSTEM-008] utcOffset produces a value carrying an explicit offset', () => {
-  const value = utcOffset('2026-01-01T00:00:00Z')
-  assert.ok('offset' in value, 'facade clock values must carry an offset property')
-  assert.equal(value.offset, 0, 'facade clock values must be UTC')
-  assert.equal(value.getTime(), Date.parse('2026-01-01T00:00:00Z'))
+const CLOSED = {
+  family: 'Companion',
+  case: 'CompanionBloggerClosed',
+  payload: { SessionId: SESSION },
+}
+
+const envelope = (overrides = {}) => ({
+  runtime: 'rt_meta',
+  seq: 1,
+  observedAt: '2026-03-04T05:06:07Z',
+  id: 'a'.repeat(40),
+  stream: { kind: 'Session', id: SESSION },
+  providerRun: null,
+  fact: CLOSED,
+  ...overrides,
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] a bare Date lacks the offset that F# comparison depends on', () => {
-  // Documents WHY utcOffset exists. If this ever starts passing, Fable changed
-  // its date representation and the facade's rationale must be re-checked.
-  assert.equal('offset' in new Date('2026-01-01T00:00:00Z'), false)
+const readEnvelope = (value) => ({
+  runtime: value.runtime,
+  seq: Number(value.seq),
+  event: value.id,
+  stream: value.stream,
+  providerRun: value.providerRun,
+  fact: value.fact,
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] deadline comparisons are correct through the facade clock', () => {
-  const dl = deadline.ofBudget('2026-01-01T00:00:00Z', 5000)
-
-  assert.equal(deadline.remainingMs(clockAt('2026-01-01T00:00:02Z'), dl), 3000)
-  assert.equal(deadline.isExpired(clockAt('2026-01-01T00:00:02Z'), dl), false)
-
-  assert.equal(deadline.remainingMs(clockAt('2026-01-01T00:00:05Z'), dl), 0)
-  assert.equal(deadline.isExpired(clockAt('2026-01-01T00:00:05Z'), dl), true)
-
-  assert.equal(deadline.isExpired(clockAt('2026-01-01T00:00:06Z'), dl), true)
+const contextReanchor = (overrides = {}) => ({
+  runtime: 'rt_context',
+  seq: 1,
+  observedAt: '2026-03-04T05:06:07Z',
+  id: 'context-event-1',
+  session: 'ses_context',
+  run: 'run_context',
+  fact: {
+    family: 'Context',
+    case: 'ContextReanchored',
+    payload: {
+      SessionId: 'ses_context',
+      PreviousEpochId: 0,
+      NextEpochId: 1,
+      ObservedCompactionRun: 'run_context',
+    },
+  },
+  ...overrides,
 })
 
-test('WHAT[VERIFICATION-SYSTEM-007] deadline verdict does not depend on the ambient timezone', () => {
-  // The naive-Date bug is invisible under TZ=UTC and wrong everywhere else.
-  // The facade must give the same answer regardless of process TZ.
+const runtimeStarted = (startedAt = '2026-01-01T00:00:00Z') => ({
+  family: 'Runtime',
+  case: 'RuntimeStarted',
+  payload: { RuntimeId: 'rt_meta', ProcessId: 42, StartedAt: startedAt },
+})
+
+// ── Process owner: deadline calculations carry instant semantics ────────────
+
+test('WHAT[VERIFICATION-SYSTEM-008] Process_deadline_uses_explicit_offset_semantics', () => {
+  const value = deadline.create('2026-01-01T00:00:00Z', 5000)
+
+  assert.equal(deadline.remainingMs('2026-01-01T00:00:02Z', value), 3000)
+  assert.equal(deadline.isExpired('2026-01-01T00:00:02Z', value), false)
+  assert.equal(deadline.remainingMs('2026-01-01T00:00:05Z', value), 0)
+  assert.equal(deadline.isExpired('2026-01-01T00:00:05Z', value), true)
+  assert.equal(deadline.isExpired('2026-01-01T00:00:06Z', value), true)
+
+  // Same instant expressed with a non-zero offset must produce the same answer.
+  assert.equal(deadline.remainingMs('2026-01-01T08:00:02+08:00', value), 3000)
+  assert.equal(deadline.isExpired('2026-01-01T08:00:02+08:00', value), false)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] Process_deadline_is_independent_of_ambient_timezone', () => {
   const original = process.env.TZ
-  const dl = deadline.ofBudget('2026-01-01T00:00:00Z', 5000)
-  const before = clockAt('2026-01-01T00:00:02Z')
+  const value = deadline.create('2026-01-01T00:00:00Z', 5000)
 
   try {
     for (const zone of ['UTC', 'Asia/Shanghai', 'America/Los_Angeles']) {
       process.env.TZ = zone
-      assert.equal(deadline.isExpired(before, dl), false, `isExpired must stay false under TZ=${zone}`)
-      assert.equal(deadline.remainingMs(before, dl), 3000, `remaining must stay 3000ms under TZ=${zone}`)
+      assert.equal(deadline.isExpired('2026-01-01T00:00:02Z', value), false, `expired under TZ=${zone}`)
+      assert.equal(deadline.remainingMs('2026-01-01T00:00:02Z', value), 3000, `remaining under TZ=${zone}`)
     }
   } finally {
     if (original === undefined) delete process.env.TZ
@@ -88,171 +102,56 @@ test('WHAT[VERIFICATION-SYSTEM-007] deadline verdict does not depend on the ambi
   }
 })
 
-// ── hazard 2: a JS array reports itself as an empty F# list ─────────────────
-// FSharpList__get_IsEmpty tests `xs.tail == null`. A JS array has no `tail`,
-// so List.fold immediately returns the initial state: the projection stays
-// empty and every assertion about it describes nothing at all.
+// ── Journal owner: canonical envelope and migration bytes ──────────────────
 
-test('WHAT[VERIFICATION-SYSTEM-008] a raw array folds to nothing, which is why toList exists', async () => {
-  const List = await import(`${domain.introspect.fableLibraryDir}/List.js`)
-  assert.equal(
-    List.fold((accumulator, item) => accumulator + item, 0, [1, 2, 3]),
-    0,
-    'a raw array must fold to the seed — documents the silent-empty hazard',
+test('WHAT[VERIFICATION-SYSTEM-008] Journal_codec_serializes_one_envelope_to_one_UTC_line', () => {
+  const line = journalCodec.serialize(envelope())
+  assert.equal(line.includes('\n'), false)
+  assert.equal(line.includes('\r'), false)
+  assert.equal(JSON.parse(line).ObservedAt, '2026-03-04T05:06:07.000+00:00')
+
+  const shifted = envelope({ observedAt: '2026-03-04T13:06:07+08:00' })
+  assert.equal(journalCodec.serialize(shifted), line)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] Journal_codec_round_trip_preserves_fold_relevant_fields', () => {
+  const original = envelope({ seq: 7, providerRun: 'run_meta' })
+  const encoded = journalCodec.encode([], [], original)
+  const decoded = journalCodec.decode(encoded)
+
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.deepEqual(readEnvelope(decoded.value), readEnvelope(original))
+  assert.equal(journalCodec.serialize(decoded.value), journalCodec.serialize(original))
+  assert.equal(encoded.eventType, journalCodec.JournalEnvelopeEventType)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] Journal_stream_owner_round_trips_all_public_stream_kinds', () => {
+  for (const stream of [
+    { kind: 'Workspace' },
+    { kind: 'Session', id: SESSION },
+    { kind: 'Child', id: 'child_meta' },
+    { kind: 'Process', id: 'process_meta' },
+  ]) {
+    const streamId = journalCodec.encodeStreamId(stream)
+    const decoded = journalCodec.decodeStreamId(streamId)
+    assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+    assert.deepEqual(decoded.value, stream)
+  }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] Journal_codec_refuses_unknown_facts_and_streams', () => {
+  assert.throws(
+    () => journalCodec.serialize(envelope({ stream: { kind: 'Unknown' } })),
+    /unknown stream/i,
   )
-  assert.equal(List.fold((accumulator, item) => accumulator + item, 0, toList([1, 2, 3])), 6)
+  assert.throws(
+    () => journalCodec.serialize(envelope({ fact: { family: 'Unknown', case: 'NoSuchFact', payload: {} } })),
+    /unknown fact/i,
+  )
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] toList round-trips through listItems', () => {
-  assert.deepEqual(listItems(toList([1, 2, 3])), [1, 2, 3])
-  assert.deepEqual(listItems(toList([])), [])
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] fold.apply converts arrays instead of silently folding nothing', () => {
-  const session = sessionId('ses_meta')
-  const accepted = envelope({
-    seq: 1,
-    stream: stream.session(session),
-    fact: fact('AuthorityRootAccepted', {
-      SessionId: session,
-      LogicalRunId: logicalRunId('run-meta'),
-      AuthorityRootUserMessageId: authorityRoot('msg_root'),
-      AuthorityKind: 'HumanRoot',
-      SelectedAgent: 'fast-coder',
-      PeerAgent: 'deep-coder',
-      CanonicalRole: 'coder',
-      SelectedTier: 'fast',
-    }),
-  })
-
-  const projection = fold.apply(fold.empty, [accepted])
-  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
-  assert.deepEqual(Object.keys(fold.sessions(projection.value)), ['ses_meta'])
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] fold.apply rejects a single envelope passed where a sequence was meant', () => {
-  const session = sessionId('ses_meta')
-  const single = envelope({
-    seq: 1,
-    stream: stream.session(session),
-    fact: fact('CompanionBloggerClosed', { SessionId: session }),
-  })
-
-  assert.throws(() => fold.apply(fold.empty, single), /envelope sequence/)
-})
-
-// ── hazard 3: union tag ordinals are positional ─────────────────────────────
-// Constructing a fact by ordinal silently builds a DIFFERENT fact when a case
-// is inserted earlier in the union. Resolving name → ordinal from cases()
-// converts that into a named failure.
-
-test('WHAT[VERIFICATION-SYSTEM-008] facts are built by case name, and an unknown name fails loudly', () => {
-  const session = sessionId('ses_meta')
-  const built = agentFact('FallbackCursorAdvanced', {
-    SessionId: session,
-    LogicalRunId: 'run-meta',
-    AuthorityRootUserMessageId: 'msg_root',
-    Reason: 'provider_error',
-    AssistantMessageId: 'msg_a1',
-    ProviderAttempt: '1',
-  })
-
-  // DSL-003: the dispatch case is the family; the business case is one payload in.
-  assert.equal(caseOf(built), 'Fallback')
-  assert.equal(agentFactCaseOf(built), 'FallbackCursorAdvanced')
-  assert.throws(() => agentFact('FallbackCursorAdvancedTypo', {}), /no AgentFact family has case/)
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] asFact wraps an AgentFact as the top-level Agent case', () => {
-  const session = sessionId('ses_meta')
-  const wrapped = asFact(agentFact('CompanionBloggerClosed', { SessionId: session }))
-
-  assert.equal(caseOf(wrapped), 'Agent')
-  assert.equal(agentFactCaseOf(payloadOf(wrapped)), 'CompanionBloggerClosed')
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] caseOf refuses a non-union value instead of returning undefined', () => {
-  assert.throws(() => caseOf({ tag: 0 }), /expects an F# union/)
-  assert.equal(caseOf(undefined), undefined)
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] stream cases resolve by name', () => {
-  assert.equal(caseOf(stream.workspace()), 'Workspace')
-  assert.equal(caseOf(stream.session(sessionId('ses_meta'))), 'Session')
-})
-
-// ── the persisted shape is the contract surface ─────────────────────────────
-
-test('WHAT[VERIFICATION-SYSTEM-008] an envelope survives NDJSON round trip and still folds', () => {
-  const session = sessionId('ses_rt')
-
-  // FALLBACK-001: the cursor is created by the Authority Root, so an advance with
-  // no root is rejected. The round trip therefore needs both envelopes.
-  const root = envelope({
-    seq: 6,
-    observedAt: '2026-03-04T05:06:06Z',
-    stream: stream.session(session),
-    fact: fact('AuthorityRootAccepted', {
-      SessionId: session,
-      LogicalRunId: logicalRunId('run-rt'),
-      AuthorityRootUserMessageId: authorityRoot('msg_root'),
-      AuthorityKind: 'HumanRoot',
-      SelectedAgent: 'fast-coder',
-      PeerAgent: 'deep-coder',
-      CanonicalRole: 'coder',
-      SelectedTier: 'fast',
-    }),
-  })
-
-  const advanced = envelope({
-    seq: 7,
-    observedAt: '2026-03-04T05:06:07Z',
-    stream: stream.session(session),
-    run: 'msg_a1',
-    fact: fact('FallbackCursorAdvanced', {
-      SessionId: session,
-      LogicalRunId: logicalRunId('run-rt'),
-      AuthorityRootUserMessageId: authorityRoot('msg_root'),
-      ProviderRun: providerRun('msg_a1'),
-      PreviousOffset: 0,
-      NextOffset: 1,
-      ConsecutiveFailureCount: 1,
-      Reason: 'provider_error',
-    }),
-  })
-
-  const line = journal.serialize(advanced)
-  assert.equal(line.includes('\n'), false, 'one envelope must serialise to one NDJSON line')
-
-  const decoded = journal.deserialize(line)
-  assert.equal(decoded.ok, true, decoded.ok ? '' : String(decoded.error))
-  // DSL-003: Fact → Agent dispatch → family dispatch → payload.
-  assert.equal(idValue.session(payloadOf(payloadOf(payloadOf(decoded.value.Fact))).SessionId), 'ses_rt')
-  assert.equal(idValue.localSeq(decoded.value.LocalSeq), 7n)
-
-  const projection = fold.replay([root, advanced])
-  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
-
-  const sessions = fold.sessions(projection.value)
-  assert.deepEqual(Object.keys(sessions), ['ses_rt'])
-
-  // FALLBACK-007: the advance is validated, not absorbed — offset and count both
-  // move, and asserting the whole cursor means a dropped field cannot pass.
-  assert.deepEqual(cursor.read(sessions.ses_rt.Fallback.Cursor), { offset: 1, failures: 1 })
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] journal.deserialize reports a decode failure as data, not an exception', () => {
-  const result = journal.deserialize('{"not":"an envelope"}')
-  assert.equal(result.ok, false)
-  assert.equal(typeof result.error, 'string')
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] pre-0.5.0 journals are refused rather than guessed (PERSIST-005)', () => {
-  // The markers are the pre-0.5.0 projection fields that a modulo-4 cursor
-  // migration would have to invent values for. Asserting the whole set means
-  // dropping one is a failure here rather than a silent acceptance of an old
-  // journal at startup.
-  const legacyMarkers = [
+test('WHAT[VERIFICATION-SYSTEM-008] Fact_codec_reports_migration_markers_as_data_errors', () => {
+  const markers = [
     'FailuresOnCurrentSide',
     'IsDead',
     'TotalFailures',
@@ -262,116 +161,85 @@ test('WHAT[VERIFICATION-SYSTEM-008] pre-0.5.0 journals are refused rather than g
     'EffectiveProviderID',
   ]
 
-  for (const marker of legacyMarkers) {
-    const line = `{"Fact":["Agent",["FallbackCursorAdvanced",{"${marker}":1}]]}`
-    assert.equal(journal.containsLegacyFallbackFields(line), true, `'${marker}' must be refused`)
-
-    const result = journal.deserialize(line)
-    assert.equal(result.ok, false, `'${marker}' must not decode`)
-    assert.equal(result.error, journal.pre050MigrationMessage)
-
-    const factResult = journal.deserializeFact(line)
-    assert.equal(factResult.ok, false)
-    assert.equal(factResult.error, journal.pre050MigrationMessage)
+  for (const marker of markers) {
+    const line = JSON.stringify({ Fact: ['Agent', ['FallbackCursorAdvanced', { [marker]: 1 }]] })
+    assert.equal(factCodec.containsLegacyFallbackFields(line), true, `${marker} must be refused`)
+    const decoded = factCodec.decode(line)
+    assert.equal(decoded.ok, false)
+    assert.equal(decoded.error, factCodec.pre050MigrationMessage)
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] a current-schema journal line is not mistaken for a legacy one', () => {
-  const session = sessionId('ses_current')
-  const line = journal.serialize(
-    envelope({
-      seq: 1,
-      stream: stream.session(session),
-      run: 'msg_a1',
-      fact: fact('FallbackCursorAdvanced', {
-        SessionId: session,
-        LogicalRunId: logicalRunId('run-current'),
-        AuthorityRootUserMessageId: authorityRoot('msg_root'),
-        ProviderRun: providerRun('msg_a1'),
-        PreviousOffset: 0,
-        NextOffset: 1,
-        ConsecutiveFailureCount: 1,
-        Reason: 'provider_error',
+test('WHAT[VERIFICATION-SYSTEM-008] Fact_codec_distinguishes_current_and_malformed_lines', () => {
+  assert.equal(factCodec.containsLegacyFallbackFields(journalCodec.serialize(envelope())), false)
+
+  const current = factCodec.decode(factCodec.encode(runtimeStarted()))
+  assert.equal(current.ok, true, current.ok ? '' : current.error)
+  assert.equal(current.case, 'RuntimeStarted')
+
+  const malformed = factCodec.decode('{not json')
+  assert.equal(malformed.ok, false)
+  assert.equal(typeof malformed.error, 'string')
+})
+
+// ── Context owner: plain arrays cross the fold boundary ─────────────────────
+
+test('WHAT[VERIFICATION-SYSTEM-008] Context_fold_accepts_plain_envelopes_and_replays_the_line_codec', () => {
+  const folded = contextFold.fold([contextReanchor()])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  assert.equal(Number(folded.value.sessions.ses_context.PrefixEpoch.EpochId), 1)
+
+  const replayed = contextFold.replay([contextReanchor()])
+  assert.equal(replayed.ok, true, replayed.ok ? '' : JSON.stringify(replayed.error))
+  assert.deepEqual(replayed.value.sessions, folded.value.sessions)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] Context_fold_rejects_unknown_fact_cases_loudly', () => {
+  assert.throws(
+    () => contextFold.fold([
+      contextReanchor({
+        fact: { family: 'Context', case: 'NoSuchContextFact', payload: {} },
       }),
-    }),
+    ]),
+    /unknown context fact/i,
   )
-
-  assert.equal(journal.containsLegacyFallbackFields(line), false)
-  assert.equal(journal.deserialize(line).ok, true)
 })
 
-// ── pure domain values reachable without any Host mock ──────────────────────
+// ── Fallback owner: cursor projection is a named semantic result ────────────
 
-test('WHAT[VERIFICATION-SYSTEM-008] fallback cursor exposes offsets as case names, not ordinals', () => {
-  assert.deepEqual([0, 1, 2, 3].map(cursor.side), ['SideA', 'SideA', 'SideB', 'SideB'])
-  assert.deepEqual(cursor.sideSequence(6), ['SideA', 'SideA', 'SideB', 'SideB', 'SideA', 'SideA'])
+test('WHAT[VERIFICATION-SYSTEM-008] Fallback_owner_exposes_cursor_and_dedupe_state', () => {
+  assert.deepEqual(fallback.ownerFailure(), {
+    offset: 1,
+    failures: 1,
+    dedupeKeys: 1,
+    exhausted: false,
+  })
+  assert.deepEqual(fallback.counterfactualBloggerFailure(), {
+    offset: 2,
+    failures: 2,
+    dedupeKeys: 2,
+    exhausted: false,
+  })
+  assert.deepEqual(fallback.recordSuccess(), {
+    offset: 1,
+    failures: 0,
+    dedupeKeys: 0,
+    exhausted: false,
+  })
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] cursor.effectiveAgent accepts a plain object as the F# record', () => {
-  const pair = { SelectedAgent: 'fast-coder', PeerAgent: 'deep-coder' }
-  const agentAt = (offset) => cursor.effectiveAgent(pair, cursor.atOffset(offset))
-
-  assert.deepEqual([0, 1, 2, 3].map(agentAt), ['fast-coder', 'fast-coder', 'deep-coder', 'deep-coder'])
-})
-
-// ── the facade must stay wired to a real build ──────────────────────────────
-
-test('WHAT[VERIFICATION-SYSTEM-008] the facade resolves exactly one versioned fable-library directory', () => {
-  assert.match(domain.introspect.fableLibraryDir, /fable-library-js\.\d+\.\d+\.\d+$/)
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] the AgentFact union is non-empty, so case resolution is meaningful', () => {
-  const names = agentFactCaseNames()
-  assert.ok(names.length > 0)
-  assert.equal(new Set(names).size, names.length, 'case names must be unique')
-})
-
-// ── hazard 4: Fable escapes a reserved emitted name with `$` ─────────────────
-//
-// `ReviewChallenge.Text` used to emit as `Text$`, so reading `.Text` off the
-// module gave `undefined`. Nothing threw: the facade exported
-// `reviewChallenge.text === undefined`, and a test asserting the challenge
-// sentence would have compared undefined to undefined and passed.
-//
-// `member()` now tries the `$` spelling too. This sweep is what found it and is
-// what keeps the next one from shipping — it needs no knowledge of which members
-// exist, so a newly bound member is covered the moment it is added.
-
-test('WHAT[VERIFICATION-SYSTEM-008] no facade member is undefined', () => {
-  const undefinedMembers = []
-
-  for (const [name, value] of Object.entries(domain)) {
-    if (value === undefined) {
-      undefinedMembers.push(name)
-      continue
-    }
-
-    // Namespace objects only. A function's own properties are not contract
-    // surface, and `introspect` is the facade describing itself.
-    const isNamespace = value !== null && typeof value === 'object' && !Array.isArray(value)
-    if (!isNamespace) continue
-
-    for (const [key, member] of Object.entries(value)) {
-      if (member === undefined) undefinedMembers.push(`${name}.${key}`)
-    }
+// The explicit export checks are compiled-surface checks, not Fable export
+// discovery. They keep this contract file loud when an owner surface is
+// renamed or omitted from the published artifact.
+test('WHAT[VERIFICATION-SYSTEM-008] registered_owner_surfaces_publish_their_contract_entries', () => {
+  for (const [name, value] of Object.entries({
+    'Process.Deadline.create': deadline.create,
+    'Process.Deadline.remainingMs': deadline.remainingMs,
+    'Journal.Codec.serialize': journalCodec.serialize,
+    'Journal.FactCodec.decode': factCodec.decode,
+    'Context.Fold.fold': contextFold.fold,
+    'Fallback.ownerFailure': fallback.ownerFailure,
+  })) {
+    assert.equal(typeof value, 'function', `${name} must be callable`)
   }
-
-  assert.deepEqual(
-    undefinedMembers,
-    [],
-    'an undefined facade member reads as undefined in every test that uses it, and comparing undefined to undefined passes',
-  )
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] member resolution prefers a real export over the escaped spelling', () => {
-  // The `$` spellings are tried LAST. If they were tried first, a module
-  // exporting both `foo` and `foo$` — Fable does this when a value and a type
-  // share a name — would bind the wrong one.
-  assert.equal(domain.reviewChallenge.textVersion, 1)
-  assert.equal(domain.reviewChallenge.path, 'review/challenge')
-  assert.match(domain.reviewChallenge.text, /^Nope, let's re-evaluate: /)
-
-  // Digest is derived from the ARCH-010 Prompt bytes, not from the bare sentence.
-  const digest = idValue.sealDigest(domain.reviewChallenge.contentDigest((input) => `H(${input})`))
-  assert.equal(digest, `H(# ${domain.reviewChallenge.text}\n)`)
 })

@@ -67,7 +67,7 @@ type HostForkRuntime
         /// GLORY-002 / SURFACE-006: ownership of every handle this runtime forks.
         /// The hidden Finality workflow passes `HostOwnedHidden` so its Reviewer
         /// never enters the Manager's list/join/guard or parent recovery.
-        ?ownership: Fact.HandleOwnership,
+        ?ownership: HandleOwnership,
         /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
         ?clock: IClockPort
     ) as this =
@@ -134,7 +134,7 @@ type HostForkRuntime
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
-    let handleOwnership = defaultArg ownership Fact.HandleOwnership.DurableParentHandle
+    let handleOwnership = defaultArg ownership HandleOwnership.DurableParentHandle
 
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId journal directoryOf

@@ -17,6 +17,7 @@ const checks = [
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
+  join(root, 'checks/js-surface-manifest.mjs'),
   join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/tool-referential-integrity.mjs'),

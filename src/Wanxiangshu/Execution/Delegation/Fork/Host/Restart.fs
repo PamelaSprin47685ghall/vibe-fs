@@ -611,8 +611,8 @@ module HostForkRestart =
                 |> Option.map (
                     List.filter (fun record ->
                         match record.Ownership with
-                        | Fact.HandleOwnership.DurableParentHandle -> true
-                        | Fact.HandleOwnership.HostOwnedHidden -> false)
+                        | HandleOwnership.DurableParentHandle -> true
+                        | HandleOwnership.HostOwnedHidden -> false)
                 )
                 |> Option.defaultValue []
 

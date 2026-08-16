@@ -1,19 +1,8 @@
-// Split from tests/unit/plugin/tool-host-codec-full.test.mjs (cutover Wave 2a);
-// owner: output-distillation.
-//
-// DISTILL-012 (确定性留尾截断 / ToolResultBound): the register path is the one
-// dynamic JS boundary where a tool definition's execute result crosses to the
-// Host. The registered execute is uncurried (args, context) and its result
-// passes ToolResultBound — bounded, not the raw 60k string.
-
+// Tool-host truncation semantics through the owner surface.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const {
-  ToolHostCodec_factory: makeFactory,
-  ToolHostCodec_register: register,
-  ToolSpec,
-} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
+const { registerBounded } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
 test('WHAT[DISTILL-012] CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result', async () => {
   const registrations = []
@@ -21,10 +10,13 @@ test('WHAT[DISTILL-012] CODEC_register_applies_tool_with_uncurried_execute_and_b
     registrations.push(definition)
     return { registered: definition.description, execute: definition.execute }
   }
-  const factory = makeFactory({ tool: fakeTool })
 
-  const spec = new ToolSpec('demo', 'a demo tool', [], async (_args, _ctx) => 'x'.repeat(60000))
-  const registered = register(factory, spec)
+  const registered = registerBounded(
+    { tool: fakeTool },
+    'demo',
+    'a demo tool',
+    () => Promise.resolve('x'.repeat(60000)),
+  )
 
   assert.equal(registrations.length, 1)
   assert.equal(registrations[0].description, 'a demo tool')

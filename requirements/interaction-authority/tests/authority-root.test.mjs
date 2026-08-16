@@ -1,88 +1,45 @@
-// INTERACTION-AUTHORITY package proof — Root 半边。
-//
-// PhysicalUserMessage ≠ AuthorityTurn；只有 typed provenance 能创建 LogicalRun；
-// Root 独占权；同一 occasion 不得重复获得 authority 型资源（禁自激励）。
-//
-// 运行：node --test requirements/interaction-authority/tests/authority-root.test.mjs
+// INTERACTION-AUTHORITY package proof — root provenance and run reset.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  authority,
-  authorityRun,
-  bloggerRequestId,
-  caseOf,
-  continuationKind,
-  idValue,
-  isAdmissionShaped,
-  mapCount,
-  mapTryFind,
-  physicalUser,
-  promoteToAuthorityRoot,
-  promptKey,
-  promptOrigin,
-  providerRun,
-  rootKind,
-  runtimeId,
-  sessionId,
-  transportReceipt,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
-// Visible stand-in for sha256：被测属性是哪些字段进 digest，不是 digest 函数本身。
-const H = (input) => `H(${input})`
-
-const RUNTIME = runtimeId('rt_1')
-const SESSION = sessionId('ses_a')
-const PHYSICAL = physicalUser('msg_u1')
-
-const rootFor = (agent = 'fast-coder', physical = PHYSICAL, kind = rootKind.human) =>
-  authorityRun.createAuthorityRoot(H, RUNTIME, SESSION, kind, physical, agent)
-
-const profileOf = (...args) => {
-  const built = rootFor(...args)
-  assert.equal(built.ok, true, built.ok ? '' : `createAuthorityRoot rejected: ${built.error}`)
-  return built.value
+const hash = (value) => `H(${value})`
+const rootFor = (agent = 'fast-coder', physical = 'msg_u1', kind = 'HumanRoot') => {
+  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, agent)
+  assert.equal(result.ok, true, result.error)
+  return result.value
 }
 
-/** 整个 profile 转成可比较纯文本，字段改名即失败。 */
-const readProfile = (profile) => ({
-  session: idValue.session(profile.SessionId),
-  logicalRun: idValue.logicalRun(profile.LogicalRunId),
-  authorityRoot: idValue.authorityRoot(profile.AuthorityRootUserMessageId),
-  authorityKind: caseOf(profile.AuthorityKind),
-  selectedAgent: profile.SelectedAgent,
-  peerAgent: profile.PeerAgent,
-  canonicalRole: authority.roleLabel(profile.CanonicalRole),
-  selectedTier: authority.tierLabel(profile.SelectedTier),
+const profile = (value) => ({
+  session: value.session,
+  logicalRun: value.logicalRun,
+  authorityRoot: value.authorityRoot,
+  authorityKind: value.authorityKind,
+  selectedAgent: value.selectedAgent,
+  peerAgent: value.peerAgent,
+  canonicalRole: value.canonicalRole,
+  selectedTier: value.selectedTier,
 })
 
-// ── INTERACTION-AUTHORITY-001/002：PhysicalUserMessage ≠ AuthorityTurn ──────
+const register = (root) => authority.registerAuthority(root, authority.empty)
+const continuation = (key, root, kind = 'ManagerGuard', agent = 'fast-coder', payload = 'payload') =>
+  authority.claimContinuation(key, 'ses_a', kind, root, agent, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-001] IA_001_authority_root_id_is_reachable_only_by_promoting_a_physical_message', () => {
-  // promoteToAuthorityRoot 是唯一 crossing；profile 只记录提升后的 root。
-  assert.equal(idValue.authorityRoot(promoteToAuthorityRoot(PHYSICAL)), 'msg_u1')
-  assert.equal(readProfile(profileOf()).authorityRoot, 'msg_u1')
-})
-
-test('WHAT[INTERACTION-AUTHORITY-001] IA_001_promote_is_the_only_crossing_no_receipt_function', () => {
-  // facade 暴露生产代码的全部 crossing：只有 promoteToAuthorityRoot 能把物理
-  // 消息变成 authority root；缺 promoteReceipt 本身就是 001 边界断言——没有
-  // 从 TransportReceipt 到 AuthorityRootUserMessageId 的函数。
-  assert.equal(typeof promoteToAuthorityRoot, 'function')
-  assert.equal(Object.keys({ ...authorityRun }).includes('promoteReceipt'), false)
+// INTERACTION-AUTHORITY-001: only an explicit physical-message promotion crosses into authority.
+test('WHAT[INTERACTION-AUTHORITY-001] IA_001_physical_message_promotes_to_authority_root', () => {
+  assert.equal(authority.promotePhysical('msg_u1'), 'msg_u1')
+  assert.equal(rootFor().authorityRoot, 'msg_u1')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-002] IA_002_transport_receipt_shape_is_not_authority_evidence', () => {
-  // `accepted-*` 是 transport 收据形态（dispatch 事实），但形态不是 authority
-  // 身份证据：正文形态分析永远不能替代 provenance 判定。
-  assert.equal(isAdmissionShaped(transportReceipt('accepted-1a2b')), true)
-  assert.equal(isAdmissionShaped(transportReceipt('msg_real')), false)
+  assert.equal(authority.transportReceiptShape('accepted-1a2b'), true)
+  assert.equal(authority.transportReceiptShape('msg_real'), false)
 })
 
-// ── INTERACTION-AUTHORITY-003：Root 独占权 ──────────────────────────────────
-
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_fixes_profile_and_derives_peer_role_tier_from_selected_agent_alone', () => {
-  assert.deepEqual(readProfile(profileOf('fast-coder')), {
+// INTERACTION-AUTHORITY-003: the root fixes the complete immutable profile.
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_derives_peer_role_and_tier_from_selected_agent', () => {
+  assert.deepEqual(profile(rootFor('fast-coder')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
@@ -90,11 +47,9 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_fixes_profile_and_derives_peer
     selectedAgent: 'fast-coder',
     peerAgent: 'deep-coder',
     canonicalRole: 'coder',
-    selectedTier: 'Fast',
+    selectedTier: 'fast',
   })
-
-  // 对称：选 deep 则 fast 成为 peer，role 不变（AGENT-010：role 不跟 tier 走）。
-  assert.deepEqual(readProfile(profileOf('deep-coder')), {
+  assert.deepEqual(profile(rootFor('deep-coder')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
@@ -102,196 +57,110 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_fixes_profile_and_derives_peer
     selectedAgent: 'deep-coder',
     peerAgent: 'fast-coder',
     canonicalRole: 'coder',
-    selectedTier: 'Deep',
+    selectedTier: 'deep',
   })
 })
 
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_replaces_the_profile_and_clears_everything_run_scoped', () => {
-  const first = profileOf('fast-coder')
-  let projection = authorityRun.registerAuthority(first, authority.empty)
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_clears_run_scoped_state', () => {
+  const first = rootFor()
+  let state = register(first)
+  const claim = continuation('pk_1', first)
+  state = authority.registerClaim(claim, state)
+  state = authority.acceptClaim('pk_1', 'msg_c1', state)
+  assert.equal(state.claimSequences.length, 1)
+  assert.equal(state.acceptedContinuations.length, 1)
 
-  // 塞满 run-scoped 状态，使重置可观察而非空洞。
-  const key = promptKey('pk_1')
-  const claim = authorityRun.claimContinuation(
-    key,
-    SESSION,
-    continuationKind.of('ManagerGuard'),
-    first,
-    'fast-coder',
-    'pd-guard',
-  )
-  projection = authorityRun.registerClaim(claim, projection)
-  projection = authorityRun.acceptClaim(key, physicalUser('msg_c1'), projection)
-  assert.deepEqual(
-    {
-      sequences: mapCount(projection.ClaimSequences),
-      acceptedContinuations: mapCount(projection.AcceptedContinuationIds),
-    },
-    { sequences: 1, acceptedContinuations: 1 },
-  )
-
-  const second = profileOf('deep-reviewer', physicalUser('msg_u2'))
-  const after = authorityRun.registerAuthority(second, projection)
-
-  assert.deepEqual(readProfile(after.ActiveLogicalRun), readProfile(second))
-  assert.deepEqual(readProfile(after.LastAuthorityProfile), readProfile(second))
-  assert.deepEqual(
-    {
-      pending: mapCount(after.PendingClaims),
-      sequences: mapCount(after.ClaimSequences),
-      acceptedContinuations: mapCount(after.AcceptedContinuationIds),
-    },
-    { pending: 0, sequences: 0, acceptedContinuations: 0 },
-    'PROMPT-002：新 root 重置 continuation、repair 预算与 claim 序列',
-  )
+  const second = rootFor('deep-reviewer', 'msg_u2')
+  const after = authority.registerAuthority(second, state)
+  assert.deepEqual(profile(after.activeLogicalRun), profile(second))
+  assert.deepEqual(profile(after.lastAuthorityProfile), profile(second))
+  assert.equal(after.pendingClaims.length, 0)
+  assert.equal(after.claimSequences.length, 0)
+  assert.equal(after.acceptedContinuations.length, 0)
 })
 
-// ── INTERACTION-AUTHORITY-006：HumanRoot 必须显式 managed agent ─────────────
-
-test('WHAT[INTERACTION-AUTHORITY-006] IA_006_bare_legacy_names_are_refused_with_typed_rejection', () => {
-  // 裸 role 名没有 tier，无法确定 peer；准入会让 fallback pair 悬空。typed 拒绝让
-  // 调用方可按原因分支，不解析散文。精确 legacy 名单 = 迁移 ratchet（HOW）。
-  for (const bare of ['coder', 'manager', 'reviewer', 'orchestrator']) {
-    const built = rootFor(bare)
-    assert.equal(built.ok, false, `'${bare}' must not produce a profile`)
+// INTERACTION-AUTHORITY-006: unqualified/legacy names fail closed with typed reasons.
+test('WHAT[INTERACTION-AUTHORITY-006] IA_006_bare_and_unknown_agent_names_are_refused', () => {
+  for (const name of ['coder', 'manager', 'reviewer']) {
+    const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', name)
+    assert.equal(result.ok, false)
   }
-  assert.equal(caseOf(authority.parseAgentName('coder').error), 'LegacyAgentName')
-  assert.equal(caseOf(authority.parseAgentName('nonsense').error), 'Malformed')
-  assert.equal(caseOf(authority.parseAgentName('unknown-role').error), 'UnknownManagedAgent')
+  assert.equal(authority.parseAgentName('coder').error.kind, 'LegacyAgentName')
+  assert.equal(authority.parseAgentName('nonsense').error.kind, 'Malformed')
+  assert.equal(authority.parseAgentName('unknown-role').error.kind, 'UnknownManagedAgent')
 })
 
-test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claims_reject_bare_legacy_names_too', () => {
-  const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_b'), SESSION, 'pd', 'manager')
+test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claim_rejects_legacy_name', () => {
+  const claim = authority.claimAgentOwnerRoot('pk_b', 'ses_a', 'pd', 'manager')
   assert.equal(claim.ok, false)
+  assert.match(claim.error, /legacy|managed|fast-\*|deep-\*/i)
 })
 
-// ── INTERACTION-AUTHORITY-010：禁自激励 / repair 预算 ────────────────────────
+// INTERACTION-AUTHORITY-010: repair identity is durable and bounded by its occasion.
+test('WHAT[INTERACTION-AUTHORITY-010] IA_010_terminal_repair_identity_is_exactly_once', () => {
+  const root = rootFor()
+  let state = register(root)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run_term', 'empty', state), false)
 
-test('WHAT[INTERACTION-AUTHORITY-010] IA_010_one_terminal_provider_run_earns_exactly_one_repair', () => {
-  const root = profileOf()
-  const terminal = providerRun('run_term')
-  const request = bloggerRequestId('req-empty')
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-
-  const alreadyClaimed = () =>
-    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, terminal, 'empty', projection)
-
-  assert.equal(alreadyClaimed(), false)
-
-  const repair = authorityRun.claimContinuation(
-    promptKey('pk_rep'),
-    SESSION,
-    continuationKind.of('InteractionRepair'),
+  const repair = authority.claimContinuation(
+    'pk_rep',
+    'ses_a',
+    'InteractionRepair',
     root,
     'fast-coder',
-    authority.repairPayloadDigest(request, terminal, 'empty'),
+    authority.repairPayloadDigest('req-empty', 'run_term', 'empty'),
   )
-  projection = authorityRun.registerClaim(repair, projection)
-  assert.equal(alreadyClaimed(), true, '预算由 ClaimSequences 派生，跨 restart 存活')
+  state = authority.registerClaim(repair, state)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run_term', 'empty', state), true)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run-other', 'empty', state), false)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run_term', 'xml-only', state), false)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-next', 'run_term', 'empty', state), false)
 
-  // 不同 terminal 是不同 occasion；同一 terminal 不同 repair kind 也是。
-  assert.equal(
-    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, providerRun('run_other'), 'empty', projection),
-    false,
-  )
-  assert.equal(authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, terminal, 'xml_only', projection), false)
-
-  // A different Blogger request on the same long-lived LogicalRun owns a fresh
-  // protocol-repair occasion even when terminal/kind happen to match.
-  assert.equal(
-    authority.repairAlreadyClaimed(
-      SESSION,
-      root.LogicalRunId,
-      bloggerRequestId('req-next'),
-      terminal,
-      'empty',
-      projection,
-    ),
-    false,
-  )
-
-  // abandon 后不得再 claim 同一 occasion：repair 不会因此获得第二次预算。
-  projection = authorityRun.abandonClaim(promptKey('pk_rep'), projection)
-  assert.equal(alreadyClaimed(), true)
+  state = authority.abandonClaim('pk_rep', state)
+  assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run_term', 'empty', state), true)
 })
 
-// ── INTERACTION-AUTHORITY-003 边界：AgentOwnerRoot claim 尚无 run ───────────
-
-test('WHAT[INTERACTION-AUTHORITY-016] IA_003_agent_owner_root_claim_has_no_run_until_physical_acceptance', () => {
-  const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_owner'), SESSION, 'pd-owner', 'fast-manager')
-  assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
-
+test('WHAT[INTERACTION-AUTHORITY-016] IA_016_agent_owner_root_has_no_run_before_physical_acceptance', () => {
+  const claim = authority.claimAgentOwnerRoot('pk_owner', 'ses_a', 'pd-owner', 'fast-manager')
+  assert.equal(claim.ok, true, claim.error)
   assert.deepEqual(
     {
-      origin: caseOf(claim.value.Origin),
-      label: authority.originLabel(claim.value.Origin),
-      hasRun: claim.value.LogicalRunId !== undefined,
-      hasRoot: claim.value.AuthorityRootUserMessageId !== undefined,
-      effectiveAgent: claim.value.EffectiveAgent,
+      origin: claim.value.origin,
+      label: claim.value.originLabel,
+      hasRun: claim.value.logicalRun !== null,
+      hasRoot: claim.value.authorityRoot !== null,
+      effectiveAgent: claim.value.effectiveAgent,
     },
     { origin: 'AuthorityRoot', label: 'AgentOwnerRoot', hasRun: false, hasRoot: false, effectiveAgent: 'fast-manager' },
   )
 
-  // 接受后 root 不进入 continuation 映射（INTERACTION-AUTHORITY-016）。
-  let projection = authorityRun.registerClaim(claim.value, authority.empty)
-  const physical = physicalUser('msg_owner')
-  projection = authorityRun.acceptClaim(promptKey('pk_owner'), physical, projection)
-  assert.deepEqual(
-    {
-      pending: mapCount(projection.PendingClaims),
-      acceptedContinuations: mapCount(projection.AcceptedContinuationIds),
-    },
-    { pending: 0, acceptedContinuations: 0 },
-  )
-  assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, false, projection), 'UnknownOrigin')
+  let state = authority.registerClaim(claim.value, authority.empty)
+  state = authority.acceptClaim('pk_owner', 'msg_owner', state)
+  assert.equal(state.pendingClaims.length, 0)
+  assert.equal(state.acceptedContinuations.length, 0)
+  assert.equal(authority.resolveKnownOrigin('msg_owner', '', false, state), 'UnknownOrigin')
 })
 
-// ── INTERACTION-AUTHORITY：root 建立 run 的身份派生（stableLogicalRunId）─────
-
-test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_stable_logical_run_id_is_a_function_of_runtime_session_and_root', () => {
-  // Split from tests/unit/prompt/authority.test.mjs (cutover Wave 2a): LogicalRunId
-  // 是 runtime + session + authority root 的确定函数；任一输入变化必须产生新 id，
-  // 否则两个不同 run 会共享一个身份。
-  const id = (rt, ses, root) =>
-    idValue.logicalRun(
-      authority.stableLogicalRunId(H, runtimeId(rt), sessionId(ses), promoteToAuthorityRoot(physicalUser(root))),
-    )
-
-  assert.equal(id('rt_1', 'ses_a', 'msg_u1'), 'H(rt_1\nses_a\nmsg_u1)')
-  assert.equal(id('rt_1', 'ses_a', 'msg_u1'), id('rt_1', 'ses_a', 'msg_u1'))
-
+test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_logical_run_id_is_stable_and_input_sensitive', () => {
+  const id = (runtime, session, physical) => authority.stableLogicalRunId(hash, runtime, session, physical)
   const base = id('rt_1', 'ses_a', 'msg_u1')
+  assert.equal(base, 'H(rt_1\nses_a\nmsg_u1)')
+  assert.equal(id('rt_1', 'ses_a', 'msg_u1'), base)
   assert.notEqual(id('rt_2', 'ses_a', 'msg_u1'), base)
   assert.notEqual(id('rt_1', 'ses_b', 'msg_u1'), base)
   assert.notEqual(id('rt_1', 'ses_a', 'msg_u2'), base)
 })
 
-// ── INTERACTION-AUTHORITY-016：continuation 用 promptOrigin 构造可解析 ──────
-
-test('WHAT[INTERACTION-AUTHORITY-012] IA_005_needhelp_kinds_are_continuations_not_roots', () => {
-  for (const name of ['NeedHelpEscalation', 'NeedHelpAdvice']) {
-    const origin = promptOrigin.continuation(continuationKind.of(name))
-    assert.equal(caseOf(origin), 'Continuation')
-    assert.equal(authority.originLabel(origin), name)
+test('WHAT[INTERACTION-AUTHORITY-012] IA_005_needhelp_kinds_are_continuations', () => {
+  for (const kind of ['NeedHelpEscalation', 'NeedHelpAdvice']) {
+    assert.deepEqual(authority.originForContinuation(kind), { kind: 'Continuation', label: kind })
   }
-  assert.equal(authority.tryParseContinuationKind('HumanRoot'), undefined)
+  assert.equal(authority.tryParseContinuationKind('HumanRoot'), null)
 })
 
-// ── INTERACTION-AUTHORITY-017：root 必须能成为 continuation 的延续来源 ──────
-
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_becomes_the_continuation_source_for_later_defaults', () => {
-  const root = profileOf('fast-coder')
-  const before = authorityRun.registerAuthority(root, authority.empty)
-
-  const claim = authorityRun.claimContinuation(
-    promptKey('pk_c'),
-    SESSION,
-    continuationKind.of('BusyAgentNudge'),
-    root,
-    'deep-coder',
-    'pd-n',
-  )
-  const after = authorityRun.registerClaim(claim, before)
-  assert.deepEqual(readProfile(after.ActiveLogicalRun), readProfile(root))
-  assert.deepEqual(readProfile(after.LastAuthorityProfile), readProfile(root))
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_remains_the_source_for_continuations', () => {
+  const root = rootFor()
+  const state = authority.registerClaim(continuation('pk_c', root, 'BusyAgentNudge', 'deep-coder', 'pd-n'), register(root))
+  assert.deepEqual(profile(state.activeLogicalRun), profile(root))
+  assert.deepEqual(profile(state.lastAuthorityProfile), profile(root))
 })

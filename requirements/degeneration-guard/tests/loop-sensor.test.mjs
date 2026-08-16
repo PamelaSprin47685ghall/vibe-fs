@@ -13,22 +13,25 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  agentJournal,
-  cursor,
-  fallbackController,
-  fallbackProjection,
-  fold,
-  loopEventCodec,
-  loopSensor,
-  physicalUser,
-  promptDispatcher,
-  PromptDispatcherModule,
-  runtimeNudge,
-  sessionId,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as fallback from '../../../dist/Participant/Provider/Attempt/Fallback/HandleSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
+import * as loopSensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
+import * as providerLanguage from '../../../dist/Participant/Provider/LanguageSurface.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const resourceLines = (semanticPath) =>
+  providerLanguage.readText('English', semanticPath)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trimEnd()
+    .split('\n')
+const runtimeNudge = {
+  loopContinueInstructions: resourceLines('runtime/loop-continue'),
+  loopContinue: providerLanguage.readText('English', 'runtime/loop-continue'),
+  providerRetry: providerLanguage.readText('English', 'runtime/provider-retry'),
+}
 // Enough repeated text to drive weighted-distinct tokens below the calibrated midpoint.
 const loopText = (character = 'x') => character.repeat(4000)
 
@@ -44,7 +47,7 @@ const rawDelta = (session, field, text) => ({
 })
 
 test('WHAT[DG-008] LOOP_001_kill_arm_is_process_local_not_persisted', () => {
-  // Facade construct takes only {owned, abort} — no journal / store / path.
+  // Owner construct takes only {owned, abort} — no journal / store / path.
   // Two independent sensors share nothing; TryArm is local HashSet state.
   const first = loopSensor.create({ owned: ['ses_a'], abort: () => {} })
   const second = loopSensor.create({ owned: ['ses_a'], abort: () => {} })
@@ -71,7 +74,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
 
   // Non-text fields never decode → Observe is a pure no-op (no arm, no abort).
   for (const field of ['reasoning', 'model_thought', 'thinking']) {
-    assert.equal(loopEventCodec.tryDecodeTextDelta(rawDelta('ses_text', field, loopText('r'))), undefined)
+    assert.equal(loopDetector.tryDecodeTextDelta(rawDelta('ses_text', field, loopText('r'))), null)
     loopSensor.observe(sensor, rawDelta('ses_text', field, loopText('r')))
   }
   await wait(8)
@@ -79,7 +82,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
   assert.equal(loopSensor.isArmed(sensor, 'ses_text'), false)
 
   // field=text is the only accepted stream; low diversity arms + aborts.
-  assert.deepEqual(loopEventCodec.tryDecodeTextDelta(rawDelta('ses_text', 'text', 'abcd')), {
+  assert.deepEqual(loopDetector.tryDecodeTextDelta(rawDelta('ses_text', 'text', 'abcd')), {
     sessionId: 'ses_text',
     messageId: 'msg_a',
     partId: 'prt_1',
@@ -131,8 +134,8 @@ test('WHAT[DG-002] LOOP_007_reasoning_deltas_are_ignored', async () => {
 
   // Reasoning never reaches the detector (codec fail-closed).
   assert.equal(
-    loopEventCodec.tryDecodeTextDelta(rawDelta('ses_owned', 'reasoning', loopText('q'))),
-    undefined,
+    loopDetector.tryDecodeTextDelta(rawDelta('ses_owned', 'reasoning', loopText('q'))),
+    null,
   )
   loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
   await wait(8)
@@ -241,7 +244,13 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
   //   isArmed → ClearArmed → FallbackController.recordConfirmedFailure("loop-kill")
   // The sensor only arms; the controller is the single cursor writer.
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-bridge-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_loop' })
+  const created = await journal.JournalSurface_bootWithWriterId(
+    directory,
+    'writer-loop-bridge',
+    'rt_loop',
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
   assert.equal(created.ok, true, created.ok ? '' : created.error)
 
   const sensor = loopSensor.create({
@@ -250,16 +259,10 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
   })
 
   try {
-    const journal = created.journal
+    const handle = created.journal
     const SESSION = 'ses_bridge'
-    const runtime = PromptDispatcherModule.forJournal(journal)
-    const accepted = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
-      runtime,
-      sessionId(SESSION),
-      physicalUser('msg_u1'),
-      'fast-coder',
-    )
-    assert.equal(accepted.name, 'Ok', `AcceptHumanRoot failed: ${accepted.toJSON()[1]}`)
+    const accepted = await dispatch.acceptHumanRoot(handle, SESSION, 'msg_u1', 'fast-coder')
+    assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
     // Arm as the sensor would after detecting LOOP.
     assert.equal(loopSensor.tryArm(sensor, SESSION), true)
@@ -270,35 +273,32 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
     loopSensor.clearArmed(sensor, SESSION)
     assert.equal(loopSensor.isArmed(sensor, SESSION), false)
 
-    const first = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const first = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'msg_asst_1',
       'loop-kill',
     )
     assert.deepEqual(first, { ok: true, outcome: 'Advanced' })
 
-    const snapshot = promptDispatcher.journalSnapshot(journal)
-    const state = fallbackProjection.read(fold.session(snapshot, SESSION).Fallback)
+    const state = fallback.snapshot(handle, SESSION)
     assert.deepEqual(
       { offset: state.offset, failures: state.failures, exhausted: state.exhausted },
       { offset: 1, failures: 1, exhausted: false },
     )
 
     // Same provider run observed twice (idle + retry race) advances once.
-    const second = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const second = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'msg_asst_1',
       'loop-kill',
     )
     assert.deepEqual(second, { ok: true, outcome: 'AlreadyRecorded' })
 
-    const again = fallbackProjection.read(
-      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
-    )
+    const again = fallback.snapshot(handle, SESSION)
     assert.deepEqual(
       { offset: again.offset, failures: again.failures },
       { offset: 1, failures: 1 },
@@ -309,7 +309,7 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
     // in production; the sensor's clear above is what makes a later unarmed abort inert.
     assert.equal(loopSensor.isArmed(sensor, SESSION), false)
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -319,67 +319,61 @@ test('WHAT[DG-012] LOOP_008_loop_kill_advances_cursor_only_via_fallback_controll
   // FallbackController (FALLBACK-003). Same ProviderRun is deduped once.
   // (Reuses the bridge shape already proven by LOOP_006_armed_abort_bridges_….)
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-008-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_loop_008' })
+  const created = await journal.JournalSurface_bootWithWriterId(
+    directory,
+    'writer-loop-008',
+    'rt_loop_008',
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
   assert.equal(created.ok, true, created.ok ? '' : created.error)
 
   // Sensor has no journal handle — it cannot be a second Offset writer.
   const sensor = loopSensor.create({ owned: ['ses_008'], abort: () => {} })
 
   try {
-    const journal = created.journal
+    const handle = created.journal
     const SESSION = 'ses_008'
-    const runtime = PromptDispatcherModule.forJournal(journal)
-    const accepted = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
-      runtime,
-      sessionId(SESSION),
-      physicalUser('msg_u008'),
-      'fast-coder',
-    )
-    assert.equal(accepted.name, 'Ok', `AcceptHumanRoot failed: ${accepted.toJSON()[1]}`)
+    const accepted = await dispatch.acceptHumanRoot(handle, SESSION, 'msg_u008', 'fast-coder')
+    assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
     assert.equal(loopSensor.tryArm(sensor, SESSION), true)
     loopSensor.clearArmed(sensor, SESSION)
 
-    const before = fallbackProjection.read(
-      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
-    )
+    const before = fallback.snapshot(handle, SESSION)
     assert.equal(before.offset, 0)
 
-    const first = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const first = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'msg_asst_008',
       'loop-kill',
     )
     assert.deepEqual(first, { ok: true, outcome: 'Advanced' })
 
-    const mid = fallbackProjection.read(
-      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
-    )
+    const mid = fallback.snapshot(handle, SESSION)
     assert.deepEqual(
       { offset: mid.offset, failures: mid.failures },
       { offset: 1, failures: 1 },
     )
 
-    const second = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const second = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'msg_asst_008',
       'loop-kill',
     )
     assert.deepEqual(second, { ok: true, outcome: 'AlreadyRecorded' })
 
-    const after = fallbackProjection.read(
-      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
-    )
+    const after = fallback.snapshot(handle, SESSION)
     assert.deepEqual(
       { offset: after.offset, failures: after.failures },
       { offset: 1, failures: 1 },
     )
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -389,24 +383,25 @@ test('WHAT[DG-009] LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_
   // controller returns Exhausted and writes FallbackExhausted; a 13th
   // confirmed failure on the same run stays AlreadyRecorded (nothing written).
   const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-exhaust-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_loop_ex' })
+  const created = await journal.JournalSurface_bootWithWriterId(
+    directory,
+    'writer-loop-exhaust',
+    'rt_loop_ex',
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
   assert.equal(created.ok, true, created.ok ? '' : created.error)
-  const journal = created.journal
+  const handle = created.journal
   const SESSION = 'ses_exhaust'
 
   try {
-    const runtime = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
-      promptDispatcher.forJournal(journal),
-      sessionId(SESSION),
-      physicalUser('msg_u1'),
-      'fast-coder',
-    )
-    assert.equal(runtime.name, 'Ok')
+    const accepted = await dispatch.acceptHumanRoot(handle, SESSION, 'msg_u1', 'fast-coder')
+    assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
     for (let i = 1; i <= 11; i += 1) {
-      const advanced = await fallbackController.recordConfirmedFailure(
-        journal,
-        cursor.defaultBudget,
+      const advanced = await fallback.recordConfirmedFailure(
+        handle,
+        fallback.defaultAutoRecoveryBudget,
         SESSION,
         `run-${i}`,
         'loop-kill',
@@ -414,31 +409,29 @@ test('WHAT[DG-009] LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_
       assert.deepEqual(advanced, { ok: true, outcome: 'Advanced' }, `attempt ${i} must advance`)
     }
 
-    const twelfth = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const twelfth = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'run-12',
       'loop-kill',
     )
     assert.deepEqual(twelfth, { ok: true, outcome: 'Exhausted' })
 
-    const exhaustedState = fallbackProjection.read(
-      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
-    )
+    const exhaustedState = fallback.snapshot(handle, SESSION)
     assert.equal(exhaustedState.failures, 12, 'twelve confirmed failures recorded')
     assert.equal(exhaustedState.exhausted, true, 'FallbackExhausted folded')
 
-    const thirteenth = await fallbackController.recordConfirmedFailure(
-      journal,
-      cursor.defaultBudget,
+    const thirteenth = await fallback.recordConfirmedFailure(
+      handle,
+      fallback.defaultAutoRecoveryBudget,
       SESSION,
       'run-13',
       'loop-kill',
     )
     assert.deepEqual(thirteenth, { ok: true, outcome: 'AlreadyRecorded' }, 'post-exhaustion is a no-op')
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
     rmSync(directory, { recursive: true, force: true })
   }
 })

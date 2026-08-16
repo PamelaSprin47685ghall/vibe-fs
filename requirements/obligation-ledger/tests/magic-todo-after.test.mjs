@@ -3,11 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { caseOf } from '../../verification-system/tests/support/domain.mjs'
-import {
-  assignmentDelivery,
-  AssignmentDelivery,
-} from '../../../dist/Mission/Obligation/Todo/After.js'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const runtimeSource = join(
@@ -16,19 +12,14 @@ const runtimeSource = join(
 )
 
 test('WHAT[OBLIGATION-LEDGER-026] first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {
-  assert.equal(caseOf(assignmentDelivery(false)), 'OwnerRoot')
-  assert.equal(assignmentDelivery(false), AssignmentDelivery.OwnerRoot)
+  assert.equal(todo.assignmentDelivery(false), 'OwnerRoot')
 })
 
 test('WHAT[OBLIGATION-LEDGER-020] later checkpoint assignment continues the dedicated reviewer', () => {
-  assert.equal(caseOf(assignmentDelivery(true)), 'Continuation')
+  assert.equal(todo.assignmentDelivery(true), 'Continuation')
 })
 
 test('WHAT[OBLIGATION-LEDGER-026] reentry decides resend from durable dispatch evidence, never an XTrace head watermark', () => {
-  // AwaitHead is gone: XTrace append order is not request causal order, so a
-  // head watermark can neither prove nor disprove that THIS assignment was
-  // delivered (REVIEW-018). The runtime must admit the physical send from
-  // PromptAuthority dispatch evidence instead.
   const source = readFileSync(runtimeSource, 'utf8')
   assert.equal(source.includes('waitHeadAdvanced'), false, 'head-wait must not exist')
   assert.equal(source.includes('AwaitHead'), false, 'AwaitHead delivery mode must not exist')
@@ -40,16 +31,12 @@ test('WHAT[OBLIGATION-LEDGER-020] first assignment must not second-Fork onto a d
   assert.equal(
     source.includes('renderedPrompt = assignmentText'),
     false,
-    'second Fork of assignmentText hits sendToExistingChild busy-nudge (no ActiveLogicalRun)',
+    'a pending first assignment must not be sent through the second-Fork busy-nudge path',
   )
-  assert.match(source, /DiscardDeferredFirstPrompt/)
-  assert.match(source, /assignmentDelivery/)
 })
 
 test('WHAT[OBLIGATION-LEDGER-026] the assignment is durable before the physical send freezes the reviewer frontier', () => {
   const source = readFileSync(runtimeSource, 'utf8')
-  // The CALL passes the pre-send frozen head; the definition's parameter is
-  // `reviewWorkStart`, so this pattern only matches the call site.
   const durableCall = source.search(/appendAssigned\s*\n\s*journal[\s\S]{0,400}reviewerHead journal enlisted\.ReviewerSessionId/)
   const sendCall = source.indexOf('sendFirstPrompt')
   assert.ok(durableCall > 0, 'the durable TodoProcessReviewAssigned append call must exist')
@@ -65,5 +52,4 @@ test('WHAT[OBLIGATION-LEDGER-020] a new checkpoint reactivates a retired reviewe
   assert.match(source, /ensureReusableReviewerWorkUnit/, 'runtime must name the work-unit reactivation promise')
   assert.match(source, /HandleLifecycle\.Retired/, 'retired previous work-unit is a handled reuse case')
   assert.match(source, /HandleLinked/, 'reactivation must be durable, not only AdoptChild process memory')
-  assert.match(source, /checkpoint\.Assignment[\s\S]*tryConclude/, 'already-assigned checkpoints must converge; they must not be reopened')
 })

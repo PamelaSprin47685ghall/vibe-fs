@@ -4,6 +4,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Composition.Durable.Fact
 
 /// Restart-safe Main tip Full/Identity delivery history (Rulebook §14–16).

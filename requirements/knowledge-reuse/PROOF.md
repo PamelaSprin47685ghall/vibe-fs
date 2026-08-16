@@ -3,7 +3,19 @@
 > 每条 WHAT 命题恰好一行落点。类型：`MOVE`（物理移入本包）/ `REUSE`（留在原处，记录锚点与 cutover 计划）。
 > 单跑：`WANXIANGSHU_PROVIDER_LANGUAGE=en node --test requirements/knowledge-reuse/tests/<file>`。全套：`node requirements/verification-system/tests/run.mjs`。
 
-## 落点表
+## Semantic surface evidence
+
+`casebook-surface.test.mjs` is the registered `CasebookSurface` contract: observations, cases,
+events, normalized output, replay classification, LRU results, and exactly-once result envelopes
+cross as plain JavaScript data. `casebook-store.test.mjs` exercises the same surface with the real
+unified EventStore capability; it does not construct F# unions or inspect Current internals.
+`casebook-index.test.mjs`, `bookkeeper-{mechanical,session,synthesis}.test.mjs`,
+`lifecycle-wiring.test.mjs`, `fetch-tool.test.mjs`, and the G6 integration tests use their
+registered owner surfaces (`IndexSurface`, `BookkeeperSurface`, `LifecycleSurface`,
+`FetchSurface`, and delegation `SyncDelegateSurface`) rather than importing Model/Workflow/Store,
+Host codecs, tool implementations, or session runtime internals. Each surface keeps its
+resource/session capability opaque and returns only JS-native observations/results.
+
 
 | 命题 | 落点测试（文件 + test 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
@@ -49,7 +61,12 @@ GAP：    0
 | `lifecycle-wiring.test.mjs` | 同名 | 8 pass | 绿 |
 | `universal-loop.test.mjs` | 同名 | 6 pass | 绿 |
 
-适配说明：`../support/domain.mjs` 深度修正为 `../../../requirements/verification-system/tests/support/domain.mjs`；包内互导（`./bookkeeper-session.test.mjs` 作为 helper 被 6 个文件引用）保持原样——同一目录内相对引用随族迁移不变。全部文件无 `dist/fable_modules` 直接 import（test-boundary 门不受影响）。
+适配说明：`casebook-domain.test.mjs`、`casebook-surface.test.mjs`、`casebook-store.test.mjs` 不再
+导入 `Model.js` / `Workflow.js` / `Store.js`、`support/domain.mjs` 或 Fable collection/result
+helpers；它们经 `CasebookSurface.js` 读取 JS-native 结果。`casebook-index.test.mjs`、Bookkeeper
+mechanical/session/synthesis、lifecycle wiring、fetch tool 与 G6 集成测试同样只消费注册的
+Index/Bookkeeper/Lifecycle/Fetch/SyncDelegate owner surfaces；真实工具、runtime、journal 与
+Host codec 由各 owner surface 内部持有，不在 semantic zone 中复制 adapter。
 
 ## semantic anchor 归属（semantic-anchors.mjs）
 

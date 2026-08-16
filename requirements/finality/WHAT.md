@@ -11,6 +11,17 @@ participant-horizon、work-record、crash-reconciliation）只引用本包命题
 
 ---
 
+## JS semantic boundary
+
+Finality semantic contracts have one production owner: `src/Wanxiangshu/Mission/Manager/FinalitySurface.fs`.
+The registered JS module `Mission/Manager/FinalitySurface.js` accepts plain lifecycle,
+review, handle, and ManagerJob history objects/IDs. It returns JSON-shaped objects/arrays;
+its folded `World` is an opaque capability that callers only pass back. Tests do not
+construct F# facts/unions, inspect Fable representations, or import package-internal
+compiled modules. The owner and executable contract evidence are registered in
+`PROOF.md`.
+
+
 ## FINALITY-001：suicide 只属 Manager，且是终结的专门入口
 
 **规范**：`suicide(last_words)` 只属于 Manager；它不是 `verdict` 或普通 completion 的别名。

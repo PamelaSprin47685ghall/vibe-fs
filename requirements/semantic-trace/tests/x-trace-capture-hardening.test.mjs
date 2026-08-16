@@ -1,101 +1,73 @@
-// COMPANION-003 / COMPANION-007 / PERSIST-010 — XTrace 捕获链路的加固测试。
+// COMPANION-003 / COMPANION-007 / PERSIST-010 — XTrace capture hardening.
 //
-// 这些测试锁定 review 发现的两个 blocking 缺陷的回归：
-//  1. captureProjection 幂等：同一 projection 反复 transform 不得重复 append
-//     （曾因 recorded 集合与 fold 存储的 provenance 命名空间不一致而完全失效，
-//     每轮 transform 全量重写 XTrace）。
-//  2. opening 捕获不得嵌套 transport envelope：fork 的 AgentOwnerRoot 首 prompt
-//     是渲染信封（含 parent_work_record），child opening 必须是原始 assignment。
+// These tests lock two blocking regressions:
+//  1. captureProjection idempotence: re-observing one projection never appends
+//     duplicate parts.
+//  2. opening capture is the original assignment, not a transport envelope.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  agentJournal,
-  agentFact,
-  xTraceCapture,
-  lifecycleWorkRecordProjection,
-  sessionId,
-  listItems,
-  caseOf,
-  prefixEpochId,
-  providerRun,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
-
-// Lazy: top-level await import races the 2.5s file timeout under full-suite
-// concurrency on GHA (file cancelled before any test body runs).
-let appendAgentFn = null
-const appendAgent = async (...args) => {
-  if (!appendAgentFn) {
-    const mod = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-    appendAgentFn = mod.AgentJournalModule_appendAgent
-  }
-  return appendAgentFn(...args)
-}
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
-  const created = await agentJournal.create({ directory: dir })
+  const created = await journal.JournalSurface_boot(dir, 'rt_xtrace_capture', 4242, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     return await fn(created.journal)
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
     rmSync(dir, { recursive: true, force: true })
   }
 }
 
-const SEM = sessionId('ses_cap')
-const streamSession = (sid) => stream.session(sid)
+const SEM = 'ses_cap'
+const parts = (projection) => xTrace.parts(projection)
 
 test('WHAT[SEMANTIC-TRACE-007] COMPANION_007_capture_projection_is_idempotent_across_transforms', async () => {
-  await withJournal(async (journal) => {
-    const projection = xTraceCapture.semantic({
+  await withJournal(async (handle) => {
+    const projection = xTrace.semantic({
       messages: [
-        { role: 'user', parts: [xTraceCapture.text('task one')] },
-        { role: 'assistant', parts: [xTraceCapture.text('work a'), xTraceCapture.reasoning('considered')] },
+        { role: 'user', parts: [xTrace.textPart('task one')] },
+        { role: 'assistant', parts: [xTrace.textPart('work a'), xTrace.reasoningPart('considered')] },
       ],
     })
 
-    // 第一轮 transform：全部 parts 进入 XTrace。
-    const first = await xTraceCapture.captureProjection(journal, SEM, projection)
-    assert.equal(listItems(first.Parts).length, 3)
+    const first = await xTrace.captureProjection(handle, SEM, projection)
+    assert.equal(parts(first).length, 3)
 
-    // 第二轮 transform（同一 projection 原样重放）：不得重复 append。
-    // 这是曾修复的 blocking：recorded 集合与 fold 存储的 provenance
-    // 命名空间不一致时，每轮都会把 3 个 part 重新写入。
-    const second = await xTraceCapture.captureProjection(journal, SEM, projection)
-    assert.equal(listItems(second.Parts).length, 3, 're-observing the same projection must not duplicate the trace')
+    const second = await xTrace.captureProjection(handle, SEM, projection)
+    assert.equal(parts(second).length, 3, 're-observing the same projection must not duplicate the trace')
   })
 })
 
 test('WHAT[SEMANTIC-TRACE-001] COMPANION_007_capture_projection_appends_only_new_turns', async () => {
-  await withJournal(async (journal) => {
-    const first = await xTraceCapture.captureProjection(
-      journal,
+  await withJournal(async (handle) => {
+    const first = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('task')] }] }),
+      xTrace.semantic({ messages: [{ role: 'user', parts: [xTrace.textPart('task')] }] }),
     )
-    assert.equal(listItems(first.Parts).length, 1)
+    assert.equal(parts(first).length, 1)
 
-    // 第二轮多了 assistant turn：只 append 新的，旧 user part 不动。
-    const second = await xTraceCapture.captureProjection(
-      journal,
+    const second = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('task')] },
-          { role: 'assistant', parts: [xTraceCapture.text('work')] },
+          { role: 'user', parts: [xTrace.textPart('task')] },
+          { role: 'assistant', parts: [xTrace.textPart('work')] },
         ],
       }),
     )
-    const parts = listItems(second.Parts).reverse()
-    assert.equal(parts.length, 2)
+    const traceParts = parts(second)
+    assert.equal(traceParts.length, 2)
     assert.deepEqual(
-      parts.map((part) => part.Provenance),
+      traceParts.map((part) => part.provenance),
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
       'provenance is generation-scoped turn/part (HOST-006 reanchor isolation)',
     )
@@ -103,87 +75,71 @@ test('WHAT[SEMANTIC-TRACE-001] COMPANION_007_capture_projection_appends_only_new
 })
 
 test('WHAT[SEMANTIC-TRACE-004] COMPANION_007_capture_projection_provenance_is_stored_verbatim', async () => {
-  await withJournal(async (journal) => {
-    await xTraceCapture.captureProjection(
-      journal,
+  await withJournal(async (handle) => {
+    await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('task')] },
-          { role: 'assistant', parts: [xTraceCapture.toolCall('call-1', 'read', '{}')] },
+          { role: 'user', parts: [xTrace.textPart('task')] },
+          { role: 'assistant', parts: [xTrace.toolCallPart('call-1', 'read', '{}')] },
         ],
       }),
     )
 
-    const updated = await xTraceCapture.captureProjection(
-      journal,
+    const updated = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('task')] }] }),
+      xTrace.semantic({ messages: [{ role: 'user', parts: [xTrace.textPart('task')] }] }),
     )
 
-    // 幂等检查依赖 recorded 集合与持久化 provenance 同命名空间：
-    // 若 fold 重写 provenance（如曾按 ProviderRun 生成 "transform"），
-    // 二次捕获会全部重 append——此处断言持久化值即 writer 传入值。
-    const parts = listItems(updated.Parts).reverse()
+    const traceParts = parts(updated)
     assert.deepEqual(
-      parts.map((part) => part.Provenance),
+      traceParts.map((part) => part.provenance),
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
     )
   })
 })
 
 test('WHAT[SEMANTIC-TRACE-004] HOST_006_capture_projection_after_reanchor_uses_next_generation', async () => {
-  // Pre-reanchor turns reuse Host indices after ContextReanchored. Provenance
-  // must open g:1 so turn:0/part:0 appends instead of colliding with g:0.
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
-  const created = await agentJournal.create({ directory: dir })
+  const created = await journal.JournalSurface_boot(dir, 'rt_xtrace_reanchor', 4242, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
-    const journal = created.journal
-    const first = await xTraceCapture.captureProjection(
-      journal,
+    const handle = created.journal
+    const first = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('pre-compact task')] },
-          { role: 'assistant', parts: [xTraceCapture.text('pre-compact work')] },
+          { role: 'user', parts: [xTrace.textPart('pre-compact task')] },
+          { role: 'assistant', parts: [xTrace.textPart('pre-compact work')] },
         ],
       }),
     )
-    assert.equal(listItems(first.Parts).length, 2)
+    assert.equal(parts(first).length, 2)
     assert.deepEqual(
-      listItems(first.Parts).reverse().map((part) => part.Provenance),
+      parts(first).map((part) => part.provenance),
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
     )
 
-    const reanchor = await appendAgent(
-      streamSession(SEM),
-      undefined,
-      agentFact('ContextReanchored', {
-        SessionId: SEM,
-        PreviousEpochId: prefixEpochId(0),
-        NextEpochId: prefixEpochId(1),
-        ObservedCompactionRun: providerRun('msg_compaction_1'),
-      }),
-      journal,
-    )
-    assert.equal(caseOf(reanchor), 'Ok', 'ContextReanchored must fold')
+    const reanchor = await xTrace.appendReanchor(handle, SEM, 0, 1, 'msg_compaction_1')
+    assert.equal(reanchor.ok, true, 'ContextReanchored must fold')
 
-    // Host renumbered: same turn indices, new content after compaction.
-    const second = await xTraceCapture.captureProjection(
-      journal,
+    const second = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('summary-of-prior')] },
-          { role: 'assistant', parts: [xTraceCapture.text('post-compact work')] },
+          { role: 'user', parts: [xTrace.textPart('summary-of-prior')] },
+          { role: 'assistant', parts: [xTrace.textPart('post-compact work')] },
         ],
       }),
     )
-    const parts = listItems(second.Parts).reverse()
-    assert.equal(parts.length, 4, 'reanchor generation must append, not collide')
+    const traceParts = parts(second)
+    assert.equal(traceParts.length, 4, 'reanchor generation must append, not collide')
     assert.deepEqual(
-      parts.map((part) => part.Provenance),
+      traceParts.map((part) => part.provenance),
       [
         'g:0/turn:0/part:0',
         'g:0/turn:1/part:0',
@@ -191,60 +147,54 @@ test('WHAT[SEMANTIC-TRACE-004] HOST_006_capture_projection_after_reanchor_uses_n
         'g:1/turn:1/part:0',
       ],
     )
-    // Sequence remains strictly monotonic across generations.
     assert.deepEqual(
-      parts.map((part) => Number(part.Cursor.Sequence)),
+      traceParts.map((part) => part.cursor.sequence),
       [1, 2, 3, 4],
     )
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_capture_opening_takes_authoritative_requirements', async () => {
-  await withJournal(async (journal) => {
-    await xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
+  await withJournal(async (handle) => {
+    await xTrace.captureOpening(handle, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
 
-    const again = await xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
-    // 幂等：同一 opening 重放不报错、不覆盖。
+    const again = await xTrace.captureOpening(handle, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
     assert.equal(again, undefined)
   })
 })
 
 test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_opening_capture_is_idempotent_for_the_same_text', async () => {
-  await withJournal(async (journal) => {
-    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
-    // 同文本重放无害（PERSIST-010 幂等语义）。
-    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+  await withJournal(async (handle) => {
+    await xTrace.captureOpening(handle, SEM, 'first task', [])
+    await xTrace.captureOpening(handle, SEM, 'first task', [])
   })
 })
 
 test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_parent_work_record_renders_the_opening_exactly_once', async () => {
-  await withJournal(async (journal) => {
-    // A human session: the opening is captured at ingress, and the first
-    // transform captures the SAME text again as XTrace part turn:0/part:0.
-    await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
-    await xTraceCapture.captureProjection(
-      journal,
+  await withJournal(async (handle) => {
+    await xTrace.captureOpening(handle, SEM, 'first task', [])
+    await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('first task')] },
-          { role: 'assistant', parts: [xTraceCapture.text('work a')] },
+          { role: 'user', parts: [xTrace.textPart('first task')] },
+          { role: 'assistant', parts: [xTrace.textPart('work a')] },
         ],
       }),
     )
 
-    const parentBound = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
+    const parentBound = await xTrace.lifecycleWorkRecord(handle, SEM, true)
     assert.equal(typeof parentBound, 'string')
-    // parent → child: Opening once; gap must not re-render the same text.
     assert.equal(parentBound.split('first task').length - 1, 1, 'opening appears exactly once for parent→child')
     assert.ok(parentBound.includes('Opening\n'), 'parent→child keeps Opening')
     assert.ok(!parentBound.includes('Opening task'), 'old Opening task heading is gone')
     assert.ok(parentBound.includes('assistant: work a'), 'the tail must carry the work after the opening')
 
-    const joinBound = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    const joinBound = await xTrace.lifecycleWorkRecord(handle, SEM, false)
     assert.equal(typeof joinBound, 'string')
     assert.ok(!joinBound.includes('Opening\nfirst task'), 'child→parent join omits Opening')
     assert.ok(!joinBound.includes('Opening task'), 'old Opening task heading is gone')
@@ -253,32 +203,31 @@ test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_parent_work_record_renders_the_open
   })
 })
 
-
 test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', async () => {
-  await withJournal(async (journal) => {
-    await xTraceCapture.captureOpening(journal, SEM, 'consult independently', [])
-    const before = await xTraceCapture.captureProjection(
-      journal,
+  await withJournal(async (handle) => {
+    await xTrace.captureOpening(handle, SEM, 'consult independently', [])
+    const before = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
+      xTrace.semantic({ messages: [{ role: 'user', parts: [xTrace.textPart('consult independently')] }] }),
     )
-    const beforeCount = listItems(before.Parts).length
+    const beforeCount = parts(before).length
 
     const terminal = 'Independent NEEDHELP perspective: preserve the original charge.'
-    await xTraceCapture.captureTerminalText(journal, SEM, terminal, providerRun('msg_terminal_only'))
+    await xTrace.captureTerminalText(handle, SEM, terminal, 'msg_terminal_only')
 
-    const after = await xTraceCapture.captureProjection(
-      journal,
+    const after = await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({ messages: [{ role: 'user', parts: [xTraceCapture.text('consult independently')] }] }),
+      xTrace.semantic({ messages: [{ role: 'user', parts: [xTrace.textPart('consult independently')] }] }),
     )
     assert.equal(
-      listItems(after.Parts).length,
+      parts(after).length,
       beforeCount,
       'terminal fallback is a read-time LWR projection, not a durable XTracePartAppended',
     )
 
-    const record = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
+    const record = await xTrace.lifecycleWorkRecord(handle, SEM, false)
     assert.equal(typeof record, 'string')
     assert.match(record, /Recent work/)
     assert.match(record, /Independent NEEDHELP perspective/)
@@ -287,30 +236,24 @@ test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_terminal_only_completion_projects_i
 })
 
 test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_last_words_land_in_recent_work_not_closing_report', async () => {
-  await withJournal(async (journal) => {
-    await xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
-    await xTraceCapture.captureProjection(
-      journal,
+  await withJournal(async (handle) => {
+    await xTrace.captureOpening(handle, SEM, 'finish the life', [])
+    await xTrace.captureProjection(
+      handle,
       SEM,
-      xTraceCapture.semantic({
+      xTrace.semantic({
         messages: [
-          { role: 'user', parts: [xTraceCapture.text('finish the life')] },
-          { role: 'assistant', parts: [xTraceCapture.text('did the work')] },
+          { role: 'user', parts: [xTrace.textPart('finish the life')] },
+          { role: 'assistant', parts: [xTrace.textPart('did the work')] },
         ],
       }),
     )
     const words = 'the last words to the user'
-    const written = await agentJournal.writeBlob(words, journal)
+    const written = await journal.JournalSurface_writePayload(handle, words)
     assert.equal(written.ok, true, written.ok ? '' : written.error)
-    await xTraceCapture.captureLastWords(
-      journal,
-      SEM,
-      written.value.BlobRef,
-      written.value.BlobDigest,
-      providerRun('run_last_words'),
-    )
+    await xTrace.captureLastWords(handle, SEM, written.blobRef, written.blobDigest, 'run_last_words')
 
-    const record = await lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, true)
+    const record = await xTrace.lifecycleWorkRecord(handle, SEM, true)
     assert.equal(typeof record, 'string')
     assert.match(record, /Recent work/)
     assert.match(record, /did the work/)

@@ -1,9 +1,4 @@
-// Split from tests/unit/session/causal-wait-bridge.test.mjs (cutover Wave 2a); owner: causal-wait.
-//
-// CAUSAL-008 bridge 面：writeSnapshot / Hub 写盘断言（诊断文件 git-excluded、非
-// Journal）。E2E diagnostics 格式化（formatDiagnostics/formatCausalSection/watchdog
-// onTimeout）已随 SPLIT@cutover 迁 requirements/verification-system/tests/
-// causal-diagnostics.test.mjs。
+// CAUSAL-008 — diagnostic bridge is process-local, overwritable and git-excluded.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -11,47 +6,41 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import {
-  causalWait,
-  causalWaitHub,
-  CausalWaitRegistry,
-} from '../../verification-system/tests/support/domain.mjs'
-import {
-  CausalWaitHub_setWorkspace,
-  CausalWaitHub_writeToWorkspace,
-} from '../../../dist/Execution/Session/Wait/Registry.js'
-import { writeSnapshot as CausalWaitBridge_writeSnapshot } from '../../../dist/Execution/Session/Wait/Bridge.js'
+const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
-const mkWait = (waitKind, ownerKind, subjectPairs, producer) =>
-  causalWait.create({
+const mkWait = (waitKind, ownerKind, subject, producer) =>
+  causal.createWait({
     waitKind,
-    owner: causalWait.owner(ownerKind, subjectPairs.slice(0, 1)),
-    subject: subjectPairs,
+    owner: causal.owner(ownerKind, { id: ownerKind }),
+    subject,
     producer,
-    escapes: [causalWait.escape.processLifetime()],
+    escapes: [causal.escape('processLifetime')],
     source: 'causal-wait-bridge.test',
   })
 
-const externalProducer = (kind, identity) => causalWait.externalProducer(kind, identity)
+const externalProducer = (kind, identity) => causal.externalProducer(kind, identity)
+
+const readDiagnostic = (workspace) =>
+  JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
 test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
   fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
-  const registry = new CausalWaitRegistry()
+  const registry = causal.createRegistry()
   const wait = mkWait(
     'provider-verdict',
     'ReviewerWorkflow',
-    [['reviewer', 'R2'], ['barrier', 'B17']],
-    externalProducer('provider', [['run', 'P81']]),
+    { reviewer: 'R2', barrier: 'B17' },
+    externalProducer('provider', { run: 'P81' }),
   )
-  const lease = registry.Enter(wait)
+  const lease = causal.enter(registry, wait)
   try {
-    CausalWaitBridge_writeSnapshot(workspace, registry)
+    causal.writeSnapshot(workspace, registry)
     const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)
     const exclude = fs.readFileSync(path.join(workspace, '.git', 'info', 'exclude'), 'utf8')
     assert.ok(exclude.includes('.wanxiangshu/'), 'diagnostic dir must be git-excluded')
-    const snap = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    const snap = readDiagnostic(workspace)
     assert.equal(typeof snap.pid, 'number')
     assert.ok(String(snap.sequence).length > 0)
     assert.equal(snap.active.length, 1)
@@ -60,31 +49,30 @@ test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', (
     assert.ok(Array.isArray(snap.frontiers))
     assert.ok(snap.frontiers.length >= 1)
   } finally {
-    lease.Dispose()
+    causal.dispose(lease)
     fs.rmSync(workspace, { recursive: true, force: true })
   }
 })
 
 test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-hub-'))
-  CausalWaitHub_setWorkspace(workspace)
+  causal.hubSetWorkspace(workspace)
   const wait = mkWait(
     'manager-job',
     'OrchestratorWorkflow',
-    [['job', 'OJ7'], ['manager', 'M4']],
-    causalWait.workflowProducer(causalWait.owner('ManagerWorkflow', [['session', 'M4']])),
+    { job: 'OJ7', manager: 'M4' },
+    causal.workflowProducer(causal.owner('ManagerWorkflow', { session: 'M4' })),
   )
-  const lease = causalWaitHub.observer.Enter(wait)
+  const lease = causal.hubEnter(wait)
   try {
     const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)
-    const snap = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    assert.ok(snap.active.some((w) => w.waitKind === 'manager-job'))
-    CausalWaitHub_writeToWorkspace()
+    assert.ok(readDiagnostic(workspace).active.some((value) => value.waitKind === 'manager-job'))
+    causal.hubWriteToWorkspace()
     assert.equal(fs.existsSync(filePath), true)
   } finally {
-    lease.Dispose()
-    CausalWaitHub_setWorkspace(undefined)
+    causal.dispose(lease)
+    causal.hubSetWorkspace(null)
     fs.rmSync(workspace, { recursive: true, force: true })
   }
 })

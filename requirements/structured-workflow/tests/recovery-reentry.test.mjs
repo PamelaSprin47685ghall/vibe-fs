@@ -7,18 +7,14 @@
 // and recovery drives the same named workflow entrypoints the live path uses.
 
 import assert from 'node:assert/strict'
+import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 import test from 'node:test'
 
 const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
 
-/** Every emitted name, minus the reflection metadata Fable adds per type. */
-const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
-
 test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async () => {
-  const mod = await load('Composition/Turn/Program')
-
-  // The pure reconcile surface is bounded reread + publish decisions
-  // (HOST-004): decision from evidence, consume keys, terminal classification.
+  // The registered ReconcileSurface is the owner contract: callers observe
+  // bounded reread + publish decisions, never emitted union metadata.
   for (const n of [
     'decideStep',
     'decisionName',
@@ -28,17 +24,26 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabi
     'consumeKey',
     'clearProvisional',
   ]) {
-    assert.equal(typeof mod[n], 'function', `ReconcileProgram must export ${n}`)
+    assert.equal(typeof reconcile[n], 'function', `ReconcileSurface must export ${n}`)
   }
 
   // No second-runtime restore surface: no continuation-pointer restore, no
   // program AST, no interpreter. (RECONCILE_PROGRAM_006 pins the same
   // absence for Command/Reply/Trace exports.)
-  const names = surfaceOf(mod)
-  const forbidden = names.filter((n) =>
-    /(RestoreContinuation|ResumeProgram|ReplayProgram|ProgramNode|TraceInterpreter|CommandBus|StepAst|materializePass|interpretWith|ProtocolMismatch)/.test(n),
-  )
-  assert.deepEqual(forbidden, [], 'ReconcileProgram must not export continuation-restore / interpreter shapes')
+  for (const n of [
+    'RestoreContinuation',
+    'ResumeProgram',
+    'ReplayProgram',
+    'ProgramNode',
+    'TraceInterpreter',
+    'CommandBus',
+    'StepAst',
+    'materializePass',
+    'interpretWith',
+    'ProtocolMismatch',
+  ]) {
+    assert.equal(n in reconcile, false, `ReconcileSurface must not export ${n}`)
+  }
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () => {

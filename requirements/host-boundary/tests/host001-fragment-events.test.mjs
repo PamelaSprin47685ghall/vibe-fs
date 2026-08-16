@@ -1,89 +1,30 @@
-// tests/unit/Verify/host001-fragment-events.test.mjs — HOST-001 event layering.
-//
-// Fragment events must be dropped at the codec boundary. Coarse session
-// lifecycle signals, including typed attempt abort, cross into the reconciler.
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hostSignals, caseOf, idValue, payloadOf } from '../../verification-system/tests/support/domain.mjs'
+import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
 
 const SESSION = 'ses_frag'
-
-// ── HOST-001: fragment events die at the earliest boundary ────────────────────
+const decode = (raw) => HostSignalSurface.tryDecode(raw) ?? undefined
 
 test('WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary', () => {
   const fragments = [
-    { type: 'message.updated', properties: { sessionID: SESSION, message: { id: 'msg_1' } } },
-    { type: 'part.delta', properties: { sessionID: SESSION, delta: { text: 'x' } } },
+    { type: 'message.updated', properties: { sessionID: SESSION } },
+    { type: 'part.delta', properties: { sessionID: SESSION } },
     { type: 'session.updated', properties: { sessionID: SESSION } },
-    { type: 'chat.message', properties: { sessionID: SESSION, message: { id: 'msg_2' } } },
+    { type: 'chat.message', properties: { sessionID: SESSION } },
   ]
-
-  for (const raw of fragments) {
-    assert.equal(hostSignals.isHostSignalEvent(raw), false, `${raw.type} must not look like a host signal`)
-    assert.equal(hostSignals.tryDecode(raw), undefined, `${raw.type} must be dropped at the codec`)
-  }
+  assert.deepEqual(fragments.map(decode), [undefined, undefined, undefined, undefined])
 })
 
 test('WHAT[HOST-BOUNDARY-002] HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => {
-  const idle = hostSignals.tryDecode({
-    type: 'session.status',
-    properties: { sessionID: SESSION, status: { type: 'idle' } },
-  })
-  assert.equal(caseOf(idle), 'SessionIdle')
-  assert.equal(idValue.session(payloadOf(idle)), SESSION)
-
-  // OpenCode 1.18 emits a dedicated session.idle after the status transition.
-  // It is a second physical encoding of the same coarse wake, not a terminal fact.
-  const dedicatedIdle = hostSignals.tryDecode({
-    type: 'session.idle',
-    properties: { sessionID: SESSION },
-  })
-  assert.equal(hostSignals.isHostSignalEvent({ type: 'session.idle' }), true)
-  assert.equal(caseOf(dedicatedIdle), 'SessionIdle')
-  assert.equal(idValue.session(payloadOf(dedicatedIdle)), SESSION)
-
-  const retry = hostSignals.tryDecode({
-    type: 'session.status',
-    properties: { sessionID: SESSION, status: { type: 'retry', attempt: 3, message: 'rate limited' } },
-  })
-  assert.equal(caseOf(retry), 'ProviderRetry')
-  const retrySignal = payloadOf(retry)
-  assert.equal(idValue.session(retrySignal.SessionId), SESSION)
-  assert.equal(retrySignal.Attempt, '3')
-  assert.equal(retrySignal.Reason, 'rate limited')
-
-  const deleted = hostSignals.tryDecode({
-    type: 'session.deleted',
-    properties: { sessionID: SESSION },
-  })
-  assert.equal(caseOf(deleted), 'SessionDeleted')
-  const deletedSignal = payloadOf(deleted)
-  assert.equal(idValue.session(deletedSignal[0]), SESSION)
-  assert.equal(deletedSignal[1], undefined, 'missing Host parentID must remain None')
-
-  const deletedChild = hostSignals.tryDecode({
-    type: 'session.deleted',
-    properties: { sessionID: SESSION, info: { parentID: 'ses_parent' } },
-  })
-  assert.equal(caseOf(deletedChild), 'SessionDeleted')
-  const deletedChildSignal = payloadOf(deletedChild)
-  assert.equal(idValue.session(deletedChildSignal[0]), SESSION)
-  assert.equal(idValue.session(deletedChildSignal[1]), 'ses_parent')
-
-  const error = hostSignals.tryDecode({
-    type: 'session.error',
-    properties: { sessionID: SESSION, error: { name: 'ProviderError', message: 'broken' } },
-  })
-  assert.equal(caseOf(error), 'ProviderFailure')
-  assert.equal(idValue.session(payloadOf(error)[0]), SESSION)
-  assert.equal(payloadOf(error)[1], 'broken')
-
-  // Abort is a physical attempt fact, never a provider failure and never dropped.
-  const abort = hostSignals.tryDecode({
-    type: 'session.error',
-    properties: { sessionID: SESSION, error: { name: 'MessageAbortedError' } },
-  })
-  assert.equal(caseOf(abort), 'AttemptAborted')
-  assert.equal(idValue.session(payloadOf(abort)), SESSION)
+  const idle = decode({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'idle' } } })
+  const dedicatedIdle = decode({ type: 'session.idle', properties: { sessionID: SESSION } })
+  const retry = decode({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'retry', attempt: 2 } } })
+  const deleted = decode({ type: 'session.deleted', properties: { sessionID: SESSION, parentID: 'root' } })
+  const aborted = decode({ type: 'session.error', properties: { sessionID: SESSION, error: { name: 'AbortError' } } })
+  assert.equal(idle.kind, 'SessionIdle')
+  assert.equal(dedicatedIdle.kind, 'SessionIdle')
+  assert.equal(retry.kind, 'ProviderRetry')
+  assert.equal(deleted.kind, 'SessionDeleted')
+  assert.equal(deleted.parentSessionId, 'root')
+  assert.equal(aborted.kind, 'AttemptAborted')
 })

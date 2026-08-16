@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createMcpServer, createStore, start, resume, assessWhy } from './support.mjs'
+import { mcpServer } from '../../../dist/Sphinx/Surface.js'
+import { createStore, start, resume, assessWhy } from './support.mjs'
 
 test('WHAT[EPI-002] handle_is_opaque_process_local_session_key', () => {
   const store = createStore()
@@ -136,7 +137,7 @@ test('WHAT[EPI-003] full_co_yield_path_preserves_grounded_epistemic_basis', () =
 })
 
 test('WHAT[EPI-004] mcp_server_surface_is_exactly_start_and_resume', async () => {
-  const server = createMcpServer(createStore())
+  const server = mcpServer(createStore())
   assert.ok('start' in server._registeredTools)
   assert.ok('resume' in server._registeredTools)
   assert.equal(Object.getOwnPropertyNames(server._registeredTools).length, 2)

@@ -1,34 +1,40 @@
-// Split from tests/unit/journal/envelope.test.mjs (cutover Wave 2a); owner: behavior-diagnosis
-//
-// ENFORCER-072 tip-v2 clean break at envelope decode: observation-commit
-// envelopes from the ScoreVectorRef era (or without a TipRuleId) are refused
-// when boot reads the NDJSON line, and the legacy BlogEntryCommitted tag
-// dual-decodes to BlogObservationCommitted. The codec-level (serializeFact /
-// deserializeFact) half lives in fact-codec-tip-v2-clean-break.test.mjs.
-
+// Tip-v2 clean break at the durable Journal envelope boundary.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFactCaseOf,
-  blobDigest,
-  blobRef,
-  bloggerRequestId,
-  envelope,
-  fact,
-  frameEpochId,
-  journal,
-  payloadOf,
-  prefixEpochId,
-  providerRun,
-  sessionId,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 
-const SESSION = sessionId('ses_a')
+const observationFact = () => ({
+  case: 'BlogObservationCommitted',
+  sessionId: 'ses_a',
+  bloggerSessionId: 'ses_b',
+  requestId: 'req-obs',
+  frameEpoch: 0,
+  previousIngestedThroughSequence: 0,
+  nextIngestedThroughSequence: 1,
+  previousCoverableTurnCutoffExclusive: 0,
+  nextCoverableTurnCutoffExclusive: 1,
+  nextCoveredPrefixDigest: 'd-1',
+  textRef: 'blobs/blob-obs',
+  textDigest: 'sha-obs',
+  run: 'run-obs',
+  toolCallIds: [],
+  tipRuleId: 'rule-obs',
+  fieldNameAtCommit: 'field-obs',
+  evidenceRef: undefined,
+  observedPrefixEpoch: 0,
+})
+
+const envelope = (fact) => ({
+  runtimeId: 'rt1',
+  localSeq: 4,
+  observedAt: '2026-01-01T00:00:00.000+00:00',
+  eventId: 'e1',
+  stream: { kind: 'Session', id: 'ses_a' },
+  providerRun: 'run-obs',
+  fact,
+})
 
 test('WHAT[BD-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
-  // Boot reads envelopes, not FactCodec alone. Without this check Thoth fails
-  // opaquely, Boot truncates mid-stream, and fold invents "already has open request".
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = JSON.stringify({
       RuntimeId: ['RuntimeId', 'rt1'],
@@ -43,17 +49,16 @@ test('WHAT[BD-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_
           {
             SessionId: ['SessionId', 'ses_a'],
             BloggerSessionId: ['SessionId', 'ses_b'],
-            // no TipRuleId, optional ScoreVectorRef-era shape
             TextDigest: ['BlobDigest', 'sha'],
             TextRef: ['BlobRef', 'blobs/sha'],
           },
         ],
       ],
     })
-    assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
-    const decoded = journal.deserialize(legacy)
+    assert.equal(blog.containsLegacyScoreVectorEntry(legacy), true, tag)
+    const decoded = blog.deserializeEnvelope(legacy)
     assert.equal(decoded.ok, false, tag)
-    assert.equal(decoded.error, journal.tipV2CleanBreakMessage)
+    assert.equal(decoded.error, blog.tipV2CleanBreakMessage)
   }
 })
 
@@ -77,41 +82,21 @@ test('WHAT[BD-008] ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_
         ],
       ],
     })
-    assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
-    const decoded = journal.deserialize(legacy)
+    assert.equal(blog.containsLegacyScoreVectorEntry(legacy), true, tag)
+    const decoded = blog.deserializeEnvelope(legacy)
     assert.equal(decoded.ok, false, tag)
     assert.match(String(decoded.error), /TipRuleId|ScoreVectorRef|tip v2/)
   }
 })
 
 test('WHAT[BD-012] PERSIST_005_envelope_dual_decodes_legacy_observation_tags', () => {
-  const observation = fact('BlogObservationCommitted', {
-    SessionId: SESSION,
-    BloggerSessionId: sessionId('ses_b'),
-    RequestId: bloggerRequestId('req-obs'),
-    FrameEpochId: frameEpochId(0),
-    PreviousIngestedThroughSequence: 0n,
-    NextIngestedThroughSequence: 1n,
-    PreviousCoverableTurnCutoffExclusive: 0,
-    NextCoverableTurnCutoffExclusive: 1,
-    NextCoveredPrefixDigest: 'd-1',
-    TextRef: blobRef('blob-obs'),
-    TextDigest: blobDigest('sha-obs'),
-    ProviderRun: providerRun('run-obs'),
-    ToolCallIds: [],
-    TipRuleId: 'rule-obs',
-    FieldNameAtCommit: 'field-obs',
-    EvidenceRef: undefined,
-    ObservedPrefixEpochId: prefixEpochId(0),
-  })
-  const value = envelope({ seq: 4, stream: stream.session(SESSION), run: 'run-obs', fact: observation })
-  const line = journal.serialize(value)
-  assert.equal(line.includes('"BlogObservationCommitted"'), true)
-  assert.equal(line.includes('"BlogEntryCommitted"'), false)
+  const line = blog.serializeEnvelope(envelope(observationFact()))
+  assert.equal(line.includes('BlogObservationCommitted'), true)
+  assert.equal(line.includes('BlogEntryCommitted'), false)
 
-  const legacy = line.replaceAll('"BlogObservationCommitted"', '"BlogEntryCommitted"')
-  const decoded = journal.deserialize(legacy)
+  const legacy = line.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
+  const decoded = blog.deserializeEnvelope(legacy)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(agentFactCaseOf(payloadOf(decoded.value.Fact)), 'BlogObservationCommitted')
-  assert.equal(journal.serialize(decoded.value), line)
+  assert.equal(decoded.value.case, 'BlogObservationCommitted')
+  assert.equal(decoded.value.line, line)
 })

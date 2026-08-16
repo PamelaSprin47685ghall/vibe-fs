@@ -27,8 +27,8 @@ test('WHAT[ENF-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
 test('WHAT[ENF-002] P7_SURFACE_permissions_matrix_matches_the_canonical_roles_matrix', () => {
   // AGENT-001/AGENT-025: Manager/Orchestrator/Coder/Inspector/Browser/Inquiry
   // entitlement sets (the same matrix capability-enforcement pins against the
-  // host schema). Values are sorted strings. Static array — no Object.entries
-  // (export-discovery debt rule).
+  // host schema). Values are sorted strings. Static array — no reflective
+  // module-export traversal (export-discovery debt rule).
   const matrix = [
     ['manager', ['Finality', 'Fission', 'Fork', 'Horizon', 'Join', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],

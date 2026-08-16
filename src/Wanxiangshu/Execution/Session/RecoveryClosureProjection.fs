@@ -49,7 +49,7 @@ module RecoveryClosureProjection =
         // GLORY-002 / SURFACE-006: the hidden Finality Reviewer is not part
         // of the parent's recovery family; the Host-owned workflow owns it.
         match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with
-        | Fact.HandleOwnership.HostOwnedHidden, _, _ -> ()
+        | HandleOwnership.HostOwnedHidden, _, _ -> ()
         | _, HandleLifecycle.Retired, _
         | _, HandleLifecycle.Abandoned _, _
         | _, _, None -> ()

@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { caseOf, managedAgentCatalog, roles } from '../../verification-system/tests/support/domain.mjs'
+import { managerForkableOffices } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const PROVIDER = join(ROOT, 'resources/provider')
@@ -76,8 +76,7 @@ const FIVE_OFFICES = [
 ]
 
 test('WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices', () => {
-  const names = managedAgentCatalog.managerForkableRoles().map((r) => caseOf(roles.of(r)))
-  assert.deepEqual(names, ['Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry'])
+  assert.deepEqual(managerForkableOffices(), ['Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry'])
 })
 
 test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {

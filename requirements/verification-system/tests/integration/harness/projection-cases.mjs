@@ -233,25 +233,33 @@ export const projectionCases = [
   {
     name: 'VERIFY-007 harness asks production, it does not re-implement',
     fn: async () => {
-      const production = await import('../../../../../dist/Participant/Provider/Projection/Model.js');
+      const production = await import('../../../../../dist/Participant/Provider/Projection/Surface.js');
       const adapter = await import('../../e2e/support/provider-wire.js');
 
-      // Identity comparison, not shape comparison: a local copy with the same
-      // behaviour today is exactly what drifts tomorrow.
-      for (const name of [
-        'toSemantic',
-        'renderSemantic',
-        'renderWire',
-        'semanticallyEqual',
-        'isAppendOnlyPrefix',
-        'sealDigest',
-        'toolResultDigests',
-      ]) {
-        assertTrue(
-          adapter[name] === production[name],
-          `provider-wire.${name} must BE the production function, not a copy`,
-        );
-      }
+      // The adapter decodes OpenAI bytes; the registered owner consumes its
+      // already-decoded JS-native wire messages. Compare both representations
+      // against the same production projection instead of reaching into its
+      // Fable model module.
+      const sample = { ...body([SYSTEM, user('Do thing A.')], []), model: null };
+      const ownerMessages = [
+        { role: 'system', parts: [{ kind: 'text', text: 'You are a manager.' }] },
+        { role: 'user', parts: [{ kind: 'text', text: 'Do thing A.' }] },
+      ];
+      const ownerSemantic = production.semanticProjection(ownerMessages);
+
+      assertTrue(
+        adapter.renderWire(adapter.wireOf(sample)) === production.renderWire(ownerMessages),
+        'provider-wire renderWire must agree with the registered projection owner',
+      );
+      assertTrue(
+        adapter.renderSemantic(adapter.semanticOf(sample)) === production.renderSemantic(ownerSemantic),
+        'provider-wire semantic rendering must agree with the registered projection owner',
+      );
+      assertTrue(
+        adapter.semanticallyEqual(adapter.semanticOf(sample), adapter.semanticOf(sample)) ===
+          production.semanticallyEqual(ownerSemantic, ownerSemantic),
+        'provider-wire equality must agree with the registered projection owner',
+      );
     },
   },
 ];

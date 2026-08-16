@@ -4,9 +4,17 @@
 
 ## 模块地图（当前实现）
 
-### Domain（纯决策；零 Host I/O）
+### Production semantic owner（纯决策 + JS-native boundary）
 
-`src/Wanxiangshu/Domain/Casebook.fs`：
+`src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs` owns the Casebook semantic
+translation. Its registered sibling owner surfaces keep adjacent contracts at their actual
+owners: `IndexSurface.fs` owns the provider index, `BookkeeperSurface.fs` owns maintenance
+transactions, `LifecycleSurface.fs` owns draft/finalize wiring, and `FetchSurface.fs` owns the
+provider fetch tool. `SyncDelegateSurface.fs` is delegation-owned and exposes only the opaque
+reusable runtime needed by the G6 host path. These modules translate plain JS values and keep
+F# models, workflows, collection/result representations, Host schemas, and session runtime
+opaque. Durable Casebook operations receive an opaque EventStoreSurface handle.
+
 
 | 类型/模块 | 内容 |
 |---|---|
@@ -17,25 +25,30 @@
 | `ReplayResult` | `Fresh` / `Stale`（KNOWLEDGE-REUSE-004/005） |
 | `Observations.normalize` | 按 identity 去重 + 稳定排序，同一证据折叠同一字节 |
 | `Observations.classifyReplay` | 存储与重放集合精确相等 → Fresh，否则 Stale |
-| `CasebookProjection.fold` | Captured 插入/替换、Refreshed 替换 Q/A/observations、Accessed 派生访问序、Evicted 移除；同 Case 多 head 由 EventStore 层表达 DomainConflict |
-| `CasebookProjection.evict` | LRU：按 LastAccessOrder 淘汰，返回被淘汰 session id（tombstone 事件由调用方 append） |
+| `CasebookProjection.apply` | Captured 插入/替换、Refreshed 替换 Q/A/observations、Accessed 派生访问序、Evicted 移除；同 Case 多 head 由 EventStore 层表达 DomainConflict |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs` | registered `CasebookSurface`: JS-native pure laws/capture plus durable operations over an opaque EventStore handle. |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs` | registered `CasebookIndexSurface`: JS-native `tryGet`/`refresh`/`resolve` snapshots and stable shelfmarks; internal index records never cross. |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs` | registered `CasebookBookkeeperSurface`: JS-native refresh/staging envelopes and opaque session-port capability; Bookkeeper runtime/tool internals stay private. |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs` | registered `CasebookLifecycleSurface`: marker, draft, collector, finalize, cleanup, and access operations with JS-native results. |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs` | registered `CasebookFetchSurface`: fetch spec/execute over an opaque EventStore handle; replay and refresh authority stay private. |
+| `src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs` | registered delegation-owned `SyncDelegateSurface`: opaque reusable runtime/Host/Journal/Attachment harness with JS-native child/result observations. |
 
-### Infrastructure（Host 适配 + EventStore）
+
 
 | 文件 | 内容 |
 |---|---|
-| `Infrastructure/CasebookCapture.fs` | `contentHash`；`ofReadExecution` / `ofGlobExecution` / `ofGrepExecution` / `ofExecCommand`（executor 命令 tokenize 识别：`cat`/`head`/`tail`/`sed` 单文件正例；`sh -c`/`bash -c`/命令替换安全跳过）；`capture(toolName, args, output)` |
-| `Infrastructure/CasebookReplay.fs` | `replayOne`（当前 worktree 只读重放单个 observation）；`replayAll`（List.choose，捕获缺失的 observation 跳过） |
-| `Infrastructure/CasebookWorkflow.fs` | `CasebookFeature.isEnabled`（marker = `.wanxiang/casebook` 目录）；`archiveInspectorResult`（Append Captured）；`fetchCase`；`checkFreshness`；`refreshCase`（Append Refreshed）；`needsRefresh`；`drainCollectorAndArchive`；`finalizeCase`（exactly-once）；`touchCaseAccess`（Append Accessed） |
-| `Infrastructure/CasebookIndex.fs` | `Snapshot`（shelfmark + canonical question only）；`shelfmarkFor`；`resolve`（shelfmark → 内部 Case）；`refresh` / `invalidate`（epoch 推进）；frozen snapshot 进程内缓存 |
-| `Infrastructure/CasebookStore.fs` | `CasebookStream = "casebook"`；事件类型 `InspectorCaseCaptured` / `InspectorCaseRefreshed` / `InspectorCaseAccessed` / `InspectorCaseEvicted`；`appendCaptured/Refreshed/Accessed/Evicted`；`loadEnvelopes` / `loadEvents` / `project`（fold） |
-| `Infrastructure/CasebookLifecycle.fs` | `collector`；`setEnabled`；`notePrompt` / `noteAnswer`（draft 收集）；`tryFinalizeInspector`（ReuseScope close → exactly one finalize）；`cleanupInspector`（unexpected delete：零 EventStore 写）；`touchAccess` |
-| `Infrastructure/CasebookSessionDraft.fs` | `CasebookDraftStore`（session → Q/A turns 的内存 draft） |
-| `Infrastructure/CasebookBookkeeper.fs` | `refreshStale`（CaseRefresh：freeze → transaction → stability verify → Refreshed） |
-| `Infrastructure/BookkeeperStaging.fs` | `beginTransaction` / `snapshot` / `apply` / `take` / `abort`（js-bookkeeper 的 staged 变换） |
-| `Infrastructure/BookkeeperRuntime.fs` | `BookkeeperRequest = CaseRefresh | CaseFinalize`；`bindSession` / `unbindSession` / `tryTxId` / `runTransaction`（CreateChildSession + `js-bookkeeper` only + staging） |
-| `Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs` | `js-bookkeeper(program)` spec + execute：case SDK（`setQuestion`/`setAnswer` 各至多一次）+ runtime base class；无 filesystem capability |
-| `Infrastructure/OpenCode/Tools/FetchTool.fs` | `fetch(shelfmark)` spec + execute：shelfmark 解析 → replay → Fresh/Refreshed/Stale consequence；`fetchGate`/`fetchInFlight`（same-worktree single-flight） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Capture.fs` | `contentHash`；`ofReadExecution` / `ofGlobExecution` / `ofGrepExecution` / `ofExecCommand`（executor 命令 tokenize 识别：`cat`/`head`/`tail`/`sed` 单文件正例；`sh -c`/`bash -c`/命令替换安全跳过）；`capture(toolName, args, output)` |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Replay.fs` | `replayOne`（当前 worktree 只读重放单个 observation）；`replayAll`（List.choose，捕获缺失的 observation 跳过） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs` | `CasebookFeature.isEnabled`（marker = `.wanxiang/casebook` 目录）；`archiveInspectorResult`（Append Captured）；`fetchCase`；`checkFreshness`；`refreshCase`（Append Refreshed）；`needsRefresh`；`drainCollectorAndArchive`；`finalizeCase`（exactly-once）；`touchCaseAccess`（Append Accessed） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs` | `Snapshot`（shelfmark + canonical question only）；`shelfmarkFor`；`resolve`（shelfmark → 内部 Case）；`refresh` / `invalidate`（epoch 推进）；frozen snapshot 进程内缓存 |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs` | `CasebookStream = "casebook"`；事件类型 `InspectorCaseCaptured` / `InspectorCaseRefreshed` / `InspectorCaseAccessed` / `InspectorCaseEvicted`；`appendCaptured/Refreshed/Accessed/Evicted`；`tryDecodeEnvelope` 只解码单个 envelope，历史枚举与 fold 归 CanonicalIntegrator |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs` | `collector`；`setEnabled`；`notePrompt` / `noteAnswer`（draft 收集）；`tryFinalizeInspector`（ReuseScope close → exactly one finalize）；`cleanupInspector`（unexpected delete：零 EventStore 写）；`touchAccess` |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs` | `CasebookDraftStore`（session → Q/A turns 的内存 draft） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs` | `refreshStale`（CaseRefresh：freeze → transaction → stability verify → Refreshed） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs` | `beginTransaction` / `snapshot` / `apply` / `take` / `abort`（js-bookkeeper 的 staged 变换） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs` | `BookkeeperRequest = CaseRefresh | CaseFinalize`；`bindSession` / `unbindSession` / `tryTxId` / `runTransaction`（CreateChildSession + `js-bookkeeper` only + staging） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs` | `js-bookkeeper(program)` spec + execute：case SDK（`setQuestion`/`setAnswer` 各至多一次）+ runtime base class；无 filesystem capability |
+| `src/Wanxiangshu/OpenCode/Tools/FetchTool.fs` | `fetch(shelfmark)` spec + execute：shelfmark 解析 → replay → Fresh/Refreshed/Stale consequence；`fetchGate`/`fetchInFlight`（same-worktree single-flight） |
 
 ### Session 交叉（不归本包 HOW 主体）
 

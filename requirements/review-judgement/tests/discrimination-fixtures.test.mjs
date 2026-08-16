@@ -12,12 +12,12 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { providerLanguage, providerResources } from '../../verification-system/tests/support/domain.mjs'
+import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
 
-const roleLaw = providerResources.readText(providerLanguage.english, 'role/reviewer')
-const ledger = providerResources.readText(providerLanguage.english, 'library/reviewer/quality-ledger')
-const roleLawZh = providerResources.readText(providerLanguage.simplifiedChinese, 'role/reviewer')
-const ledgerZh = providerResources.readText(providerLanguage.simplifiedChinese, 'library/reviewer/quality-ledger')
+const roleLaw = provider.readText('English', 'role/reviewer')
+const ledger = provider.readText('English', 'library/reviewer/quality-ledger')
+const roleLawZh = provider.readText('SimplifiedChinese', 'role/reviewer')
+const ledgerZh = provider.readText('SimplifiedChinese', 'library/reviewer/quality-ledger')
 
 /** Collapse newlines so line-wrapped prose matches the single-line phrase. */
 const flat = (text) => text.replace(/\s+/g, ' ').trim()

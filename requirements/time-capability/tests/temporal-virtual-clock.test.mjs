@@ -1,58 +1,51 @@
-// Split from tests/unit/temporal/fallback-aabb-confluence.test.mjs (cutover Wave 2a); owner: time-capability
-//
-// TIME-005 — "One World / Pure Time": time is input, never authority
-// (the temporal harness's VirtualClock is the proof-side evidence of this rule;
-// the underlying ITimerPort semantics are also pinned by timer-port.test.mjs).
-// The fallback theorems moved to provider-attempt-recovery; the other harness
-// primitives' tests moved to verification-system (temporal-harness.test.mjs).
+// TIME-005 — virtual time is input, never authority.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createVirtualClock } from '../../verification-system/tests/support/temporal-harness.mjs'
 
-// ── VirtualClock is time as input ──────────────────────────────────────────
+const process = await import('../../../dist/Process/Surface.js')
+const settle = () => new Promise((resolve) => setImmediate(resolve))
 
 test('WHAT[TIME-005] TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
-  const vt = createVirtualClock()
+  const timer = process.createVirtualTimer()
   let fired = 0
-  const handle = vt.port.delay(100)
-  handle.delay().then(() => {
+  const handle = process.timerDelay(timer, 100)
+  process.timerAwait(handle).then(() => {
     fired += 1
   })
   assert.equal(fired, 0, 'must not fire before advance')
-  vt.advance(99)
-  await new Promise((r) => setImmediate(r))
+  process.timerAdvance(timer, 99)
+  await settle()
   assert.equal(fired, 0, '99ms of 100ms deadline must not fire')
-  vt.advance(1)
-  await handle.delay()
+  process.timerAdvance(timer, 1)
+  await process.timerAwait(handle)
   assert.equal(fired, 1, 'advance past deadline fires exactly once')
-  vt.port.dispose()
+  process.timerDispose(timer)
 })
 
 test('WHAT[TIME-005] TEMPORAL_virtual_clock_cancel_and_dispose_yield_zero_callbacks', async () => {
-  const vt = createVirtualClock()
+  const timer = process.createVirtualTimer()
   let fired = 0
-  const a = vt.port.delay(10)
-  const b = vt.port.delay(20)
-  a.delay().then(() => {
+  const first = process.timerDelay(timer, 10)
+  const second = process.timerDelay(timer, 20)
+  process.timerAwait(first).then(() => {
     fired += 1
   })
-  b.delay().then(() => {
+  process.timerAwait(second).then(() => {
     fired += 1
   })
-  a.cancel()
-  vt.advance(30)
-  await new Promise((r) => setImmediate(r))
+  process.timerCancel(first)
+  process.timerAdvance(timer, 30)
+  await settle()
   assert.equal(fired, 1, 'cancelled handle must not fire; other handle fires once')
-  vt.port.dispose()
-  const c = vt.port.delay(10)
+
+  process.timerDispose(timer)
+  const afterDispose = process.timerDelay(timer, 10)
   let firedAfterDispose = 0
-  // Dispose clears pending; new handles after dispose still enqueue but advance is no-op per PtyTiming.fs
-  c.delay().then(() => {
+  process.timerAwait(afterDispose).then(() => {
     firedAfterDispose += 1
   })
-  vt.advance(10)
-  await new Promise((r) => setImmediate(r))
-  // After port dispose, Advance is a no-op — so c must not fire.
+  process.timerAdvance(timer, 10)
+  await settle()
   assert.equal(firedAfterDispose, 0)
 })

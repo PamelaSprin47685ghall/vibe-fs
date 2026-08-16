@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcer } from '../../verification-system/tests/support/domain.mjs'
+import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
 const firstField = () => enforcer.fieldNames()[0]
 const firstRule = () => enforcer.tryFindByField(firstField())
@@ -15,7 +15,7 @@ const firstRule = () => enforcer.tryFindByField(firstField())
 test('WHAT[BD-006] ENFORCER_023_missing_tip_fails', () => {
   const result = enforcer.decodeCall({ text: 'work log entry' })
   assert.equal(result.ok, false)
-  assert.equal(result.error, enforcer.MissingTipError)
+  assert.equal(result.error, enforcer.missingTipError)
   assert.equal(result.error, 'missing required argument: tip')
 })
 
@@ -23,7 +23,7 @@ test('WHAT[BD-006] ENFORCER_023_empty_tip_fails', () => {
   for (const tip of ['', '   ', null]) {
     const result = enforcer.decodeCall({ text: 'entry', tip })
     assert.equal(result.ok, false, `tip=${JSON.stringify(tip)}`)
-    assert.equal(result.error, enforcer.MissingTipError)
+    assert.equal(result.error, enforcer.missingTipError)
   }
 })
 

@@ -16,11 +16,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerDelta as delta, companionPrompt as prompt } from '../../verification-system/tests/support/domain.mjs'
-import { byteCount as tomlByteCount } from '../../../dist/Foundation/SyntheticTomlSurface.js'
+import * as delta from '../../../dist/Context/Companion/Blogger/DeltaSurface.js'
+import * as prompt from '../../../dist/Context/Companion/ProjectionSurface.js'
+import * as toml from '../../../dist/Context/Companion/Blogger/TomlSurface.js'
 
-const toml = await import('../../../dist/Context/Companion/Blogger/TomlSurface.js')
-const syn = { byteCount: tomlByteCount }
+const syn = { byteCount: delta.byteCount }
 
 const textItem = (text, role = 'user') => ({
   Role: role,

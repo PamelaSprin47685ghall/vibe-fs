@@ -21,12 +21,25 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readdirSync } from 'node:fs'
+import { resolve, join } from 'node:path'
 import { walk } from '../../../scripts/lib/walk.mjs'
-import { introspect } from './support/domain.mjs'
 
-// Repo-relative, because `walk` takes a path and `introspect.buildRoot` is the
-// absolute URL form the facade resolves modules through.
+// Repo-relative, because `walk` takes a path and the build contract resolves
+// the same artifact directory directly.
 const BUILD_ROOT = 'dist'
+const BUILD_ROOT_ABS = `${resolve(BUILD_ROOT)}/`
+const FABLE_LIBRARY_DIR = (() => {
+  const candidates = readdirSync(join(BUILD_ROOT_ABS, 'fable_modules')).filter((entry) =>
+    entry.startsWith('fable-library-js.'),
+  )
+  if (candidates.length !== 1) {
+    throw new Error(
+      `expected exactly one fable-library-js.* in ${BUILD_ROOT_ABS}/fable_modules, found: ${candidates.join(', ') || '(none)'}`,
+    )
+  }
+  return join(BUILD_ROOT_ABS, 'fable_modules', candidates[0])
+})()
 
 const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
 
@@ -242,8 +255,8 @@ test('WHAT[VERIFICATION-SYSTEM-008] every emitted module actually loads', async 
 // ── the facade is wired to a real build ─────────────────────────────────────
 
 test('WHAT[VERIFICATION-SYSTEM-008] the contract and the facade read the same build', () => {
-  // Both resolve `dist` independently. If they ever disagreed, this file
+  // Both checks resolve `dist` independently. If they ever disagreed, this file
   // would be asserting against artifacts no test actually uses.
-  assert.match(introspect.buildRoot, /\/dist\/$/)
-  assert.match(introspect.fableLibraryDir, /fable-library-js\.\d+\.\d+\.\d+$/)
+  assert.match(BUILD_ROOT_ABS, /\/dist\/$/)
+  assert.match(FABLE_LIBRARY_DIR, /fable-library-js\.\d+\.\d+\.\d+$/)
 })

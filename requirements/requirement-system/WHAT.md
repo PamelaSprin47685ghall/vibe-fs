@@ -243,18 +243,29 @@ cutover 设计期完成（历史见 git）。
 **规范陈述**：`requirements/**/tests/**/*.test.mjs` 中的每个可执行 test case 必须显式声明恰
 一个当前 WHAT proposition ID；该 ID 必须存在于唯一 owner package 的 WHAT.md。每个当前
 WHAT proposition 必须至少被一个非 skip、非 todo 的 test case 证明。test 与 WHAT 之间不
-存在无归属、悬空、多 primary 或仅依赖路径推断的关系。机器合同只认 test title 开头的
-`WHAT[<CURRENT-WHAT-ID>]`，不认历史 ID、文件路径隐式 ownership 或注释里的近似表述。
+存在无归属、悬空、多 primary 或仅依赖路径推断的关系。
 
-**含义/动机**：WHAT → PROOF → test 的正向边已由 meta-verifier 检查；缺的是反向边
-test → WHAT。没有反向边，测试可以偷偷创造第二套需求体系，而文档漏测无人发现。双向闭环
-使每个 test 的存在理由机器可答（`requirement-trace --explain`），使每个 WHAT 的活性机器
-可验（零 active test = 命题失效）。「一个 test 只回答一个 WHAT」保证 failure meaning 唯一；
-两条命题若无法分别测试，优先回头合并命题而不是放宽本条。
+**机器结构**：一个 proof case = 一个实际的 `test()` 或 `t.test()` call site（含 nested
+call）。其唯一 primary tag 是 title 开头的 `WHAT[<CURRENT-WHAT-ID>]`；tag 必须是 WHAT.md
+中的完整三位编号 ID。scanner 以 token/结构边界识别 call site，不把注释、字符串、正则、
+模板静态文本、`describe`/hook/alias 当作 proof case。`test.skip` 与 `test.todo` 仍须带
+恰一个 tag，但 state 永远不满足 proof。
+
+**PROOF 边**：PROOF.md 中显式 executable anchor（`tests/file.test.mjs::exact test title`
+或同等精确 title anchor）必须解析到仍存在、line/title/state 可定位且 WHAT ID 相同的
+active call site；缺失、重复、WHAT 不同、skip/todo 或已删除 anchor 都是 dangling edge，
+不得以文件存在代替闭合。未标明 executable anchor 的文件/命令/人工证据仍是结构索引，
+不被 scanner 猜成 test edge。
+
+**含义/动机**：WHAT → PROOF → test 的正向边已由 meta-verifier 检查；缺的是反方向
+ test → WHAT。没有反向边，测试可以偷偷创造第二套需求体系，而文档漏测无人发现。双向
+闭环使每个 test 的存在理由机器可答（`requirement-trace --explain`），使每个 WHAT 的
+活性机器可验（零 active test = 命题失效）。「一个 test 只回答一个 WHAT」保证 failure
+meaning 唯一；两条命题若无法分别测试，优先回头合并命题而不是放宽本条。
 
 **边界**：helper、fixture、`beforeEach`、普通 `assert` 不是独立 proof case；粒度以
 `test()` / `t.test()` 为准。`test.skip` / `test.todo` 可携带标签但**不构成** WHAT 的
-proof。`requirements/**/tests/e2e/` 与 `tests/integration/` 拥有各自 entrypoint 与验收
-口径，由对应包自行声明归属，不在本命题扫描宇宙内。
+proof。`requirements/**/tests/e2e/` 与 `tests/integration/` 下的 `*.test.mjs` 仍属于
+同一 call-site 扫描宇宙；不以目录、文件名或历史注释推断 ownership。
 
 **证据指针**：→ PROOF.md L25。

@@ -51,7 +51,7 @@ const runtimeOf = (source) => {
   const result = compileScenario(source, { name: 'p.toml' });
   assertTrue(result.ok, `fixture must compile: ${result.ok ? '' : result.problems.join(' | ')}`);
   const runtime = new ScenarioRuntime(result.scenario);
-  runtime.bind('fast-manager', SESSION);
+  runtime['bind']('fast-manager', SESSION);
   return runtime;
 };
 

@@ -15,7 +15,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { permissions } from '../../../dist/Foundation/RolesSurface.js'
-import { managedAgentConfig, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
+import {
+  configure as configureManagedAgents,
+  installDefaultResources,
+  validate as validateManagedAgents,
+} from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
+
+installDefaultResources()
 
 const ROLES = [
   'Manager',
@@ -66,15 +72,15 @@ const evaluate = (rules, permission, pattern) =>
     action: 'ask',
   }
 
-/** Plugin permission object → the ruleset Host's `fromConfig` would build. */
 const rulesOf = (permissionObj) => {
   const rules = []
-  for (const [key, value] of Object.entries(permissionObj)) {
+  for (const key in permissionObj) {
+    const value = permissionObj[key]
     if (typeof value === 'string') {
       rules.push({ permission: key, action: value, pattern: '*' })
       continue
     }
-    for (const [pattern, action] of Object.entries(value)) rules.push({ permission: key, pattern, action })
+    for (const pattern in value) rules.push({ permission: key, pattern, action: value[pattern] })
   }
   return rules
 }
@@ -160,13 +166,9 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test.before(() => {
-  runtimeResources.installFromPackage()
-})
-
 test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
   const config = buildConfig()
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, `gate must accept distinct models: ${outcome.error}`)
 
   // Every managed agent got the owned mode + permission + prompt.
@@ -182,7 +184,7 @@ test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fiel
 
 test('WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set', () => {
   const config = buildConfig()
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
 
   // AGENT-010: fast and deep carry the same permission set.
@@ -195,7 +197,7 @@ test('WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set', ()
 
 test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
   const config = buildConfig()
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
 
   for (const role of ROLES) {
@@ -213,7 +215,7 @@ test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () =>
   // legal, so the error path is a leftover legacy agent name.
   const config = buildConfig()
   config.agent.coder = { model: 'some-model' }
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, false, 'legacy agent name must fail the gate')
   assert.match(outcome.error, /Legacy agent name 'coder'/)
 
@@ -236,7 +238,7 @@ test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () =>
 test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
   const config = buildConfig()
   config.agent.coder = { model: 'some-model' }
-  const outcome = managedAgentConfig.validate(config)
+  const outcome = validateManagedAgents(config)
   assert.equal(outcome.ok, false)
   assert.match(outcome.error, /Legacy agent name 'coder'/)
 })
@@ -244,7 +246,7 @@ test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
 test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   const config = buildConfig()
   delete config.agent['deep-coder']
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
   const entry = config.agent['deep-coder']
   assert.equal(entry.mode, 'primary')
@@ -256,18 +258,19 @@ test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
 test('WHAT[ENF-010] AGENT_004_legacy_agent_name_fails_validation', () => {
   const config = buildConfig()
   config.agent.coder = { model: 'some-model' }
-  const outcome = managedAgentConfig.validate(config)
+  const outcome = validateManagedAgents(config)
   assert.equal(outcome.ok, false)
   assert.match(outcome.error, /Legacy agent name 'coder'/)
 })
 
 test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () => {
   const config = buildConfig()
-  const before = Object.fromEntries(Object.entries(config.agent).map(([k, v]) => [k, v.model]))
-  const outcome = managedAgentConfig.configure(config)
+  const before = {}
+  for (const name in config.agent) before[name] = config.agent[name].model
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
-  for (const [name, model] of Object.entries(before)) {
-    assert.equal(config.agent[name].model, model, `model binding of ${name} must be untouched`)
+  for (const name in before) {
+    assert.equal(config.agent[name].model, before[name], `model binding of ${name} must be untouched`)
   }
 })
 
@@ -309,7 +312,7 @@ test('WHAT[ENF-002] roles.permissions_agree_with_the_host_schema_matrix', () => 
   for (const role of ROLES) {
     const fromRoles = permissions(role.toLowerCase())
     const config = buildConfig()
-    managedAgentConfig.configure(config)
+    configureManagedAgents(config)
     const fromSchema = [...new Set(allowList(config, agentName('fast', role)).map(permissionOf))].sort()
     assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)
   }
@@ -319,7 +322,7 @@ test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', ()
   // AGENT-019: Host agent.ts defaults external_directory:* = ask. Managed agents
   // must emit a trailing allow so findLast cancels the Host ask on any external path.
   const config = buildConfig()
-  assert.equal(managedAgentConfig.configure(config).ok, true)
+  assert.equal(configureManagedAgents(config).ok, true)
 
   for (const tier of TIERS) {
     for (const role of ROLES) {

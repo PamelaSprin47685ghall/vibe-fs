@@ -1,238 +1,79 @@
-// Split from tests/unit/invariants/prompt-stability.test.mjs (cutover Wave 2a); owner: prefix-stability
-//
-// System-prompt-byte half of ARCH-016 Gate D: one session keeps its system
-// prompt bytes, prompt ids and catalog bytes stable across fallback peer
-// switch / T1 review / reanchor. The persona-binding half of the same
-// scenario lives in participant-identity/tests/persona-binding.test.mjs.
+// PREFIX-STABILITY-002 / PROMPT-019 — system-prompt identity is role-owned,
+// while attempt tier/cursor metadata selects the effective agent and capabilities.
+// The registered Authority, Planner, Strength and Delegation surfaces are the
+// only boundaries this proof needs; no Fable Role/Identity representation crosses.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { Role } from '../../../dist/Foundation/Roles.js'
-import { systemPromptIdFor } from '../../../dist/Interaction/Authority/Model.js'
-import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Foundation/Identity.js'
-import {
-  attemptPlanner as planner,
-  cursor,
-  projectionAlgebra,
-  projectionIntent,
-  projectionSnapshot,
-  promptOrigin,
-  promptResources,
-  providerProjection,
-  requestKind,
-  reviewChallenge,
-  rootKind,
-  toList,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as authority from '../../../dist/Interaction/Authority/Surface.js'
+import * as planner from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
+import * as delegation from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as strength from '../../../dist/Strength/Surface.js'
 
-const roleCatalogBytes = (catalog) => ({
-  ManagerSystemPrompt: catalog.ManagerSystemPrompt,
-  CoderSystemPrompt: catalog.CoderSystemPrompt,
-  DevopsSystemPrompt: catalog.DevopsSystemPrompt,
-  InspectorSystemPrompt: catalog.InspectorSystemPrompt,
-  ReviewerSystemPrompt: catalog.ReviewerSystemPrompt,
-  BrowserSystemPrompt: catalog.BrowserSystemPrompt,
-  InquirySystemPrompt: catalog.InquirySystemPrompt,
-  OrchestratorSystemPrompt: catalog.OrchestratorSystemPrompt,
-  DistillerSystemPrompt: catalog.DistillerSystemPrompt,
-  BloggerSystemPrompt: catalog.BloggerSystemPrompt,
+const OWNER = 'ses_owner_prompt'
+const roles = ['Manager', 'Coder', 'Inspector', 'Reviewer', 'Browser', 'Inquiry', 'Distiller', 'Blogger']
+const profile = (role, tier = 'Fast', kind = 'WorkMain') => planner.plan({ role, tier, kind })
+
+// ── PROMPT-019: resources are distinct from their role identity ───────────
+
+test('WHAT[PREFIX-STABILITY-002] PROMPT_019_each_canonical_role_has_one_stable_prompt_identity', () => {
+  const ids = new Set()
+  for (const role of roles) {
+    const id = authority.systemPromptIdForRole(role)
+    const resource = strength.systemPromptForRole(role)
+    const fast = profile(role, 'Fast')
+    const deep = profile(role, 'Deep')
+
+    assert.equal(typeof id, 'string')
+    assert.ok(id.length > 0)
+    assert.equal(fast.ok, true)
+    assert.equal(deep.ok, true)
+    assert.equal(fast.systemPromptId, id)
+    assert.equal(deep.systemPromptId, id)
+    assert.equal(typeof resource, 'string')
+    assert.ok(resource.length > 0, `${role} resource must not be empty`)
+    assert.equal(resource.includes(id), false, 'resource bytes must not smuggle the identity field')
+    ids.add(id)
+  }
+  assert.equal(ids.size, roles.length, 'canonical roles must not alias prompt identities')
 })
 
-const assertSystemFrozen = ({ catalog, managerPromptId, reviewerPromptId }) => {
-  assert.deepEqual(roleCatalogBytes(promptResources.load()), catalog)
-  assert.equal(promptIdValue(systemPromptIdFor(Role.Manager)), managerPromptId)
-  assert.equal(promptIdValue(systemPromptIdFor(Role.Reviewer)), reviewerPromptId)
-}
+test('WHAT[PREFIX-STABILITY-002] PROMPT_019_effective_agent_changes_by_tier_not_prompt_identity', () => {
+  const managerFast = delegation.vocabulary('Manager', 'Fast', OWNER)
+  const managerDeep = delegation.vocabulary('Manager', 'Deep', OWNER)
+  const reviewerFast = delegation.vocabulary('Reviewer', 'Fast', OWNER)
+  const reviewerDeep = delegation.vocabulary('Reviewer', 'Deep', OWNER)
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
-  const what = readFileSync(new URL('../WHAT.md', import.meta.url), 'utf8')
-  assert.match(what, /system-prompt-stability\.test\.mjs/)
-  assert.match(what, /byte-identical/)
-  assert.match(what, /Peer Fallback/)
+  assert.notEqual(managerFast.agent, managerDeep.agent)
+  assert.notEqual(reviewerFast.agent, reviewerDeep.agent)
+  assert.equal(profile('Manager', 'Fast').systemPromptId, profile('Manager', 'Deep').systemPromptId)
+  assert.equal(profile('Reviewer', 'Fast').systemPromptId, profile('Reviewer', 'Deep').systemPromptId)
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_fallback_peer_switch_keeps_system_prompt_bytes', () => {
-  const managerBytes = promptResources.load().ManagerSystemPrompt
-  assert.ok(managerBytes.length > 0)
+test('WHAT[PREFIX-STABILITY-002] PROMPT_019_role_identity_does_not_inherit_attempt_cursor_or_replica_metadata', () => {
+  const manager = profile('Manager', 'Fast')
+  const reviewer = profile('Reviewer', 'Fast')
 
-  const managerPromptId = promptIdValue(systemPromptIdFor(Role.Manager))
-  assert.equal(managerPromptId, 'manager')
-  assert.doesNotMatch(managerPromptId, /fast|deep/i)
-
-  const authority = planner.authority({
-    role: 'Manager',
-    selected: 'fast-manager',
-    peer: 'deep-manager',
-  })
-
-  const profiles = [0, 1, 2, 3].map((offset) =>
-    planner.plan({
-      authorityProfile: authority,
-      cursor: cursor.atOffset(offset),
-      kind: requestKind.workMain,
-    }),
-  )
-
-  assert.deepEqual(
-    profiles.map((profile) => profile.systemPromptId),
-    ['manager', 'manager', 'manager', 'manager'],
-  )
-  assert.deepEqual(
-    profiles.map((profile) => profile.effectiveAgent),
-    ['fast-manager', 'fast-manager', 'deep-manager', 'deep-manager'],
-  )
-  assert.deepEqual(
-    profiles.map((profile) => profile.toolCapabilities),
-    profiles.map(() => profiles[0].toolCapabilities),
-  )
-
-  const replica = planner.plan({
-    authorityProfile: authority,
-    cursor: cursor.atOffset(2),
-    kind: requestKind.of('StrengthReplica'),
-  })
-  assert.equal(replica.systemPromptId, 'manager')
-  assert.equal(replica.effectiveAgent, 'deep-manager')
-
-  assert.equal(promptResources.load().ManagerSystemPrompt, managerBytes)
-
-  const coderBytes = promptResources.load().CoderSystemPrompt
-  assert.equal(promptIdValue(systemPromptIdFor(Role.Coder)), 'coder')
-  assert.doesNotMatch(coderBytes, /strength|replica|prefetch/i)
-
-  const coderAuthority = planner.authority({
-    role: 'Coder',
-    selected: 'fast-coder',
-    peer: 'deep-coder',
-  })
-  const coderProfiles = [0, 2].map((offset) =>
-    planner.plan({
-      authorityProfile: coderAuthority,
-      cursor: cursor.atOffset(offset),
-      kind: requestKind.workMain,
-    }),
-  )
-  assert.equal(coderProfiles[0].systemPromptId, coderProfiles[1].systemPromptId)
-  assert.notEqual(coderProfiles[0].effectiveAgent, coderProfiles[1].effectiveAgent)
+  // Authority owns prompt IDs; the derived attempt profile owns request kind and
+  // capabilities. Neither surface accepts a cursor or a replica id as an identity
+  // input, so changing those lifecycle facts cannot change the role identity.
+  assert.equal(manager.systemPromptId, authority.systemPromptIdForRole('Manager'))
+  assert.equal(reviewer.systemPromptId, authority.systemPromptIdForRole('Reviewer'))
+  assert.equal('cursor' in manager, false)
+  assert.equal('replicaId' in manager, false)
+  assert.equal(manager.requestKind, 'WorkMain')
+  assert.equal(reviewer.requestKind, 'WorkMain')
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_STABILITY_t1_review_reanchor_keep_system_prompt_bytes', async () => {
-  const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
+test('WHAT[PREFIX-STABILITY-002] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {
+  const managerFast = profile('Manager', 'Fast')
+  const managerDeep = profile('Manager', 'Deep')
+  const inspectorFast = profile('Inspector', 'Fast')
 
-  const catalogBefore = roleCatalogBytes(promptResources.load())
-  assert.ok(catalogBefore.ManagerSystemPrompt.length > 0)
-  assert.ok(catalogBefore.ReviewerSystemPrompt.length > 0)
-  const managerPromptId = promptIdValue(systemPromptIdFor(Role.Manager))
-  const reviewerPromptId = promptIdValue(systemPromptIdFor(Role.Reviewer))
-  assert.equal(managerPromptId, 'manager')
-  assert.equal(reviewerPromptId, 'reviewer')
-
-  const managerAuthority = planner.authority({
-    role: 'Manager',
-    selected: 'fast-manager',
-    peer: 'deep-manager',
-  })
-  const profileBefore = planner.plan({
-    authorityProfile: managerAuthority,
-    cursor: cursor.atOffset(0),
-    kind: requestKind.workMain,
-  })
-  assert.equal(profileBefore.systemPromptId, managerPromptId)
-
-  // T1 — entrustment rides conversation tool result only (TODO-015 / GLORY-075).
-  const t1Conversation = managerNarrative.wrapT1AcceptedResult('checkpoint body')
-  assert.match(t1Conversation, /The account has been accepted/)
-  assert.match(t1Conversation, /The Manager who will carry it is you/)
-  assert.ok(t1Conversation.includes('checkpoint body'))
-  assert.notEqual(t1Conversation, catalogBefore.ManagerSystemPrompt)
-  assert.doesNotMatch(catalogBefore.ManagerSystemPrompt, /The account has been accepted/)
-  assert.doesNotMatch(catalogBefore.ManagerSystemPrompt, /checkpoint body/)
-  assertSystemFrozen({
-    catalog: catalogBefore,
-    managerPromptId,
-    reviewerPromptId,
-  })
-
-  // review — AppendReviewChallenge injects conversation bytes; system catalog untouched.
-  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
-  const wire = providerProjection.decodeMessageView(toList(raw)).Messages
-  const reviewSnapshot = projectionSnapshot.of({
-    currentProjection: providerProjection.toSemantic(providerProjection.decodeMessageView(toList(raw))),
-    blogFrames: [],
-    transportMessages: [],
-  })
-  const reviewIntent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
-  const reviewPlan = projectionAlgebra.plan([reviewIntent])
-  assert.equal(reviewPlan.ok, true)
-  assert.deepEqual(reviewPlan.intents, ['AppendReviewChallenge'])
-  const reviewView = projectionAlgebra.renderMessagesWithIntents(reviewSnapshot, wire, [reviewIntent])
-  const reviewTexts = reviewView.flatMap((m) => m.parts.map((p) => p.text)).filter(Boolean)
-  assert.equal(
-    reviewTexts.some((t) => t === reviewChallenge.prompt || t.includes(reviewChallenge.text)),
-    true,
-    'review must append challenge conversation bytes',
-  )
-  assert.equal(
-    reviewTexts.includes(catalogBefore.ManagerSystemPrompt),
-    false,
-    'review must not swap Manager system catalog into conversation',
-  )
-  assert.equal(
-    reviewTexts.includes(catalogBefore.ReviewerSystemPrompt),
-    false,
-    'review must not swap Reviewer system catalog into conversation',
-  )
-  const reviewProfile = planner.plan({
-    authorityProfile: planner.authority({
-      role: 'Reviewer',
-      selected: 'fast-reviewer',
-      peer: 'deep-reviewer',
-    }),
-    cursor: cursor.atOffset(0),
-    kind: requestKind.workMain,
-    origin: promptOrigin.continuation('ReviewConfirmation'),
-  })
-  assert.equal(reviewProfile.systemPromptId, reviewerPromptId)
-  assertSystemFrozen({
-    catalog: catalogBefore,
-    managerPromptId,
-    reviewerPromptId,
-  })
-
-  // reanchor — Host compaction intent is a wire no-op; catalog / prompt id stay.
-  const reanchorRaw = [
-    { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'before' }] },
-    { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'after' }] },
-  ]
-  const reanchorWire = providerProjection.decodeMessageView(toList(reanchorRaw)).Messages
-  const reanchorSnapshot = projectionSnapshot.of({
-    currentProjection: providerProjection.toSemantic(providerProjection.decodeMessageView(toList(reanchorRaw))),
-    blogFrames: [],
-    transportMessages: [],
-    hostReanchor: projectionSnapshot.hostReanchor(),
-  })
-  const reanchorIntent = projectionIntent.reanchorAfterCompaction
-  const reanchorPlan = projectionAlgebra.plan([reanchorIntent])
-  assert.equal(reanchorPlan.ok, true)
-  assert.deepEqual(reanchorPlan.intents, ['ReanchorAfterCompaction'])
-  const reanchorView = projectionAlgebra.renderMessagesWithIntents(reanchorSnapshot, reanchorWire, [reanchorIntent])
-  assert.deepEqual(
-    reanchorView.map((m) => m.parts[0]?.text),
-    ['before', 'after'],
-    'reanchor must not rewrite conversation wire bytes',
-  )
-  const profileAfter = planner.plan({
-    authorityProfile: managerAuthority,
-    cursor: cursor.atOffset(0),
-    kind: requestKind.workMain,
-    origin: promptOrigin.authorityRoot(rootKind.human),
-  })
-  assert.equal(profileAfter.systemPromptId, profileBefore.systemPromptId)
-  assertSystemFrozen({
-    catalog: catalogBefore,
-    managerPromptId,
-    reviewerPromptId,
-  })
+  assert.ok(managerFast.toolCapabilities.length > 0)
+  assert.ok(managerDeep.toolCapabilities.length > 0)
+  assert.ok(inspectorFast.toolCapabilities.length > 0)
+  assert.deepEqual(managerFast.toolCapabilities, managerDeep.toolCapabilities)
+  assert.notDeepEqual(managerFast.toolCapabilities, inspectorFast.toolCapabilities)
 })

@@ -7,9 +7,30 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { xTrace, lifecycleWorkRecord } from '../../verification-system/tests/support/domain.mjs'
+import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
 
-const opening = (assignment, requirements = []) => lifecycleWorkRecord.opening({ assignment, requirements })
+const xTrace = {
+  item: ({ sequence, role, part }) => workRecord.item(sequence, role, part),
+  text: workRecord.textPart,
+  reasoning: workRecord.reasoningPart,
+}
+const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
+const materialize = (
+  openingValue,
+  frames,
+  trace,
+  coverage,
+  openingEnd = { Sequence: 0 },
+  includeOpening = true,
+) =>
+  workRecord.materialize(
+    openingValue,
+    frames,
+    trace,
+    Number(coverage.Sequence),
+    Number(openingEnd.Sequence),
+    includeOpening,
+  )
 
 const trace = [
   xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('Rewrite the fallback controller.') }),
@@ -19,7 +40,7 @@ const trace = [
 ]
 
 test('WHAT[WORK-RECORD-011] LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('Rewrite the fallback controller.'),
     [],
     trace,
@@ -42,7 +63,7 @@ test('WHAT[WORK-RECORD-011] LWR_statement_is_the_last_assistant_text_in_recent_w
 })
 
 test('WHAT[WORK-RECORD-012] LWR_prose_claim_never_renders_fixed_report_headings', () => {
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('Rewrite the fallback controller.'),
     [],
     trace,

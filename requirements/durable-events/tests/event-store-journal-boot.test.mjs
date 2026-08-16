@@ -30,29 +30,29 @@ const withRepo = (fn) => {
 
 test('WHAT[DURABLE-EVENTS-013] restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
   await withRepo(async (commonDir) => {
-    const first = mustOk(await journal.bootWithWriterId(commonDir, 'boot-writer-a', 'rt_before', 4242, '2026-04-01T00:00:00Z'), 'first boot')
+    const first = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'boot-writer-a', 'rt_before', 4242, '2026-04-01T00:00:00Z'), 'first boot')
 
     assert.equal(Number(first.localSeq), 1)
     const firstAppend = mustOk(
-      await journal.appendAgent(first.journal, { kind: 'Session', session: 'ses_es_boot' }, null, CLOSED),
+      await journal.JournalSurface_appendAgent(first.journal, { kind: 'Session', session: 'ses_es_boot' }, null, CLOSED),
       'first append',
     )
-    assert.ok(journal.hasSession(first.journal, 'ses_es_boot'))
-    first.release?.()
+    assert.ok(journal.JournalSurface_hasSession(first.journal, 'ses_es_boot'))
+    journal.JournalSurface_dispose(first.journal)
 
-    const restarted = mustOk(await journal.bootWithWriterId(commonDir, 'boot-writer-b', 'rt_after', 5252, '2026-04-02T00:00:00Z'), 'reboot')
+    const restarted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'boot-writer-b', 'rt_after', 5252, '2026-04-02T00:00:00Z'), 'reboot')
     assert.equal(Number(restarted.localSeq), 1, 'fresh RuntimeId owns a fresh LocalSeq domain')
-    assert.ok(journal.hasSession(restarted.journal, 'ses_es_boot'), 'prior journal fact is rebuilt only through Integrator boot replay')
-    restarted.release?.()
+    assert.ok(journal.JournalSurface_hasSession(restarted.journal, 'ses_es_boot'), 'prior journal fact is rebuilt only through Integrator boot replay')
+    journal.JournalSurface_dispose(restarted.journal)
   })
 })
 
 test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
   await withRepo(async (commonDir) => {
-    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'boot-empty', 'rt_empty', 6001, '2026-05-01T00:00:00Z'), 'empty boot')
+    const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'boot-empty', 'rt_empty', 6001, '2026-05-01T00:00:00Z'), 'empty boot')
     assert.equal(Number(booted.localSeq), 1)
     assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', 'boot-empty.ndjson')), false)
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 

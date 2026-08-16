@@ -7,118 +7,104 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
-import { contentHash as hash } from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
-import { shelfmarkFor } from '../../../dist/Repository/Knowledge/Casebook/Index.js'
-import { listItems } from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
+import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
+import * as index from '../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
-import { HostToolArguments_$ctor_4E60E31B as hostArgs } from '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 
-const fileRead = (path, h) => ({ kind: 'file-read', path, contentHash: h })
+const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fetch-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+  const handle = eventStore.EventStoreSurface_create(dir, 'fetch-tool')
+  return { dir, handle, cleanup: () => { eventStore.EventStoreSurface_dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
-const factoryFor = async () => {
-  const codec = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
-  return codec.ToolHostCodec_factory({ tool: { schema: { string: () => ({ type: 'string' }) } } })
-}
-const buildTool = async (dir, store) => {
-  const { spec } = await import('../../../dist/OpenCode/Tools/FetchTool.js')
-  return spec(await factoryFor(), dir, store)
-}
-const record = (session, q, a, obs) => ({ sessionId: session, q, a, observations: obs, lastAccessOrder: 0 })
+const factory = { tool: { schema: { string: () => ({}) } } }
+const buildTool = (dir, handle) => fetchSurface.contract(factory, dir, handle)
+const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
+const execute = (tool, shelfmark) => tool.execute({ shelfmark }, { sessionID: 'ses', agent: 'fast-inspector' })
+const assertFresh = (text) => assert.match(text, /No change was found in the evidence this answer depended on\.|这份答案所依赖的证据没有变化。/i)
+const assertRefreshed = (text) => assert.match(text, /The evidence this case depended on had changed\.|这份 case 所依赖的证据已经变化。/i)
+const assertNoCase = (text) => assert.match(text, /The Casebook contains no entry under that shelfmark\.|Casebook 在该 shelfmark 下没有条目。/i)
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
 test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_refreshing', async () => {
-  const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+  const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', hash('hello'))])
-    assert.equal((await casebook.archive(local.store, caseRec)).ok, true)
-    const tool = await buildTool(dir, local.store)
-    assert.equal(tool.Name, 'fetch')
-    assert.deepEqual(listItems(tool.Arguments).map(([name]) => name), ['shelfmark'])
-    const shelfmark = shelfmarkFor('s1', caseRec.q)
+    const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
+    assert.equal((await casebook.archive(handle, caseRec)).ok, true)
+    const tool = buildTool(dir, handle)
+    assert.equal(tool.name, 'fetch')
+    const shelfmark = index.shelfmarkFor('s1', caseRec.q)
 
-    const fresh = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(fresh, /No change was found in the evidence this answer depended on\./)
+    const fresh = await execute(tool, shelfmark)
+    assertFresh(fresh)
     assertNoMachineFreshness(fresh)
     assert.equal(fresh.includes('s1'), false)
 
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     const { port, createCalls, programCalls } = scriptedBookkeeperPort()
-    setSessionPort(port)
-    const afterChange = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(afterChange, /The evidence this case depended on had changed\./)
+    bookkeeper.setSessionPort(port)
+    const afterChange = await execute(tool, shelfmark)
+    assertRefreshed(afterChange)
+
     assert.equal(afterChange.includes(CANONICAL_A), true)
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
 
-    const again = await tool.Execute(hostArgs({ shelfmark: shelfmarkFor('s1', CANONICAL_Q) }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(again, /No change was found in the evidence this answer depended on\./)
-    const missing = await tool.Execute(hostArgs({ shelfmark: 'Nothing here · 00000000' }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(missing, /The Casebook contains no entry under that shelfmark\./)
+    const again = await execute(tool, index.shelfmarkFor('s1', CANONICAL_Q))
+    assertFresh(again)
+    const missing = await execute(tool, 'Nothing here · 00000000')
+    assertNoCase(missing)
+
   } finally {
-    resetSessionPort()
-    local.close()
+    bookkeeper.resetSessionPort()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async () => {
-  const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+  const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', hash('hello'))])
-    const archived = await casebook.archive(local.store, caseRec)
-    assert.equal(archived.ok, true)
-    const tool = await buildTool(dir, local.store)
-    const shelfmark = shelfmarkFor('s1', caseRec.q)
+    const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
+    assert.equal((await casebook.archive(handle, caseRec)).ok, true)
+    const tool = buildTool(dir, handle)
+    const shelfmark = index.shelfmarkFor('s1', caseRec.q)
 
-    const fresh = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
+    const fresh = await execute(tool, shelfmark)
     assert.match(fresh, /answer = "A1"/)
   } finally {
-    local.close()
     cleanup()
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-001] CASE009_fetch_never_writes_the_subject', async () => {
-  const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+test('WHAT[KNOWLEDGE-REUSE-004] CASE009_fetch_never_writes_the_subject', async () => {
+  const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    await casebook.archive(local.store, record('s1', 'Q', 'A', [fileRead('a.txt', hash('hello'))]))
-    const tool = await buildTool(dir, local.store)
-    await tool.Execute(hostArgs({ shelfmark: shelfmarkFor('s1', 'Q') }), { sessionID: 'ses', agent: 'fast-inspector' })
+    await casebook.archive(handle, record('s1', 'Q', 'A', [fileRead('a.txt', casebook.contentHash('hello'))]))
+    const tool = buildTool(dir, handle)
+    await execute(tool, index.shelfmarkFor('s1', 'Q'))
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'hello')
   } finally {
-    local.close()
     cleanup()
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-011] CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
-  const { dir, cleanup } = sandbox()
-  const local = createLocalEventStore()
+  const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    await casebook.archive(local.store, record('s1', 'Q', 'A', [fileRead('a.txt', hash('hello'))]))
-    const tool = await buildTool(dir, local.store)
-    const shelfmark = shelfmarkFor('s1', 'Q')
-    const [a, b] = await Promise.all([
-      tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' }),
-      tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' }),
-    ])
-    assert.match(a, /No change was found in the evidence this answer depended on\./)
+    await casebook.archive(handle, record('s1', 'Q', 'A', [fileRead('a.txt', casebook.contentHash('hello'))]))
+    const tool = buildTool(dir, handle)
+    const shelfmark = index.shelfmarkFor('s1', 'Q')
+    const [a, b] = await Promise.all([execute(tool, shelfmark), execute(tool, shelfmark)])
+    assertFresh(a)
     assert.equal(b, a)
   } finally {
-    local.close()
     cleanup()
   }
 })

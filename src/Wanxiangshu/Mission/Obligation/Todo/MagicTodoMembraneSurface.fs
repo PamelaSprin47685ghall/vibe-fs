@@ -1,0 +1,222 @@
+namespace Wanxiangshu.Mission.Obligation.Todo
+
+open System
+open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+
+/// JS-native effect-shell owner for the Magic Todo membrane.
+/// Journal, snapshot, and review ports stay opaque resources; only durable
+/// receipts and provider-visible outcomes cross the boundary.
+type MagicTodoPreparedHandle private(bridge: MagicTodoMembrane.PreparedBridge) =
+    member internal _.Bridge = bridge
+    static member Create(bridge: MagicTodoMembrane.PreparedBridge) = MagicTodoPreparedHandle(bridge)
+
+[<RequireQualifiedAccess>]
+module MagicTodoMembraneSurface =
+
+    let private text (value: obj) =
+        if isNull value then "" else string value
+
+    type private SnapshotPort(source: obj) =
+        interface ISessionSnapshotPort with
+            member _.GetMessages(_sessionId: SessionId) =
+                task {
+                    let! value = source?GetMessages()
+
+                    if not (isNull (value?ok)) && not (unbox<bool> (value?ok)) then
+                        return Error(text (value?error))
+                    else
+                        return Ok []
+                }
+
+    let private stateOf (value: obj) : SnapshotToolPartState =
+        match if isNull value then 0 else unbox<int> value with
+        | 1 -> SnapshotToolPartState.Completed ""
+        | 2 -> SnapshotToolPartState.Failed ""
+        | _ -> SnapshotToolPartState.Pending
+
+    let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
+
+    let private localizedOf (callId: string) (inputCanonical: string) (state: obj) : MagicTodoLocality.LocalizedToolCall =
+        let frontier = cursor 7
+
+        { ProviderRun = ProviderRunIdentity.create "msg-provider-run"
+          HostToolPartId = HostToolPartId.create "prt-todowrite"
+          ToolCallId = ToolCallId.create callId
+          ToolName = "todowrite"
+          InputCanonical = inputCanonical
+          State = stateOf state
+          TodowriteCallIdsInMessage = [ ToolCallId.create callId ]
+          ToolPartOrdinal = 1
+          ReviewFrontier = frontier
+          Range =
+            { Start = frontier
+              EndExclusive = cursor 8 } }
+
+    let private obligationsOf (values: obj array) : ObligationList =
+        if isNull values then
+            []
+        else
+            values
+            |> Array.toList
+            |> List.map (fun value -> { Name = text (value?name); Work = text (value?work) })
+
+    let private blobView reference digest =
+        box {| reference = BlobRef.value reference; digest = BlobDigest.value digest |}
+
+    let private preparedView (bridge: MagicTodoMembrane.PreparedBridge) : obj =
+        box
+            {| managerLifeId = ManagerLifeId.value bridge.Prepared.ManagerLifeId
+               todoWriteId = TodoWriteId.value bridge.Prepared.TodoWriteId
+               toolCallId = ToolCallId.value bridge.Prepared.ToolCallId
+               planCompleteDeclared = bridge.Prepared.PlanCompleteDeclared
+               providerInputDigest = bridge.Prepared.ProviderInputDigest
+               baseTodo = blobView bridge.Prepared.BaseTodoRef bridge.Prepared.BaseTodoDigest
+               proposedTodo = blobView bridge.Prepared.ProposedTodoRef bridge.Prepared.ProposedTodoDigest
+               proposedTodoRef = BlobRef.value bridge.Prepared.ProposedTodoRef
+               proposedTodoDigest = BlobDigest.value bridge.Prepared.ProposedTodoDigest
+               baseTodoRef = BlobRef.value bridge.Prepared.BaseTodoRef
+               baseTodoDigest = BlobDigest.value bridge.Prepared.BaseTodoDigest |}
+
+    let private rejectionView rejection : obj =
+        let code =
+            match rejection with
+            | MagicTodoMembrane.PrepareRejection.NoOpenManagerLife -> "NoOpenManagerLife"
+            | MagicTodoMembrane.PrepareRejection.UnexpectedToolName _ -> "UnexpectedToolName"
+            | MagicTodoMembrane.PrepareRejection.SnapshotInputMismatch -> "SnapshotInputMismatch"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.MultipleTodowriteInMessage _) -> "MultipleTodowriteInMessage"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.EmptyObligationName _) -> "EmptyObligationName"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) -> "DuplicateObligationName"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.IdentityCorruption _) -> "IdentityCorruption"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) -> "AwaitingConsumableReview"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.FirstSuicideWithoutCheckpoint) -> "FirstSuicideWithoutCheckpoint"
+            | MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _ -> "AwaitingConsumableReview"
+            | MagicTodoMembrane.PrepareRejection.BlobRead _ -> "BlobRead"
+            | MagicTodoMembrane.PrepareRejection.BlobWrite _ -> "BlobWrite"
+            | MagicTodoMembrane.PrepareRejection.BlobDigestMismatch _ -> "BlobDigestMismatch"
+            | MagicTodoMembrane.PrepareRejection.BlobDecode _ -> "BlobDecode"
+            | MagicTodoMembrane.PrepareRejection.JournalAppend _ -> "JournalAppend"
+            | MagicTodoMembrane.PrepareRejection.ProjectionInconsistent _ -> "ProjectionInconsistent"
+
+        box {| code = code; detail = sprintf "%A" rejection |}
+
+    let private acceptRejectionView rejection : obj =
+        match rejection with
+        | MagicTodoMembrane.AcceptRejection.InputDigestMismatch -> box {| code = "InputDigestMismatch" |}
+        | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch -> box {| code = "OutputDigestMismatch" |}
+        | MagicTodoMembrane.AcceptRejection.JournalAppend reason -> box {| code = "JournalAppend"; detail = reason |}
+
+    let private physicalOf value =
+        match text value with
+        | "RecoveredCompletedToolPart" -> PhysicalSuccessEvidence.RecoveredCompletedToolPart
+        | _ -> PhysicalSuccessEvidence.LiveAfterSuccess
+
+    let openLife (handle: JournalHandle) (sessionId: string) (lifeId: string) : Task<obj> =
+        ObligationJournalSurface.appendManagerLifecycle
+            handle
+            sessionId
+            "LifeOpened"
+            (box
+                {| sessionId = sessionId
+                   lifeId = lifeId
+                   openingUserMessageId = "msg-opening"
+                   openingTextRef = "blob-opening"
+                   openingTextDigest = "digest-opening"
+                   openingCursorSequence = 1 |})
+
+    let prepare
+        (handle: JournalHandle)
+        (sessionId: string)
+        (callId: string)
+        (inputCanonical: string)
+        (providerInputDigest: string)
+        (planComplete: bool)
+        (obligations: obj array)
+        (state: obj)
+        : Task<obj> =
+        task {
+            let localized = localizedOf callId inputCanonical state
+            let! result =
+                MagicTodoMembrane.prepare
+                    handle.Journal
+                    (SessionId.create sessionId)
+                    localized
+                    providerInputDigest
+                    planComplete
+                    (obligationsOf obligations)
+
+            return
+                match result with
+                | Error rejection -> box {| ok = false; error = rejectionView rejection |}
+                | Ok bridge ->
+                    box
+                        {| ok = true
+                           value =
+                            box
+                                {| bridge = MagicTodoPreparedHandle.Create bridge
+                                   prepared = preparedView bridge
+                                   submitted =
+                                    bridge.SubmittedObligations
+                                    |> List.map (fun value -> box {| name = value.Name; work = value.Work |})
+                                    |> List.toArray |} |}
+        }
+
+    let accept
+        (handle: JournalHandle)
+        (prepared: MagicTodoPreparedHandle)
+        (physicalEvidence: string)
+        (observedInputDigest: string)
+        (observedOutputDigest: string)
+        : Task<obj> =
+        task {
+            let! result =
+                MagicTodoMembrane.accept
+                    handle.Journal
+                    prepared.Bridge
+                    (physicalOf physicalEvidence)
+                    observedInputDigest
+                    observedOutputDigest
+
+            return
+                match result with
+                | Error rejection -> box {| ok = false; error = acceptRejectionView rejection |}
+                | Ok outcome ->
+                    box
+                        {| ok = true
+                           value =
+                            box
+                                {| enrichedResult = outcome.EnrichedResult
+                                   needsDedicatedEnlist = outcome.NeedsDedicatedEnlist
+                                   needsEnsureReview = outcome.NeedsEnsureReview |} |}
+        }
+
+    let appendFact
+        (handle: JournalHandle)
+        (sessionId: string)
+        (factJson: string)
+        : Task<obj> =
+        ObligationJournalSurface.appendMagicTodo handle sessionId null factJson
+
+    let snapshot (handle: JournalHandle) (lifeId: string) : obj =
+        ObligationJournalSurface.snapshotMagicTodo handle lifeId
+
+    let createHooks (handle: JournalHandle) (snapshot: obj) (processReview: obj) : obj =
+        let snapshotPort =
+            if isNull snapshot then None else Some((SnapshotPort(snapshot) :> ISessionSnapshotPort))
+
+        let processReviewPort =
+            if isNull processReview then None else Some(unbox<ProcessReviewPort> processReview)
+
+        let hooks = MagicTodoHostHooks.create (Some handle.Journal) snapshotPort processReviewPort
+
+        createObj
+            [ "Definition", box hooks.Definition
+              "Before", box hooks.Before
+              "After", box hooks.After ]

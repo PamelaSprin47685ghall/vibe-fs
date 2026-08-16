@@ -55,7 +55,7 @@ type DiagnosticWaitSnapshot = { Active: DiagnosticWait list; History: WaitTransi
 
 1. `Domain/` 不得引用 `CausalWaitRegistry|CausalWaitHub|CausalAwait`。
 2. `Application/` 不得访问 `IWaitSnapshotReader`。
-3. `Journal/**` 与 `Kernel/Fact.fs` 不得出现 `CausalWait|WaitKind|IWaitSnapshotReader|CausalAwait`。
+3. `Journal/**` 与 `Composition/Durable/Fact.fs` 不得出现 `CausalWait|WaitKind|IWaitSnapshotReader|CausalAwait`。
 4. `Session/PromptDispatcher.fs`、`Application/Reconciliation/TurnCompletionProgram.fs` 不得引用诊断 snapshot / `causal-waits.json`。
 5. 关键迁移点（SyncDelegateRuntime、CohortWorkflow、FinalityTool、JoinTool、Host、ReviewBarrierWorkflow、ManagerJob）不得有裸 `return!/do! xxx.Task` 业务等待（`cancel.Task` 臂与 `CausalAwait.await` 窗内例外）。
 6. `CausalWaitRegistry.fs` 的 `let mutable` 必须带 `DSL-MUTABLE` 注释。

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Composition.Durable
+namespace Wanxiangshu.OpenCode.Host.PairProgramming
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

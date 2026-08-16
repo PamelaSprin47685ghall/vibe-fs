@@ -6,7 +6,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// JS-native semantic surface for intra-participant Fission laws.
+/// JS-native semantic surface for intra-participant Fission laws. Admission
+/// runtimes are opaque Host capabilities; lifecycle observations and algebraic
+/// state cross as plain JS data only.
 module FissionSurface =
 
     [<Emit("$0==null")>]
@@ -125,21 +127,100 @@ module FissionSurface =
 
         FissionCompletionRouting.targets laneCount parsed |> List.toArray
 
-    let deliveryEmpty (laneCount: int) : FissionDelivery = FissionDelivery.empty laneCount
+    let private deliveryToJs (delivery: FissionDelivery) : obj =
+        let deliveries =
+            delivery.Delivered
+            |> Map.toList
+            |> List.map (fun (completionId, laneIndices) ->
+                box
+                    {| completionId = completionId
+                       laneIndices = laneIndices |> Set.toArray |})
+            |> List.toArray
 
-    let deliveryMark (completionId: string) (laneIndex: int) (delivery: FissionDelivery) : obj =
-        match FissionDelivery.mark completionId laneIndex delivery with
-        | Ok next -> box {| ok = true; delivery = next |}
+        box
+            {| laneCount = delivery.LaneCount
+               deliveries = deliveries |}
+
+    let private deliveryOfJs (value: obj) : FissionDelivery =
+        let rawEntries = value?deliveries
+
+        let entries =
+            if isNullish rawEntries then
+                [||]
+            else
+                unbox<obj array> rawEntries
+
+        let delivered =
+            entries
+            |> Array.fold
+                (fun state entry ->
+                    let completionId = string (entry?completionId)
+                    let laneIndices =
+                        let raw = entry?laneIndices
+
+                        if isNullish raw then
+                            [||]
+                        else
+                            unbox<obj array> raw
+                            |> Array.map intOf
+
+                    Map.add completionId (Set.ofArray laneIndices) state)
+                Map.empty
+
+        { LaneCount = intOf (value?laneCount)
+          Delivered = delivered }
+
+    let deliveryEmpty (laneCount: int) : obj = FissionDelivery.empty laneCount |> deliveryToJs
+
+    let deliveryMark (completionId: string) (laneIndex: int) (delivery: obj) : obj =
+        match FissionDelivery.mark completionId laneIndex (deliveryOfJs delivery) with
+        | Ok next -> box {| ok = true; delivery = deliveryToJs next |}
         | Error(FissionDeliveryError.InvalidLane index) ->
             box
                 {| ok = false
                    reason = "InvalidLane"
                    laneIndex = index |}
 
-    let deliveryPendingTargets (completionId: string) (delivery: FissionDelivery) : int array =
-        FissionDelivery.pendingTargets completionId delivery |> List.toArray
+    let deliveryPendingTargets (completionId: string) (delivery: obj) : int array =
+        FissionDelivery.pendingTargets completionId (deliveryOfJs delivery) |> List.toArray
 
-    let workBundleEmpty: FissionWorkBundle = FissionWorkBundle.empty
+    let private bundleToJs (bundle: FissionWorkBundle) : obj =
+        let entries =
+            FissionWorkBundle.entries bundle
+            |> List.map (fun (index, workRef) -> box [| box index; box workRef |])
+            |> List.toArray
+
+        box {| entries = entries |}
+
+    let private bundleOfJs (value: obj) : FissionWorkBundle =
+        let rawEntries = value?entries
+
+        let entries =
+            if isNullish rawEntries then
+                [||]
+            else
+                unbox<obj array> rawEntries
+
+        entries
+        |> Array.fold
+            (fun bundle entry ->
+                let pair = unbox<obj array> entry
+                let laneIndex = intOf pair.[0]
+                let workRecordRef = string pair.[1]
+
+                match FissionWorkBundle.add laneIndex workRecordRef bundle with
+                | Ok next -> next
+                | Error(FissionBundleError.ConflictingLaneRecord(index, existing, proposed)) ->
+                    invalidArg
+                        "value"
+                        (sprintf
+                            "conflicting lane record %d: existing %s, proposed %s"
+                            index
+                            existing
+                            proposed))
+            FissionWorkBundle.empty
+
+    let workBundleEmpty: obj = FissionWorkBundle.empty |> bundleToJs
 
     let private bundleErrorToJs (error: FissionBundleError) : obj =
         match error with
@@ -151,36 +232,41 @@ module FissionSurface =
                    existingRef = existing
                    proposedRef = proposed |}
 
-    let workBundleAdd (laneIndex: int) (workRecordRef: string) (bundle: FissionWorkBundle) : obj =
-        match FissionWorkBundle.add laneIndex workRecordRef bundle with
-        | Ok next -> box {| ok = true; bundle = next |}
+    let workBundleAdd (laneIndex: int) (workRecordRef: string) (bundle: obj) : obj =
+        match FissionWorkBundle.add laneIndex workRecordRef (bundleOfJs bundle) with
+        | Ok next -> box {| ok = true; bundle = bundleToJs next |}
         | Error error -> bundleErrorToJs error
 
-    let workBundleMerge (left: FissionWorkBundle) (right: FissionWorkBundle) : obj =
-        match FissionWorkBundle.merge left right with
-        | Ok next -> box {| ok = true; bundle = next |}
+    let workBundleMerge (left: obj) (right: obj) : obj =
+        match FissionWorkBundle.merge (bundleOfJs left) (bundleOfJs right) with
+        | Ok next -> box {| ok = true; bundle = bundleToJs next |}
         | Error error -> bundleErrorToJs error
 
-    let workBundleKeys (bundle: FissionWorkBundle) : int array =
-        FissionWorkBundle.keys bundle |> List.toArray
+    let workBundleKeys (bundle: obj) : int array =
+        FissionWorkBundle.keys (bundleOfJs bundle) |> List.toArray
 
-    let workBundleEntries (bundle: FissionWorkBundle) : obj array =
-        FissionWorkBundle.entries bundle
+    let workBundleEntries (bundle: obj) : obj array =
+        FissionWorkBundle.entries (bundleOfJs bundle)
         |> List.map (fun (index, workRef) -> box [| box index; box workRef |])
         |> List.toArray
 
     let convergenceReady
         (laneCount: int)
         (completionIds: string array)
-        (bundle: FissionWorkBundle)
-        (delivery: FissionDelivery)
+        (bundle: obj)
+        (delivery: obj)
         : bool =
-        FissionConvergence.ready laneCount (Array.toList completionIds) bundle delivery
+        FissionConvergence.ready
+            laneCount
+            (Array.toList completionIds)
+            (bundleOfJs bundle)
+            (deliveryOfJs delivery)
 
-    let startedLane (index: int) (sessionId: string) (prompt: string) : obj =
+    /// A lane observation carries only semantic lane work. Physical session
+    /// identity remains a Host-owned capability and never crosses this surface.
+    let startedLane (index: int) (_sessionId: string) (prompt: string) : obj =
         box
             {| index = index
-               sessionId = sessionId
                prompt = prompt
                hasAgentId = false
                hasHandle = false
@@ -294,24 +380,17 @@ module FissionSurface =
                 } }
 
     let private admissionToJs (admission: FissionAdmission) : obj =
-        let parent =
-            match admission.ParentSessionId with
-            | None -> null
-            | Some parent -> box (SessionId.value parent)
-
         let lanes =
             admission.Lanes
             |> List.map (fun lane ->
                 box
                     {| index = lane.Index
-                       sessionId = SessionId.value lane.SessionId
                        prompt = lane.Prompt |})
             |> List.toArray
 
         box
             {| ok = true
-               ownerSessionId = SessionId.value admission.OwnerSessionId
-               parentSessionId = parent
+               laneCount = lanes.Length
                ownerWorkRecord = admission.OwnerWorkRecord
                lanes = lanes |}
 

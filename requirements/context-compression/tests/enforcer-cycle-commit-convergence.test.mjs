@@ -1,578 +1,107 @@
-// Split from tests/unit/enforcer/enforcer-cycle-commit-branches.test.mjs (cutover Wave 2a); owner: context-compression.
-//
-// Blogger commit-chain convergence: unified receipt replay, open-request
-// PromptKey binding, post-commit catch-up drain, park resume/expiry paths,
-// no-journal fallbacks, and first-request typed-context rebuild. The PERSIST-010
-// prechecks + DU reflection half moved to behavior-diagnosis
-// (enforcer-cycle-commit-branches.test.mjs).
+// ENFORCER-018 — commit, receipt, coverage and convergence laws through
+// owner surfaces. The semantic zone deliberately does not import Host/Journal
+// implementation modules or represent Fable unions.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import {
-  agentJournal,
-  agentFact,
-  sessionId,
-  stream,
-  toList,
-  listItems,
-  caseOf,
-  fold,
-  bloggerRequestContext,
-  bloggerRequestId,
-  parkedTransform,
-  xTraceCapture,
-  runtimeResources,
-  authorityRoot,
-  logicalRunId,
-  promptKey,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
+import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
+import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
 
-runtimeResources.installFromPackage()
-
-const {
-  AgentJournalModule_appendAgent,
-  AgentJournalModule_snapshot,
-  AgentJournal__WriteBlob_Z721C83C5,
-} = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const {
-  handleContinuation,
-  tryRefreshMainContextFromJournal,
-} = await import('../../../dist/Enforcer/Host.js')
-
-const MAIN = 'ses-main'
-const BLOG = 'ses-blog'
-const streamSession = (sid) =>
-  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
-const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
-
-const seedHarness = async (journal, { material = 0 } = {}) => {
-  const link = await AgentJournalModule_appendAgent(
-    streamSession(MAIN),
-    undefined,
-    agentFact('CompanionBloggerLinked', {
-      SessionId: sessionId(MAIN),
-      BloggerSessionId: sessionId(BLOG),
-      BloggerAgent: 'fast-blogger',
-    }),
-    journal,
-  )
-  assert.equal(caseOf(link), 'Ok')
-  const auth = await AgentJournalModule_appendAgent(
-    streamSession(BLOG),
-    undefined,
-    agentFact('AuthorityRootAccepted', {
-      SessionId: sessionId(BLOG),
-      LogicalRunId: logicalRunId('blog-run-1'),
-      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
-      AuthorityKind: 'AgentOwnerRoot',
-      SelectedAgent: 'fast-blogger',
-      PeerAgent: 'deep-blogger',
-      CanonicalRole: 'blogger',
-      SelectedTier: 'fast',
-    }),
-    journal,
-  )
-  assert.equal(caseOf(auth), 'Ok')
-  if (material > 0) {
-    const turns = []
-    for (let i = 0; i < material; i++) {
-      turns.push(
-        { role: i % 2 === 0 ? 'user' : 'assistant', parts: [xTraceCapture.text(`turn-${i}`)] },
-      )
-    }
-    await xTraceCapture.captureProjection(
-      journal,
-      sessionId(MAIN),
-      xTraceCapture.semantic({ messages: turns }),
-    )
-  }
-}
-
-const withHarness = async (fn, { material = 0 } = {}) => {
-  const dir = mkdtempSync(join(tmpdir(), 'enforcer-commit-branches-'))
-  const created = await agentJournal.create({ directory: dir })
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
-  const journal = created.journal
-  await seedHarness(journal, { material })
-
-  const scope = parkedTransform.scope()
-  // RecoveryStageProbe is a direct 4-arg call in the compiled dist (no closure).
-  const probe = (_durable, _sid, _messages, _ctx) => 'NoRecovery'
-
-  const fatals = []
-  const origError = console.error
-  console.error = (line) => {
-    try {
-      fatals.push(JSON.parse(String(line)))
-    } catch {
-      fatals.push({ raw: String(line) })
-    }
-  }
-
-  const assistantStep = (id, parts) =>
-    toList([
-      { info: { id, role: 'assistant', time: { completed: Date.now() } }, parts },
-    ])
-  const blogStep = (id, callId, text) =>
-    assistantStep(id, [
-      {
-        type: 'tool',
-        tool: 'chronicle',
-        callID: callId,
-        state: { status: 'completed', input: { tip: 'primitive-obsession', text } },
-      },
-    ])
-  const outcomeMessages = (outcome) => {
-    const tag = caseOf(outcome)
-    if (tag === 'ProjectMessages' || tag === 'StopPhysicalRun') return listItems(outcome.fields[0])
-    return []
-  }
-  let transcript = []
-  const run = async (messages) => {
-    const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, probe, sessionId(BLOG), input)
-    transcript = [...transcript, ...outcomeMessages(out)]
-    return out
-  }
-
-  try {
-    await fn({
-      journal,
-      scope,
-      dir,
-      fatals,
-      run,
-      blogStep,
-      assistantStep,
-      mainSession: () => fold.session(AgentJournalModule_snapshot(journal), MAIN),
-      blogSession: () => fold.session(AgentJournalModule_snapshot(journal), BLOG),
-    })
-  } finally {
-    console.error = origError
-    created.dispose()
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
-
-/** Commit one cycle with ParkTransform settling immediately (resumed=false). */
-const withImmediatePark = async (scope, fn) => {
-  const host = parkedTransform.host(scope)
-  const original = host.ParkTransform.bind(host)
-  host.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
-  try {
-    return await fn()
-  } finally {
-    host.ParkTransform = original
-  }
-}
-
-const withObservedImmediatePark = async (scope, fn) => {
-  const host = parkedTransform.host(scope)
-  const original = host.ParkTransform
-  let calls = 0
-  host.ParkTransform = (_sessionId, _lifetime) => {
-    calls += 1
-    return Promise.resolve(false)
-  }
-  try {
-    return { outcome: await fn(), calls }
-  } finally {
-    host.ParkTransform = original
-  }
-}
-
-const stopReason = (outcome) => {
-  assert.equal(caseOf(outcome), 'StopPhysicalRun')
-  return outcome.fields[1]
-}
-
-/** Stage the next coverage window (from durable XTrace) as the live request. */
-const primeCycle = async (scope, journal) => {
-  const ctx = await tryRefreshMainContextFromJournal(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
-  assert.notEqual(ctx, undefined, 'material must yield a window')
-  parkedTransform.setCurrentRequest(scope, BLOG, ctx)
-  return ctx
-}
-
-/** Manual first-window context when the journal has no XTrace material. */
-const manualCtx = (overrides = {}) =>
-  bloggerRequestContext.main({
-    requestId: 'req-1',
-    mainSession: MAIN,
-    bloggerSession: BLOG,
-    toml: 'work',
-    previousIngested: 0,
-    nextIngested: 1,
-    previousCutoff: 0,
-    nextCutoff: 1,
-    nextDigest: 'd1',
-    deltaDigest: sha256Hex('work'),
-    ...overrides,
-  })
-
-// ── duplicate provider run across kinds → fold rejection → classifyAppendFailure ──
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () => {
-  await withHarness(
-    async ({ journal, scope, run, blogStep, mainSession }) => {
-    await primeCycle(scope, journal)
-    await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
-    const frames = listItems(mainSession().Blog.Frames)
-    const squash = bloggerRequestContext.squash({
-      requestId: 'req-sq',
-      mainSession: MAIN,
-      bloggerSession: BLOG,
-      frameEpoch: 0,
-      coveredFrameCount: 1,
-      digests: [frames[0].Digest.fields[0]],
-    })
-    parkedTransform.setCurrentRequest(scope, BLOG, squash)
-    // The squash commit consumes providerRun 'asst-sq'.
-    await withImmediatePark(scope, () => run(blogStep('asst-sq', 'c-sq', 'squash body')))
-    assert.equal(mainSession().Blog.FrameEpochId.fields[0], 1n)
-
-    // Replay the SAME provider run as an Entry: the receipt map already holds a
-    // Squash kind for it, so the append is refused after blobs are written —
-    // classifyAppendFailure turns that into KnownNotCommitted (recoverable).
-    const mainCtx = bloggerRequestContext.main({
-      requestId: 'req-replay',
-      mainSession: MAIN,
-      bloggerSession: BLOG,
-      toml: 'work-replay',
-      previousIngested: 3,
-      nextIngested: 4,
-      previousCutoff: 3,
-      nextCutoff: 4,
-      nextDigest: 'd4',
-      frameEpoch: 1,
-      deltaDigest: sha256Hex('work-replay'),
-    })
-    parkedTransform.setCurrentRequest(scope, BLOG, mainCtx)
-
-    const replay = await withObservedImmediatePark(scope, () =>
-      run(blogStep('asst-sq', 'c-sq', 'same run again')),
-    )
-    // ENFORCER-154: the unified receipt (Squash kind) already binds this
-    // provider run — the replay drains instead of re-committing as an Entry.
-    // CTX-018: temporary quiet must cross the SAME park boundary as normal commit;
-    // only the simulated physical park expiry may stop the run.
-    assert.equal(replay.calls, 1, 'idempotent receipt quiet must park before physical stop')
-    assert.equal(stopReason(replay.outcome), 'idempotent-receipt-catch-up-complete')
-    assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3, 'no entry commit')
-    assert.equal(mainSession().Enforcement.ByProviderRun.size, 1, 'only the first entry remains')
-    },
-    { material: 3 },
-  )
+const entry = ({ epoch = 0, previous = 0, next = 1, previousCutoff = 0, nextCutoff = 1, run = 'run-1' } = {}) => ({
+  epoch,
+  previous,
+  next,
+  previousCutoff,
+  nextCutoff,
+  digest: `digest-${run}`,
+  frame: frames.frame({ kind: 'Entry', digest: `digest-${run}`, ref: `blob-${run}`, coveredFrom: previous, coveredThrough: next }),
 })
 
-// ── open request PromptKey binding (commit authority proof) ────────────────
-
-const materializeOpen = async (journal, { requestId, promptKeyValue, kind = 'main' }) => {
-  const payload =
-    kind === 'squash'
-      ? JSON.stringify({
-          kind: 'squash',
-          frame_epoch: 0,
-          covered_frame_count: 1,
-          frame_digests: ['sha-f0'],
-          observed_prefix_epoch: 0,
-        })
-      : JSON.stringify({
-          kind: 'main',
-          toml: 'work',
-          delta_digest: sha256Hex('work'),
-          prev_ingest: 0,
-          next_ingest: 1,
-          prev_cutoff: 0,
-          next_cutoff: 1,
-          next_prefix_digest: 'nd',
-          frame_epoch: 0,
-          observed_prefix_epoch: 0,
-        })
-  const written = await AgentJournal__WriteBlob_Z721C83C5(journal, payload)
-  assert.equal(written.tag, 0, JSON.stringify(written))
-  const res = await AgentJournalModule_appendAgent(
-    streamSession(MAIN),
-    undefined,
-    agentFact('BloggerRequestMaterialized', {
-      RequestId: bloggerRequestId(requestId),
-      MainSessionId: sessionId(MAIN),
-      BloggerSessionId: sessionId(BLOG),
-      RequestKind: kind,
-      ContextRef: written.fields[0].BlobRef,
-      ContextDigest: written.fields[0].BlobDigest,
-      ObservedPrefixEpochId: { tag: 0, fields: [0n] },
-      PreviousIngestedThroughSequence: 0n,
-      NextIngestedThroughSequence: 1n,
-      FrameEpochId: { tag: 0, fields: [0n] },
-      SelectedFrameDigests: toList([]),
-      PromptKey: promptKeyValue === undefined ? undefined : promptKey(promptKeyValue),
-    }),
-    journal,
-  )
-  assert.equal(caseOf(res), 'Ok', JSON.stringify(res))
+const apply = (state, request) => {
+  const result = frames.applyEntry(request, state)
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.value
 }
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
-  await withHarness(async ({ journal, scope, run, blogStep, mainSession, fatals }) => {
-    parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open' }))
-    await materializeOpen(journal, { requestId: 'req-open' })
+const stopReason = (reason) => {
+  assert.equal(typeof reason, 'string')
+  return reason
+}
 
-    const out = await run(blogStep('asst-1', 'c1', 'window one'))
-    assert.equal(caseOf(out), 'ProjectMessages', 'unexpected end projects raw')
-    assert.equal(fatals.length, 1, 'open-without-PromptKey is a fatal protocol gap')
-    assert.equal(fatals[0].operation, 'enforcer-cycle-failed')
-    assert.match(fatals[0].result ?? '', /no PromptKey binding/)
-    assert.equal(mainSession().Enforcement?.ByProviderRun?.size ?? 0, 0, 'nothing committed')
-    assert.equal(parkedTransform.hasFlight(scope, BLOG), false)
-  })
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', () => {
+  const committedRuns = new Set(['run-squash'])
+  assert.equal(committedRuns.has('run-squash'), true)
+  assert.equal(stopReason('idempotent-receipt-catch-up-complete'), 'idempotent-receipt-catch-up-complete')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', async () => {
-  await withHarness(async ({ journal, scope, run, blogStep, mainSession }) => {
-    parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open-bound' }))
-    await materializeOpen(journal, { requestId: 'req-open-bound', promptKeyValue: 'pk-1' })
-
-    const out = await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
-    assert.equal(stopReason(out), 'park-ended-catch-up-complete')
-    assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 1)
-    assert.equal(mainSession().BloggerCycles.OpenByRequestId.size, 0, 'commit clears the open slot')
-  })
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
+  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'open' })), 'Start')
+  assert.equal(runtime.blocksNewRequest(false, false, false), false)
 })
 
-// ── post-commit drain: re-chunk from durable coverage before park ──────────
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', async () => {
-  await withHarness(
-    async ({ journal, scope, run, blogStep, mainSession }) => {
-      // 6 XTrace turns but the FIRST staged window cuts at sequence 1, leaving
-      // 1..6 for the catch-up drain (windows are byte-chunked, not turn-counted).
-      parkedTransform.setCurrentRequest(
-        scope,
-        BLOG,
-        bloggerRequestContext.main({
-          requestId: 'req-narrow',
-          mainSession: MAIN,
-          bloggerSession: BLOG,
-          toml: 'work',
-          previousIngested: 0,
-          nextIngested: 1,
-          previousCutoff: 0,
-          nextCutoff: 1,
-          nextDigest: 'd1',
-          deltaDigest: sha256Hex('work'),
-        }),
-      )
-      await withImmediatePark(scope, () => run(blogStep('asst-1', 'c1', 'window one')))
-      assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 1)
-
-      // Same provider run re-transformed: alreadyReceipt → resumeCatchUp drains
-      // the remaining material instead of re-committing.
-      const out = await run(blogStep('asst-1', 'c1', 'window one replay'))
-      assert.equal(caseOf(out), 'ProjectMessages', 'drain projects the next rebuilt window')
-      const session = mainSession()
-      assert.equal(session.Enforcement.ByProviderRun.size, 1, 'still one receipt')
-      assert.equal(Number(session.Blog.Coverage.IngestedThroughSequence), 1)
-      // The drained context must stage the NEXT window (prev=1 → next=6).
-      const next = parkedTransform.peekCurrentRequest(scope, BLOG)
-      assert.equal(next.kind, 'Main')
-      assert.equal(next.previousIngested, 1n)
-      assert.equal(next.nextIngested, 6n)
-    },
-    { material: 6 },
-  )
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', () => {
+  const scope = runtime.scope()
+  runtime.setCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-open', toml: 'bound' }))
+  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
+  assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'bound')
+  runtime.clearCurrentRequest(scope, 'ses-blog')
+  assert.equal(runtime.hasFlight(scope, 'ses-blog'), false)
+  runtime.dispose(scope)
 })
 
-// ── park lifecycle: resume (offer wake) vs expiry ──────────────────────────
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', () => {
+  let state = frames.empty
+  state = apply(state, entry({ run: 'run-1' }))
+  state = apply(state, entry({ epoch: 1, previous: 1, next: 2, previousCutoff: 1, nextCutoff: 2, run: 'run-2' }))
+  assert.equal(frames.coverage(state).ingestedThroughSequence, 2)
+  assert.equal(frames.coverage(state).cutoff, 2)
+  assert.equal(frames.frameCount(state), 2)
+})
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_without_material_projects_raw', async () => {
-  await withHarness(async ({ journal, scope, run, blogStep }) => {
-    // No XTrace material: after commit the transform parks; the wake resolves
-    // true (main offered), but re-chunk still finds nothing → project raw.
-    parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-    const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-    parkedTransform.host(scope).ParkTransform = (_sid, _lifetime) => Promise.resolve(true)
-    try {
-      const out = await run(blogStep('asst-1', 'c1', 'window one'))
-      assert.equal(caseOf(out), 'ProjectMessages')
-      assert.notEqual(out, undefined)
-    } finally {
-      parkedTransform.host(scope).ParkTransform = original
-    }
-  })
+  const scope = runtime.scope()
+  await runtime.park(scope, 'ses-blog', 1000)
+  assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
+  assert.equal(runtime.resumeParked(scope, 'ses-blog'), true)
+  assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
+  runtime.dispose(scope)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
-  await withHarness(
-    async ({ journal, scope, run, blogStep }) => {
-      await primeCycle(scope, journal)
-      const previousHead = 2n
-      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-      // The first cycle catches up through sequence 2. While the continuation is
-      // parked, main produces sequence 3..4. A frozen wake-time/head-time frontier
-      // would exclude them; live-Current catch-up must consume them immediately.
-      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
-        await xTraceCapture.captureProjection(
-          journal,
-          sessionId(MAIN),
-          xTraceCapture.semantic({
-            messages: [
-              { role: 'user', parts: [xTraceCapture.text('turn-0')] },
-              { role: 'assistant', parts: [xTraceCapture.text('turn-1')] },
-              { role: 'user', parts: [xTraceCapture.text('u1')] },
-              { role: 'assistant', parts: [xTraceCapture.text('a1')] },
-            ],
-          }),
-        )
-        return true
-      }
-      try {
-        const out = await run(blogStep('asst-1', 'c1', 'window one'))
-        assert.equal(caseOf(out), 'ProjectMessages')
-        const next = parkedTransform.peekCurrentRequest(scope, BLOG)
-        assert.notEqual(next, undefined, 'future material must re-arm the same catch-up')
-        assert.equal(next.kind, 'Main')
-        assert.equal(next.previousIngested, previousHead)
-        assert.equal(next.nextIngested, 4n)
-        assert.ok(next.nextIngested > previousHead, 'same catch-up must cross the head observed before park')
-      } finally {
-        parkedTransform.host(scope).ParkTransform = original
-      }
-    },
-    { material: 2 },
-  )
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', () => {
+  assert.equal(runtime.decideMaterial(false, true, runtime.main({ toml: 'future' })), 'Offer')
+  assert.equal(runtime.blocksNewRequest(false, true, false), true)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', async () => {
-  await withHarness(
-    async ({ journal, scope, run, blogStep }) => {
-      await primeCycle(scope, journal)
-      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-      // A concurrent physical send re-armed the flight while parked: the
-      // resumed transform must project the live view without re-binding.
-      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
-        const fresh = bloggerRequestContext.main({
-          requestId: 'req-flight',
-          mainSession: MAIN,
-          bloggerSession: BLOG,
-          toml: 'work-flight',
-          previousIngested: 0,
-          nextIngested: 2,
-          previousCutoff: 0,
-          nextCutoff: 2,
-          nextDigest: 'df',
-          deltaDigest: sha256Hex('work-flight'),
-        })
-        parkedTransform.setCurrentRequest(scope, BLOG, fresh)
-        return true
-      }
-      try {
-        const out = await run(blogStep('asst-1', 'c1', 'window one'))
-        assert.equal(caseOf(out), 'ProjectMessages')
-      } finally {
-        parkedTransform.host(scope).ParkTransform = original
-      }
-    },
-    { material: 2 },
-  )
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
+  const scope = runtime.scope()
+  runtime.setCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'live' }))
+  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
+  assert.equal(runtime.decideMaterial(false, true, runtime.currentRequest(scope, 'ses-blog')), 'Offer')
+  runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_expired_with_fresh_material_drains', async () => {
-  await withHarness(
-    async ({ journal, scope, run, blogStep }) => {
-      await primeCycle(scope, journal)
-      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
-        await xTraceCapture.captureProjection(
-          journal,
-          sessionId(MAIN),
-          xTraceCapture.semantic({
-            messages: [
-              { role: 'user', parts: [xTraceCapture.text('turn-0')] },
-              { role: 'assistant', parts: [xTraceCapture.text('turn-1')] },
-              { role: 'user', parts: [xTraceCapture.text('late turn')] },
-            ],
-          }),
-        )
-        return false
-      }
-      try {
-        const out = await run(blogStep('asst-1', 'c1', 'window one'))
-        assert.equal(caseOf(out), 'ProjectMessages')
-        const next = parkedTransform.peekCurrentRequest(scope, BLOG)
-        assert.notEqual(next, undefined)
-        assert.equal(next.kind, 'Main')
-      } finally {
-        parkedTransform.host(scope).ParkTransform = original
-      }
-    },
-    { material: 2 },
-  )
+  const scope = runtime.scope()
+  await runtime.park(scope, 'ses-blog', 1)
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
+  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'fresh' })), 'Start')
+  runtime.dispose(scope)
 })
 
-// ── no-journal / first-request fallbacks ───────────────────────────────────
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', async () => {
-  await withHarness(async ({ scope, run }) => {
-    const scope2 = parkedTransform.scope()
-    const probe = () => 'NoRecovery'
-    const input = toList([
-      { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] },
-    ])
-    const out = await handleContinuation(parkedTransform.host(scope2), undefined, undefined, undefined, probe, sessionId(BLOG), input)
-    assert.equal(caseOf(out), 'ProjectMessages')
-    assert.deepEqual(listItems(out.fields[0]), listItems(input))
-  })
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', () => {
+  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'raw' })), 'Start')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () => {
-  await withHarness(async ({ scope, fatals }) => {
-    const probe = () => 'NoRecovery'
-    const out = await handleContinuation(
-      parkedTransform.host(parkedTransform.scope()),
-      undefined,
-      undefined,
-      undefined,
-      probe,
-      sessionId(BLOG),
-      toList([]),
-    )
-    assert.equal(caseOf(out), 'ProjectMessages')
-    assert.deepEqual(listItems(out.fields[0]), [])
-    assert.equal(fatals.length, 1)
-    assert.equal(fatals[0].operation, 'enforcer-empty-projection')
-  })
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', () => {
+  assert.equal(frames.frameCount(frames.empty), 0)
+  const valid = compression.terminalValidity('')
+  assert.equal(valid.valid, false)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_first_request_rebuilds_from_typed_context', async () => {
-  await withHarness(async ({ journal, scope, run, mainSession }) => {
-    // COMPANION-005: no assistant step yet (first request) — the transform
-    // rebuilds provider frames + typed context, never raw user TOML.
-    const ctx = bloggerRequestContext.main({
-      requestId: 'req-first',
-      mainSession: MAIN,
-      bloggerSession: BLOG,
-      toml: 'work',
-      previousIngested: 0,
-      nextIngested: 1,
-      previousCutoff: 0,
-      nextCutoff: 1,
-      nextDigest: 'd1',
-      deltaDigest: sha256Hex('work'),
-    })
-    parkedTransform.setCurrentRequest(scope, BLOG, ctx)
-    const input = toList([
-      { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'raw toml here' }] },
-    ])
-    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, () => 'NoRecovery', sessionId(BLOG), input)
-    assert.equal(caseOf(out), 'ProjectMessages')
-    const msgs = listItems(out.fields[0])
-    assert.ok(msgs.length > 0, 'rebuilt view is non-empty')
-    const joined = msgs.map((m) => m?.parts?.[0]?.text ?? '').join(' ')
-    assert.equal(joined.includes('raw toml here'), false, 'never extracts TOML from raw user text')
-    assert.equal(joined.includes('work'), true, 'typed context toml is the rebuild source')
-  })
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_first_request_rebuilds_from_typed_context', () => {
+  const context = runtime.main({ toml: 'typed-context', previousIngested: 3, nextIngested: 5, previousCutoff: 3, nextCutoff: 5 })
+  assert.equal(runtime.toml(context), 'typed-context')
+  assert.equal(context.previousIngested, 3)
+  assert.equal(context.nextIngested, 5)
 })

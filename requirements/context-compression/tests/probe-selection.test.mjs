@@ -15,7 +15,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { prefixEpochProjection as prefix, probeSelection as selection } from '../../verification-system/tests/support/domain.mjs'
+import * as selection from '../../../dist/Context/Companion/CompressionSurface.js'
+const prefix = selection
 
 /** A digest oracle that agrees with the Companion at every cutoff. */
 const agreeing = (digest) => () => digest
@@ -268,8 +269,8 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_the_built_candidate_is_exactly_what_
   const promoted = prefix.applyRebase({ previousEpoch: 0, nextEpoch: 1, candidate: result.candidate }, prefix.empty)
 
   assert.equal(promoted.ok, true, promoted.ok ? '' : promoted.error)
-  assert.deepEqual(promoted.value.Snapshot, result.candidate, 'promoted byte-for-byte, not rebuilt')
-  assert.equal(promoted.value.Snapshot.SealRoot, result.sealRoot)
+  assert.deepEqual(promoted.value.snapshot, result.candidate, 'promoted byte-for-byte, not rebuilt')
+  assert.equal(promoted.value.snapshot.sealRoot, result.sealRoot)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_candidate_the_selector_refuses_is_one_the_fold_would_also_refuse', () => {

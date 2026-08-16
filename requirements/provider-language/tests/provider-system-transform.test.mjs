@@ -8,46 +8,32 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { create as transformSystem } from '../../../dist/OpenCode/Host/ProviderSystemTransform.js'
 import {
-  BookkeeperRuntime_bindSession as bindBookkeeper,
-  BookkeeperRuntime_unbindSession as unbindBookkeeper,
-} from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
-import { promptResources, providerLanguage, sessionId } from '../../verification-system/tests/support/domain.mjs'
+  clearAllForTests,
+  bindOnce,
+  loadBookkeeperSystem,
+  transformBookkeeperSystem,
+} from '../../../dist/Participant/Provider/LanguageSurface.js'
 
 const SID = 'provider-system-i18n-bookkeeper'
 
-test.beforeEach(() => providerLanguage.clearAllForTests())
-test.afterEach(() => {
-  unbindBookkeeper(SID)
-  providerLanguage.clearAllForTests()
-})
+test.beforeEach(() => clearAllForTests())
+test.afterEach(() => clearAllForTests())
 
 test('WHAT[PROVIDER-LANGUAGE-005] system transform localizes only the wanxiangshu-owned segment', async () => {
-  const sid = sessionId(SID)
-  assert.equal(providerLanguage.bindOnce(sid, providerLanguage.simplifiedChinese).ok, true)
-  bindBookkeeper(SID, 'tx-i18n', 'owner-i18n')
-
-  const english = promptResources.loadBookkeeperSystemFor(providerLanguage.english)
-  const chinese = promptResources.loadBookkeeperSystemFor(providerLanguage.simplifiedChinese)
+  assert.equal(bindOnce(SID, 'SimplifiedChinese').ok, true)
+  const english = loadBookkeeperSystem('English')
+  const chinese = loadBookkeeperSystem('SimplifiedChinese')
   const hostOwned = 'HOST-OWNED-SYSTEM-BYTES'
-  const output = { system: [english, hostOwned] }
+  const output = await transformBookkeeperSystem(SID, [english, hostOwned])
 
-  await transformSystem(undefined, { sessionID: SID, model: {} }, output)
-
-  assert.equal(output.system[0], chinese)
-  assert.equal(output.system[1], hostOwned)
+  assert.deepEqual(output.system, [chinese, hostOwned])
   assert.match(output.system[0], /^# 共同法/)
 })
 
 test('WHAT[PROVIDER-LANGUAGE-001] system transform is stable for an English session', async () => {
-  const sid = sessionId(SID)
-  assert.equal(providerLanguage.bindOnce(sid, providerLanguage.english).ok, true)
-  bindBookkeeper(SID, 'tx-i18n', 'owner-i18n')
-
-  const english = promptResources.loadBookkeeperSystemFor(providerLanguage.english)
-  const output = { system: [english, 'OTHER'] }
-  await transformSystem(undefined, { sessionID: SID, model: {} }, output)
-
+  assert.equal(bindOnce(SID, 'English').ok, true)
+  const english = loadBookkeeperSystem('English')
+  const output = await transformBookkeeperSystem(SID, [english, 'OTHER'])
   assert.deepEqual(output.system, [english, 'OTHER'])
 })

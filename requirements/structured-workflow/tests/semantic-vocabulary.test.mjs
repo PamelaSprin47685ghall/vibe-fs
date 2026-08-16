@@ -56,12 +56,12 @@ test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_
   // site. A global DecoratorBase / MiddlewarePipeline / IWorkflowDecorator
   // framework is banned. Assert the production vocabulary modules expose no
   // such framework shape.
-  const frameworkShape = /(DecoratorBase|MiddlewarePipeline|IWorkflowDecorator|WorkflowBuilder)$/
+  const frameworkNames = ['DecoratorBase', 'MiddlewarePipeline', 'IWorkflowDecorator', 'WorkflowBuilder']
   for (const modulePath of Object.keys(VOCABULARY_SURFACES)) {
     const mod = await load(modulePath)
-    const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
-    const hits = names.filter((n) => frameworkShape.test(n))
-    assert.deepEqual(hits, [], `${modulePath} must not export middleware-framework shapes`)
+    for (const name of frameworkNames) {
+      assert.equal(name in mod, false, `${modulePath} must not export ${name}`)
+    }
   }
 })
 

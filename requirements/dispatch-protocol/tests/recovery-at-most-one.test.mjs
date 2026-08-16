@@ -18,20 +18,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import {
-  agentJournal,
-  idValue,
-  isSome,
-  listItems,
-  okResult,
-  prod,
-  promptDispatcher,
-  reviewSeal,
-  sessionId,
-  transportReceipt,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const { reconcile } = await prod('Interaction/Dispatch/Recovery')
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as recovery from '../../../dist/Interaction/Dispatch/RecoverySurface.js'
 
 const BOOT_AFTER_CLAIM = '2099-01-01T00:00:00Z'
 
@@ -39,65 +28,55 @@ const capturingPort = (captured) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
   SendPrompt: async (session, text, options) => {
     captured.push({ text, options })
-    return promptDispatcher.admittedWithReceipt(transportReceipt('accepted-011'))
+    return dispatch.admittedWithReceipt('accepted-011')
   },
 })
 
-/** role=user 消息：PromptKey 落在 metadata（PROMPT-011 的物理落地证据）。
- * Host-raw 形状：reconcile 经 SessionSnapshotPort.projectMessages 投影，
- * 与真实 Host 转录形状一致（`wanxiangshu_prompt_key` 是 PromptMetadataCodec 字段）。 */
+/** role=user 消息：PromptKey 落在 metadata（PROMPT-011 的物理落地证据）。 */
 const userMessageWithKey = (id, keyValue) => ({
   id,
   role: 'user',
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-const snapshotPort = (rawMessages) => ({
-  GetMessages: async (sid) => okResult(reviewSeal.projectMessages(rawMessages)),
-})
-
 test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp008-'))
   try {
     // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt —— claim 挂起。
-    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2026-01-01T00:00:00Z' })
+    const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp008-1', 'rt_1', 4242, '2026-01-01T00:00:00Z')
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
-      const runtime = promptDispatcher.forJournal(first.journal)
       const captured = []
-      const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, capturingPort(captured), {
-        session: 'ses_008',
-        text: 'crash before acceptance',
-        agent: 'fast-coder',
-      })
+      const sent = await dispatch.sendAgentOwnerRoot(
+        capturingPort(captured),
+        first.journal,
+        'ses_008',
+        'crash before acceptance',
+        'fast-coder',
+      )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
-      assert.ok(isSome(sent.key), 'Detached 仍返回 PromptKey')
+      assert.ok(sent.key, 'Detached 仍返回 PromptKey')
       assert.equal(captured.length, 1, '发送只发生一次')
 
       // 启动 2（崩溃后重开同目录）：快照找不到匹配物理消息 → StillPending，
       // 保持 Pending，绝不重发（SendPrompt 不再被调用）。
-      const second = await agentJournal.createFromBoot({
-        directory: base,
-        runtime: 'rt_2',
-        startedAt: BOOT_AFTER_CLAIM,
-      })
+      const second = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp008-2', 'rt_2', 4243, BOOT_AFTER_CLAIM)
       assert.equal(second.ok, true, second.ok ? '' : JSON.stringify(second.error))
       try {
-        const secondRuntime = promptDispatcher.forJournal(second.journal)
-        const noMatch = listItems(await reconcile(second.journal, snapshotPort([])))
+        const noMatch = await recovery.reconcile(second.journal, [])
         assert.equal(noMatch.length, 1, '恰好一条 pending claim 被恢复')
-        assert.equal(noMatch[0].Outcome.name, 'StillPending')
+        assert.equal(noMatch[0].outcome, 'StillPending')
         assert.equal(captured.length, 1, '未证明物理落地 → 绝不自动重发')
         assert.equal(
-          promptDispatcher.pendingClaimCount(secondRuntime, 'ses_008'),
+          dispatch.pendingClaimCount(second.journal, 'ses_008'),
           1,
           '未找到时 claim 保持 Pending',
         )
       } finally {
-        second.dispose()
+        journal.JournalSurface_dispose(second.journal)
       }
     } finally {
-      first.dispose()
+      journal.JournalSurface_dispose(first.journal)
     }
   } finally {
     rmSync(base, { recursive: true, force: true })
@@ -109,51 +88,45 @@ test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_p
   try {
     // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt（accepted-*）。
     // accepted-* 永远不够：claim 保持 pending，未解决。
-    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2026-01-01T00:00:00Z' })
+    const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp004-1', 'rt_1', 4242, '2026-01-01T00:00:00Z')
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
-      const runtime = promptDispatcher.forJournal(first.journal)
       const captured = []
-      const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, capturingPort(captured), {
-        session: 'ses_004',
-        text: 'crash before acceptance',
-        agent: 'fast-coder',
-      })
+      const sent = await dispatch.sendAgentOwnerRoot(
+        capturingPort(captured),
+        first.journal,
+        'ses_004',
+        'crash before acceptance',
+        'fast-coder',
+      )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
-      assert.ok(isSome(sent.key), 'Detached 仍返回 PromptKey')
+      assert.ok(sent.key, 'Detached 仍返回 PromptKey')
       const key = sent.key
       assert.equal(captured.length, 1, '发送只发生一次')
       assert.equal(
-        promptDispatcher.pendingClaimCount(runtime, 'ses_004'),
+        dispatch.pendingClaimCount(first.journal, 'ses_004'),
         1,
         'accepted-* 收据不解决 claim —— 物理证据尚未建立',
       )
 
       // 启动 2：快照里出现 role=user 且携带同一 PromptKey 的物理消息 → Proven。
-      const second = await agentJournal.createFromBoot({
-        directory: base,
-        runtime: 'rt_2',
-        startedAt: BOOT_AFTER_CLAIM,
-      })
+      const second = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp004-2', 'rt_2', 4243, BOOT_AFTER_CLAIM)
       assert.equal(second.ok, true, second.ok ? '' : JSON.stringify(second.error))
       try {
-        const secondRuntime = promptDispatcher.forJournal(second.journal)
-        const matched = listItems(
-          await reconcile(second.journal, snapshotPort([userMessageWithKey('msg_physical_004', key)])),
-        )
+        const matched = await recovery.reconcile(second.journal, [userMessageWithKey('msg_physical_004', key)])
         assert.equal(matched.length, 1)
-        assert.equal(matched[0].Outcome.name, 'Proven')
+        assert.equal(matched[0].outcome, 'Proven')
         assert.equal(
-          promptDispatcher.pendingClaimCount(secondRuntime, 'ses_004'),
+          dispatch.pendingClaimCount(second.journal, 'ses_004'),
           0,
           '找到物理证据 → 补写 PhysicalAccepted，claim 解决',
         )
         assert.equal(captured.length, 1, '恢复只证明，从不重发')
       } finally {
-        second.dispose()
+        journal.JournalSurface_dispose(second.journal)
       }
     } finally {
-      first.dispose()
+      journal.JournalSurface_dispose(first.journal)
     }
   } finally {
     rmSync(base, { recursive: true, force: true })
@@ -163,58 +136,56 @@ test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_p
 test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
-    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2020-01-01T00:00:00Z' })
+    const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp011b-1', 'rt_1', 4242, '2020-01-01T00:00:00Z')
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
-      const runtime = promptDispatcher.forJournal(first.journal)
       const captured = []
-      const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, capturingPort(captured), {
-        session: 'ses_011b',
-        text: 'never lands',
-        agent: 'fast-coder',
-      })
+      const sent = await dispatch.sendAgentOwnerRoot(
+        capturingPort(captured),
+        first.journal,
+        'ses_011b',
+        'never lands',
+        'fast-coder',
+      )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.equal(captured.length, 1)
 
       // Repeated process restarts are not recovery authority. No physical message
       // means StillPending forever unless an explicit later workflow proves it.
       for (let start = 2; start <= 3; start += 1) {
-        const reopened = await agentJournal.createFromBoot({
-          directory: base,
-          runtime: `rt_${start}`,
-          startedAt: BOOT_AFTER_CLAIM,
-        })
+        const reopened = await journal.JournalSurface_bootWithWriterId(
+          base,
+          `writer-dp011b-${start}`,
+          `rt_${start}`,
+          4240 + start,
+          BOOT_AFTER_CLAIM,
+        )
         assert.equal(reopened.ok, true, reopened.ok ? '' : JSON.stringify(reopened.error))
-        const outcomes = listItems(await reconcile(reopened.journal, snapshotPort([])))
+        const outcomes = await recovery.reconcile(reopened.journal, [])
         assert.equal(outcomes.length, 1)
-        assert.equal(outcomes[0].Outcome.name, 'StillPending', `启动 ${start}：未超预算，保持 Pending`)
+        assert.equal(outcomes[0].outcome, 'StillPending', `启动 ${start}：未超预算，保持 Pending`)
         assert.equal(captured.length, 1, '绝不重发')
-        reopened.dispose()
+        journal.JournalSurface_dispose(reopened.journal)
       }
 
       // Even a fourth restart cannot manufacture Abandoned/GaveUp.
-      const fourth = await agentJournal.createFromBoot({
-        directory: base,
-        runtime: 'rt_4',
-        startedAt: BOOT_AFTER_CLAIM,
-      })
+      const fourth = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp011b-4', 'rt_4', 4244, BOOT_AFTER_CLAIM)
       assert.equal(fourth.ok, true, fourth.ok ? '' : JSON.stringify(fourth.error))
       try {
-        const fourthRuntime = promptDispatcher.forJournal(fourth.journal)
-        const unresolved = listItems(await reconcile(fourth.journal, snapshotPort([])))
+        const unresolved = await recovery.reconcile(fourth.journal, [])
         assert.equal(unresolved.length, 1)
-        assert.equal(unresolved[0].Outcome.name, 'StillPending')
+        assert.equal(unresolved[0].outcome, 'StillPending')
         assert.equal(
-          promptDispatcher.pendingClaimCount(fourthRuntime, 'ses_011b'),
+          dispatch.pendingClaimCount(fourth.journal, 'ses_011b'),
           1,
           'restart does not rewrite the broken tool into an abandonment terminal',
         )
         assert.equal(captured.length, 1, '全程一次发送：unknown outcome 永不复制逻辑效果')
       } finally {
-        fourth.dispose()
+        journal.JournalSurface_dispose(fourth.journal)
       }
     } finally {
-      first.dispose()
+      journal.JournalSurface_dispose(first.journal)
     }
   } finally {
     rmSync(base, { recursive: true, force: true })

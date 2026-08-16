@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { toList, listItems, resultOf } from '../../verification-system/tests/support/domain.mjs'
+import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 
 const {
   tryInject,
@@ -17,12 +17,12 @@ const {
   source,
   text,
   stableCallId,
-} = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
+} = pair
 
 const inject = async (session, raw, markerText = text) => {
-  const result = resultOf(await tryInject(undefined, session, markerText, toList(raw)))
+  const result = await tryInject(session, markerText, raw)
   assert.equal(result.ok, true, `HOST-013 transform must commit the pair: ${result.error ?? ''}`)
-  return listItems(result.value)
+  return result.value
 }
 
 const userMsg = (id, body = 'hello') => ({

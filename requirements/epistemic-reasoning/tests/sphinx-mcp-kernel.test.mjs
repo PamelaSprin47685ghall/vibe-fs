@@ -14,7 +14,7 @@ import {
   isTool,
   localCommand,
   fixtureCommand,
-} from './support.mjs'
+} from '../../../dist/Sphinx/Surface.js'
 
 test('WHAT[EPI-004] AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')

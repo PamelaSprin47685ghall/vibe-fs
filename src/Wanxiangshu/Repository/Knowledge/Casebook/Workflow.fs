@@ -90,7 +90,11 @@ module CasebookWorkflow =
     /// canonical Integrator/store, not to a feature-owned history scan.
     let archiveInspectorResult (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
-            match! CasebookStore.appendCaptured store case with
+            let canonical =
+                { case with
+                    Observations = Observations.normalize case.Observations }
+
+            match! CasebookStore.appendCaptured store canonical with
             | Ok _ -> return Ok()
             | Error err -> return Error err
         }

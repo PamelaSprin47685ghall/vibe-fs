@@ -9,49 +9,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Frame from '../../../dist/Strength/Frame.js'
-import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
-import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
-import * as Runtime from '../../../dist/Strength/Runtime.js'
-import { Role, ToolPermission } from '../../../dist/Foundation/Roles.js'
-import { mapEntries } from '../../verification-system/tests/support/domain.mjs'
-
-const caseOf = (value) => value.cases()[value.tag]
-const permissionNames = (set) => [...set].map(caseOf).sort()
+import {
+  capabilities,
+  exactReadonlyHostToolMap,
+  isAllowedTool,
+} from '../../../dist/Strength/Surface.js'
 
 test('WHAT[ENF-005] STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
   // Not the live Host execution-gate canary. Same capability set the schema is
   // built from: forged mutating/network/session tools stay outside the replica.
-  const capabilities = toolCapabilitiesFor(Role.Coder, ProviderRequestKind.StrengthReplica)
-  const allowed = new Set(permissionNames(capabilities))
-  const denied = [
-    ToolPermission.Write,
-    ToolPermission.Edit,
-    ToolPermission.Exec,
-    ToolPermission.Fork,
-    ToolPermission.Join,
-    ToolPermission.Horizon,
-    ToolPermission.Network,
-    ToolPermission.Pty,
-  ]
+  const allowed = new Set(capabilities('coder'))
+  const denied = ['Write', 'Edit', 'Exec', 'Fork', 'Join', 'Horizon', 'Network', 'Pty']
   for (const permission of denied) {
-    assert.equal(allowed.has(caseOf(permission)), false, caseOf(permission))
+    assert.equal(allowed.has(permission), false, permission)
   }
 
   for (const tool of ['write', 'edit', 'run', 'fork', 'join', 'network', 'bash', 'horizon']) {
-    assert.equal(Frame.StrengthFrame_isAllowedTool(tool), false, tool)
+    assert.equal(isAllowedTool(tool), false, tool)
   }
-  assert.equal(Frame.StrengthFrame_isAllowedTool('read'), true)
-  assert.equal(Frame.StrengthFrame_isAllowedTool('glob'), true)
-  assert.equal(Frame.StrengthFrame_isAllowedTool('grep'), true)
+  assert.equal(isAllowedTool('read'), true)
+  assert.equal(isAllowedTool('glob'), true)
+  assert.equal(isAllowedTool('grep'), true)
 })
 
 test('WHAT[ENF-005] STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking', () => {
-  // Not the live Host permission-popup canary. `* = false` is the unit stand-in:
-  // unknown tools are denied, so there is no permission-ask surface to raise.
-  const entries = Object.fromEntries(mapEntries(Runtime.StrengthReplicaTools_exactReadonlyHostToolMap))
-  assert.equal(entries['*'], false)
-  assert.equal(entries.read, true)
-  assert.equal(entries.glob, true)
-  assert.equal(entries.grep, true)
+  const rules = exactReadonlyHostToolMap
+  assert.equal(rules.length, 4)
+  assert.deepEqual(rules[0], { tool: '*', allowed: false })
+  assert.deepEqual(rules[1], { tool: 'glob', allowed: true })
+  assert.deepEqual(rules[2], { tool: 'grep', allowed: true })
+  assert.deepEqual(rules[3], { tool: 'read', allowed: true })
 })

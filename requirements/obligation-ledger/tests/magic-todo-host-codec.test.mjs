@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  listItems,
-  magicTodoHost,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
 
 test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete plus obligations', () => {
-  const decoded = magicTodoHost.decodeInput({
+  const decoded = host.decodeInput({
     planComplete: false,
     obligations: [
       { name: 'bridge', work: 'Review the bridge' },
@@ -15,30 +12,29 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete plus obligations
   })
 
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(decoded.value.PlanComplete, false)
-  const rows = listItems(decoded.value.Obligations)
-  assert.equal(rows[0].Name, 'bridge')
-  assert.equal(rows[0].Work, 'Review the bridge')
-  assert.equal(rows[1].Name, 'proof')
-  assert.equal(rows[1].Work, 'Close the proof')
+  assert.equal(decoded.value.planComplete, false)
+  assert.deepEqual(decoded.value.obligations, [
+    { name: 'bridge', work: 'Review the bridge' },
+    { name: 'proof', work: 'Close the proof' },
+  ])
 
-  const missingCommitment = magicTodoHost.decodeInput({ obligations: [{ name: 'bridge', work: 'x' }] })
+  const missingCommitment = host.decodeInput({ obligations: [{ name: 'bridge', work: 'x' }] })
   assert.equal(missingCommitment.ok, false)
   assert.equal(missingCommitment.error, 'todowrite.planComplete is required')
 
-  const nonBooleanCommitment = magicTodoHost.decodeInput({ planComplete: 'false', obligations: [] })
+  const nonBooleanCommitment = host.decodeInput({ planComplete: 'false', obligations: [] })
   assert.equal(nonBooleanCommitment.ok, false)
   assert.equal(nonBooleanCommitment.error, 'todowrite.planComplete must be a boolean')
 
-  const malformed = magicTodoHost.decodeInput({ planComplete: false, obligations: [{ name: 1, work: 'x' }] })
+  const malformed = host.decodeInput({ planComplete: false, obligations: [{ name: 1, work: 'x' }] })
   assert.equal(malformed.ok, false)
   assert.equal(malformed.error, 'todowrite.name must be a string')
 
-  const missingWork = magicTodoHost.decodeInput({ planComplete: false, obligations: [{ name: 'bridge' }] })
+  const missingWork = host.decodeInput({ planComplete: false, obligations: [{ name: 'bridge' }] })
   assert.equal(missingWork.ok, false)
   assert.equal(missingWork.error, "todowrite obligation item requires field 'work'")
 
-  const duplicateName = magicTodoHost.decodeInput({
+  const duplicateName = host.decodeInput({
     planComplete: true,
     obligations: [
       { name: 'same', work: 'first' },
@@ -52,8 +48,8 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete plus obligations
 test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 compatibility view', () => {
   const args = { planComplete: false, obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }] }
   const output = { args }
-  magicTodoHost.replaceCompatibilityArgs(output, [
-    { Content: 'bridge: Review bridge', Status: 'in_progress', Priority: 'medium' },
+  host.replaceCompatibilityArgs(output, [
+    { content: 'bridge: Review bridge', status: 'in_progress', priority: 'medium' },
   ])
 
   assert.equal(output.args, args, 'before must preserve the Host args object identity')
@@ -69,7 +65,7 @@ test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 
 
 test('WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema', () => {
   const output = { description: '', parameters: {}, jsonSchema: {} }
-  magicTodoHost.applyDefinition(output)
+  host.applyDefinition(output)
 
   assert.match(output.description, /owed-work|owed work|current.*account/i)
   assert.deepEqual(output.parameters.required, ['planComplete', 'obligations'])

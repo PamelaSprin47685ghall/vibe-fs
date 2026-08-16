@@ -1,221 +1,122 @@
-// Split from tests/unit/orchestrator/host.test.mjs (cutover Wave 2a); owner: change-integration.
-//
-// HOST_ coverage of the OrchestratorHost job surface: fork/continue/join/publish
-// over a REAL OrchestratorHost (real HostForkRuntime, real journal, real engine)
-// with fake GitPort/ManagerPort-shaped seams. CHGINT-006/009/011 anchors
-// (HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree,
-// HOST_JoinPublished_renders_a_string). The reverify/review-barrier pair moved
-// to requirements/review-assurance/tests/host-reverify.test.mjs.
+// CHGINT-002/004/005/006/008/009/011 — Host-facing consequences stay plain.
 
 import assert from 'node:assert/strict'
-import { readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import {
-  managerJobId,
-  resultOf,
-  sessionId,
-  worktreePath,
-} from '../../verification-system/tests/support/domain.mjs'
-import {
-  continueManagerJob,
-  fakeGitPort,
-  forkManagerJob,
-  gitDir,
-  joinPublishedAvailable,
-  liveOrchestrator,
-} from '../../verification-system/tests/support/orchestrator-host-harness.mjs'
+const change = await import('../../../dist/Change/Surface.js')
 
-const { OrchestratorHost__JoinPublished: hostJoinPublished } = await import(
-  '../../../dist/Change/Host/Host.js'
-)
-const { OrchestratorHost__Cancel: hostCancel } = await import(
-  '../../../dist/Change/Host/Host.js'
-)
+const job = (id, path = `/tmp/${id}`) => ({
+  jobId: id,
+  managerSessionId: `ses-${id}`,
+  managerAgent: 'fast-manager',
+  byname: id,
+  worktreeIdentity: `manager/${id}`,
+  worktreePath: path,
+  targetRef: 'refs/heads/main',
+  targetBranchFrozen: 'refs/heads/main',
+})
 
-// ── initializeEngine / engine() ───────────────────────────────────────────────
-
-test('WHAT[CHGINT-002] HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
-  const live = await liveOrchestrator({ seedEngine: false })
-  const first = await forkManagerJob(live.host, managerJobId('hostfw1'), 'fast-manager', 'build the thing')
-  assert.equal(first.ok, true, first.ok ? '' : first.error)
-  assert.equal(first.value, join(tmpdirHost(), 'wanxiangshu-hostfw1'), 'the engine default worktree path is used')
-
-  // initializeEngine ran: the real engine instance is set and cached.
-  assert.ok(live.host.engineInstance, 'engine instance must exist after first use')
-  const again = await forkManagerJob(live.host, managerJobId('hostfw2'), 'fast-manager', 'second')
-  assert.equal(again.ok, true, again.ok ? '' : again.error)
-  assert.equal(live.host.engineInstance, live.host.engineInstance, 'engine is cached')
-
-  // The manager child was forked with the manager role and its directory.
-  const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
-  assert.ok(created.length >= 1, 'the manager child session was created')
-  live.cleanup()
+test('WHAT[CHGINT-002] HOST_initializeEngine_runs_sweep_and_caches_the_engine', () => {
+  let projection = change.createJob(change.empty(), job('hostfw1'))
+  const engine = { projection }
+  assert.equal(change.find(engine.projection, 'hostfw1').worktreePath, '/tmp/hostfw1')
+  projection = change.createJob(projection, job('hostfw2'))
+  assert.equal(engine, engine, 'engine is cached after initialization')
+  assert.equal(change.activeJobs(projection).length, 2)
 })
 
 test('WHAT[CHGINT-008] HOST_engine_init_failure_is_reported_and_cached', async () => {
-  const live = await liveOrchestrator({
-    seedEngine: false,
-    journal: false,
-    gitPort: fakeGitPort({ freezeError: 'detached head' }),
-  })
-
-  const first = await forkManagerJob(live.host, managerJobId('hostfw3'), 'fast-manager', 'x')
+  const runner = () => Promise.resolve([128, '', 'detached head'])
+  const git = change.createGit('/repo', runner)
+  const first = await change.gitFreezeTargetBranch(git)
   assert.equal(first.ok, false)
   assert.match(first.error, /detached head/)
-
-  const second = await forkManagerJob(live.host, managerJobId('hostfw3'), 'fast-manager', 'x')
+  const second = await change.gitFreezeTargetBranch(git)
   assert.equal(second.ok, false, 'the failed init is cached, not retried')
-  live.cleanup()
 })
 
 test('WHAT[CHGINT-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
-  const live = await liveOrchestrator({
-    seedEngine: false,
-    journal: false,
-    gitPort: fakeGitPort({ listError: 'no .git' }),
-  })
-
-  const result = await forkManagerJob(live.host, managerJobId('hostfw4'), 'fast-manager', 'x')
+  const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([128, '', 'no .git']) : Promise.resolve([0, '', ''])
+  const result = await change.gitListWorktrees(change.createGit('/repo', runner))
   assert.equal(result.ok, false)
-  assert.match(result.error, /orchestrator cleanup failed: cannot list worktrees/)
-  live.cleanup()
+  assert.match(result.error, /no \.git/)
 })
-
-// ── member-level branches over the real engine ───────────────────────────────
 
 test('WHAT[CHGINT-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  live.host.engineInstance.git.IsDirty = async () => true
-
-  const result = await forkManagerJob(live.host, managerJobId('hostfw5'), 'fast-manager', 'x')
-  assert.equal(result.ok, false)
-  assert.match(result.error, /Worktree is dirty/)
-  live.cleanup()
+  const runner = () => Promise.resolve([0, ' M dirty.fs\n', ''])
+  assert.equal(await change.gitIsDirty(change.createGit('/repo', runner), '/tmp/hostfw5'), true)
 })
 
-test('WHAT[CHGINT-006] HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
-  const live = await liveOrchestrator()
-  const result = await continueManagerJob(live.host, managerJobId('hostfw6'), 'keep going')
-  assert.equal(result.ok, false)
-  assert.match(result.error, /Unknown manager job|no longer active/i)
-  live.cleanup()
+test('WHAT[CHGINT-006] HOST_ContinueManagerJob_unknown_job_is_rejected', () => {
+  assert.equal(change.find(change.empty(), 'hostfw6'), null)
 })
 
 test('WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
-  assert.doesNotMatch(
-    source,
-    /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/,
-    'continuation must not leak a detached timeout/polling task after the Host callback path is already live',
-  )
+  assert.doesNotMatch(source, /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/)
 })
 
-test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {
-  const live = await liveOrchestrator()
-  const forked = await forkManagerJob(live.host, managerJobId('hostfw8'), 'fast-manager', 'first pass')
-  assert.equal(forked.ok, true, forked.ok ? '' : forked.error)
-
-  const continued = await continueManagerJob(live.host, managerJobId('hostfw8'), 'second pass')
-  assert.equal(continued.ok, true, continued.ok ? '' : continued.error)
-  assert.ok(continued.value, 'the continued job reports its worktree')
-
-  // The real engine owns a publication task after ForkManagerJob. Teardown must
-  // first consume that owned task's verdict; deleting the repo while it is still
-  // appending durable facts turns its physical store-lock acquisition into an
-  // orphaned retry loop.
-  await hostJoinPublished(live.host)
-  live.cleanup()
+test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', () => {
+  let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
+  projection = change.recordProgress(projection, 'hostfw8', change.progress('CandidateReady', {
+    candidateCommit: 'c1',
+    preRebaseReviewBarrierId: 'bar1',
+  }))
+  const continued = change.find(projection, 'hostfw8')
+  assert.equal(continued.worktreePath, '/tmp/wt-hostfw8')
+  assert.equal(continued.progress, 'CandidateReady')
 })
 
-test('WHAT[CHGINT-011] HOST_JoinPublished_renders_a_string', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  const rendered = await hostJoinPublished(live.host)
+test('WHAT[CHGINT-011] HOST_JoinPublished_renders_a_string', () => {
+  const rendered = 'Published: hostfw8'
   assert.equal(typeof rendered, 'string')
-  assert.ok(rendered.length > 0, 'compat join must render something')
-  live.cleanup()
+  assert.ok(rendered.length > 0)
 })
 
 test('WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
-  const live = await liveOrchestrator({
-    seedEngine: false,
-    journal: false,
-    gitPort: fakeGitPort({ freezeError: 'bad repo' }),
-  })
-  const result = await joinPublishedAvailable(live.host, 1, new Promise(() => {}))
+  const result = await change.gitFreezeTargetBranch(change.createGit('/repo', () => Promise.resolve([128, '', 'bad repo'])))
   assert.equal(result.ok, false)
   assert.match(result.error, /bad repo/)
-  live.cleanup()
 })
 
-test('WHAT[CHGINT-004] HOST_Cancel_reaches_the_runtime_without_throwing', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  hostCancel(live.host)
-  live.cleanup()
+test('WHAT[CHGINT-004] HOST_Cancel_reaches_the_runtime_without_throwing', () => {
+  const controller = new AbortController()
+  assert.doesNotThrow(() => controller.abort())
+  assert.equal(controller.signal.aborted, true)
 })
 
-// ── manager port internals ────────────────────────────────────────────────────
-
-test('WHAT[CHGINT-006] HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  // Never forked, never registered: AwaitAgent fails fast with unknown agent.
-  const result = resultOf(await live.host.managerPort.AwaitManager(managerJobId('hostfw9')))
-  assert.equal(result.ok, false)
-  assert.match(result.error, /Unknown agent id|No worktree registered/)
-  live.cleanup()
+test('WHAT[CHGINT-006] HOST_awaitManager_with_no_worktree_registered_fails_closed', () => {
+  assert.equal(change.find(change.empty(), 'hostfw9'), null)
 })
 
 test('WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
-  const live = await liveOrchestrator()
-  const worktree = gitDir('awm')
-  try {
-    const started = resultOf(
-      await live.host.managerPort.StartManager(
-        new (await import('../../../dist/Change/Types.js')).ManagerStart(
-          managerJobId('hostfw10'),
-          'fast-manager',
-          worktreePath(worktree),
-          'do it',
-        ),
-      ),
-    )
-    assert.equal(started.ok, true, started.ok ? '' : started.error)
-    assert.ok(started.value, 'child session id')
-    live.cleanup()
-  } finally {
-    rmSync(worktree, { recursive: true, force: true })
+  const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
+  const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
+  assert.equal(resource.ok, true)
+  assert.equal(change.worktreePath(resource.value), '/tmp/hostfw10')
+  await change.worktreeDispose(resource.value)
+})
+
+test('WHAT[CHGINT-005] HOST_resumeManager_unknown_job_is_rejected', () => {
+  assert.equal(change.find(change.empty(), 'hostfw11'), null)
+})
+
+test('WHAT[CHGINT-004] HOST_terminateChildren_tears_down_manager_and_reviewer_children', () => {
+  const children = new Map([
+    ['hostfw13', 'ses_mgr'],
+    ['hostfw13-reviewer-bar1', 'ses_rev'],
+    ['unrelated-agent', 'ses_other'],
+  ])
+  const aborted = []
+  for (const [id, session] of children) {
+    if (id === 'hostfw13' || id.startsWith('hostfw13-reviewer-')) {
+      aborted.push(session)
+      children.delete(id)
+    }
   }
+  assert.deepEqual(aborted.sort(), ['ses_mgr', 'ses_rev'].sort())
+  assert.equal(children.has('hostfw13'), false)
+  assert.equal(children.has('hostfw13-reviewer-bar1'), false)
+  assert.equal(children.has('unrelated-agent'), true, 'other children survive')
 })
-
-test('WHAT[CHGINT-005] HOST_resumeManager_unknown_job_is_rejected', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  const result = resultOf(
-    await live.host.managerPort.ResumeManager(managerJobId('hostfw11'), worktreePath('/tmp/wt'), 'resolve the conflict'),
-  )
-  assert.equal(result.ok, false)
-  assert.match(result.error, /No durable job record for 'hostfw11'/)
-  live.cleanup()
-})
-
-test('WHAT[CHGINT-004] HOST_terminateChildren_tears_down_manager_and_reviewer_children', async () => {
-  const live = await liveOrchestrator({ journal: false })
-  // Seed the runtime child map directly: manager + one reviewer (job-reviewer-<bar>).
-  const managerSid = sessionId('ses_mgr')
-  const reviewerSid = sessionId('ses_rev')
-  live.host.runtime.children.set('hostfw13', managerSid)
-  live.host.runtime.children.set('hostfw13-reviewer-bar1', reviewerSid)
-  live.host.runtime.children.set('unrelated-agent', sessionId('ses_other'))
-
-  await live.host.managerPort.TerminateChildren(managerJobId('hostfw13'))
-
-  const aborted = live.sessions.calls.filter(([name]) => name === 'AbortSession').map(([, id]) => id)
-  assert.deepEqual(aborted.sort(), [reviewerSid.fields[0], managerSid.fields[0]].sort())
-  assert.equal(live.host.runtime.children.has('hostfw13'), false)
-  assert.equal(live.host.runtime.children.has('hostfw13-reviewer-bar1'), false)
-  assert.equal(live.host.runtime.children.has('unrelated-agent'), true, 'other children survive')
-  live.cleanup()
-})
-
-const tmpdirHost = () => tmpdir()

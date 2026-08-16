@@ -1,379 +1,233 @@
-// Split from tests/unit/glory/lifecycle.test.mjs (cutover Wave 2a); owner: finality.
-//
-// GLORY-010/011/012/014/045/052/055/057/060/062/064/066/076 + SURFACE golden
-// byte fixtures (proof/glory.md). Layer-1 pure tests: the ManagerLifecycle
-// fact algebra, its fold, the frozen narrative texts, and the golden bytes.
-// GLORY_074 (T1 revelation) and GLORY_021 (WorkActivated inert decode) moved to
-// requirements/obligation-ledger/tests/lifecycle-opening.test.mjs.
+// FINALITY lifecycle laws: plain lifecycle events enter the registered
+// FinalitySurface; only JS-shaped projections leave it.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+
+import * as finality from '../../../dist/Mission/Manager/FinalitySurface.js'
 import {
-  blobDigest,
-  blobRef,
-  envelope,
-  finalityRequestId,
-  fold,
-  gitTreeHash,
-  idValue,
-  listItems,
-  managerLifecycleFact,
-  managerLifeId,
-  mapEntries,
-  physicalUser,
-  promptKey,
-  providerRun,
-  reviewBarrierId,
-  sessionId,
-  stream,
+  blessed,
+  firstBirth,
+  firstBirthText,
+  finalityUndecidable,
+  idleEncouragementPostT1,
+  idleEncouragementPreT1,
+  managerSystemPrompt,
+  planningTail,
+  rejected,
+  reawakening as managerReawakening,
+  reawakeningText,
+  rest,
+  workActivation,
+} from '../../../dist/Mission/Finality/PromptSurface.js'
+
+const SESSION = 'ses_a'
+const LIFE = 'life-1'
+const REVIEWER = 'ses-reviewer'
+const REQUEST = 'req-1'
+const TREE = 'tree-1'
+const BARRIER = 'bar-1'
+
+const lifeOpened = (lifeId = LIFE, cursor = 1) => ({
+  kind: 'life-opened',
+  sessionId: SESSION,
+  lifeId,
+  openingUserMessageId: `msg-open-${lifeId}`,
+  openingTextRef: 'blob-1',
+  openingTextDigest: 'd-1',
+  openingCursorSequence: cursor,
+})
+
+const workActivated = (lifeId = LIFE) => ({
+  kind: 'work-activated',
+  sessionId: SESSION,
+  lifeId,
+  activationPromptKey: 'key-1',
+  protectedPrefixEndSequence: 42,
+})
+
+const finalityRequested = (requestId = REQUEST, toolCallId = 'call-1') => ({
+  kind: 'finality-requested',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  gitTreeHash: TREE,
+  lastWordsRef: 'blob-1',
+  lastWordsDigest: 'd-1',
+  providerRun: 'run-1',
   toolCallId,
-} from '../../verification-system/tests/support/domain.mjs'
-import * as finalitySurface from './support/finality-surface.mjs'
+})
 
-const SESSION = sessionId('ses_a')
-const LIFE = managerLifeId('life-1')
-const OPENING_MSG = physicalUser('msg-open-1')
-const TREE = gitTreeHash('tree-1')
-const REQ = finalityRequestId('req-1')
-const REVIEWER = sessionId('ses-reviewer')
-const BARRIER = reviewBarrierId('bar-1')
-const BLOB = blobRef('blob-1')
-const DIGEST = blobDigest('d-1')
-const RUN = providerRun('run-1')
-const CALL = toolCallId('call-1')
-const KEY = promptKey('key-1')
+const finalityReviewerEnlisted = (requestId = REQUEST) => ({
+  kind: 'finality-reviewer-enlisted',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  reviewerSessionId: REVIEWER,
+  reviewerOrdinal: 1,
+  barrierId: BARRIER,
+  gitTreeHash: TREE,
+  isNewReviewer: true,
+})
 
-const lifecycleEnv = (fact) => envelope({ stream: stream.session(SESSION), fact })
+const finalityRejected = (requestId = REQUEST) => ({
+  kind: 'finality-rejected',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  rejectingReviewerSessionId: REVIEWER,
+  barrierId: BARRIER,
+  gitTreeHash: TREE,
+  workRecordRef: 'blob-1',
+  workRecordDigest: 'd-1',
+})
 
-const lifeOpened = () =>
-  managerLifecycleFact('LifeOpened', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    OpeningUserMessageId: OPENING_MSG,
-    OpeningTextRef: BLOB,
-    OpeningTextDigest: DIGEST,
-    OpeningCursorSequence: 1n,
-  })
+const finalityBlessed = (requestId = REQUEST) => ({
+  kind: 'finality-blessed',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  gitTreeHash: TREE,
+  workRecordBundleRef: 'blob-1',
+  workRecordBundleDigest: 'd-1',
+})
 
-const workActivated = () =>
-  managerLifecycleFact('WorkActivated', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    ActivationPromptKey: KEY,
-    ProtectedPrefixEndSequence: 42n,
-  })
+const finalityUndecided = (requestId = REQUEST) => ({
+  kind: 'finality-undecided',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  reviewerSessionId: REVIEWER,
+  barrierId: BARRIER,
+  gitTreeHash: TREE,
+})
 
-const finalityRequested = () =>
-  managerLifecycleFact('FinalityRequested', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    GitTreeHash: TREE,
-    LastWordsRef: BLOB,
-    LastWordsDigest: DIGEST,
-    ProviderRun: RUN,
-    ToolCallId: CALL,
-  })
+const lifeCompleted = (requestId = REQUEST) => ({
+  kind: 'life-completed',
+  sessionId: SESSION,
+  lifeId: LIFE,
+  requestId,
+  terminalRef: 'blob-terminal',
+  terminalDigest: 'digest-terminal',
+})
 
-const finalityReviewerEnlisted = () =>
-  managerLifecycleFact('FinalityReviewerEnlisted', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    ReviewerSessionId: REVIEWER,
-    ReviewerOrdinal: 1,
-    BarrierId: BARRIER,
-    GitTreeHash: TREE,
-    IsNewReviewer: true,
-  })
+const worldOf = (events) => {
+  const result = finality.project(events)
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  return result.world
+}
 
-const finalityRejected = () =>
-  managerLifecycleFact('FinalityRejected', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    RejectingReviewerSessionId: REVIEWER,
-    BarrierId: BARRIER,
-    GitTreeHash: TREE,
-    WorkRecordRef: BLOB,
-    WorkRecordDigest: DIGEST,
-  })
+const base = (extra = []) => [lifeOpened(), workActivated(), ...extra]
 
-const finalityBlessed = () =>
-  managerLifecycleFact('FinalityBlessed', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    GitTreeHash: TREE,
-    WorkRecordBundleRef: BLOB,
-    WorkRecordBundleDigest: DIGEST,
-  })
-
-const lifeCompleted = () =>
-  managerLifecycleFact('LifeCompleted', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    TerminalRef: BLOB,
-    TerminalDigest: DIGEST,
-  })
-
-const life = (session) => fold.session(session, 'ses_a')?.ManagerLife
-
-// ── GLORY-010/011: the fact algebra folds into the session projection ────────
+// ── lifecycle projection ────────────────────────────────────────────────────
 
 test('WHAT[FINALITY-021] LifeOpened opens the first life', () => {
-  const out = fold.apply(fold.empty, [lifecycleEnv(lifeOpened())])
-  assert.equal(out.ok, true, JSON.stringify(out.error))
-  const current = life(out.value).CurrentLife
-  assert.ok(current !== null && current !== undefined)
-  assert.equal(idValue.managerLife(current.LifeId), 'life-1')
-  assert.ok(current.ProtectedPrefixEnd == null)
-  assert.equal(current.Completed, false)
-  assert.ok(current.ActiveFinality == null)
+  const life = finality.lifeView(worldOf([lifeOpened()]))
+  assert.equal(life.lifeId, LIFE)
+  assert.equal(life.openingCursorSequence, 1)
+  assert.equal(life.protectedPrefixEnd, null)
+  assert.equal(life.completed, false)
+  assert.equal(life.activeFinality, null)
 })
 
 test('WHAT[FINALITY-022] a second life cannot open while one is active', () => {
-  const first = fold.apply(fold.empty, [lifecycleEnv(lifeOpened())])
-  const secondLife = managerLifecycleFact('LifeOpened', {
-    SessionId: SESSION,
-    LifeId: managerLifeId('life-2'),
-    OpeningUserMessageId: physicalUser('msg-open-2'),
-    OpeningTextRef: BLOB,
-    OpeningTextDigest: DIGEST,
-    OpeningCursorSequence: 50n,
-  })
-  const out = fold.apply(first.value, [lifecycleEnv(secondLife)])
-  assert.equal(out.ok, false)
-  assert.match(JSON.stringify(out.error), /GLORY-012/)
+  const result = finality.project([lifeOpened(), lifeOpened('life-2', 50)])
+  assert.equal(result.ok, false)
+  assert.match(JSON.stringify(result.error), /GLORY-012|LifeAlreadyOpen/)
 })
 
 test('WHAT[FINALITY-008] FinalityRequested is rejected while a request is open', () => {
-  const opened = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-  ])
-  assert.equal(opened.ok, true, JSON.stringify(opened.error))
-
-  const second = finalityRequested()
-  const out = fold.apply(opened.value, [lifecycleEnv(second)])
-  assert.equal(out.ok, false)
+  const result = finality.project(base([finalityRequested(), finalityRequested('req-2', 'call-2')]))
+  assert.equal(result.ok, false)
+  assert.match(JSON.stringify(result.error), /FinalityAlreadyActive|FinalityRequested/)
 })
 
 test('WHAT[FINALITY-008] a rejected request closes and a new suicide opens a new one', () => {
-  const rejected = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityRejected()),
-  ])
-  assert.equal(rejected.ok, true, JSON.stringify(rejected.error))
-  assert.equal(life(rejected.value).CurrentLife.ActiveFinality.Resolution.name, 'Rejected')
-  assert.ok(life(rejected.value).CurrentLife.LastRejectedWorkRecord != null)
-
-  const retry = finalityRequested()
-  const out = fold.apply(rejected.value, [lifecycleEnv(retry)])
-  assert.equal(out.ok, true, JSON.stringify(out.error))
-  assert.equal(life(out.value).CurrentLife.ActiveFinality.Resolution.name, 'Open')
+  const result = finality.project(
+    base([finalityRequested(), finalityReviewerEnlisted(), finalityRejected(), finalityRequested('req-2', 'call-2')]),
+  )
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  const life = finality.lifeView(result.world)
+  assert.equal(life.activeFinality.requestId, 'req-2')
+  assert.equal(life.activeFinality.resolution.kind, 'open')
+  assert.equal(life.lastRejectedWorkRecord, 'blob-1')
 })
 
 test('WHAT[FINALITY-016] a blessing leaves the life open until the second suicide', () => {
-  const blessed = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityBlessed()),
-  ])
-  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
-  // GLORY-061/062: Blessed is not completion; the Manager keeps working.
-  const open = life(blessed.value)
-  assert.ok(open.CurrentLife != null)
-  assert.equal(open.CurrentLife.Completed, false)
-  assert.equal(open.CurrentLife.ActiveFinality.Resolution.name, 'Blessed')
-  assert.ok(open.CurrentLife.LastBlessing != null)
+  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()])))
+  assert.equal(life.completed, false)
+  assert.equal(life.activeFinality.resolution.kind, 'blessed')
+  assert.equal(life.lastBlessing.requestId, REQUEST)
 })
 
 test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives the Life', () => {
-  const blessed = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityBlessed()),
-  ])
-  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
-
-  // The second suicide is the rest in peace: LifeCompleted archives the Life.
-  const glory = fold.apply(blessed.value, [lifecycleEnv(lifeCompleted())])
-  assert.equal(glory.ok, true, JSON.stringify(glory.error))
-  const state = life(glory.value)
-  assert.ok(state.CurrentLife == null)
-  const completed = listItems(state.CompletedLives)
-  assert.equal(completed.length, 1)
-  const archived = completed[0]
-  assert.equal(archived.Completed, true)
-  assert.ok(archived.CompletedTerminal != null)
-  assert.equal(archived.ActiveFinality.Resolution.name, 'Blessed')
+  const result = finality.project(
+    base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed(), lifeCompleted()]),
+  )
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  assert.equal(finality.lifeView(result.world), null)
+  const archived = finality.archivedLivesView(result.world)
+  assert.equal(archived.length, 1)
+  assert.equal(archived[0].completed, true)
+  assert.equal(archived[0].completedTerminal, 'blob-terminal')
+  assert.equal(archived[0].activeFinality.resolution.kind, 'blessed')
 })
 
-// PR 6: isLifeArchived now answers against a FinalitySurface world — the JS
-// test expresses lifecycle history as events; the surface folds them through
-// production and answers the GLORY-070 primitive.
-const surfaceWorldOf = (events) => {
-  const out = finalitySurface.project(events)
-  assert.equal(out.ok, true, JSON.stringify(out.error))
-  return out.world
-}
-
-const S = 'ses_a'
-const baseEvents = (extra = []) => [
-  { kind: 'life-opened', sessionId: S, lifeId: 'life-1', openingUserMessageId: 'msg-open-1', openingTextRef: 'blob-1', openingTextDigest: 'd-1', openingCursorSequence: 1 },
-  { kind: 'work-activated', sessionId: S, lifeId: 'life-1', activationPromptKey: 'key-1', protectedPrefixEndSequence: 42 },
-  ...extra,
-]
-
 test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
-  // GLORY-070: an idle earns encouragement for any Life state EXCEPT a completed
-  // one. The production bug re-sent `IdleEncouragement` after the final
-  // rest-in-peace suicide, because the leftover turn saw `CurrentLife = None`
-  // (archived) and took the generic Manager idle branch. This is the pure
-  // decision primitive: a Life is "done" only when it was archived by
-  // LifeCompleted (CurrentLife cleared AND CompletedLives non-empty).
-  const archived = surfaceWorldOf(
-    baseEvents([
-      { kind: 'finality-requested', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', lastWordsRef: 'blob-1', lastWordsDigest: 'd-1', providerRun: 'run-1', toolCallId: 'call-1' },
-      { kind: 'finality-reviewer-enlisted', sessionId: S, lifeId: 'life-1', requestId: 'req-1', reviewerSessionId: 'ses-reviewer', reviewerOrdinal: 1, barrierId: 'bar-1', gitTreeHash: 'tree-1', isNewReviewer: true },
-      { kind: 'finality-blessed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', workRecordBundleRef: 'blob-1', workRecordBundleDigest: 'd-1' },
-      { kind: 'life-completed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', terminalRef: 'blob-1', terminalDigest: 'd-1' },
-    ]),
+  const fresh = worldOf([])
+  assert.equal(finality.isLifeArchived(fresh), false)
+
+  const open = worldOf(base())
+  assert.equal(finality.isLifeArchived(open), false)
+
+  const blessed = worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]))
+  assert.equal(finality.isLifeArchived(blessed), false)
+
+  const archived = worldOf(
+    base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed(), lifeCompleted()]),
   )
-  assert.equal(finalitySurface.isLifeArchived(archived), true)
-
-  // A fresh session that never opened a Life is NOT done (no session history).
-  const fresh = surfaceWorldOf([])
-  assert.equal(finalitySurface.isLifeArchived(fresh), false)
-
-  // An open / activated-but-unfinished Life is NOT done.
-  const open = surfaceWorldOf(baseEvents())
-  assert.equal(finalitySurface.isLifeArchived(open), false)
-
-  // A blessed Life is still open until the second suicide (GLORY-061/062).
-  const blessed = surfaceWorldOf(
-    baseEvents([
-      { kind: 'finality-requested', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', lastWordsRef: 'blob-1', lastWordsDigest: 'd-1', providerRun: 'run-1', toolCallId: 'call-1' },
-      { kind: 'finality-reviewer-enlisted', sessionId: S, lifeId: 'life-1', requestId: 'req-1', reviewerSessionId: 'ses-reviewer', reviewerOrdinal: 1, barrierId: 'bar-1', gitTreeHash: 'tree-1', isNewReviewer: true },
-      { kind: 'finality-blessed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', workRecordBundleRef: 'blob-1', workRecordBundleDigest: 'd-1' },
-    ]),
-  )
-  assert.equal(finalitySurface.isLifeArchived(blessed), false)
+  assert.equal(finality.isLifeArchived(archived), true)
 })
 
 test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound record', () => {
-  const undecided = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(
-      managerLifecycleFact('FinalityUndecided', {
-        SessionId: SESSION,
-        LifeId: LIFE,
-        RequestId: REQ,
-        ReviewerSessionId: REVIEWER,
-        BarrierId: BARRIER,
-        GitTreeHash: TREE,
-      }),
-    ),
-  ])
-  assert.equal(undecided.ok, true, JSON.stringify(undecided.error))
-  const request = life(undecided.value).CurrentLife.ActiveFinality
-  assert.equal(request.Resolution.name, 'Undecided')
-  // No wound record is ever fabricated (GLORY-056).
-  assert.ok(life(undecided.value).CurrentLife.LastRejectedWorkRecord == null)
+  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityUndecided()])))
+  assert.equal(life.activeFinality.resolution.kind, 'undecided')
+  assert.equal(life.lastRejectedWorkRecord, null)
 })
 
 test('WHAT[FINALITY-011] a revise closes finality without confirming the life', () => {
-  const out = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityRejected()),
+  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityRejected()])))
+  assert.equal(life.activeFinality.resolution.kind, 'rejected')
+  assert.equal(life.activeFinality.resolution.rejectingReviewer, REVIEWER)
+  assert.equal(life.completed, false)
+})
+
+test('WHAT[FINALITY-021] lifecycle history projection replays identically', () => {
+  const history = base([
+    finalityRequested(),
+    finalityReviewerEnlisted(),
+    finalityRejected(),
+    finalityRequested('req-2', 'call-2'),
+    finalityReviewerEnlisted('req-2'),
+    finalityBlessed('req-2'),
+    lifeCompleted('req-2'),
   ])
+  const direct = finality.project(history)
+  assert.equal(direct.ok, true, JSON.stringify(direct.error))
 
-  assert.equal(out.ok, true, JSON.stringify(out.error))
-  const request = life(out.value).CurrentLife.ActiveFinality
-  assert.equal(request.Resolution.name, 'Rejected')
-  // The rejection evidence still identifies the rejecting reviewer for cleanup (GLORY-004).
-  // toJSON() = [caseName, payload...]; the single-field Rejected case carries
-  // the rejection evidence.
-  const evidence = request.Resolution.toJSON()[1]
-  assert.equal(idValue.session(evidence.RejectingReviewer), 'ses-reviewer')
-})
-
-// Plain-data view of the lifecycle projection. Raw deepEqual of two folds of
-// the same facts fails on the projection's map comparer closure identity, not
-// on content; this view compares the durable facts (members, standing,
-// evidence) instead.
-const managerLifeView = (projection) => {
-  const lifeView = (life) => ({
-    LifeId: idValue.managerLife(life.LifeId),
-    Completed: life.Completed,
-    CompletedTerminal: life.CompletedTerminal == null ? null : idValue.blobRef(life.CompletedTerminal),
-    ActiveFinality:
-      life.ActiveFinality == null
-        ? null
-        : {
-            RequestId: idValue.finalityRequest(life.ActiveFinality.RequestId),
-            Resolution: life.ActiveFinality.Resolution.name,
-            Members: mapEntries(life.ActiveFinality.Members).map(([session, member]) => [
-              idValue.session(session),
-              {
-                ordinal: member.ReviewerOrdinal,
-                barrier: idValue.reviewBarrier(member.BarrierId),
-                isNew: member.IsNewReviewer,
-              },
-            ]),
-          },
-    EnlistedReviewers: mapEntries(life.EnlistedReviewers).map(([session, standing]) => [
-      idValue.session(session),
-      { ordinal: standing.ReviewerOrdinal, barriers: listItems(standing.Barriers).map(idValue.reviewBarrier) },
-    ]),
-    LastRejectedWorkRecord: life.LastRejectedWorkRecord == null ? null : idValue.blobRef(life.LastRejectedWorkRecord),
-    LastBlessing: life.LastBlessing == null ? null : idValue.finalityRequest(life.LastBlessing.RequestId),
-  })
-  return {
-    current: projection.CurrentLife == null ? null : lifeView(projection.CurrentLife),
-    completed: listItems(projection.CompletedLives).map(lifeView),
-  }
-}
-
-test('WHAT[FINALITY-021] lifecycle facts round trip through ndjson', () => {
-  const envelopes = [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityRejected()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityBlessed()),
-    lifecycleEnv(lifeCompleted()),
-  ]
-  const replayed = fold.replay(envelopes)
+  const replay = finality.project([])
+  assert.equal(replay.ok, true, JSON.stringify(replay.error))
+  const replayed = finality.applyEvents(replay.world, history)
   assert.equal(replayed.ok, true, JSON.stringify(replayed.error))
-  const replayedSessions = fold.sessions(replayed.value)
-  const directSessions = fold.sessions(fold.apply(fold.empty, envelopes).value)
-  assert.deepEqual(managerLifeView(replayedSessions.ses_a.ManagerLife), managerLifeView(directSessions.ses_a.ManagerLife))
+
+  assert.deepEqual(finality.lifeView(replayed.world), finality.lifeView(direct.world))
+  assert.deepEqual(finality.archivedLivesView(replayed.world), finality.archivedLivesView(direct.world))
 })
 
-// ── golden byte fixtures (proof/glory.md) ────────────────────────────────────
+// ── golden byte fixtures (provider-language contracts) ──────────────────────
 
 test('WHAT[FINALITY-004] first birth golden bytes: planning commitment is irreversible', async () => {
-  const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
-  const birth = managerNarrative.firstBirth('Fix the retry race.')
+  const birth = firstBirth('Fix the retry race.')
   assert.equal(birth.parts.length, 2)
   assert.equal(birth.parts[0].text, 'Fix the retry race.')
   assert.equal(birth.parts[0].synthetic, false)
@@ -383,12 +237,11 @@ test('WHAT[FINALITY-004] first birth golden bytes: planning commitment is irreve
   assert.ok(birth.parts[1].text.includes('planning work'))
   assert.ok(birth.parts[1].text.includes('planComplete=true'))
   assert.ok(birth.parts[1].text.match(/irreversible|cannot be undone|never returns to false/i))
-  assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
+  assert.equal(planningTail().includes('Do not perform any actual work'), true)
 })
 
 test('WHAT[FINALITY-022] reawakening golden bytes', async () => {
-  const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
-  const reawakening = managerNarrative.reawakening('Add Windows support.')
+  const reawakening = managerReawakening('Add Windows support.')
   assert.equal(reawakening.parts.length, 3)
   assert.equal(reawakening.parts[0].synthetic, true)
   assert.ok(reawakening.parts[0].text.includes('# You awaken once more in the distant future.'))
@@ -400,59 +253,50 @@ test('WHAT[FINALITY-022] reawakening golden bytes', async () => {
 })
 
 test('WHAT[FINALITY-024] activation golden bytes: planning is not completion', async () => {
-  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
-    managerLifecyclePrompt.workActivation(),
+    workActivation(),
     '# Now complete it yourself.\n# Carry out the work you described until the final goal is fully achieved.\n#\n# Planning is not completion.\n# Delegation is not completion.\n# A child finishing is not completion.\n# A successful command is not completion while meaningful uncertainty remains.\n# An explanation of the work is not the work itself.\n# A partial implementation is not completion merely because the remaining work is difficult.\n# As long as any useful action remains, continue.\n',
   )
 })
 
 test('WHAT[FINALITY-019] idle encouragement golden bytes', async () => {
-  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
-  assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
-  assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('planComplete=false'))
-  assert.ok(managerLifecyclePrompt.idleEncouragementPostT1().includes('# You have done useful work'))
+  assert.ok(idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
+  assert.ok(idleEncouragementPreT1().includes('planComplete=false'))
+  assert.ok(idleEncouragementPostT1().includes('# You have done useful work'))
 })
 
 test('WHAT[FINALITY-026] host undecidable golden bytes', async () => {
-  const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
-    managerLifecyclePrompt.finalityUndecidable(),
+    finalityUndecidable(),
     '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n',
   )
 })
 
 test('WHAT[FINALITY-012] finality rejection renders work record as guidance comments', async () => {
-  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const record = 'Chronicle\n- defect A at src/a.ts\n- missing test for B'
-  const rendered = finalityPrompt.rejected(record)
+  const rendered = rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
   assert.ok(rendered.includes('# The work before you is finite.'), rendered)
   assert.ok(rendered.includes('# - defect A at src/a.ts'), rendered)
 })
 
 test('WHAT[FINALITY-020] rejection rendering exposes no mechanism vocabulary', async () => {
-  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const record = 'Chronicle\n- defect A at src/a.ts'
-  const rendered = finalityPrompt.rejected(record)
-  // The rejection evidence is guidance, not an explanation of the hidden review
-  // mechanism: no unfinished_work_record identifier leaks.
+  const rendered = rejected(record)
   assert.ok(!rendered.includes('unfinished_work_record'), rendered)
 })
 
 test('WHAT[FINALITY-013] finality three experiences', async () => {
-  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
-  const rejected = finalityPrompt.rejected('')
-  assert.ok(rejected.includes('# Your ending has not accepted you.'))
-  const blessed = finalityPrompt.blessed('')
-  assert.ok(blessed.includes('# Your ending has accepted you.'))
-  assert.ok(blessed.includes('# You are not yet at rest.'))
-  const rest = finalityPrompt.rest()
-  assert.ok(rest.includes('# Rest in peace.'))
+  const rejectedText = rejected('')
+  assert.ok(rejectedText.includes('# Your ending has not accepted you.'))
+  const blessedText = blessed('')
+  assert.ok(blessedText.includes('# Your ending has accepted you.'))
+  assert.ok(blessedText.includes('# You are not yet at rest.'))
+  const restText = rest()
+  assert.ok(restText.includes('# Rest in peace.'))
 })
 
 test('WHAT[PREFIX-STABILITY-007] manager system prompt stable role law', async () => {
-  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   assert.equal(prompt.includes('carrying one task'), false)
   assert.equal(prompt.includes('Born with a Task'), false)
@@ -461,15 +305,22 @@ test('WHAT[PREFIX-STABILITY-007] manager system prompt stable role law', async (
 })
 
 test('WHAT[FINALITY-020] manager surface has no forbidden words', async () => {
-  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
-  const forbidden = [/\breview\b/i, /\breviewer\b/i, /\bverdict\b/i, /\bPERFECT\b/, /\bREVISE\b/, /\bbarrier\b/i, /\bwitness\b/i, /\bconfirmation\b/i]
+  const forbidden = [
+    /\breview\b/i,
+    /\breviewer\b/i,
+    /\bverdict\b/i,
+    /\bPERFECT\b/,
+    /\bREVISE\b/,
+    /\bbarrier\b/i,
+    /\bwitness\b/i,
+    /\bconfirmation\b/i,
+  ]
   for (const re of forbidden) {
     assert.equal(re.test(managerSystemPrompt()), false, `manager prompt must not contain ${re}`)
   }
 })
 
 test('WHAT[FINALITY-020] manager role law does not name foreign tools', async () => {
-  const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   for (const tool of [
     'read', 'write', 'edit', 'glob', 'grep', 'bash', 'bash-honeypot',
@@ -484,18 +335,15 @@ test('WHAT[FINALITY-020] manager role law does not name foreign tools', async ()
   }
 })
 
-// ── SURFACE-002: LF-only line endings ────────────────────────────────────────
-
 test('WHAT[PROVIDER-LANGUAGE-005] frozen texts use lf only', async () => {
-  const { managerNarrative, managerLifecyclePrompt, finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   for (const text of [
-    managerNarrative.firstBirthText('X'),
-    managerNarrative.reawakeningText('X'),
-    managerLifecyclePrompt.workActivation(),
-    managerLifecyclePrompt.idleEncouragementPreT1(),
-    managerLifecyclePrompt.idleEncouragementPostT1(),
-    managerLifecyclePrompt.finalityUndecidable(),
-    finalityPrompt.rejected('record'),
+    firstBirthText('X'),
+    reawakeningText('X'),
+    workActivation(),
+    idleEncouragementPreT1(),
+    idleEncouragementPostT1(),
+    finalityUndecidable(),
+    rejected('record'),
   ]) {
     assert.equal(text.includes('\r'), false, 'frozen text must not contain CR')
   }

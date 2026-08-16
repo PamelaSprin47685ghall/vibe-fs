@@ -13,7 +13,8 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
+open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality

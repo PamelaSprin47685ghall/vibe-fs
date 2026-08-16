@@ -45,6 +45,10 @@ Fission 的 provider-visible schema 不按 turn 动态增删。一个 session �
 
 历史 Proposal 中的 `Meditator` 已不在当前 Role vocabulary；其现行 reasoning office 是 `Inquiry`。因此 V1 entitlement 使用 `Role.Inquiry`。历史 `Executor` 也不是当前 Role case；hidden execution helper不获得 fission office consequence。
 
+## 9. JS semantic boundary
+
+`Execution/Fission/Surface.fs` translates parser, delivery, keyed-work, admission, and lifecycle observations to JS-native strings, numbers, booleans, arrays, and plain objects. The admission runtime is an opaque Host capability; physical owner/parent/lane session identities never appear in semantic output. `OpenCode/Host/FissionHostSurface.fs` owns the Host turn-observation canary and returns a JSON-shaped observation. Tests call these owner surfaces, never emitted F# constructors or representation helpers.
+
 ## 历史与弃权
 
 - 不采用 OpenCode `session.fork`：它会把 lane 塞进错误的 Host parent/child topology，而且把 transcript clone 机制与业务 identity 耦合。

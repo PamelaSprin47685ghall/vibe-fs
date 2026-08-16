@@ -1,71 +1,75 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentJournal,
-  blobDigest,
-  blobRef,
-  envelope,
-  fact,
-  fold,
-  hostToolPartId,
-  idValue,
-  listItems,
-  magicTodoLocality,
-  mapEntries,
-  providerProjection,
-  providerRun,
-  sessionId,
-  sessionSnapshot,
-  stream,
-  toolCallId,
-  xTraceCapture,
-  lifecycleWorkRecordProjection,
-} from '../../verification-system/tests/support/domain.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
+const managerSession = 'ses_xtrace_locality'
 
-const managerSession = sessionId('ses_xtrace_locality')
+let sequence = 0
+const nextEnvelope = (factValue, run = 'asst_manager_run') =>
+  xTrace.envelope({ seq: (sequence += 1), session: managerSession, run, fact: factValue })
 
-test('WHAT[SEMANTIC-TRACE-002] TODO-004 preserves a captured tool call identity on its durable XTrace range', () => {
-  const folded = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(managerSession),
-      run: 'asst_manager_run',
-      fact: fact('XTracePartAppended', {
-        SessionId: managerSession,
-        CursorSequence: 7n,
-        Role: 'assistant',
-        Turn: 4,
-        PartIndex: 2,
-        Kind: 'tool_call',
-        ToolName: 'todowrite',
-        TextRef: blobRef('blobs/todo-call'),
-        TextDigest: blobDigest('digest:todo-call'),
-        Provenance: 'g:0/turn:4/part:2',
-        ProviderRun: providerRun('asst_manager_run'),
-        ToolCallId: toolCallId('call_todo'),
-        HostToolPartId: hostToolPartId('part_todo'),
-      }),
+const tracePartEnvelope = ({
+  sequence: cursorSequence,
+  run = 'asst_manager_run',
+  role = 'assistant',
+  turn = 4,
+  partIndex = 2,
+  kind = 'tool_call',
+  toolName = 'todowrite',
+  textRef = 'blobs/todo-call',
+  textDigest = 'digest:todo-call',
+  provenance = `g:0/turn:${turn}/part:${partIndex}`,
+  toolCallId = 'call_todo',
+  hostToolPartId = 'part_todo',
+} = {}) =>
+  nextEnvelope(
+    xTrace.fact('XTracePartAppended', {
+      sessionId: managerSession,
+      sequence: cursorSequence,
+      role,
+      turn,
+      partIndex,
+      kind,
+      toolName,
+      textRef,
+      textDigest,
+      provenance,
+      providerRun: run,
+      toolCallId,
+      hostToolPartId,
     }),
+    run,
   )
 
+const assertLocality = (localized) => {
+  assert.equal(localized.ok, true, localized.ok ? '' : JSON.stringify(localized.error))
+  return localized.value
+}
+
+test('WHAT[SEMANTIC-TRACE-002] TODO-004 preserves a captured tool call identity on its durable XTrace range', () => {
+  const folded = xTrace.fold([tracePartEnvelope({ sequence: 7 })])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  const sessions = mapEntries(folded.value.AgentProjections.Sessions)
-  assert.equal(sessions.length, 1)
-  const part = sessions[0][1].XTrace.Parts.head
-  assert.equal(idValue.providerRun(part.ProviderRun), 'asst_manager_run')
-  assert.equal(idValue.toolCall(part.ToolCallId), 'call_todo')
-  assert.equal(idValue.hostToolPart(part.HostToolPartId), 'part_todo')
-  assert.equal(Number(part.Cursor.Sequence), 7)
+  const session = xTrace.session(folded.value, managerSession)
+  const parts = xTrace.parts(session.xTrace)
+  assert.equal(parts.length, 1)
+  const part = parts[0]
+  assert.equal(part.providerRun, 'asst_manager_run')
+  assert.equal(part.toolCallId, 'call_todo')
+  assert.equal(part.hostToolPartId, 'part_todo')
+  assert.equal(part.cursor.sequence, 7)
 })
 
 test('WHAT[SEMANTIC-TRACE-002] TODO-004 captures the SDK-visible assistant run and Host ToolPart without index inference', async () => {
-  const created = await agentJournal.create({ directory: 'xtrace-locality-capture' })
+  const dir = mkdtempSync(join(tmpdir(), 'xtrace-locality-'))
+  const created = await journal.JournalSurface_boot(dir, 'rt_xtrace_locality', 4242, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 
   try {
-    const captured = providerProjection.decodeCapturedMessageView([
+    const trace = await xTrace.captureMessageView(created.journal, managerSession, [
       {
         info: { id: 'asst_manager_run', role: 'assistant' },
         parts: [
@@ -80,47 +84,22 @@ test('WHAT[SEMANTIC-TRACE-002] TODO-004 captures the SDK-visible assistant run a
         ],
       },
     ])
-
-    const trace = await xTraceCapture.captureMessageView(created.journal, managerSession, captured)
-    const parts = listItems(xTraceParts(trace))
+    const parts = xTrace.parts(trace)
     assert.equal(parts.length, 2)
 
     const todoPart = parts[1]
-    assert.equal(idValue.providerRun(todoPart.ProviderRun), 'asst_manager_run')
-    assert.equal(idValue.toolCall(todoPart.ToolCallId), 'call_todo')
-    assert.equal(idValue.hostToolPart(todoPart.HostToolPartId), 'part_todo')
-    assert.equal(Number(todoPart.Cursor.Sequence), 2)
+    assert.equal(todoPart.providerRun, 'asst_manager_run')
+    assert.equal(todoPart.toolCallId, 'call_todo')
+    assert.equal(todoPart.hostToolPartId, 'part_todo')
+    assert.equal(todoPart.cursor.sequence, 2)
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
+    rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[SEMANTIC-TRACE-006] TODO-004 joins the persisted ToolPart to its exact durable XTrace range', () => {
-  const projection = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(managerSession),
-      run: 'asst_manager_run',
-      fact: fact('XTracePartAppended', {
-        SessionId: managerSession,
-        CursorSequence: 9n,
-        Role: 'assistant',
-        Turn: 4,
-        PartIndex: 2,
-        Kind: 'tool_call',
-        ToolName: 'todowrite',
-        TextRef: blobRef('blobs/todo-call'),
-        TextDigest: blobDigest('digest:todo-call'),
-        Provenance: 'g:0/turn:4/part:2',
-        ProviderRun: providerRun('asst_manager_run'),
-        ToolCallId: toolCallId('call_todo'),
-        HostToolPartId: hostToolPartId('part_todo'),
-      }),
-    }),
-  )
-  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
-
-  const messages = sessionSnapshot.projectMessages([
+  const messages = [
     {
       info: { id: 'asst_manager_run', role: 'assistant' },
       parts: [
@@ -133,42 +112,23 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-004 joins the persisted ToolPart to its exac
         },
       ],
     },
-  ])
-  const localized = magicTodoLocality.resolve(managerSession, messages, projection.value, toolCallId('call_todo'))
+  ]
+  const localized = xTrace.resolveLocality(
+    managerSession,
+    messages,
+    [tracePartEnvelope({ sequence: 9 })],
+    'call_todo',
+  )
+  const value = assertLocality(localized)
 
-  assert.equal(localized.ok, true, localized.ok ? '' : JSON.stringify(localized.error))
-  assert.equal(Number(localized.value.ReviewFrontier.Sequence), 9)
-  assert.equal(Number(localized.value.Range.Start.Sequence), 9)
-  assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 10)
-  assert.equal(localized.value.ToolPartOrdinal, 1)
+  assert.equal(value.reviewFrontier.sequence, 9)
+  assert.equal(value.range.start.sequence, 9)
+  assert.equal(value.range.endExclusive.sequence, 10)
+  assert.equal(value.toolPartOrdinal, 1)
 })
 
 test('WHAT[SEMANTIC-TRACE-006] TODO-004 localizes a pending before-hook ToolPart from snapshot before XTrace capture', () => {
-  const projection = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(managerSession),
-      run: 'asst_prior_run',
-      fact: fact('XTracePartAppended', {
-        SessionId: managerSession,
-        CursorSequence: 8n,
-        Role: 'assistant',
-        Turn: 3,
-        PartIndex: 1,
-        Kind: 'text',
-        ToolName: undefined,
-        TextRef: blobRef('blobs/prior-text'),
-        TextDigest: blobDigest('digest:prior-text'),
-        Provenance: 'g:0/turn:3/part:1',
-        ProviderRun: providerRun('asst_prior_run'),
-        ToolCallId: undefined,
-        HostToolPartId: undefined,
-      }),
-    }),
-  )
-  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
-
-  const messages = sessionSnapshot.projectMessages([
+  const messages = [
     {
       info: { id: 'asst_pending_run', role: 'assistant' },
       parts: [
@@ -181,50 +141,38 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-004 localizes a pending before-hook ToolPart
         },
       ],
     },
-  ])
-
-  const localized = magicTodoLocality.resolve(
+  ]
+  const localized = xTrace.resolveLocality(
     managerSession,
     messages,
-    projection.value,
-    toolCallId('call_pending_todo'),
+    [
+      tracePartEnvelope({
+        sequence: 8,
+        run: 'asst_prior_run',
+        turn: 3,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/prior-text',
+        textDigest: 'digest:prior-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+    ],
+    'call_pending_todo',
   )
+  const value = assertLocality(localized)
 
-  assert.equal(localized.ok, true, localized.ok ? '' : JSON.stringify(localized.error))
-  assert.equal(idValue.providerRun(localized.value.ProviderRun), 'asst_pending_run')
-  assert.equal(idValue.hostToolPart(localized.value.HostToolPartId), 'part_pending_todo')
-  assert.equal(Number(localized.value.ReviewFrontier.Sequence), 9)
-  assert.equal(Number(localized.value.Range.Start.Sequence), 9)
-  assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 10)
-  assert.equal(localized.value.ToolPartOrdinal, 1)
+  assert.equal(value.providerRun, 'asst_pending_run')
+  assert.equal(value.hostToolPartId, 'part_pending_todo')
+  assert.equal(value.reviewFrontier.sequence, 9)
+  assert.equal(value.range.start.sequence, 9)
+  assert.equal(value.range.endExclusive.sequence, 10)
+  assert.equal(value.toolPartOrdinal, 1)
 })
 
 test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending before-hook ReviewFrontier includes last assistant text in the same message', () => {
-  const projection = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(managerSession),
-      run: 'asst_prior_run',
-      fact: fact('XTracePartAppended', {
-        SessionId: managerSession,
-        CursorSequence: 8n,
-        Role: 'assistant',
-        Turn: 3,
-        PartIndex: 1,
-        Kind: 'text',
-        ToolName: undefined,
-        TextRef: blobRef('blobs/prior-text'),
-        TextDigest: blobDigest('digest:prior-text'),
-        Provenance: 'g:0/turn:3/part:1',
-        ProviderRun: providerRun('asst_prior_run'),
-        ToolCallId: undefined,
-        HostToolPartId: undefined,
-      }),
-    }),
-  )
-  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
-
-  const messages = sessionSnapshot.projectMessages([
+  const messages = [
     {
       info: { id: 'asst_pending_run', role: 'assistant' },
       parts: [
@@ -238,29 +186,42 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending before-hook ReviewFrontier inclu
         },
       ],
     },
-  ])
-
-  const localized = magicTodoLocality.resolve(
+  ]
+  const localized = xTrace.resolveLocality(
     managerSession,
     messages,
-    projection.value,
-    toolCallId('call_pending_todo'),
+    [
+      tracePartEnvelope({
+        sequence: 8,
+        run: 'asst_prior_run',
+        turn: 3,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/prior-text',
+        textDigest: 'digest:prior-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+    ],
+    'call_pending_todo',
   )
+  const value = assertLocality(localized)
 
-  assert.equal(localized.ok, true, localized.ok ? '' : JSON.stringify(localized.error))
   // next-assigned = 9 is the last assistant text; tool-call occupies 10 = Before(Tk)
-  assert.equal(Number(localized.value.ReviewFrontier.Sequence), 10)
-  assert.equal(Number(localized.value.Range.Start.Sequence), 10)
-  assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 11)
+  assert.equal(value.reviewFrontier.sequence, 10)
+  assert.equal(value.range.start.sequence, 10)
+  assert.equal(value.range.endExclusive.sequence, 11)
 })
 
 test('WHAT[SEMANTIC-TRACE-006] TODO-008 ManagerCheckpointLWR range includes last assistant text before todowrite', async () => {
-  const created = await agentJournal.create({ directory: 'xtrace-locality-lwr-last-text' })
+  const dir = mkdtempSync(join(tmpdir(), 'xtrace-locality-lwr-'))
+  const created = await journal.JournalSurface_boot(dir, 'rt_xtrace_locality_lwr', 4242, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 
   try {
-    await xTraceCapture.captureOpening(created.journal, managerSession, 'task', [])
-    const captured = providerProjection.decodeCapturedMessageView([
+    await xTrace.captureOpening(created.journal, managerSession, 'task', [])
+    const trace = await xTrace.captureMessageView(created.journal, managerSession, [
       {
         info: { id: 'asst_manager_run', role: 'assistant' },
         parts: [
@@ -275,20 +236,17 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-008 ManagerCheckpointLWR range includes last
         ],
       },
     ])
-    const trace = await xTraceCapture.captureMessageView(created.journal, managerSession, captured)
-    const parts = listItems(xTraceParts(trace))
+    const parts = xTrace.parts(trace)
     assert.equal(parts.length, 2)
-    assert.equal(Number(parts[0].Cursor.Sequence), 1)
-    assert.equal(Number(parts[1].Cursor.Sequence), 2)
+    assert.equal(parts[0].cursor.sequence, 1)
+    assert.equal(parts[1].cursor.sequence, 2)
 
-    const bounded = await lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(created.journal, managerSession, {
-      StartInclusive: { Sequence: 1 },
-      EndExclusive: { Sequence: 2 },
-    })
+    const bounded = await xTrace.lifecycleWorkRecordBounded(created.journal, managerSession, 1, 2)
     assert.equal(typeof bounded, 'string')
     assert.match(bounded, /I will update the plan/)
     assert.doesNotMatch(bounded, /^Opening\n/m)
   } finally {
-    created.dispose()
+    journal.JournalSurface_dispose(created.journal)
+    rmSync(dir, { recursive: true, force: true })
   }
 })

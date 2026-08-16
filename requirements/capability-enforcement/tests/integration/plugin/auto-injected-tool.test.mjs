@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('HOST_013_auto_injected_and_hyphen_are_not_registered_in_hooks_tool', async () => {
+test('WHAT[ENF-006] HOST_013_auto_injected_and_hyphen_are_not_registered_in_hooks_tool', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'coder-auto-injected', 'fast-coder')
     assert.equal(hooks.tool['auto-injected'], undefined, 'auto-injected must not be in hooks.tool')

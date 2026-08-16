@@ -1,70 +1,95 @@
-// FROZEN — 2026-08-14. Convergence laws over EventKWayMerge + Integrator structural Current.
-// Intentionally NOT executed before implementation.
+// FROZEN — 2026-08-14. Replica convergence laws over the public EventStore merge
+// owner and EventStore structural Current. Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { eventId, FsList, idValue, listItems } from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
-const Merge = await import('../../../dist/Persistence/EventStore/EventKWayMerge.js')
-const streamId = (v) => Domain.EventStreamIdModule_create(v)
-const make = (id, parents = [], stream = 'replica/law', type = 'JobRequested', payload = {}) => new Domain.EventEnvelope(
-  eventId(id), streamId(stream), type, FsList.ofArray(parents.map(eventId)), payload, FsList.ofArray([]),
-)
-const ids = (r) => listItems(r.toJSON()[1]).map((e) => idValue.event(e.EventId))
-const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40), R = 'd'.repeat(40)
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as merge from '../../../dist/Persistence/EventStore/MergeSurface.js'
+
+const make = (id, parents = [], stream = 'replica/law', type = 'JobRequested', payload = {}) => ({
+  id,
+  stream,
+  type,
+  parents,
+  payload,
+  payloadRefs: [],
+})
+const ids = (result) => {
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+  return result.events.map((event) => event.id)
+}
+const A = 'a'.repeat(40)
+const B = 'b'.repeat(40)
+const C = 'c'.repeat(40)
+const R = 'd'.repeat(40)
+
+const withStore = async (writerId, fn) => {
+  const root = mkdtempSync(join(tmpdir(), `wxs-replica-${writerId}-`))
+  const commonDir = join(root, '.git')
+  mkdirSync(commonDir, { recursive: true })
+  const handle = eventStore.EventStoreSurface_create(commonDir, writerId)
+  try {
+    await fn(handle)
+  } finally {
+    eventStore.EventStoreSurface_dispose(handle)
+    rmSync(root, { recursive: true, force: true })
+  }
+}
 
 test('WHAT[DURABLE-CONVERGENCE-001] set union never drops concurrent events', () => {
-  const merged = ids(Merge.merge(FsList.ofArray([['a', FsList.ofArray([make(A)])], ['b', FsList.ofArray([make(B)])]])))
-  assert.deepEqual(new Set(merged), new Set([A, B]))
+  const merged = merge.merge([
+    ['writer-a', [make(A)]],
+    ['writer-b', [make(B)]],
+  ])
+  assert.deepEqual(new Set(ids(merged)), new Set([A, B]))
 })
 
 test('WHAT[DURABLE-CONVERGENCE-002] merge is commutative associative idempotent at writer stream level', () => {
-  const sa = ['a', FsList.ofArray([make(A)])]
-  const sb = ['b', FsList.ofArray([make(B)])]
-  const sc = ['c', FsList.ofArray([make(C)])]
-  const abc = ids(Merge.merge(FsList.ofArray([sa, sb, sc])))
-  const cba = ids(Merge.merge(FsList.ofArray([sc, sb, sa])))
+  const sa = ['writer-a', [make(A)]]
+  const sb = ['writer-b', [make(B)]]
+  const sc = ['writer-c', [make(C)]]
+  const abc = ids(merge.merge([sa, sb, sc]))
+  const cba = ids(merge.merge([sc, sb, sa]))
   assert.deepEqual(abc, cba)
-  assert.deepEqual(ids(Merge.merge(FsList.ofArray([sa, ['copy', FsList.ofArray([make(A)])]]))), [A])
+  assert.deepEqual(ids(merge.merge([sa, ['copy', [make(A)]]])), [A])
 })
 
 test('WHAT[DURABLE-CONVERGENCE-006] convergence is a function of event truth not arrival wall clock', () => {
-  const streams1 = FsList.ofArray([['a', FsList.ofArray([make(A), make(C, [A])])], ['b', FsList.ofArray([make(B)])]])
-  const streams2 = FsList.ofArray([['b', FsList.ofArray([make(B)])], ['a', FsList.ofArray([make(A), make(C, [A])])]])
-  assert.deepEqual(ids(Merge.merge(streams1)), ids(Merge.merge(streams2)))
+  const streams1 = [
+    ['writer-a', [make(A), make(C, [A])]],
+    ['writer-b', [make(B)]],
+  ]
+  const streams2 = [
+    ['writer-b', [make(B)]],
+    ['writer-a', [make(A), make(C, [A])]],
+  ]
+  assert.deepEqual(ids(merge.merge(streams1)), ids(merge.merge(streams2)))
 })
 
 test('WHAT[DURABLE-CONVERGENCE-004] concurrent heads are preserved as structural DomainConflict frontier', async () => {
-  const local = createLocalEventStore()
-  try {
-    const sid = streamId('replica/conflict')
+  await withStore('writer-conflict', async (store) => {
     const a = make(A, [], 'replica/conflict')
     const b = make(B, [], 'replica/conflict')
-    assert.equal((await local.store.Append(FsList.ofArray([a]))).toJSON()[0], 'Ok')
-    assert.equal((await local.store.Append(FsList.ofArray([b]))).toJSON()[0], 'Ok')
-    const heads = listItems(local.store.TryHeads(sid)).map(idValue.event).sort()
-    assert.deepEqual(heads, [A, B].sort())
-    assert.equal(local.store.TryHead(sid), undefined, 'conflict must not masquerade as one linear head')
-  } finally {
-    local.close()
-  }
+    assert.equal((await eventStore.EventStoreSurface_append(store, [a])).ok, true)
+    assert.equal((await eventStore.EventStoreSurface_append(store, [b])).ok, true)
+    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'replica/conflict').sort(), [A, B].sort())
+    assert.equal(eventStore.EventStoreSurface_head(store, 'replica/conflict') == null, true, 'conflict must not masquerade as one linear head')
+  })
 })
 
 test('WHAT[DURABLE-CONVERGENCE-005] resolution with all competing heads collapses structural frontier', async () => {
-  const local = createLocalEventStore()
-  try {
-    const sid = streamId('replica/resolution')
+  await withStore('writer-resolution', async (store) => {
     const a = make(A, [], 'replica/resolution')
     const b = make(B, [], 'replica/resolution')
     const resolution = make(R, [A, B], 'replica/resolution', 'JobConflictResolved', { winner: A })
-    assert.equal((await local.store.Append(FsList.ofArray([a]))).toJSON()[0], 'Ok')
-    assert.equal((await local.store.Append(FsList.ofArray([b]))).toJSON()[0], 'Ok')
-    assert.equal((await local.store.Append(FsList.ofArray([resolution]))).toJSON()[0], 'Ok')
-    assert.deepEqual(listItems(local.store.TryHeads(sid)).map(idValue.event), [R])
-    assert.equal(idValue.event(local.store.TryHead(sid)), R)
-  } finally {
-    local.close()
-  }
+    assert.equal((await eventStore.EventStoreSurface_append(store, [a])).ok, true)
+    assert.equal((await eventStore.EventStoreSurface_append(store, [b])).ok, true)
+    assert.equal((await eventStore.EventStoreSurface_append(store, [resolution])).ok, true)
+    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'replica/resolution'), [R])
+    assert.equal(eventStore.EventStoreSurface_head(store, 'replica/resolution'), R)
+  })
 })

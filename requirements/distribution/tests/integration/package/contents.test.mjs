@@ -27,7 +27,7 @@ const PROVIDER_ROLES = [
 
 const exists = (rel) => fs.existsSync(path.join(repoRoot, rel))
 
-test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
+test('WHAT[DISTRIBUTION-001] PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   assert.ok(Array.isArray(pkg.files))
   assert.ok(pkg.files.some((f) => f === 'dist' || f === 'dist/' || f.startsWith('dist')))
@@ -66,7 +66,7 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
   }
 })
 
-test('PACKAGE_contents_tarball_excludes_source_tests_docs_scripts', () => {
+test('WHAT[DISTRIBUTION-004] PACKAGE_contents_tarball_excludes_source_tests_docs_scripts', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   const files = pkg.files.map((f) => String(f).replace(/\\/g, '/'))
   const banned = ['src', 'src/', 'tests', 'tests/', 'scripts', 'scripts/', 'spec', 'spec/', 'docs', 'docs/', 'requirements', 'requirements/']

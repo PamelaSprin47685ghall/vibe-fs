@@ -1,33 +1,24 @@
-// Split from tests/unit/execution/join-v2-mailbox.test.mjs (cutover Wave 2a);
-// owner: process-execution. PROC-008 完成事实双通道：CompletionMailbox 的 drain
-// 保持 publish FIFO（PTY 队列完成经 mailbox FIFO 送达；其余 mailbox/中断/批次
-// 断言 → delegation）。
+// Process owner mailbox surface: PTY completions drain FIFO and bounded.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentCompletion,
-  completionMailbox,
+
+const {
+  completionMailboxCreate,
+  completionMailboxPublishPty,
+  completionMailboxDrainPty,
+  completionMailboxPendingCount,
   maxJoinBatch,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const run = (id) =>
-  agentCompletion.completedRun({
-    runId: `run-${id}`,
-    agentId: id,
-    agentName: `agent-${id}`,
-    workRecord: `wr-${id}`,
-  })
-
-// ── 4: two completions drained in one batch ──────────────────────────────────
+  ptyExited,
+} = await import('../../../dist/Process/Surface.js')
 
 test('WHAT[PROC-008] EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
-  const box = completionMailbox.create()
-  completionMailbox.publish(box, run('a'))
-  completionMailbox.publish(box, run('b'))
-  const batch = completionMailbox.drainPtyCompletions(box, maxJoinBatch)
+  const mailbox = completionMailboxCreate()
+  completionMailboxPublishPty(mailbox, ptyExited('a', 'closed'))
+  completionMailboxPublishPty(mailbox, ptyExited('b', 'closed'))
+  const batch = completionMailboxDrainPty(mailbox, maxJoinBatch)
   assert.equal(batch.length, 2)
-  assert.equal(completionMailbox.ptyIdOf(batch[0]), 'a')
-  assert.equal(completionMailbox.ptyIdOf(batch[1]), 'b')
-  assert.equal(completionMailbox.pendingCount(box), 0)
+  assert.equal(batch[0].ptyId, 'a')
+  assert.equal(batch[1].ptyId, 'b')
+  assert.equal(completionMailboxPendingCount(mailbox), 0)
 })

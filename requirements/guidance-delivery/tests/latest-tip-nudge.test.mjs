@@ -3,85 +3,62 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  agentFact,
-  agentJournal,
-  envelope,
-  listItems,
-  fact,
-  frameEpochId,
-  blobDigest,
-  blobRef,
-  bloggerRequestId,
-  prefixEpochId,
-  providerRun,
-  runtimeResources,
-  sessionId,
-  stream,
-  toolCallId,
-  FsList,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as guidance from '../../../dist/Enforcer/Guidance/TipSurface.js'
+import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
+import * as resources from '../../../dist/Resources/PromptSurface.js'
+resources.runtimeInstallFromPackage()
 
-runtimeResources.installFromPackage()
+const latestTipNudge = guidance.latestNudge
+const latestTipGuidance = guidance.latest
+const tryInject = pair.tryInject
 
-const { EnforcerTipGuidance_latestTipNudge: latestTipNudge } = await import(
-  '../../../dist/Enforcer/Guidance/Tip.js',
-)
-const { EnforcerTipGuidance_latestTipGuidance: latestTipGuidance } = await import(
-  '../../../dist/Enforcer/Guidance/Tip.js',
-)
-const { tryInject } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
+const main = 'ses-nudge-main'
+const blogger = 'ses-nudge-blogger'
 
-const main = sessionId('ses-nudge-main')
-const blogger = sessionId('ses-nudge-blogger')
-const journalStream = (id) => stream.session(id)
-
-const append = async (journal, id, value, run) => {
-  const result = await agentJournal.appendAgent(journalStream(id), run, value, journal)
-  assert.equal(result.ok, true)
-}
+const appendObservation = (journal) =>
+  guidance.appendObservation(journal, {
+    session: main,
+    bloggerSession: blogger,
+    requestId: 'req-nudge-1',
+    frameEpoch: 0,
+    previousIngestedThrough: 0,
+    nextIngestedThrough: 1,
+    previousCutoff: 0,
+    nextCutoff: 1,
+    nextCoveredPrefixDigest: 'digest-nudge-1',
+    textRef: 'blob-nudge-1',
+    textDigest: 'sha-nudge-1',
+    providerRun: 'run-nudge-1',
+    toolCallIds: ['call-nudge-1'],
+    tipRuleId: 'primitive-obsession',
+    fieldNameAtCommit: 'primitive-obsession',
+    observedPrefixEpoch: 0,
+  })
 
 const seed = async ({ withAssociation = true, withTip = true } = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-latest-tip-'))
-  const created = await agentJournal.create({ directory })
-  assert.equal(created.ok, true)
+  const created = await guidance.createJournal(directory)
+  assert.equal(created.ok, true, created.error)
   const journal = created.journal
 
   if (withAssociation) {
-    await append(journal, main, agentFact('CompanionBloggerLinked', {
-      SessionId: main,
-      BloggerSessionId: blogger,
-      BloggerAgent: 'fast-blogger',
-    }))
+    const linked = await guidance.appendCompanionLink(journal, {
+      session: main,
+      bloggerSession: blogger,
+      bloggerAgent: 'fast-blogger',
+    })
+    assert.equal(linked.ok, true, linked.error)
   }
 
   if (withTip) {
-    const field = 'primitive-obsession'
-    await append(journal, main, agentFact('BlogObservationCommitted', {
-      SessionId: main,
-      BloggerSessionId: blogger,
-      RequestId: bloggerRequestId('req-nudge-1'),
-      FrameEpochId: frameEpochId(0),
-      PreviousIngestedThroughSequence: 0n,
-      NextIngestedThroughSequence: 1n,
-      PreviousCoverableTurnCutoffExclusive: 0,
-      NextCoverableTurnCutoffExclusive: 1,
-      NextCoveredPrefixDigest: 'digest-nudge-1',
-      TextRef: blobRef('blob-nudge-1'),
-      TextDigest: blobDigest('sha-nudge-1'),
-      ProviderRun: providerRun('run-nudge-1'),
-      ToolCallIds: [toolCallId('call-nudge-1')],
-      TipRuleId: 'primitive-obsession',
-      FieldNameAtCommit: field,
-      EvidenceRef: undefined,
-      ObservedPrefixEpochId: prefixEpochId(0),
-    }), providerRun('run-nudge-1'))
+    const committed = await appendObservation(journal)
+    assert.equal(committed.ok, true, committed.error)
   }
 
   return {
     journal,
     dispose: () => {
-      created.dispose()
+      guidance.disposeJournal(journal)
       rmSync(directory, { recursive: true, force: true })
     },
   }
@@ -120,7 +97,7 @@ test('WHAT[GD-007] ENFORCER_TIP_NUDGE_001b_latestTipNudge_is_same_bytes_as_lates
 test('WHAT[GD-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
   const fixture = await seed({ withTip: false })
   try {
-    assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
+    assert.equal(await latestTipNudge(fixture.journal, blogger), null)
   } finally {
     fixture.dispose()
   }
@@ -129,30 +106,29 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', asyn
 test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
   const fixture = await seed({ withAssociation: false })
   try {
-    assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
+    assert.equal(await latestTipNudge(fixture.journal, blogger), null)
   } finally {
     fixture.dispose()
   }
 })
 
 const guideline = '# Pair programming auto-injected'
-const anchor = FsList.ofArray([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }])
+const anchor = [{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
 const markerOutput = (messages) => {
-  const items = listItems(messages)
   // pair sits before trailing user: completed -, user
-  const result = items.find((m) => m?.parts?.[0]?.tool === '-' && m?.parts?.[0]?.state?.status === 'completed')
+  const result = messages.find((m) => m?.parts?.[0]?.tool === '-' && m?.parts?.[0]?.state?.status === 'completed')
   return result?.parts?.[0]?.state?.output
 }
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
-  const result = (await tryInject(undefined, 'ses-auto-injected', guideline, anchor)).toJSON()
-  assert.equal(result[0], 'Ok', result[1] ?? '')
-  assert.equal(markerOutput(result[1]), guideline)
+  const result = await tryInject(undefined, `${guideline}`, anchor)
+  assert.equal(result.ok, true, result.error)
+  assert.equal(markerOutput(result.value), guideline)
 })
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const result = (await tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor)).toJSON()
-  assert.equal(result[0], 'Ok', result[1] ?? '')
-  assert.equal(markerOutput(result[1]), `${nudge}\n\n${guideline}`)
+  const result = await tryInject(undefined, `${nudge}\n\n${guideline}`, anchor)
+  assert.equal(result.ok, true, result.error)
+  assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
 })

@@ -1,41 +1,16 @@
-// Split from tests/unit/temporal/fallback-aabb-confluence.test.mjs (cutover Wave 2a); owner: provider-attempt-recovery
+// Fallback temporal theorem suite.
 //
-// G4R-1 Temporal Kernel theorem, fallback half. Proves race-as-algebra on
-// production FallbackProjection / Fold — PAR-003 (same failure advances once /
-// dedupe), PAR-007 (fold rejection precedence), cursor confluence and durable
-// dropEphemeral recovery. No test-only business logic: every assertion folds
-// through production code.
-//
-// Race model (G4R §10/§24):
-//   Time is input, not authority. If A and B are independent (different
-//   sessions / logical runs), fold(A;B) == fold(B;A) — confluence.
-//   If they contend on one cursor, the journal has a unique precedence outcome
-//   (exactly once, not double-counted). No scheduler lottery.
-//
-// The TEMPORAL_* harness-contract tests of the original file moved to
-// verification-system (temporal-harness.test.mjs) and time-capability
-// (temporal-virtual-clock.test.mjs); the shared harness itself now lives in
-// verification-system/tests/support/temporal-harness.mjs.
+// Fallback facts, durable journal traces, and folds cross the production
+// TemporalSurface as plain values. The owner keeps typed identities, unions,
+// and projection state private while this suite proves race algebra.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFact,
-  agentJournal,
-  authorityRoot,
-  cursor,
-  envelope,
-  fact,
-  fallbackProjection,
-  fold,
-  logicalRunId,
-  providerRun,
-  sessionId,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
+
+import * as temporal from '../../../dist/Verification/TemporalSurface.js'
 import {
   DeterministicEventQueue,
-  createVirtualClock,
+  createDurableWorld,
   dropEphemeral,
 } from '../../verification-system/tests/support/temporal-harness.mjs'
 
@@ -43,100 +18,88 @@ import {
 
 const SES_A = 'ses_a'
 const SES_B = 'ses_b'
-const RUN_L = logicalRunId('run_L')
-const RUN_M = logicalRunId('run_M')
-const ROOT_A = authorityRoot('msg_u1')
-const ROOT_B = authorityRoot('msg_u2')
-const SESSION_A = sessionId(SES_A)
-const SESSION_B = sessionId(SES_B)
+const RUN_L = 'run_L'
+const RUN_M = 'run_M'
+const ROOT_A = 'msg_u1'
+const ROOT_B = 'msg_u2'
+const SESSION_A = SES_A
+const SESSION_B = SES_B
 
-const identityFor = (session, logical, root, run) => cursor.attemptIdentity(session, logical, root, providerRun(run))
+const stream = (session) => ({ kind: 'Session', session })
 
-const rootAgentFact = (session, logical, root) =>
-  agentFact('AuthorityRootAccepted', {
-    SessionId: sessionId(session),
-    LogicalRunId: logicalRunId(logical),
-    AuthorityRootUserMessageId: authorityRoot(root),
+const identityFor = (session, logical, root, run) => ({
+  session,
+  logicalRun: logical,
+  authorityRoot: root,
+  providerRun: run,
+})
+
+const rootFact = (session, logical, root) => ({
+  family: 'Prompt',
+  case: 'AuthorityRootAccepted',
+  payload: {
+    SessionId: session,
+    LogicalRunId: logical,
+    AuthorityRootUserMessageId: root,
     AuthorityKind: 'HumanRoot',
     SelectedAgent: 'fast-coder',
     PeerAgent: 'deep-coder',
     CanonicalRole: 'coder',
     SelectedTier: 'fast',
-  })
-
-const advanceAgentFact = (session, logical, root, run, previous, next, count) =>
-  agentFact('FallbackCursorAdvanced', {
-    SessionId: sessionId(session),
-    LogicalRunId: logicalRunId(logical),
-    AuthorityRootUserMessageId: authorityRoot(root),
-    ProviderRun: providerRun(run),
-    PreviousOffset: previous,
-    NextOffset: next,
-    ConsecutiveFailureCount: count,
-    Reason: 'provider_error',
-  })
-
-const rootFact = (session, logical, root) => fact('AuthorityRootAccepted', {
-  SessionId: sessionId(session),
-  LogicalRunId: logicalRunId(logical),
-  AuthorityRootUserMessageId: authorityRoot(root),
-  AuthorityKind: 'HumanRoot',
-  SelectedAgent: 'fast-coder',
-  PeerAgent: 'deep-coder',
-  CanonicalRole: 'coder',
-  SelectedTier: 'fast',
+  },
 })
 
-const advanceFact = (session, logical, root, run, previous, next, count) =>
-  fact('FallbackCursorAdvanced', {
-    SessionId: sessionId(session),
-    LogicalRunId: logicalRunId(logical),
-    AuthorityRootUserMessageId: authorityRoot(root),
-    ProviderRun: providerRun(run),
+const advanceFact = (session, logical, root, run, previous, next, count) => ({
+  family: 'Fallback',
+  case: 'FallbackCursorAdvanced',
+  payload: {
+    SessionId: session,
+    LogicalRunId: logical,
+    AuthorityRootUserMessageId: root,
+    ProviderRun: run,
     PreviousOffset: previous,
     NextOffset: next,
     ConsecutiveFailureCount: count,
     Reason: 'provider_error',
-  })
+  },
+})
 
-const fallbackOf = (projection, sessionIdStr) => {
-  const sess = fold.session(projection, sessionIdStr)
-  if (!sess) return undefined
-  return fallbackProjection.read(sess.Fallback)
-}
+const envelope = (seq, session, fact, run) => ({
+  runtime: 'rt_temporal',
+  seq,
+  observedAt: '2026-01-01T00:00:00Z',
+  id: `e${seq}`,
+  stream: stream(session),
+  ...(run === undefined ? {} : { run }),
+  fact,
+})
+
+const fallbackOf = (projection, sessionId) => projection?.sessions?.[sessionId]?.fallback
+
+const fold = (envelopes) => temporal.fold(envelopes)
 
 // ── Theorem 1: independent sessions commute (A;B == B;A) ───────────────────
-//
-// Two independent fallback domains (different SessionId / LogicalRun) are
-// commutative: the fold over their envelopes yields the same per-session
-// cursors regardless of interleaving. This is the algebraic shape of
-// "owner failure vs blogger interruption" when they land on different runs —
-// but proved here at pure Fold level without spawning Host.
 
 test('WHAT[PAR-015] THEOREM_fallback_independent_sessions_commute_pure_projection', () => {
-  const a0 = fallbackProjection.forAuthority(RUN_L, ROOT_A)
-  const b0 = fallbackProjection.forAuthority(RUN_M, ROOT_B)
+  const a0 = temporal.fallbackForAuthority(RUN_L, ROOT_A)
+  const b0 = temporal.fallbackForAuthority(RUN_M, ROOT_B)
 
-  const a1 = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, 'run_1'), 0, 1, 1, a0)
-  const b1 = fallbackProjection.applyAdvance(identityFor(SESSION_B, RUN_M, ROOT_B, 'run_9'), 0, 1, 1, b0)
+  const a1 = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, 'run_1'), 0, 1, 1, a0)
+  const b1 = temporal.fallbackApplyAdvance(identityFor(SESSION_B, RUN_M, ROOT_B, 'run_9'), 0, 1, 1, b0)
   assert.equal(a1.ok, true, `A advance failed: ${a1.error}`)
   assert.equal(b1.ok, true, `B advance failed: ${b1.error}`)
 
-  // Independent — applying A then B vs B then A would be identical if the
-  // projection were global; at single-projection level they are disjoint, so we
-  // prove the Fold-level global commutativity instead (next test). Here prove
-  // that neither projection observes the other.
-  assert.deepEqual(fallbackProjection.read(a1.value), {
-    logicalRun: 'run_L',
-    authorityRoot: 'msg_u1',
+  assert.deepEqual(temporal.fallbackRead(a1.value), {
+    logicalRun: RUN_L,
+    authorityRoot: ROOT_A,
     offset: 1,
     failures: 1,
     dedupeKeys: 1,
     exhausted: false,
   })
-  assert.deepEqual(fallbackProjection.read(b1.value), {
-    logicalRun: 'run_M',
-    authorityRoot: 'msg_u2',
+  assert.deepEqual(temporal.fallbackRead(b1.value), {
+    logicalRun: RUN_M,
+    authorityRoot: ROOT_B,
     offset: 1,
     failures: 1,
     dedupeKeys: 1,
@@ -145,194 +108,136 @@ test('WHAT[PAR-015] THEOREM_fallback_independent_sessions_commute_pure_projectio
 })
 
 test('WHAT[PAR-001] THEOREM_fold_independent_sessions_confluent_across_interleavings', () => {
-  // Four envelopes: root+advance for ses_a, root+advance for ses_b.
-  // Any interleaving of the two per-session sequences must fold to the same
-  // global projection (per-session cursors identical). We enumerate a subset
-  // explicitly rather than racing wall clocks.
   const seqA = [
-    envelope({ seq: 10, stream: stream.session(SESSION_A), fact: rootFact(SES_A, 'run_L', 'msg_u1') }),
-    envelope({ seq: 11, stream: stream.session(SESSION_A), fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_1', 0, 1, 1) }),
+    envelope(10, SES_A, rootFact(SES_A, RUN_L, ROOT_A)),
+    envelope(11, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_1', 0, 1, 1)),
   ]
   const seqB = [
-    envelope({ seq: 20, stream: stream.session(SESSION_B), fact: rootFact(SES_B, 'run_M', 'msg_u2') }),
-    envelope({ seq: 21, stream: stream.session(SESSION_B), fact: advanceFact(SES_B, 'run_M', 'msg_u2', 'run_9', 0, 1, 1) }),
+    envelope(20, SES_B, rootFact(SES_B, RUN_M, ROOT_B)),
+    envelope(21, SES_B, advanceFact(SES_B, RUN_M, ROOT_B, 'run_9', 0, 1, 1)),
   ]
 
-  // Two representative interleavings: A before B, and B before A.
-  // Full enumeration would be DeterministicEventQueue.interleavings(seqA, seqB).
-  const interleaveAB = [...seqA, ...seqB]
-  const interleaveBA = [...seqB, ...seqA]
-
-  const foldAB = fold.apply(fold.empty, interleaveAB)
-  const foldBA = fold.apply(fold.empty, interleaveBA)
+  const foldAB = fold([...seqA, ...seqB])
+  const foldBA = fold([...seqB, ...seqA])
   assert.equal(foldAB.ok, true, foldAB.ok ? '' : JSON.stringify(foldAB.error))
   assert.equal(foldBA.ok, true, foldBA.ok ? '' : JSON.stringify(foldBA.error))
-
-  // Both worlds agree per session.
   assert.deepEqual(fallbackOf(foldAB.value, SES_A), fallbackOf(foldBA.value, SES_A))
   assert.deepEqual(fallbackOf(foldAB.value, SES_B), fallbackOf(foldBA.value, SES_B))
   assert.equal(fallbackOf(foldAB.value, SES_A).offset, 1)
   assert.equal(fallbackOf(foldBA.value, SES_B).offset, 1)
 
-  // Exhaustively prove confluence over all interleavings, not just two.
   for (const interleaving of DeterministicEventQueue.interleavings(seqA, seqB)) {
-    const folded = fold.apply(fold.empty, interleaving)
+    const folded = fold(interleaving)
     assert.equal(folded.ok, true)
     assert.deepEqual(fallbackOf(folded.value, SES_A), fallbackOf(foldAB.value, SES_A))
     assert.deepEqual(fallbackOf(folded.value, SES_B), fallbackOf(foldAB.value, SES_B))
   }
 })
 
-// ── Theorem 2: exactly-once / dedupe — same ProviderRun observed twice ───────
-//
-// FALLBACK-003: one logical failure observed by both a retry signal and an
-// idle reconcile must advance the cursor once. The dedupe key is
-// ProviderRunIdentity. Proving it as algebra: any trace that contains the same
-// ProviderRun twice converges to count==1, regardless of interleaving with an
-// unrelated independent event.
+// ── Theorem 2: exactly-once / dedupe ─────────────────────────────────────────
 
 test('WHAT[PAR-003] THEOREM_fallback_exactly_once_same_provider_run_advances_once', () => {
-  const start = fallbackProjection.forAuthority(RUN_L, ROOT_A)
+  const start = temporal.fallbackForAuthority(RUN_L, ROOT_A)
   const run = 'run_dup'
 
-  // First observation valid 0→1.
-  const first = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 0, 1, 1, start)
+  const first = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 0, 1, 1, start)
   assert.equal(first.ok, true)
-  // Second observation of SAME run, now claiming 1→2, must be AlreadyObserved — not a second unit of budget.
-  const second = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, first.value)
+  const second = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, first.value)
   assert.deepEqual(second, { ok: false, error: 'AlreadyObserved' })
-  // State unchanged.
-  assert.deepEqual(fallbackProjection.read(first.value), fallbackProjection.read(first.value))
-  assert.equal(fallbackProjection.read(first.value).failures, 1)
+  assert.deepEqual(temporal.fallbackRead(first.value), temporal.fallbackRead(first.value))
+  assert.equal(temporal.fallbackRead(first.value).failures, 1)
 
-  // Reverse-race algebra: if the duplicate's offset is stale, the valid step still wins.
-  // Apply duplicate with stale offset first (1→2 from state 0): not deduped yet, so InvalidTransition.
-  const staleFirst = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, start)
+  const staleFirst = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, start)
   assert.deepEqual(staleFirst, { ok: false, error: 'InvalidTransition' })
-  // Then the valid 0→1 succeeds.
-  const validAfterStale = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 0, 1, 1, start)
+  const validAfterStale = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 0, 1, 1, start)
   assert.equal(validAfterStale.ok, true)
-  // And any later duplicate is absorbed.
-  const absorbed = fallbackProjection.applyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, validAfterStale.value)
+  const absorbed = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, validAfterStale.value)
   assert.deepEqual(absorbed, { ok: false, error: 'AlreadyObserved' })
-  assert.deepEqual(fallbackProjection.read(validAfterStale.value), fallbackProjection.read(first.value))
+  assert.deepEqual(temporal.fallbackRead(validAfterStale.value), temporal.fallbackRead(first.value))
 })
 
 test('WHAT[PAR-003] THEOREM_fold_duplicate_absorbed_not_double_counted', () => {
-  // At Fold level, a duplicate FallbackCursorAdvanced line is absorbed (fold stays ok, projection unchanged).
-  // Two distinct traces that both contain the same ProviderRun twice must converge to failures==1.
-  const root = envelope({ seq: 1, stream: stream.session(SESSION_A), fact: rootFact(SES_A, 'run_L', 'msg_u1') })
-  const adv1 = envelope({
-    seq: 2,
-    stream: stream.session(SESSION_A),
-    fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_dup', 0, 1, 1),
-  })
-  const dup = envelope({
-    seq: 3,
-    stream: stream.session(SESSION_A),
-    fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_dup', 1, 2, 2),
-  })
+  const root = envelope(1, SES_A, rootFact(SES_A, RUN_L, ROOT_A))
+  const advance = envelope(2, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_dup', 0, 1, 1))
+  const duplicate = envelope(3, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_dup', 1, 2, 2))
 
-  const foldOnce = fold.apply(fold.empty, [root, adv1])
-  const foldDup = fold.apply(fold.empty, [root, adv1, dup])
+  const foldOnce = fold([root, advance])
+  const foldDuplicate = fold([root, advance, duplicate])
   assert.equal(foldOnce.ok, true)
-  assert.equal(foldDup.ok, true, foldDup.ok ? '' : JSON.stringify(foldDup.error))
-  assert.deepEqual(fallbackOf(foldOnce.value, SES_A), fallbackOf(foldDup.value, SES_A))
-  assert.equal(fallbackOf(foldDup.value, SES_A).failures, 1)
-  assert.equal(fallbackOf(foldDup.value, SES_A).dedupeKeys, 1)
+  assert.equal(foldDuplicate.ok, true, foldDuplicate.ok ? '' : JSON.stringify(foldDuplicate.error))
+  assert.deepEqual(fallbackOf(foldOnce.value, SES_A), fallbackOf(foldDuplicate.value, SES_A))
+  assert.equal(fallbackOf(foldDuplicate.value, SES_A).failures, 1)
+  assert.equal(fallbackOf(foldDuplicate.value, SES_A).dedupeKeys, 1)
 })
 
-// ── Theorem 3: precedence — contending advances on one cursor have a unique outcome
-//
-// Within one Logical Run, two valid-looking advances that both claim 0→1 contend.
-// Exactly one wins; the other is InvalidTransition. The final offset/count is
-// deterministic (1 failure) regardless of which contender won.
+// ── Theorem 3: precedence ───────────────────────────────────────────────────
 
 test('WHAT[PAR-003] THEOREM_fallback_precedence_one_winner_for_one_cursor', () => {
-  const start = fallbackProjection.forAuthority(RUN_L, ROOT_A)
+  const start = temporal.fallbackForAuthority(RUN_L, ROOT_A)
   const attemptA = identityFor(SESSION_A, RUN_L, ROOT_A, 'run_a')
   const attemptB = identityFor(SESSION_A, RUN_L, ROOT_A, 'run_b')
 
-  // Order A;B: A wins, B is stale.
-  let s = fallbackProjection.applyAdvance(attemptA, 0, 1, 1, start)
-  assert.equal(s.ok, true)
-  const afterB = fallbackProjection.applyAdvance(attemptB, 0, 1, 1, s.value)
+  const winnerAB = temporal.fallbackApplyAdvance(attemptA, 0, 1, 1, start)
+  assert.equal(winnerAB.ok, true)
+  const afterB = temporal.fallbackApplyAdvance(attemptB, 0, 1, 1, winnerAB.value)
   assert.deepEqual(afterB, { ok: false, error: 'InvalidTransition' })
-  const finalAB = fallbackProjection.read(s.value)
+  const finalAB = temporal.fallbackRead(winnerAB.value)
 
-  // Order B;A: B wins, A is stale. Same offset/count.
-  let t = fallbackProjection.applyAdvance(attemptB, 0, 1, 1, start)
-  assert.equal(t.ok, true)
-  const afterA = fallbackProjection.applyAdvance(attemptA, 0, 1, 1, t.value)
+  const winnerBA = temporal.fallbackApplyAdvance(attemptB, 0, 1, 1, start)
+  assert.equal(winnerBA.ok, true)
+  const afterA = temporal.fallbackApplyAdvance(attemptA, 0, 1, 1, winnerBA.value)
   assert.deepEqual(afterA, { ok: false, error: 'InvalidTransition' })
-  const finalBA = fallbackProjection.read(t.value)
+  const finalBA = temporal.fallbackRead(winnerBA.value)
 
   assert.equal(finalAB.offset, 1)
   assert.equal(finalBA.offset, 1)
   assert.equal(finalAB.failures, 1)
   assert.equal(finalBA.failures, 1)
-  // The cursor (offset/failures) converges; only the dedupe key identity differs (which run was remembered).
 })
 
 // ── Theorem 4: dropEphemeral preserves durable fallback facts ───────────────
-//
-// G4R §12: world1 → durable facts F, DROP EPHEMERAL, world2 := recover(F) → same cursor, no resurrection.
 
 test('WHAT[PAR-007] THEOREM_drop_ephemeral_preserves_fallback_cursor', async () => {
-  const dir = `temporal-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`
-
-  // Pure algebra: envelopes prove confluence/dedupe at Fold level.
   const seqEnvelopes = [
-    envelope({ seq: 1, stream: stream.session(SESSION_A), fact: rootFact(SES_A, 'run_L', 'msg_u1') }),
-    envelope({ seq: 2, stream: stream.session(SESSION_A), fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_1', 0, 1, 1) }),
-    envelope({ seq: 3, stream: stream.session(SESSION_A), fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_2', 1, 2, 2) }),
+    envelope(1, SES_A, rootFact(SES_A, RUN_L, ROOT_A)),
+    envelope(2, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_1', 0, 1, 1)),
+    envelope(3, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_2', 1, 2, 2)),
   ]
-  const beforeFold = fold.apply(fold.empty, seqEnvelopes)
+  const beforeFold = fold(seqEnvelopes)
   assert.equal(beforeFold.ok, true, beforeFold.ok ? '' : JSON.stringify(beforeFold.error))
-  const beforeFallback = fallbackProjection.read(fold.session(beforeFold.value, SES_A).Fallback)
+  const beforeFallback = fallbackOf(beforeFold.value, SES_A)
   assert.deepEqual({ offset: beforeFallback.offset, failures: beforeFallback.failures }, { offset: 2, failures: 2 })
 
-  // Durable survival: write the SAME facts through AgentJournal's single writer (inner AgentFact),
-  // then crash (dropEphemeral) and prove the recovered projection equals the pure one.
-  const vt1 = createVirtualClock()
-  const created1 = await agentJournal.create({ directory: dir, runtime: 'rt_1', pid: 4242, startedAt: '2026-01-01T00:00:00Z' })
-  assert.equal(created1.ok, true, created1.ok ? '' : String(created1.error))
-  const world1b = { vt: vt1, journal: created1.journal, raw: created1.raw, directory: dir, dispose: created1.dispose }
-  const streamA = stream.session(SESSION_A)
-
+  const world1 = await createDurableWorld({ directory: 'temporal-fallback', runtime: 'rt_1', pid: 4242 })
+  const streamA = stream(SESSION_A)
   const agentFacts = [
-    rootAgentFact(SES_A, 'run_L', 'msg_u1'),
-    advanceAgentFact(SES_A, 'run_L', 'msg_u1', 'run_1', 0, 1, 1),
-    advanceAgentFact(SES_A, 'run_L', 'msg_u1', 'run_2', 1, 2, 2),
+    rootFact(SES_A, RUN_L, ROOT_A),
+    advanceFact(SES_A, RUN_L, ROOT_A, 'run_1', 0, 1, 1),
+    advanceFact(SES_A, RUN_L, ROOT_A, 'run_2', 1, 2, 2),
   ]
-  for (const af of agentFacts) {
-    const appended = await agentJournal.appendAgent(streamA, undefined, af, world1b.journal)
+  const runs = [undefined, 'run_1', 'run_2']
+  for (let index = 0; index < agentFacts.length; index += 1) {
+    const appended = await temporal.journalAppendAgent(world1.journal, streamA, runs[index], agentFacts[index])
     assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))
   }
 
-  const snapBefore = agentJournal.snapshot(world1b.journal)
-  const snapBeforeFallback = fallbackProjection.read(fold.session(snapBefore, SES_A).Fallback)
-  assert.deepEqual(snapBeforeFallback, beforeFallback, 'durable snapshot must match pure fold')
+  const snapshotBefore = temporal.journalSnapshot(world1.journal)
+  const snapshotBeforeFallback = fallbackOf(snapshotBefore, SES_A)
+  assert.deepEqual(snapshotBeforeFallback, beforeFallback, 'durable snapshot must match pure fold')
 
-  // Crash: drop ephemeral, recover durable via same EventStore directory.
-  const world2 = await dropEphemeral(world1b, { runtime: 'rt_recovered', pid: 4243 })
-  const after = agentJournal.snapshot(world2.journal)
-  const afterFallback = fallbackProjection.read(fold.session(after, SES_A).Fallback)
+  const world2 = await dropEphemeral(world1, { runtime: 'rt_recovered', pid: 4243 })
+  const afterFallback = fallbackOf(temporal.journalSnapshot(world2.journal), SES_A)
   assert.deepEqual(afterFallback, beforeFallback, 'durable fallback cursor must survive dropEphemeral')
 
-  // Replay of a duplicate via the durable fold still absorbs (no double-count).
-  const persisted = await agentJournal.persistedEnvelopes(world2.journal)
-  const replay = fold.apply(fold.empty, persisted)
+  const persisted = temporal.journalPersistedEnvelopes(world2.journal)
+  const replay = fold(persisted)
   assert.equal(replay.ok, true, replay.ok ? '' : JSON.stringify(replay.error))
-  const replayFallback = fallbackProjection.read(fold.session(replay.value, SES_A).Fallback)
-  assert.deepEqual(replayFallback, beforeFallback, 'persisted envelope replay must converge')
+  assert.deepEqual(fallbackOf(replay.value, SES_A), beforeFallback, 'persisted envelope replay must converge')
 
-  // Pure replay absorption.
-  const rootDupEnvelope = envelope({ seq: 999, stream: streamA, fact: advanceFact(SES_A, 'run_L', 'msg_u1', 'run_1', 0, 1, 1) })
-  const replayFold = fold.apply(beforeFold.value, [rootDupEnvelope])
-  assert.equal(replayFold.ok, true, replayFold.ok ? '' : JSON.stringify(replayFold.error))
-  const afterReplayFallback = fallbackProjection.read(fold.session(replayFold.value, SES_A).Fallback)
-  assert.equal(afterReplayFallback.failures, 2, 'replaying a duplicate must not double-count')
+  const duplicate = envelope(999, SES_A, advanceFact(SES_A, RUN_L, ROOT_A, 'run_1', 0, 1, 1))
+  const replayWithDuplicate = fold([...seqEnvelopes, duplicate])
+  assert.equal(replayWithDuplicate.ok, true, replayWithDuplicate.ok ? '' : JSON.stringify(replayWithDuplicate.error))
+  assert.equal(fallbackOf(replayWithDuplicate.value, SES_A).failures, 2, 'replaying a duplicate must not double-count')
 
   world2.dispose()
 })

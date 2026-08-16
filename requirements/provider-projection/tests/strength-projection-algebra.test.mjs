@@ -1,114 +1,92 @@
-// Split from tests/unit/strength/projection-algebra.test.mjs (cutover Wave 2a); owner: provider-projection
+// PROVIDER-PROJECTION algebra oracle over Strength intents.
 //
-// PROVIDER-PROJECTION algebra oracle over the Strength intents: the projection
-// module exposes the intent constructors, the planner's conflict rule rejects a
-// Strength mirror alongside a normal-work base selection, and multiple promoted
-// absolute anchors render registration-order independent (permutation) with
-// deterministic wire output. Strength product-semantics assertions
-// (candidate/promotion behaviour) went to speculative-investigation.
+// The registered ProjectionSurface owns F# intent construction, planner
+// reduction, and renderer output. This test only exchanges JSON-shaped values
+// and an opaque hash callback at that boundary.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Intent from '../../../dist/Participant/Provider/Projection/Intent.js'
-import * as Planner from '../../../dist/Participant/Provider/Projection/Planner.js'
-import * as Renderer from '../../../dist/Participant/Provider/Projection/Renderer.js'
-// Fable emits a bare `plan` for the single-module Planner file; keep the
-// historical prefixed name so call sites stay stable.
-const P = { ...Intent, ...Planner, ...Renderer, ProjectionPlanner_plan: Planner.plan }
-import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
-import * as Frame from '../../../dist/Strength/Frame.js'
-import * as Id from '../../../dist/Foundation/Identity.js'
-import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
+import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 const H = (text) => `H(${text})`
-const resultOf = (value) => value.tag === 0
-  ? { ok: true, value: value.fields[0] }
-  : { ok: false, error: value.fields[0] }
-const caseOf = (value) => value.cases()[value.tag]
-const session = (value) => Id.SessionIdModule_create(value)
-const run = (value) => Id.ProviderRunIdentityModule_create(value)
-const decision = (value) => Id.StrengthDecisionIdModule_create(value)
-const textPart = (text) => new Provider.WirePart(0, [text])
-const message = (role, parts) => ({ Role: role, Parts: toList(parts) })
-
-const snapshot = new P.ProjectionSnapshot(
-  { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: toList([]) },
-  undefined,
-  toList([]),
-  undefined,
-  undefined,
+const textMessage = (role, text) => ({ role, parts: [{ kind: 'text', text }] })
+const emptySnapshot = () => Projection.projectionSnapshot(
+  Projection.semanticProjection([]),
+  { blogFrames: [], transportMessages: [], hostReanchor: null },
 )
 
-const bundle = resultOf(
-  Frame.StrengthFrame_tryBuild(
-    H,
-    10000,
-    toList([
-      {
-        RequestOrdinal: 1,
-        Exchanges: toList([
-          { ToolName: 'read', CanonicalArguments: '{"filePath":"a"}', CanonicalResult: 'alpha' },
-          { ToolName: 'grep', CanonicalArguments: '{"pattern":"x"}', CanonicalResult: 'a:1:x' },
-        ]),
-      },
-    ]),
-  ),
-).value
+const bundle = {
+  digest: 'bundle-digest',
+  byteLength: 10,
+  batches: [
+    {
+      requestOrdinal: 1,
+      exchanges: [
+        { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+        { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+      ],
+    },
+  ],
+}
 
 test('WHAT[PROVIDER-PROJECTION-005] STRENGTH_009_016_projection_exposes_strength_intent_constructors', () => {
-  assert.equal(typeof P.ProjectionIntentModule_useStrengthMirror, 'function')
-  assert.equal(typeof P.ProjectionIntentModule_strengthCandidate, 'function')
-  assert.equal(typeof P.ProjectionIntentModule_strengthPromoted, 'function')
-  assert.equal(typeof P.ProjectionIntentModule_strengthReplicaLocal, 'function')
+  assert.equal(typeof Projection.useStrengthMirror, 'function')
+  assert.equal(typeof Projection.strengthCandidate, 'function')
+  assert.equal(typeof Projection.strengthPromoted, 'function')
+  assert.equal(typeof Projection.strengthReplicaLocal, 'function')
 })
 
 test('WHAT[PROVIDER-PROJECTION-006] STRENGTH_009_mirror_conflicts_with_normal_work_base_selection', () => {
-  const mirror = P.ProjectionIntentModule_useStrengthMirror(
-    decision('d1'),
-    run('target'),
-    'sem-a',
-    toList([message('user', [textPart('mirror')])]),
-  )
-  const planned = resultOf(P.ProjectionPlanner_plan(toList([P.ProjectionIntent.KeepPhysicalPrefix, mirror])))
+  const mirror = Projection.useStrengthMirror({
+    decisionId: 'd1',
+    targetProviderRun: 'target',
+    semanticDigest: 'sem-a',
+    messages: [textMessage('user', 'mirror')],
+  })
+  const planned = Projection.plan([Projection.keepPhysicalPrefix, mirror])
   assert.equal(planned.ok, false)
-  assert.equal(caseOf(planned.error), 'ConflictingPrefixSelection')
+  assert.equal(planned.conflict, 'ConflictingPrefixSelection')
 })
 
 test('WHAT[PROVIDER-PROJECTION-006] STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order_independent', () => {
-  const base = toList([
-    message('user', [textPart('u1')]),
-    message('assistant', [textPart('target-1')]),
-    message('user', [textPart('u2')]),
-    message('assistant', [textPart('target-2')]),
-  ])
-  const first = P.ProjectionIntentModule_strengthPromoted(
-    session('owner'), decision('d1'), run('target-1'), 1, false, bundle,
-  )
-  const second = P.ProjectionIntentModule_strengthPromoted(
-    session('owner'), decision('d2'), run('target-2'), 3, false, bundle,
-  )
+  const base = [
+    textMessage('user', 'u1'),
+    textMessage('assistant', 'target-1'),
+    textMessage('user', 'u2'),
+    textMessage('assistant', 'target-2'),
+  ]
+  const first = Projection.strengthPromoted({
+    ownerSessionId: 'owner',
+    decisionId: 'd1',
+    targetProviderRun: 'target-1',
+    beforeIndex: 1,
+    isReplicaRequest: false,
+    bundle,
+  })
+  const second = Projection.strengthPromoted({
+    ownerSessionId: 'owner',
+    decisionId: 'd2',
+    targetProviderRun: 'target-2',
+    beforeIndex: 3,
+    isReplicaRequest: false,
+    bundle,
+  })
 
-  const forward = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([first, second]))
-  const reverse = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([second, first]))
-  const forwardMessages = listItems(forward.Messages)
-  const forwardIds = listItems(forward.HostMessageIds)
+  const forward = Projection.renderMessagesWithHostIds(H, emptySnapshot(), base, [first, second])
+  const reverse = Projection.renderMessagesWithHostIds(H, emptySnapshot(), base, [second, first])
 
-  assert.deepEqual(forwardMessages.map((item) => item.Role), [
+  assert.deepEqual(forward.messages.map((item) => item.role), [
     'user', 'assistant', 'tool', 'assistant', 'user', 'assistant', 'tool', 'assistant',
   ])
   assert.equal(
-    forwardIds[1],
-    Frame.StrengthFrame_hostMessageId(H, session('owner'), decision('d1'), 1, 'call', bundle.Digest),
+    forward.hostMessageIds[1],
+    H(`owner\u001fd1\u001f1\u001fcall\u001fbundle-digest`),
   )
   assert.equal(
-    forwardIds[5],
-    Frame.StrengthFrame_hostMessageId(H, session('owner'), decision('d2'), 1, 'call', bundle.Digest),
+    forward.hostMessageIds[5],
+    H(`owner\u001fd2\u001f1\u001fcall\u001fbundle-digest`),
   )
-  assert.deepEqual(listItems(reverse.HostMessageIds), forwardIds)
-  assert.equal(Provider.renderWire(
-    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: forward.Messages },
-  ), Provider.renderWire(
-    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: reverse.Messages },
-  ))
+  assert.deepEqual(reverse.hostMessageIds, forward.hostMessageIds)
+  assert.equal(Projection.renderWire(forward.messages), Projection.renderWire(reverse.messages))
 })

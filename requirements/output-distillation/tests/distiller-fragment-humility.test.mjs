@@ -12,27 +12,39 @@
 // WHAT, all sharing the same failed-second-chunk setup; the assertion set of
 // the original test is conserved across the split.
 //
-// Uses distillationRuntime.fake + distillSpool from tests/unit/support/domain/execution.mjs.
+// The production owner surface adapts the plain callback runtime at its boundary.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import {
-  agentCompletion,
-  distillationRuntime,
-  okResult,
-  providerLanguage,
-} from '../../verification-system/tests/support/domain.mjs'
 
-/** Spool.ChunkSizeBytes — a spool of this size + 64 bytes splits into 2 chunks. */
+const { distillSpool } = await import('../../../dist/OpenCode/Tools/DistillationSurface.js')
+
 const SPOOL_CHUNK_BYTES = 204_800
+
+function fakeRuntime({ fork, awaitAgent, cancel } = {}) {
+  const cancelled = []
+  const runtime = {
+    fork: (agentId) => (typeof fork === 'function' ? fork(agentId) : { ok: true, agentId }),
+    awaitAgent: (agentId, timeoutMs) =>
+      typeof awaitAgent === 'function' ? awaitAgent(agentId, timeoutMs) : { ok: false, kind: 'not-found' },
+    awaitRecoveryReadiness: () => undefined,
+    cancel: (agentId) => {
+      cancelled.push(agentId)
+      if (typeof cancel === 'function') cancel(agentId)
+    },
+  }
+  return { runtime, cancelled }
+}
+
+const notFound = (agentId) => ({ ok: false, kind: 'not-found', error: `blocked:${agentId}` })
 
 /**
  * Two-chunk spool: chunk 0 is quiet filler; the distinct marker lives in
  * chunk 1 — the last raw chunk distillSpool keeps verbatim. The chunk-1 map
- * agent hard-fails (ForkError.NotFound — FamilyBlocked / real join timeout),
+ * agent hard-fails (NotFound — FamilyBlocked / real join timeout),
  * so every shared assertion below runs against the same partial-account shape.
  */
 async function runFailedSecondChunkScenario() {
@@ -46,32 +58,26 @@ async function runFailedSecondChunkScenario() {
   const forked = []
   let failedMapAgentId = null
 
-  const { runtime, cancelled } = distillationRuntime.fake({
+  const { runtime, cancelled } = fakeRuntime({
     fork: (agentId) => {
       forked.push(agentId)
       // First two forks are the two map agents in chunk order: the second one
       // (chunk 1 — the chunk that carries the distinct marker) is the failure.
       if (forked.length === 2) failedMapAgentId = agentId
-      return distillationRuntime.forkOk(agentId)
+      return { ok: true, agentId }
     },
     awaitAgent: (agentId) => {
-      // Hard fail with ForkError.NotFound — FamilyBlocked / real join timeout —
+      // Hard fail with a NotFound result — FamilyBlocked / real join timeout —
       // which must not be retried and must not report success.
-      if (agentId === failedMapAgentId) return distillationRuntime.notFound(agentId)
+      if (agentId === failedMapAgentId) return notFound(agentId)
       // Successful fragments return a work record the caller can distinguish:
       // `summary-for-<agentId>` must appear for survivors and never for the failed one.
-      return okResult(
-        agentCompletion.completedRun({
-          runId: `run-${agentId}`,
-          agentId,
-          workRecord: `summary-for-${agentId}`,
-        }),
-      )
+      return { ok: true, runId: `run-${agentId}`, agentId, workRecord: `summary-for-${agentId}` }
     },
   })
 
   try {
-    const summary = await distillationRuntime.distillSpool(runtime, spoolPath, providerLanguage.english)
+    const summary = await distillSpool(runtime, spoolPath, 'en')
     return { summary, cancelled, forked, failedMapAgentId, marker }
   } finally {
     rmSync(dir, { recursive: true, force: true })

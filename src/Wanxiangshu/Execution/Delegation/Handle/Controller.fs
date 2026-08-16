@@ -77,7 +77,7 @@ module HandleController =
         (targetAgent: string)
         (byname: string)
         (role: Role)
-        (ownership: Fact.HandleOwnership)
+        (ownership: HandleOwnership)
         : Task<Result<unit, string>> =
         match journal with
         | None -> Task.FromResult(Ok())
@@ -103,7 +103,7 @@ module HandleController =
         (childSessionId: SessionId)
         (targetAgent: string)
         (role: Role)
-        (ownership: Fact.HandleOwnership)
+        (ownership: HandleOwnership)
         : Task<Result<unit, string>> =
         linkNamed journal parentId agentId childSessionId targetAgent targetAgent role ownership
 

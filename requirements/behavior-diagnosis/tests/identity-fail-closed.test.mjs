@@ -1,190 +1,22 @@
-// behavior-diagnosis: ENFORCER-043 provider-run identity fail-closed.
-// Multi-call cardinality is a recoverable protocol failure and is covered by
-// enforcer-cycle-protocol.test.mjs before commit identity validation.
-//
-// VERIFY-003: fake Host trajectory against real dist (same pattern as bounds.test.mjs).
-
+// Provider-run identity fail-closed boundary (ENFORCER-043).
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import {
-  agentJournal,
-  agentFact,
-  sessionId,
-  stream,
-  toList,
-  caseOf,
-  bloggerRequestContext,
-  parkedTransform,
-  runtimeResources,
-  fold,
-  authorityRoot,
-  logicalRunId,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
-// EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
-runtimeResources.installFromPackage()
-
-const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
-  '../../../dist/Persistence/Journal/AgentJournal.js'
-)
-const { handleContinuation } = await import('../../../dist/Enforcer/Host.js')
-
-const MAIN = 'ses-main'
-const BLOG = 'ses-blog'
-const streamSession = (sid) =>
-  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
-const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
-const digestForToml = (toml) => sha256Hex(toml)
-
-/** Seed AgentOwnerRoot so the commit/abandon path stays on contract. */
-const seedBloggerAuthority = async (journal) => {
-  const root = await AgentJournalModule_appendAgent(
-    streamSession(BLOG),
-    undefined,
-    agentFact('AuthorityRootAccepted', {
-      SessionId: sessionId(BLOG),
-      LogicalRunId: logicalRunId('blog-run-1'),
-      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
-      AuthorityKind: 'AgentOwnerRoot',
-      SelectedAgent: 'fast-blogger',
-      PeerAgent: 'deep-blogger',
-      CanonicalRole: 'blogger',
-      SelectedTier: 'fast',
-    }),
-    journal,
-  )
-  assert.equal(caseOf(root), 'Ok', 'AuthorityRootAccepted must fold')
-}
-
-/**
- * Drive the real handleContinuation with a crafted provider step, then hand the
- * harness the captured fatals + a commit-mode runner. `messageId` is overridable so
- * the empty-id fail-closed path is reachable. Commit mode swaps ParkTransform for an
- * immediate settle so a valid multi-call actually finalises its BlogObservationCommitted.
- */
-const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
-  const dir = mkdtempSync(join(tmpdir(), 'enforcer-identity-'))
-  const created = await agentJournal.create({ directory: dir })
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
-  const journal = created.journal
-  const main = sessionId(MAIN)
-  const blog = sessionId(BLOG)
-
-  const link = await AgentJournalModule_appendAgent(
-    streamSession(main),
-    undefined,
-    agentFact('CompanionBloggerLinked', {
-      SessionId: main,
-      BloggerSessionId: blog,
-      BloggerAgent: 'fast-blogger',
-    }),
-    journal,
-  )
-  assert.equal(caseOf(link), 'Ok')
-  await seedBloggerAuthority(journal)
-
-  const scope = parkedTransform.scope()
-  const toml = 'work'
-  const ctx = bloggerRequestContext.main({
-    requestId: 'req-identity',
-    mainSession: MAIN,
-    bloggerSession: BLOG,
-    toml,
-    previousIngested: 0,
-    nextIngested: 1,
-    previousCutoff: 0,
-    nextCutoff: 1,
-    nextDigest: 'd1',
-    deltaDigest: digestForToml(toml),
-  })
-  // Physical flight ownership: CurrentRequest is the sole live-cycle authority.
-  parkedTransform.setCurrentRequest(scope, BLOG, ctx)
-
-  const fatals = []
-  const origError = console.error
-  console.error = (line) => {
-    try {
-      fatals.push(JSON.parse(String(line)))
-    } catch {
-      fatals.push({ raw: String(line) })
-    }
-  }
-
-  const rawMessagesFor = (parts) =>
-    toList([
-      {
-        info: { id: messageId, role: 'assistant', time: { completed: Date.now() } },
-        parts,
-      },
-    ])
-
-  const run = async (parts) => {
-    await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, () => undefined, blog, rawMessagesFor(parts))
-  }
-
-  // Owned commit with no further XTrace material reaches ParkTransform; settle it
-  // immediately so coverage commit finalises (same technique as enforcer-cycle-protocol).
-  const runOwnedCommit = async (parts) => {
-    const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
-    parkedTransform.host(scope).ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
-    try {
-      await run(parts)
-    } finally {
-      parkedTransform.host(scope).ParkTransform = original
-    }
-  }
-
-  try {
-    await fn({
-      journal,
-      scope,
-      blog,
-      main,
-      fatals,
-      lastFatal: () => fatals.at(-1),
-      run,
-      runOwnedCommit,
-      mainSessionCoverage: () => {
-        const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
-        return session?.Blog?.Coverage
-      },
-      enforcementReceiptCount: () => {
-        const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
-        return session?.Enforcement?.ByProviderRun?.size ?? 0
-      },
-    })
-  } finally {
-    console.error = origError
-    created.dispose()
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
-
-/** A single completed blog tool part (tip = a real packaged catalog field). */
-const blogCall = (callId, input) => ({
-  type: 'tool',
-  tool: 'chronicle',
-  callID: callId,
-  state: { status: 'completed', input: { tip: 'primitive-obsession', ...input } },
+test('WHAT[BD-010] ENFORCER_043_no_provable_provider_run_fails_closed', () => {
+  const result = enforcer.validateProviderRun('')
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'no provable provider run')
 })
 
-// ── empty / missing messageId → fail closed (ENFORCER-043) ───────────────────
+test('WHAT[BD-010] ENFORCER_043_whitespace_provider_run_fails_closed', () => {
+  const result = enforcer.validateProviderRun('   ')
+  assert.equal(result.ok, false)
+  assert.match(result.error, /no provable provider run/)
+})
 
-test('WHAT[BD-010] ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
-  // Empty provider messageId: there is no provable provider run, so the cycle must
-  // fail closed even though the blog call itself is well-formed.
-  const parts = [blogCall('c1', { text: 'work' })]
-  await withHarness(
-    async ({ run, fatals, lastFatal }) => {
-      await run(parts)
-      assert.ok(fatals.length >= 1, 'no provable provider run must fail closed with a fatal')
-      assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
-      assert.match(lastFatal()?.result ?? '', /no provable provider run/)
-    },
-    { messageId: '' },
-  )
+test('WHAT[BD-010] ENFORCER_043_provider_run_identity_is_preserved', () => {
+  const result = enforcer.validateProviderRun('asst-identity')
+  assert.equal(result.ok, true)
+  assert.equal(result.providerRun, 'asst-identity')
 })

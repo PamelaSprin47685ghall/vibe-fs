@@ -28,6 +28,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission

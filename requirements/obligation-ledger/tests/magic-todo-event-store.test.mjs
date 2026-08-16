@@ -1,128 +1,87 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import {
-  blobDigest,
-  blobRef,
-  caseOf,
-  idValue,
-  magicTodo,
-  magicTodoJournal,
-  managerLifeId,
-  payloadOf,
-  providerRun,
-  runtimeId,
-  sessionId,
-  stream,
-  toolCallId,
-  utcOffset,
-} from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as todoJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
-const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
-const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
+const sha256 = (value) => `sha:${value}`
+const managerSession = 'ses_magic_todo_manager'
+const life = 'life_magic_todo'
+const call = 'call_magic_todo'
+const write = todo.todoWriteId(sha256, life, call)
+const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
+const prepared = fact('TodoWritePrepared', {
+  ManagerSessionId: managerSession,
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  ToolCallId: call,
+  ToolPartOrdinal: 1,
+  BaseTodoRef: 'blobs/base',
+  BaseTodoDigest: 'digest:base',
+  ProposedTodoRef: 'blobs/proposed',
+  ProposedTodoDigest: 'digest:proposed',
+  PlanCompleteDeclared: true,
+  ProviderInputDigest: 'digest:provider-input',
+  ReviewFrontier: { Sequence: 7 },
+  SemanticVersion: 'magic-todo.v1',
+})
 
-const resolveExport = (mod, prefix) => {
-  const entry = Object.entries(mod).find(([name]) => name.startsWith(prefix))
-  assert.ok(entry, `${prefix} export missing`)
-  return entry[1]
-}
+const accepted = (preparedFactRef) => fact('TodoWriteAccepted', {
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  ToolCallId: call,
+  PreparedFactRef: preparedFactRef,
+  InputDigest: 'digest:provider-input',
+  OutputDigest: 'digest:output',
+  PhysicalSuccessEvidence: 'LiveAfterSuccess',
+  SemanticVersion: 'magic-todo.v1',
+})
 
-const mustOk = (result, label) => {
-  assert.equal(caseOf(result), 'Ok', `${label}: ${caseOf(result)} ${JSON.stringify(payloadOf(result))}`)
-  return payloadOf(result)
-}
-
-const createWriter = async (store, runtime = 'rt_magic_todo') => {
-  const create = resolveExport(EsWriter, 'EventStoreJournalWriter_create')
-  const pair = await create(runtimeId(runtime), 4242, utcOffset('2026-08-11T00:00:00Z'), store)
-  return { writer: pair[0], init: pair[1] }
-}
-
-const resumeWriter = async (store) => {
-  const resume = resolveExport(EsWriter, 'EventStoreJournalWriter_resumeOrCreate')
-  const result = await resume(runtimeId('rt_magic_todo_recovery'), 4243, utcOffset('2026-08-11T00:01:00Z'), store)
-  return mustOk(result, 'resumeOrCreate')
+const assertBoot = (result) => {
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.journal
 }
 
 test('WHAT[OBLIGATION-LEDGER-018] persists typed prepared identity through AgentJournal and EventStore boot', async () => {
-  const local = createLocalEventStore()
-  const store = local.store
-  const { writer, init } = await createWriter(store)
-  const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init), 'createFromEventStore')
-  const managerSession = sessionId('ses_magic_todo_manager')
-  const life = managerLifeId('life_magic_todo')
-  const call = toolCallId('call_magic_todo')
-  const write = magicTodo.todoWriteId((value) => `sha:${value}`, life, call)
-  const prepared = new magicTodoJournal.TodoWritePrepared(
-    managerSession,
-    life,
-    write,
-    call,
-    1,
-    blobRef('blobs/base'),
-    blobDigest('digest:base'),
-    blobRef('blobs/proposed'),
-    blobDigest('digest:proposed'),
-    true,
-    'digest:provider-input',
-    new magicTodoJournal.XTraceCursor(7n),
-    'magic-todo.v1',
-  )
-
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-event-store-'))
+  const startedAt = '2026-08-11T00:00:00Z'
   try {
-    const appended = await AgentJournal.AgentJournalModule_appendMagicTodo(
-      stream.session(managerSession),
-      providerRun('assistant-message-id'),
-      magicTodoJournal.MagicTodoFact('TodoWritePrepared', [prepared]),
-      journal,
-    )
-    const preparedReceipt = mustOk(appended, 'append prepared')
-    assert.notEqual(idValue.event(preparedReceipt.EventId), '')
+    const booted = assertBoot(await journal.JournalSurface_bootWithWriterId(directory, 'writer-obligation', 'rt_magic_todo', 4242, startedAt))
+    const preparedReceipt = await todoJournal.appendMagicTodo(booted, managerSession, 'assistant-message-id', prepared)
+    assert.equal(preparedReceipt.ok, true, preparedReceipt.ok ? '' : preparedReceipt.error)
+    assert.notEqual(preparedReceipt.eventId, '')
 
-    const accepted = new magicTodoJournal.TodoWriteAccepted(
-      life,
-      write,
-      call,
-      preparedReceipt.EventId,
-      'digest:provider-input',
-      'digest:output',
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-todo.v1',
+    const acceptedReceipt = await todoJournal.appendMagicTodo(
+      booted,
+      managerSession,
+      'assistant-message-id',
+      accepted(preparedReceipt.eventId),
     )
-    const acceptedReceipt = mustOk(
-      await AgentJournal.AgentJournalModule_appendMagicTodo(
-        stream.session(managerSession),
-        providerRun('assistant-message-id'),
-        magicTodoJournal.MagicTodoFact('TodoWriteAccepted', [accepted]),
-        journal,
-      ),
-      'append accepted',
-    )
-    assert.notEqual(idValue.event(acceptedReceipt.EventId), '')
+    assert.equal(acceptedReceipt.ok, true, acceptedReceipt.ok ? '' : acceptedReceipt.error)
+    assert.notEqual(acceptedReceipt.eventId, '')
 
-    const live = AgentJournal.AgentJournalModule_snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life_magic_todo')
-    assert.equal(live.Checkpoints.size, 1)
-    assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).ProviderInputDigest, 'digest:provider-input')
-    assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).PlanCompleteDeclared, true)
-    assert.equal(live.Checkpoints.get(magicTodo.todoWriteIdValue(write)).Accepted, true)
-    assert.equal(magicTodo.todoWriteIdValue(live.FirstPlanCommitment), magicTodo.todoWriteIdValue(write))
-  } finally {
-    journal.Dispose()
-  }
+    const live = todoJournal.snapshotMagicTodo(booted, life)
+    assert.equal(live.checkpoints.length, 1)
+    assert.equal(live.checkpoints[0].providerInputDigest, 'digest:provider-input')
+    assert.equal(live.checkpoints[0].planCompleteDeclared, true)
+    assert.equal(live.checkpoints[0].accepted, true)
+    assert.equal(live.firstPlanCommitment, write)
+    journal.JournalSurface_dispose(booted)
 
-  const resumed = await resumeWriter(store)
-  try {
-    const recovered = resumed[2].AgentProjections.MagicTodo.ByLife.get('life_magic_todo')
+    const resumed = assertBoot(await journal.JournalSurface_bootWithWriterId(directory, 'writer-obligation', 'rt_magic_todo_recovery', 4243, '2026-08-11T00:01:00Z'))
+    const recovered = todoJournal.snapshotMagicTodo(resumed, life)
     assert.ok(recovered, 'Magic Todo prepared fact must survive EventStore boot')
-    const checkpoint = recovered.Checkpoints.get(magicTodo.todoWriteIdValue(write))
-    assert.equal(checkpoint.ProviderInputDigest, 'digest:provider-input')
-    assert.equal(checkpoint.PlanCompleteDeclared, true)
-    assert.equal(checkpoint.Accepted, true)
-    assert.equal(magicTodo.todoWriteIdValue(recovered.FirstPlanCommitment), magicTodo.todoWriteIdValue(write))
-    assert.equal(idValue.toolCall(checkpoint.ToolCallId), 'call_magic_todo')
-    assert.equal(Number(checkpoint.ReviewFrontier.Sequence), 7)
+    assert.equal(recovered.checkpoints[0].providerInputDigest, 'digest:provider-input')
+    assert.equal(recovered.checkpoints[0].planCompleteDeclared, true)
+    assert.equal(recovered.checkpoints[0].accepted, true)
+    assert.equal(recovered.firstPlanCommitment, write)
+    assert.equal(recovered.checkpoints[0].toolCallId, call)
+    assert.equal(recovered.checkpoints[0].reviewFrontier, 7)
+    journal.JournalSurface_dispose(resumed)
   } finally {
-    resumed[0].Release()
-    local.close()
+    rmSync(directory, { recursive: true, force: true })
   }
 })

@@ -1,112 +1,78 @@
-// requirements/crash-reconciliation/tests/reconcile-observation-contract.test.mjs
-//
-// CRASH-003 / CRASH-007 最小 contract test：本包直接消费 Reconcile 纯域
-// （structured-workflow 的 RECONCILE_PROGRAM_* 完整矩阵留在原 owner 处，本文件
-// 只锁本包命题的契约面）：
-//   - CRASH-003：未决外部 effect 先 reconcile 再决定是否可重试——finish=None
-//     的稳定快照只作为 reconciliation 私有观测（SnapshotObservation），在无
-//     quiescence 证据时绝不被当作「未发生」而重放（StopPass），ReconcileDecision
-//     只有 Reread/Publish/StopPass observation vocabulary，无业务 repair 名字。
-//   - CRASH-007：TurnUnknown 不得作为 TurnOutcome case 发布；publishDecision 的
-//     交接面（PublishTurn.Outcome）在类型上只接受 TurnOutcome。
+// CRASH-003 / CRASH-007 contract through the production Reconcile owner
+// surface. Wake, evidence, decision, and publish maps cross as plain data;
+// publish maps remain opaque handles.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 
-import {
-  quiescencePermit,
-  reconcileProgram,
-  reconcileWake,
-} from '../../verification-system/tests/support/domain.mjs'
+const decisionName = (remaining, evidence, wake = reconcile.retryWake()) =>
+  reconcile.decisionName(reconcile.decideStep(wake, remaining, evidence))
 
 test('WHAT[CRASH-003] unknown_effect_without_quiescence_is_not_replayed', () => {
-  // decideStep 是 reconcile 的核心：finish=None（Unknown）稳定快照在
-  // Retry/Failure wake 下耗尽预算 → StopPass，而不是 Publish 一个「当作未发生」
-  // 的 continuation；只有 IdleWake（携带 QuiescencePermit）才把观测交接给业务。
-  const name = (remaining, evidence, wake) =>
-    reconcileProgram.decisionName(reconcileProgram.decideStep(wake, remaining, evidence))
+  // Exhausted non-actionable evidence stops without replay. Unknown only
+  // publishes after a fresh idle/quiescence observation.
+  assert.equal(decisionName(0, reconcile.evidenceSnapshotError('transient')), 'StopPass')
+  assert.equal(decisionName(0, reconcile.evidenceNoTurn()), 'StopPass')
 
-  // 耗尽预算：SnapshotError / NoTurn 无可作用对象 → StopPass（不重放、不猜继续）。
-  assert.equal(name(0, reconcileProgram.evidence.snapshotError('transient')), 'StopPass')
-  assert.equal(name(0, reconcileProgram.evidence.noTurn()), 'StopPass')
+  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.retryWake()), 'StopPass')
+  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.failureWake()), 'StopPass')
+  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.abortWake()), 'StopPass')
 
-  // 耗尽预算：Unknown 在 retry/failure wake 下 StopPass —— 观测稳定但不静止，
-  // 不得当作「已 reconcile 完成」重试。
-  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.retryWake()), 'StopPass')
-  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.failureWake()), 'StopPass')
-  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.abortWake()), 'StopPass')
-
-  // 只有 IdleWake（fresh idle 证据）才 Publish —— reconcile 先于任何 effect 决策。
   assert.equal(
-    name(0, reconcileProgram.evidence.unknown(), reconcileWake.idleWake(quiescencePermit.create('ses-a', 1))),
+    decisionName(0, reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
     'Publish',
   )
 
-  // 预算未耗尽时仍在 reconcile（Reread），不提前下结论。
-  assert.equal(name(3, reconcileProgram.evidence.unknown(), reconcileWake.retryWake()), 'Reread')
+  // A bounded causal reread remains a reread rather than a premature decision.
+  assert.equal(decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()), 'Reread')
 })
 
 test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', () => {
-  // ReconcileDecision 只有 observation vocabulary：Reread / Publish / StopPass。
-  // 不含任何业务 repair 名字（CRASH-003/004 同一契约面）。
-  const decisionCases = reconcileProgram.decisionCases()
-  assert.deepEqual(
-    decisionCases,
-    ['Reread', 'Publish', 'StopPass'],
-    `ReconcileDecision must stay observation-only; have: ${decisionCases.join(', ')}`,
-  )
-  assert.equal(
-    decisionCases.some((c) => /Repair|Resend|Rollback|Abort|Replay/i.test(c)),
-    false,
-    'ReconcileDecision must not carry business repair names',
-  )
+  // The owner exposes only observation decisions. Exercise every decision shape
+  // through the JS-native surface rather than reflecting a Fable union.
+  const names = new Set([
+    decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()),
+    decisionName(0, reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
+    decisionName(0, reconcile.evidenceNoTurn(), reconcile.retryWake()),
+  ])
+  assert.deepEqual([...names].sort(), ['Publish', 'Reread', 'StopPass'])
+  assert.equal([...names].some((name) => /Repair|Resend|Rollback|Abort|Replay/i.test(name)), false)
 })
 
 test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', () => {
-  // TurnUnknown 不在 TurnOutcome case 列表里：publishDecision 在类型上不可接收它。
-  const turnOutcomeCases = reconcileProgram.turnOutcomeCases()
-  assert.deepEqual(
-    turnOutcomeCases,
-    ['TurnInProgress', 'TurnNeedsContinuation', 'TurnCompleted', 'TurnAborted', 'TurnFailed'],
-    `publishable TurnOutcome must exclude TurnUnknown; have: ${turnOutcomeCases.join(', ')}`,
-  )
-
-  // TurnUnknown 只作为 reconciliation 私有 SnapshotObservation 存在。
-  assert.deepEqual(
-    reconcileProgram.snapshotObservationCases(),
-    ['TurnUnknown'],
-    'SnapshotObservation must carry TurnUnknown only',
-  )
-
-  // outcomeOf 拒绝把 TurnUnknown 铸成 TurnOutcome（不得静默 mint，也不得塌缩成
-  // TurnFailed 假 terminal）。
-  const minted = reconcileProgram.tryOutcome('TurnUnknown')
-  if (minted.accepted) {
-    assert.notEqual(minted.name, 'TurnUnknown')
-    assert.notEqual(minted.name, 'TurnFailed')
+  const publishable = ['TurnInProgress', 'TurnNeedsContinuation', 'TurnCompleted', 'TurnAborted', 'TurnFailed']
+  for (const name of publishable) {
+    assert.equal(reconcile.tryOutcome(name).accepted, true, `${name} must be a publishable outcome`)
+    assert.equal(reconcile.isPublishableOutcome(name), true, `${name} must remain publishable`)
   }
+
+  assert.equal(reconcile.tryOutcome('TurnUnknown').accepted, false)
+  assert.equal(reconcile.isSnapshotObservation('TurnUnknown'), true)
+  assert.equal(reconcile.isPublishableOutcome('TurnUnknown'), false)
 })
 
 test('WHAT[CRASH-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', () => {
-  // publishDecision 的交接面 PublishTurn.Outcome 的 reflection 类型是 TurnOutcome；
-  // 结构上不可能携带 SnapshotObservation。
-  const outcomeFieldType = reconcileProgram.publishOutcomeFieldType()
-  assert.match(outcomeFieldType, /TurnOutcome/, 'PublishTurn.Outcome must be typed TurnOutcome')
-  assert.doesNotMatch(
-    outcomeFieldType,
-    /SnapshotObservation/,
-    'PublishTurn.Outcome must never be typed SnapshotObservation',
-  )
+  // This is the owner-defined plain input contract, not Fable reflection.
+  assert.deepEqual(reconcile.acceptedTurnFields(), ['session', 'physical', 'providerRun', 'outcome'])
 
-  // 行为面：terminal 交接照常 publish 一次并 seal，重复 token 被 dedupe ——
-  // 交接面只消费 TurnOutcome，Unknown 无法进入。
-  const terminal = reconcileProgram.turnFixture({
+  const terminal = reconcile.turnFixture({
     session: 'ses-a',
     physical: 'user-1',
     providerRun: 'asst-1',
     outcome: 'TurnCompleted',
   })
-  const first = reconcileProgram.publishDecision(reconcileProgram.publishMaps.empty(), terminal)
+  const first = reconcile.publishDecision(reconcile.empty(), terminal)
   assert.equal(first.shouldPublish, true)
-  const second = reconcileProgram.publishDecision(first.maps, terminal)
+  const second = reconcile.publishDecision(first.maps, terminal)
   assert.equal(second.shouldPublish, false, 'same completion must be sealed once (dedupe, no replay)')
+
+  // A snapshot observation has no business outcome constructor and therefore
+  // cannot cross the publish handoff.
+  const unknown = reconcile.turnFixture({
+    session: 'ses-a',
+    physical: 'user-unknown',
+    providerRun: 'asst-unknown',
+    outcome: 'TurnUnknown',
+  })
+  assert.throws(() => reconcile.publishDecision(reconcile.empty(), unknown), /TurnUnknown|outcome/i)
 })

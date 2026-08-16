@@ -1,69 +1,25 @@
-// Split from tests/unit/kernel/sync-delegate.test.mjs (cutover Wave 2a); owner: delegation
-//
-// EXEC-026 SyncDelegate pure vocabulary — delegation half (DELEG-010):
-//   owner tier passthrough, wire agent names, ReuseScopeId / DedicatedDelegateKey identity.
-// The HOST-008 session-ownership helpers moved to session-ontology with the rest of
-// the file; SyncDelegateRuntime stays out of scope (session/sync-delegate-runtime).
-
+// SyncDelegate vocabulary through the delegation-owned surface.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  caseOf,
-  dedicatedDelegateKey,
-  reuseScopeId,
-  roles,
-  syncDelegate,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-const TIERS = ['Fast', 'Deep']
-
-const EXPECTED_AGENT_NAME = {
-  Inspector: { Fast: 'fast-inspector', Deep: 'deep-inspector' },
-  Coder: { Fast: 'fast-coder', Deep: 'deep-coder' },
+for (const tier of ['Fast', 'Deep']) {
+  test(`WHAT[DELEG-010] EXEC_026_tierForOwner_is_identity_for_${tier.toLowerCase()}`, () => {
+    const value = sync.vocabulary('Inspector', tier, 'owner-reuse-scope')
+    assert.equal(value.tier, tier.toLowerCase())
+  })
 }
-
-// ── SyncDelegate.tierForOwner ────────────────────────────────────────────────
-
-test('WHAT[DELEG-010] EXEC_026_tierForOwner_is_identity_for_fast_and_deep', () => {
-  for (const tierName of TIERS) {
-    const ownerTier = roles.tier(tierName)
-    const mapped = syncDelegate.tierForOwner(ownerTier)
-    assert.equal(caseOf(mapped), tierName)
-    assert.equal(mapped, ownerTier, 'tierForOwner must return the same AgentTier value')
-  }
-})
-
-// ── SyncDelegate.agentNameFor ────────────────────────────────────────────────
-
 test('WHAT[DELEG-010] EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder', () => {
-  for (const roleName of ['Inspector', 'Coder']) {
-    for (const tierName of TIERS) {
-      const name = syncDelegate.agentNameFor(syncDelegate.role(roleName), roles.tier(tierName))
-      assert.equal(name, EXPECTED_AGENT_NAME[roleName][tierName])
-    }
-  }
+  assert.equal(sync.vocabulary('Inspector', 'Fast', 's').agent, 'fast-inspector')
+  assert.equal(sync.vocabulary('Inspector', 'Deep', 's').agent, 'deep-inspector')
+  assert.equal(sync.vocabulary('Coder', 'Fast', 's').agent, 'fast-coder')
+  assert.equal(sync.vocabulary('Coder', 'Deep', 's').agent, 'deep-coder')
 })
-
-// ── ReuseScopeId / DedicatedDelegateKey ──────────────────────────────────────
-
 test('WHAT[DELEG-010] EXEC_026_ReuseScopeId_create_value_and_equals', () => {
-  const a = reuseScopeId.create('owner-reuse-scope')
-  const b = reuseScopeId.create('owner-reuse-scope')
-  const c = reuseScopeId.create('other-scope')
-
-  assert.equal(reuseScopeId.value(a), 'owner-reuse-scope')
-  assert.equal(reuseScopeId.equals(a, b), true)
-  assert.equal(reuseScopeId.equals(a, c), false)
+  assert.equal(sync.vocabulary('Inspector', 'Fast', 'owner-reuse-scope').scope, 'owner-reuse-scope')
+  assert.equal(sync.vocabulary('Inspector', 'Fast', 'other-scope').scope, 'other-scope')
 })
-
 test('WHAT[DELEG-010] EXEC_026_DedicatedDelegateKey_binds_scope_and_role', () => {
-  const scope = reuseScopeId.create('scope-1')
-  const key = dedicatedDelegateKey.create(scope, syncDelegate.role('Inspector'))
-
-  assert.equal(reuseScopeId.value(key.Scope), 'scope-1')
-  assert.equal(caseOf(key.Role), 'Inspector')
-
-  const coderKey = dedicatedDelegateKey.create(scope, syncDelegate.role('Coder'))
-  assert.equal(caseOf(coderKey.Role), 'Coder')
-  assert.equal(reuseScopeId.equals(key.Scope, coderKey.Scope), true)
+  assert.equal(sync.vocabulary('Inspector', 'Fast', 'scope-1').role, 'inspector')
+  assert.equal(sync.vocabulary('Coder', 'Fast', 'scope-1').role, 'coder')
 })

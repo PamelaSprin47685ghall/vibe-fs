@@ -4,10 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-const {
-  ModelRouting_bootstrapAndLoadAt: bootstrapAndLoadAt,
-  ModelRouting_invokeScheduler: invokeScheduler,
-} = await import('../../../dist/OpenCode/Host/ModelRouting.js')
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+
+const { bootstrapAndLoadAt, invokeScheduler } = routing
 
 const template = `export default function route(role, running) {
   if (role !== 'fast-coder') return null
@@ -30,8 +29,8 @@ test('WHAT[EMR-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_d
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), template)
     const selected = invokeScheduler(scheduler, 'fast-coder', [])
-    assert.equal(selected.Model, 'provider/fast-model')
-    assert.equal(selected.Reasoning, 'none')
+    assert.equal(selected.model, 'provider/fast-model')
+    assert.equal(selected.reasoning, 'none')
   })
 })
 
@@ -43,7 +42,7 @@ test('WHAT[EMR-001] EMR_001_existing_scheduler_is_never_overwritten', async () =
 
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), existing)
-    assert.equal(invokeScheduler(scheduler, 'deep-coder', []).Model, 'provider/user-choice')
+    assert.equal(invokeScheduler(scheduler, 'deep-coder', []).model, 'provider/user-choice')
   })
 })
 
@@ -55,8 +54,8 @@ test('WHAT[EMR-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without
     ])
 
     assert.equal(await readFile(path, 'utf8'), template)
-    assert.equal(invokeScheduler(left, 'fast-coder', []).Model, 'provider/fast-model')
-    assert.equal(invokeScheduler(right, 'fast-coder', []).Model, 'provider/fast-model')
+    assert.equal(invokeScheduler(left, 'fast-coder', []).model, 'provider/fast-model')
+    assert.equal(invokeScheduler(right, 'fast-coder', []).model, 'provider/fast-model')
   })
 })
 
@@ -69,10 +68,10 @@ test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_and_null', as
     }\n`
     const scheduler = await bootstrapAndLoadAt(path, body)
     const running = [
-      { Model: 'provider/shared', Reasoning: 'low' },
-      { Model: 'provider/shared', Reasoning: 'low' },
+      { model: 'provider/shared', reasoning: 'low' },
+      { model: 'provider/shared', reasoning: 'low' },
     ]
-    assert.equal(invokeScheduler(scheduler, 'deep-coder', running), undefined)
+    assert.equal(invokeScheduler(scheduler, 'deep-coder', running), null)
   })
 })
 

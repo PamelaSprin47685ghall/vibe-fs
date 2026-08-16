@@ -1,77 +1,33 @@
-// Shared OrchestratorHost integration harness (cutover Wave 2a).
+// Shared OrchestratorHost semantic harness.
 //
-// Used by requirements/change-integration/tests/host.test.mjs and
-// requirements/review-assurance/tests/host-reverify.test.mjs (split from
-// tests/unit/orchestrator/host.test.mjs; ≥2 target packages → support/).
-//
-// A REAL OrchestratorHost (real HostForkRuntime, real journal, real engine)
-// over fake GitPort/ManagerPort-shaped seams. The engine is either pre-seeded
-// (host.engineInstance = real engine built on fakes — member-level branches)
-// or left to the host's own lazy initializeEngine (fake gitPort injected onto
-// the host — init/sweep/caching branches). Fable compiles members to module
-// functions, so engine behavior is varied through the real engine's ports,
-// never through stubbed engine objects.
+// The owner surface constructs the real Host over plain JavaScript port
+// contracts. Journal and Host state cross this boundary only as opaque
+// capabilities; observations returned by this harness are ordinary JS values.
 
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import {
-  agentJournal,
-  commitHash,
-  hostEventPort,
-  physicalUser,
-  resultOf,
-  sessionId,
-  targetRef,
-  toList,
-  worktreePath,
-} from './domain.mjs'
-
-const hostModule = await import(new URL('../../../../dist/Change/Host/Host.js', import.meta.url).pathname)
-const { OrchestratorHost } = hostModule
-const rawJoinPublishedAvailable = Object.entries(hostModule).find(([k]) => k.startsWith('OrchestratorHost__JoinPublishedAvailable_'))?.[1]
-const member = (name) =>
-  Object.entries(hostModule).find(
-    ([exportName, value]) => exportName.includes(`OrchestratorHost__${name}_`) && typeof value === 'function',
-  )?.[1]
-const rawForkManagerJob = member('ForkManagerJob')
-const rawContinueManagerJob = member('ContinueManagerJob')
-for (const [name, value] of [
-  ['ForkManagerJob', rawForkManagerJob],
-  ['ContinueManagerJob', rawContinueManagerJob],
-]) {
-  if (typeof value !== 'function') throw new Error(`${name} export must be discoverable without pinning Fable hash`)
-}
-const { OrchestratorHostDeps } = await import('../../../../dist/Change/Host/Types.js')
-const RuntimeModule = await import('../../../../dist/Change/Runtime.js')
-const createOrchestrator = Object.entries(RuntimeModule).find(([k]) => k.startsWith('Orchestrator_$ctor'))?.[1] ?? ((...args) => new RuntimeModule.Orchestrator(...args))
-
-// Fable Results are {tag, fields}; resultOf restores the {ok, value, error} surface.
-export const forkManagerJob = async (host, ...args) => resultOf(await rawForkManagerJob(host, ...args))
-export const continueManagerJob = async (host, ...args) => resultOf(await rawContinueManagerJob(host, ...args))
-export const joinPublishedAvailable = async (host, ...args) => resultOf(await rawJoinPublishedAvailable(host, ...args))
+import * as hostSurface from '../../../../dist/Change/Host/Surface.js'
+import * as journalSurface from '../../../../dist/Persistence/Journal/Surface.js'
 
 export const fakeGitPort = (behaviour = {}) => ({
-  IsDirty: async () => !!behaviour.dirty,
-  CreateWorktree: async (jobId) => ({
-    tag: 0,
-    fields: [{ fields: [`manager/${jobId.fields?.[0] ?? jobId}`], tag: 0, cases: () => ['WorktreeIdentity'] }],
-  }),
+  IsDirty: async () => Boolean(behaviour.dirty),
+  CreateWorktree: async (jobId) => ({ ok: true, value: `manager/${jobId}` }),
   FreezeTargetBranch: async () =>
-    behaviour.freezeError ? { tag: 1, fields: [behaviour.freezeError] } : { tag: 0, fields: [targetRef('main')] },
-  Rebase: async () => ({ tag: 0, fields: [] }),
-  ConflictedFiles: async () => ({ tag: 0, fields: [toList([])] }),
-  FfMerge: async () => ({ tag: 0, fields: [commitHash('cafe01')] }),
-  RemoveWorktree: async () => ({ tag: 0, fields: [] }),
+    behaviour.freezeError ? { ok: false, error: behaviour.freezeError } : { ok: true, value: 'refs/heads/main' },
+  Rebase: async () => ({ ok: true }),
+  ConflictedFiles: async () => ({ ok: true, value: [] }),
+  FfMerge: async () => ({ ok: true, value: 'cafe01' }),
+  RemoveWorktree: async () => ({ ok: true }),
   HasRebaseHead: async () => false,
   ListWorktrees: async () =>
-    behaviour.listError ? { tag: 1, fields: [behaviour.listError] } : { tag: 0, fields: [toList([])] },
-  ListManagerBranches: async () => ({ tag: 0, fields: [toList([])] }),
-  DeleteBranch: async () => ({ tag: 0, fields: [] }),
-  ReadHead: async () => ({ tag: 0, fields: [commitHash('beef02')] }),
-  GetTargetHead: async () => ({ tag: 0, fields: [commitHash('beef02')] }),
+    behaviour.listError ? { ok: false, error: behaviour.listError } : { ok: true, value: [] },
+  ListManagerBranches: async () => ({ ok: true, value: [] }),
+  DeleteBranch: async () => ({ ok: true }),
+  ReadHead: async () => ({ ok: true, value: 'beef02' }),
+  GetTargetHead: async () => ({ ok: true, value: 'beef02' }),
 })
 
 export const fakeSessions = (behaviour = {}) => {
@@ -80,7 +36,7 @@ export const fakeSessions = (behaviour = {}) => {
   const terminalListeners = new Map()
   const stickyTerminals = new Map()
 
-  const sessionKey = (value) => value?.fields?.[0] ?? value
+  const sessionKey = (value) => value
   const notifyTerminal = (session, outcome) => {
     const key = sessionKey(session)
     stickyTerminals.set(key, outcome)
@@ -92,25 +48,33 @@ export const fakeSessions = (behaviour = {}) => {
     CreateChildSession: async (parentId, options) => {
       childSeq += 1
       calls.push(['CreateChildSession', options])
-      if (behaviour.createError) return { tag: 1, fields: [behaviour.createError] }
-      return { tag: 0, fields: [sessionId(`child-${childSeq}`)] }
+      if (behaviour.createError) return { ok: false, error: behaviour.createError }
+      return { ok: true, value: `child-${childSeq}` }
     },
     AbortSession: async (id) => {
-      calls.push(['AbortSession', id.fields?.[0] ?? id])
-      return { tag: 0, fields: [] }
+      calls.push(['AbortSession', id])
+      return { ok: true }
     },
+    InterruptSessionOnly: async (id) => {
+      calls.push(['InterruptSessionOnly', id])
+      return { ok: true }
+    },
+    AbortChildren: async (id) => {
+      calls.push(['AbortChildren', id])
+    },
+    CreateSiblingSession: async (owner, parent, options) => {
+      calls.push(['CreateSiblingSession', owner, parent, options])
+      return { ok: true, value: `sibling-${++childSeq}` }
+    },
+    TryGetParentSession: async () => ({ ok: true, value: undefined }),
     SendPrompt: async (...args) => {
       calls.push(['SendPrompt', ...args])
       behaviour.onSendPrompt?.(...args)
-      if (behaviour.sendPromptError) return { tag: 4, fields: [behaviour.sendPromptError] }
+      if (behaviour.sendPromptError) return { kind: 'Fatal', reason: behaviour.sendPromptError }
       if (behaviour.terminalAfterSend) {
-        queueMicrotask(() => notifyTerminal(args[0], hostEventPort.failed(behaviour.terminalAfterSend)))
+        queueMicrotask(() => notifyTerminal(args[0], { kind: 'Failed', error: behaviour.terminalAfterSend }))
       }
-      return { tag: 1, fields: [physicalUser('msg_fake_prompt')] }
-    },
-    SendPromptAsync: async (...args) => {
-      calls.push(['SendPromptAsync', ...args])
-      return { tag: 0, fields: [] }
+      return { kind: 'Physical', value: 'msg_fake_prompt' }
     },
     SubscribeTerminal: (childId, callback) => {
       calls.push(['SubscribeTerminal', childId])
@@ -126,23 +90,10 @@ export const fakeSessions = (behaviour = {}) => {
         },
       }
     },
-    ListChildren: async () => ({ tag: 0, fields: [toList([])] }),
+    ListChildren: async () => ({ ok: true, value: [] }),
+    FamilyRootOf: (sessionId) => sessionId,
   }
 }
-
-export const fakeManagerPort = (calls) => ({
-  StartManager: async (start) => {
-    calls.push(['StartManager', start])
-    return { tag: 0, fields: [sessionId('manager-ses-1')] }
-  },
-  AwaitManager: async () => ({ tag: 0, fields: [] }),
-  Reverify: async () => ({ tag: 0, fields: [] }),
-  ResumeManager: async (jobId, worktree, prompt) => {
-    calls.push(['ResumeManager', prompt])
-    return { tag: 0, fields: [] }
-  },
-  TerminateChildren: async () => {},
-})
 
 /** A real git repo with one empty commit; gitCommonDir/init stay hermetic. */
 export const gitDir = (label) => {
@@ -157,10 +108,8 @@ export const gitDir = (label) => {
 }
 
 /**
- * Real OrchestratorHost over a real journal + real repo. When `seedEngine` is
- * true (default) the host carries a REAL engine built on the fake git port, so
- * member-level branches run without initializeEngine; when false the host
- * initializes its own engine lazily through host.gitPort (init/sweep/caching).
+ * Real OrchestratorHost over a real journal + real repo. The Host owns lazy
+ * engine initialization through its own manager and git ports.
  */
 export const liveOrchestrator = async (options = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-hostcov-'))
@@ -172,48 +121,30 @@ export const liveOrchestrator = async (options = {}) => {
     ['-C', repoDir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'],
     { stdio: 'ignore' },
   )
-  const opened = options.journal === false ? null : await agentJournal.create({ directory: dir })
+  const opened =
+    options.journal === false
+      ? null
+      : await journalSurface.JournalSurface_bootWithWriterId(
+          dir,
+          `writer-${options.orchestratorId ?? 'orchestrator'}`,
+          'rt-orchestrator-host',
+          4242,
+          '2026-01-01T00:00:00Z',
+        )
   if (opened) {
     const ok = opened.ok === true
     if (!ok) throw new Error('journal must open')
   }
 
   const sessions = fakeSessions(options.sessionBehaviour)
-  const deps = new OrchestratorHostDeps(
+  const host = hostSurface.create({
     sessions,
-    opened?.journal,
-    undefined,
-    () => {},
-    () => {},
-    options.registerReviewerTree ?? (() => {}),
-    () => {},
-    options.repoPath ?? repoDir,
-    options.targetBranch ?? '',
-    async () => undefined,
-    async () => undefined,
-  )
-  const host = new OrchestratorHost(deps, sessionId('ses_orphost'))
-  host.gitPort = options.gitPort ?? fakeGitPort()
-
-  if (options.seedEngine !== false) {
-    const managerCalls = []
-    const engine = createOrchestrator(
-      host.gitPort,
-      fakeManagerPort(managerCalls),
-      repoDir,
-      targetRef('main'),
-      {
-        AppendFact: async (streamId, factValue) => {
-          const appended = await agentJournal.appendAgent(streamId, undefined, factValue, opened.journal)
-          return appended.ok ? { tag: 0, fields: [appended.value] } : { tag: 1, fields: ['append failed'] }
-        },
-        Snapshot: () => agentJournal.snapshot(opened.journal),
-      },
-      repoDir,
-    )
-    host.engineInstance = engine
-    host.__managerCalls = managerCalls
-  }
+    journal: opened?.journal,
+    gitPort: options.gitPort ?? fakeGitPort(),
+    repoPath: options.repoPath ?? repoDir,
+    targetBranch: options.targetBranch ?? '',
+    orchestratorId: options.orchestratorId ?? 'ses_orphost',
+  })
 
   return {
     host,
@@ -221,7 +152,7 @@ export const liveOrchestrator = async (options = {}) => {
     journal: opened?.journal,
     cleanup: () => {
       try {
-        opened?.dispose()
+        if (opened?.journal) journalSurface.JournalSurface_dispose(opened.journal)
       } catch {}
       rmSync(dir, { recursive: true, force: true })
     },

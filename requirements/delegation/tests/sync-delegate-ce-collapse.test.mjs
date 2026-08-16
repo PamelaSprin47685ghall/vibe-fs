@@ -1,162 +1,31 @@
-// Split from tests/unit/session/sync-delegate-ce-collapse.test.mjs (cutover Wave 2a); owner: delegation.
-//
-// EXEC-031 单栈断言：whitespace-normalized completion 经 bounded WorkRecord
-// Recent work 解析 invoke（无 deleted return/TextComplete 通道）。dispose/cancel
-// scope 断言已随 SPLIT@cutover 迁
-// requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs。
-
+// Concurrent sync delegate calls collapse at one owner boundary.
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import test from 'node:test'
+import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test from 'node:test'
+import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/OpenCode/Host/SessionQuiescenceGate.js'
-import { TurnOutcome } from '../../../dist/Composition/Turn/Program.js'
-import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
-import { SyncDelegateRole } from '../../../dist/Execution/Delegation/SyncDelegate/Model.js'
-const attachedModule = await import('../../../dist/Execution/Session/Attachment/AttachedRuntime.js')
-const createAttached = Object.entries(attachedModule).find(([k]) => k.startsWith('AttachedSessionRuntime_$ctor'))?.[1]
-const syncDelegateRuntimeModule = await import('../../../dist/Execution/Delegation/SyncDelegate/Runtime.js')
-const { SyncDelegateRuntime, SyncDelegateRuntime__Dispose: disposeRuntime } = syncDelegateRuntimeModule
-const invoke = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__Invoke_'))?.[1]
-const handleTurn = Object.entries(syncDelegateRuntimeModule).find(([k]) => k.startsWith('SyncDelegateRuntime__HandleTurn_'))?.[1]
-import {
-  agentJournal,
-  authorityRoot,
-  idValue,
-  lifecycleWorkRecordProjection,
-  okResult,
-  physicalUser,
-  promptDispatcher,
-  providerRun,
-  reconcileSupervisor,
-  resultOf,
-  roles,
-  sessionId,
-  xTraceCapture,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const waitFor = async (predicate, message, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
-const turn = (delegateKey, role, text, runId = 'asst_turn') =>
-  new ReconciledTurn(
-    sessionId(delegateKey),
-    physicalUser('msg_phys_turn'),
-    authorityRoot('msg_root_turn'),
-    providerRun(runId),
-    role,
-    undefined,
-    [reconcileSupervisor.textPart(text)],
-    'stop',
-    undefined,
-    undefined,
-    TurnOutcome.TurnCompleted,
-    undefined,
-  )
-
-let activeJournal
-
-const withHarness = async (fn) => {
-  const base = mkdtempSync(join(tmpdir(), 'wxs-sync-ce-'))
-  const opened = await agentJournal.create({ directory: base })
-  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  activeJournal = opened.journal
-
-  const dispatcher = promptDispatcher.forJournal(opened.journal)
-  const createCalls = []
-  const prompts = []
-  let physicalSeq = 0
-
-  const sessions = {
-    SubscribeTerminal: () => ({ Dispose: () => {} }),
-    SendPrompt: async (session, text, options) => {
-      physicalSeq += 1
-      prompts.push({
-        session: idValue.session(session),
-        text,
-        agent: options?.Agent,
-      })
-      return promptDispatcher.admittedWithPhysicalMessage(`msg_phys_${physicalSeq}`)
-    },
-    CreateChildSession: async (parentId, options) => {
-      const child = sessionId(`delegate-${createCalls.length + 1}`)
-      createCalls.push({
-        parent: idValue.session(parentId),
-        agent: options?.Agent,
-        title: options?.Title,
-        child: idValue.session(child),
-      })
-      return okResult(child)
-    },
-  }
-
-  const quiescence = createQuiescenceGate()
-  const attached = createAttached()
-  const runtime = new SyncDelegateRuntime(
-    sessions,
-    dispatcher,
-    opened.journal,
-    attached,
-    (_owner) => roles.tier('Fast'),
-    (_delegateSession, _agent) => {},
-    quiescence,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    // EXEC-031: bounded WorkRecord via the real journal projector.
-    (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
-  )
-
+test('WHAT[DELEG-021] SYNC_CE_COLLAPSE_provider_first_call_owns_work_record', async () => {
+  const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-')))
   try {
-    await fn({
-      runtime,
-      createCalls,
-      prompts,
-      quiescence,
-    })
-  } finally {
-    disposeRuntime(runtime)
-    opened.dispose()
-    rmSync(base, { recursive: true, force: true })
-  }
-}
-
-test('WHAT[DELEG-011] EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
-  await withHarness(async ({ runtime, prompts, createCalls }) => {
-    const owner = 'ses_owner_normalize'
-    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'normalize')
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
-    const delegate = createCalls[0].child
-
-    const answer = '  normalized answer  \n'
-    xTraceCapture.captureProjection(
-      activeJournal,
-      sessionId(delegate),
-      xTraceCapture.semantic({
-        messages: [{ role: 'assistant', parts: [xTraceCapture.text(answer)] }],
-      }),
-    )
-    const handled = await handleTurn(
-      runtime,
-      turn(delegate, roles.of('Inspector'), answer, 'asst_norm_complete'),
-      undefined,
-    )
-    assert.equal(handled, true)
-
-    const done = resultOf(await pending)
-    assert.equal(done.ok, true, done.error)
-    // The answer travels inside the bounded WorkRecord's Recent work, not as
-    // a trimmed raw last-message payload (EXEC-031).
-    assert.match(done.value, /normalized answer/)
-    assert.match(done.value, /Recent work/)
-    assert.doesNotMatch(done.value, /Closing report/)
-  })
+    const first = sync.invoke(h, 'owner-ce', 'Inspector', 'first arrival')
+    const second = sync.invoke(h, 'owner-ce', 'Inspector', 'second arrival')
+    assert.equal(await sync.settle(h, 'owner-ce', 'Inspector', 'combined answer\nRecent work', 'run-ce'), true)
+    const a = await first; const b = await second
+    assert.equal(a.ok, true); assert.equal(b.ok, true)
+    assert.match(a.value, /combined answer/)
+    assert.match(a.value, /Recent work/)
+    assert.equal(sync.childCount(h), 1)
+  } finally { sync.dispose(h) }
+})
+test('WHAT[DELEG-021] SYNC_CE_COLLAPSE_sibling_references_canonical_result', async () => {
+  const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-ref-')))
+  try {
+    const first = sync.invoke(h, 'owner-ce', 'Inspector', 'first')
+    const second = sync.invoke(h, 'owner-ce', 'Inspector', 'second')
+    assert.equal(await sync.settle(h, 'owner-ce', 'Inspector', 'canonical', 'run-ref'), true)
+    assert.equal((await first).ok, true)
+    assert.equal((await second).ok, true)
+  } finally { sync.dispose(h) }
 })

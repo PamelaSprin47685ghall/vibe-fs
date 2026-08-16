@@ -150,6 +150,7 @@ module CasebookProjection =
         | CasebookEvent.CaseCaptured case ->
             let withAccess =
                 { case with
+                    Observations = Observations.normalize case.Observations
                     LastAccessOrder = state.AccessCounter }
 
             { AccessCounter = state.AccessCounter + 1L

@@ -6,38 +6,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, liveToken, processRequest } from '../../verification-system/tests/support/domain.mjs'
-import { lib } from '../../verification-system/tests/support/domain.mjs'
-
-const { runWithLauncher } = await import('../../../dist/Process/ProcessRunner.js')
-const { fromSeconds } = await lib('TimeSpan.js')
-
-const CTX = {
-  WorkingDirectory: undefined,
-  HardLimit: fromSeconds(3600),
-  Environment: undefined,
-}
-
-const cmd = processRequest.command({ fileName: 'sh', args: ['-c', 'echo hi'] })
-const estimate = (runtimeSeconds = 10, outputBytes = 1024, memory = 'Medium') =>
-  processRequest.estimate({ runtimeSeconds, outputBytes, memory })
+const { getCount, release, runLargeEstimate } = await import('../../../dist/Process/LargeGateSurface.js')
 
 // ── Large gate ───────────────────────────────────────────────────────────────
 
 test('WHAT[DISTILL-011] EXEC_011_large_estimate_acquires_and_releases_the_gate', async () => {
-  const { acquire, release, getCount } = await import('../../../dist/Process/LargeGate.js')
   // Drain to a known state.
   while (getCount() === 0) release()
 
   let gateCountDuringRun = undefined
-  const observingLauncher = async (_cmd, _ct) => {
+  const result = await runLargeEstimate(() => {
     gateCountDuringRun = getCount()
-    return [0, new Uint8Array(0), new Uint8Array(0)]
-  }
+  })
 
-  const result = await runWithLauncher(observingLauncher, cmd, estimate(10, 1024, 'Large'), CTX, liveToken())
-
-  assert.equal(caseOf(result), 'Ok')
+  assert.equal(result, true)
   assert.equal(gateCountDuringRun, 0, 'the gate is held while the large process runs')
   assert.equal(getCount(), 1, 'the gate is released after the run')
 })

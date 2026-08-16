@@ -9,70 +9,76 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  attemptPlanner as planner,
-  okResult,
-  prefixEpochProjection as prefix,
-  prefixProbe,
-  projectionChoice,
-  requestKind,
-  xPrefix,
-} from '../../verification-system/tests/support/domain.mjs'
+
+import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
-    digest: `frozen-${cutoff}`,
+    frozenDigest: `frozen-${cutoff}`,
     cutoff,
     prefixDigest: `prefix-${cutoff}`,
     sealRoot: seal,
     syntheticId: `synthetic-${seal}`,
   })
 
-const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => prefixProbe({ id, candidate: snapshotAt(cutoff) })
+const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
+  probeId: id,
+  basedOnEpoch: 0,
+  candidate: snapshotAt(cutoff),
+})
 
 test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
   // The absence of a rollback, seen from the planner: a failed probe attempt produces
   // no promotable probe, and the next slot's plan reads the same committed snapshot.
   const committed = snapshotAt(4)
 
-  const failed = planner.plan({
-    kind: requestKind.workMain,
+  const failed = planner.attemptPlan({
+    role: 'Coder',
+    tier: 'Fast',
+    kind: 'WorkMain',
     mayRecover: true,
-    selectProbe: () => okResult(probeFor({ cutoff: 9 })),
+    noCandidateReason: 'NoCoverage',
   })
 
-  assert.equal(planner.promotableProbeId(failed, 'Failed'), undefined)
+  assert.equal(failed.choice, 'UseCommittedEpoch')
+  assert.equal(failed.probeId, null)
+  assert.equal(failed.noProbeReason, 'NoCoverage')
 
   // The next, unarmed slot projects the committed prefix — cutoff 4, not the
   // candidate's 9.
-  const next = xPrefix.forChoice(projectionChoice.committed, committed, 'B BODY')
+  const next = prefix.forChoice({ kind: 'committed' }, committed, 'B BODY')
   assert.equal(next.dropLeading, 4)
 })
 
 // ── COMPANION-009 / CTX-010: the prefix plan ──────────────────────────────
 
 test('WHAT[PREFIX-STABILITY-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {
-  const plan = xPrefix.forSnapshot(undefined, 'unused')
+  const plan = prefix.forSnapshot(null, 'unused')
 
   assert.equal(plan.replacesPrefix, false)
   assert.equal(plan.dropLeading, 0)
-  assert.equal(plan.memoryId, undefined)
+  assert.equal(plan.memoryId, null)
 })
 
 test('WHAT[PREFIX-STABILITY-006] HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan', () => {
   // The two histories are different but the instruction is identical, which is why
   // `Snapshot = None` carries both.
+  const rebased = prefix.applyRebase(
+    { previousEpoch: 0, nextEpoch: 1, candidate: snapshotAt(6) },
+    prefix.empty,
+  ).value
   const retired = prefix.applyReanchor(
     { previousEpoch: 1, nextEpoch: 2, observedRun: 'msg_c1' },
-    prefix.applyRebase({ previousEpoch: 0, nextEpoch: 1, candidate: snapshotAt(6) }, prefix.empty).value,
+    rebased,
   ).value
 
-  assert.deepEqual(xPrefix.forSnapshot(retired.Snapshot, 'x'), xPrefix.forSnapshot(prefix.empty.Snapshot, 'x'))
+  assert.deepEqual(prefix.forSnapshot(retired.snapshot, 'x'), prefix.forSnapshot(null, 'x'))
 })
 
 test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_is_wrapped_as_low_trust_context', () => {
-  const plan = xPrefix.forSnapshot(snapshotAt(3), 'THE WORK LOG')
+  const plan = prefix.forSnapshot(snapshotAt(3), 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)
   assert.equal(plan.dropLeading, 3)
@@ -86,7 +92,7 @@ test('WHAT[PREFIX-STABILITY-015] COMPANION_013_the_plan_reuses_the_snapshot_s_ow
   // drift a cold boundary on every later request.
   const snapshot = snapshotAt(3, { seal: 'seal-fixed' })
 
-  assert.equal(xPrefix.forSnapshot(snapshot, 'body').memoryId, 'synthetic-seal-fixed')
+  assert.equal(prefix.forSnapshot(snapshot, 'body').memoryId, 'synthetic-seal-fixed')
 })
 
 test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
@@ -95,8 +101,8 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_b
   // a promoted probe to be byte-identical to what the successful attempt sent.
   const candidate = snapshotAt(7, { seal: 'seal-candidate' })
 
-  const asProbe = xPrefix.forChoice(projectionChoice.probe(prefixProbe({ candidate })), undefined, 'BODY')
-  const asCommitted = xPrefix.forSnapshot(candidate, 'BODY')
+  const asProbe = prefix.forChoice({ kind: 'probe', candidate }, null, 'BODY')
+  const asCommitted = prefix.forSnapshot(candidate, 'BODY')
 
   assert.deepEqual(asProbe, asCommitted)
 })
@@ -109,15 +115,15 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_the_required_blob_follows_the_choice_no
   const committed = snapshotAt(4)
   const candidate = snapshotAt(9)
 
-  assert.equal(xPrefix.requiredBlob(projectionChoice.committed, committed), 'blob-frozen-4')
+  assert.equal(prefix.requiredBlob({ kind: 'committed' }, committed), 'blob-frozen-4')
   assert.equal(
-    xPrefix.requiredBlob(
-      projectionChoice.probe(prefixProbe({ candidate })),
+    prefix.requiredBlob(
+      { kind: 'probe', candidate: probeFor({ cutoff: 9 }).candidate },
       committed,
     ),
     'blob-frozen-9',
     'a probe attempt reads the CANDIDATE blob',
   )
 
-  assert.equal(xPrefix.requiredBlob(projectionChoice.committed, undefined), undefined, 'raw history needs no blob')
+  assert.equal(prefix.requiredBlob({ kind: 'committed' }, null), null, 'raw history needs no blob')
 })

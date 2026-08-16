@@ -535,10 +535,6 @@
     "deep-dist-import": 2,
     "interop-helper": 1
   },
-  "requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs": {
-    "du-shape": 2,
-    "deep-dist-import": 1
-  },
   "requirements/knowledge-reuse/tests/bookkeeper-mechanical.test.mjs": {
     "deep-dist-import": 7,
     "du-shape": 2,

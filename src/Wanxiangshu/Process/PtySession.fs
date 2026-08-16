@@ -19,6 +19,7 @@ type PtySession =
         /// workflow stage: exactly one read may be in flight per PTY.
         mutable AwaitingFirstByte: bool
         mutable ExitCompletion: TaskCompletionSource<unit>
+        mutable ExitCompleted: bool
         mutable Pending: ResizeArray<PtyCommand * TaskCompletionSource<Result<unit, string>> option>
     }
 
@@ -30,4 +31,5 @@ module PtySession =
           Closed = false
           AwaitingFirstByte = false
           ExitCompletion = TaskCompletionSource<unit>()
+          ExitCompleted = false
           Pending = ResizeArray<_>() }

@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcer } from '../../verification-system/tests/support/domain.mjs'
+import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
 const tip = () => enforcer.fieldNames()[0]
 const call = (text, evidence) => ({

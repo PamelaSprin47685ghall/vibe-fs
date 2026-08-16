@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { managedAgentConfig, runtimeResources } from '../../verification-system/tests/support/domain.mjs'
+import { configure as configureManagedAgents, installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
 
 const permissionKey = 'sphinx_*'
 
@@ -49,7 +49,8 @@ const wildcardMatch = (input, pattern) => {
 
 const evaluate = (permissionObj, tool) => {
   const rules = []
-  for (const [key, value] of Object.entries(permissionObj)) {
+  for (const key in permissionObj) {
+    const value = permissionObj[key]
     if (typeof value === 'string') rules.push({ permission: key, action: value })
   }
   return (
@@ -57,13 +58,11 @@ const evaluate = (permissionObj, tool) => {
   )
 }
 
-test.before(() => {
-  runtimeResources.installFromPackage()
-})
+installDefaultResources()
 
 test('WHAT[ENF-007] AGENT_030_inquiry_only_wildcard_permission', () => {
   const config = buildConfig()
-  assert.equal(managedAgentConfig.configure(config).ok, true)
+  assert.equal(configureManagedAgents(config).ok, true)
 
   for (const tier of TIERS) {
     for (const role of ROLES) {

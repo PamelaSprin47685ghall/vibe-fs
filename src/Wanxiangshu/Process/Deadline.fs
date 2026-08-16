@@ -12,7 +12,7 @@ module Deadline =
     ///
     /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
     /// so a layer 1 test could not read the bound it must assert against.
-    let MaxTimerWaitMs = 2147483647
+    let MaxTimerWaitMs = 2_147_483_647
 
     /// Build a deadline from the current clock and a time budget, clamping to
     /// DateTimeOffset.MaxValue so the calculation cannot overflow.

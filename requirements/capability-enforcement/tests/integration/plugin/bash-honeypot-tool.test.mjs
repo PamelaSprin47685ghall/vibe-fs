@@ -9,7 +9,7 @@ import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('AGENT_023_coder_receives_hard_denial_and_no_shell', async () => {
+test('WHAT[ENF-010] AGENT_023_coder_receives_hard_denial_and_no_shell', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'coder-bash-honey', 'fast-coder')
     assert.ok(hooks.tool['bash-honeypot'], 'bash-honeypot must be registered')
@@ -24,7 +24,7 @@ test('AGENT_023_coder_receives_hard_denial_and_no_shell', async () => {
   })
 })
 
-test('AGENT_023_bash_honeypot_is_denied_for_non_coder_roles', async () => {
+test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_for_non_coder_roles', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-bash-honey', 'fast-manager')
     const result = parseToml(
@@ -37,7 +37,7 @@ test('AGENT_023_bash_honeypot_is_denied_for_non_coder_roles', async () => {
   })
 })
 
-test('AGENT_023_bash_honeypot_is_denied_when_the_role_is_unresolved', async () => {
+test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_when_the_role_is_unresolved', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = parseToml(
       await hooks.tool['bash-honeypot'].execute(

@@ -16,73 +16,67 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFactCaseNames,
-  authorityRoot,
-  cursor,
-  envelope,
-  fact,
-  fallbackAttemptIdentity,
-  fallbackProjection,
-  fold,
-  idValue,
-  logicalRunId,
-  providerRun,
-  sessionId,
-  stream,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as fallbackOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
 
-const SESSION = sessionId('ses_a')
-const RUN = logicalRunId('run_L')
-const ROOT = authorityRoot('msg_u1')
-const PAIR = { SelectedAgent: 'fast-coder', PeerAgent: 'deep-coder' }
+const {
+  cursor,
+  fallbackProjection,
+  fold: foldFactsThroughOwner,
+  authorityRootAccepted,
+  fallbackCursorAdvanced,
+  fallbackExhausted,
+  envelope: ownerEnvelope,
+  fallbackFactCaseNames,
+} = fallbackOwner
+
+const SESSION = 'ses_a'
+const RUN = 'run_L'
+const ROOT = 'msg_u1'
+const PAIR = { selectedAgent: 'fast-coder', peerAgent: 'deep-coder' }
 
 const identityFor = (run, { logical = RUN, root = ROOT } = {}) =>
-  cursor.attemptIdentity(SESSION, logical, root, providerRun(run))
+  cursor.attemptIdentity(SESSION, logical, root, run)
 
 // ── PERSIST-001 fixtures for the fold-level tests ────────────────────────────
 
 const rootFact = ({ kind = 'HumanRoot', logical = RUN, root = ROOT } = {}) =>
-  fact('AuthorityRootAccepted', {
-    SessionId: SESSION,
-    LogicalRunId: logical,
-    AuthorityRootUserMessageId: root,
-    AuthorityKind: kind,
-    SelectedAgent: 'fast-coder',
-    PeerAgent: 'deep-coder',
-    CanonicalRole: 'coder',
-    SelectedTier: 'fast',
+  authorityRootAccepted({
+    session: SESSION,
+    logicalRun: logical,
+    authorityRoot: root,
+    authorityKind: kind,
+    selectedAgent: 'fast-coder',
+    peerAgent: 'deep-coder',
+    canonicalRole: 'coder',
+    selectedTier: 'fast',
   })
 
 const advanceFact = ({ run, previous, next, count, logical = RUN, root = ROOT, reason = 'provider_error' }) =>
-  fact('FallbackCursorAdvanced', {
-    SessionId: SESSION,
-    LogicalRunId: logical,
-    AuthorityRootUserMessageId: root,
-    ProviderRun: providerRun(run),
-    PreviousOffset: previous,
-    NextOffset: next,
-    ConsecutiveFailureCount: count,
-    Reason: reason,
+  fallbackCursorAdvanced({
+    session: SESSION,
+    logicalRun: logical,
+    authorityRoot: root,
+    providerRun: run,
+    previousOffset: previous,
+    nextOffset: next,
+    consecutiveFailureCount: count,
+    reason,
   })
 
 const exhaustedFact = ({ count, offset }) =>
-  fact('FallbackExhausted', {
-    SessionId: SESSION,
-    LogicalRunId: RUN,
-    AuthorityRootUserMessageId: ROOT,
-    FinalConsecutiveFailureCount: count,
-    FinalOffset: offset,
+  fallbackExhausted({
+    session: SESSION,
+    logicalRun: RUN,
+    authorityRoot: ROOT,
+    finalConsecutiveFailureCount: count,
+    finalOffset: offset,
   })
 
 /** Fold a sequence of facts, numbering LocalSeq from 1. */
 const foldFacts = (facts) =>
-  fold.apply(
-    fold.empty,
-    facts.map((value, index) => envelope({ seq: index + 1, stream: stream.session(SESSION), fact: value })),
-  )
+  foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 
-const fallbackOf = (projection) => fallbackProjection.read(fold.session(projection, 'ses_a').Fallback)
+const fallbackOf = (projection) => fallbackProjection.read(projection)
 
 // ── FALLBACK-002: the two quantities, and what each operation moves ──────────
 
@@ -114,7 +108,7 @@ test('WHAT[PAR-002] FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing
   }
 
   assert.deepEqual(walked, [1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0])
-  assert.equal(value.ConsecutiveFailureCount, 12)
+  assert.equal(cursor.read(value).failures, 12)
 })
 
 test('WHAT[PAR-002] FALLBACK_002_each_offset_maps_to_a_fixed_side_and_a_fixed_agent', () => {
@@ -303,7 +297,7 @@ test('WHAT[PAR-007] FALLBACK_007_each_rejection_names_a_different_cause', () => 
       duplicate: fallbackProjection.applyAdvance(identityFor('run_1'), 1, 2, 2, current).error,
       badSuccessor: fallbackProjection.applyAdvance(identityFor('run_2'), 1, 3, 2, current).error,
       badCount: fallbackProjection.applyAdvance(identityFor('run_3'), 1, 2, 4, current).error,
-      otherRun: fallbackProjection.applyAdvance(identityFor('run_4', { logical: logicalRunId('run_other') }), 1, 2, 2, current)
+      otherRun: fallbackProjection.applyAdvance(identityFor('run_4', { logical: 'run_other' }), 1, 2, 2, current)
         .error,
       afterExhausted: fallbackProjection.applyAdvance(
         identityFor('run_5'),
@@ -476,30 +470,25 @@ test('WHAT[PAR-009] FALLBACK_010_the_dedupe_identity_names_the_run_the_root_and_
   const identity = identityFor('run_1')
 
   assert.deepEqual(
-    {
-      session: idValue.session(identity.SessionId),
-      run: idValue.logicalRun(identity.LogicalRunId),
-      root: idValue.authorityRoot(identity.AuthorityRootUserMessageId),
-      attempt: idValue.providerRun(identity.ProviderRun),
-    },
+    identity,
     { session: 'ses_a', run: 'run_L', root: 'msg_u1', attempt: 'run_1' },
   )
 
   // The key is a `\u001f`-joined string of exactly those four, in that order.
   assert.equal(
-    fallbackAttemptIdentity.dedupeKey(identity),
+    cursor.dedupeKey(identity),
     ['ses_a', 'run_L', 'msg_u1', 'run_1'].join('\u001f'),
   )
 
   // Each component must move the key, or two different attempts would dedupe as one.
-  const base = fallbackAttemptIdentity.dedupeKey(identity)
-  assert.notEqual(fallbackAttemptIdentity.dedupeKey(identityFor('run_2')), base)
+  const base = cursor.dedupeKey(identity)
+  assert.notEqual(cursor.dedupeKey(identityFor('run_2')), base)
   assert.notEqual(
-    fallbackAttemptIdentity.dedupeKey(identityFor('run_1', { logical: logicalRunId('run_other') })),
+    cursor.dedupeKey(identityFor('run_1', { logical: 'run_other' })),
     base,
   )
   assert.notEqual(
-    fallbackAttemptIdentity.dedupeKey(identityFor('run_1', { root: authorityRoot('msg_u9') })),
+    cursor.dedupeKey(identityFor('run_1', { root: 'msg_u9' })),
     base,
   )
 })
@@ -612,7 +601,7 @@ test('WHAT[PAR-001] FALLBACK_001_a_new_authority_root_replaces_the_cursor_entire
     rootFact(),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
     advanceFact({ run: 'run_2', previous: 1, next: 2, count: 2 }),
-    rootFact({ logical: logicalRunId('run_M'), root: authorityRoot('msg_u2') }),
+    rootFact({ logical: 'run_M', root: 'msg_u2' }),
   ])
 
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
@@ -631,7 +620,7 @@ test('WHAT[PAR-007] FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_a
   // written across an Authority Root change looks like.
   const folded = foldFacts([
     rootFact(),
-    rootFact({ logical: logicalRunId('run_M'), root: authorityRoot('msg_u2') }),
+    rootFact({ logical: 'run_M', root: 'msg_u2' }),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
   ])
 
@@ -652,10 +641,10 @@ test('WHAT[PAR-004] FALLBACK_007_success_writes_no_fact_so_no_journal_line_zeroe
   //
   // Asserted as absence over the whole fact union, because a new fact is exactly
   // how this guarantee would be lost — and it would look like a feature.
-  const names = agentFactCaseNames()
+  const names = fallbackFactCaseNames
 
   assert.deepEqual(
-    names.filter((name) => name.startsWith('Fallback')).sort(),
+    names.slice().sort(),
     ['FallbackCursorAdvanced', 'FallbackExhausted'],
     'the cursor has exactly two durable facts: one advance, one terminal',
   )

@@ -5,6 +5,8 @@ open Wanxiangshu.Composition.Durable
 open System
 open Thoth.Json
 open Wanxiangshu.Foundation
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Composition.Durable.Fact
 
 /// Fact serialization (PERSIST-005).

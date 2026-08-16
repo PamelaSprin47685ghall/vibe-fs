@@ -4,7 +4,7 @@ import test from 'node:test'
 import { library, phase0Names, createStore, start, resume } from './support.mjs'
 
 test('WHAT[EPI-007] method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics', () => {
-  const names = [...library].map((definition) => definition.Name)
+  const names = [...library]
   assert.deepEqual([...phase0Names].sort(), [
     'Abduction',
     'Analogy',

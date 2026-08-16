@@ -6,27 +6,28 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  attemptPlanner as planner,
-  cursor,
-  okResult,
-  prefixEpochProjection as prefix,
-  prefixProbe,
-  recoverySlot as slot,
-  requestKind,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+
+const planner = compression.attemptPlanner
+const cursor = cursorOwner.cursor
+const prefix = compression
+const prefixProbe = compression.prefixProbe
+const requestKind = compression.requestKind
+const slot = compression
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
-    digest: `frozen-${cutoff}`,
+    frozenDigest: `frozen-${cutoff}`,
     cutoff,
     prefixDigest: `prefix-${cutoff}`,
     sealRoot: seal,
     syntheticId: `synthetic-${seal}`,
   })
 
-const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => prefixProbe({ id, candidate: snapshotAt(cutoff) })
+const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) =>
+  prefixProbe({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
 
 test('WHAT[PAR-013] FALLBACK_002_the_cursor_is_the_only_thing_that_moves_the_effective_agent', () => {
   const at = (offset) =>
@@ -43,22 +44,22 @@ test('WHAT[PAR-008] CTX_012_only_a_probe_attempt_with_a_usable_terminal_may_prom
   const withProbe = planner.plan({
     kind: requestKind.workMain,
     mayRecover: true,
-    selectProbe: () => okResult(probeFor({ id: 'probe-p1' })),
+    probe: probeFor({ id: 'probe-p1' }),
   })
 
   assert.equal(planner.promotableProbeId(withProbe, 'Completed'), 'probe-p1')
 
   // An invalid terminal arrived intact but is unusable (CTX-004), so there is nothing
   // to promote — FALLBACK-008 gives it a repair instead.
-  assert.equal(planner.promotableProbeId(withProbe, 'CompletedInvalid'), undefined)
-  assert.equal(planner.promotableProbeId(withProbe, 'Failed'), undefined)
-  assert.equal(planner.promotableProbeId(withProbe, 'Aborted'), undefined)
+  assert.equal(planner.promotableProbeId(withProbe, 'CompletedInvalid'), null)
+  assert.equal(planner.promotableProbeId(withProbe, 'Failed'), null)
+  assert.equal(planner.promotableProbeId(withProbe, 'Aborted'), null)
 })
 
 test('WHAT[PAR-011] CTX_012_an_attempt_without_a_probe_cannot_promote_even_on_success', () => {
   const withoutProbe = planner.plan({ kind: requestKind.workMain, mayRecover: false })
 
-  assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), undefined)
+  assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), null)
 })
 
 // ── PAR-010: 槽内维护子请求（RecoverySlot 决策表）───────────────────────────
@@ -83,7 +84,7 @@ test('WHAT[PAR-010] PAR_010_a_successful_squash_keeps_the_count_and_continues_to
 
   assert.equal(decision.name, 'CommitSquashThenMain')
   assert.equal(decision.advancesCursor, false)
-  assert.equal(decision.clearsFailureCount, undefined, 'squash 成功不携带清零语义')
+  assert.equal(decision.clearsFailureCount, false, 'squash 成功不携带清零语义')
 
   const main = slot.onMain({ kind: requestKind.workMain, outcome: 'Completed' })
   assert.equal(main.name, 'CommitMain')

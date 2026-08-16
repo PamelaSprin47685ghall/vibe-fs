@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { countTokens, encode } from 'gpt-tokenizer/encoding/o200k_base'
 
-import { loopDetector } from '../../verification-system/tests/support/domain.mjs'
+import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import {
   nextPowerOfTwo,
   percentile,
@@ -26,7 +26,7 @@ test('WHAT[DG-004] LOOP_004_repository_text_calibrates_every_detector_constant',
 
   const p99LineTokens = percentile(nonEmptyLineTokenLengths, 0.99)
   const calibratedHalfLife = nextPowerOfTwo(p99LineTokens)
-  assert.equal(p99LineTokens, 56)
+  assert.equal(p99LineTokens, 58)
   assert.equal(calibratedHalfLife, 64)
   assert.equal(loopDetector.halfLife, calibratedHalfLife)
   close(loopDetector.lambda, 2 ** (-1 / calibratedHalfLife))

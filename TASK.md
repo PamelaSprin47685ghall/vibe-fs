@@ -4799,15 +4799,17 @@ requirements/<owner>/WHAT.md
 - Provider projection algebra slice 已新增 `ProjectionSurface`，两组代数测试已迁移；fsproj/manifest 已补。
 - Join cleanup 已删除 `renderCompletedBatch` / `renderCompletionItem` 过渡路径；`JoinItem.ofAgentRunCompletion` 保留为仍有生产债权人的 canonical projection。
 - Composition/Durable/Fact ownership rotation 已完成第一轮 owner files、GuidelineProjection owner relocation 与静态路径更新。
-- Participant identity/deadline slice 已新增 JS-native Persona、Session、Prompt、Deadline、SessionBinding、ModelRouting surfaces；三组 participant tests 与 deadline tests 已迁移，仍需编译与 package-wide proof。
-
-当前实测债务（不可视为完成）：
+- Participant identity/deadline slice 已新增 JS-native Persona、Session、Prompt、Deadline、SessionBinding、ModelRouting surfaces；三组 participant tests 与 deadline tests 已迁移，并已通过编译与 focused proof。
+- Behavior-diagnosis、capability-enforcement、causal-wait/change-integration/time、durable-events residual、managed-session/host、provider/speculative zones 已完成 owner surface 切片；编译与 manifest 已集成，需在全库债务清零前继续复核跨包 support/domain 调用。
+- Casebook Index/Bookkeeper/Lifecycle/Fetch、Context Companion、Obligation Ledger、Crash/Delegation/Horizon/Fallback、Process/Interaction owner surfaces 已注册并纳入 602-source green build；semantic tests 已迁移至 JS-native/opaque APIs，仍需全库 gate 清零。
+- Durable/Prefix/Review/Repository/Provider residual waves and shared support cutover are integrated; `verification-system/tests/support/domain` and `glory.mjs` were deleted after zero semantic-zone imports. Only the build-verification `run-inner.mjs` path check remains exempt.
 
 ```text
-semantic test files with debt = 318
-violating lines             = 3488
-requirement-trace findings  = 180
-registered surfaces         = 21
+semantic test files with debt = 1 (build-verification support only)
+violating lines             = 5 (run-inner.mjs Fable path checks)
+requirement-trace findings  = 0
+registered surfaces         = 129
+Fable build                 = green (644 source files)
 ```
 
 因此 P6/P7/P8/P9 仍保持：
@@ -4816,16 +4818,16 @@ registered surfaces         = 21
 P6 — IN PROGRESS
 P7 — NOT PROVEN
 P8 — NOT PROVEN
-P9 — STARTED; internal authority/domain.mjs debt remains
+P9 — STARTED; semantic owner cutover complete, only exempt build-verification path debt remains
 ```
 
 下一步必须先完成：
 
 ```text
-[ ] requirement-trace findings → 0
-[ ] boundary debt → 0；删除 baseline 机制
-[ ] support/domain 与 package-local contract authority → 0
-[ ] remaining durable/provider/host/effect semantic tests → surfaces
-[ ] compile + focused tests + full gate proof
+[x] requirement-trace findings → 0
+[ ] boundary debt → 0 non-exempt debt；保留 build-verification path exemption
+[x] support/domain 与 package-local contract authority → 0 semantic consumers
+[x] remaining durable/provider/host/effect semantic tests → production surfaces
+[ ] integrated build + focused tests + full gate proof
 ```
 

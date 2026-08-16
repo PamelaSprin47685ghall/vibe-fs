@@ -7,49 +7,46 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, prefixEpochId, idValue, listItems } from '../../verification-system/tests/support/domain.mjs'
-
-const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Context/Trace/Projection.js')
+import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
 const SESSION = 'ses_provenance'
-const session = sessionId(SESSION)
 
 let seq = 0
-const next = (factValue, run) => envelope({ seq: (seq += 1), stream: stream.session(session), run, fact: factValue })
+const next = (factValue, run) => xTrace.envelope({ seq: (seq += 1), session: SESSION, run, fact: factValue })
 
 const partFact = ({ sequence, turn = 0, partIndex = 0, kind = 'text', run = `msg_p${sequence}`, provenance } = {}) =>
   next(
-    fact('XTracePartAppended', {
-      SessionId: session,
-      CursorSequence: BigInt(sequence),
-      Role: 'assistant',
-      Turn: turn,
-      PartIndex: partIndex,
-      Kind: kind,
-      ToolName: undefined,
-      TextRef: blobRef(`blob-p${sequence}`),
-      TextDigest: blobDigest(`sha-p${sequence}`),
-      Provenance: provenance ?? `g:0/turn:${turn}/part:${partIndex}`,
-      ProviderRun: providerRun(run),
+    xTrace.fact('XTracePartAppended', {
+      sessionId: SESSION,
+      sequence,
+      role: 'assistant',
+      turn,
+      partIndex,
+      kind,
+      toolName: undefined,
+      textRef: `blob-p${sequence}`,
+      textDigest: `sha-p${sequence}`,
+      provenance: provenance ?? `g:0/turn:${turn}/part:${partIndex}`,
+      providerRun: run,
     }),
     run,
   )
 
 const reanchorFact = ({ previousEpoch = 0, nextEpoch = 1, run = 'msg_compaction' } = {}) =>
   next(
-    fact('ContextReanchored', {
-      SessionId: session,
-      PreviousEpochId: prefixEpochId(previousEpoch),
-      NextEpochId: prefixEpochId(nextEpoch),
-      ObservedCompactionRun: providerRun(run),
+    xTrace.fact('ContextReanchored', {
+      sessionId: SESSION,
+      previousEpochId: previousEpoch,
+      nextEpochId: nextEpoch,
+      observedCompactionRun: run,
     }),
     run,
   )
 
 const foldOk = (envelopes) => {
-  const result = fold.apply(fold.empty, envelopes)
+  const result = xTrace.fold(envelopes)
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-  return fold.session(result.value, SESSION)
+  return xTrace.session(result.value, SESSION)
 }
 
 test('WHAT[SEMANTIC-TRACE-004] SEMANTIC_TRACE_provider_run_segments_fold_projection', () => {
@@ -59,10 +56,10 @@ test('WHAT[SEMANTIC-TRACE-004] SEMANTIC_TRACE_provider_run_segments_fold_project
     partFact({ sequence: 3, run: 'run-c', provenance: 'g:0/turn:2/part:0' }),
   ])
 
-  const parts = listItems(xTraceParts(s.XTrace))
+  const parts = xTrace.parts(s.xTrace)
   assert.deepEqual(
-    parts.map((p) => p.ProviderRun),
-    [providerRun('run-a'), providerRun('run-b'), providerRun('run-c')],
+    parts.map((p) => p.providerRun),
+    ['run-a', 'run-b', 'run-c'],
     'each part keeps the provider run that produced it — fallback/agent switches do not collapse into one model value',
   )
 })
@@ -76,14 +73,14 @@ test('WHAT[SEMANTIC-TRACE-004] SEMANTIC_TRACE_reanchor_opens_a_new_provenance_ge
     partFact({ sequence: 2, turn: 0, provenance: 'g:1/turn:0/part:0', run: 'msg_post' }),
   ])
 
-  const parts = listItems(xTraceParts(s.XTrace))
+  const parts = xTrace.parts(s.xTrace)
   assert.equal(parts.length, 2)
-  assert.equal(parts[0].Generation, 0)
-  assert.equal(parts[1].Generation, 1)
-  assert.equal(parts[0].Turn, 0)
-  assert.equal(parts[1].Turn, 0)
+  assert.equal(parts[0].generation, 0)
+  assert.equal(parts[1].generation, 1)
+  assert.equal(parts[0].turn, 0)
+  assert.equal(parts[1].turn, 0)
   // Same (generation, turn, part) would collide; the generation is what keeps
   // the post-reanchor numbering distinct from the pre-reanchor one.
-  assert.notEqual(parts[0].Provenance, parts[1].Provenance)
-  assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 1n)
+  assert.notEqual(parts[0].provenance, parts[1].provenance)
+  assert.equal(s.prefixEpoch.epochId, 1)
 })

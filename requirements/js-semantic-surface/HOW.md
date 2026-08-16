@@ -11,13 +11,13 @@
 六条宪法中可静态判定的机器面：
 
 ```text
-001: 扫描 requirements/**/tests/**/*.test.mjs 全部是 .mjs（F# 测试文件不存在）
-002: 契约面测试存在（guide-contract 机制）；FORBIDDEN pattern 扫描（.tag/.fields/.cases()
-     /fable_modules/deep dist import）在语义测试中归零
-003: 本包自身即示范：law → owner → surface 的归属文档化（PROOF 表）
-004: positive/negative canary 概念由本包 PROOF 落点 + verification-system 承接
+001: 扫描 requirements/**/tests/**/*.mjs 全部是 JS（F# 测试文件不存在）
+002: 扫描完整 semantic-test dependency zone；禁止 deep dist / Fable 形状 / mangled
+     export discovery，已存迁移债务只能由 baseline 单调减少，baseline 缺失仅在零债务时允许
+003: SURFACE_MANIFEST 机械证明 law → owner → source → Compile Include → contract test
+004: semanticImportEdges 扫描整个 corpus；有债务的 helper 不能成为新的直接测试 subject
 005/006: representation 规则由 P5 `js-contract.mjs` validator 承载（assertJsData /
-     assertOpaque），本包 tests 只做规则存在性与禁止清单 pin
+     assertOpaque）；compiler/build verification 才能拥有显式 quarantine
 ```
 
 ### 2. P2 ratchet gate（`scripts/checks/js-boundary-gate.mjs`）
@@ -31,8 +31,18 @@ Fable representation knowledge（.tag / .fields / .cases() / FSharpList / fable_
 legacy interop authority（member( / bind( / fableInstanceMethod( / prod( / toList( / caseOf( / payloadOf( / resultOf(）
 ```
 
-现存违规进 `legacy-js-boundary-debt.json` baseline；`baseline 可以删，不可以加`。
-每迁一个测试删一个 entry；P11 归零后删 baseline 与 gate 本身。
+现存违规进 `js-boundary-baseline.json`；baseline 可以删，不能新增或增大。`--generate` 先以
+当前 baseline 比较，发现新文件或计数上升即拒绝写入；只有债务已经减少时才落盘。baseline
+文件可在绝对零债务时删除，gate 会把「文件缺失但仍有债务」判红，把「文件缺失且零债务」判为
+终态。
+
+### 2a. SURFACE_MANIFEST 注册合同
+
+`scripts/lib/test-surface-scan.mjs` 中的 `SURFACE_MANIFEST` 不是字符串免检名单。每项同时
+声明 `module`、`owner`、`laws`、`source`、`representation`、`kind`；
+`scripts/checks/js-surface-manifest.mjs` 逐项证明：owner 的 WHAT heading 当前存在、每条 law
+有 owner PROOF 表行、source 文件存在且被 `Wanxiangshu.fsproj` 精确 Compile、至少一个
+`.test.mjs` 真实 import 该 emitted surface。缺一项即无权绕过 deep-import 规则。
 
 ### 3. P5 representation validator（`tests/support/js-contract.mjs`）
 
@@ -72,20 +82,14 @@ anti-corruption boundary，Fable mechanics 在 `domain/interop.mjs`。退场分�
 以下模式进入 migration debt，现存只能减少，**禁止新增**：
 
 ```text
-requirements/<package>/tests/support/*-contract.mjs
-requirements/<package>/tests/support.mjs
+requirements/<package>/tests/**/*-contract.mjs
 （deep-import dist / 使用 interop helpers / re-export Fable 形状）
 ```
 
-现存清单（baseline 内合法，必须单调减少）：
-
-```text
-finality/tests/support/finality-contract.mjs
-knowledge-reuse/tests/support/casebook-contract.mjs
-intra-participant-parallelism/tests/support/fission-contract.mjs
-epistemic-reasoning/tests/support.mjs
-（PR 6/7/8 各 vertical slice 逐一消除）
-```
+`js-boundary-frozen-contracts.json` 是显式 creditor 清单；当前清单为空，因仓库没有仍受支持
+的 package-local contract adapter。将来若真实迁移 creditor 必须命名并冻结路径；没有清单项的
+新 `*-contract.mjs` 直接 RED。所有其它 support/fixture 文件仍由 whole-zone scanner 扫描，
+不是 quarantine。
 
 support 可以是纯 fixture（`userMessage`、`fakeClock` 之类），禁止的是「support 必须调用
 production 时越过 registered surface 直连 internal dist」。

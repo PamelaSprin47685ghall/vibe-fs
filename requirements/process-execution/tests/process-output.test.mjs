@@ -1,158 +1,131 @@
-// Split from tests/unit/process/process-output.test.mjs (cutover Wave 2a); owner: process-execution
-//
-// EXEC-011 OutputCollector (stdout/stderr aggregation, byte counting,
-// spool-threshold handoff) and the Spool chunking primitives. Pure byte math;
-// the only side effect is a temp spool file, deleted per test.
-// (effectiveDeadline / DefaultHardLimit 纯代数断言 → time-capability。)
+// Process owner output surface: bounded collection and streaming spool.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf } from '../../verification-system/tests/support/domain.mjs'
-
 const {
-  EstimatedRuntime,
-  EstimatedOutput,
-  EstimatedMemory,
-} = await import('../../../dist/Process/ProcessRequest.js')
-
-const { OutputCollector, create, addStdout, addStderr, buildResult } = await import(
-  '../../../dist/Process/ProcessOutput.js'
-)
-
-const {
-  chunkBytes,
-  chunkCount,
-  appendStreamingSpool,
-  delete$: spoolDelete,
-  readChunksSync,
-  spoolBytesToTempFile,
-  startStreamingSpool,
-} = await import('../../../dist/Process/Spool.js')
-
-// Spool.ChunkSizeBytes is a [<Literal>] — Fable inlines it and exports nothing.
-const CHUNK_SIZE_BYTES = 204800
-
-const runtime = (seconds) => new EstimatedRuntime(seconds)
-const output = (bytes) => new EstimatedOutput(bytes)
-const estimate = (seconds, bytes, memory = EstimatedMemory.Medium) => ({
-  EstimatedRuntime: runtime(seconds),
-  EstimatedOutput: output(bytes),
-  EstimatedMemory: memory,
-})
+  estimate,
+  outputCreate,
+  outputAddStdout,
+  outputAddStderr,
+  outputBuildResult,
+  outputView,
+  spoolChunkCount,
+  spoolChunkBytes,
+  spoolStart,
+  spoolAppend,
+  spoolPath,
+  spoolBytesWritten,
+  spoolRead,
+  spoolReadPath,
+  spoolDelete,
+} = await import('../../../dist/Process/Surface.js')
 
 const text = (value) => new TextEncoder().encode(value)
+const decode = (bytes) => new TextDecoder().decode(Uint8Array.from(bytes))
+const create = (seconds, bytes) => outputCreate(estimate(seconds, bytes, 'medium'))
+
+const tempSpool = (value) => {
+  const spool = spoolStart()
+  spoolAppend(spool, text(value))
+  return spool
+}
+
+const readSpool = async (spool) => {
+  const chunks = spool.path ? await spoolReadPath(spool.path) : await spoolRead(spool)
+  return chunks.map(decode).join('')
+}
 
 // ── OutputCollector ──────────────────────────────────────────────────────────
 
 test('WHAT[PROC-009] EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
-  const collector = create(estimate(10, 1000n))
-  addStdout(collector, text('hello '))
-  addStderr(collector, text('warn\n'))
-  addStdout(collector, text('世界'))
-  const outcome = buildResult(collector, 7)
-  assert.equal(caseOf(outcome), 'Completed')
-  const [exitCode, stdout, stderr, spooled] = outcome.fields
-  assert.equal(exitCode, 7)
-  assert.equal(stdout, 'hello 世界')
-  assert.equal(stderr, 'warn\n')
-  assert.equal(spooled, false)
+  const collector = create(10, 1000)
+  outputAddStdout(collector, text('hello '))
+  outputAddStderr(collector, text('warn\n'))
+  outputAddStdout(collector, text('世界'))
+  assert.deepEqual(outputBuildResult(collector, 7), {
+    kind: 'Completed',
+    exitCode: 7,
+    stdout: 'hello 世界',
+    stderr: 'warn\n',
+    spooled: false,
+  })
 })
 
 test('WHAT[PROC-009] EXEC_011_collector_ignores_empty_chunks', () => {
-  const collector = create(estimate(10, 1000n))
-  addStdout(collector, new Uint8Array(0))
-  addStdout(collector, undefined)
-  assert.equal(collector.BytesObserved, 0n)
-  const outcome = buildResult(collector, 0)
-  assert.equal(caseOf(outcome), 'Completed')
-  assert.equal(outcome.fields[1], '')
+  const collector = create(10, 1000)
+  outputAddStdout(collector, new Uint8Array(0))
+  outputAddStdout(collector, undefined)
+  assert.equal(outputView(collector).bytesObserved, 0)
+  assert.equal(outputBuildResult(collector, 0).stdout, '')
 })
 
-test('WHAT[PROC-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold', () => {
-  // Threshold = 2 × 3 = 6 bytes. Seven bytes cross it.
-  const collector = create(estimate(10, 2n))
-  addStdout(collector, text('abcdefg'))
-  assert.notEqual(collector.Spool, undefined, 'crossing the threshold must start a spool')
+test('WHAT[PROC-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold', async () => {
+  const collector = create(10, 2)
+  outputAddStdout(collector, text('abcdefg'))
+  assert.equal(outputView(collector).spooled, true, 'crossing the threshold must start a spool')
 
-  const outcome = buildResult(collector, 3)
-  assert.equal(caseOf(outcome), 'Spooled')
-  const [exitCode, spoolPath, totalBytes, chunks] = outcome.fields
-  assert.equal(exitCode, 3)
-  assert.equal(totalBytes, 7n)
-  assert.equal(chunks, 1)
-
-  const seen = []
-  readChunksSync(spoolPath, (bytes) => seen.push(new TextDecoder().decode(bytes)))
-  assert.equal(seen.join(''), 'abcdefg')
-
-  spoolDelete(spoolPath)
+  const outcome = outputBuildResult(collector, 3)
+  assert.equal(outcome.kind, 'Spooled')
+  assert.equal(outcome.exitCode, 3)
+  assert.equal(outcome.totalBytes, 7)
+  assert.equal(outcome.chunkCount, 1)
+  assert.equal(await readSpool({ path: outcome.spoolPath }), 'abcdefg')
+  spoolDelete(outcome.spoolPath)
 })
 
-test('WHAT[PROC-009] EXEC_011_collector_spool_accumulates_later_chunks', () => {
-  const collector = create(estimate(10, 2n))
-  addStdout(collector, text('abcdefg')) // 7 bytes → spool started
-  addStderr(collector, text('x')) // appended to the same spool file
+test('WHAT[PROC-009] EXEC_011_collector_spool_accumulates_later_chunks', async () => {
+  const collector = create(10, 2)
+  outputAddStdout(collector, text('abcdefg'))
+  outputAddStderr(collector, text('x'))
 
-  const outcome = buildResult(collector, 4)
-  assert.equal(caseOf(outcome), 'Spooled')
-  const [, spoolPath, totalBytes, chunks] = outcome.fields
-  assert.equal(totalBytes, 8n)
-  assert.equal(chunks, 1)
-
-  const seen = []
-  readChunksSync(spoolPath, (bytes) => seen.push(new TextDecoder().decode(bytes)))
-  assert.equal(seen.join(''), 'abcdefgx')
-
-  spoolDelete(spoolPath)
+  const outcome = outputBuildResult(collector, 4)
+  assert.equal(outcome.kind, 'Spooled')
+  assert.equal(outcome.totalBytes, 8)
+  assert.equal(outcome.chunkCount, 1)
+  assert.equal(await readSpool({ path: outcome.spoolPath }), 'abcdefgx')
+  spoolDelete(outcome.spoolPath)
 })
 
 test('WHAT[PROC-009] EXEC_011_collector_spooled_buffers_are_cleared', () => {
-  const collector = create(estimate(10, 2n))
-  addStdout(collector, text('abcdefg'))
-  assert.equal(collector.Stdout.length, 0)
-  assert.equal(collector.Combined.length, 0)
+  const collector = create(10, 2)
+  outputAddStdout(collector, text('abcdefg'))
+  const view = outputView(collector)
+  assert.equal(view.stdoutChunks, 0)
+  assert.equal(view.stderrChunks, 0)
 })
 
 // ── Spool primitives ─────────────────────────────────────────────────────────
 
 test('WHAT[PROC-009] EXEC_011_spool_chunk_count_rounds_up', () => {
-  assert.equal(chunkCount(0n), 0)
-  assert.equal(chunkCount(1n), 1)
-  assert.equal(chunkCount(BigInt(CHUNK_SIZE_BYTES)), 1)
-  assert.equal(chunkCount(BigInt(CHUNK_SIZE_BYTES) + 1n), 2)
+  assert.equal(spoolChunkCount(0), 0)
+  assert.equal(spoolChunkCount(1), 1)
+  assert.equal(spoolChunkCount(204800), 1)
+  assert.equal(spoolChunkCount(204801), 2)
 })
 
 test('WHAT[PROC-009] EXEC_011_spool_chunk_bytes_splits_at_chunk_size', () => {
-  assert.deepEqual(chunkBytes(3, new Uint8Array(0)), [])
-  assert.deepEqual(chunkBytes(3, undefined), [])
-  const parts = chunkBytes(3, new Uint8Array([1, 2, 3, 4, 5]))
-  assert.equal(parts.length, 2)
-  assert.deepEqual(parts[0], new Uint8Array([1, 2, 3]))
-  assert.deepEqual(parts[1], new Uint8Array([4, 5]))
+  assert.deepEqual(spoolChunkBytes(3, new Uint8Array(0)), [])
+  assert.deepEqual(spoolChunkBytes(3, undefined), [])
+  assert.deepEqual(spoolChunkBytes(3, new Uint8Array([1, 2, 3, 4, 5])), [
+    [1, 2, 3],
+    [4, 5],
+  ])
 })
 
-test('WHAT[PROC-009] EXEC_011_spool_round_trips_bytes_through_temp_file', () => {
-  const [path, totalBytes, chunks] = spoolBytesToTempFile(text('0123456789'))
-  assert.equal(totalBytes, 10n)
-  assert.equal(chunks, 1)
-
-  const seen = []
-  readChunksSync(path, (bytes) => seen.push(new TextDecoder().decode(bytes)))
-  assert.equal(seen.join(''), '0123456789')
-
-  spoolDelete(path)
+test('WHAT[PROC-009] EXEC_011_spool_round_trips_bytes_through_temp_file', async () => {
+  const spool = tempSpool('0123456789')
+  assert.equal(spoolBytesWritten(spool), 10)
+  assert.equal(spoolChunkCount(spoolBytesWritten(spool)), 1)
+  assert.equal(await readSpool(spool), '0123456789')
+  spoolDelete(spoolPath(spool))
 })
 
-test('WHAT[PROC-009] EXEC_011_spool_append_tracks_bytes_written', () => {
-  const spool = startStreamingSpool()
-  appendStreamingSpool(spool, text('ab'))
-  appendStreamingSpool(spool, new Uint8Array(0)) // empty → no-op
-  assert.equal(spool.BytesWritten, 2n)
-
-  const seen = []
-  readChunksSync(spool.Path, (bytes) => seen.push(new TextDecoder().decode(bytes)))
-  assert.equal(seen.join(''), 'ab')
-
-  spoolDelete(spool.Path)
+test('WHAT[PROC-009] EXEC_011_spool_append_tracks_bytes_written', async () => {
+  const spool = spoolStart()
+  spoolAppend(spool, text('ab'))
+  spoolAppend(spool, new Uint8Array(0))
+  assert.equal(spoolBytesWritten(spool), 2)
+  assert.equal(await readSpool(spool), 'ab')
+  spoolDelete(spoolPath(spool))
 })

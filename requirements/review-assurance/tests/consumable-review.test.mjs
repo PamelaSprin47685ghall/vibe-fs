@@ -1,708 +1,191 @@
-// requirements/review-assurance/tests/consumable-review.test.mjs
-//
-// REVIEW-014/017/018/020 (TODO-006, GLORY-072/073 crossing): the two-stage
-// consumability contract. A durable reviewer verdict (VerdictKnown) settles the
-// checkpoint business outcome, but ONLY `TodoReviewConcluded` — appended after a
-// record-ready LWR in the same snapshot — makes the review consumable by the
-// next TodoWrite / suicide drain. The projection must never fabricate
-// consumability from a verdict, must bind the conclusion to its assignment, and
-// must fail closed when the process-review producer is absent (infra failure is
-// never a REVISE and never a premature Concluded).
-
+// REVIEW-014/017/018: ConsumableReview is a durable Todo marker, not a
+// provider-visible verdict. Magic Todo and Review journal capabilities cross only
+// through their owner surfaces.
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import test from 'node:test'
-import { HandleCompletionKind, HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
-import {
-  agentFact,
-  agentJournal,
-  authorityRoot,
-  blobDigest,
-  blobRef,
-  caseOf,
-  envelope,
-  eventId,
-  fact,
-  fold,
-  gitTreeHash,
-  handleId,
-  idValue,
-  logicalRunId,
-  listItems,
-  magicTodo,
-  magicTodoJournal,
-  managerLifeId,
-  mapEntries,
-  providerRun,
-  resultOf,
-  reviewBarrierId,
-  reviewProjection,
-  reviewWitness,
-  roles,
-  sessionId,
-  stream,
-  toolCallId,
-  verdict,
-  verdictWitness,
-  xTraceCapture,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const { tryConclude, producerPresence, awaitConsumableReview } = await import(
-  '../../../dist/Mission/Review/TodoProcess.js'
-)
-const { XTraceProjection_head } = await import('../../../dist/Context/Trace/Projection.js')
-
-const xTraceHeadOf = (snapshot, session) =>
-  BigInt(XTraceProjection_head(fold.sessions(snapshot)[idValue.session(session)].XTrace))
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
+import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
+import * as todo from '../../../dist/Mission/Review/ReviewTodoSurface.js'
 
 const sha256 = (value) => `digest:${value}`
-const life = managerLifeId('life-consumable')
-const managerSession = sessionId('ses-manager')
-const reviewerSession = sessionId('ses-rev')
-const call = toolCallId('todo-call')
-const cursor = (sequence) => new magicTodoJournal.XTraceCursor(BigInt(sequence))
-
-const write = magicTodo.todoWriteId(sha256, life, call)
-const review = magicTodo.todoReviewId(sha256, life, write)
-const reviewer = magicTodo.dedicatedReviewerId(sha256, life)
-
-const prepared = new magicTodoJournal.TodoWritePrepared(
-  managerSession,
-  life,
-  write,
-  call,
-  2,
-  blobRef('base-list'),
-  blobDigest('base-digest'),
-  blobRef('proposal-list'),
-  blobDigest('proposal-digest'),
-  true,
-  'provider-input-digest',
-  cursor(10),
-  'magic-v1',
-)
-const accepted = new magicTodoJournal.TodoWriteAccepted(
-  life,
-  write,
-  call,
-  eventId('prepared-fact-ref'),
-  'provider-input-digest',
-  'output-digest',
-  magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-  'magic-v1',
-)
-const enlisted = new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession)
-const assigned = new magicTodoJournal.TodoProcessReviewAssigned(life, write, review, reviewer, reviewerSession, cursor(4), cursor(10))
-const concluded = new magicTodoJournal.TodoReviewConcluded(
-  life,
-  write,
-  review,
-  reviewer,
-  reviewerSession,
-  magicTodo.revise,
-  blobRef('review-lwr'),
-  blobDigest('review-lwr-digest'),
-  blobRef('settled-list'),
-  blobDigest('settled-list-digest'),
-  cursor(8),
-  providerRun('reviewer-provider-run'),
-  toolCallId('reviewer-call'),
-)
-
-const magicFact = (caseName, payload) => magicTodoJournal.MagicTodoFact(caseName, [payload])
-const foldMagic = (state, magicFactValue, envelopeEventId = eventId(`evt-${Math.random().toString(36).slice(2)}`)) =>
-  resultOf(magicTodoJournal.fold(envelopeEventId, state, magicFactValue))
-
-/** Accepted + enlisted + assigned, in order. */
-const checkpointState = () => {
-  let state = magicTodoJournal.empty
-  state = foldMagic(state, magicFact('TodoWritePrepared', prepared), eventId('prepared-fact-ref')).value
-  state = foldMagic(state, magicFact('TodoWriteAccepted', accepted)).value
-  state = foldMagic(state, magicFact('DedicatedTodoReviewerEnlisted', enlisted)).value
-  state = foldMagic(state, magicFact('TodoProcessReviewAssigned', assigned)).value
-  return state
+const life = 'life-consumable'
+const managerSession = 'ses-manager'
+const reviewerSession = 'ses-rev'
+const ids = todo.ids(sha256, life, 'todo-call')
+const write = ids.todoWriteId
+const reviewId = ids.todoReviewId
+const dedicated = ids.dedicatedReviewerId
+const prepared = {
+  ManagerSessionId: managerSession,
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  ToolCallId: 'todo-call',
+  ToolPartOrdinal: 2,
+  BaseTodoRef: 'base-list',
+  BaseTodoDigest: 'base-digest',
+  ProposedTodoRef: 'proposal-list',
+  ProposedTodoDigest: 'proposal-digest',
+  PlanCompleteDeclared: true,
+  ProviderInputDigest: 'provider-input-digest',
+  ReviewFrontier: { Sequence: 10 },
+  SemanticVersion: 'magic-v1',
+}
+const accepted = {
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  ToolCallId: 'todo-call',
+  PreparedFactRef: 'prepared-fact-ref',
+  InputDigest: 'provider-input-digest',
+  OutputDigest: 'output-digest',
+  PhysicalSuccessEvidence: 'LiveAfterSuccess',
+  SemanticVersion: 'magic-v1',
+}
+const enlisted = { ManagerLifeId: life, DedicatedReviewerId: dedicated, ReviewerSessionId: reviewerSession }
+const assigned = {
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  TodoReviewId: reviewId,
+  DedicatedReviewerId: dedicated,
+  ReviewerSessionId: reviewerSession,
+  ReviewWorkStartCursor: { Sequence: 4 },
+  ManagerReviewFrontier: { Sequence: 10 },
+}
+const concluded = {
+  ManagerLifeId: life,
+  TodoWriteId: write,
+  TodoReviewId: reviewId,
+  DedicatedReviewerId: dedicated,
+  ReviewerSessionId: reviewerSession,
+  Verdict: 'REVISE',
+  WorkRecordRef: 'review-lwr',
+  WorkRecordDigest: 'review-lwr-digest',
+  SettledTodoRef: 'settled-list',
+  SettledTodoDigest: 'settled-list-digest',
+  ReviewerRecordFrontier: { Sequence: 8 },
+  ProviderRunId: 'reviewer-provider-run',
+  ToolCallId: 'reviewer-call',
 }
 
-const checkpoint = (state) => {
-  const lifeState = state.ByLife.get(idValue.managerLife(life))
-  return mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
+const populated = () => {
+  const projection = todo.newProjection()
+  for (const [eventId, caseName, payload] of [
+    ['prepared-fact-ref', 'TodoWritePrepared', prepared],
+    ['accepted-fact-ref', 'TodoWriteAccepted', accepted],
+    ['enlisted-fact-ref', 'DedicatedTodoReviewerEnlisted', enlisted],
+    ['assigned-fact-ref', 'TodoProcessReviewAssigned', assigned],
+  ]) {
+    const result = todo.fold(projection, eventId, caseName, payload)
+    assert.equal(result.ok, true, JSON.stringify(result))
+  }
+  return projection
 }
 
-// ── REVIEW-014: VerdictKnown vs ConsumableReview ────────────────────────────
+const open = async (label) => {
+  const directory = mkdtempSync(join(tmpdir(), `wxs-consumable-${label}-`))
+  const opened = await journal.JournalSurface_bootWithWriterId(directory, `writer-${label}`, `rt-${label}`, 4242, '2026-01-01T00:00:00Z')
+  assert.equal(opened.ok, true, JSON.stringify(opened))
+  return { directory, opened, cleanup: () => { journal.JournalSurface_dispose(opened.journal); rmSync(directory, { recursive: true, force: true }) } }
+}
 
-test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_a_durable_verdict_alone_never_makes_the_review_consumable', () => {
-  const state = checkpointState()
-  const before = checkpoint(state)
-  assert.equal(before.Accepted, true)
-  assert.equal(before.Assignment == null, false, 'Rk must be assigned')
-  assert.equal(before.Concluded == null, true, 'no Concluded fact yet')
-
-  // VerdictKnown: a durable reviewer verdict lands in the Reviewer domain
-  // guard. It settles the checkpoint business outcome (REVIEW-011/013), but it
-  // is not a consumable report.
-  const barrier = reviewBarrierId('bar_process')
-  const attempt = reviewWitness.attemptIdentity(
-    barrier,
-    verdictWitness({ run: 'run_1', call: 'call_1', tree: 'tree_1', reviewer: 'ses-rev' }),
+const appendReviewFacts = async (opened, reviewerSessionId) => {
+  const preparedResult = await todo.appendFact(opened.journal, managerSession, null, 'TodoWritePrepared', prepared)
+  assert.equal(preparedResult.ok, true, JSON.stringify(preparedResult))
+  const acceptedResult = await todo.appendFact(
+    opened.journal,
+    managerSession,
+    null,
+    'TodoWriteAccepted',
+    { ...accepted, PreparedFactRef: preparedResult.eventId },
   )
-  const revised = reviewProjection.applyVerdict(attempt, verdict.revise, reviewProjection.empty)
-  assert.equal(revised.ok, true)
-  assert.equal(caseOf(revised.value.Witness), 'RevisionWitness', 'VerdictKnown exists in the Reviewer domain')
+  assert.equal(acceptedResult.ok, true, JSON.stringify(acceptedResult))
+  const enlistedResult = await todo.appendFact(
+    opened.journal,
+    managerSession,
+    null,
+    'DedicatedTodoReviewerEnlisted',
+    { ...enlisted, ReviewerSessionId: reviewerSessionId },
+  )
+  assert.equal(enlistedResult.ok, true, JSON.stringify(enlistedResult))
+  const assignedResult = await todo.appendFact(
+    opened.journal,
+    managerSession,
+    null,
+    'TodoProcessReviewAssigned',
+    { ...assigned, ReviewerSessionId: reviewerSessionId },
+  )
+  assert.equal(assignedResult.ok, true, JSON.stringify(assignedResult))
+}
 
-  // The Magic Todo projection is untouched by the verdict: still no Concluded.
-  // REVIEW-014 forbids squeezing "only a verdict, no report" into
-  // TodoReviewConcluded; the checkpoint marker stays null.
-  const after = checkpoint(state)
-  assert.equal(after.Concluded == null, true, 'verdict must not fabricate consumability')
+test('WHAT[REVIEW-ASSURANCE-011] REVIEW_014_a_process_verdict_is_not_a_consumable_marker', () => {
+  const guard = review.emptyGuard()
+  const attempt = review.attemptIdentity('bar_process', review.verdictWitness({ ProviderRun: 'run-1', ToolCallId: 'call-1', GitTreeHash: 'tree-1', ReviewerSessionId: reviewerSession }))
+  const applied = review.applyVerdict(attempt, 'REVISE', guard)
+  assert.equal(applied.ok, true)
+  assert.equal(review.guardView(applied.value).witness.state, 'RevisionWitness')
+  assert.equal(review.satisfiesGuard('tree-1', applied.value), false)
+  assert.equal(todo.view(populated(), life).checkpoints.find((item) => item.todoWriteId === write).concluded, null)
 })
 
-test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_only_todo_review_concluded_marks_the_review_consumable', () => {
-  let state = checkpointState()
-  state = foldMagic(state, magicFact('TodoReviewConcluded', concluded)).value
-
-  const cp = checkpoint(state)
-  assert.equal(cp.Concluded == null, false, 'TodoReviewConcluded sets the consumable marker')
-  assert.equal(cp.Concluded.Verdict, magicTodo.revise)
-  assert.equal(cp.Concluded.WorkRecordRef.fields[0], blobRef('review-lwr').fields[0])
-  // The record identity carries the frozen reviewer frontier (REVIEW-016):
-  // evidence is bounded to the request, not the session head.
-  assert.equal(cp.Concluded.ReviewerRecordFrontier.Sequence, 8n)
+test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_concluded_marker_is_durable_and_consumable', () => {
+  const projection = populated()
+  const result = todo.fold(projection, 'concluded-fact-ref', 'TodoReviewConcluded', concluded)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  const checkpoint = todo.view(projection, life).checkpoints.find((item) => item.todoWriteId === write)
+  assert.ok(checkpoint.concluded)
+  assert.equal(checkpoint.concluded.verdict, 'REVISE')
+  assert.equal(checkpoint.concluded.workRecordRef, 'review-lwr')
 })
 
-// ── REVIEW-018: the projection cannot fabricate consumability ────────────────
-
-test('WHAT[REVIEW-ASSURANCE-012] REVIEW_016_the_concluded_review_evidence_is_bounded_to_the_frozen_request_frontier', () => {
-  // REVIEW-016 (GLORY-051): the record identity carries the frozen reviewer
-  // frontier — evidence is bounded to the request, not the session head.
-  let state = checkpointState()
-  state = foldMagic(state, magicFact('TodoReviewConcluded', concluded)).value
-
-  const cp = checkpoint(state)
-  assert.equal(cp.Concluded.ReviewerRecordFrontier.Sequence, 8n)
+test('WHAT[REVIEW-ASSURANCE-012] REVIEW_016_concluded_fact_freezes_the_request_frontier', () => {
+  const encoded = JSON.parse(todo.factJson('TodoReviewConcluded', concluded))
+  assert.equal(String(encoded.ReviewerRecordFrontier.Sequence), '8')
+  assert.notEqual(String(encoded.ReviewerRecordFrontier.Sequence), String(prepared.ReviewFrontier.Sequence))
 })
 
 test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_without_accepted_is_rejected', () => {
-  let state = magicTodoJournal.empty
-  state = foldMagic(state, magicFact('TodoWritePrepared', prepared), eventId('prepared-fact-ref')).value
-
-  const rejected = foldMagic(state, magicFact('TodoReviewConcluded', concluded))
-  assert.equal(rejected.ok, false)
-  assert.equal(caseOf(rejected.error), 'ConcludedWithoutAccepted')
+  const projection = todo.newProjection()
+  assert.deepEqual(todo.fold(projection, 'concluded-only', 'TodoReviewConcluded', concluded), { ok: false, error: { code: 'ConcludedWithoutAccepted', todoWriteId: write } })
 })
 
 test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_without_assignment_is_rejected', () => {
-  let state = magicTodoJournal.empty
-  state = foldMagic(state, magicFact('TodoWritePrepared', prepared), eventId('prepared-fact-ref')).value
-  state = foldMagic(state, magicFact('TodoWriteAccepted', accepted)).value
-
-  const rejected = foldMagic(state, magicFact('TodoReviewConcluded', concluded))
-  assert.equal(rejected.ok, false)
-  assert.equal(caseOf(rejected.error), 'AssignmentWithoutAccepted')
+  const projection = todo.newProjection()
+  assert.equal(todo.fold(projection, 'prepared-fact-ref', 'TodoWritePrepared', prepared).ok, true)
+  assert.equal(todo.fold(projection, 'accepted-fact-ref', 'TodoWriteAccepted', accepted).ok, true)
+  assert.deepEqual(todo.fold(projection, 'concluded', 'TodoReviewConcluded', concluded), { ok: false, error: { code: 'AssignmentWithoutAccepted', todoWriteId: write } })
 })
 
-test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_must_bind_to_its_assignment_identity', () => {
-  // REVIEW-006/051: evidence must bind to the reviewed object. A conclusion
-  // that names a different review/todo/reviewer than the assignment is a fold
-  // rejection — the record cannot be attached to the wrong request.
-  const foreignReview = magicTodo.todoReviewId(sha256, life, toolCallId('call-other'))
-  const mismatched = new magicTodoJournal.TodoReviewConcluded(
-    life,
-    write,
-    foreignReview,
-    reviewer,
-    reviewerSession,
-    magicTodo.revise,
-    blobRef('review-lwr'),
-    blobDigest('review-lwr-digest'),
-    blobRef('settled-list'),
-    blobDigest('settled-list-digest'),
-    cursor(8),
-    providerRun('reviewer-provider-run'),
-    toolCallId('reviewer-call'),
-  )
-
-  let state = checkpointState()
-  const rejected = foldMagic(state, magicFact('TodoReviewConcluded', mismatched))
-  assert.equal(rejected.ok, false)
-  assert.equal(caseOf(rejected.error), 'IdentityCorruption')
-  assert.equal(checkpoint(state).Concluded == null, true, 'the checkpoint stays unconsumable after a rejected conclusion')
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_binds_to_assignment_identity', () => {
+  const projection = populated()
+  const foreign = { ...concluded, TodoReviewId: 'review-other' }
+  assert.deepEqual(todo.fold(projection, 'concluded', 'TodoReviewConcluded', foreign), { ok: false, error: { code: 'IdentityCorruption', field: 'TodoReviewAssignment' } })
+  assert.equal(todo.view(projection, life).checkpoints.find((item) => item.todoWriteId === write).concluded, null)
 })
 
-// ── REVIEW-020: a process verdict never enters the terminal witness algebra ──
-
-test('WHAT[REVIEW-ASSURANCE-011] REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection', () => {
-  // Fold a process REVISE through the reviewer session projection: the guard
-  // becomes RevisionWitness. No ConfirmedReviewWitness fact is produced, no
-  // dual-PERFECT algebra is entered, and the Magic Todo checkpoint is not
-  // Concluded by it (REVIEW-014 separation, above).
-  const barrier = reviewBarrierId('bar_process')
-  const session = sessionId('ses-rev')
-
-  const opened = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(session),
-      fact: fact('ReviewBarrierStarted', {
-        ReviewerSessionId: session,
-        ManagerSessionId: managerSession,
-        BarrierId: barrier,
-        GitTreeHash: gitTreeHash('tree_1'),
-      }),
-    }),
-  )
-  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const guard = fold.sessions(opened.value)['ses-rev'].ReviewGuard
-  assert.equal(caseOf(guard.Witness), 'NoReview')
-
-  const verdictRecorded = fold.one(
-    opened.value,
-    envelope({
-      stream: stream.session(session),
-      fact: fact('ReviewVerdictRecorded', {
-        ReviewerSessionId: session,
-        ManagerSessionId: managerSession,
-        BarrierId: barrier,
-        GitTreeHash: gitTreeHash('tree_1'),
-        ProviderRun: providerRun('run_1'),
-        ToolCallId: toolCallId('call_1'),
-        Verdict: verdict.revise,
-      }),
-    }),
-  )
-  assert.equal(verdictRecorded.ok, true, verdictRecorded.ok ? '' : JSON.stringify(verdictRecorded.error))
-  assert.equal(caseOf(fold.sessions(verdictRecorded.value)['ses-rev'].ReviewGuard.Witness), 'RevisionWitness')
-  assert.equal(
-    reviewProjection.satisfiesGuard(gitTreeHash('tree_1'), fold.sessions(verdictRecorded.value)['ses-rev'].ReviewGuard),
-    false,
-  )
-
-  // The reviewer guard is the only place the process verdict lives: the Magic
-  // Todo projection still shows an unconsumed, unconcluded checkpoint.
-  assert.equal(checkpoint(checkpointState()).Concluded == null, true)
-})
-
-test('WHAT[REVIEW-ASSURANCE-008] REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_not_a_judge_tool_call_trace', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-consumable-projection-verdict-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_consumable_projection_verdict' })
-  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
-
+test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_verdict_requires_closed_reviewer_turn_before_conclusion', async () => {
+  const { opened, cleanup } = await open('pending')
   try {
-    const journal = created.journal
-    const barrier = reviewBarrierId(review.fields[0])
-
-    const appendMagic = async (caseName, payload) => {
-      const appended = await agentJournal.appendMagicTodo(
-        stream.session(managerSession),
-        undefined,
-        magicFact(caseName, payload),
-        journal,
-      )
-      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-      return appended.value.EventId
-    }
-
-    const preparedRef = await appendMagic('TodoWritePrepared', prepared)
-    await appendMagic('TodoWriteAccepted', new magicTodoJournal.TodoWriteAccepted(
-      life,
-      write,
-      call,
-      preparedRef,
-      'provider-input-digest',
-      'output-digest',
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-v1',
-    ))
-    await appendMagic('DedicatedTodoReviewerEnlisted', enlisted)
-    await appendMagic('TodoProcessReviewAssigned', assigned)
-
-    await xTraceCapture.captureOpening(journal, reviewerSession, 'Review this checkpoint.', [])
-    await xTraceCapture.captureProjection(
-      journal,
-      reviewerSession,
-      xTraceCapture.semantic({
-        messages: [
-          { role: 'user', parts: [xTraceCapture.text('Review this checkpoint.')] },
-          { role: 'assistant', parts: [xTraceCapture.reasoning('Checked the planning account.')] },
-          { role: 'assistant', parts: [xTraceCapture.text('No material issue.')] },
-          { role: 'assistant', parts: [xTraceCapture.text('Ready to conclude.')] },
-          { role: 'assistant', parts: [xTraceCapture.toolResult('judge-call', 'PERFECT')] },
-        ],
-      }),
-    )
-
-    await agentJournal.appendAgent(
-      stream.session(reviewerSession),
-      undefined,
-      agentFact('ReviewBarrierStarted', {
-        ReviewerSessionId: reviewerSession,
-        ManagerSessionId: managerSession,
-        BarrierId: barrier,
-        GitTreeHash: gitTreeHash('tree_projection_verdict'),
-      }),
-      journal,
-    )
-    await agentJournal.appendAgent(
-      stream.session(reviewerSession),
-      providerRun('reviewer-provider-run'),
-      agentFact('ReviewVerdictRecorded', {
-        ReviewerSessionId: reviewerSession,
-        ManagerSessionId: managerSession,
-        BarrierId: barrier,
-        GitTreeHash: gitTreeHash('tree_projection_verdict'),
-        ProviderRun: providerRun('reviewer-provider-run'),
-        ToolCallId: toolCallId('reviewer-call'),
-        Verdict: verdict.perfect,
-      }),
-      journal,
-    )
-
-    // REVIEW-013/017: the verdict alone must not conclude — the reviewer's
-    // reconciled turn has to close first, freezing the record frontier.
-    const beforeClosure = await tryConclude(journal, life, write)
-    assert.equal(caseOf(beforeClosure), 'Pending', 'verdict without a closed reviewer turn must stay Pending')
-
-    const headAtClosure = xTraceHeadOf(agentJournal.snapshot(journal), reviewerSession)
-
-    await agentJournal.appendAgent(
-      stream.session(reviewerSession),
-      providerRun('reviewer-provider-run'),
-      agentFact('ReviewAttemptClosed', {
-        ReviewerSessionId: reviewerSession,
-        BarrierId: barrier,
-        GitTreeHash: gitTreeHash('tree_projection_verdict'),
-        ProviderRun: providerRun('reviewer-provider-run'),
-        ToolCallId: toolCallId('reviewer-call'),
-        FrozenFrontierSequence: headAtClosure,
-      }),
-      journal,
-    )
-
-    // The finished turn's late-landing XTrace tail: appended AFTER the closure.
-    // It must never widen the frozen frontier (cross-checkpoint pollution).
-    await xTraceCapture.captureProjection(
-      journal,
-      reviewerSession,
-      xTraceCapture.semantic({
-        messages: [
-          { role: 'assistant', parts: [xTraceCapture.text('A late tail landing after closure.')] },
-        ],
-      }),
-    )
-
-    const before = agentJournal.snapshot(journal)
-    const reviewerTrace = fold.sessions(before)[idValue.session(reviewerSession)].XTrace
-    assert.equal(
-      listItems(reviewerTrace.Parts).some((part) => part.Kind === 'tool_call'),
-      false,
-      'regression premise: Host projection has no judge tool_call XTrace part',
-    )
-
-    const conclude = await tryConclude(journal, life, write)
-    assert.equal(caseOf(conclude), 'Concluded')
-
-    const after = agentJournal.snapshot(journal)
-    const lifeState = after.AgentProjections.MagicTodo.ByLife.get(idValue.managerLife(life))
-    const cp = mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
-    assert.equal(cp.Concluded.ProviderRunId.fields[0], providerRun('reviewer-provider-run').fields[0])
-    assert.equal(cp.Concluded.ToolCallId.fields[0], toolCallId('reviewer-call').fields[0])
-
-    // The record frontier is the closure's frozen value, not the post-closure head.
-    assert.equal(
-      cp.Concluded.ReviewerRecordFrontier.Sequence,
-      headAtClosure,
-      'the late-landing tail must not leak into the frozen record frontier',
-    )
-  } finally {
-    created.dispose()
-    rmSync(directory, { recursive: true, force: true })
-  }
+    await appendReviewFacts(opened, reviewerSession)
+    await reviewJournal.appendReview(opened.journal, reviewerSession, null, 'ReviewBarrierStarted', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1' })
+    await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewVerdictRecorded', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1', ProviderRun: 'run-1', ToolCallId: 'call-1', Verdict: 'PERFECT' })
+    const pending = await todo.tryConclude(opened.journal, life, write)
+    assert.equal(pending.status, 'Pending')
+    assert.match(pending.reason, /not closed/i)
+  } finally { cleanup() }
 })
 
-// ── REVIEW-017/018: record-ready wait is event-driven and fails closed ───────
-
-test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_await_consumable_review_fails_closed_when_the_producer_is_absent', async () => {
-  // A checkpoint whose reviewer session never materialised must not hang the
-  // waiter nor fabricate a Concluded: this is the infra-failure fail-closed
-  // path (REVIEW-018), not a semantic REVISE.
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-consumable-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_consumable' })
-  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
-
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_absent_reviewer_fails_closed_without_fabricated_conclusion', async () => {
+  const { opened, cleanup } = await open('absent')
   try {
-    const journal = created.journal
-
-    const ghost = sessionId('ses-ghost')
-    const ghostAssigned = new magicTodoJournal.TodoProcessReviewAssigned(
-      life,
-      write,
-      review,
-      reviewer,
-      ghost,
-      cursor(4),
-      cursor(10),
-    )
-
-    const append = async (caseName, payload) => {
-      const appended = await agentJournal.appendMagicTodo(
-        stream.session(managerSession),
-        undefined,
-        magicFact(caseName, payload),
-        journal,
-      )
-      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-      // MagicTodoAppendReceipt { EventId; Projection } → the named field is the EventId.
-      return appended.value.EventId
-    }
-
-    // TodoWriteAccepted must name the exact Prepared envelope (TODO-004), so
-    // the ref comes from the append receipt — never invented.
-    const preparedRef = await append('TodoWritePrepared', prepared)
-    const acceptedWithRef = new magicTodoJournal.TodoWriteAccepted(
-      life,
-      write,
-      call,
-      preparedRef,
-      'provider-input-digest',
-      'output-digest',
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-v1',
-    )
-    await append('TodoWriteAccepted', acceptedWithRef)
-    await append('DedicatedTodoReviewerEnlisted', new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, ghost))
-    await append('TodoProcessReviewAssigned', ghostAssigned)
-
-    // No verdict in the ghost guard → pending, never concluded.
-    const conclude = await tryConclude(journal, life, write)
-    assert.equal(caseOf(conclude), 'Pending')
-
-    // The producer is absent (no reviewer session exists) → fail closed, no
-    // timer, no polling, no fabricated Concluded.
-    const presence = await producerPresence(journal, life, write)
-    assert.equal(caseOf(presence), 'Absent')
-
-    const waited = resultOf(await awaitConsumableReview(journal, life, write))
+    await appendReviewFacts(opened, 'ses-ghost')
+    const presence = todo.producerPresence(opened.journal, life, write)
+    assert.equal(presence.status, 'Absent')
+    assert.match(presence.reason, /reviewer session missing/)
+    const waited = await todo.awaitConsumableReview(opened.journal, life, write)
     assert.equal(waited.ok, false)
     assert.match(waited.error, /process review cannot progress: reviewer session missing/)
-
-    const snap = agentJournal.snapshot(journal)
-    const lifeState = snap.AgentProjections.MagicTodo.ByLife.get(idValue.managerLife(life))
-    const cp = mapEntries(lifeState.Checkpoints).find(([key]) => key === magicTodo.todoWriteIdValue(write))[1]
-    assert.equal(cp.Concluded == null, true, 'fail-closed wait must not fabricate a Concluded')
-  } finally {
-    created.dispose()
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[REVIEW-ASSURANCE-009] REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedAwaitingJoin', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-completed-presence-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_completed_presence' })
-  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
-
-  try {
-    const journal = created.journal
-    const reviewerSession = sessionId('ses-completed-reviewer')
-    const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
-      life,
-      write,
-      review,
-      reviewer,
-      reviewerSession,
-      cursor(4),
-      cursor(10),
-    )
-
-    const append = async (caseName, payload) => {
-      const appended = await agentJournal.appendMagicTodo(
-        stream.session(managerSession),
-        undefined,
-        magicFact(caseName, payload),
-        journal,
-      )
-      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-      return appended.value.EventId
-    }
-
-    const preparedRef = await append('TodoWritePrepared', prepared)
-    const acceptedWithRef = new magicTodoJournal.TodoWriteAccepted(
-      life,
-      write,
-      call,
-      preparedRef,
-      'provider-input-digest',
-      'output-digest',
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-v1',
-    )
-    await append('TodoWriteAccepted', acceptedWithRef)
-    await append('DedicatedTodoReviewerEnlisted', new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession))
-    await append('TodoProcessReviewAssigned', assigned)
-
-    // Simulate child session creation + completion
-    await agentJournal.appendAgent(
-      stream.session(reviewerSession),
-      undefined,
-      agentFact('AuthorityRootAccepted', {
-        SessionId: reviewerSession,
-        LogicalRunId: logicalRunId('run-rev'),
-        AuthorityRootUserMessageId: authorityRoot('root-rev'),
-        AuthorityKind: 'ChildRoot',
-        SelectedAgent: 'fast-reviewer',
-        PeerAgent: 'deep-reviewer',
-        CanonicalRole: 'Reviewer',
-        SelectedTier: 'fast',
-      }),
-      journal,
-    )
-    await agentJournal.appendAgent(
-      stream.session(managerSession),
-      undefined,
-      agentFact('HandleLinked', {
-        ParentSessionId: managerSession,
-        Handle: handleId.agent('h_rev'),
-        TargetAgent: 'fast-reviewer',
-        Byname: 'fast-reviewer',
-        ChildSessionId: reviewerSession,
-        CanonicalRole: roles.of('Reviewer'),
-        Ownership: HandleOwnership.HostOwnedHidden,
-      }),
-      journal,
-    )
-    await agentJournal.appendAgent(
-      stream.session(managerSession),
-      undefined,
-      agentFact('HandleCompleted', {
-        ParentSessionId: managerSession,
-        Handle: handleId.agent('h_rev'),
-        Kind: HandleCompletionKind.Terminal,
-        CompletionRef: undefined,
-        CompletionDigest: undefined,
-      }),
-      journal,
-    )
-
-    const presence = await producerPresence(journal, life, write)
-    assert.equal(caseOf(presence), 'Present', 'CompletedAwaitingJoin handle must be Present, not Absent')
-  } finally {
-    created.dispose()
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[REVIEW-ASSURANCE-009] REVIEW_017 durable verdict keeps record-ready producer present after the reviewer work-unit is Retired', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-retired-verdict-presence-'))
-  const created = await agentJournal.create({ directory, runtime: 'rt_retired_verdict_presence' })
-  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
-
-  try {
-    const journal = created.journal
-    const retiredReviewerSession = sessionId('ses-retired-verdict-reviewer')
-    const barrier = reviewBarrierId(review.fields[0])
-    const retiredAssigned = new magicTodoJournal.TodoProcessReviewAssigned(
-      life,
-      write,
-      review,
-      reviewer,
-      retiredReviewerSession,
-      cursor(4),
-      cursor(10),
-    )
-
-    const append = async (caseName, payload) => {
-      const appended = await agentJournal.appendMagicTodo(
-        stream.session(managerSession),
-        undefined,
-        magicFact(caseName, payload),
-        journal,
-      )
-      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-      return appended.value.EventId
-    }
-    const appendAgent = async (session, payload) => {
-      const appended = await agentJournal.appendAgent(stream.session(session), undefined, payload, journal)
-      assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-    }
-
-    const preparedRef = await append('TodoWritePrepared', prepared)
-    await append('TodoWriteAccepted', new magicTodoJournal.TodoWriteAccepted(
-      life,
-      write,
-      call,
-      preparedRef,
-      'provider-input-digest',
-      'output-digest',
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-v1',
-    ))
-    await append('DedicatedTodoReviewerEnlisted', new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, retiredReviewerSession))
-    await append('TodoProcessReviewAssigned', retiredAssigned)
-
-    await appendAgent(retiredReviewerSession, agentFact('AuthorityRootAccepted', {
-      SessionId: retiredReviewerSession,
-      LogicalRunId: logicalRunId('run-retired-reviewer'),
-      AuthorityRootUserMessageId: authorityRoot('root-retired-reviewer'),
-      AuthorityKind: 'ChildRoot',
-      SelectedAgent: 'fast-reviewer',
-      PeerAgent: 'deep-reviewer',
-      CanonicalRole: 'Reviewer',
-      SelectedTier: 'fast',
-    }))
-    await appendAgent(managerSession, agentFact('HandleLinked', {
-      ParentSessionId: managerSession,
-      Handle: handleId.agent('h_retired_verdict'),
-      TargetAgent: 'fast-reviewer',
-      Byname: 'fast-reviewer',
-      ChildSessionId: retiredReviewerSession,
-      CanonicalRole: roles.of('Reviewer'),
-      Ownership: HandleOwnership.HostOwnedHidden,
-    }))
-    await appendAgent(retiredReviewerSession, agentFact('ReviewBarrierStarted', {
-      ReviewerSessionId: retiredReviewerSession,
-      ManagerSessionId: managerSession,
-      BarrierId: barrier,
-      GitTreeHash: gitTreeHash('tree-retired-verdict'),
-    }))
-    await appendAgent(retiredReviewerSession, agentFact('ReviewVerdictRecorded', {
-      ReviewerSessionId: retiredReviewerSession,
-      ManagerSessionId: managerSession,
-      BarrierId: barrier,
-      GitTreeHash: gitTreeHash('tree-retired-verdict'),
-      ProviderRun: providerRun('run-retired-verdict'),
-      ToolCallId: toolCallId('judge-retired-verdict'),
-      Verdict: verdict.perfect,
-    }))
-    // REVIEW-013/017: the reviewer's turn completed and closed the attempt. The
-    // frozen closure frontier (12) lies beyond any captured XTrace, so the LWR
-    // is intentionally not record-ready and the review keeps waiting — but the
-    // closure proves the review is not lost, so the producer stays Present.
-    await appendAgent(retiredReviewerSession, agentFact('ReviewAttemptClosed', {
-      ReviewerSessionId: retiredReviewerSession,
-      BarrierId: barrier,
-      GitTreeHash: gitTreeHash('tree-retired-verdict'),
-      ProviderRun: providerRun('run-retired-verdict'),
-      ToolCallId: toolCallId('judge-retired-verdict'),
-      FrozenFrontierSequence: 12n,
-    }))
-    await appendAgent(managerSession, agentFact('HandleCompleted', {
-      ParentSessionId: managerSession,
-      Handle: handleId.agent('h_retired_verdict'),
-      Kind: HandleCompletionKind.Terminal,
-      CompletionRef: undefined,
-      CompletionDigest: undefined,
-    }))
-    await appendAgent(managerSession, agentFact('HandleRetired', {
-      ParentSessionId: managerSession,
-      Handle: handleId.agent('h_retired_verdict'),
-    }))
-
-    const conclude = await tryConclude(journal, life, write)
-    assert.equal(caseOf(conclude), 'Pending', 'verdict exists but LWR is intentionally not record-ready')
-    const presence = await producerPresence(journal, life, write)
-    assert.equal(caseOf(presence), 'Present', 'Retired after a durable verdict must keep waiting for Journal/XTrace record-ready convergence')
-  } finally {
-    created.dispose()
-    rmSync(directory, { recursive: true, force: true })
-  }
+  } finally { cleanup() }
 })

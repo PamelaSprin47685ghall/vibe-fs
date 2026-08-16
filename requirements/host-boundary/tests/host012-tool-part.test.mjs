@@ -1,55 +1,26 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { providerProjection, toList } from '../../verification-system/tests/support/domain.mjs';
-const { decodeMessageView, toolResultDigests } = providerProjection;
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { toolParts } from './support/host-surface.mjs'
 
-// VERIFY-007 / HOST-012: Host 1.18.10 的组装形状（message-v2.ts）把 tool 结果
-// 放在 assistant 消息的 parts 里：`{ type: "tool-<tool>", state:
-// "output-available", toolCallId, input, output }`。Projection 必须把它解码成
-// WireToolResult，否则 REVIEW-010 的 seal 永远没有 IncludedToolResultDigests，
-// REVIEW-003 的第二次 PERFECT 必拒（实测 dual-PERFECT 全失败）。
+const assistantTool = ({ messageID = 'asst_1', partID = 'part_1', callID = 'call_1', status = 'completed', output = 'result' } = {}) => ({
+  info: { id: messageID, role: 'assistant', sessionID: 'ses_1' },
+  parts: [{ type: 'tool', id: partID, callID, state: { status, output } }],
+})
+
 test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
-  const view = decodeMessageView(toList([
-    {
-      info: { role: 'assistant', sessionID: 'ses_1' },
-      parts: [
-        {
-          type: 'tool-verdict',
-          state: 'output-available',
-          toolCallId: 'call_1',
-          input: {},
-          output: 'Nope, let us re-evaluate.',
-        },
-      ],
-    },
-  ]));
-  const digests = toolResultDigests((s) => s, view);
-  assert.equal(digests.length, 1);
-  assert.equal(digests[0], 'Nope, let us re-evaluate.');
-});
+  const view = toolParts.decode([assistantTool()])
+  assert.equal(view[0].parts[0].parts, 'ToolResult')
+  assert.equal(view[0].parts[0].toolParts, 'Completed')
+  assert.deepEqual(toolParts.resultDigests(view), [{ callId: 'call_1', status: 'completed', text: 'result' }])
+})
 
-// 旧形状（tool-result / tool_result 独立消息）保持兼容。
 test('WHAT[HOST-BOUNDARY-020] HOST_012_legacy_tool_result_shape_still_decodes', () => {
-  const view = decodeMessageView(toList([
-    {
-      info: { role: 'tool', sessionID: 'ses_1' },
-      parts: [{ type: 'tool_result', callID: 'call_1', result: 'ok' }],
-    },
-  ]));
-  const digests = toolResultDigests((s) => s, view);
-  assert.equal(digests.length, 1);
-  assert.equal(digests[0], 'ok');
-});
+  const view = toolParts.decode([{ info: { role: 'tool', sessionID: 'ses_1' }, parts: [{ type: 'tool-result', callID: 'legacy', state: { status: 'completed', output: 'legacy' } }] }])
+  assert.equal(view[0].parts[0].parts, 'ToolResult')
+})
 
-// errorText 分支（工具失败）同样进入 digest。
 test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_error_part_enters_digest', () => {
-  const view = decodeMessageView(toList([
-    {
-      info: { role: 'assistant', sessionID: 'ses_1' },
-      parts: [{ type: 'tool-read', state: 'output-error', toolCallId: 'c1', input: {}, errorText: 'boom' }],
-    },
-  ]));
-  const digests = toolResultDigests((s) => s, view);
-  assert.equal(digests.length, 1);
-  assert.equal(digests[0], 'boom');
-});
+  const view = toolParts.decode([assistantTool({ status: 'error', output: 'failed' })])
+  assert.equal(view[0].parts[0].toolParts, 'Failed')
+  assert.equal(toolParts.resultDigests(view)[0].status, 'error')
+})

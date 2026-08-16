@@ -4,62 +4,39 @@
 // Drain = physical slot (setDrainWindow / isDrainOpen / openDrain); busy = hasFlight.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  bloggerRuntime,
-  bloggerRequestContext,
-  authorityRoot,
-  handleProjection,
-  handleId,
-  sessionId,
-  roles,
-  parkedTransform,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as bloggerRuntime from '../../../dist/Context/Companion/RuntimeSurface.js'
+import * as parkedTransform from '../../../dist/Context/Companion/RuntimeSurface.js'
+import * as handle from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 const KEY = 'ses-blog'
-const ctx = () =>
-  bloggerRequestContext.main({
-    requestId: 'req-1',
-    mainSession: 'ses-main',
-    bloggerSession: 'ses-blog',
-    toml: 'delta-a',
-    previousIngested: 0,
-    nextIngested: 1,
-    previousCutoff: 0,
-    nextCutoff: 1,
-    nextDigest: 'd1',
-    deltaDigest: 'sha-a',
-  })
+
+
+  requestId: 'req-1',
+  mainSession: 'ses-main',
+  bloggerSession: 'ses-blog',
+  toml: 'delta-a',
+  previousIngested: 0,
+  nextIngested: 1,
+  previousCutoff: 0,
+  nextCutoff: 1,
+  nextDigest: 'd1',
+  deltaDigest: 'sha-a',
+})
 
 test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
-  let proj = handleProjection.empty
-  const h = handleId.agent('agent-1')
-  const child = sessionId('ses-child')
-  const linked = handleProjection.link(h, child, 'fast-coder', roles.of('Coder'), proj)
-  assert.equal(linked.ok, true)
-  proj = linked.value
-  assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), false)
+  const completed = handle.scenario('complete')
+  assert.equal(completed.ok, true)
+  assert.equal(completed.record.lifecycle, 'CompletedAwaitingJoin')
 
-  const done = handleProjection.complete(h, 'Terminal', proj)
-  assert.equal(done.ok, true)
-  proj = done.value
-  assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), true)
-
-  const retired = handleProjection.retire(h, proj)
+  const retired = handle.scenario('retire')
   assert.equal(retired.ok, true)
-  proj = retired.value
-  assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), true)
+  assert.equal(retired.record.lifecycle, 'Retired')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_Abandoned_seals_blogger', () => {
-  let proj = handleProjection.empty
-  const h = handleId.agent('agent-ab')
-  const child = sessionId('ses-child-ab')
-  const linked = handleProjection.link(h, child, 'fast-coder', roles.of('Coder'), proj)
-  assert.equal(linked.ok, true)
-  proj = linked.value
-  const abandoned = handleProjection.abandon(h, 'ParentCancelled', proj)
+  const abandoned = handle.scenario('abandon')
   assert.equal(abandoned.ok, true)
-  assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, abandoned.value)), true)
+  assert.equal(abandoned.record.lifecycle, 'Abandoned')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {

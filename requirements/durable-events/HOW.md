@@ -6,13 +6,21 @@
 ## 生产装配链
 
 ```text
-ProcessEventLog(commonDir, WriterId)         // Infrastructure/Persist/ProcessEventLog.fs
+ProcessEventLog(commonDir, WriterId)         // Persistence/EventStore/ProcessEventLog.fs
   → .git/wanxiang/events/<WriterId>.ndjson   // one process = one file; never sliced
   → CanonicalIntegrator CE                   // the only history consumer
   → EventStore.createLocal                   // append + payload closure + Current
   → WorkspaceEventStore.acquire（process-local refcount）
   → IJournalEventStoreBoot.ResumeOrCreate / EventStoreJournalWriter
   → AgentJournal.createFromEventStore | createFromProjection
+
+JS semantic boundary (requirements/durable-events/tests)
+  → EventStore/CodecSurface.js       // canonical bytes + identity result objects
+  → EventStore/MergeSurface.js       // deterministic merge of plain events
+  → EventStore/Surface.js             // opaque EventStoreHandle lifecycle + append/read
+  → Journal/CodecSurface.js          // plain journal envelope codec
+  → Journal/FactCodecSurface.js      // decode-only fact compatibility
+  → Journal/Surface.js               // opaque JournalHandle + plain projection summary
 
 Wanxiangshu/OpenCode Load Phase
   → parse module/resources/config + validate/read durable bytes
@@ -45,14 +53,14 @@ later, user Git process (Wanxiangshu may be absent)
 | Domain | `EventEnvelope` / `PayloadRef` / 因果与业务语义 | `GitObjectId` / `RootOid` / `StoreSnapshot` / Git 操作 |
 | Persist | canonical JSON、本地 process NDJSON、payload closure、k-way input、唯一 `CanonicalIntegrator` CE、sync materialization | 领域业务判断、feature-owned history reader、按 domain 拆 backend |
 | HookDispatcher / HookSync / GitGateway | activation-time hook/refspec ensure；独立 Git-hook 进程 transport、writer-file blobification、remote snapshot replace | plugin Load Phase mutation、产品进程主动 fetch/pull/push、Domain reducer、后台同步状态机、第二套业务积分器 |
-| AgentJournal / Strength / Casebook / JsTransaction | EventEnvelope producer + 向 Integrator 注册单-event rule + 读取 Current | 历史枚举、独立 replay/fold/project loop、physical journal/backend |
+| Semantic owner surfaces | `EventStore/CodecSurface`, `EventStore/MergeSurface`, `EventStore/Surface`, `Journal/CodecSurface`, `Journal/FactCodecSurface`, `Journal/Surface`; each names one law family and translates to JS-native values | domain.mjs imports, Fable list/union values, typed-ID constructors, test-side interop facades |
 
 红线：`src/Wanxiangshu/Domain/EventStore.fs` 不引用 `Infrastructure`；Git object identity 只存在于
 sync membrane；业务模块不能取得 `IEventHistoryReader`/本地 writer 文件路径。
 
 ## 核心机制（逐概念）
 
-### 1. Canonical JSON（`CanonicalEventCodec.fs`）
+### 1. Canonical JSON（`Persistence/EventStore/CanonicalEventCodec.fs` + `CodecSurface.fs`）
 
 ```text
 normalizeJson：递归 Object.keys 排序
@@ -63,7 +71,7 @@ mergeByIdentity：set-union by EventId，输出按 EventId 排序
 tryDecode：null/非单 LF/形状错/重编码不等 → StorageInvalid（NonCanonical | MalformedEnvelope）
 ```
 
-### 2. Store / local-log 类型（`StoreTypes.fs` / `ProcessEventLog.fs`）
+### 2. Store / local-log 类型（`Persistence/EventStore/StoreTypes.fs` / `ProcessEventLog.fs`）
 
 ```text
 WriterId：process-start fresh globally-unique physical writer identity
@@ -75,7 +83,7 @@ DomainConflict = ConcurrentHeads of streamId * heads
 GitObjectId / RootOid / StoreRef：只在 remote sync materialization/transport 使用
 ```
 
-### 3. Local Append / Publish（`EventStore.fs` / `ProcessEventLog.fs`）
+### 3. Local Append / Publish（`Persistence/EventStore/Store.fs` / `ProcessEventLog.fs` + `Surface.fs`）
 
 ```text
 createLocal：生成 fresh WriterId；打开 .git/wanxiang/events/<WriterId>.ndjson（append-only）
@@ -98,7 +106,7 @@ publish：先在同一 physical gate 下把新增 payload bytes 写 .git/wanxian
 没有 `SegmentMaxBytes`、rotation、tail rewrite、EventId→blob index、Git tree/CAS retry。
 `WriterId.ndjson` 从进程开始一直增长到进程退出；新进程只创建新 WriterId。
 
-### 4. K-way merge / Sync（`EventKWayMerge.fs` / `CanonicalIntegrator.fs` / 独立 hook）
+### 4. K-way merge / Sync（`Persistence/EventStore/EventKWayMerge.fs` / `CanonicalIntegrator.fs` + `MergeSurface.fs` / independent hook）
 
 ```text
 local source：每个 WriterId 一个天然有序 NDJSON stream
@@ -115,7 +123,7 @@ pre-push：discover remote root → 同一个 full bidirectional converge
 sync 可以重写本地**同步快照文件集合**，
 但不能修改已经存在 event 的 canonical bytes，也不能把业务 state 计算塞进 sync。
 
-### 5. 唯一 Canonical Integrator CE（`CanonicalIntegrator.fs`）
+### 5. 唯一 Canonical Integrator CE（`Persistence/EventStore/CanonicalIntegrator.fs`）
 
 ```text
 integrator {
@@ -151,16 +159,21 @@ remote sync only:
 Wanxiangshu 不创建 event chunk/segment DAG，不维护 EventId→Git OID index，不自己做 delta。
 Git pack/delta 是 Git 内部优化；sync 每次可以为增长后的 writer file 产生新 OID，旧 OID 不具有领域意义。
 
-### 7. Journal / feature 适配
+### 7. Journal / feature 适配（`Persistence/Journal/CodecSurface.fs`, `FactCodecSurface.fs`, `Surface.fs`）
 
 ```text
-EventStoreJournalWriter：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
+EventStoreJournalWriter（`Persistence/Journal/EventStoreJournalWriter.fs`）：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
                          boot projection 直接读取 CanonicalIntegrator.Current.Journal
 Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.rule、读取自己的 Current 槽位
 AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则先 `FatalProcess.trip("journal-semantic-cut", ...)` 再返回 typed `FactRejected`（仅 node:test 能继续观察）；durable writer 不 poison，但生产当前进程不得继续 append/effect
 ```
 
-Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`（EventStoreJournalWriter.fs）
+`Journal/CodecSurface.js` accepts a plain envelope descriptor and returns plain event/decode results;
+`FactCodecSurface.js` keeps decoded facts internal and exposes only normalized bytes, case, and error text.
+`Journal/Surface.js` returns an opaque `JournalHandle`; `appendAgent`, `appendManagerLifecycle`, payload
+read/write, and projection snapshot return plain objects. Callers release the handle with `dispose`.
+
+Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`（`Persistence/Journal/EventStoreJournalWriter.fs`）
 是唯一派生点，把 fact 中所有真实 sha256 content-address（`BlobRef`/`BlobDigest`）映射为 `PayloadRef`；
 `MagicTodoFactCodec.payloadRefs` 对 `Fact.MagicTodo` 的 typed fact 做同样映射。非 content-address 的
 占位值（如测试里的 `blob-1`/`digest:base`）不是 payload reference。append 前 closure 校验（

@@ -4,18 +4,13 @@
  */
 
 import { join } from 'node:path'
-import { eventId } from '../../support/domain/identity.mjs'
-import { toList } from '../../support/domain/interop.mjs'
-import { createLocalEventStore } from '../../support/local-event-store.mjs'
 
-const Domain = await import('../../../../../dist/Persistence/EventStore/Model.js')
-const streamId = (v) => Domain.EventStreamIdModule_create(v)
+import * as eventStore from '../../../../../dist/Persistence/EventStore/Surface.js'
 
 export const hexId = (n) => n.toString(16).padStart(40, '0')
 
 export function openGateFactStore(workDir) {
-  const local = createLocalEventStore({ commonDir: join(workDir, '.git'), writerId: `verification-gate-${process.pid}` })
-  const es = local.store
+  const store = eventStore.create(join(workDir, '.git'), `verification-gate-${process.pid}`)
   let seq = 0
   let lastId = null
   let serial = Promise.resolve()
@@ -24,17 +19,18 @@ export function openGateFactStore(workDir) {
     const run = serial.then(async () => {
       seq += 1
       const id = hexId(seq)
-      const parents = lastId === null ? [] : [eventId(lastId)]
-      const envelope = new Domain.EventEnvelope(
-        eventId(id),
-        streamId('gate/wait-fact'),
-        'JobRequested',
-        toList(parents),
-        { type: name, n },
-        toList([]),
-      )
-      const result = await es.Append(toList([envelope]))
-      if (result.tag !== 0) throw new Error(`EventStore.Append(${name}) failed: ${JSON.stringify(result)}`)
+      const parents = lastId === null ? [] : [lastId]
+      const result = await eventStore.append(store, [
+        {
+          id,
+          stream: 'gate/wait-fact',
+          type: 'JobRequested',
+          parents,
+          payload: { type: name, n },
+          payloadRefs: [],
+        },
+      ])
+      if (!result.ok) throw new Error(`EventStore.append(${name}) failed: ${JSON.stringify(result.error)}`)
       lastId = id
     })
     serial = run

@@ -12,33 +12,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import {
-  agentFact,
-  agentJournal,
-  asFact,
-  bootSnapshot,
-  caseOf,
-  envelope,
-  fold,
-  listItems,
-  payloadOf,
-  providerProjection,
-  resultOf,
-  sessionId,
-  stream,
-  toolCallId,
-  transcriptAddress,
-  transcriptGap,
-  toList,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
+import * as providerCodec from '../../../dist/OpenCode/Codec/ProviderProjectionSurface.js'
+import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 const {
-  tryInject,
+  tryInjectWithJournal,
   isPairProgrammingThought,
   source,
   text,
   stableCallId,
-} = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
+} = pair
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -75,13 +59,13 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
 
 const inject = async (journal, session, raw, markerText = text) => {
-  const result = resultOf(await tryInject(journal, session, markerText, toList(raw)))
+  const result = await tryInjectWithJournal(journal, session, markerText, raw)
   assert.equal(result.ok, true, `HOST-013 transform must commit the pair: ${result.error ?? ''}`)
-  return listItems(result.value)
+  return result.value
 }
 
 /** The authority: ARCH-004 append-only prefix law (ProviderProjection.isAppendOnlyPrefix). */
-const wire = (raw) => providerProjection.decodeMessageView(toList(raw))
+const wire = (raw) => providerCodec.decodeMessageView(raw)
 const assertPrefixLaw = (previous, next, label) => {
   assert.equal(
     providerProjection.isAppendOnlyPrefix(wire(previous), wire(next)),
@@ -107,18 +91,12 @@ const callIdOf = (messages, index) => messages[index].parts[0].callID
 
 /** Fresh durable journal in a temp dir. */
 const openJournal = async (dir) => {
-  const opened = await agentJournal.create({ directory: dir })
+  const opened = await pair.createJournal(dir)
   assert.equal(opened.ok, true, JSON.stringify(opened))
   return opened
 }
 
-const durablePairCount = (journal, session) => {
-  const snapshot = agentJournal.snapshot(journal)
-  const sessionProj = fold.session(snapshot, session)
-  assert.ok(sessionProj, `session ${session} must exist in the journal`)
-  const pairs = listItems(sessionProj.Guidelines.Pairs)
-  return pairs.length
-}
+const durablePairCount = (journal, session) => pair.pairCount(journal, session)
 
 // ── H13-01: the canonical multi-tool sequence ───────────────────────────────
 
@@ -198,7 +176,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair',
     assert.deepEqual(twice, once)
     assert.equal(durablePairCount(opened.journal, session), 1, 'journal must hold exactly one anchored fact')
   } finally {
-    opened.dispose()
+    pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -219,23 +197,21 @@ test('WHAT[PREFIX-STABILITY-010] H13_04_restart_replay_is_byte_identical', async
   try {
     wireBefore = await inject(before.journal, session, raw)
   } finally {
-    before.dispose()
+    pair.disposeJournal(before.journal)
   }
 
   // New process: boot the persisted journal, fold it, open a fresh writer.
-  const boot = await bootSnapshot.load(dir)
-  const after = await agentJournal.createFromBoot({ directory: dir, boot })
-  assert.equal(after.ok, true, JSON.stringify(after))
+  const after = await openJournal(dir)
   let wireAfter
   try {
     // The restarting process sees the persisted transcript including synthetics.
     wireAfter = await inject(after.journal, session, [...wireBefore])
+    assertWireEqual(wireBefore, wireAfter, 'H13-04 restart replay')
+    assert.equal(durablePairCount(after.journal, session), 1, 'restart re-entry must not append a second fact')
   } finally {
-    after.dispose()
+    pair.disposeJournal(after.journal)
   }
 
-  assertWireEqual(wireBefore, wireAfter, 'H13-04 restart replay')
-  assert.equal(durablePairCount(after.journal, session), 1, 'restart re-entry must not append a second fact')
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -253,20 +229,14 @@ test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_reloc
   try {
     const session = 'h13-05'
 
-    const anchored = agentFact('PairProgrammingGuidelineAnchored', {
-      SessionId: sessionId(session),
-      Ordinal: 1n,
-      CallId: toolCallId(stableCallId(session, 1n)),
-      MarkerText: text,
-      CallGap: transcriptGap.after(transcriptAddress.create('msg_7')),
-      ResultGap: transcriptGap.after(transcriptAddress.create('msg_7')),
+    const appended = await pair.appendAnchoredPair(opened.journal, {
+      session,
+      ordinal: 1,
+      callId: stableCallId(session, 1n),
+      markerText: text,
+      callGapAfter: 'msg_7',
+      resultGapAfter: 'msg_7',
     })
-    const appended = await agentJournal.appendAgent(
-      stream.session(sessionId(session)),
-      undefined,
-      anchored,
-      opened.journal,
-    )
     assert.equal(appended.ok, true, JSON.stringify(appended))
 
     // Rewritten view: covered u1/msg_7 gone; only a synthetic prefix + continue.
@@ -275,9 +245,9 @@ test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_reloc
       parts: [{ type: 'text', text: '# Opening\ncovered work' }],
     }
     const cont = userMsg('u-continue', '# The previous attempt did not complete.')
-    const result = resultOf(await tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
+    const result = await tryInjectWithJournal(opened.journal, session, text, [synthPrefix, cont])
     assert.equal(result.ok, true, `missing-anchor pair must omit, not fail: ${result.error ?? ''}`)
-    const wire = listItems(result.value)
+    const wire = result.value
     // Pair1 (after msg_7) must not reappear anywhere — no relocate.
     const call1 = stableCallId(session, 1n)
     assert.equal(
@@ -296,7 +266,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_reloc
       'new wire pairs must not reuse the unplaceable historical callId',
     )
   } finally {
-    opened.dispose()
+    pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -320,11 +290,9 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     // DropLeading removes u1 (pair1's Before(u1) anchors).
-    const result = resultOf(
-      await tryInject(opened.journal, session, text, toList([synthPrefix, failAsst, cont])),
-    )
+    const result = await tryInjectWithJournal(opened.journal, session, text, [synthPrefix, failAsst, cont])
     assert.equal(result.ok, true, `XWire continue must not fail closed: ${result.error ?? ''}`)
-    const wire2 = listItems(result.value)
+    const wire2 = result.value
     const call1 = stableCallId(session, 1n)
     assert.equal(
       wire2.some((m) => m.parts?.[0]?.callID === call1),
@@ -339,7 +307,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
     )
     assertWireEqual(wire1, await inject(opened.journal, session, [user1]), 'H13-05b same placement on u1 is pure replay')
   } finally {
-    opened.dispose()
+    pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -431,37 +399,25 @@ test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', asyn
 // 其它 trace 系投影保持不存在（None = undefined）。
 
 test('WHAT[PREFIX-STABILITY-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections', () => {
-  const session = sessionId('h13-014')
+  const session = 'h13-014'
   const markerBody = 'SECRET synthetic marker body'
-  const anchored = agentFact('PairProgrammingGuidelineAnchored', {
-    SessionId: session,
-    Ordinal: 1n,
-    CallId: toolCallId(stableCallId('h13-014', 1n)),
-    MarkerText: markerBody,
-    CallGap: transcriptGap.after(transcriptAddress.create('msg_7')),
-    ResultGap: transcriptGap.after(transcriptAddress.create('msg_7')),
+  const result = pair.foldAnchoredPair({
+    session,
+    ordinal: 1,
+    callId: stableCallId(session, 1n),
+    markerText: markerBody,
+    callGapAfter: 'msg_7',
+    resultGapAfter: 'msg_7',
   })
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result))
 
-  // `fold.apply` folds top-level Fact envelopes; wrap the AgentFact in the Fact
-  // union exactly as `fact()` does (the production append path does the same).
-  const result = fold.apply(fold.empty, [
-    envelope({ seq: 1, stream: stream.session(session), fact: asFact(anchored) }),
-  ])
-  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-
-  const s = fold.session(result.value, 'h13-014')
-  assert.ok(s, 'session projection must exist after the anchored fact')
-
+  const flags = result.flags
   // The only projection the pair fact may grow is Guidelines (HOST-013 recovery).
-  assert.ok(s.Guidelines, 'the anchored fact must land in Guidelines')
+  assert.equal(flags.guidelines, true, 'the anchored fact must land in Guidelines')
 
   // HOST-013 行为约束 4: no trace-family projection may be created or touched.
   // (LifecycleWorkRecord is materialized FROM the XTrace, so an absent XTrace
   // also means the work record can never carry pair bytes.)
-  for (const [key, label] of [
-    ['XTrace', 'XTrace'],
-    ['Blog', 'Companion frame sequence (Blogger delta)'],
-  ]) {
-    assert.equal(s[key], undefined, `${label} must not be created by the pair fact`)
-  }
+  assert.equal(flags.xTrace, false, 'XTrace must not be created by the pair fact')
+  assert.equal(flags.blog, false, 'Companion frame sequence must not be created by the pair fact')
 })

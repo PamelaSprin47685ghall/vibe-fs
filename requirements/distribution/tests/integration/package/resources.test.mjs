@@ -24,7 +24,7 @@ const PROVIDER_ROLES = [
   'reviewer',
 ]
 
-test('PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
+test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
   const providerDir = path.join(repoRoot, 'resources', 'provider')
   const enforcerDir = path.join(repoRoot, 'resources', 'enforcer')
 
@@ -70,7 +70,7 @@ test('PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', 
   }
 })
 
-test('PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () => {
+test('WHAT[DISTRIBUTION-008] PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () => {
   const packageResourcesJs = path.join(repoRoot, 'dist', 'Resources', 'PackageResources.js')
   assert.ok(fs.existsSync(packageResourcesJs), 'PackageResources.js must exist under dist')
 

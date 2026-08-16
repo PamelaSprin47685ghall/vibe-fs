@@ -3,10 +3,12 @@ namespace Wanxiangshu.Mission.Manager
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Change
 open Wanxiangshu.Composition.Bridges.FinalityReview
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -55,6 +57,30 @@ module FinalitySurface =
         | _ -> System.Boolean.Parse(string value)
 
     let private str (value: obj) : string = string value
+
+    let private roleOf (value: obj) : Role =
+        Roles.tryParseRole (str value) |> Option.defaultValue Role.Coder
+
+    let private stringArrayOf (value: obj) : string list =
+        if isNull value then
+            []
+        else
+            unbox<string array> value |> Array.toList
+
+    let private optionalBlobRef (value: obj) : BlobRef option =
+        if isNull value then None else Some(BlobRef.create (str value))
+
+    let private optionalBlobDigest (value: obj) : BlobDigest option =
+        if isNull value then None else Some(BlobDigest.create (str value))
+
+    let private handleOf (value: obj) : HandleId =
+        HandleId.Agent(AgentHandleId.create (str value))
+
+    let private ownershipOf (value: obj) : HandleOwnership =
+        if str value = "host-owned-hidden" then
+            HandleOwnership.HostOwnedHidden
+        else
+            HandleOwnership.DurableParentHandle
 
     /// The opaque world handle: the folded projection plus the Manager session
     /// the lifecycle facts belong to. Tests pass it back; they never read it
@@ -223,6 +249,50 @@ module FinalitySurface =
                     )
                 )
             )
+        | "handle-linked" ->
+            Ok(
+                Fact.Agent(
+                    AgentFact.Execution(
+                        ExecutionFactCases.HandleLinked
+                            {| ParentSessionId = sessionId
+                               ChildSessionId = SessionId.create (str (event?childSessionId))
+                               Handle = handleOf (event?handleId)
+                               TargetAgent = str (event?targetAgent)
+                               Byname = str (event?byname)
+                               CanonicalRole = roleOf (event?role)
+                               Ownership = ownershipOf (event?ownership) |}
+                    )
+                )
+            )
+        | "handle-completed" ->
+            let completionKind =
+                match str (event?completionKind) with
+                | "send-failure" -> HandleCompletionKind.SendFailure
+                | "cancelled" -> HandleCompletionKind.Cancelled
+                | _ -> HandleCompletionKind.Terminal
+
+            Ok(
+                Fact.Agent(
+                    AgentFact.Execution(
+                        ExecutionFactCases.HandleCompleted
+                            {| ParentSessionId = sessionId
+                               Handle = handleOf (event?handleId)
+                               Kind = completionKind
+                               CompletionRef = optionalBlobRef (event?completionRef)
+                               CompletionDigest = optionalBlobDigest (event?completionDigest) |}
+                    )
+                )
+            )
+        | "handle-retired" ->
+            Ok(
+                Fact.Agent(
+                    AgentFact.Execution(
+                        ExecutionFactCases.HandleRetired
+                            {| ParentSessionId = sessionId
+                               Handle = handleOf (event?handleId) |}
+                    )
+                )
+            )
         | other -> Error $"unknown finality event kind: {other}"
 
     let private envelopeFor (seq: int64) (stream: StreamId) (fact: Fact) : Envelope =
@@ -253,6 +323,12 @@ module FinalitySurface =
             StreamId.Session payload.ReviewerSessionId
         | Fact.Agent(AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)) ->
             StreamId.Session payload.ReviewerSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleLinked payload)) ->
+            StreamId.Session payload.ParentSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted payload)) ->
+            StreamId.Session payload.ParentSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleRetired payload)) ->
+            StreamId.Session payload.ParentSessionId
         | _ -> StreamId.Workspace
 
     let private sessionOfStream (stream: StreamId) : SessionId option =
@@ -279,9 +355,14 @@ module FinalitySurface =
             let stream = streamOf fact
             let session = firstSession managerSession stream
 
+            let eventKind =
+                match str event?kind with
+                | "finality-requested" -> "FinalityRequested"
+                | other -> other
+
             Fold.foldEnvelope projection (envelopeFor nextSeq stream fact)
             |> Result.mapError (fun rejection ->
-                sprintf "fold rejected lifecycle event %d (%A): %A" nextSeq stream rejection)
+                sprintf "fold rejected %s at lifecycle event %d (%A): %A" eventKind nextSeq stream rejection)
             |> Result.map (fun next -> (nextSeq, next, session)))
 
     /// Fold a JS event list through the production fold, threading the
@@ -386,10 +467,10 @@ module FinalitySurface =
                    openingUserMessageId = PhysicalUserMessageId.value life.OpeningUserMessageId
                    openingTextRef = BlobRef.value life.OpeningTextRef
                    openingTextDigest = BlobDigest.value life.OpeningTextDigest
-                   openingCursorSequence = life.OpeningCursor.Sequence
+                   openingCursorSequence = int life.OpeningCursor.Sequence
                    protectedPrefixEnd =
                     life.ProtectedPrefixEnd
-                    |> Option.map (fun cursor -> box cursor.Sequence)
+                    |> Option.map (fun cursor -> box (int cursor.Sequence))
                     |> Option.defaultValue null
                    activeFinality = life.ActiveFinality |> Option.map requestView |> Option.defaultValue null
                    enlistedReviewers =
@@ -570,13 +651,12 @@ module FinalitySurface =
             |> List.map slotView
             |> List.toArray
 
-    /// GLORY-045 roster algebra from a durable `AgentJournal.snapshot`:
-    /// the projection is an opaque snapshot, lifeId / requestId are plain
-    /// strings, and the answer is JS-shaped slots. No Fable types cross the
-    /// boundary beyond the snapshot handle itself.
+    /// GLORY-045 roster algebra from an opaque projection handle: the lifeId /
+    /// requestId are plain strings and the answer is JS-shaped slots. The
+    /// projection remains inside the FinalitySurface world capability.
     let cohortRosterFromSnapshot (snapshot: obj) (lifeId: string) (requestId: string) : obj array =
-        let projection = unbox<ProjectionSet> snapshot
-        let ps = projection.AgentProjections
+        let world = asWorld snapshot
+        let ps = world.Projection.AgentProjections
         let lifeId = ManagerLifeId.create lifeId
         let requestId = FinalityRequestId.create requestId
 
@@ -714,3 +794,171 @@ module FinalitySurface =
             {| kind = "confirmed"
                reviewerSessionId = reviewerSessionId
                barrierId = barrierId |}
+
+    /// FINALITY-001: the Finality capability is granted only to Manager. The
+    /// role and permission labels are plain strings at this boundary.
+    let isAllowed (role: string) (permission: string) : bool =
+        RolesSurface.isAllowed role permission
+
+    /// FINALITY-027: durable parent-visible handles are the Manager's only
+    /// background obligation. Hidden Reviewer handles stay invisible through
+    /// the same HandleProjection.listable rule used by TerminalPolicy.
+    let backgroundOutstanding (world: obj) (sessionId: string) : bool =
+        let world = asWorld world
+        let session = SessionId.create sessionId
+
+        AgentProjection.tryFind session world.Projection.AgentProjections
+        |> Option.bind (fun projection -> projection.Handles)
+        |> Option.map (HandleProjection.listable >> List.isEmpty >> not)
+        |> Option.defaultValue false
+
+    // ── ManagerJob history projection (FINALITY-028) ─────────────────────────
+
+    let private jobProgressOf (event: obj) : Result<JobProgress, string> =
+        match str (event?progress) with
+        | "manager-started" -> Ok JobProgress.ManagerStarted
+        | "candidate-ready" ->
+            Ok
+                (JobProgress.CandidateReady
+                    {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
+                       PreRebaseReviewBarrierId = ReviewBarrierId.create (str (event?preRebaseReviewBarrierId)) |})
+        | "conflict-pending" ->
+            Ok
+                (JobProgress.ConflictPending
+                    {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
+                       TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
+                       ConflictFiles = stringArrayOf (event?conflictFiles)
+                       DiagnosticsDigest = str (event?diagnosticsDigest) |})
+        | "rebased-candidate-ready" ->
+            Ok
+                (JobProgress.RebasedCandidateReady
+                    {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
+                       TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
+                       PostRebaseReviewBarrierId = ReviewBarrierId.create (str (event?postRebaseReviewBarrierId)) |})
+        | "publish-claimed" ->
+            Ok
+                (JobProgress.PublishClaimed
+                    {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
+                       ExpectedHead = CommitHash.create (str (event?expectedHead)) |})
+        | "published" ->
+            Ok
+                (JobProgress.Published
+                    {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
+                       ResultingTargetHead = CommitHash.create (str (event?resultingTargetHead)) |})
+        | "failed" -> Ok(JobProgress.Failed(str (event?reason)))
+        | "abandoned" -> Ok JobProgress.Abandoned
+        | other -> Error $"unknown ManagerJob progress kind: {other}"
+
+    let private jobProjectionEvents (events: obj array) : Result<OrchestratorProjection, string> =
+        let rec loop (projection: OrchestratorProjection) (remaining: obj list) =
+            match remaining with
+            | [] -> Ok projection
+            | event :: rest ->
+                match str (event?kind) with
+                | "job-created" ->
+                    let job =
+                        {| ManagerJobId = ManagerJobId.create (str (event?jobId))
+                           ManagerSessionId = SessionId.create (str (event?managerSessionId))
+                           ManagerAgent = str (event?managerAgent)
+                           Byname = str (event?byname)
+                           WorktreeIdentity = WorktreeIdentity.create (str (event?worktreeIdentity))
+                           WorktreePath = WorktreePath.create (str (event?worktreePath))
+                           TargetRef = TargetRef.create (str (event?targetRef))
+                           TargetBranchFrozen = str (event?targetBranchFrozen) |}
+
+                    loop (OrchestratorProjection.createJob job projection) rest
+                | "job-progress" ->
+                    let jobId = ManagerJobId.create (str (event?jobId))
+
+                    jobProgressOf event
+                    |> Result.map (fun progress -> OrchestratorProjection.recordProgress jobId progress projection)
+                    |> Result.bind (fun next -> loop next rest)
+                | other -> Error $"unknown ManagerJob event kind: {other}"
+
+        loop OrchestratorProjection.empty (List.ofArray events)
+
+    let private jobProgressView (progress: JobProgress) : obj =
+        match progress with
+        | JobProgress.ManagerStarted -> box {| kind = "manager-started" |}
+        | JobProgress.CandidateReady candidate ->
+            box
+                {| kind = "candidate-ready"
+                   candidateCommit = CommitHash.value candidate.CandidateCommit
+                   preRebaseReviewBarrierId = ReviewBarrierId.value candidate.PreRebaseReviewBarrierId |}
+        | JobProgress.ConflictPending conflict ->
+            box
+                {| kind = "conflict-pending"
+                   candidateCommit = CommitHash.value conflict.CandidateCommit
+                   targetHeadSnapshot = CommitHash.value conflict.TargetHeadSnapshot
+                   conflictFiles = conflict.ConflictFiles |> List.toArray
+                   diagnosticsDigest = conflict.DiagnosticsDigest |}
+        | JobProgress.RebasedCandidateReady rebased ->
+            box
+                {| kind = "rebased-candidate-ready"
+                   rebasedCommit = CommitHash.value rebased.RebasedCommit
+                   targetHeadSnapshot = CommitHash.value rebased.TargetHeadSnapshot
+                   postRebaseReviewBarrierId = ReviewBarrierId.value rebased.PostRebaseReviewBarrierId |}
+        | JobProgress.PublishClaimed claim ->
+            box
+                {| kind = "publish-claimed"
+                   rebasedCommit = CommitHash.value claim.RebasedCommit
+                   expectedHead = CommitHash.value claim.ExpectedHead |}
+        | JobProgress.Published published ->
+            box
+                {| kind = "published"
+                   candidateCommit = CommitHash.value published.CandidateCommit
+                   resultingTargetHead = CommitHash.value published.ResultingTargetHead |}
+        | JobProgress.Failed reason -> box {| kind = "failed"; reason = reason |}
+        | JobProgress.Abandoned -> box {| kind = "abandoned" |}
+
+    let private recoveryActionView (action: JobRecoveryAction) : obj =
+        match action with
+        | JobRecoveryAction.ResumeManager -> box {| kind = "resume-manager" |}
+        | JobRecoveryAction.RebaseReviewPublish commit ->
+            box {| kind = "rebase-review-publish"; candidateCommit = CommitHash.value commit |}
+        | JobRecoveryAction.ResumeConflictResolution conflict ->
+            box
+                {| kind = "resume-conflict-resolution"
+                   candidateCommit = CommitHash.value conflict.CandidateCommit
+                   conflictFiles = conflict.ConflictFiles |> List.toArray |}
+        | JobRecoveryAction.AttemptPublish claim ->
+            box
+                {| kind = "attempt-publish"
+                   rebasedCommit = CommitHash.value claim.RebasedCommit
+                   expectedHead = CommitHash.value claim.ExpectedHead |}
+        | JobRecoveryAction.BackfillPublished published ->
+            box
+                {| kind = "backfill-published"
+                   rebasedCommit = CommitHash.value published.RebasedCommit
+                   resultingTargetHead = CommitHash.value published.ResultingTargetHead |}
+        | JobRecoveryAction.RebaseAndReviewAgain -> box {| kind = "rebase-and-review-again" |}
+        | JobRecoveryAction.CleanUp -> box {| kind = "clean-up" |}
+        | JobRecoveryAction.FailClosed reason -> box {| kind = "fail-closed"; reason = reason |}
+
+    let private jobView (job: ManagerJobProjection) : obj =
+        box
+            {| jobId = ManagerJobId.value job.ManagerJobId
+               managerSessionId = SessionId.value job.ManagerSessionId
+               managerAgent = job.ManagerAgent
+               byname = job.Byname
+               worktreeIdentity = WorktreeIdentity.value job.WorktreeIdentity
+               worktreePath = WorktreePath.value job.WorktreePath
+               targetRef = TargetRef.value job.TargetRef
+               targetBranchFrozen = job.TargetBranchFrozen
+               progress = jobProgressView job.Progress
+               recovery = recoveryActionView (OrchestratorProjection.recoveryAction None job) |}
+
+    /// FINALITY-028: fold plain ManagerJob history and return only JS-native
+    /// job records, active records, and recovery decisions.
+    let jobProjection (events: obj array) : obj =
+        match jobProjectionEvents events with
+        | Error message -> box {| ok = false; error = message |}
+        | Ok projection ->
+            let jobs = projection.Jobs |> Map.toList |> List.map (fun (_, job) -> jobView job) |> List.toArray
+
+            let activeJobs =
+                OrchestratorProjection.activeJobs projection
+                |> List.map jobView
+                |> List.toArray
+
+            box {| ok = true; jobs = jobs; activeJobs = activeJobs |}

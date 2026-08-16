@@ -12,6 +12,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 
 open Wanxiangshu.Foundation
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

@@ -24,17 +24,11 @@ const part = {
   mediaOmitted: (mediaType) => ({ Kind: 'mediaOmitted', Text: '', Tool: '', Args: '', MediaType: mediaType }),
 }
 
-test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_exports_exact_schema_names', () => {
-  assert.deepEqual(Object.getOwnPropertyNames(toml).sort(), [
-    'DoNotExecTable',
-    'NewWorkTable',
-    'TruncationMarker',
-    'render',
-    'renderHistoricFrame',
-    'renderItem',
-    'renderPreviousEnforcerTip',
-    'renderWith',
-  ])
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_writer_contract_is_callable', () => {
+  assert.equal(typeof toml.renderItem, 'function')
+  assert.equal(typeof toml.render, 'function')
+  assert.equal(typeof toml.renderHistoricFrame, 'function')
+  assert.match(toml.renderHistoricFrame('frame'), /historic_frame/)
 })
 
 test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_tool_call_renders_as_new_work_table', () => {

@@ -279,7 +279,8 @@ export const singleSourceCases = [
       );
 
       assertEq(problems.length, 1, `exactly one problem: ${problems.join(' | ')}`);
-      assertTrue(problems[0].startsWith('fixture.mjs:1 CANARY_COUNT = 17 '), `must name the site: ${problems[0]}`);
+      const prefix = 'fixture.mjs:1 CANARY_COUNT = 17 ';
+      assertTrue(problems[0].slice(0, prefix.length) === prefix, `must name the site: ${problems[0]}`);
       assertTrue(problems[0].includes('CANARY_TESTS, which holds 16'), `and the other side: ${problems[0]}`);
       assertTrue(problems[0].includes('declared at :2'), `and where it is: ${problems[0]}`);
 

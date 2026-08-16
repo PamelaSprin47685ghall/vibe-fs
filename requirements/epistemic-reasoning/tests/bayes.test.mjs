@@ -44,7 +44,7 @@ test('WHAT[EPI-009] bayesian_posterior_requires_explicit_numeric_qualification',
     ],
   })
 
-  assert.equal(state(store, handle).Bayesian, undefined)
+  assert.equal(state(store, handle).bayesian, null)
 })
 
 test('WHAT[EPI-009] qualified_independent_evidence_updates_posterior', () => {
@@ -79,7 +79,7 @@ test('WHAT[EPI-009] qualified_independent_evidence_updates_posterior', () => {
 
   assert.equal(next.status, 'yield')
   assert.equal(next.request.type, 'GenerateCandidatesRequest')
-  const posterior = Object.fromEntries(state(store, handle).Bayesian.Posterior)
+  const posterior = state(store, handle).bayesian.posterior
   assert.ok(Math.abs(posterior.up - 0.7) < 1e-12)
   assert.ok(Math.abs(posterior.down - 0.3) < 1e-12)
 })
@@ -115,7 +115,7 @@ test('WHAT[EPI-009] unqualified_item_cannot_mask_qualified_evidence_from_same_de
     ],
   })
 
-  const posterior = Object.fromEntries(state(store, handle).Bayesian.Posterior)
+  const posterior = state(store, handle).bayesian.posterior
   assert.ok(Math.abs(posterior.up - 0.9) < 1e-12)
   assert.ok(Math.abs(posterior.down - 0.1) < 1e-12)
 })
@@ -152,8 +152,8 @@ test('WHAT[EPI-006] same_semantic_evidence_from_independent_dependency_groups_is
   })
 
   const current = state(store, handle)
-  const posterior = Object.fromEntries(current.Bayesian.Posterior)
-  assert.equal(current.Evidence.size, 2)
+  const posterior = current.bayesian.posterior
+  assert.equal(current.evidence.length, 2)
   assert.ok(Math.abs(posterior.up - 12 / 13) < 1e-12)
   assert.ok(Math.abs(posterior.down - 1 / 13) < 1e-12)
 })
@@ -189,8 +189,8 @@ test('WHAT[EPI-006] same_dependency_group_is_not_counted_as_independent_evidence
     ],
   })
 
-  const belief = state(store, handle).Bayesian
-  const posterior = Object.fromEntries(belief.Posterior)
+  const belief = state(store, handle).bayesian
+  const posterior = belief.posterior
   assert.ok(Math.abs(posterior.up - 0.8) < 1e-12)
   assert.ok(Math.abs(posterior.down - 0.2) < 1e-12)
 })

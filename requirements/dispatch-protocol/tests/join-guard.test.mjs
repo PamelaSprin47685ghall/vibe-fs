@@ -9,57 +9,41 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import {
-  agentJournal, agentFact, sessionId, logicalRunId, authorityRoot,
-  stream, promptDispatcher, transportReceipt,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const { nudge } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinGuard.js')
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as joinGuard from '../../../dist/Interaction/Dispatch/JoinGuardSurface.js'
 
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
   SendPrompt: async (session, text, options) => {
     captured.push({ session, text, options })
     if (behaviour.failFirst && captured.length === 1) {
-      return { tag: 2, fields: ['port refused'] }
+      return dispatch.retryable('port refused')
     }
-    return promptDispatcher.admittedWithReceipt(transportReceipt('accepted-jg'))
+    return dispatch.admittedWithReceipt('accepted-jg')
   },
 })
 
-const rootFact = (sid) =>
-  agentFact('AuthorityRootAccepted', {
-    SessionId: sid,
-    LogicalRunId: logicalRunId(`run-${sid}`),
-    AuthorityRootUserMessageId: authorityRoot(`root-${sid}`),
-    AuthorityKind: 'AgentOwnerRoot',
-    SelectedAgent: 'fast-coder',
-    PeerAgent: 'deep-coder',
-    CanonicalRole: 'coder',
-    SelectedTier: 'fast',
-  })
-
-const outcomeName = (outcome) => outcome.name
-
 test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
-  const sid = sessionId('ses_jg2')
+  const sid = 'ses_jg2'
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
-  const opened = await agentJournal.create({ directory: dir })
+  const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg2', 'rt-jg2', 4242, '2026-01-01T00:00:00Z')
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const appended = await agentJournal.appendAgent(stream.session(sid), undefined, rootFact(sid), opened.journal)
-  assert.equal(appended.ok, true, 'authority root must fold')
+  const appended = await dispatch.appendAuthorityRoot(opened.journal, sid, 'fast-coder')
+  assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))
   try {
     const captured = []
+    const reservations = joinGuard.newReservations()
     const port = capturingPort(captured, { failFirst: true })
 
-    const first = await nudge(port, opened.journal, new Set(), sid, undefined)
-    assert.equal(outcomeName(first), 'Failed', 'a refused port must surface as Failed')
+    const first = await joinGuard.nudge(port, opened.journal, reservations, sid, null)
+    assert.equal(first.outcome, 'Failed', 'a refused port must surface as Failed')
 
-    const second = await nudge(port, opened.journal, new Set(), sid, undefined)
-    assert.equal(outcomeName(second), 'Sent', 'the key must be released after a failed send')
+    const second = await joinGuard.nudge(port, opened.journal, reservations, sid, null)
+    assert.equal(second.outcome, 'Sent', 'the key must be released after a failed send')
     assert.equal(captured.length, 2)
   } finally {
-    try { opened.dispose() } catch {}
+    try { journal.JournalSurface_dispose(opened.journal) } catch {}
     rmSync(dir, { recursive: true, force: true })
   }
 })

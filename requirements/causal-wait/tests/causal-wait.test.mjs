@@ -1,143 +1,202 @@
-// DSL-012 causal wait registry / await bracket (RED-1..RED-4, history, RED-8).
-// Process-local diagnostic observation only — never Journal / recovery / branch input.
+// CAUSAL-002/005/006/008 — process-local causal-wait lifecycle and event-driven waits.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  causalAwait,
-  causalWait,
-  causalWaitHub,
-  CausalWaitRegistry,
-  listItems,
-  taskSource,
-} from '../../verification-system/tests/support/domain.mjs'
+import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
 
-const owner = (id) => causalWait.owner('flow', [['id', id]])
-const external = (id) => causalWait.externalProducer('capability', [['id', id]])
+const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
+const process = await import('../../../dist/Process/Surface.js')
 
+const owner = (id) => causal.owner('flow', { id })
+const external = (id) => causal.externalProducer('capability', { id })
 const waitFor = (ownerId, producerId, waitKind = 'capability') =>
-  causalWait.create({
+  causal.createWait({
     waitKind,
     owner: owner(ownerId),
-    subject: [['target', producerId]],
+    subject: { target: producerId },
     producer: external(producerId),
+    escapes: [causal.escape('processLifetime')],
     source: 'causal-wait.test',
   })
 
-const viewSnapshot = (snapshot) => {
-  const history = listItems(snapshot.History).map((t) => ({
-    kind: t.Kind.name,
-    exit: t.Exit == null ? undefined : t.Exit.name,
-    ownerKey: causalWait.ownerKey(t.Wait.Owner),
-    producerKey: causalWait.producerKey(t.Wait.Producer),
-  }))
+const deferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((resolveValue, rejectValue) => {
+    resolve = resolveValue
+    reject = rejectValue
+  })
   return {
-    active: listItems(snapshot.Active),
-    history,
-    sequence: snapshot.Sequence,
+    promise,
+    resolve,
+    reject,
+    cancel: () => reject(new Error('Operation Cancelled')),
   }
 }
 
-const lastExit = (snapshot) => {
-  const history = listItems(snapshot.History)
+const lastExit = (registry) => {
+  const history = causal.snapshot(registry).history
   assert.ok(history.length > 0, 'expected history')
-  const exit = history.at(-1).Exit
-  assert.ok(exit != null, 'expected leave exit')
-  return exit.name
+  assert.ok(history.at(-1).exit, 'expected leave exit')
+  return history.at(-1).exit
 }
 
+const activeCount = (registry) => causal.snapshot(registry).active.length
+
+// ── lifecycle ────────────────────────────────────────────────────────────────
+
 test('WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter', () => {
-  const registry = new CausalWaitRegistry()
+  const registry = causal.createRegistry()
   const descriptor = waitFor('A', 'X')
-  const lease = registry.Enter(descriptor)
-  const snap = viewSnapshot(registry.Snapshot())
+  const lease = causal.enter(registry, descriptor)
+  assertOpaque(registry, 'causal registry')
+  assertOpaque(lease, 'wait lease')
+  const snap = causal.snapshot(registry)
 
   assert.equal(snap.active.length, 1)
-  assert.equal(causalWait.ownerKey(snap.active[0].Owner), 'flow:id=A')
-  assert.equal(causalWait.producerKey(snap.active[0].Producer), 'external:capability:id=X')
+  assert.equal(causal.ownerKey(snap.active[0].owner), 'flow:id=A')
+  assert.equal(causal.producerKey(snap.active[0].producer), 'external:capability:id=X')
   assert.equal(snap.history.length, 1)
   assert.equal(snap.history[0].kind, 'Entered')
 
-  lease.Dispose()
+  causal.dispose(lease)
 })
 
 test('WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved', async () => {
-  const registry = new CausalWaitRegistry()
-  const pending = taskSource()
-  const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
+  const registry = causal.createRegistry()
+  const pending = deferred()
+  const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
 
-  assert.equal(listItems(registry.Snapshot().Active).length, 1, 'visible while pending')
+  assert.equal(activeCount(registry), 1, 'visible while pending')
   pending.resolve('ok')
   assert.equal(await awaited, 'ok')
-
-  const snap = registry.Snapshot()
-  assert.equal(listItems(snap.Active).length, 0)
-  assert.equal(lastExit(snap), 'WaitResolved')
+  assert.equal(activeCount(registry), 0)
+  assert.equal(lastExit(registry), 'WaitResolved')
 })
 
 test('WHAT[CAUSAL-006] RED_3_fail_clears_active_and_records_failed', async () => {
-  const registry = new CausalWaitRegistry()
-  const pending = taskSource()
-  const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
+  const registry = causal.createRegistry()
+  const pending = deferred()
+  const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
 
   pending.reject(new Error('boom'))
   await assert.rejects(() => awaited, /boom/)
-
-  const snap = registry.Snapshot()
-  assert.equal(listItems(snap.Active).length, 0)
-  assert.equal(lastExit(snap), 'WaitFailed')
+  assert.equal(activeCount(registry), 0)
+  assert.equal(lastExit(registry), 'WaitFailed')
 })
 
 test('WHAT[CAUSAL-006] RED_4_cancel_clears_active_and_records_cancelled', async () => {
-  const registry = new CausalWaitRegistry()
-  const pending = taskSource()
-  const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
+  const registry = causal.createRegistry()
+  const pending = deferred()
+  const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
 
   pending.cancel()
   await assert.rejects(() => awaited)
-
-  const snap = registry.Snapshot()
-  assert.equal(listItems(snap.Active).length, 0)
-  assert.equal(lastExit(snap), 'WaitCancelled')
+  assert.equal(activeCount(registry), 0)
+  assert.equal(lastExit(registry), 'WaitCancelled')
 })
 
 test('WHAT[CAUSAL-006] RED_4_cancel_message_also_classifies_as_cancelled', async () => {
-  const registry = new CausalWaitRegistry()
-  const pending = taskSource()
-  const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
+  const registry = causal.createRegistry()
+  const pending = deferred()
+  const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
 
   pending.reject(new Error('Operation Cancelled'))
   await assert.rejects(() => awaited, /Cancel/)
-
-  assert.equal(lastExit(registry.Snapshot()), 'WaitCancelled')
-  assert.equal(listItems(registry.Snapshot().Active).length, 0)
+  assert.equal(lastExit(registry), 'WaitCancelled')
+  assert.equal(activeCount(registry), 0)
 })
 
 test('WHAT[CAUSAL-006] history_capacity_bounds_ring_buffer', () => {
-  const registry = new CausalWaitRegistry(2)
+  const registry = causal.createRegistry(2)
   for (let i = 0; i < 3; i += 1) {
-    const lease = registry.Enter(waitFor('A', `X${i}`))
-    lease.MarkExit(causalWait.exit.resolved())
-    lease.Dispose()
+    const lease = causal.enter(registry, waitFor('A', `X${i}`))
+    causal.markExit(lease, 'WaitResolved')
+    causal.dispose(lease)
   }
 
-  const history = listItems(registry.Snapshot().History)
+  const history = causal.snapshot(registry).history
   assert.equal(history.length, 2)
   assert.ok(history.length <= 2)
 })
 
 test('WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
-  assert.equal(typeof causalWaitHub.observer.Enter, 'function')
-  assert.equal(typeof causalWaitHub.snapshot, 'function')
-  assert.equal(typeof causalWaitHub.reader.Snapshot, 'function')
+  assert.equal(causal.observerHasSnapshot(), false)
+  assert.equal(causal.readerHasSnapshot(), true)
 
-  // Application-facing contract: observer is for Enter; Snapshot is read via
-  // CausalWaitHub_snapshot / reader, not as a required observer API surface.
-  const lease = causalWaitHub.observer.Enter(waitFor('hub', 'ext'))
-  const viaSnapshotFn = causalWaitHub.snapshot()
-  const viaReader = causalWaitHub.reader.Snapshot()
-  assert.ok(listItems(viaSnapshotFn.Active).length >= 1)
-  assert.ok(listItems(viaReader.Active).length >= 1)
-  lease.MarkExit(causalWait.exit.resolved())
-  lease.Dispose()
+  const lease = causal.hubEnter(waitFor('hub', 'ext'))
+  const viaSnapshotFn = causal.hubSnapshot()
+  assert.ok(viaSnapshotFn.active.length >= 1)
+  causal.markExit(lease, 'WaitResolved')
+  causal.dispose(lease)
+})
+
+// ── event-driven causal wait ─────────────────────────────────────────────────
+
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', async () => {
+  const registry = causal.createRegistry()
+  const timer = process.createVirtualTimer()
+  const handle = process.timerDelay(timer, 10_000)
+  const result = await causal.untilSignalOrDeadline(
+    registry,
+    waitFor('A', 'X', 'until-signal-or-deadline'),
+    handle,
+    () => 42,
+    () => new Promise(() => {}),
+  )
+
+  assert.deepEqual(result, { ok: true, value: 42 })
+  assert.equal(activeCount(registry), 0)
+  process.timerDispose(timer)
+})
+
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+  const registry = causal.createRegistry()
+  const timer = process.createVirtualTimer()
+  const handle = process.timerDelay(timer, 5_000)
+  let ready = false
+  const waiters = []
+  const pending = causal.untilSignalOrDeadline(
+    registry,
+    waitFor('A', 'X', 'until-signal-or-deadline'),
+    handle,
+    () => (ready ? 'material' : null),
+    () => new Promise((resolve) => waiters.push(resolve)),
+  )
+
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(waiters.length, 1)
+  ready = true
+  waiters[0]()
+  assert.deepEqual(await pending, { ok: true, value: 'material' })
+  process.timerAdvance(timer, 10_000)
+  assert.equal(activeCount(registry), 0)
+  process.timerDispose(timer)
+})
+
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+  const registry = causal.createRegistry()
+  const timer = process.createVirtualTimer()
+  const handle = process.timerDelay(timer, 250)
+  const waiters = []
+  const pending = causal.untilSignalOrDeadline(
+    registry,
+    waitFor('A', 'X', 'until-signal-or-deadline'),
+    handle,
+    () => null,
+    () => new Promise((resolve) => waiters.push(resolve)),
+  )
+
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(waiters.length, 1)
+  waiters[0]()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(waiters.length, 2)
+  waiters[1]()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(waiters.length, 3)
+  process.timerAdvance(timer, 250)
+  assert.deepEqual(await pending, { ok: false, reason: 'WaitTimedOut' })
+  assert.ok(waiters.length >= 2, `expected ≥2 signal arms, got ${waiters.length}`)
+  process.timerDispose(timer)
 })

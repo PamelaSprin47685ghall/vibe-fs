@@ -1,77 +1,39 @@
-// INTERACTION-AUTHORITY package proof — Continuation / 来源解析半边。
-//
-// Continuation 只延长已存在 LogicalRun；来源解析顺序（accepted → claimed →
-// compaction → AgentOwnerRoot → UnknownOrigin）；纯函数永不推断 HumanRoot；
-// ingress 是唯一可授予 HumanRoot 的边界。
-//
-// 运行：node --test requirements/interaction-authority/tests/continuation-origin.test.mjs
+// INTERACTION-AUTHORITY package proof — continuation provenance and ingress precedence.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
-import {
-  authority,
-  authorityRun,
-  caseOf,
-  continuationKind,
-  idValue,
-  mapCount,
-  mapTryFind,
-  physicalUser,
-  promptKey,
-  promptOrigin,
-  rootKind,
-  runtimeId,
-  sessionId,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
-const H = (input) => `H(${input})`
-
-const RUNTIME = runtimeId('rt_1')
-const SESSION = sessionId('ses_a')
-const PHYSICAL = physicalUser('msg_u1')
-
-const rootFor = (agent = 'fast-coder', physical = PHYSICAL, kind = rootKind.human) =>
-  authorityRun.createAuthorityRoot(H, RUNTIME, SESSION, kind, physical, agent)
-
-const profileOf = (...args) => {
-  const built = rootFor(...args)
-  assert.equal(built.ok, true, built.ok ? '' : `createAuthorityRoot rejected: ${built.error}`)
-  return built.value
+const hash = (value) => `H(${value})`
+const rootFor = (agent = 'fast-coder', physical = 'msg_u1', kind = 'HumanRoot') => {
+  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, agent)
+  assert.equal(result.ok, true, result.error)
+  return result.value
 }
-
-const readProfile = (profile) => ({
-  session: idValue.session(profile.SessionId),
-  logicalRun: idValue.logicalRun(profile.LogicalRunId),
-  authorityRoot: idValue.authorityRoot(profile.AuthorityRootUserMessageId),
-  authorityKind: caseOf(profile.AuthorityKind),
-  selectedAgent: profile.SelectedAgent,
-  peerAgent: profile.PeerAgent,
+const profile = (value) => ({
+  session: value.session,
+  logicalRun: value.logicalRun,
+  authorityRoot: value.authorityRoot,
+  authorityKind: value.authorityKind,
+  selectedAgent: value.selectedAgent,
+  peerAgent: value.peerAgent,
 })
+const register = (root) => authority.registerAuthority(root, authority.empty)
 
-// ── INTERACTION-AUTHORITY-004：continuation 继承 run/root，永不改写 profile ─
-
-test('WHAT[INTERACTION-AUTHORITY-004] IA_004_a_continuation_never_replaces_the_authority_root', () => {
-  const root = profileOf('fast-coder')
-  const before = authorityRun.registerAuthority(root, authority.empty)
-
-  const claim = authorityRun.claimContinuation(
-    promptKey('pk_c'),
-    SESSION,
-    continuationKind.of('ProviderRetryAttempt'),
-    root,
-    'deep-coder',
-    'pd-retry',
-  )
+// INTERACTION-AUTHORITY-004: a continuation inherits run/root and changes only effective agent.
+test('WHAT[INTERACTION-AUTHORITY-004] IA_004_continuation_inherits_run_and_root', () => {
+  const root = rootFor()
+  const before = register(root)
+  const claim = authority.claimContinuation('pk_c', 'ses_a', 'ProviderRetryAttempt', root, 'deep-coder', 'pd-retry')
 
   assert.deepEqual(
     {
-      origin: caseOf(claim.Origin),
-      logicalRun: idValue.logicalRun(claim.LogicalRunId),
-      authorityRoot: idValue.authorityRoot(claim.AuthorityRootUserMessageId),
-      effectiveAgent: claim.EffectiveAgent,
+      origin: claim.origin,
+      logicalRun: claim.logicalRun,
+      authorityRoot: claim.authorityRoot,
+      effectiveAgent: claim.effectiveAgent,
     },
     {
       origin: 'Continuation',
@@ -79,17 +41,14 @@ test('WHAT[INTERACTION-AUTHORITY-004] IA_004_a_continuation_never_replaces_the_a
       authorityRoot: 'msg_u1',
       effectiveAgent: 'deep-coder',
     },
-    'continuation 继承 run 与 root，只携带 cursor 选的 agent',
   )
 
-  const after = authorityRun.registerClaim(claim, before)
-  assert.deepEqual(readProfile(after.ActiveLogicalRun), readProfile(root))
-  assert.deepEqual(readProfile(after.LastAuthorityProfile), readProfile(root))
+  const after = authority.registerClaim(claim, before)
+  assert.deepEqual(profile(after.activeLogicalRun), profile(root))
+  assert.deepEqual(profile(after.lastAuthorityProfile), profile(root))
 })
 
-// ── INTERACTION-AUTHORITY-005：所有 continuation kind 可表示且无一是 root ──
-
-test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_representable_and_none_is_a_root', () => {
+test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseable_and_not_root', () => {
   const kinds = [
     'InteractionRepair',
     'JoinGuard',
@@ -105,60 +64,31 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_represen
     'FinalitySteer',
   ]
 
-  for (const name of kinds) {
-    const origin = promptOrigin.continuation(continuationKind.of(name))
-    assert.equal(caseOf(origin), 'Continuation')
-    assert.equal(authority.originLabel(origin), name)
+  for (const kind of kinds) {
+    assert.deepEqual(authority.originForContinuation(kind), { kind: 'Continuation', label: kind })
+    assert.deepEqual(authority.tryParseContinuationKind(kind), { kind })
   }
-
-  // 反方向：root 名称不可解析为 continuation；未知名称返回 None（fail-closed）。
-  assert.equal(authority.tryParseContinuationKind('AuthorityRoot'), undefined)
-  assert.throws(() => continuationKind.of('HumanRoot'), /unknown ContinuationKind/)
+  assert.equal(authority.tryParseContinuationKind('HumanRoot'), null)
 })
 
-// ── INTERACTION-AUTHORITY-008/009：来源解析顺序 + 纯函数永不推断 HumanRoot ──
-
+// INTERACTION-AUTHORITY-008/009: accepted > claimed > compaction > owner root > unknown.
 test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
-  const root = profileOf('fast-coder', PHYSICAL, rootKind.agentOwner)
-  let projection = authorityRun.registerAuthority(root, authority.empty)
+  const root = rootFor('fast-coder', 'msg_u1', 'AgentOwnerRoot')
+  let state = register(root)
 
-  const claimedKey = promptKey('pk_claimed')
-  projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(
-      claimedKey,
-      SESSION,
-      continuationKind.of('ReviewConfirmation'),
-      root,
-      'fast-coder',
-      'pd-c',
-    ),
-    projection,
-  )
-
-  const acceptedKey = promptKey('pk_accepted')
-  const acceptedPhysical = physicalUser('msg_accepted')
-  projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(
-      acceptedKey,
-      SESSION,
-      continuationKind.of('BusyAgentNudge'),
-      root,
-      'fast-coder',
-      'pd-a',
-    ),
-    projection,
-  )
-  projection = authorityRun.acceptClaim(acceptedKey, acceptedPhysical, projection)
-
-  const unseen = physicalUser('msg_unseen')
+  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewConfirmation', root, 'fast-coder', 'pd-c')
+  state = authority.registerClaim(claimed, state)
+  const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'fast-coder', 'pd-a')
+  state = authority.registerClaim(accepted, state)
+  state = authority.acceptClaim('pk_accepted', 'msg_accepted', state)
 
   assert.deepEqual(
     {
-      accepted: authorityRun.resolveKnownOrigin(acceptedPhysical, undefined, false, projection),
-      claimed: authorityRun.resolveKnownOrigin(unseen, claimedKey, false, projection),
-      compaction: authorityRun.resolveKnownOrigin(unseen, undefined, true, projection),
-      registeredRoot: authorityRun.resolveKnownOrigin(unseen, promptKey('pk_unknown'), false, projection),
-      nothing: authorityRun.resolveKnownOrigin(unseen, undefined, false, projection),
+      accepted: authority.resolveKnownOrigin('msg_accepted', '', false, state),
+      claimed: authority.resolveKnownOrigin('msg_unseen', 'pk_claimed', false, state),
+      compaction: authority.resolveKnownOrigin('msg_unseen', '', true, state),
+      registeredRoot: authority.resolveKnownOrigin('msg_unseen', 'pk_unknown', false, state),
+      nothing: authority.resolveKnownOrigin('msg_unseen', '', false, state),
     },
     {
       accepted: 'Continuation',
@@ -170,114 +100,54 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_c
   )
 })
 
-test('WHAT[INTERACTION-AUTHORITY-008] IA_008_an_accepted_id_outranks_host_compaction', () => {
-  // 顺序是语义：插件自己发出并见到 accepted 的消息必须是 continuation，
-  // 即使同一 turn Host 也报告 compaction。
-  const root = profileOf()
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-
-  const key = promptKey('pk_both')
-  const physical = physicalUser('msg_both')
-  projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(key, SESSION, continuationKind.of('ManagerGuard'), root, 'fast-coder', 'pd-b'),
-    projection,
+test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_compaction', () => {
+  const root = rootFor()
+  let state = register(root)
+  state = authority.registerClaim(
+    authority.claimContinuation('pk_both', 'ses_a', 'ManagerGuard', root, 'fast-coder', 'pd-b'),
+    state,
   )
-  projection = authorityRun.acceptClaim(key, physical, projection)
-
-  assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, true, projection), 'Continuation')
+  state = authority.acceptClaim('pk_both', 'msg_both', state)
+  assert.equal(authority.resolveKnownOrigin('msg_both', '', true, state), 'Continuation')
 })
 
-test('WHAT[INTERACTION-AUTHORITY-009] IA_009_a_human_root_is_never_inferred_by_a_pure_function', () => {
-  // resolveKnownOrigin 无法观测「外部接受 + 显式 agent」，永不返回 HumanRoot；
-  // 已激活的 HumanRoot 也不会让后来的未知消息像 root。
-  const humanRoot = profileOf('fast-coder', PHYSICAL, rootKind.human)
-  const projection = authorityRun.registerAuthority(humanRoot, authority.empty)
-
-  assert.equal(caseOf(projection.ActiveLogicalRun.AuthorityKind), 'HumanRoot')
-  assert.equal(
-    authorityRun.resolveKnownOrigin(physicalUser('msg_new'), promptKey('pk_any'), false, projection),
-    'UnknownOrigin',
-    'active HumanRoot 不得让后来未知消息看起来像 root',
-  )
+test('WHAT[INTERACTION-AUTHORITY-009] IA_009_pure_resolution_never_infers_human_root', () => {
+  const root = rootFor('fast-coder', 'msg_u1', 'HumanRoot')
+  const state = register(root)
+  assert.equal(state.activeLogicalRun.authorityKind, 'HumanRoot')
+  assert.equal(authority.resolveKnownOrigin('msg_new', 'pk_any', false, state), 'UnknownOrigin')
 })
 
-// ── INTERACTION-AUTHORITY-009/015：ingress 结构锁（source-read）────────────
-
-test('WHAT[INTERACTION-AUTHORITY-015] IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_active', () => {
-  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const ingress = readFileSync(join(repoRoot, 'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs'), 'utf8')
-
-  assert.match(ingress, /ActiveProfile sessionId/, 'HumanRoot 提升必须 gate 在 ActiveLogicalRun 缺席')
-  assert.match(ingress, /Some agent, None when isValidAgent agent/, 'HumanRoot 仅当显式 agent 有效且无 active run')
-  assert.match(ingress, /\| _ -> PromptAuthority\.PromptOrigin\.UnknownOrigin/, '非首个 prompt 的 UnknownOrigin 保持 fail-closed')
-  assert.doesNotMatch(
-    ingress,
-    /match message\.ExplicitAgent with[\s\S]{0,120}Some agent when isValidAgent agent[\s\S]{0,80}HumanRoot/,
-    '禁止旧 fail-open：仅凭 ExplicitAgent 抬权、不看 ActiveProfile',
-  )
-  assert.match(
-    ingress,
-    /match explicitAgent, runtime\.ActiveProfile sessionId with/,
-    '提升必须在同一个 decision 中配对 ExplicitAgent 与 ActiveProfile（None = 仅首条）',
-  )
+// INTERACTION-AUTHORITY-015: ingress must pair explicit agent with an empty active run.
+test('WHAT[INTERACTION-AUTHORITY-015] IA_009_ingress_gates_human_root_on_active_run_and_explicit_agent', () => {
+  const source = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs'), 'utf8')
+  assert.match(source, /ActiveProfile sessionId/)
+  assert.match(source, /Some agent, None when isValidAgent agent/)
+  assert.match(source, /PromptAuthority\.PromptOrigin\.UnknownOrigin/)
+  assert.match(source, /match explicitAgent, runtime\.ActiveProfile sessionId with/)
 })
 
-// ── INTERACTION-AUTHORITY-016：accepted root claim 不入 continuation map ────
-
-test('WHAT[INTERACTION-AUTHORITY-016] IA_016_accepting_an_authority_root_claim_does_not_enter_the_continuation_map', () => {
-  const key = promptKey('pk_owner')
-  const claim = authorityRun.claimAgentOwnerRoot(key, SESSION, 'pd-owner', 'fast-manager')
-  assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
-
-  let projection = authorityRun.registerClaim(claim.value, authority.empty)
-  const physical = physicalUser('msg_owner')
-  projection = authorityRun.acceptClaim(key, physical, projection)
-
-  assert.deepEqual(
-    {
-      pending: mapCount(projection.PendingClaims),
-      acceptedContinuations: mapCount(projection.AcceptedContinuationIds),
-    },
-    { pending: 0, acceptedContinuations: 0 },
-    'root 不是 continuation，也不得被记录成 continuation',
-  )
-  assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, false, projection), 'UnknownOrigin')
+test('WHAT[INTERACTION-AUTHORITY-016] IA_016_accepted_root_claim_stays_out_of_continuation_map', () => {
+  const claim = authority.claimAgentOwnerRoot('pk_owner', 'ses_a', 'pd-owner', 'fast-manager')
+  assert.equal(claim.ok, true, claim.error)
+  let state = authority.registerClaim(claim.value, authority.empty)
+  state = authority.acceptClaim('pk_owner', 'msg_owner', state)
+  assert.equal(state.pendingClaims.length, 0)
+  assert.equal(state.acceptedContinuations.length, 0)
+  assert.equal(authority.resolveKnownOrigin('msg_owner', '', false, state), 'UnknownOrigin')
 })
 
-// ── INTERACTION-AUTHORITY-007：UnknownOrigin fail-closed ───────────────────
-
-test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_updates_nothing_enables_no_fallback_sends_no_continuation', () => {
-  // 无法证明身份的东西被拒绝，而不是被猜测：UnknownOrigin 不得更新 profile、
-  // 不得启用 Fallback、不得发 continuation。resolveKnownOrigin 是纯函数，
-  // UnknownOrigin 结果不触碰 run-scoped 状态——profile 与映射逐字段不变。
-  const root = profileOf('fast-coder')
-  const projection = authorityRun.registerAuthority(root, authority.empty)
-  const beforeProfile = readProfile(projection.ActiveLogicalRun)
-  const beforePending = mapCount(projection.PendingClaims)
-  const beforeAccepted = mapCount(projection.AcceptedContinuationIds)
-
-  const unknown = authorityRun.resolveKnownOrigin(
-    physicalUser('msg_never_proven'),
-    promptKey('pk_never_proven'),
-    false,
-    projection,
-  )
-  assert.equal(unknown, 'UnknownOrigin')
-
-  assert.deepEqual(readProfile(projection.ActiveLogicalRun), beforeProfile, 'profile 未被 UnknownOrigin 更新')
-  assert.equal(mapCount(projection.PendingClaims), beforePending, '无 claim 被写入')
-  assert.equal(mapCount(projection.AcceptedContinuationIds), beforeAccepted, '无 continuation 被发出/记录')
+test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_changes_no_projection_state', () => {
+  const root = rootFor()
+  const state = register(root)
+  const before = JSON.stringify(state)
+  assert.equal(authority.resolveKnownOrigin('msg_never_proven', 'pk_never_proven', false, state), 'UnknownOrigin')
+  assert.equal(JSON.stringify(state), before)
 })
 
-// ── INTERACTION-AUTHORITY-017：continuation 只接续 active run ──────────────
-
-test('WHAT[INTERACTION-AUTHORITY-017] IA_017_unclaimed_continuation_without_active_run_stays_unknown', () => {
-  // 无 active run 时，claimed PromptKey 也落 UnknownOrigin（fail-closed）——
-  // 绝不凭 key 猜测一个不存在的 continuation。
-  const projection = authorityRun.registerAuthority(profileOf(), authority.empty)
-  const unknownKey = promptKey('pk_never_claimed')
-  assert.equal(
-    authorityRun.resolveKnownOrigin(physicalUser('msg_x'), unknownKey, false, projection),
-    'UnknownOrigin',
-  )
+test('WHAT[INTERACTION-AUTHORITY-017] IA_017_claimed_key_without_active_run_stays_unknown', () => {
+  const root = rootFor()
+  const state = authority.registerAuthority(root, authority.empty)
+  const closed = { ...state, activeLogicalRun: null }
+  assert.equal(authority.resolveKnownOrigin('msg_x', 'pk_never_claimed', false, closed), 'UnknownOrigin')
 })

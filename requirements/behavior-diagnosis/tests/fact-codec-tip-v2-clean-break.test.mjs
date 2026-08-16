@@ -1,114 +1,97 @@
-// Split from tests/unit/journal/fact-codec.test.mjs (cutover Wave 2a); owner: behavior-diagnosis
+// Tip-v2 clean break at the Blogger observation fact codec.
 //
-// ENFORCER-072 tip-v2 clean break at the fact codec: ScoreVectorRef-era
-// observation commits and entries without a TipRuleId are refused, modern tip-v2
-// entries pass the marker check, and the legacy observation tags
-// (BlogEntryCommitted / BlogSquashCommitted) encode/dual-decode to the new
-// observation names (BD-012: BlogObservationCommitted is the only atomic fact).
-
+// The test speaks only the Blog owner surface. Fact payload identities are
+// semantic strings at this boundary; FactCodec owns their typed conversion.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 
-import {
-  agentFactCaseOf,
-  blobDigest,
-  blobRef,
-  bloggerRequestId,
-  fact,
-  frameEpochId,
-  journal,
-  payloadOf,
-  prefixEpochId,
-  providerRun,
-  sessionId,
-} from '../../verification-system/tests/support/domain.mjs'
+const observation = (overrides = {}) => ({
+  case: 'BlogObservationCommitted',
+  sessionId: 'ses_obs',
+  bloggerSessionId: 'ses_blogger',
+  requestId: 'req-obs',
+  frameEpoch: 0,
+  previousIngestedThroughSequence: 0,
+  nextIngestedThroughSequence: 1,
+  previousCoverableTurnCutoffExclusive: 0,
+  nextCoverableTurnCutoffExclusive: 1,
+  nextCoveredPrefixDigest: 'd-1',
+  textRef: 'blobs/blob-obs',
+  textDigest: 'sha-obs',
+  run: 'run-obs',
+  toolCallIds: [],
+  tipRuleId: 'rule-obs',
+  fieldNameAtCommit: 'field-obs',
+  evidenceRef: undefined,
+  observedPrefixEpoch: 0,
+  ...overrides,
+})
+
+const squashed = () => ({
+  case: 'BlogObservationsSquashed',
+  sessionId: 'ses_obs',
+  bloggerSessionId: 'ses_blogger',
+  requestId: 'req-squash',
+  previousFrameEpoch: 0,
+  nextFrameEpoch: 1,
+  coveredFrameCount: 1,
+  textRef: 'blobs/blob-squash',
+  textDigest: 'sha-squash',
+  run: 'run-squash',
+})
 
 test('WHAT[BD-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = `{"${tag}":{"ScoreVectorRef":"sv-1","TipRuleId":"rule"}}`
-    assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
+    assert.equal(blog.containsLegacyScoreVectorEntry(legacy), true, tag)
 
-    const decoded = journal.deserializeFact(legacy)
+    const decoded = blog.deserializeFact(legacy)
     assert.equal(decoded.ok, false, tag)
-    assert.equal(decoded.error, journal.tipV2CleanBreakMessage)
+    assert.equal(decoded.error, blog.tipV2CleanBreakMessage)
   }
 })
 
 test('WHAT[BD-008] ENFORCER_072_entry_without_tip_rule_id_is_legacy', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const noTipRule = `{"${tag}":{"Entry":"e"}}`
-    assert.equal(journal.containsLegacyScoreVectorEntry(noTipRule), true, tag)
+    assert.equal(blog.containsLegacyScoreVectorEntry(noTipRule), true, tag)
   }
 })
 
 test('WHAT[BD-008] ENFORCER_072_modern_tip_v2_entry_passes_the_marker_check', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const modern = `{"${tag}":{"TipRuleId":"rule-x","Entry":"e"}}`
-    assert.equal(journal.containsLegacyScoreVectorEntry(modern), false, tag)
+    assert.equal(blog.containsLegacyScoreVectorEntry(modern), false, tag)
   }
 
-  // The marker check only fires on observation-commit lines (new or legacy tag).
-  assert.equal(journal.containsLegacyScoreVectorEntry('{"Other":{"TipRuleId":null}}'), false)
+  assert.equal(blog.containsLegacyScoreVectorEntry('{"Other":{"TipRuleId":null}}'), false)
 })
 
-const observationCommitted = () =>
-  fact('BlogObservationCommitted', {
-    SessionId: sessionId('ses_obs'),
-    BloggerSessionId: sessionId('ses_blogger'),
-    RequestId: bloggerRequestId('req-obs'),
-    FrameEpochId: frameEpochId(0),
-    PreviousIngestedThroughSequence: 0n,
-    NextIngestedThroughSequence: 1n,
-    PreviousCoverableTurnCutoffExclusive: 0,
-    NextCoverableTurnCutoffExclusive: 1,
-    NextCoveredPrefixDigest: 'd-1',
-    TextRef: blobRef('blob-obs'),
-    TextDigest: blobDigest('sha-obs'),
-    ProviderRun: providerRun('run-obs'),
-    ToolCallIds: [],
-    TipRuleId: 'rule-obs',
-    FieldNameAtCommit: 'field-obs',
-    EvidenceRef: undefined,
-    ObservedPrefixEpochId: prefixEpochId(0),
-  })
-
-const observationsSquashed = () =>
-  fact('BlogObservationsSquashed', {
-    SessionId: sessionId('ses_obs'),
-    BloggerSessionId: sessionId('ses_blogger'),
-    RequestId: bloggerRequestId('req-squash'),
-    PreviousFrameEpochId: frameEpochId(0),
-    NextFrameEpochId: frameEpochId(1),
-    CoveredFrameCount: 1,
-    TextRef: blobRef('blob-squash'),
-    TextDigest: blobDigest('sha-squash'),
-    ProviderRun: providerRun('run-squash'),
-  })
-
 test('WHAT[BD-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
-  const committed = journal.serializeFact(observationCommitted())
-  assert.equal(committed.includes('"BlogObservationCommitted"'), true)
-  assert.equal(committed.includes('"BlogEntryCommitted"'), false)
+  const committed = blog.serializeFact(observation())
+  assert.equal(committed.includes('BlogObservationCommitted'), true)
+  assert.equal(committed.includes('BlogEntryCommitted'), false)
 
-  const squashed = journal.serializeFact(observationsSquashed())
-  assert.equal(squashed.includes('"BlogObservationsSquashed"'), true)
-  assert.equal(squashed.includes('"BlogSquashCommitted"'), false)
+  const encodedSquash = blog.serializeFact(squashed())
+  assert.equal(encodedSquash.includes('BlogObservationsSquashed'), true)
+  assert.equal(encodedSquash.includes('BlogSquashCommitted'), false)
 })
 
 test('WHAT[BD-012] PERSIST_005_legacy_observation_tags_dual_decode_to_new_names', () => {
-  const committed = journal.serializeFact(observationCommitted())
-  const legacyCommitted = committed.replaceAll('"BlogObservationCommitted"', '"BlogEntryCommitted"')
-  assert.equal(legacyCommitted.includes('"BlogEntryCommitted"'), true)
+  const committed = blog.serializeFact(observation())
+  const legacyCommitted = committed.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
+  assert.equal(legacyCommitted.includes('BlogEntryCommitted'), true)
 
-  const decodedCommitted = journal.deserializeFact(legacyCommitted)
+  const decodedCommitted = blog.deserializeFact(legacyCommitted)
   assert.equal(decodedCommitted.ok, true, decodedCommitted.ok ? '' : decodedCommitted.error)
-  assert.equal(agentFactCaseOf(payloadOf(decodedCommitted.value)), 'BlogObservationCommitted')
-  assert.equal(journal.serializeFact(decodedCommitted.value), committed)
+  assert.equal(decodedCommitted.case, 'BlogObservationCommitted')
+  assert.equal(decodedCommitted.line, committed)
 
-  const squashed = journal.serializeFact(observationsSquashed())
-  const legacySquashed = squashed.replaceAll('"BlogObservationsSquashed"', '"BlogSquashCommitted"')
-  const decodedSquashed = journal.deserializeFact(legacySquashed)
+  const encodedSquash = blog.serializeFact(squashed())
+  const legacySquashed = encodedSquash.replaceAll('BlogObservationsSquashed', 'BlogSquashCommitted')
+  const decodedSquashed = blog.deserializeFact(legacySquashed)
   assert.equal(decodedSquashed.ok, true, decodedSquashed.ok ? '' : decodedSquashed.error)
-  assert.equal(agentFactCaseOf(payloadOf(decodedSquashed.value)), 'BlogObservationsSquashed')
-  assert.equal(journal.serializeFact(decodedSquashed.value), squashed)
+  assert.equal(decodedSquashed.case, 'BlogObservationsSquashed')
+  assert.equal(decodedSquashed.line, encodedSquash)
 })

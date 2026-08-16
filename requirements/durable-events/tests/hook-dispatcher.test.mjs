@@ -6,9 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { caseOf } from '../../verification-system/tests/support/domain.mjs'
-
-const Hook = await import('../../../dist/Git/Hook/Dispatcher.js')
+const Hook = await import('../../../dist/Git/Hook/Surface.js')
 const MARKER = 'wanxiang-hook-dispatcher'
 const read = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
@@ -57,22 +55,22 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_th
 })
 
 test('WHAT[DURABLE-EVENTS-018] HOOK_classification_preserves_foreign_hooks', () => {
-  assert.equal(caseOf(Hook.classifyExistingHook(undefined)), 'Installed')
-  assert.equal(caseOf(Hook.classifyExistingHook(`# ${MARKER}\n`)), 'AlreadyOwned')
-  assert.equal(caseOf(Hook.classifyExistingHook('#!/bin/sh\necho foreign\n')), 'ForeignHook')
+  assert.equal(Hook.classifyExistingHook(null), 'Installed')
+  assert.equal(Hook.classifyExistingHook(`# ${MARKER}\n`), 'AlreadyOwned')
+  assert.equal(Hook.classifyExistingHook('#!/bin/sh\necho foreign\n'), 'ForeignHook')
 })
 
 test('WHAT[DURABLE-EVENTS-018] HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
   const { dir, cleanup } = sandboxHooks()
   try {
     const owned = `#!/bin/sh\n# ${MARKER}\nexit 0\n`
-    const installed = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, owned)
-    assert.equal(caseOf(installed), 'Installed')
+    const installed = Hook.installOrDiagnose(dir, 'PrePush', owned)
+    assert.equal(installed, 'Installed')
     assert.equal(readFileSync(join(dir, 'pre-push'), 'utf8'), owned)
 
     const refreshed = `${owned}# refreshed\n`
-    const refreshVerdict = Hook.installOrDiagnose(dir, Hook.HookKind.PrePush, refreshed)
-    assert.equal(caseOf(refreshVerdict), 'AlreadyOwned')
+    const refreshVerdict = Hook.installOrDiagnose(dir, 'PrePush', refreshed)
+    assert.equal(refreshVerdict, 'AlreadyOwned')
     assert.equal(readFileSync(join(dir, 'pre-push'), 'utf8'), refreshed)
 
     const foreignDir = mkdtempSync(join(tmpdir(), 'wxs-hooks-foreign-'))
@@ -80,8 +78,8 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_install_refreshes_owned_hook_but_never_overw
       const foreignPath = join(foreignDir, 'pre-push')
       const foreign = '#!/bin/sh\necho foreign\n'
       writeFileSync(foreignPath, foreign)
-      const verdict = Hook.installOrDiagnose(foreignDir, Hook.HookKind.PrePush, owned)
-      assert.equal(caseOf(verdict), 'ForeignHook')
+      const verdict = Hook.installOrDiagnose(foreignDir, 'PrePush', owned)
+      assert.equal(verdict, 'ForeignHook')
       assert.equal(readFileSync(foreignPath, 'utf8'), foreign)
     } finally {
       rmSync(foreignDir, { recursive: true, force: true })

@@ -1,13 +1,12 @@
 // P3 pilot: ForkChildPayloadSurface — JSON-shaped semantic surface proof.
 // owner: delegation. JS-SEMANTIC-SURFACE-002/003/005: the registered surface
 // (scripts/lib/test-surface-scan.mjs SURFACE_MODULES) is the legal entry
-// point; input/output are JS-native data (assertJsData), no Fable shapes.
+// point; input/output are JS-native data, no Fable shapes.
 // Semantics stay byte-identical with ForkChildPayload (FORK_CHILD_PAYLOAD_*).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
 const { instructions, render } = await import('../../../dist/Execution/Delegation/Fork/Surface.js')
 
@@ -27,7 +26,7 @@ const input = (over = {}) => ({
 
 test('WHAT[DELEG-019] P3_SURFACE_instructions_are_js_native_data', () => {
   const instr = instructions('en')
-  assertJsData(instr, 'instructions')
+  assert.equal(Object.getPrototypeOf(instr), Object.prototype)
   assert.equal(typeof instr.CommissionerRecord, 'string')
   assert.equal(typeof instr.Attachment, 'string')
   assert.equal(typeof instr.Requirements, 'string')
@@ -37,7 +36,7 @@ test('WHAT[DELEG-019] P3_SURFACE_instructions_are_js_native_data', () => {
 
 test('WHAT[DELEG-019] P3_SURFACE_render_output_is_js_native_and_deterministic', () => {
   const doc = render('en', input({ RootRequirements: ['Ship it.'] }))
-  assertJsData(doc, 'rendered document')
+  assert.equal(typeof doc, 'string')
   assert.equal(doc, render('en', input({ RootRequirements: ['Ship it.'] })))
 })
 

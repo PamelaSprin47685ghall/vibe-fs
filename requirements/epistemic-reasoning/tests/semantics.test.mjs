@@ -32,7 +32,7 @@ test('WHAT[EPI-003] ungrounded_model_finding_is_retained_as_claim_but_never_prom
     ],
   })
 
-  assert.equal(state(store, started.handle).Evidence.size, 0)
+  assert.equal(state(store, started.handle).evidence.length, 0)
   assert.equal(investigated.request.type, 'GenerateCandidatesRequest')
 
   const regenerated = resume(store, started.handle, { type: 'Candidates', items: [] })
@@ -86,14 +86,14 @@ test('WHAT[EPI-005] synthesis_is_information_propagation_not_information_acquisi
   assert.equal(investigated.request.type, 'GenerateCandidatesRequest')
   const regenerated = resume(store, started.handle, { type: 'Candidates', items: [] })
   assert.equal(regenerated.request.type, 'SynthesizeRequest')
-  const before = state(store, started.handle).Evidence.size
+  const before = state(store, started.handle).evidence.length
 
   resume(store, started.handle, {
     type: 'Synthesis',
     text: '把已有发现组织为解释。',
     findingKeys: ['finding:mechanism'],
   })
-  assert.equal(state(store, started.handle).Evidence.size, before)
+  assert.equal(state(store, started.handle).evidence.length, before)
 })
 
 test('WHAT[EPI-007] later_semantic_assessment_updates_control_belief_without_creating_evidence', () => {
@@ -126,8 +126,8 @@ test('WHAT[EPI-007] later_semantic_assessment_updates_control_belief_without_cre
   const current = state(store, started.handle)
   assert.equal(next.request.type, 'GenerateCandidatesRequest')
   assert.ok(Math.abs(next.request.contract.formBelief.How - 0.7) < 1e-12)
-  assert.equal(current.Evidence.size, 0)
-  assert.equal(current.Findings.size, 0)
+  assert.equal(current.evidence.length, 0)
+  assert.equal(current.findings.length, 0)
 })
 
 test('WHAT[EPI-008] gateway_gain_can_make_low_immediate_gain_question_worth_asking', () => {

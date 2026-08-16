@@ -17,7 +17,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session
   const code = fissionProduction()
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 
-  const facts = read('src/Wanxiangshu/Composition/Durable/Fact.fs')
+  const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')
   const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs') + read('src/Wanxiangshu/Execution/Fission/Fold.fs')
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)

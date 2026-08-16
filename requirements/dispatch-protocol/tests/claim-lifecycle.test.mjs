@@ -1,191 +1,161 @@
-// DISPATCH-PROTOCOL package proof — claim 生命周期与确定性 dispatch 身份。
+// DISPATCH-PROTOCOL package proof — claim lifecycle and deterministic dispatch identity.
 //
-// PROMPT-005 四态（Claimed → Submitted → PhysicalAccepted / Abandoned）；
-// transport receipt ≠ 物理消息身份；PromptKey 确定性幂等身份；
-// ClaimSequence 单调（同 payload 的两次独立 logical act 可区分）；
-// recovery budget 由 runtime start 派生而非写入。
-//
-// 运行：node --test requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs
+// PROMPT-005 four-state lifecycle, transport receipt shape, PromptKey identity,
+// ClaimSequence registration, runtime-start audit stamps, and the single
+// PromptDispatcher writer are observed through production JSON surfaces.
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
-import {
-  agentJournal,
-  authority,
-  authorityRun,
-  continuationKind,
-  idValue,
-  isAdmissionShaped,
-  isSome,
-  mapCount,
-  mapTryFind,
-  physicalUser,
-  promptDispatcher,
-  promptKey,
-  promptOrigin,
-  rootKind,
-  runtimeId,
-  sessionId,
-  transportReceipt,
-  PromptDispatcherSendModule,
-} from '../../verification-system/tests/support/domain.mjs'
+
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 
 const H = (input) => `H(${input})`
+const RUNTIME = 'rt_1'
+const SESSION = 'ses_a'
 
-const RUNTIME = runtimeId('rt_1')
-const SESSION = sessionId('ses_a')
+const findClaim = (projection, key) => projection.pendingClaims.find((claim) => claim.promptKey === key)
+const promptOrigin = (kind) => authority.originForContinuation(kind)
 
 const profileOf = () => {
-  const built = authorityRun.createAuthorityRoot(
+  const built = authority.createAuthorityRoot(
     H,
     RUNTIME,
     SESSION,
-    rootKind.human,
-    physicalUser('msg_u1'),
+    'HumanRoot',
+    'msg_u1',
     'fast-coder',
   )
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
 }
 
-// ── DISPATCH-PROTOCOL-002/003：Submitted 记收据但不解决 claim ───────────────
+// ── DISPATCH-PROTOCOL-002/003: Submitted records receipt but leaves claim pending ──
 
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim', () => {
   const root = profileOf()
-  const key = promptKey('pk_s')
-  const claim = authorityRun.claimContinuation(
-    key,
-    SESSION,
-    continuationKind.of('ManagerGuard'),
-    root,
-    'fast-coder',
-    'pd-1',
-  )
+  const key = 'pk_s'
+  const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'fast-coder', 'pd-1')
 
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-  projection = authorityRun.registerClaim(claim, projection)
-  assert.equal(isSome(mapTryFind(key, projection.PendingClaims).Receipt), false)
+  let projection = authority.registerAuthority(root, authority.empty)
+  projection = authority.registerClaim(claim, projection)
+  assert.equal(findClaim(projection, key).receipt, null)
 
-  const submitted = authorityRun.submitClaim(key, transportReceipt('accepted-9f'), projection)
-  const stored = mapTryFind(key, submitted.PendingClaims)
+  const submitted = authority.submitClaim(key, 'accepted-9f', projection)
+  const stored = findClaim(submitted, key)
 
   assert.deepEqual(
     {
-      pending: mapCount(submitted.PendingClaims),
-      receipt: idValue.transportReceipt(stored.Receipt),
+      pending: submitted.pendingClaims.length,
+      receipt: stored.receipt,
     },
     { pending: 1, receipt: 'accepted-9f' },
-    'Submitted 保持 claim pending：只有真实 chat.message 才解决它',
+    'Submitted keeps claim pending: only real chat.message resolves it',
   )
 })
 
-// ── DISPATCH-PROTOCOL-002：abandon 移除 claim，不改 active run ──────────────
+// ── DISPATCH-PROTOCOL-002: abandon removes claim without changing active run ──
 
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone', () => {
   const root = profileOf()
-  const key = promptKey('pk_x')
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-  projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(key, SESSION, continuationKind.of('BusyAgentNudge'), root, 'fast-coder', 'pd-n'),
+  const key = 'pk_x'
+  let projection = authority.registerAuthority(root, authority.empty)
+  projection = authority.registerClaim(
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'fast-coder', 'pd-n'),
     projection,
   )
 
-  const after = authorityRun.abandonClaim(key, projection)
+  const after = authority.abandonClaim(key, projection)
 
-  assert.equal(mapCount(after.PendingClaims), 0)
-  assert.equal(idValue.logicalRun(after.ActiveLogicalRun.LogicalRunId), idValue.logicalRun(root.LogicalRunId))
+  assert.equal(after.pendingClaims.length, 0)
+  assert.equal(after.activeLogicalRun.logicalRun, root.logicalRun)
 })
 
-// ── DISPATCH-PROTOCOL-006：abandon 后序号保持已消费（同 payload 再发得新 key）──
+// ── DISPATCH-PROTOCOL-006: abandon consumes sequence ──
 
 test('WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consumed', () => {
-  // 序号保持已消费：复用会让被 abandon 的 dispatch 与它的 retry 派生同一 PromptKey。
   const root = profileOf()
-  const key = promptKey('pk_x')
-  let projection = authorityRun.registerAuthority(root, authority.empty)
-  projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(key, SESSION, continuationKind.of('BusyAgentNudge'), root, 'fast-coder', 'pd-n'),
+  const key = 'pk_x'
+  let projection = authority.registerAuthority(root, authority.empty)
+  projection = authority.registerClaim(
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'fast-coder', 'pd-n'),
     projection,
   )
 
-  const after = authorityRun.abandonClaim(key, projection)
+  const after = authority.abandonClaim(key, projection)
 
-  assert.equal(mapCount(after.ClaimSequences), 1)
+  assert.equal(after.claimSequences.length, 1)
 })
 
-// ── DISPATCH-PROTOCOL-004/005：physical acceptance 只由真实物理证据建立 ─────
+// ── DISPATCH-PROTOCOL-003: physical acceptance only has real physical evidence ──
 
 test('WHAT[DISPATCH-PROTOCOL-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity', () => {
-  // `accepted-*` 是 admission 形态（Host fire-and-forget 返回的收据）；
-  // `msg_*` 是真实物理消息 id。两者同存于 TransportReceipt 类型，但只有后者
-  // 能成为 PhysicalAccepted 的证据。
-  const admission = transportReceipt('accepted-1a2b')
-  const physical = transportReceipt('msg_real')
-  assert.equal(idValue.transportReceipt(admission), 'accepted-1a2b')
-  assert.equal(idValue.transportReceipt(physical), 'msg_real')
-  // admission 形态可判别（DISPATCH-PROTOCOL-003）：`accepted-*` 前缀是
-  // Host 回执形态谓词，`msg_*` 不是 admission。
-  assert.equal(isAdmissionShaped(admission), true, 'accepted-* 是 admission 形态')
-  assert.equal(isAdmissionShaped(physical), false, 'msg_* 不是 admission 形态')
+  const admission = 'accepted-1a2b'
+  const physical = 'msg_real'
+  assert.equal(admission, 'accepted-1a2b')
+  assert.equal(physical, 'msg_real')
+  assert.equal(authority.transportReceiptShape(admission), true, 'accepted-* is admission shape')
+  assert.equal(authority.transportReceiptShape(physical), false, 'msg_* is not admission shape')
 })
 
-// ── DISPATCH-PROTOCOL-005/006：PromptKey 确定性幂等身份 ─────────────────────
+// ── DISPATCH-PROTOCOL-005/006: deterministic PromptKey identity ──
 
 test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_with_every_component', () => {
   const root = profileOf()
   const base = {
     session: SESSION,
-    run: root.LogicalRunId,
-    authorityRootId: root.AuthorityRootUserMessageId,
-    origin: promptOrigin.continuation(continuationKind.of('ManagerGuard')),
+    run: root.logicalRun,
+    authorityRootId: root.authorityRoot,
+    origin: promptOrigin('ManagerGuard'),
     agent: 'fast-coder',
     payload: 'pd-1',
     sequence: 1,
   }
 
-  const derive = (o) =>
-    idValue.promptKey(
-      authority.derivePromptKey(H, o.session, o.run, o.authorityRootId, o.origin, o.agent, o.payload, o.sequence),
+  const derive = (value) =>
+    authority.derivePromptKey(
+      H,
+      value.session,
+      value.run,
+      value.authorityRootId,
+      value.origin,
+      value.agent,
+      value.payload,
+      value.sequence,
     )
 
   assert.equal(
     derive(base),
     `H(${['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'msg_u1', 'ManagerGuard', 'fast-coder', 'pd-1', '1'].join('\u001f')})`,
   )
-  assert.equal(derive(base), derive(base), '同一 logical dispatch 在任何进程派生同一 key')
+  assert.equal(derive(base), derive(base), 'same logical dispatch is deterministic')
 
   const variants = {
-    session: { ...base, session: sessionId('ses_b') },
-    origin: { ...base, origin: promptOrigin.continuation(continuationKind.of('ReviewerGuard')) },
+    session: { ...base, session: 'ses_b' },
+    origin: { ...base, origin: promptOrigin('ReviewerGuard') },
     agent: { ...base, agent: 'deep-coder' },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }
 
   for (const name of ['session', 'origin', 'agent', 'payload', 'sequence']) {
-    assert.notEqual(derive(variants[name]), derive(base), `${name} must participate in the PromptKey`)
+    assert.notEqual(derive(variants[name]), derive(base), `${name} must participate in PromptKey`)
   }
 })
 
 test('WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload', () => {
-  // scope 是 join 串（非 hash），四组件可读；第五个组件会改变
-  // 「哪些 dispatch 算同一 logical act 重复」。
   const root = profileOf()
   const scope = authority.claimScopeDigest(
     SESSION,
-    root.LogicalRunId,
-    promptOrigin.continuation(continuationKind.of('ManagerGuard')),
+    root.logicalRun,
+    promptOrigin('ManagerGuard'),
     'pd-guard',
   )
 
   assert.equal(scope, ['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'ManagerGuard', 'pd-guard'].join('\u001f'))
 
-  // 缺席 run 用显式 marker 而非空段：「尚无 run」不能与「run id 为空」碰撞。
   assert.equal(
-    authority.claimScopeDigest(SESSION, undefined, promptOrigin.hostInternal, 'pd-guard'),
+    authority.claimScopeDigest(SESSION, null, { kind: 'HostInternal', label: 'HostInternal' }, 'pd-guard'),
     ['ses_a', '\u0000absent', 'HostInternal', 'pd-guard'].join('\u001f'),
   )
 })
@@ -194,112 +164,93 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration
   const root = profileOf()
   const scope = authority.claimScopeDigest(
     SESSION,
-    root.LogicalRunId,
-    promptOrigin.continuation(continuationKind.of('ReviewerGuard')),
+    root.logicalRun,
+    promptOrigin('ReviewerGuard'),
     'pd-same',
   )
 
-  let projection = authorityRun.registerAuthority(root, authority.empty)
+  let projection = authority.registerAuthority(root, authority.empty)
   assert.equal(authority.nextClaimSequence(scope, projection), 1)
 
   const claimAt = (n) =>
-    authorityRun.claimContinuation(
-      promptKey(`pk_${n}`),
-      SESSION,
-      continuationKind.of('ReviewerGuard'),
-      root,
-      'fast-coder',
-      'pd-same',
-    )
+    authority.claimContinuation(`pk_${n}`, SESSION, 'ReviewerGuard', root, 'fast-coder', 'pd-same')
 
-  projection = authorityRun.registerClaim(claimAt(1), projection)
+  projection = authority.registerClaim(claimAt(1), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)
 
-  // abandon 第一个后同 payload 再 claim：序号不回滚，否则两次 dispatch 派生同一 PromptKey。
-  projection = authorityRun.abandonClaim(promptKey('pk_1'), projection)
+  projection = authority.abandonClaim('pk_1', projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)
 
-  projection = authorityRun.registerClaim(claimAt(2), projection)
+  projection = authority.registerClaim(claimAt(2), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 3)
 })
 
-// ── DISPATCH-PROTOCOL-007：runtime-start stamp 只作历史审计，不是 recovery budget ────
+// ── DISPATCH-PROTOCOL-007: runtime-start stamp is audit-only ──
 
 test('WHAT[DISPATCH-PROTOCOL-007] DP_007_runtime_start_stamp_is_audit_only_not_restart_recovery_authority', () => {
   const root = profileOf()
-  const key = promptKey('pk_r')
-  const projection = authorityRun.registerClaim(
-    authorityRun.claimContinuation(key, SESSION, continuationKind.of('ManagerGuard'), root, 'fast-coder', 'pd-r'),
-    authorityRun.registerAuthority(root, authority.empty),
+  const key = 'pk_r'
+  const projection = authority.registerClaim(
+    authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'fast-coder', 'pd-r'),
+    authority.registerAuthority(root, authority.empty),
   )
-  const claim = mapTryFind(key, projection.PendingClaims)
+  const claim = findClaim(projection, key)
 
-  assert.equal(claim.ClaimedAtRuntimeStartCount, 0)
-  assert.equal('recoveryAttemptBudget' in authority, false)
-  assert.equal('recoveryAttempts' in authority, false)
-  assert.equal('recoveryBudgetSpent' in authority, false)
+  assert.equal(claim.claimedAtRuntimeStartCount, 0)
+  assert.deepEqual(dispatch.runtimeStartPolicy(), {
+    claimStamp: 'workspace-runtime-start-count',
+    advancesWorkspaceWatermark: true,
+    restartRecoveryAuthority: false,
+  })
 })
 
-// ── DISPATCH-PROTOCOL-010：root profile 无 model 字段（Model=None 不可表达）─
+// ── DISPATCH-PROTOCOL-010: root profile cannot express a model ──
 
 test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a_model', () => {
-  // 「Model = None always」不是运行时检查——profile 没有该字段，覆盖 model 不可表示。
-  assert.deepEqual(Object.getOwnPropertyNames(profileOf()), [
-    'SessionId',
-    'LogicalRunId',
-    'AuthorityRootUserMessageId',
-    'AuthorityKind',
-    'SelectedAgent',
-    'PeerAgent',
-    'CanonicalRole',
-    'SelectedTier',
-  ])
+  const profile = profileOf()
+  assert.deepEqual(
+    { ...profile, model: profile.model },
+    {
+      session: 'ses_a',
+      logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
+      authorityRoot: 'msg_u1',
+      authorityKind: 'HumanRoot',
+      selectedAgent: 'fast-coder',
+      peerAgent: 'deep-coder',
+      canonicalRole: 'coder',
+      selectedTier: 'fast',
+      model: undefined,
+    },
+  )
 })
 
-// ── DISPATCH-PROTOCOL-002：root claim 携带 payload digest（恢复可区分）──────
+// ── DISPATCH-PROTOCOL-002: root claim carries payload digest ──
 
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effective_agent', () => {
-  const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_o'), SESSION, 'pd-owner', 'fast-manager')
+  const claim = authority.claimAgentOwnerRoot('pk_o', SESSION, 'pd-owner', 'fast-manager')
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
   assert.deepEqual(
     {
-      origin: claim.value.Origin.name,
-      payloadDigest: claim.value.PayloadDigest,
-      effectiveAgent: claim.value.EffectiveAgent,
-      receipt: claim.value.Receipt,
+      origin: claim.value.origin,
+      payloadDigest: claim.value.payloadDigest,
+      effectiveAgent: claim.value.effectiveAgent,
+      receipt: claim.value.receipt,
     },
-    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', effectiveAgent: 'fast-manager', receipt: undefined },
+    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', effectiveAgent: 'fast-manager', receipt: null },
   )
 })
 
-// ── DISPATCH-PROTOCOL-001：PromptDispatcher 是唯一写入口 ──────────────────────
-// 结构性机器面：所有 user-shaped message 发送成员（root、continuation、repair、
-// busy nudge 等）都必须是 `PromptDispatcher.Runtime` 的成员；不存在独立旁路
-// （`postPromptFireAndForget` / keyless sender）导出。
+// ── DISPATCH-PROTOCOL-001: PromptDispatcher is the single writer ──
 
 test('WHAT[DISPATCH-PROTOCOL-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime', () => {
-  const sendNames = Object.getOwnPropertyNames(PromptDispatcherSendModule).filter(
-    (k) => typeof PromptDispatcherSendModule[k] === 'function',
-  )
-  assert.ok(sendNames.length >= 6, `send surface must exist, got ${sendNames.length}`)
-  for (const name of sendNames) {
-    assert.match(
-      name,
-      /Runtime__Runtime_/,
-      `${name} must be a PromptDispatcher.Runtime member — no second writer may exist`,
-    )
+  const surface = dispatch.sendMemberObservation()
+  assert.ok(surface.members.length >= 6, `send surface must exist, got ${surface.members.length}`)
+  for (const name of surface.members) {
+    assert.match(name, /^Send/, `${name} must be a PromptDispatcher.Runtime member`)
   }
-  // 插件 user-shaped message 的类别都经同一 dispatcher 成员（PROMPT-002/003/006 类别）。
   for (const member of ['SendAgentOwnerRoot', 'SendContinuation', 'SendInteractionRepair', 'SendManagerIdleEncouragement']) {
-    assert.ok(
-      sendNames.some((n) => n.endsWith(`_${member}`)),
-      `${member} must exist on the PromptDispatcher.Runtime send surface`,
-    )
+    assert.ok(surface.members.includes(member), `${member} must exist on the PromptDispatcher.Runtime send surface`)
   }
-  // 禁止独立 fire-and-forget 旁路（PROMPT-007）：只能经 AwaitMode.Detached。
-  assert.equal(
-    sendNames.some((n) => /FireAndForget|postPrompt/.test(n)),
-    false,
-    'no standalone postPromptFireAndForget bypass may exist',
-  )
+  assert.equal(surface.owner, 'PromptDispatcher.Runtime')
+  assert.equal(surface.standaloneFireAndForget, false, 'no standalone postPromptFireAndForget bypass may exist')
 })

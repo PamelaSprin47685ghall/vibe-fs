@@ -8,9 +8,30 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { xTrace, lifecycleWorkRecord } from '../../verification-system/tests/support/domain.mjs'
+import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
 
-const opening = (assignment, requirements = []) => lifecycleWorkRecord.opening({ assignment, requirements })
+const xTrace = {
+  item: ({ sequence, role, part }) => workRecord.item(sequence, role, part),
+  text: workRecord.textPart,
+  reasoning: workRecord.reasoningPart,
+}
+const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
+const materialize = (
+  openingValue,
+  frames,
+  trace,
+  coverage,
+  openingEnd = { Sequence: 0 },
+  includeOpening = true,
+) =>
+  workRecord.materialize(
+    openingValue,
+    frames,
+    trace,
+    Number(coverage.Sequence),
+    Number(openingEnd.Sequence),
+    includeOpening,
+  )
 
 // One full turn of two parts: user text at 0, assistant reasoning at 1, and a
 // second turn: assistant text at 2.
@@ -23,7 +44,7 @@ const trace = [
 test('WHAT[WORK-RECORD-014] LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
   // RecordCoverage consumed through cursor 1 (the reasoning part) — mid-turn
   // relative to any complete-turn boundary. The gap must start at cursor 2.
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('Charge'),
     [],
     trace,
@@ -50,7 +71,7 @@ test('WHAT[WORK-RECORD-014] LWR_recent_work_can_start_mid_turn_at_record_coverag
 test('WHAT[WORK-RECORD-005] LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
   // With coverage at origin, the gap is the whole trace after the opening end —
   // still NOT turn-bounded: a partial turn is a valid uncovered suffix.
-  const rendered = lifecycleWorkRecord.materialize(
+  const rendered = materialize(
     opening('Charge'),
     [],
     trace,

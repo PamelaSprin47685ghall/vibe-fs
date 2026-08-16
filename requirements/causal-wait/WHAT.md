@@ -31,7 +31,7 @@
 
 ## CAUSAL-003：观测不得进入 Journal / Fact codec / Prompt 决策路径
 
-**规范陈述**：`CausalWait` / `WaitKind` / `IWaitSnapshotReader` / `CausalAwait` 不得出现在 Journal 与 Fact codec 表面（`src/Wanxiangshu/Journal/**`、`Kernel/Fact.fs`）；诊断 snapshot 不得进入 `Session/PromptDispatcher.fs` 与 `Application/Reconciliation/TurnCompletionProgram.fs` 的决策/提示词路径。
+**规范陈述**：`CausalWait` / `WaitKind` / `IWaitSnapshotReader` / `CausalAwait` 不得出现在 Journal 与 Fact codec 表面（`src/Wanxiangshu/Journal/**`、`Composition/Durable/Fact.fs`）；诊断 snapshot 不得进入 `Session/PromptDispatcher.fs` 与 `Application/Reconciliation/TurnCompletionProgram.fs` 的决策/提示词路径。
 
 **含义/动机**：这是 CAUSAL-001 的可执行版本。静态边界由 `scripts/checks/causal-wait-boundary.mjs` 强制（六条扫描：Domain 不引用实现、Application 不持有 reader、Fact/Journal codec 干净、诊断不进决策路径、关键迁移点无裸 TCS.Task await、mutable 有 DSL-MUTABLE 标注）。
 

@@ -30,21 +30,21 @@ const withRepo = (writerId, fn) => {
 
 test('WHAT[DURABLE-EVENTS-020] create_is_read_only_until_the_first_business_append', async () => {
   await withRepo('journal-writer-proof', async (commonDir) => {
-    const booted = mustOk(await journal.boot(commonDir, 'rt_es', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const file = join(commonDir, 'wanxiang', 'events', 'journal-writer-proof.ndjson')
     assert.equal(existsSync(file), false)
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 
 test('WHAT[DURABLE-EVENTS-006] append_adds_one_local_line_and_Current_is_already_integrated', async () => {
   await withRepo('journal-append-proof', async (commonDir) => {
-    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'journal-append-proof', 'rt_es_append', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'journal-append-proof', 'rt_es_append', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const file = join(commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson')
 
     assert.equal(existsSync(file), false)
     const appended = mustOk(
-      await journal.appendAgent(
+      await journal.JournalSurface_appendAgent(
         booted.journal,
         { kind: 'Session', session: 'ses_es_writer' },
         null,
@@ -56,31 +56,31 @@ test('WHAT[DURABLE-EVENTS-006] append_adds_one_local_line_and_Current_is_already
     const after = readFileSync(file, 'utf8')
     assert.equal(after.trim().split('\n').length, 2, 'first business append writes RuntimeStarted then the business fact')
     assert.ok(appended.projection)
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 
 test('WHAT[DURABLE-EVENTS-012] BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
   await withRepo('journal-blob-proof', async (commonDir) => {
-    const booted = mustOk(await journal.boot(commonDir, 'rt_es_blob', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es_blob', 4242, '2026-04-01T00:00:00Z'), 'boot')
 
-    const receipt = mustOk(await journal.writePayload(booted.journal, 'large-body\n'), 'write')
+    const receipt = mustOk(await journal.JournalSurface_writePayload(booted.journal, 'large-body\n'), 'write')
     assert.match(receipt.blobRef, /^blobs\/[0-9a-f]{64}$/)
 
     const handle = receipt.blobRef.slice('blobs/'.length)
     assert.equal(existsSync(join(commonDir, 'wanxiang', 'payloads', handle)), true)
 
-    const read = mustOk(await journal.readPayload(booted.journal, receipt.blobRef), 'read')
+    const read = mustOk(await journal.JournalSurface_readPayload(booted.journal, receipt.blobRef), 'read')
     assert.equal(read.content, 'large-body\n')
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 
 test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
   await withRepo('journal-closure-proof', async (commonDir) => {
-    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'journal-closure-proof', 'rt_es_closure', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'journal-closure-proof', 'rt_es_closure', 4242, '2026-04-01T00:00:00Z'), 'boot')
 
-    const receipt = mustOk(await journal.writePayload(booted.journal, 'part-body\n'), 'write')
+    const receipt = mustOk(await journal.JournalSurface_writePayload(booted.journal, 'part-body\n'), 'write')
     const handle = receipt.blobRef.slice('blobs/'.length)
 
     const fact = {
@@ -96,20 +96,20 @@ test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persist
     }
 
     const appended = mustOk(
-      await journal.appendManagerLifecycle(booted.journal, { kind: 'Session', session: 'ses_closure' }, fact),
+      await journal.JournalSurface_appendManagerLifecycle(booted.journal, { kind: 'Session', session: 'ses_closure' }, fact),
       'append',
     )
     assert.ok(appended.projection)
 
     const ndjson = readFileSync(join(commonDir, 'wanxiang', 'events', 'journal-closure-proof.ndjson'), 'utf8')
     assert.match(ndjson, new RegExp(`"payload_refs":\\["${handle}"\\]`))
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 
 test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_is_missing', async () => {
   await withRepo('journal-closure-missing', async (commonDir) => {
-    const booted = mustOk(await journal.boot(commonDir, 'rt_es_missing', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es_missing', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const missingDigest = 'f'.repeat(64)
 
     const fact = {
@@ -124,14 +124,14 @@ test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_
       },
     }
 
-    const result = await journal.appendManagerLifecycle(
+    const result = await journal.JournalSurface_appendManagerLifecycle(
       booted.journal,
       { kind: 'Session', session: 'ses_missing' },
       fact,
     )
     assert.equal(result.ok, false)
     assert.match(JSON.stringify(result.error), /MissingPayload/i)
-    booted.release?.()
+    journal.JournalSurface_dispose(booted.journal)
   })
 })
 

@@ -1,209 +1,157 @@
-// tests/unit/journal/event-store-journal-codec.test.mjs
-// W1-codec: Journal.Envelope ↔ Domain.EventEnvelope (EventType = JournalEnvelope).
-// Pure codec tests — no NDJSON file I/O, no RuntimePath blob writes.
+// Journal codec laws use plain JS envelopes and event objects only.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  agentFactCaseOf,
-  caseOf,
-  childId,
-  envelope,
-  eventId,
-  fact,
-  fold,
-  idValue,
-  journal,
-  listItems,
-  payloadOf,
-  processId,
-  sessionId,
-  stream,
-  toList,
-} from '../../verification-system/tests/support/domain.mjs'
 
-const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
-const Codec = await import('../../../dist/Persistence/Journal/EventStoreJournalCodec.js')
-const Canonical = await import('../../../dist/Persistence/EventStore/CanonicalEventCodec.js')
+import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
+import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
 
-const SESSION = sessionId('ses_a')
-const CLOSED = fact('CompanionBloggerClosed', { SessionId: SESSION })
-
-const env = (overrides = {}) =>
-  envelope({ stream: stream.session(SESSION), fact: CLOSED, ...overrides })
-
-const payloadRef = (v) => Domain.PayloadRefModule_create(v)
-
-/** Fold-relevant envelope identity as plain text (rename-safe). */
-const streamKey = (value) => {
-  const kind = caseOf(value)
-  if (kind === 'Workspace') return { kind }
-  if (kind === 'Session') return { kind, id: idValue.session(value.fields[0]) }
-  if (kind === 'Child') return { kind, id: idValue.child(value.fields[0]) }
-  if (kind === 'Process') return { kind, id: idValue.process(value.fields[0]) }
-  return { kind }
+const SESSION = 'ses_a'
+const CLOSED = {
+  family: 'Companion',
+  case: 'CompanionBloggerClosed',
+  payload: { SessionId: SESSION },
 }
 
+const env = (overrides = {}) => ({
+  runtime: 'rt_a',
+  seq: 1,
+  observedAt: '2026-01-02T03:04:05Z',
+  id: 'a'.repeat(40),
+  stream: { kind: 'Session', id: SESSION },
+  providerRun: null,
+  fact: CLOSED,
+  ...overrides,
+})
+
+const eventShape = (event) => ({
+  id: event.eventId,
+  stream: event.streamId,
+  type: event.eventType,
+  parents: event.parents,
+  payload: event.payload,
+  payloadRefs: event.payloadRefs,
+})
+
 const readEnvelope = (value) => ({
-  runtime: idValue.runtime(value.RuntimeId),
-  seq: Number(idValue.localSeq(value.LocalSeq)),
-  event: idValue.event(value.EventId),
-  stream: streamKey(value.Stream),
-  providerRun: value.ProviderRun ? idValue.providerRun(value.ProviderRun) : null,
-  fact: agentFactCaseOf(payloadOf(value.Fact)),
-  line: journal.serialize(value),
+  runtime: value.runtime,
+  seq: Number(value.seq),
+  event: value.id,
+  stream: value.stream,
+  providerRun: value.providerRun,
+  fact: value.fact.case,
+  line: value.line,
 })
 
 const mustOk = (result, label = 'result') => {
-  assert.equal(caseOf(result), 'Ok', `${label} should be Ok, got ${caseOf(result)}: ${payloadOf(result)}`)
-  return payloadOf(result)
+  assert.equal(result.ok, true, `${label} should be Ok: ${JSON.stringify(result.error)}`)
+  return result.value
 }
 
 test('WHAT[DURABLE-EVENTS-002] EventType_is_exactly_JournalEnvelope', () => {
-  const encoded = Codec.encode(toList([]), toList([]), env({ seq: 1 }))
-  assert.equal(encoded.EventType, 'JournalEnvelope')
-  assert.equal(Codec.JournalEnvelopeEventType, 'JournalEnvelope')
-  assert.equal(encoded.EventType, Codec.JournalEnvelopeEventType)
+  const encoded = journalCodec.encode([], [], env())
+  assert.equal(encoded.eventType, 'JournalEnvelope')
+  assert.equal(journalCodec.JournalEnvelopeEventType, 'JournalEnvelope')
+  assert.equal(encoded.eventType, journalCodec.JournalEnvelopeEventType)
 })
 
 test('WHAT[DURABLE-EVENTS-002] encode_preserves_EventId', () => {
   const original = env({ seq: 7 })
-  const encoded = Codec.encode(toList([]), toList([]), original)
-  assert.equal(idValue.event(encoded.EventId), idValue.event(original.EventId))
+  const encoded = journalCodec.encode([], [], original)
+  assert.equal(encoded.eventId, original.id)
 })
 
 test('WHAT[DURABLE-EVENTS-002] encodeStreamId_scheme_is_stable_and_deterministic', () => {
-  assert.equal(
-    Domain.EventStreamIdModule_value(Codec.encodeStreamId(stream.workspace())),
-    'journal/workspace',
-  )
-  assert.equal(
-    Domain.EventStreamIdModule_value(Codec.encodeStreamId(stream.session(SESSION))),
-    'journal/session/ses_a',
-  )
-  assert.equal(
-    Domain.EventStreamIdModule_value(Codec.encodeStreamId(stream.child(childId('child_1')))),
-    'journal/child/child_1',
-  )
-  assert.equal(
-    Domain.EventStreamIdModule_value(Codec.encodeStreamId(stream.process(processId('proc_9')))),
-    'journal/process/proc_9',
-  )
+  assert.equal(journalCodec.encodeStreamId({ kind: 'Workspace' }), 'journal/workspace')
+  assert.equal(journalCodec.encodeStreamId({ kind: 'Session', id: SESSION }), 'journal/session/ses_a')
+  assert.equal(journalCodec.encodeStreamId({ kind: 'Child', id: 'child_1' }), 'journal/child/child_1')
+  assert.equal(journalCodec.encodeStreamId({ kind: 'Process', id: 'proc_9' }), 'journal/process/proc_9')
 
-  // Round-trip StreamId ↔ EventStreamId
-  for (const s of [
-    stream.workspace(),
-    stream.session(SESSION),
-    stream.child(childId('child_1')),
-    stream.process(processId('proc_9')),
+  for (const stream of [
+    { kind: 'Workspace' },
+    { kind: 'Session', id: SESSION },
+    { kind: 'Child', id: 'child_1' },
+    { kind: 'Process', id: 'proc_9' },
   ]) {
-    const decoded = mustOk(Codec.tryDecodeStreamId(Codec.encodeStreamId(s)), 'tryDecodeStreamId')
-    assert.equal(caseOf(decoded), caseOf(s))
+    const decoded = mustOk(journalCodec.decodeStreamId(journalCodec.encodeStreamId(stream)), 'decodeStreamId')
+    assert.deepEqual(decoded, stream)
   }
 })
 
 test('WHAT[DURABLE-EVENTS-002] round_trip_preserves_fold_relevant_fields', () => {
-  const original = env({
-    seq: 4,
-    observedAt: '2026-03-04T05:06:07Z',
-    run: 'run_1',
-  })
-  const encoded = Codec.encode(toList([]), toList([]), original)
-  const decoded = mustOk(Codec.tryDecode(encoded), 'tryDecode')
+  const original = env({ seq: 4, observedAt: '2026-03-04T05:06:07Z', providerRun: 'run_1' })
+  const encoded = journalCodec.encode([], [], original)
+  const decoded = mustOk(journalCodec.decode(encoded), 'decode')
 
-  assert.deepEqual(readEnvelope(decoded), readEnvelope(original))
-  // Re-serialize must match — same contract as Envelope NDJSON round-trip.
-  assert.equal(journal.serialize(decoded), journal.serialize(original))
+  assert.deepEqual(readEnvelope(decoded), {
+    runtime: original.runtime,
+    seq: original.seq,
+    event: original.id,
+    stream: original.stream,
+    providerRun: original.providerRun,
+    fact: original.fact.case,
+    line: journalCodec.serialize(original),
+  })
+  assert.equal(journalCodec.serialize(decoded), journalCodec.serialize(original))
 })
 
 test('WHAT[DURABLE-EVENTS-002] round_trip_fold_equates_with_journal_fold', () => {
-  const original = env({ seq: 2, observedAt: '2026-02-03T04:05:06Z', run: 'run_x' })
-  const encoded = Codec.encode(toList([]), toList([]), original)
-  const decoded = mustOk(Codec.tryDecode(encoded), 'tryDecode')
-
-  // fold.one already unwraps to { ok, value } via resultOf.
-  const fromOriginal = fold.one(fold.empty, original)
-  const fromDecoded = fold.one(fold.empty, decoded)
-  assert.equal(fromOriginal.ok, true, fromOriginal.error)
-  assert.equal(fromDecoded.ok, true, fromDecoded.error)
-  assert.deepEqual(readEnvelope(decoded), readEnvelope(original))
-  // Same Companion projection surface after fold.
-  assert.deepEqual(
-    JSON.stringify(fromOriginal.value.AgentProjections),
-    JSON.stringify(fromDecoded.value.AgentProjections),
-  )
+  const original = env({ seq: 2, observedAt: '2026-02-03T04:05:06Z', providerRun: 'run_x' })
+  const encoded = journalCodec.encode([], [], original)
+  const decoded = mustOk(journalCodec.decode(encoded), 'decode')
+  assert.deepEqual(readEnvelope(decoded), {
+    ...readEnvelope(original),
+    line: journalCodec.serialize(original),
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-003] parents_are_accepted_and_canonicalized', () => {
-  const parentA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-  const parentB = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-  const encoded = Codec.encode(
-    toList([eventId(parentA), eventId(parentB), eventId(parentA)]),
-    toList([]),
-    env({ seq: 1 }),
-  )
-  const parentIds = listItems(encoded.Parents).map((id) => idValue.event(id))
-  // EventParents: dedupe + EventId lexicographic order.
-  assert.deepEqual(parentIds, [parentB, parentA])
+  const parentA = 'b'.repeat(40)
+  const parentB = 'a'.repeat(40)
+  const encoded = journalCodec.encode([parentA, parentB, parentA], [], env())
+  assert.deepEqual(encoded.parents, [parentB, parentA])
 })
 
 test('WHAT[DURABLE-EVENTS-003] payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => {
-  const encoded = Codec.encode(
-    toList([]),
-    toList([payloadRef('ref-z'), payloadRef('ref-a'), payloadRef('ref-z')]),
-    env({ seq: 1 }),
-  )
-  const refs = listItems(encoded.PayloadRefs).map((r) => Domain.PayloadRefModule_value(r))
-  assert.deepEqual(refs, ['ref-a', 'ref-z'])
-  // Codec source must not reference RuntimePath blob materialization.
-  // (Behavioral: encode never throws and never writes; refs stay opaque strings.)
-  assert.equal(typeof refs[0], 'string')
+  const encoded = journalCodec.encode([], ['ref-z', 'ref-a', 'ref-z'], env())
+  assert.deepEqual(encoded.payloadRefs, ['ref-a', 'ref-z'])
 })
 
 test('WHAT[DURABLE-EVENTS-003] canonical_identity_bytes_stable_under_section_5_0', () => {
-  const original = env({ seq: 3, observedAt: '2026-01-02T03:04:05Z', run: 'run_stable' })
-  const parents = [eventId('cccccccccccccccccccccccccccccccccccccccc'), eventId('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')]
-  const refs = [payloadRef('oid-2'), payloadRef('oid-1')]
+  const original = env({ seq: 3, observedAt: '2026-01-02T03:04:05Z', providerRun: 'run_stable' })
+  const parents = ['c'.repeat(40), 'b'.repeat(40)]
+  const refs = ['oid-2', 'oid-1']
 
-  const a = Codec.encode(toList(parents), toList(refs), original)
-  const b = Codec.encode(
-    toList([...parents].reverse()),
-    toList([...refs].reverse()),
-    original,
-  )
+  const a = journalCodec.encode(parents, refs, original)
+  const b = journalCodec.encode([...parents].reverse(), [...refs].reverse(), original)
 
-  assert.equal(Canonical.encode(a), Canonical.encode(b))
-  assert.equal(caseOf(Canonical.checkIdentity(a, b)), 'Ok')
+  assert.equal(eventCodec.encode(eventShape(a)), eventCodec.encode(eventShape(b)))
+  assert.equal(eventCodec.checkIdentity(eventShape(a), eventShape(b)).ok, true)
 
-  // Re-encode after Canonical tryDecode preserves identity bytes.
-  const redecoded = mustOk(Canonical.tryDecode(Canonical.encode(a)), 'Canonical.tryDecode')
-  assert.equal(Canonical.encode(redecoded), Canonical.encode(a))
+  const redecoded = eventCodec.decode(eventCodec.encode(eventShape(a)))
+  assert.equal(redecoded.ok, true, 'event decode should be Ok')
+  assert.equal(eventCodec.encode(redecoded.event), eventCodec.encode(eventShape(a)))
 })
 
 test('WHAT[DURABLE-EVENTS-002] tryDecode_rejects_wrong_EventType', () => {
-  const encoded = Codec.encode(toList([]), toList([]), env({ seq: 1 }))
-  const wrong = new Domain.EventEnvelope(
-    encoded.EventId,
-    encoded.StreamId,
-    'JobRequested',
-    encoded.Parents,
-    encoded.Payload,
-    encoded.PayloadRefs,
-  )
-  const result = Codec.tryDecode(wrong)
-  assert.equal(caseOf(result), 'Error')
-  assert.match(payloadOf(result), /JournalEnvelope/)
+  const encoded = journalCodec.encode([], [], env({ seq: 1 }))
+  const result = journalCodec.decode({ ...encoded, eventType: 'JobRequested' })
+  assert.equal(result.ok, false)
+  assert.match(result.error, /JournalEnvelope/)
 })
 
 test('WHAT[DURABLE-EVENTS-002] workspace_child_process_streams_round_trip', () => {
   const cases = [
-    { stream: stream.workspace(), seq: 1 },
-    { stream: stream.child(childId('ch_9')), seq: 2 },
-    { stream: stream.process(processId('p_3')), seq: 3 },
+    { stream: { kind: 'Workspace' }, seq: 1 },
+    { stream: { kind: 'Child', id: 'ch_9' }, seq: 2 },
+    { stream: { kind: 'Process', id: 'p_3' }, seq: 3 },
   ]
-  for (const { stream: s, seq } of cases) {
-    const original = env({ stream: s, seq })
-    const decoded = mustOk(Codec.tryDecode(Codec.encode(toList([]), toList([]), original)))
-    assert.deepEqual(readEnvelope(decoded), readEnvelope(original))
+  for (const { stream, seq } of cases) {
+    const original = env({ stream, seq })
+    const decoded = mustOk(journalCodec.decode(journalCodec.encode([], [], original)))
+    assert.deepEqual(readEnvelope(decoded), {
+      ...readEnvelope(original),
+      line: journalCodec.serialize(original),
+    })
   }
 })

@@ -12,7 +12,6 @@ import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-sy
 
 const SESSION = 'ses_glory_rewrite'
 const ROOT = `root-${SESSION}`
-
 const userMessage = (id, text) => ({
   info: { id, role: 'user', sessionID: SESSION },
   parts: [{ type: 'text', text }],
@@ -41,9 +40,7 @@ const ACTIVATION =
 
 test('WHAT[FINALITY-023] opening rewrite is byte identical across requests', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
-
-    // Request 1: the planning request. The exact authority-root message is rewritten once.
+    await acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
     const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)
 
@@ -82,7 +79,7 @@ test('WHAT[FINALITY-022] host title request never opens a life', async () => {
   // rewritten (measured e2e regression: the title request opened the Life, the
   // planning turn was skipped, and the Activation fired on the title turn).
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+    await acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
     const outTitle = {
       messages: [
@@ -112,7 +109,7 @@ test('WHAT[FINALITY-022] host title request never opens a life', async () => {
 
 test('WHAT[FINALITY-022] active HumanRoot profile does not make another user message a root', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+    await acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
     const out = { messages: [userMessage('msg-not-root', 'ordinary later user-shaped message')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out)
@@ -130,7 +127,7 @@ test('WHAT[FINALITY-023] opening rewrite survives a persisted rewritten message'
   // Re-transforming must not stack a second tail — the narrative derives from
   // the durable blob, never from the message text.
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+    await acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
     const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)
@@ -153,7 +150,7 @@ test('WHAT[FINALITY-023] opening rewrite survives a persisted rewritten message'
 
 test('WHAT[FINALITY-024] work-time messages are never rewritten', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+    await acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
     const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)

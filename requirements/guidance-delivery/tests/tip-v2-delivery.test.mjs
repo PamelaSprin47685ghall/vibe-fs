@@ -10,11 +10,11 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import {
-  companionPrompt as prompt,
-  companionProjection as proj,
-  bloggerToml as toml,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as companion from '../../../dist/Context/Companion/ProjectionSurface.js'
+import * as toml from '../../../dist/Context/Companion/Blogger/TomlSurface.js'
+
+const prompt = companion
+const proj = companion
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const bloggerRoleLawPath = join(ROOT, 'resources/provider/role/blogger/en.md')

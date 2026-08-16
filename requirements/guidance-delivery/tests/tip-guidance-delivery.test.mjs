@@ -5,29 +5,15 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  agentFact,
-  agentJournal,
-  runtimeResources,
-  providerLanguage,
-  sessionId,
-  stream,
-  bloggerRequestId,
-  frameEpochId,
-  blobDigest,
-  blobRef,
-  prefixEpochId,
-  providerRun,
-  toolCallId,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as guidance from '../../../dist/Enforcer/Guidance/TipSurface.js'
+import * as language from '../../../dist/Participant/Provider/LanguageSurface.js'
+import * as resources from '../../../dist/Resources/PromptSurface.js'
 
-runtimeResources.installFromPackage()
+resources.runtimeInstallFromPackage()
 
-const {
-  EnforcerTipGuidance_latestTipGuidance: latestTipGuidance,
-  EnforcerTipGuidance_latestTipNudge: latestTipNudge,
-  EnforcerTipGuidance_resolveTipGuidance: resolveTipGuidance,
-} = await import('../../../dist/Enforcer/Guidance/Tip.js')
+const latestTipGuidance = guidance.latest
+const latestTipNudge = guidance.latestNudge
+const resolveTipGuidance = guidance.resolve
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const MAIN_MD = readFileSync(
@@ -39,79 +25,52 @@ const MAIN_ZH_CN_MD = readFileSync(
   'utf8',
 ).trim()
 
-const main = sessionId('ses-tip-delivery-main')
-const blogger = sessionId('ses-tip-delivery-blogger')
-const journalStream = (id) => stream.session(id)
-
-const append = async (journal, id, value, run) => {
-  const result = await agentJournal.appendAgent(journalStream(id), run, value, journal)
-  assert.equal(result.ok, true, `append failed: ${JSON.stringify(result)}`)
-}
+const main = 'ses-tip-delivery-main'
+const blogger = 'ses-tip-delivery-blogger'
 
 const seedOwnerWithTip = async (journal, { tip = 'primitive-obsession', runSuffix = '1' } = {}) => {
-  await append(
-    journal,
-    main,
-    agentFact('CompanionBloggerLinked', {
-      SessionId: main,
-      BloggerSessionId: blogger,
-      BloggerAgent: 'fast-blogger',
-    }),
-  )
+  const linked = await guidance.appendCompanionLink(journal, {
+    session: main,
+    bloggerSession: blogger,
+    bloggerAgent: 'fast-blogger',
+  })
+  assert.equal(linked.ok, true, linked.error)
 
-  await append(
-    journal,
-    main,
-    agentFact('BlogObservationCommitted', {
-      SessionId: main,
-      BloggerSessionId: blogger,
-      RequestId: bloggerRequestId(`req-tip-${runSuffix}`),
-      FrameEpochId: frameEpochId(0),
-      PreviousIngestedThroughSequence: 0n,
-      NextIngestedThroughSequence: BigInt(runSuffix),
-      PreviousCoverableTurnCutoffExclusive: 0,
-      NextCoverableTurnCutoffExclusive: Number(runSuffix),
-      NextCoveredPrefixDigest: `digest-tip-${runSuffix}`,
-      TextRef: blobRef(`blob-tip-${runSuffix}`),
-      TextDigest: blobDigest(`sha-tip-${runSuffix}`),
-      ProviderRun: providerRun(`run-tip-${runSuffix}`),
-      ToolCallIds: [toolCallId(`call-tip-${runSuffix}`)],
-      TipRuleId: tip,
-      FieldNameAtCommit: tip,
-      EvidenceRef: undefined,
-      ObservedPrefixEpochId: prefixEpochId(0),
-    }),
-    providerRun(`run-tip-${runSuffix}`),
-  )
+  const committed = await guidance.appendObservation(journal, {
+    session: main,
+    bloggerSession: blogger,
+    requestId: `req-tip-${runSuffix}`,
+    frameEpoch: 0,
+    previousIngestedThrough: 0,
+    nextIngestedThrough: Number(runSuffix),
+    previousCutoff: 0,
+    nextCutoff: Number(runSuffix),
+    nextCoveredPrefixDigest: `digest-tip-${runSuffix}`,
+    textRef: `blob-tip-${runSuffix}`,
+    textDigest: `sha-tip-${runSuffix}`,
+    providerRun: `run-tip-${runSuffix}`,
+    toolCallIds: [`call-tip-${runSuffix}`],
+    tipRuleId: tip,
+    fieldNameAtCommit: tip,
+    observedPrefixEpoch: 0,
+  })
+  assert.equal(committed.ok, true, committed.error)
 }
 
 const withJournal = async (fn) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-tip-guidance-'))
-  const created = await agentJournal.create({ directory })
-  assert.equal(created.ok, true)
+  const created = await guidance.createJournal(directory)
+  assert.equal(created.ok, true, created.error)
   try {
     return await fn(created.journal)
   } finally {
-    created.dispose()
+    guidance.disposeJournal(created.journal)
     rmSync(directory, { recursive: true, force: true })
   }
 }
 
-const presentationOf = (guidance) => {
-  if (guidance == null) return undefined
-  const p = guidance.Presentation
-  if (p == null) return undefined
-  if (typeof p === 'string') return p
-  // Fable RequireQualifiedAccess DU compiles to a Union instance; the case
-  // name is `.name` (never the positional tag ordinal).
-  if (p.name === 'Full') return 'Full'
-  if (p.name === 'IdentityOnly') return 'IdentityOnly'
-  if (Object.prototype.hasOwnProperty.call(p, 'Full')) return 'Full'
-  if (Object.prototype.hasOwnProperty.call(p, 'IdentityOnly')) return 'IdentityOnly'
-  return undefined
-}
-
-const textOf = (guidance) => guidance?.Text ?? guidance?.text
+const presentationOf = (value) => value?.presentation
+const textOf = (value) => value?.text
 
 test('WHAT[GD-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
   await withJournal(async (journal) => {
@@ -186,24 +145,21 @@ test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_m
 
 test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
   await withJournal(async (journal) => {
-    await append(
-      journal,
-      main,
-      agentFact('CompanionBloggerLinked', {
-        SessionId: main,
-        BloggerSessionId: blogger,
-        BloggerAgent: 'fast-blogger',
-      }),
-    )
-    assert.equal(await resolveTipGuidance(journal, main), undefined)
-    assert.equal(await latestTipGuidance(journal, main), undefined)
+    const linked = await guidance.appendCompanionLink(journal, {
+      session: main,
+      bloggerSession: blogger,
+      bloggerAgent: 'fast-blogger',
+    })
+    assert.equal(linked.ok, true, linked.error)
+    assert.equal(await resolveTipGuidance(journal, main), null)
+    assert.equal(await latestTipGuidance(journal, main), null)
   })
 })
 
 test('WHAT[GD-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
-  providerLanguage.clearAllForTests()
+  language.clearAllForTests()
   try {
-    const bound = providerLanguage.bindOnce(main, providerLanguage.simplifiedChinese)
+    const bound = language.bindOnce(main, 'SimplifiedChinese')
     assert.equal(bound.ok, true)
     await withJournal(async (journal) => {
       await seedOwnerWithTip(journal, { runSuffix: '7' })
@@ -216,7 +172,7 @@ test('WHAT[GD-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_c
       assert.ok(!text.includes(MAIN_MD), 'zh-CN guidance must not silently fall back to English main.md')
     })
   } finally {
-    providerLanguage.clearAllForTests()
+    language.clearAllForTests()
   }
 })
 
@@ -228,17 +184,13 @@ test('WHAT[GD-005] ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_nex
     assert.equal(presentationOf(await resolveTipGuidance(journal, main)), 'IdentityOnly')
 
     // HOST-006: compaction reanchor voids FullDeliveredTips with Blog/Prefix.
-    await append(
-      journal,
-      main,
-      agentFact('ContextReanchored', {
-        SessionId: main,
-        PreviousEpochId: prefixEpochId(0),
-        NextEpochId: prefixEpochId(1),
-        ObservedCompactionRun: providerRun('run-compaction-tip'),
-      }),
-      providerRun('run-compaction-tip'),
-    )
+    const reanchored = await guidance.appendContextReanchored(journal, {
+      session: main,
+      previousEpoch: 0,
+      nextEpoch: 1,
+      observedCompactionRun: 'run-compaction-tip',
+    })
+    assert.equal(reanchored.ok, true, reanchored.error)
 
     const after = await resolveTipGuidance(journal, main)
     assert.ok(after, 'post-reanchor must still resolve tip')

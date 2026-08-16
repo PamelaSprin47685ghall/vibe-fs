@@ -20,12 +20,11 @@
 //   - open request owns labor                         → finality-owns-life
 //
 // JS-SEMANTIC-SURFACE-002/003/005: the only production entry is the
-// registered FinalitySurface; the test never touches Fable unions, dist
-// internals, or the fold facade.
+// registered FinalitySurface; the test never touches Fable unions or internal
+// dist modules.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isAllowed } from '../../../dist/Foundation/RolesSurface.js'
 
 const finality = await import('../../../dist/Mission/Manager/FinalitySurface.js')
 
@@ -113,9 +112,9 @@ const classify = (world, callId, hasPlanCommitment) =>
   finality.classifyEnding(world, callId ?? '', hasPlanCommitment)
 
 test('WHAT[FINALITY-001] only the Manager holds ToolPermission.Finality', () => {
-  assert.equal(isAllowed('manager', 'Finality'), true)
+  assert.equal(finality.isAllowed('manager', 'Finality'), true)
   for (const role of ['coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'orchestrator', 'distiller', 'blogger']) {
-    assert.equal(isAllowed(role, 'Finality'), false, `role ${role} must not hold Finality`)
+    assert.equal(finality.isAllowed(role, 'Finality'), false, `role ${role} must not hold Finality`)
   }
 })
 

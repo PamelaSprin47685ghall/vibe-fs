@@ -712,7 +712,17 @@ module PluginTransforms =
 
         let transform (inObj: obj) (outObj: obj) : Task<unit> =
             task {
-                let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
+                let projectionSessionIdOpt =
+                    projectionSessionIdFromMessages outObj
+                    |> Option.orElseWith (fun () ->
+                        if not (isNull inObj) && not (isNull inObj?sessionID) then
+                            let sid = string inObj?sessionID
+                            if String.IsNullOrWhiteSpace sid then None else Some sid
+                        elif not (isNull inObj) && not (isNull inObj?sessionId) then
+                            let sid = string inObj?sessionId
+                            if String.IsNullOrWhiteSpace sid then None else Some sid
+                        else
+                            None)
 
                 projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 

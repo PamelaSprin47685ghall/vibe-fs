@@ -131,7 +131,7 @@ module HostForkJoin =
     /// journal=None: agent join fail-closed; pure PTY drain still allowed.
     /// Abandoned items join the same ResultsAvailable batch — never withhold
     /// completed results behind a top-level ForkError.Abandoned.
-    /// EXEC-020: PTY stays JoinItem/PtyJoinItem until renderer (no toRunCompletion on batch path).
+    /// EXEC-020: PTY stays JoinItem/PtyJoinItem until renderer, preserving PtyAborted.
     let private tryDrainAvailable
         (runtime: HostForkRuntime)
         (maxCount: int)

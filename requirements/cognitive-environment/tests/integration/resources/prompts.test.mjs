@@ -3,7 +3,11 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { promptResources, providerLanguage, providerResources, runtimeResources } from '../../../../verification-system/tests/support/domain.mjs'
+import * as promptResources from '../../../../dist/Resources/PromptSurface.js'
+import * as providerLanguage from '../../../../dist/Participant/Provider/LanguageSurface.js'
+
+const english = 'English'
+const simplifiedChinese = 'SimplifiedChinese'
 
 const PROMPT_FIELDS = [
   'ManagerSystemPrompt',
@@ -18,7 +22,9 @@ const PROMPT_FIELDS = [
   'BloggerSystemPrompt',
 ]
 
-const assertTenNonEmpty = (catalog, label) => {
+const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[field]])
+
+
   for (const field of PROMPT_FIELDS) {
     assert.equal(typeof catalog[field], 'string', `${label}: ${field}`)
     assert.ok(catalog[field].trim().length > 0, `${label}: ${field} non-empty`)
@@ -55,18 +61,18 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('PROMPT_resources_load_from_package_independent_of_cwd', () => {
+test('WHAT[DISTRIBUTION-002] PROMPT_resources_load_from_package_independent_of_cwd', () => {
   const previous = process.cwd()
   try {
     process.chdir('/')
     assertTenNonEmpty(promptResources.load(), 'PromptResources')
-    assertTenNonEmpty(runtimeResources.load().Prompts, 'RuntimeResources')
+    assertTenNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
   } finally {
     process.chdir(previous)
   }
 })
 
-test('PROMPT_composition_common_law_role_law_then_inherited_library', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   const prompts = promptResources.load()
   inOrder(prompts.ManagerSystemPrompt, ['# Common Law', '# Management', '# Office Library', '# The Kolmogorov Book', '# The Book of Scarcity'])
   inOrder(prompts.CoderSystemPrompt, ['# Common Law', '# Mutation', '# Office Library', '# The Kolmogorov Book'])
@@ -80,36 +86,36 @@ test('PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   }
 })
 
-test('PROMPT_common_law_discourages_ascii_art_in_both_languages', () => {
-  const en = promptResources.loadForLanguage(providerLanguage.english)
-  const zh = promptResources.loadForLanguage(providerLanguage.simplifiedChinese)
+test('WHAT[COGNITIVE-ENVIRONMENT-001] PROMPT_common_law_discourages_ascii_art_in_both_languages', () => {
+  const en = promptResources.loadForLanguage(english)
+  const zh = promptResources.loadForLanguage(simplifiedChinese)
 
   for (const text of Object.values(en)) assert.match(text, /avoid ASCII art where possible/)
   for (const text of Object.values(zh)) assert.match(text, /输出尽量不要使用 ASCII art/)
 })
 
-test('PROMPT_role_laws_are_identity_not_tool_inventory', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-004] PROMPT_role_laws_are_identity_not_tool_inventory', () => {
   for (const path of ROLE_PATHS) {
-    const law = providerResources.readText(providerLanguage.english, path)
+    const law = providerLanguage.readText(english, path)
     assert.doesNotMatch(law, forbiddenRoleToolInventory, path)
   }
 
-  const inquiry = providerResources.readText(providerLanguage.english, 'role/inquiry')
+  const inquiry = providerLanguage.readText(english, 'role/inquiry')
   assert.match(inquiry, /Inspector/)
   assert.doesNotMatch(inquiry, /sphinx_start|sphinx_resume/)
 })
 
-test('PROMPT_017_world_role_library_all_have_en_zh_parity', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_world_role_library_all_have_en_zh_parity', () => {
   for (const semantic of [...ROLE_PATHS, ...SHARED_PATHS]) {
-    providerResources.requireLanguagePair(semantic)
-    assert.ok(providerResources.exists(providerLanguage.english, semantic), `${semantic}: en`)
-    assert.ok(providerResources.exists(providerLanguage.simplifiedChinese, semantic), `${semantic}: zh-CN`)
+    providerLanguage.requireLanguagePair(semantic)
+    assert.ok(providerLanguage.exists(english, semantic), `${semantic}: en`)
+    assert.ok(providerLanguage.exists(simplifiedChinese, semantic), `${semantic}: zh-CN`)
   }
 })
 
-test('PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
-  const en = promptResources.loadForLanguage(providerLanguage.english)
-  const zh = promptResources.loadForLanguage(providerLanguage.simplifiedChinese)
+test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
+  const en = promptResources.loadForLanguage(english)
+  const zh = promptResources.loadForLanguage(simplifiedChinese)
   assertTenNonEmpty(zh, 'zh-CN')
 
   for (const field of PROMPT_FIELDS) {
@@ -119,16 +125,16 @@ test('PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
   }
 })
 
-test('PROMPT_bookkeeper_inherits_common_law_and_casebook_role_law', () => {
-  const en = promptResources.loadBookkeeperSystemFor(providerLanguage.english)
-  const zh = promptResources.loadBookkeeperSystemFor(providerLanguage.simplifiedChinese)
+test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_bookkeeper_inherits_common_law_and_casebook_role_law', () => {
+  const en = promptResources.loadBookkeeperSystemFor(english)
+  const zh = promptResources.loadBookkeeperSystemFor(simplifiedChinese)
   inOrder(en, ['# Common Law', '# The Casebook'])
   assert.match(zh, /^# 共同法/)
   assert.match(zh, /# Casebook/)
 })
 
-test('PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {
-  for (const [field, text] of Object.entries(promptResources.load())) {
+test('WHAT[COGNITIVE-ENVIRONMENT-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {
+  for (const [field, text] of promptEntries(promptResources.load())) {
     assert.doesNotMatch(text, /\bfork-manager\b|\bfork-pty\b|\bedit-qa\b|\bmeditator\b|\bfast-executor\b|\bdeep-executor\b/i, field)
   }
 })

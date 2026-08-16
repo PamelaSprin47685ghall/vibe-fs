@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { paretoFrontier, createStore, start, resume, state, assessWhy, fsharpList } from './support.mjs'
+import { paretoFrontier, createStore, start, resume, state, assessWhy } from './support.mjs'
 
 test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
   const store = createStore()
@@ -30,9 +30,9 @@ test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
     ],
   })
 
-  const actions = [...state(store, started.handle).Actions].map(([, action]) => action)
+  const actions = state(store, started.handle).actions
   assert.equal(actions.length, 2)
-  assert.ok(actions.every((action) => action.EquivalenceKey === undefined))
+  assert.ok(actions.every((action) => action.equivalenceKey === null))
 })
 
 test('WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', () => {
@@ -64,9 +64,9 @@ test('WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_
     ],
   })
 
-  const actions = [...state(store, started.handle).Actions].map(([, action]) => action)
+  const actions = state(store, started.handle).actions
   assert.equal(actions.length, 1)
-  assert.deepEqual([...actions[0].Provenance].sort(), ['generator:abduction', 'generator:counterexample'])
+  assert.deepEqual(actions[0].provenance.sort(), ['generator:abduction', 'generator:counterexample'])
 })
 
 test('WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
@@ -96,36 +96,35 @@ test('WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_fals
     ],
   })
 
-  assert.equal(state(store, started.handle).Actions.size, 2)
+  assert.equal(state(store, started.handle).actions.length, 2)
 })
 
 const kernelAction = ({ id, gain, gateway = 0, cost, value, provenance = [] }) => ({
-  Id: id,
-  ExpectedRootGain: gain,
-  GatewayGain: gateway,
-  Cost: cost,
-  Value: value,
-  Provenance: fsharpList(provenance),
+  id,
+  methodName: 'Abduction',
+  question: id,
+  semanticKey: id,
+  expectedRootGain: gain,
+  gatewayGain: gateway,
+  cost,
+  value,
+  provenance,
 })
 
 test('WHAT[EPI-011] kernel_owned_equivalence_class_removes_only_truly_dominated_representation', () => {
-  const frontier = paretoFrontier(
-    fsharpList([
-      kernelAction({ id: 'expensive', gain: 0.9, cost: 0.4, value: 0.5 }),
-      kernelAction({ id: 'cheap', gain: 0.9, cost: 0.2, value: 0.7 }),
-    ]),
-  )
+  const frontier = paretoFrontier([
+    kernelAction({ id: 'expensive', gain: 0.9, cost: 0.4, value: 0.5 }),
+    kernelAction({ id: 'cheap', gain: 0.9, cost: 0.2, value: 0.7 }),
+  ])
 
-  assert.deepEqual([...frontier].map((action) => action.Id), ['cheap'])
+  assert.deepEqual(frontier.map((action) => action.id), ['cheap'])
 })
 
 test('WHAT[EPI-011] pareto_incomparable_equivalent_representations_both_survive', () => {
-  const frontier = paretoFrontier(
-    fsharpList([
-      kernelAction({ id: 'high', gain: 1, cost: 0.4, value: 0.6 }),
-      kernelAction({ id: 'low', gain: 0.7, cost: 0.1, value: 0.6 }),
-    ]),
-  )
+  const frontier = paretoFrontier([
+    kernelAction({ id: 'high', gain: 1, cost: 0.4, value: 0.6 }),
+    kernelAction({ id: 'low', gain: 0.7, cost: 0.1, value: 0.6 }),
+  ])
 
-  assert.equal([...frontier].length, 2)
+  assert.equal(frontier.length, 2)
 })

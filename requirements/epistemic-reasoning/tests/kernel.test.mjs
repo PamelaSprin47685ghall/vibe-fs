@@ -35,8 +35,8 @@ test('WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_
   assessWhy(store, started.handle)
 
   let current = state(store, started.handle)
-  assert.equal(current.Evidence.size, 0)
-  assert.equal(current.Findings.size, 0)
+  assert.equal(current.evidence.length, 0)
+  assert.equal(current.findings.length, 0)
 
   const next = resume(store, started.handle, {
     type: 'Candidates',
@@ -53,8 +53,8 @@ test('WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_
   assert.equal(next.request.type, 'InvestigateRequest')
 
   current = state(store, started.handle)
-  assert.equal(current.Evidence.size, 0)
-  assert.equal(current.Findings.size, 0)
+  assert.equal(current.evidence.length, 0)
+  assert.equal(current.findings.length, 0)
 })
 
 test('WHAT[EPI-005] candidate_question_must_be_investigated_before_it_can_affect_answer', () => {

@@ -37,13 +37,13 @@ const plant = (commonDir) => {
   ]
 }
 
-test('local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
+test('WHAT[DURABLE-EVENTS-009] local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-leave-unread-'))
   try {
     execFileSync('git', ['init', '--quiet', repo])
     const commonDir = join(repo, '.git')
     const planted = plant(commonDir)
-    const local = eventStore.createLocalStore(commonDir, 'fresh-writer')
+    const local = eventStore.EventStoreSurface_create(commonDir, 'fresh-writer')
     const event = {
       id: 'a'.repeat(40),
       stream: 'leave-unread/new',
@@ -53,7 +53,8 @@ test('local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
       payloadRefs: [],
     }
 
-    const result = await eventStore.append(local.store, [event])
+    const result = await eventStore.EventStoreSurface_append(local, [event])
+    eventStore.EventStoreSurface_dispose(local)
     assert.equal(result.ok, true, `append failed: ${JSON.stringify(result.error)}`)
 
     for (const [path, before] of planted) {
@@ -65,7 +66,7 @@ test('local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
   }
 })
 
-test('shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async () => {
+test('WHAT[DURABLE-EVENTS-009] shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async () => {
   const { readFile } = await import('node:fs/promises')
   const eventStore = await readFile(
     new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url),

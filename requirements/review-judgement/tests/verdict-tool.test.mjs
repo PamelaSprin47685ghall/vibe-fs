@@ -1,42 +1,8 @@
-// tests/unit/tools/verdict-tool.test.mjs — VERIFY-008/009: reviewer judge tool contract.
-
+// REVIEW-JUDGEMENT-001: executable judge tool and public contract.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
-import { listItems, payloadOf } from '../../verification-system/tests/support/domain.mjs'
-
-const {
-  HostToolArguments_$ctor_4E60E31B: makeArgs,
-  HostToolContext,
-  ToolHostCodec_factory,
-} = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Mission/Review/OpenCode/JudgeTool.js')
-const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScope.js')
-
-const fakeSchema = {
-  enum: (values) => ({ values }),
-}
-const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
-
-const emptyScope = () =>
-  new ToolRuntimeScope(
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    new Map(),
-    () => undefined,
-    new Set(),
-    new Map(),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-  )
-
-const context = ({ sessionId = 'ses-reviewer', toolCallId, providerRunId } = {}) =>
-  new HostToolContext(sessionId, undefined, toolCallId, providerRunId, undefined, () => () => {})
+import * as judge from '../../../dist/Mission/Review/OpenCode/JudgeSurface.js'
 
 const hostContext = ({ sessionId = 'ses-reviewer', toolCallId, providerRunId } = {}) => ({
   sessionID: sessionId,
@@ -45,37 +11,20 @@ const hostContext = ({ sessionId = 'ses-reviewer', toolCallId, providerRunId } =
   ...(providerRunId === undefined ? {} : { messageID: providerRunId }),
 })
 
-const parseToml = (text) =>
-  Object.fromEntries(
-    text
-      .split('\n')
-      .filter((line) => line.includes(' = '))
-      .map((line) => {
-        const [name, ...rest] = line.split(' = ')
-        const raw = rest.join(' = ')
-        return [name, raw.startsWith('"') ? JSON.parse(raw) : raw]
-      }),
-  )
-
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
-  const tool = spec(factory, emptyScope())
-
-  assert.equal(tool.Name, 'judge')
-  assert.match(tool.Description, /PERFECT or REVISE/)
-  assert.match(tool.Description, /does not mutate source/)
-  const args = listItems(tool.Arguments)
-  assert.deepEqual(args[0][0], 'verdict')
-  assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
+  const contract = judge.contract('English')
+  assert.equal(contract.name, 'judge')
+  assert.match(contract.description, /PERFECT or REVISE/)
+  assert.match(contract.description, /does not mutate source/)
+  assert.deepEqual(contract.arguments[0], { name: 'verdict', values: ['PERFECT', 'REVISE'] })
 })
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
-
     const result = await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext())
-
-    assert.match(result, /judgment was not received/i)
-    assert.match(result, /PERFECT or REVISE/)
+    assert.match(result, /(?:judgment was not received|你的判断未被收下)/i)
+    assert.match(result, /(?:PERFECT or REVISE|PERFECT 或 REVISE)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
@@ -83,35 +32,26 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_invalid_input_is_rejected_as_a_natural_co
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
-
     const result = await hooks.tool.judge.execute({}, hostContext())
-
-    assert.match(result, /judgment was not received/i)
-    assert.match(result, /PERFECT or REVISE/)
+    assert.match(result, /(?:judgment was not received|你的判断未被收下)/i)
+    assert.match(result, /(?:PERFECT or REVISE|PERFECT 或 REVISE)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
-  const result = await spec(factory, emptyScope()).Execute(
-    makeArgs({ verdict: 'REVISE' }),
-    context({ sessionId: 'ses-manager' }),
-  )
-
-  assert.match(result, /did not come from a Reviewer/i)
-  assert.doesNotMatch(result, /\berror\s*=/)
+  await withExecutablePlugin(async (hooks) => {
+    const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: 'ses-manager' }))
+    assert.match(result, /(?:did not come from a Reviewer|并非来自 Reviewer|调用方权威确立之前)/i)
+    assert.doesNotMatch(result, /\berror\s*=/)
+  })
 })
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
-
-    const result = await hooks.tool.judge.execute(
-      { verdict: 'REVISE' },
-      hostContext({ sessionId: '' }),
-    )
-
-    assert.match(result, /authority is established/i)
+    const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' }))
+    assert.match(result, /(?:authority is established|no active identity|没有有效身份|调用方权威确立之前)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
@@ -119,13 +59,8 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_empty_session_is_rejected_before_role_res
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
-
-    const result = await hooks.tool.judge.execute(
-      { verdict: 'REVISE' },
-      hostContext({ providerRunId: 'run-1' }),
-    )
-
-    assert.match(result, /could not be bound to the current review turn/i)
+    const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ providerRunId: 'run-1' }))
+    assert.match(result, /(?:could not be bound to the current review turn|无法绑定到当前审查轮次)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
 })

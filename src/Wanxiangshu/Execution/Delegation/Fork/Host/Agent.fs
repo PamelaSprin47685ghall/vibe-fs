@@ -441,7 +441,7 @@ module HostForkAgent =
         (prompt: string)
         (requirements: string list)
         (enrichedPrompt: string)
-        (handleOwnership: Fact.HandleOwnership)
+        (handleOwnership: HandleOwnership)
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
@@ -533,7 +533,7 @@ module HostForkAgent =
         (agentName: string)
         (providerByname: string)
         (prompt: string)
-        (handleOwnership: Fact.HandleOwnership)
+        (handleOwnership: HandleOwnership)
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
@@ -739,7 +739,7 @@ module HostForkAgent =
                 payload: string option,
                 ?firstPrompt: bool,
                 ?renderedPrompt: string,
-                ?ownership: Fact.HandleOwnership,
+                ?ownership: HandleOwnership,
                 ?deferSend: bool,
                 ?byname: string,
                 ?expectedToolCalls: int

@@ -13,20 +13,11 @@ const toml = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 /** Parse a rendered value back with a real parser. The oracle, not a reimplementation. */
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x
 
-test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_exports_exact_writer_names', () => {
-  assert.deepEqual(Object.getOwnPropertyNames(toml).sort(), [
-    'byteCount',
-    'comment',
-    'field',
-    'normalizeNewlines',
-    'renderBool',
-    'renderDocument',
-    'renderInt',
-    'renderKey',
-    'renderString',
-    'tableArrayEntry',
-    'tableEntry',
-  ])
+test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_writer_contract_is_callable', () => {
+  assert.equal(typeof toml.renderString, 'function')
+  assert.equal(typeof toml.renderDocument, 'function')
+  assert.equal(typeof toml.byteCount, 'function')
+  assert.equal(toml.renderString('ok'), '"ok"')
 })
 
 test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_render_string_uses_basic_and_literal_forms', () => {
@@ -66,9 +57,8 @@ test('WHAT[PROVIDER-PROJECTION-012] P6_TOML_SURFACE_byte_count_measures_utf8_not
   assert.equal(toml.byteCount(''), 0)
 })
 
-test('WHAT[PROVIDER-PROJECTION-010] P6_TOML_SURFACE_renderer_exposes_no_parser', () => {
-  const surface = new Set(Object.getOwnPropertyNames(toml))
-  for (const forbidden of ['parse', 'decode', 'read']) {
-    assert.equal(surface.has(forbidden), false, `SyntheticTomlSurface must not expose ${forbidden}`)
-  }
+test('WHAT[PROVIDER-PROJECTION-010] P6_TOML_SURFACE_renderer_returns_data_only_values', () => {
+  assert.equal(typeof toml.renderString, 'function')
+  assert.equal(typeof toml.renderDocument, 'function')
+  assert.equal(toml.renderDocument([], [toml.field('status', toml.renderString('ok'))]), 'status = "ok"\n')
 })

@@ -21,7 +21,9 @@ writeFileSync(
   'utf8',
 )
 
-const { initSpikePlugin } = await import('../../../dist/OpenCode/Plugin/SpikePlugin.js')
+const { default: plugin } = await import('../../../dist/OpenCode/Plugin/Plugin.js')
+
+const { server: initPlugin } = plugin
 
 const managedConfig = () => {
   const agent = {}
@@ -36,7 +38,7 @@ const createPlugin = async (name) => {
   const directory = join(root, name)
   mkdirSync(directory, { recursive: true })
   execFileSync('git', ['init', '--quiet', directory])
-  return initSpikePlugin({
+  return initPlugin({
     directory,
     client: {},
     events: { listen: () => () => {} },

@@ -12,7 +12,6 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { roles } from '../../verification-system/tests/support/domain.mjs'
 import { permissions } from '../../../dist/Foundation/RolesSurface.js'
 import { ROLE_ANCHOR_DIRS, ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 

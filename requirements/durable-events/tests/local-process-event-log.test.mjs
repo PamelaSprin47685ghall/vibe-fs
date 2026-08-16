@@ -1,52 +1,51 @@
-//
 // DURABLE-EVENTS-004/005/010/011/017:
 // local truth is one unbounded .git/wanxiang/events/<WriterId>.ndjson per process;
 // local append performs no Git object/tree/ref work; blobification belongs only to remote sync.
 
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
-import { eventId, toList } from '../../verification-system/tests/support/domain.mjs'
-
-const Domain = await import('../../../dist/Persistence/EventStore/Model.js')
-const LocalLog = await import('../../../dist/Persistence/EventStore/ProcessEventLog.js')
-
-const streamId = (value) => Domain.EventStreamIdModule_create(value)
-const envelope = (id, n) =>
-  new Domain.EventEnvelope(
-    eventId(id),
-    streamId('proof/local'),
-    'JobRequested',
-    toList([]),
-    { n },
-    toList([]),
-  )
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 
 const hexId = (n) => n.toString(16).padStart(40, '0')
+const event = (id, n, parents = []) => ({
+  id,
+  stream: 'proof/local',
+  type: 'JobRequested',
+  parents,
+  payload: { n },
+  payloadRefs: [],
+})
 const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.git')
+
+const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
 test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments', async () => {
   const gitCommonDir = await commonDir()
-  const writerId = 'writer-proof-a'
-  const log = LocalLog.ProcessEventLogModule_create(gitCommonDir, writerId)
+  const store = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-proof-a')
+  try {
+    const first = Array.from({ length: 4 }, (_, i) => event(hexId(i + 1), i + 1))
+    assert.equal((await eventStore.EventStoreSurface_append(store, first)).ok, true)
+    const file = path.join(gitCommonDir, 'wanxiang', 'events', 'writer-proof-a.ndjson')
+    const prefix = await readFile(file)
 
-  const first = Array.from({ length: 4 }, (_, i) => envelope(hexId(i + 1), i + 1))
-  LocalLog.ProcessEventLogModule_append(log, toList(first))
-  const prefix = await readFile(LocalLog.ProcessEventLogModule_filePath(log))
+    const many = Array.from({ length: 160 }, (_, i) => event(hexId(i + 100), i + 100))
+    assert.equal((await eventStore.EventStoreSurface_append(store, many)).ok, true)
+    const after = await readFile(file)
 
-  const many = Array.from({ length: 160 }, (_, i) => envelope(hexId(i + 100), i + 100))
-  LocalLog.ProcessEventLogModule_append(log, toList(many))
-  const after = await readFile(LocalLog.ProcessEventLogModule_filePath(log))
+    assert.equal(after.subarray(0, prefix.length).equals(prefix), true, 'append must preserve every prior byte')
+    assert.equal(path.basename(file), 'writer-proof-a.ndjson')
 
-  assert.equal(after.subarray(0, prefix.length).equals(prefix), true, 'append must preserve every prior byte')
-  assert.equal(path.basename(LocalLog.ProcessEventLogModule_filePath(log)), `${writerId}.ndjson`)
-
-  const files = await readdir(path.join(gitCommonDir, 'wanxiang', 'events'))
-  assert.deepEqual(files, [`${writerId}.ndjson`], 'history size must not create 000000/segment/chunk files')
-  assert.equal(files.some((name) => /^\d+\.ndjson$/.test(name)), false)
+    const files = await readdir(path.join(gitCommonDir, 'wanxiang', 'events'))
+    assert.deepEqual(files, ['writer-proof-a.ndjson'], 'history size must not create 000000/segment/chunk files')
+    assert.equal(files.some((name) => /^\d+\.ndjson$/.test(name)), false)
+  } finally {
+    eventStore.EventStoreSurface_dispose(store)
+    await remove(path.dirname(gitCommonDir))
+  }
 })
 
 test('WHAT[DURABLE-EVENTS-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies', async () => {
@@ -75,15 +74,19 @@ test('WHAT[DURABLE-EVENTS-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_
 
 test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_file_without_machine_identity', async () => {
   const gitCommonDir = await commonDir()
-  const a = LocalLog.ProcessEventLogModule_create(gitCommonDir, 'writer-a')
-  const b = LocalLog.ProcessEventLogModule_create(gitCommonDir, 'writer-b')
+  const a = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-a')
+  const b = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-b')
+  try {
+    assert.equal((await eventStore.EventStoreSurface_append(a, [event(hexId(0xa1), 1)])).ok, true)
+    assert.equal((await eventStore.EventStoreSurface_append(b, [event(hexId(0xb1), 2)])).ok, true)
 
-  LocalLog.ProcessEventLogModule_append(a, toList([envelope(hexId(0xa1), 1)]))
-  LocalLog.ProcessEventLogModule_append(b, toList([envelope(hexId(0xb1), 2)]))
-
-  assert.notEqual(LocalLog.ProcessEventLogModule_filePath(a), LocalLog.ProcessEventLogModule_filePath(b))
-  const files = (await readdir(path.join(gitCommonDir, 'wanxiang', 'events'))).sort()
-  assert.deepEqual(files, ['writer-a.ndjson', 'writer-b.ndjson'])
+    const files = (await readdir(path.join(gitCommonDir, 'wanxiang', 'events'))).sort()
+    assert.deepEqual(files, ['writer-a.ndjson', 'writer-b.ndjson'])
+  } finally {
+    eventStore.EventStoreSurface_dispose(a)
+    eventStore.EventStoreSurface_dispose(b)
+    await remove(path.dirname(gitCommonDir))
+  }
 })
 
 test('WHAT[DURABLE-EVENTS-011] one_complete_writer_file_is_one_blob_only_at_remote_sync_boundary', async () => {
@@ -92,13 +95,8 @@ test('WHAT[DURABLE-EVENTS-011] one_complete_writer_file_is_one_blob_only_at_remo
   const store = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
   const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
 
-  // One complete writer file becomes exactly one Git blob: the sync materializer
-  // writes one blob per `<writerId>.ndjson` entry, with no chunk/segment/delta/index.
   assert.match(sync, /WriteBlob/, 'remote sync encodes writer bytes as Git blobs')
   assert.match(sync, /writerId \+ "\.ndjson"/, 'one complete writer file maps to one blob entry')
   assert.doesNotMatch(sync, /delta|chunk|segment|EventIdShard|index/, 'no delta/chunk/segment/index protocol in sync encoding')
-
-  // Wanxiangshu main process never initiates fetch/pull/push: remote operations
-  // belong to user Git processes entering the installed hooks, never the runtime.
   assert.doesNotMatch(store + log, /\.Fetch|\.Pull|\.Push|WriterStreamSync|GitGateway|ProcessGitRawStore/, 'runtime append path performs no remote sync or Git CAS')
 })

@@ -12,33 +12,94 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  authorityRoot,
-  caseOf,
-  envelope,
-  fact,
-  fold,
-  gitTreeHash,
-  idValue,
-  isSome,
-  listItems,
-  payloadOf,
-  providerInputSeal,
-  providerRun,
-  reviewAttemptIdentity,
-  reviewBarrierId,
-  reviewChallenge,
-  reviewProjection,
-  reviewRequirements,
-  reviewWitness,
-  sealDigest,
-  sessionId,
-  stream,
-  verdict,
-  verdictWitness,
-  providerLanguage,
-  providerResources,
-} from '../../verification-system/tests/support/domain.mjs'
+import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
+import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
+
+const reviewChallenge = {
+  path: review.challengePath,
+  text: review.challengeText('English'),
+  textVersion: review.challengeTextVersion,
+  prompt: review.challengePrompt(review.challengeText('English')),
+  promptOf: review.challengePrompt,
+  contentDigest: (sha256, prompt) => review.challengeDigest(sha256, prompt),
+  issued: ({ barrier, tree, reviewer, run, call, digest }) => review.issuedChallenge({
+    BarrierId: barrier, GitTreeHash: tree, ReviewerSessionId: reviewer,
+    FirstProviderRun: run, FirstToolCallId: call, ChallengeTextVersion: 1,
+    ChallengeContentDigest: digest,
+  }),
+}
+const reviewWitness = {
+  attemptIdentity: review.attemptIdentity,
+  isDistinctAttempt: review.isDistinctAttempt,
+  isConfirmed: review.isConfirmed,
+  isPerfectPending: review.isPerfectPending,
+  isRevision: review.isRevision,
+  isValidForTree: review.isValidForTree,
+  confirmedReviewer: review.confirmedReviewer,
+  gitTreeHash: review.gitTreeHash,
+  read: (value) => review.readWitness(value?.value?.Witness ?? value?.value ?? value),
+  noReview: review.noReview,
+  confirm: (barrier, digest, input, first, second) => {
+    const value = review.confirmWitness(barrier, digest, input, first, second)
+    return value == null ? undefined : { ok: true, value: { Witness: value } }
+  },
+}
+const guardWrap = (handle) => ({ handle, Witness: review.guardWitness(handle) })
+const guardUnwrap = (value) => value.handle ?? value
+const guardResult = (result) => result.ok ? { ok: true, value: guardWrap(result.value) } : result
+const reviewProjection = {
+  empty: guardWrap(review.emptyGuard()),
+  startBarrier: (barrier, tree, current) => guardWrap(review.startBarrier('ses_manager', barrier, tree, guardUnwrap(current))),
+  applyChallengeIssued: (challenge, current) => guardWrap(review.applyChallengeIssued(challenge, guardUnwrap(current))),
+  applySeal: (seal, current) => guardWrap(review.applySeal(seal, guardUnwrap(current))),
+  applyVerdict: (attempt, verdict, current) => guardResult(review.applyVerdict(attempt, verdict, guardUnwrap(current))),
+  applyConfirmedWitness: (barrier, digest, input, first, second, current) =>
+    guardResult(review.applyConfirmedWitness(barrier, digest, input, first, second, guardUnwrap(current))),
+  read: (current) => {
+    const value = review.guardView(guardUnwrap(current))
+    return {
+      barrier: value.barrier ?? undefined,
+      tree: value.tree ?? undefined,
+      witness: value.witness.state,
+      hasPendingChallenge: value.hasPendingChallenge,
+      seals: value.sealCount,
+      observedAttempts: value.observedAttempts,
+    }
+  },
+  satisfiesGuard: (tree, current) => review.satisfiesGuard(tree, guardUnwrap(current)),
+  hasObservedAttempt: (attempt, current) => review.hasObservedAttempt(attempt, guardUnwrap(current)),
+}
+const requirementWrap = (handle) => {
+  const value = review.requirementsView(handle)
+  return { handle, HumanPromptInputs: value.humanPromptInputs, LastConfirmedProviderRun: value.lastConfirmedProviderRun }
+}
+const requirementUnwrap = (value) => value.handle ?? value
+const reviewRequirements = {
+  empty: requirementWrap(review.requirementsEmpty()),
+  addRequirement: (session, root, current) => requirementWrap(review.addRequirement(session, root, requirementUnwrap(current))),
+  clearOnConfirmation: (run, current) => requirementWrap(review.clearRequirements(run, requirementUnwrap(current))),
+  read: (current) => review.requirementsView(requirementUnwrap(current)),
+}
+const providerLanguage = { english: 'English', simplifiedChinese: 'SimplifiedChinese' }
+const providerResources = { readText: (language, path) => provider.readText(language, path) }
+const reviewAttemptIdentity = { dedupeKey: review.dedupeKey }
+const providerInputSeal = (value) => review.providerInputSeal(value)
+const verdictWitness = (value) => review.verdictWitness({ ProviderRun: value.run, ToolCallId: value.call, GitTreeHash: value.tree, ReviewerSessionId: value.reviewer })
+const verdict = { perfect: 'PERFECT', revise: 'REVISE' }
+const reviewBarrierId = (value) => value
+const gitTreeHash = (value) => value
+const providerRun = (value) => value
+const sealDigest = (value) => value
+const sessionId = (value) => value
+const authorityRoot = (value) => value
+const idValue = {
+  sealDigest: (value) => value,
+  session: (value) => value,
+  providerRun: (value) => value,
+  gitTree: (value) => value,
+}
+const isSome = (value) => value != null
+
 
 // A visible stand-in for sha256: the property under test is which text is
 // digested, not the hash function.
@@ -205,7 +266,7 @@ test('WHAT[REVIEW-ASSURANCE-004] REVIEW_005_an_empty_guard_is_NoReview_and_satis
 
   // No tree, so nothing can be valid for one — including the current tree.
   assert.equal(reviewWitness.isValidForTree(TREE, reviewWitness.noReview), false)
-  assert.equal(isSome(reviewWitness.gitTreeHash(reviewWitness.noReview)), false)
+  assert.equal(reviewWitness.gitTreeHash(reviewWitness.noReview) != null, false)
 })
 
 test('WHAT[REVIEW-ASSURANCE-002] REVIEW_005_a_first_PERFECT_becomes_a_pending_witness_the_fold_can_produce', () => {
@@ -330,7 +391,7 @@ test('WHAT[REVIEW-ASSURANCE-005] REVIEW_006_the_witness_has_no_authority_root_fi
 
   const confirmed = confirmOn(afterChallengeAndSeal())
   assert.equal(confirmed.ok, true, confirmed.ok ? '' : confirmed.error)
-  const payload = payloadOf(confirmed.value.Witness)
+  const payload = review.confirmedWitnessRecord(confirmed.value)
 
   assert.deepEqual(Object.keys(payload).sort(), [
     'BarrierId',
@@ -376,7 +437,7 @@ test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_the_witness_carries_the_digests_rath
   // witness — a second lookup that can disagree with the first.
   const confirmed = reviewWitness.confirm(BARRIER, CHALLENGE_DIGEST, sealDigest('seal_2'), first, second)
 
-  assert.equal(caseOf(confirmed), 'Confirmed')
+  assert.equal(confirmed.value.Witness.state, 'Confirmed')
   assert.deepEqual(
     {
       challenge: reviewWitness.read(confirmed).challengeResultDigest,
@@ -401,25 +462,16 @@ test('WHAT[REVIEW-ASSURANCE-004] REVIEW_005_confirmedReviewer_is_derived_from_th
     issuedChallenge(),
     reviewProjection.startBarrier(BARRIER, TREE, reviewProjection.empty),
   )
-  assert.equal(isSome(reviewWitness.confirmedReviewer(pending.Witness)), false)
-  assert.equal(isSome(reviewWitness.confirmedReviewer(reviewWitness.noReview)), false)
+  assert.equal(reviewWitness.confirmedReviewer(pending.Witness) != null, false)
+  assert.equal(reviewWitness.confirmedReviewer(reviewWitness.noReview) != null, false)
 })
 
 test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard', () => {
-  const reviewer = sessionId(REVIEWER)
   const manager = sessionId('ses_manager')
-  const result = fold.one(fold.empty, envelope({
-    stream: stream.session(reviewer),
-    fact: fact('ReviewBarrierStarted', {
-      ReviewerSessionId: reviewer,
-      ManagerSessionId: manager,
-      BarrierId: BARRIER,
-      GitTreeHash: TREE,
-    }),
-  }))
-
-  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-  assert.equal(reviewProjection.read(fold.sessions(result.value).ses_manager.ReviewGuard).barrier, 'bar_1')
+  const mirrored = review.startBarrier(manager, BARRIER, TREE, review.emptyGuard())
+  assert.equal(review.guardView(mirrored).managerSession, manager)
+  assert.equal(review.guardView(mirrored).barrier, BARRIER)
+  assert.equal(review.guardView(mirrored).tree, TREE)
 })
 
 // ── REVIEW-008: a tree change invalidates without deleting ──────────────────
@@ -499,7 +551,7 @@ test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_every_witness_state_reports_the_tree
       pending: idValue.gitTree(reviewWitness.gitTreeHash(pending.Witness)),
       revised: idValue.gitTree(reviewWitness.gitTreeHash(revised.Witness)),
       confirmed: idValue.gitTree(reviewWitness.gitTreeHash(confirmed.Witness)),
-      noReview: isSome(reviewWitness.gitTreeHash(reviewWitness.noReview)),
+      noReview: reviewWitness.gitTreeHash(reviewWitness.noReview) != null,
     },
     { pending: 'tree_1', revised: 'tree_1', confirmed: 'tree_1', noReview: false },
   )
@@ -513,14 +565,14 @@ test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_requirement_is_keyed_by_authority_
   // identity. Keying by the wire message would also force converting one identity
   // into the other, which PROMPT-001 exists to prevent.
   let requirements = reviewRequirements.empty
-  assert.equal(listItems(requirements.HumanPromptInputs).length, 0)
+  assert.equal(requirements.HumanPromptInputs.length, 0)
 
   requirements = reviewRequirements.addRequirement(sessionId('ses_m'), authorityRoot('msg_1'), requirements)
   requirements = reviewRequirements.addRequirement(sessionId('ses_m'), authorityRoot('msg_1'), requirements)
-  assert.equal(listItems(requirements.HumanPromptInputs).length, 1, 'the same root twice is one requirement')
+  assert.equal(requirements.HumanPromptInputs.length, 1, 'the same root twice is one requirement')
 
   requirements = reviewRequirements.addRequirement(sessionId('ses_m'), authorityRoot('msg_2'), requirements)
-  assert.equal(listItems(requirements.HumanPromptInputs).length, 2)
+  assert.equal(requirements.HumanPromptInputs.length, 2)
 })
 
 test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_confirmed_review_clears_the_requirements_it_covered', () => {
@@ -533,16 +585,16 @@ test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_confirmed_review_clears_the_requir
 
   const cleared = reviewRequirements.clearOnConfirmation(providerRun('run_conf'), requirements)
 
-  assert.equal(listItems(cleared.HumanPromptInputs).length, 0)
+  assert.equal(cleared.HumanPromptInputs.length, 0)
   assert.equal(idValue.providerRun(cleared.LastConfirmedProviderRun), 'run_conf')
 
   // Idempotent for the same run, so a replayed confirmation cannot clear
   // requirements that arrived after it.
   const laterRequirement = reviewRequirements.addRequirement(sessionId('ses_m'), authorityRoot('msg_3'), cleared)
   const replayed = reviewRequirements.clearOnConfirmation(providerRun('run_conf'), laterRequirement)
-  assert.equal(listItems(replayed.HumanPromptInputs).length, 1, 'a replay must not clear a newer requirement')
+  assert.equal(replayed.HumanPromptInputs.length, 1, 'a replay must not clear a newer requirement')
 
   // A genuinely different confirmation does clear it.
   const nextConfirmation = reviewRequirements.clearOnConfirmation(providerRun('run_other'), laterRequirement)
-  assert.equal(listItems(nextConfirmation.HumanPromptInputs).length, 0)
+  assert.equal(nextConfirmation.HumanPromptInputs.length, 0)
 })

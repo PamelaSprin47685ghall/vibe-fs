@@ -1,418 +1,381 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  blobDigest,
-  blobRef,
-  caseOf,
-  envelope,
-  eventId,
-  fold,
-  magicTodo,
-  magicTodoFactEnvelope,
-  magicTodoJournal,
-  managerLifeId,
-  mapEntries,
-  providerRun,
-  sessionId,
-  stream,
-  toList,
-  toolCallId,
-} from '../../verification-system/tests/support/domain.mjs'
-
-const FactCodec = await import('../../../dist/Persistence/Journal/FactCodec.js')
+import * as projection from '../../../dist/Mission/Obligation/Todo/MagicTodoProjectionSurface.js'
+import * as codec from '../../../dist/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.js'
+import * as envelope from '../../../dist/Persistence/Journal/ObligationEnvelopeSurface.js'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
 const sha256 = (value) => `digest:${value}`
-const life = managerLifeId('manager-life')
-const managerSession = sessionId('manager-session')
-const reviewerSession = sessionId('reviewer-session')
-const call = toolCallId('todo-call')
-const cursor = (sequence) => new magicTodoJournal.XTraceCursor(BigInt(sequence))
+const life = 'manager-life'
+const managerSession = 'manager-session'
+const reviewerSession = 'reviewer-session'
+const call = 'todo-call'
+const write = todo.todoWriteId(sha256, life, call)
+const review = todo.todoReviewId(sha256, life, write)
+const reviewer = todo.dedicatedReviewerId(sha256, life)
+const cursor = (sequence) => ({ Sequence: sequence })
+const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
 const ok = (result) => {
-  assert.equal(result.tag, 0, `expected Ok, got ${JSON.stringify(result.fields?.[0])}`)
-  return result.fields[0]
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+  return result
 }
 const error = (result) => {
-  assert.equal(result.tag, 1, 'expected Error')
-  return result.fields[0]
+  assert.equal(result.ok, false, 'expected projection rejection')
+  return result.error
+}
+let nextEvent = 0
+const foldMagic = (handle, magicFact, eventId = undefined) => {
+  nextEvent += 1
+  return projection.MagicTodoProjectionSurface_fold(handle, eventId ?? `magic-todo-${nextEvent}`, magicFact)
 }
 
-const write = magicTodo.todoWriteId(sha256, life, call)
-const review = magicTodo.todoReviewId(sha256, life, write)
-const reviewer = magicTodo.dedicatedReviewerId(sha256, life)
-const preparedFactRef = eventId('prepared-fact-ref')
-const prepared = new magicTodoJournal.TodoWritePrepared(
-  managerSession,
-  life,
-  write,
-  call,
-  2,
-  blobRef('base-list'),
-  blobDigest('base-digest'),
-  blobRef('proposal-list'),
-  blobDigest('proposal-digest'),
-  false,
-  'provider-input-digest',
-  cursor(10),
-  'magic-v1',
-)
-const accepted = new magicTodoJournal.TodoWriteAccepted(
-  life,
-  write,
-  call,
-  preparedFactRef,
-  'provider-input-digest',
-  'output-digest',
-  magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-  'magic-v1',
-)
-const enlisted = new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession)
-const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
-  life,
-  write,
-  review,
-  reviewer,
-  reviewerSession,
-  cursor(4),
-  cursor(10),
-)
-const concluded = new magicTodoJournal.TodoReviewConcluded(
-  life,
-  write,
-  review,
-  reviewer,
-  reviewerSession,
-  magicTodo.revise,
-  blobRef('review-lwr'),
-  blobDigest('review-lwr-digest'),
-  blobRef('settled-list'),
-  blobDigest('settled-list-digest'),
-  cursor(8),
-  providerRun('reviewer-provider-run'),
-  toolCallId('reviewer-call'),
-)
-const fact = (caseName, payload) => magicTodoJournal.MagicTodoFact(caseName, [payload])
-let nextEnvelope = 0
-const foldMagic = (state, magicFact, envelopeEventId = undefined) => {
-  const ref = envelopeEventId ?? (caseOf(magicFact) === 'TodoWritePrepared' ? preparedFactRef : eventId(`magic-todo-${nextEnvelope++}`))
-  return magicTodoJournal.fold(ref, state, magicFact)
+const preparedFact = ({
+  managerSessionId = managerSession,
+  managerLifeId = life,
+  todoWriteId = write,
+  toolCallId = call,
+  toolPartOrdinal = 2,
+  baseTodoRef = 'base-list',
+  baseTodoDigest = 'base-digest',
+  proposedTodoRef = 'proposal-list',
+  proposedTodoDigest = 'proposal-digest',
+  planCompleteDeclared = false,
+  providerInputDigest = 'provider-input-digest',
+  reviewFrontier = 10,
+  semanticVersion = 'magic-v1',
+} = {}) => fact('TodoWritePrepared', {
+  ManagerSessionId: managerSessionId,
+  ManagerLifeId: managerLifeId,
+  TodoWriteId: todoWriteId,
+  ToolCallId: toolCallId,
+  ToolPartOrdinal: toolPartOrdinal,
+  BaseTodoRef: baseTodoRef,
+  BaseTodoDigest: baseTodoDigest,
+  ProposedTodoRef: proposedTodoRef,
+  ProposedTodoDigest: proposedTodoDigest,
+  PlanCompleteDeclared: planCompleteDeclared,
+  ProviderInputDigest: providerInputDigest,
+  ReviewFrontier: cursor(reviewFrontier),
+  SemanticVersion: semanticVersion,
+})
+
+const acceptedFact = ({
+  managerLifeId = life,
+  todoWriteId = write,
+  toolCallId = call,
+  preparedFactRef = 'prepared-fact-ref',
+  inputDigest = 'provider-input-digest',
+  outputDigest = 'output-digest',
+  physicalSuccessEvidence = 'LiveAfterSuccess',
+  semanticVersion = 'magic-v1',
+} = {}) => fact('TodoWriteAccepted', {
+  ManagerLifeId: managerLifeId,
+  TodoWriteId: todoWriteId,
+  ToolCallId: toolCallId,
+  PreparedFactRef: preparedFactRef,
+  InputDigest: inputDigest,
+  OutputDigest: outputDigest,
+  PhysicalSuccessEvidence: physicalSuccessEvidence,
+  SemanticVersion: semanticVersion,
+})
+
+const enlistedFact = ({ managerLifeId = life, dedicatedReviewerId = reviewer, reviewerSessionId = reviewerSession } = {}) =>
+  fact('DedicatedTodoReviewerEnlisted', {
+    ManagerLifeId: managerLifeId,
+    DedicatedReviewerId: dedicatedReviewerId,
+    ReviewerSessionId: reviewerSessionId,
+  })
+
+const assignedFact = ({
+  managerLifeId = life,
+  todoWriteId = write,
+  todoReviewId = review,
+  dedicatedReviewerId = reviewer,
+  reviewerSessionId = reviewerSession,
+  reviewWorkStart = 4,
+  managerReviewFrontier = 10,
+} = {}) => fact('TodoProcessReviewAssigned', {
+  ManagerLifeId: managerLifeId,
+  TodoWriteId: todoWriteId,
+  TodoReviewId: todoReviewId,
+  DedicatedReviewerId: dedicatedReviewerId,
+  ReviewerSessionId: reviewerSessionId,
+  ReviewWorkStartCursor: cursor(reviewWorkStart),
+  ManagerReviewFrontier: cursor(managerReviewFrontier),
+})
+
+const concludedFact = ({
+  managerLifeId = life,
+  todoWriteId = write,
+  todoReviewId = review,
+  dedicatedReviewerId = reviewer,
+  reviewerSessionId = reviewerSession,
+  verdict = 'REVISE',
+  workRecordRef = 'review-lwr',
+  workRecordDigest = 'review-lwr-digest',
+  settledTodoRef = 'settled-list',
+  settledTodoDigest = 'settled-list-digest',
+  reviewerRecordFrontier = 8,
+  providerRunId = 'reviewer-provider-run',
+  toolCallId = 'reviewer-call',
+} = {}) => fact('TodoReviewConcluded', {
+  ManagerLifeId: managerLifeId,
+  TodoWriteId: todoWriteId,
+  TodoReviewId: todoReviewId,
+  DedicatedReviewerId: dedicatedReviewerId,
+  ReviewerSessionId: reviewerSessionId,
+  Verdict: verdict,
+  WorkRecordRef: workRecordRef,
+  WorkRecordDigest: workRecordDigest,
+  SettledTodoRef: settledTodoRef,
+  SettledTodoDigest: settledTodoDigest,
+  ReviewerRecordFrontier: cursor(reviewerRecordFrontier),
+  ProviderRunId: providerRunId,
+  ToolCallId: toolCallId,
+})
+
+const prepared = preparedFact()
+const accepted = acceptedFact()
+const enlisted = enlistedFact()
+const assigned = assignedFact()
+const concluded = concludedFact()
+
+const acceptedState = () => {
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  ok(foldMagic(handle, accepted))
+  return handle
 }
 
 test('WHAT[OBLIGATION-LEDGER-010] Accepted supersedes Current immediately', () => {
-  let state = magicTodoJournal.empty
-  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-
-  const lifeState = state.ByLife.get('manager-life')
-  assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
-  assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
+  const lifeState = projection.MagicTodoProjectionSurface_view(acceptedState(), life)
+  assert.equal(lifeState.currentObligations.reference, 'proposal-list')
+  assert.equal(lifeState.currentObligations.digest, 'proposal-digest')
 })
 
 test('WHAT[OBLIGATION-LEDGER-011] REVISE conclusion cannot roll back CurrentObligations', () => {
-  let state = magicTodoJournal.empty
-  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
+  const handle = acceptedState()
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assigned))
+  ok(foldMagic(handle, concluded))
 
-  state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
-  state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
-  state = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
-
-  const lifeState = state.ByLife.get('manager-life')
-  assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
-  assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
-  assert.equal(lifeState.Checkpoints.get(magicTodo.todoWriteIdValue(write)).Concluded.Verdict, magicTodo.revise)
+  const lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.currentObligations.reference, 'proposal-list')
+  assert.equal(lifeState.currentObligations.digest, 'proposal-digest')
+  assert.equal(lifeState.checkpoints[0].concluded.verdict, 'REVISE')
 })
 
 test('WHAT[OBLIGATION-LEDGER-012] rejects a conclusion with no matching assignment', () => {
-  let state = magicTodoJournal.empty
-  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-
-  const rejected = error(foldMagic(state, fact('TodoReviewConcluded', concluded)))
-  assert.equal(rejected.cases()[rejected.tag], 'AssignmentWithoutAccepted')
+  const handle = acceptedState()
+  assert.equal(error(foldMagic(handle, concluded)).code, 'AssignmentWithoutAccepted')
 })
 
 test('WHAT[OBLIGATION-LEDGER-020] rejects process assignment before dedicated enlistment', () => {
-  let state = magicTodoJournal.empty
-  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-
-  const rejected = error(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
-  assert.equal(rejected.cases()[rejected.tag], 'DedicatedMissingForAssign')
+  const handle = acceptedState()
+  assert.equal(error(foldMagic(handle, assigned)).code, 'DedicatedMissingForAssign')
 })
 
 test('WHAT[OBLIGATION-LEDGER-008] rejects Accepted when it names another Prepared envelope', () => {
-  const mismatched = new magicTodoJournal.TodoWriteAccepted(
-    life,
-    write,
-    call,
-    eventId('different-prepared-fact-ref'),
-    'provider-input-digest',
-    'output-digest',
-    magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-    'magic-v1',
-  )
-  const state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
-  const rejected = error(foldMagic(state, fact('TodoWriteAccepted', mismatched)))
-  assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  const mismatched = acceptedFact({ preparedFactRef: 'different-prepared-fact-ref' })
+  assert.equal(error(foldMagic(handle, mismatched)).code, 'IdentityCorruption')
 })
 
 test('WHAT[OBLIGATION-LEDGER-013] treats an exact durable conclusion replay as idempotent', () => {
-  let state = magicTodoJournal.empty
-  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-  state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
-  state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
-  state = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
-
-  const replayed = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
-  assert.equal(replayed.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
+  const handle = acceptedState()
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assigned))
+  ok(foldMagic(handle, concluded))
+  ok(foldMagic(handle, concluded))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).currentObligations.reference, 'proposal-list')
 })
 
 test('WHAT[OBLIGATION-LEDGER-013] rejects a new prepare until the preceding review concludes', () => {
-  const nextCall = toolCallId('todo-call-2')
-  const nextWrite = magicTodo.todoWriteId(sha256, life, nextCall)
-  const nextPrepared = new magicTodoJournal.TodoWritePrepared(
-    managerSession,
-    life,
-    nextWrite,
-    nextCall,
-    1,
-    blobRef('proposal-list'),
-    blobDigest('proposal-digest'),
-    blobRef('next-proposal-list'),
-    blobDigest('next-proposal-digest'),
-    true,
-    'next-provider-input-digest',
-    cursor(12),
-    'magic-v1',
-  )
-
-  let state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-
-  const rejected = error(foldMagic(state, fact('TodoWritePrepared', nextPrepared)))
-  assert.equal(rejected.cases()[rejected.tag], 'OutstandingReviewBeforePrepare')
+  const nextWrite = todo.todoWriteId(sha256, life, 'todo-call-2')
+  const handle = acceptedState()
+  const nextPrepared = preparedFact({
+    todoWriteId: nextWrite,
+    toolCallId: 'todo-call-2',
+    toolPartOrdinal: 1,
+    baseTodoRef: 'proposal-list',
+    baseTodoDigest: 'proposal-digest',
+    proposedTodoRef: 'next-proposal-list',
+    proposedTodoDigest: 'next-proposal-digest',
+    planCompleteDeclared: true,
+    providerInputDigest: 'next-provider-input-digest',
+    reviewFrontier: 12,
+  })
+  assert.equal(error(foldMagic(handle, nextPrepared, 'next-prepared')).code, 'OutstandingReviewBeforePrepare')
 })
 
 test('WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic provider request', () => {
-  const legacySeed = new magicTodoJournal.LegacyTodoSeedAdopted(
-    managerSession,
-    life,
-    blobRef('legacy-list'),
-    blobDigest('legacy-digest'),
-  )
-  const state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
-  const rejected = error(foldMagic(state, fact('LegacyTodoSeedAdopted', legacySeed)))
-  assert.equal(rejected.cases()[rejected.tag], 'LegacySeedAfterCheckpoint')
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  const legacySeed = fact('LegacyTodoSeedAdopted', {
+    ManagerSessionId: managerSession,
+    ManagerLifeId: life,
+    SeedTodoRef: 'legacy-list',
+    SeedTodoDigest: 'legacy-digest',
+  })
+  assert.equal(error(foldMagic(handle, legacySeed)).code, 'LegacySeedAfterCheckpoint')
 })
 
 test('WHAT[OBLIGATION-LEDGER-014] legacy conclusion locator remains replayable but is not a Current writer', () => {
-  const encoded = magicTodoJournal.encode(fact('TodoReviewConcluded', concluded))
-  const decoded = ok(magicTodoJournal.tryDecode(encoded))
-  const payload = decoded.fields[0]
-
-  assert.equal(payload.SettledTodoRef.fields[0], 'settled-list')
-  assert.equal(payload.SettledTodoDigest.fields[0], 'settled-list-digest')
-
-  let state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
-  state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
-  state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
-  state = ok(foldMagic(state, fact('TodoReviewConcluded', payload)))
-  assert.equal(state.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
+  const encoded = JSON.parse(concluded)
+  assert.equal(encoded.SettledTodoRef, 'settled-list')
+  assert.equal(encoded.SettledTodoDigest, 'settled-list-digest')
+  const handle = acceptedState()
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assigned))
+  ok(foldMagic(handle, concluded))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).currentObligations.reference, 'proposal-list')
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] stores typed Magic Todo bytes in the canonical Fact envelope', () => {
-  const typed = magicTodoJournal.encode(fact('TodoReviewConcluded', concluded))
-  const encoded = FactCodec.serializeFact(magicTodoFactEnvelope(typed))
-  const decoded = ok(FactCodec.deserializeFact(encoded))
+  const typed = ok(codec.encode(concluded)).value
+  const encoded = envelope.serializeMagicTodoEnvelope(typed)
+  const decoded = envelope.deserializeMagicTodoEnvelope(encoded)
 
-  assert.equal(decoded.cases()[decoded.tag], 'MagicTodo')
-  assert.equal(decoded.fields[0], typed)
-  const replayed = ok(magicTodoJournal.tryDecode(decoded.fields[0]))
-  assert.equal(replayed.cases()[replayed.tag], 'TodoReviewConcluded')
+  assert.equal(decoded.ok, true)
+  assert.equal(decoded.case, 'MagicTodo')
+  assert.equal(decoded.payload, typed)
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] legacy Prepared without planComplete decodes as committed true', () => {
-  const encoded = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
-  const legacy = encoded.replace(/,"PlanCompleteDeclared":false/, '')
-  const decoded = ok(magicTodoJournal.tryDecode(legacy))
-  assert.equal(decoded.fields[0].PlanCompleteDeclared, true, 'legacy protocol already meant complete-plan commitment')
+  const legacy = prepared.replace(/,"PlanCompleteDeclared":false/, '')
+  const decoded = codec.decode(legacy)
+  assert.equal(decoded.ok, true)
+  assert.equal(decoded.planCompleteDeclared, true)
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] rejects forward Magic Todo payloads without throwing through boot fold', () => {
-  const encoded = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
-  const forward = encoded.replace('TodoWritePrepared', 'FutureMagicTodoCase')
-
-  assert.doesNotThrow(() => magicTodoJournal.tryDecode(forward))
-  assert.equal(magicTodoJournal.tryDecode(forward).tag, 1)
+  const forward = prepared.replace('TodoWritePrepared', 'FutureMagicTodoCase')
+  assert.doesNotThrow(() => codec.decode(forward))
+  assert.equal(codec.decode(forward).ok, false)
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] folds a typed Magic Todo envelope into the one canonical projection', () => {
-  const typed = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
-  const folded = fold.one(
-    fold.empty,
-    envelope({
-      stream: stream.session(managerSession),
-      run: 'manager-provider-run',
-      fact: magicTodoFactEnvelope(typed),
-    }),
-  )
-  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-
-  const lives = mapEntries(folded.value.AgentProjections.MagicTodo.ByLife)
-  assert.equal(lives.length, 1)
-  const checkpoints = mapEntries(lives[0][1].Checkpoints)
-  assert.equal(checkpoints.length, 1)
-  assert.equal(checkpoints[0][1].ProposedTodoDigest.fields[0], 'proposal-digest')
+  const typed = ok(codec.encode(prepared)).value
+  const folded = envelope.foldMagicEnvelope(managerSession, 'manager-provider-run', typed)
+  assert.equal(folded.ok, true, folded.ok ? '' : folded.error)
+  assert.equal(folded.lives.length, 1)
+  assert.equal(folded.lives[0].checkpoints, 1)
+  assert.equal(folded.lives[0].proposedDigests[0], 'proposal-digest')
 })
 
 test('WHAT[OBLIGATION-LEDGER-008] rejects a replay whose frozen prepared identity differs', () => {
-  const collision = new magicTodoJournal.TodoWritePrepared(
-    managerSession,
-    life,
-    write,
-    call,
-    2,
-    blobRef('base-list'),
-    blobDigest('base-digest'),
-    blobRef('proposal-list'),
-    blobDigest('proposal-digest'),
-    false,
-    'different-provider-input-digest',
-    cursor(10),
-    'magic-v1',
-  )
-
-  let state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
-  const rejected = error(foldMagic(state, fact('TodoWritePrepared', collision)))
-  assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  const collision = preparedFact({ providerInputDigest: 'different-provider-input-digest' })
+  assert.equal(error(foldMagic(handle, collision, 'prepared-fact-ref-2')).code, 'IdentityCorruption')
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] reviewer reverse locator is maintained on enlist and replacement', () => {
-  const replacementSession = sessionId('reviewer-session-replacement')
-  let state = ok(foldMagic(magicTodoJournal.empty, fact('DedicatedTodoReviewerEnlisted', enlisted)))
+  const replacementSession = 'reviewer-session-replacement'
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, enlisted))
+  assert.equal(projection.MagicTodoProjectionSurface_reviewerLife(handle, reviewerSession), life)
 
-  assert.equal(
-    state.ReviewerLifeBySession.get('reviewer-session').fields[0],
-    'manager-life',
-    'enlist must index reviewer session directly to its Manager Life',
-  )
-
-  const replaced = new magicTodoJournal.DedicatedTodoReviewerReplaced(
-    life,
-    reviewer,
-    reviewerSession,
-    replacementSession,
-    blobRef('reviewer-replacement-evidence'),
-  )
-  state = ok(foldMagic(state, fact('DedicatedTodoReviewerReplaced', replaced)))
-
-  assert.equal(
-    mapEntries(state.ReviewerLifeBySession).some(([key]) => key === 'reviewer-session'),
-    false,
-    'old reviewer session locator must be retired',
-  )
-  assert.equal(
-    state.ReviewerLifeBySession.get('reviewer-session-replacement').fields[0],
-    'manager-life',
-    'replacement session must become the direct reverse locator',
-  )
+  const replaced = fact('DedicatedTodoReviewerReplaced', {
+    ManagerLifeId: life,
+    DedicatedReviewerId: reviewer,
+    OldSessionId: reviewerSession,
+    NewSessionId: replacementSession,
+    EvidenceRef: 'reviewer-replacement-evidence',
+  })
+  ok(foldMagic(handle, replaced))
+  assert.equal(projection.MagicTodoProjectionSurface_reviewerLife(handle, reviewerSession), null)
+  assert.equal(projection.MagicTodoProjectionSurface_reviewerLife(handle, replacementSession), life)
 })
 
 test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment and never reopens it', () => {
   const makeCheckpoint = (suffix, declared, baseName, proposalName, frontier) => {
-    const cpCall = toolCallId(`todo-${suffix}`)
-    const cpWrite = magicTodo.todoWriteId(sha256, life, cpCall)
-    const cpPreparedRef = eventId(`prepared-${suffix}`)
+    const cpCall = `todo-${suffix}`
+    const cpWrite = todo.todoWriteId(sha256, life, cpCall)
+    const cpPreparedRef = `prepared-${suffix}`
     const inputDigest = `provider-${suffix}`
-    const cpPrepared = new magicTodoJournal.TodoWritePrepared(
-      managerSession,
-      life,
-      cpWrite,
-      cpCall,
-      1,
-      blobRef(baseName),
-      blobDigest(`${baseName}-digest`),
-      blobRef(proposalName),
-      blobDigest(`${proposalName}-digest`),
-      declared,
-      inputDigest,
-      cursor(frontier),
-      'magic-v1',
-    )
-    const cpAccepted = new magicTodoJournal.TodoWriteAccepted(
-      life,
-      cpWrite,
-      cpCall,
-      cpPreparedRef,
-      inputDigest,
-      `output-${suffix}`,
-      magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-      'magic-v1',
-    )
-    return { suffix, call: cpCall, write: cpWrite, preparedRef: cpPreparedRef, prepared: cpPrepared, accepted: cpAccepted, frontier }
+    return {
+      suffix,
+      write: cpWrite,
+      frontier,
+      prepared: preparedFact({
+        todoWriteId: cpWrite,
+        toolCallId: cpCall,
+        toolPartOrdinal: 1,
+        baseTodoRef: baseName,
+        baseTodoDigest: `${baseName}-digest`,
+        proposedTodoRef: proposalName,
+        proposedTodoDigest: `${proposalName}-digest`,
+        planCompleteDeclared: declared,
+        providerInputDigest: inputDigest,
+        reviewFrontier: frontier,
+      }),
+      accepted: acceptedFact({
+        todoWriteId: cpWrite,
+        toolCallId: cpCall,
+        preparedFactRef: cpPreparedRef,
+        inputDigest,
+        outputDigest: `output-${suffix}`,
+      }),
+      preparedRef: cpPreparedRef,
+    }
   }
 
-  const closeReview = (state, cp) => {
-    const reviewId = magicTodo.todoReviewId(sha256, life, cp.write)
-    const assignment = new magicTodoJournal.TodoProcessReviewAssigned(
-      life,
-      cp.write,
-      reviewId,
-      reviewer,
-      reviewerSession,
-      cursor(cp.frontier + 1),
-      cursor(cp.frontier),
-    )
-    const conclusion = new magicTodoJournal.TodoReviewConcluded(
-      life,
-      cp.write,
-      reviewId,
-      reviewer,
-      reviewerSession,
-      magicTodo.perfect,
-      blobRef(`review-${cp.suffix}`),
-      blobDigest(`review-${cp.suffix}-digest`),
-      blobRef(`settled-${cp.suffix}`),
-      blobDigest(`settled-${cp.suffix}-digest`),
-      cursor(cp.frontier + 2),
-      providerRun(`review-run-${cp.suffix}`),
-      toolCallId(`review-call-${cp.suffix}`),
-    )
-    state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assignment)))
-    return ok(foldMagic(state, fact('TodoReviewConcluded', conclusion)))
+  const closeReview = (handle, cp) => {
+    const reviewId = todo.todoReviewId(sha256, life, cp.write)
+    const assignment = assignedFact({
+      todoWriteId: cp.write,
+      todoReviewId: reviewId,
+      reviewWorkStart: cp.frontier + 1,
+      managerReviewFrontier: cp.frontier,
+    })
+    const conclusion = concludedFact({
+      todoWriteId: cp.write,
+      todoReviewId: reviewId,
+      verdict: 'PERFECT',
+      workRecordRef: `review-${cp.suffix}`,
+      workRecordDigest: `review-${cp.suffix}-digest`,
+      settledTodoRef: `settled-${cp.suffix}`,
+      settledTodoDigest: `settled-${cp.suffix}-digest`,
+      reviewerRecordFrontier: cp.frontier + 2,
+      providerRunId: `review-run-${cp.suffix}`,
+      toolCallId: `review-call-${cp.suffix}`,
+    })
+    ok(foldMagic(handle, assignment))
+    ok(foldMagic(handle, conclusion))
   }
 
   const planning = makeCheckpoint('planning', false, 'base-0', 'plan-1', 10)
   const commitment = makeCheckpoint('commit', true, 'plan-1', 'mission-1', 20)
   const laterFalse = makeCheckpoint('later-false', false, 'mission-1', 'mission-2', 30)
+  const handle = projection.MagicTodoProjectionSurface_create()
 
-  let state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', planning.prepared), planning.preparedRef))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', planning.accepted)))
-  let lifeState = state.ByLife.get('manager-life')
-  assert.equal(lifeState.FirstPlanCommitment, undefined)
-  assert.equal(lifeState.LatestCommittedCheckpoint, undefined)
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.FirstAcceptedCheckpoint), magicTodo.todoWriteIdValue(planning.write))
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.PendingReviewCheckpoint), magicTodo.todoWriteIdValue(planning.write))
+  ok(foldMagic(handle, planning.prepared, planning.preparedRef))
+  ok(foldMagic(handle, planning.accepted))
+  let lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.firstPlanCommitment, null)
+  assert.equal(lifeState.latestCommittedCheckpoint, null)
+  assert.equal(lifeState.firstAcceptedCheckpoint, planning.write)
+  assert.equal(lifeState.pendingReviewCheckpoint, planning.write)
 
-  state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
-  state = closeReview(state, planning)
-  lifeState = state.ByLife.get('manager-life')
-  assert.equal(lifeState.PendingReviewCheckpoint, undefined)
+  ok(foldMagic(handle, enlisted))
+  closeReview(handle, planning)
+  lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.pendingReviewCheckpoint, null)
 
-  state = ok(foldMagic(state, fact('TodoWritePrepared', commitment.prepared), commitment.preparedRef))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', commitment.accepted)))
-  lifeState = state.ByLife.get('manager-life')
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.FirstPlanCommitment), magicTodo.todoWriteIdValue(commitment.write))
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.LatestCommittedCheckpoint), magicTodo.todoWriteIdValue(commitment.write))
-  assert.equal(lifeState.PreviousCommittedCheckpoint, undefined, 'T1 has no committed predecessor')
+  ok(foldMagic(handle, commitment.prepared, commitment.preparedRef))
+  ok(foldMagic(handle, commitment.accepted))
+  lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.firstPlanCommitment, commitment.write)
+  assert.equal(lifeState.latestCommittedCheckpoint, commitment.write)
+  assert.equal(lifeState.previousCommittedCheckpoint, null)
 
-  state = closeReview(state, commitment)
-  state = ok(foldMagic(state, fact('TodoWritePrepared', laterFalse.prepared), laterFalse.preparedRef))
-  state = ok(foldMagic(state, fact('TodoWriteAccepted', laterFalse.accepted)))
-  lifeState = state.ByLife.get('manager-life')
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.FirstPlanCommitment), magicTodo.todoWriteIdValue(commitment.write), 'first true is once-set')
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.PreviousCommittedCheckpoint), magicTodo.todoWriteIdValue(commitment.write))
-  assert.equal(magicTodo.todoWriteIdValue(lifeState.LatestCommittedCheckpoint), magicTodo.todoWriteIdValue(laterFalse.write), 'raw false after commitment is still effective committed')
+  closeReview(handle, commitment)
+  ok(foldMagic(handle, laterFalse.prepared, laterFalse.preparedRef))
+  ok(foldMagic(handle, laterFalse.accepted))
+  lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.firstPlanCommitment, commitment.write)
+  assert.equal(lifeState.previousCommittedCheckpoint, commitment.write)
+  assert.equal(lifeState.latestCommittedCheckpoint, laterFalse.write)
 })

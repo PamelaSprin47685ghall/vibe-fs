@@ -1,24 +1,19 @@
-// Split from tests/unit/execution/handle.test.mjs (cutover Wave 2a);
-// owner: process-execution. EXEC-011/010 process 面：kill-ack 有界等待（PROC-006）、
-// OneShotAgentTool completion 有界（PROC-004）、typed ProcessRequest 全字段
-// （PROC-005）。handle 生命周期 → managed-session-lifecycle；
-// deadline/estimate 纯代数 → time-capability。
+// Process ownership checks: bounded kill acknowledgement and typed request data.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import {
-  caseOf,
-  listItems,
-  payloadOf,
-  processRequest,
-} from '../../verification-system/tests/support/domain.mjs'
+
+const {
+  command,
+  commandView,
+  estimate,
+  estimateView,
+} = await import('../../../dist/Process/Surface.js')
 
 test('WHAT[PROC-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
-  // After SIGKILL, wait must not use MaxTimerWaitMs (~24.8d) or unbounded Exit.Task.
-  // KillAckGraceMs is the management bound; TimedOut + ExitCode=-1 when close never comes.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const waitSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessWait.fs'), 'utf8')
 
@@ -38,7 +33,6 @@ test('WHAT[PROC-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () =
 })
 
 test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
-  // OneShotAgentTool must not await completion.Task unbounded.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const oneshot = readFileSync(
     join(root, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs'),
@@ -52,34 +46,20 @@ test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadl
     /let! output = completion\.Task\s*$/m,
     'must not bare-await completion.Task without race',
   )
-  assert.match(
-    oneshot,
-    /AbortSession childId/,
-    'timeout path aborts the child session',
-  )
-  assert.match(
-    oneshot,
-    /timed out after/,
-    'timeout returns Error with timeout message, not hang',
-  )
+  assert.match(oneshot, /AbortSession childId/, 'timeout path aborts the child session')
+  assert.match(oneshot, /timed out after/, 'timeout returns Error with timeout message, not hang')
 })
 
-// ── EXEC-010: a process request carries the full executor estimate ─────────────
-
 test('WHAT[PROC-005] EXEC_010_process_request_carries_all_fields', () => {
-  const cmd = processRequest.command({
-    fileName: 'sh',
-    args: ['-lc', 'echo hi'],
-    workingDirectory: '/tmp/wx',
-    stdin: 'input',
-  })
-  const est = processRequest.estimate({ runtimeSeconds: 42, outputBytes: 65536, memory: 'Large' })
+  const cmd = command('sh', ['-lc', 'echo hi'], '/tmp/wx', 'input')
+  const cmdView = commandView(cmd)
+  const estView = estimateView(estimate(42, 65536, 'large'))
 
-  assert.equal(cmd.FileName, 'sh')
-  assert.deepEqual(listItems(cmd.Arguments), ['-lc', 'echo hi'])
-  assert.equal(cmd.WorkingDirectory, '/tmp/wx')
-  assert.equal(cmd.Stdin, 'input')
-  assert.equal(payloadOf(est.EstimatedRuntime), 42)
-  assert.equal(payloadOf(est.EstimatedOutput), 65536n)
-  assert.equal(caseOf(est.EstimatedMemory), 'Large')
+  assert.equal(cmdView.fileName, 'sh')
+  assert.deepEqual(cmdView.arguments, ['-lc', 'echo hi'])
+  assert.equal(cmdView.workingDirectory, '/tmp/wx')
+  assert.equal(cmdView.stdin, 'input')
+  assert.equal(estView.runtimeSeconds, 42)
+  assert.equal(estView.outputBytes, 65536)
+  assert.equal(estView.memory, 'large')
 })

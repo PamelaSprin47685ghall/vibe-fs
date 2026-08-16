@@ -7,17 +7,18 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { lib } from '../../verification-system/tests/support/domain.mjs'
 
-const { acquire, getCount, release } = await import('../../../dist/Process/LargeGate.js')
+const {
+  acquire,
+  getCount,
+  release,
+  createToken,
+  cancelToken,
+  isCancellationRequested,
+} = await import('../../../dist/Process/LargeGateSurface.js')
 
-// Fable's CancellationToken polyfill lives in the versioned fable-library dir;
-// resolved through the shared support facade so no compiler-runtime path leaks
-// into package scope (test-boundary gate).
-const { createCancellationToken, cancel, isCancellationRequested } = await lib('Async.js')
-
-const live = () => createCancellationToken(false)
-const cancelled = () => createCancellationToken(true)
+const live = () => createToken(false)
+const cancelled = () => createToken(true)
 
 const drain = () => {
   while (getCount() === 0) release()
@@ -81,7 +82,7 @@ test('WHAT[DISTILL-011] VERIFY_009_large_gate_cancelled_waiter_is_skipped', asyn
   await acquire(live())
   const token = live()
   const waiter = acquire(token)
-  cancel(token)
+  cancelToken(token)
   await assert.rejects(waiter, 'a cancelled waiter must reject, not block the queue')
 
   // The cancelled waiter is skipped: the next release must leave the gate unheld.
@@ -98,7 +99,7 @@ test('WHAT[DISTILL-011] VERIFY_009_large_gate_precancelled_token_is_rejected_imm
 test('WHAT[DISTILL-011] VERIFY_009_large_gate_cancellation_observed_by_gate', async () => {
   const token = live()
   assert.equal(isCancellationRequested(token), false)
-  cancel(token)
+  cancelToken(token)
   assert.equal(isCancellationRequested(token), true)
 })
 

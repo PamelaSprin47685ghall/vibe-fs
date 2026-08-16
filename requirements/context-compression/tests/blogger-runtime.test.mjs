@@ -4,7 +4,10 @@
 // Busy = host HasFlight; material route = decideMaterial(hasParked, hasFlight, ctx).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bloggerRequestContext as ctx, bloggerRuntime as rt, parkedTransform } from '../../verification-system/tests/support/domain.mjs'
+import * as owner from '../../../dist/Context/Companion/RuntimeSurface.js'
+const ctx = owner
+const rt = owner
+const parkedTransform = owner
 
 const main = () => ctx.main({ toml: 'work' })
 const main2 = () => ctx.main({ toml: 'more' })

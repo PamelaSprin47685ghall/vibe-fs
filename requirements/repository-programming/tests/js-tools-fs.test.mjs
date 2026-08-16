@@ -11,38 +11,27 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
-  readUtf8Classified as readUtf8,
-} from '../../../dist/Repository/Programming/Js/Utf8Fs.js'
-import {
-  glob as glob,
-} from '../../../dist/Repository/Programming/Js/GlobFs.js'
-import {
-  findAnchor as findAnchor,
-  requireUnique as requireUnique,
-  grep as grep,
-} from '../../../dist/Repository/Programming/Js/AnchorFs.js'
-import {
-  commitPlan as commitPlan,
-  rollbackPlan as rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/MutationFs.js'
-import { AnchorSpec } from '../../../dist/Repository/Programming/Js/Anchor.js'
-import { JsFailureModule_code as failureCode } from '../../../dist/Repository/Programming/Js/Failure.js'
-import { listItems, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
+  readUtf8,
+  glob,
+  findAnchor,
+  requireUnique,
+  grep,
+  commitPlan,
+  rollbackPlan,
+} from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
 
-const anchorCaseIndex = (name) => Object.create(AnchorSpec.prototype).cases().indexOf(name)
-const exact = (text) => new AnchorSpec(anchorCaseIndex('Exact'), [text])
-const regex = (pattern) => new AnchorSpec(anchorCaseIndex('Regex'), [pattern])
+const exact = (text) => ({ kind: 'exact', text })
+const regex = (text) => ({ kind: 'regex', text })
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jstools-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
-const ok = (result) => resultOf(result).ok
-const codeOf = (result) => failureCode(resultOf(result).error)
+const ok = (result) => result.ok
+const codeOf = (result) => result.code
 const unwrap = (result) => {
-  const r = resultOf(result)
-  assert.equal(r.ok, true, `expected Ok, got ${JSON.stringify(r.error)}`)
-  return r.value
+  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
+  return result.value
 }
 
 test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_readUtf8_reads_and_classifies', () => {
@@ -93,14 +82,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', ()
     writeFileSync(join(dir, 'readme.md'), 'r', 'utf8')
 
     const all = unwrap(glob(dir, '**/*.fs'))
-    assert.deepEqual(listItems(all.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
-    assert.equal('Truncated' in all, false)
+    assert.deepEqual(all.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    assert.equal('truncated' in all, false)
     const nested = unwrap(glob(dir, '*.fs'))
-    assert.deepEqual(listItems(nested.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    assert.deepEqual(nested.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
     const shallow = unwrap(glob(dir, 'src/*.fs'))
-    assert.deepEqual(listItems(shallow.Paths), ['src/a.fs', 'src/b.fs'])
+    assert.deepEqual(shallow.paths, ['src/a.fs', 'src/b.fs'])
     const zeroStar = unwrap(glob(dir, 'src/**/*.fs'))
-    assert.deepEqual(listItems(zeroStar.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    assert.deepEqual(zeroStar.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
   } finally {
     cleanup()
   }
@@ -120,7 +109,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignore
     writeFileSync(join(dir, '.gitignore'), 'secret.txt\n/dist/\n', 'utf8')
 
     const listing = unwrap(glob(dir, '**/*'))
-    const paths = listItems(listing.Paths)
+    const paths = listing.paths
     assert.equal(paths.some((p) => p.startsWith('.git/') || p === '.git'), false)
     assert.equal(paths.includes('secret.txt'), false)
     assert.equal(paths.includes('dist/out.js'), false)
@@ -129,7 +118,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignore
     assert.equal(paths.includes('.gitignore'), true)
 
     const braces = unwrap(glob(dir, '**/*.{fs,md}'))
-    assert.deepEqual(listItems(braces.Paths), ['readme.md', 'src/keep.fs'])
+    assert.deepEqual(braces.paths, ['readme.md', 'src/keep.fs'])
   } finally {
     cleanup()
   }
@@ -145,13 +134,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_
     writeFileSync(join(dir, '.gitignore'), '/dist/\n', 'utf8')
 
     const listing = unwrap(grep(dir, regex('TODO:.+'), 'src/**/*.fs'))
-    const hits = listItems(listing.Matches)
+    const hits = listing.matches
     assert.equal(hits.length, 1)
-    assert.equal(hits[0].Path, 'src/a.fs')
-    assert.equal(hits[0].Line, 2)
-    assert.equal(hits[0].Column, 1)
-    assert.equal(hits[0].Text, 'TODO: one')
-    assert.equal('Truncated' in listing, false)
+    assert.equal(hits[0].path, 'src/a.fs')
+    assert.equal(hits[0].line, 2)
+    assert.equal(hits[0].column, 1)
+    assert.equal(hits[0].text, 'TODO: one')
+    assert.equal('truncated' in listing, false)
   } finally {
     cleanup()
   }
@@ -166,7 +155,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_all_or_nothing', () => {
       ['a.txt', 'newA'],
       ['b.txt', 'newB'],
     ]
-    assert.equal(ok(commitPlan(dir, toList(plan))), true)
+    assert.equal(ok(commitPlan(dir, plan)), true)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'newA')
     assert.equal(readFileSync(join(dir, 'b.txt'), 'utf8'), 'newB')
   } finally {
@@ -184,7 +173,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_aborts_before_write_when
       ['a.txt', 'newA'],
       ['blocked', 'nope'],
     ]
-    assert.equal(codeOf(commitPlan(dir, toList(plan))), 'FILE_READ_FAILED')
+    assert.equal(codeOf(commitPlan(dir, plan)), 'FILE_READ_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'no write happened at all')
   } finally {
     cleanup()
@@ -201,7 +190,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_rolls_back_written_files
       ['a.txt', 'newA'],
       ['x/y.txt', 'nope'],
     ]
-    assert.equal(codeOf(commitPlan(dir, toList(plan))), 'TRANSACTION_COMMIT_FAILED')
+    assert.equal(codeOf(commitPlan(dir, plan)), 'TRANSACTION_COMMIT_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write rolled back')
   } finally {
     cleanup()
@@ -213,15 +202,15 @@ test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_restores_originals_and
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
     // simulate a partial commit, then roll back
-    commitPlan(dir, toList([
+    commitPlan(dir, [
       ['a.txt', 'newA'],
       ['b.txt', 'newB'],
-    ]))
+    ])
     const rollback = [
       ['b.txt', undefined],
       ['a.txt', 'oldA'],
     ]
-    rollbackPlan(dir, toList(rollback))
+    rollbackPlan(dir, rollback)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA')
     assert.equal(existsSync(join(dir, 'b.txt')), false)
   } finally {

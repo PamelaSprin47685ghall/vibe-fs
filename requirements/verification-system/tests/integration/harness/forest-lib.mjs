@@ -115,8 +115,8 @@ import { fileURLToPath } from 'node:url';
 import { relative } from 'node:path';
 
 import { walk } from '../../../../../scripts/lib/walk.mjs';
-import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJson.js';
-import { sha256Hex } from '../../../../../dist/Host/Digest.js';
+import { createHash } from 'node:crypto';
+import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJsonSurface.js';
 import { compileScenario } from '../../e2e/support/scenario-schema.js';
 import { faultBody } from '../../e2e/support/delivery-plan.js';
 import { kindOf, turnFragments } from '../../e2e/support/runtime-key.js';
@@ -361,6 +361,7 @@ export function deriveRequests(scenario) {
 
 // ── 3. serialise a run to comparable text ───────────────────────────────────
 
+const sha256Hex = (value) => createHash('sha256').update(value).digest('hex');
 const digestOf = (value) => sha256Hex(canonicalJson(value ?? null)).slice(0, 16);
 
 /** The four fields, and the one selection shape each comes from. */
@@ -390,7 +391,7 @@ const lineOf = (selection) => {
  */
 export function runForest(scenario, { bindings, requests }) {
   const runtime = new ScenarioRuntime(scenario);
-  for (const [alias, sessionId] of bindings) runtime.bind(alias, sessionId);
+  for (const [alias, sessionId] of bindings) runtime['bind'](alias, sessionId);
 
   const lines = [`scenario ${scenario.name} requests ${requests.length}`];
   const mismatches = [];

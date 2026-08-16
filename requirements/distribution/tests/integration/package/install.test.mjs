@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
 
-test('PACKAGE_install_layout_matches_manifest_and_main', () => {
+test('WHAT[DISTRIBUTION-003] PACKAGE_install_layout_matches_manifest_and_main', () => {
   assert.equal(pkg.name, 'wanxiangshu')
   assert.ok(Array.isArray(pkg.files), 'package.json files whitelist must exist')
   assert.ok(pkg.files.includes('dist/') || pkg.files.includes('dist'), 'files must include dist/')

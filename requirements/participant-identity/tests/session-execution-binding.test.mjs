@@ -1,74 +1,51 @@
 // PID-008 / PROMPT-006: external user messages own EffectiveAgent selection;
-// execution model is always leased from execution-model-routing and never from Host config.
+// model execution is leased by the scheduler and the binding surface only
+// exposes the semantic result of that ownership protocol.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test, { after } from 'node:test'
-import { physicalUser, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const originalHome = process.env.HOME
 const home = await mkdtemp(join(tmpdir(), 'wanxiangshu-binding-home-'))
 process.env.HOME = home
 await mkdir(join(home, '.config', 'opencode'), { recursive: true })
-await writeFile(join(home, '.config', 'opencode', 'wanxiangshu.mjs'), `
+await writeFile(
+  join(home, '.config', 'opencode', 'wanxiangshu.mjs'),
+  `
 export default function route(role) {
   if (role.startsWith('deep-')) return { model: 'test/deep', reasoning: 'high' }
   if (role.startsWith('fast-')) return { model: 'test/fast', reasoning: 'none' }
   return { model: 'test/system', reasoning: 'none' }
 }
-`, 'utf8')
+`,
+  'utf8',
+)
 
-const routing = await import('../../../dist/OpenCode/Host/ModelRouting.js')
-await routing.ModelRouting_initialize()
-const binding = await import('../../../dist/OpenCode/Host/SessionExecutionBinding.js')
-const sessionsModule = await import('../../../dist/OpenCode/Host/Sessions.js')
-const { create: createChatParams } = await import('../../../dist/OpenCode/Host/ChatParamsHook.js')
+const binding = await import('../../../dist/OpenCode/Host/SessionBindingSurface.js')
+const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+await routing.initialize()
 
-const createPort = Object.entries(sessionsModule).find(([k]) => k.startsWith('InjectedSessionPort_$ctor'))?.[1]
-const eventPort = { SubscribeTerminalListener: () => ({ Dispose: () => {} }) }
-const preserve = { tag: 0, fields: [] }
-const override = { tag: 1, fields: [] }
+const modelFor = (agent) =>
+  agent.startsWith('deep-')
+    ? { providerID: 'test', modelID: 'deep', variant: 'high' }
+    : { providerID: 'test', modelID: 'fast', variant: 'none' }
 
-const options = (agent, intent = preserve) => ({
-  Model: undefined,
-  Agent: agent,
-  Directory: undefined,
-  Metadata: undefined,
-  Tools: undefined,
-  BindingIntent: intent,
-})
-
-const modelKey = (model) => `${model.providerID}/${model.modelID}[${model.variant}]`
-const modelFor = (agent) => agent.startsWith('deep-')
-  ? { providerID: 'test', modelID: 'deep', variant: 'high' }
-  : { providerID: 'test', modelID: 'fast', variant: 'none' }
-
-const applyParams = (hook, sessionID, physicalID, agent, model) => {
-  const sid = sessionId(sessionID)
-  const physical = physicalUser(physicalID)
-  const pk = { fields: [`pk-${physicalID}`] }
-  binding.acceptPromptExecution(sid, pk, physical, agent, model)
-  binding.beginProviderAttempt(sid, physical, pk)
-  const next = hook({
-    sessionID,
-    agent,
-    model: { providerID: model.providerID, modelID: model.modelID },
-    message: { agent, model },
-  })
-  if (typeof next === 'function') next({})
+const assertPrepared = (result, agent) => {
+  assert.equal(result.ok, true, result.error)
+  assert.equal(result.value.agent, agent)
+  assert.equal(result.value.modelProvided, false, 'dispatch remains model-free')
 }
 
-let executionOrdinal = 0
-const admitPhysicalExecution = async (hook, sessionID, agent) => {
-  const sid = sessionId(sessionID)
-  const physicalID = `msg-binding-${++executionOrdinal}`
-  await routing.ModelRouting_acquireManagedExecution(sid, physicalUser(physicalID), agent)
-  const model = modelFor(agent)
-  applyParams(hook, sessionID, physicalID, agent, model)
-  routing.ModelRouting_releaseExecution(sid)
-  return model
+const admitPhysicalExecution = async (sessionId, agent) => {
+  const physicalId = `msg-binding-${sessionId}`
+  const target = await routing.acquire(sessionId, physicalId, agent)
+  assert.equal(target.model, agent.startsWith('deep-') ? 'test/deep' : 'test/fast')
+  assert.equal(target.reasoning, agent.startsWith('deep-') ? 'high' : 'none')
+  routing.release(sessionId)
+  return target
 }
 
 after(async () => {
@@ -78,101 +55,72 @@ after(async () => {
 })
 
 test('WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned', async () => {
-  const root = sessionId('ses_binding_root')
-  const sends = []
-  const hook = createChatParams()
+  const root = 'ses_binding_root'
+  const model = modelFor('deep-coder')
 
-  const port = createPort({
-    SendPrompt: async (sid, text, sent) => {
-      sends.push({ sid: sid.fields[0], text, sent })
-      return { tag: 0, fields: [{ fields: [`accepted-${sid.fields[0]}`] }] }
-    },
-  }, eventPort)
-  const subscription = port.SubscribeTerminal(root, () => {})
+  const unproven = binding.prepareUserFacing(root, 'deep-coder', false, model)
+  assert.equal(unproven.ok, false)
+  assert.match(unproven.error, /no observed user binding/i)
 
-  try {
-    const unproven = await port.SendPrompt(root, 'no external user binding', options('deep-coder'))
-    assert.equal(unproven.tag, 4)
-    assert.equal(sends.length, 0)
+  binding.observeUserFacingAgent(root, 'deep-coder')
+  assertPrepared(binding.prepareUserFacing(root, 'deep-coder', false, model), 'deep-coder')
+  await admitPhysicalExecution(root, 'deep-coder')
 
-    binding.observeUserFacingAgent(root, 'deep-coder')
-    const deep = await port.SendPrompt(root, 'ordinary continuation', options('deep-coder'))
-    assert.equal(deep.tag, 0)
-    assert.equal(sends.at(-1).sent.Model, undefined, 'enqueue is capacity/model free')
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_binding_root', 'deep-coder')), 'test/deep[high]')
+  const temporary = binding.prepareUserFacing(root, 'fast-coder', true, modelFor('fast-coder'))
+  assertPrepared(temporary, 'fast-coder')
+  await admitPhysicalExecution(`${root}-override`, 'fast-coder')
 
-    const temporary = await port.SendPrompt(root, 'peer fallback', options('fast-coder', override))
-    assert.equal(temporary.tag, 0)
-    assert.equal(sends.at(-1).sent.Model, undefined)
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_binding_root', 'fast-coder')), 'test/fast[none]')
+  // A preserve request cannot use the peer override as a new base.
+  assertPrepared(binding.prepareUserFacing(root, 'deep-coder', false, model), 'deep-coder')
+  await admitPhysicalExecution(`${root}-restored`, 'deep-coder')
 
-    const stillDeep = await port.SendPrompt(root, 'ordinary continuation', options('deep-coder'))
-    assert.equal(stillDeep.tag, 0, 'internal peer override cannot rewrite external user selection')
-    assert.equal(sends.at(-1).sent.Model, undefined)
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_binding_root', 'deep-coder')), 'test/deep[high]')
+  binding.observeUserFacingAgent(root, 'fast-coder')
+  assertPrepared(binding.prepareUserFacing(root, 'fast-coder', false, modelFor('fast-coder')), 'fast-coder')
+  await admitPhysicalExecution(`${root}-switched`, 'fast-coder')
 
-    binding.observeUserFacingAgent(root, 'fast-coder')
-    const switched = await port.SendPrompt(root, 'follow next external user choice', options('fast-coder'))
-    assert.equal(switched.tag, 0)
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_binding_root', 'fast-coder')), 'test/fast[none]')
-  } finally {
-    binding.drop(root)
-    subscription.Dispose()
-  }
+  binding.drop(root)
 })
 
 test('WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only', async () => {
-  const parent = sessionId('ses_parent')
-  const child = sessionId('ses_child')
-  const sends = []
-  const hook = createChatParams()
+  const parent = 'ses_parent'
+  const child = 'ses_child'
+  const created = binding.bindChild(parent, child, 'fast-distiller')
+  assert.equal(created.ok, true, created.error)
 
-  const port = createPort({
-    CreateChildSession: async () => ({ tag: 0, fields: [child] }),
-    SendPrompt: async (sid, text, sent) => {
-      sends.push({ sid: sid.fields[0], text, sent })
-      return { tag: 0, fields: [{ fields: ['accepted'] }] }
-    },
-  }, eventPort)
+  assertPrepared(binding.prepareManaged(child, 'fast-distiller', false, modelFor('fast-distiller')), 'fast-distiller')
+  await admitPhysicalExecution(child, 'fast-distiller')
 
-  const created = await port.CreateChildSession(parent, { Agent: 'fast-distiller' })
-  assert.equal(created.tag, 0)
-  const subscription = port.SubscribeTerminal(child, () => {})
+  const peer = binding.prepareManaged(child, 'deep-distiller', true, modelFor('deep-distiller'))
+  assertPrepared(peer, 'deep-distiller')
+  await admitPhysicalExecution(`${child}-peer`, 'deep-distiller')
 
-  try {
-    const opening = await port.SendPrompt(child, 'opening', options('fast-distiller'))
-    assert.equal(opening.tag, 0)
-    assert.equal(sends.at(-1).sent.Model, undefined)
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_child', 'fast-distiller')), 'test/fast[none]')
+  const foreign = binding.prepareManaged(child, 'fast-coder', true, modelFor('fast-coder'))
+  assert.equal(foreign.ok, false)
+  assert.match(foreign.error, /not the peer|override/i)
 
-    const peer = await port.SendPrompt(child, 'fallback', options('deep-distiller', override))
-    assert.equal(peer.tag, 0)
-    assert.equal(sends.at(-1).sent.Model, undefined)
-    assert.equal(modelKey(await admitPhysicalExecution(hook, 'ses_child', 'deep-distiller')), 'test/deep[high]')
-
-    const foreign = await port.SendPrompt(child, 'illegal role change', options('fast-coder', override))
-    assert.equal(foreign.tag, 4)
-    assert.match(foreign.fields[0], /not the peer|override/i)
-  } finally {
-    binding.drop(child)
-    subscription.Dispose()
-  }
+  binding.drop(child)
 })
 
 test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
-  const child = sessionId('ses_variant_exact')
-  binding.bind(sessionId('ses_variant_parent'), child, 'deep-distiller')
-  const physicalID = 'msg-variant-exact'
-  await routing.ModelRouting_acquireManagedExecution(child, physicalUser(physicalID), 'deep-distiller')
-  const hook = createChatParams()
+  const parent = 'ses_variant_parent'
+  const child = 'ses_variant_exact'
+  assert.equal(binding.bindChild(parent, child, 'deep-distiller').ok, true)
 
-  assert.doesNotThrow(() => applyParams(hook, 'ses_variant_exact', physicalID, 'deep-distiller', {
-    providerID: 'test', modelID: 'deep', variant: 'high',
-  }))
+  const physicalId = 'msg-variant-exact'
+  const expected = modelFor('deep-distiller')
+  const target = await routing.acquire(child, physicalId, 'deep-distiller')
+  assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
 
-  assert.throws(() => applyParams(hook, 'ses_variant_exact', physicalID, 'deep-distiller', {
-    providerID: 'test', modelID: 'deep', variant: 'default',
-  }), /model\/reasoning drift/i)
+  binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'deep-distiller', expected)
+  assert.equal(binding.beginProviderAttempt(child, physicalId, 'prompt-variant-exact').ok, true)
+
+  const valid = binding.validateObservedProvider(child, 'deep-distiller', expected)
+  assert.equal(valid.ok, true)
+  assert.equal(valid.value, true)
+
+  const drift = binding.validateObservedProvider(child, 'deep-distiller', { ...expected, variant: 'default' })
+  assert.equal(drift.ok, false)
+  assert.match(drift.error, /model\/reasoning drift/i)
 
   binding.drop(child)
 })

@@ -13,8 +13,9 @@ participant-horizon / verification-system 的交叉引用）在本包落地为�
 
 ## JS-SEMANTIC-SURFACE-001：所有 automated tests 使用 JavaScript
 
-**规范陈述**：`requirements/**/tests/**/*.test.mjs` 是 automated semantic proof 的唯一载体；
-语义测试不写 F#、不引入第二测试语言。生产代码是 `.fs`；测试世界是 `.mjs`。
+**规范陈述**：`requirements/**/tests/**/*.mjs` 是 automated semantic proof 的唯一载体；语义测试及其
+support、fixtures、helpers、e2e、integration 依赖区不写 F#，不引入第二测试语言。生产代码是
+`.fs`；测试世界是 `.mjs`。
 
 **含义 / 动机**：语言边界物理性阻止测试触碰实现内部（与 `verification-system` 的契约面
 语言边界同源）；Fable 约定是编译器产物不是领域概念。
@@ -38,11 +39,11 @@ owner 分布，不集中成 god facade；「测试需要，所以 export interna
 **边界**：编译产物验证测试（`VERIFY_008_every_emitted_module_actually_loads` 一类）的
 subject 就是编译产物，有资格知道 `dist`；它们归 compiler/build verification quarantine，
 不算 semantic tests。**quarantine 只存在于 compiler/build verification**——产品包的
-`tests/support` 不是第二 quarantine；把 forbidden knowledge 从 test 文件搬进 support 不
-减少债务，只是给 white-box 加一层布。当前 transition 入口 `domain.mjs` 是迁移载体
-（HOW），其退场路径见本包 HOW「domain.mjs 退场」；`domain.mjs` 及其子层、以及现存
-package-local `*-contract.mjs` 只在 js-boundary-gate baseline 内合法（只减不增），禁止
-新增任何新的 package-local contract 访问 internal dist。
+`tests/support`、`tests/fixtures`、`*-contract.mjs` 不是第二 quarantine；把 forbidden knowledge
+从 test 文件搬进 support 不减少债务，只是给 white-box 加一层布。`SURFACE_MANIFEST` 的
+module 只有在 owner/laws/source/Compile/representation/kind/contract-test 全部闭合时才能
+成为正式入口。迁移期 `domain.mjs` 与已有 package-local `*-contract.mjs` 仍是 baseline 中的
+可见债务；baseline 不能新增，任何新 adapter 都直接 RED。它们最终可以连同 baseline 一起删除。
 
 **证据指针**：→ PROOF.md L14。
 

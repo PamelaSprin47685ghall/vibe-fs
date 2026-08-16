@@ -49,10 +49,10 @@ type HandleRecord =
         /// the Host machine binding used for restart and session execution.
         Byname: string
         CanonicalRole: Role
-        /// Who owns this handle (Fact.HandleOwnership). HostOwnedHidden handles
+        /// Who owns this handle (HandleOwnership). HostOwnedHidden handles
         /// are excluded from every parent-visible surface and from parent
         /// recovery (GLORY-002 / SURFACE-006).
-        Ownership: Fact.HandleOwnership
+        Ownership: HandleOwnership
         Lifecycle: HandleLifecycle
         /// EXEC-018: handle create order (HandleLinked fold sequence). Additive;
         /// derived from link order, not a fact-schema field. Stable sort key #2.
@@ -102,7 +102,7 @@ module HandleProjection =
         (targetAgent: string)
         (byname: string)
         (role: Role)
-        (ownership: Fact.HandleOwnership)
+        (ownership: HandleOwnership)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
@@ -151,7 +151,7 @@ module HandleProjection =
         (childSessionId: SessionId)
         (targetAgent: string)
         (role: Role)
-        (ownership: Fact.HandleOwnership)
+        (ownership: HandleOwnership)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         linkNamed handle childSessionId targetAgent targetAgent role ownership current
@@ -263,8 +263,8 @@ module HandleProjection =
     /// workflow's own recovery.
     let private parentVisible (record: HandleRecord) =
         match record.Ownership with
-        | Fact.HandleOwnership.DurableParentHandle -> true
-        | Fact.HandleOwnership.HostOwnedHidden -> false
+        | HandleOwnership.DurableParentHandle -> true
+        | HandleOwnership.HostOwnedHidden -> false
 
     /// EXEC-002: provider continuation lookup is by stable Byname, never by
     /// AgentHandleId. Retired records remain searchable so a name cannot be

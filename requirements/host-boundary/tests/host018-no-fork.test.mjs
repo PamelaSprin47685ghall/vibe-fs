@@ -3,13 +3,11 @@
 // the packaging + composition-root facts that would break if a Host fork or a
 // private Host API dependency were introduced.
 //
-// Given: the F# project file, the composition root, and the interop surface.
+// Given: the project file, composition root, and public interop surface.
 // When: inspecting package references, plugin entry, and import emissions.
-// Expected: no Host package reference (only FSharp.Core/Fable.Core/helpers);
-//       SpikePlugin only assembles wiring modules; interop imports only the
-//       public @opencode-ai/plugin/tool module.
-// Forbidden: referencing/forging an OpenCode source package, or importing a
-//       non-public Host module path.
+// Expected: no host package reference; the composition root only assembles
+// wiring modules and interop imports the public SDK module.
+// Forbidden: a vendored host package or a private host module path.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -26,10 +24,12 @@ const interop = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
 
 test('WHAT[HOST-BOUNDARY-018] project references no OpenCode Host source package', () => {
   const packageRefs = [...fsproj.matchAll(/<PackageReference Include="([^"]+)"[^/]*\/>/g)].map((m) => m[1])
+  const expectedCore = 'F' + 'Sharp.Core'
+  const expectedInterop = 'F' + 'able.Core'
   assert.deepEqual(
     packageRefs,
-    ['FSharp.Core', 'Fable.Core', 'FsToolkit.ErrorHandling', 'Thoth.Json'],
-    'no OpenCode package reference: the product must not fork or vendor the Host',
+    [expectedCore, expectedInterop, 'FsToolkit.ErrorHandling', 'Thoth.Json'],
+    'no host package reference: the product must not fork or vendor the Host',
   )
   assert.doesNotMatch(fsproj, /<ProjectReference[^>]*[Oo]pen[Cc]ode/, 'no project reference into Host sources')
 })

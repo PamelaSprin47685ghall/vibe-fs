@@ -9,12 +9,12 @@
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { BUILD_ROOT } from '../../verification-system/tests/support/domain.mjs'
-
-const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
+const here = dirname(fileURLToPath(import.meta.url))
+const providerRoot = join(here, '../../../resources/provider')
 const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semanticPath, `${locale}.md`), 'utf8')
 
 // Every assertion below must hold in BOTH locales: the provider-facing evidence

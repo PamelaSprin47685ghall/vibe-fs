@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -12,21 +11,25 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 
-/// Host boundary surface for Fission turn absorption tests.
+/// JS-native Host boundary surface for Fission turn absorption.
 ///
-/// This module lives in OpenCode/Host because it composes host session/event
-/// ports and the ordinary turn workflow to observe a Fission-replaced owner
-/// turn. It is not part of the public Fission semantic surface; it exposes a
-/// single test-only probe for WHAT[INTRA-PARTICIPANT-PARALLELISM-009].
+/// This module composes host session/event ports with ordinary-turn observation
+/// and publishes only a JSON-shaped observation for the logical-owner law. It
+/// keeps Host capabilities private; callers cannot obtain emitted turn values.
 module FissionHostSurface =
 
     type private CallFlags() =
         member val ContinuationSent = false with get, set
         member val TerminalNotified = false with get, set
 
+    type private DummyDeadline() =
+        interface IDeadlineHandle with
+            member _.Delay = Task.FromResult(())
+            member _.Cancel() = ()
+
     type private DummyTimer() =
         interface ITimerPort with
-            member _.Delay _ = Unchecked.defaultof<_>
+            member _.Delay _ = DummyDeadline() :> IDeadlineHandle
             member _.Dispose() = ()
 
     type private DummySessionPort(flags: CallFlags) =

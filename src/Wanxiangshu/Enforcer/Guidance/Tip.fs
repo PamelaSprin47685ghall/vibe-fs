@@ -65,6 +65,7 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 

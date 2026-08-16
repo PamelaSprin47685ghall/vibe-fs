@@ -8,34 +8,26 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CasebookWorkflow_archiveInspectorResult as archive, CasebookWorkflow_finalizeCase as finalize, CasebookWorkflow_fetchCase as fetch } from '../../../dist/Repository/Knowledge/Casebook/Workflow.js'
-import { setEnabled, notePrompt, noteAnswer, tryFinalizeInspector, cleanupInspector, collector } from '../../../dist/Repository/Knowledge/Casebook/Lifecycle.js'
-import { refreshStale } from '../../../dist/Repository/Knowledge/Casebook/Bookkeeper.js'
-import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
-import { contentHash } from '../../../dist/Repository/Knowledge/Casebook/Capture.js'
-import { ObservationCollector__Collect_Z15AE2BE0 as collect } from '../../../dist/Enforcer/ObservationCollector.js'
-import { acquire } from '../../../dist/OpenCode/Host/WorkspaceEventStore.js'
-import { gitCommonDir } from '../../../dist/Persistence/Journal/RuntimePath.js'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-import { toList, resultOf, listItems } from '../../verification-system/tests/support/domain.mjs'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
-import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 
-const obsIndex = (n) => Object.create(Observation.prototype).cases().indexOf(n)
-const fileRead = (p, h) => new Observation(obsIndex('FileRead'), [p, h])
-const record = (session, q, a, obs) => ({ SessionId: session, Q: q, A: a, Observations: toList(obs), LastAccessOrder: 0 })
+const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
+const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-'))
-  const local = createLocalEventStore()
+  const handle = eventStore.EventStoreSurface_create(dir, 'universal-archive')
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    const c1 = record('reuse-scope-1', 'Q1', 'A1', [fileRead('a.txt', contentHash('hello'))])
-    assert.equal(resultOf(await archive(local.store, c1)).ok, true)
-    assert.equal(resultOf(await finalize(local.store, c1)).ok, false)
-    assert.equal(resultOf(await fetch(local.store, 10, 'reuse-scope-1')).value.A, 'A1')
+    const c1 = record('reuse-scope-1', 'Q1', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
+    assert.equal((await casebook.archive(handle, c1)).ok, true)
+    assert.equal((await casebook.finalize(handle, c1)).ok, false)
+    assert.equal((await casebook.fetchCase(handle, 10, 'reuse-scope-1')).value.a, 'A1')
   } finally {
-    local.close()
+    eventStore.EventStoreSurface_dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -46,39 +38,40 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const { port, createCalls, programCalls } = scriptedBookkeeperPort()
-    setSessionPort(port)
+    bookkeeper.setSessionPort(port)
     const key = 'reuse-insp-1'
-    notePrompt(key, 'Who owns PromptAuthority?')
-    collect(collector, key, 'read', { path: 'a.txt' }, 'hello')
+    lifecycle.notePrompt(key, 'Who owns PromptAuthority?')
+    lifecycle.collect(key, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'Host owns PromptAuthority.'
-    noteAnswer(key, rawA)
-    assert.equal(resultOf(await tryFinalizeInspector(dir, key)).ok, true)
+    lifecycle.noteAnswer(key, rawA)
+    assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
 
-    const store = acquire(gitCommonDir(dir))
-    const fetched = resultOf(await fetch(store, 10, key))
-    assert.equal(fetched.value.Q, CANONICAL_Q)
-    assert.notEqual(fetched.value.A, rawA)
-    assert.equal(fetched.value.A, CANONICAL_A)
+    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'universal-lifecycle-read')
+    const fetched = await casebook.fetchCase(handle, 10, key)
+    assert.equal(fetched.value.q, CANONICAL_Q)
+    assert.notEqual(fetched.value.a, rawA)
+    assert.equal(fetched.value.a, CANONICAL_A)
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
-    assert.equal(listItems(fetched.value.Observations).length, 1)
+    assert.equal(fetched.value.observations.length, 1)
 
-    const publishedA = fetched.value.A
-    cleanupInspector(key)
-    assert.equal(resultOf(await fetch(store, 10, key)).value.A, publishedA)
+    const publishedA = fetched.value.a
+    lifecycle.cleanup(key)
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
     writeFileSync(join(dir, 'a.txt'), 'drift', 'utf8')
-    const mech = resultOf(await refreshStale(store, dir, key))
-    assert.equal(mech.ok, true)
-    assert.equal(mech.value, true)
-    const after = resultOf(await fetch(store, 10, key))
-    assert.equal(after.value.Q, CANONICAL_Q)
+    const refreshed = await bookkeeper.refreshStale(handle, dir, key)
+    assert.equal(refreshed.ok, true)
+    assert.equal(refreshed.value, true)
+    const after = await casebook.fetchCase(handle, 10, key)
+    assert.equal(after.value.q, CANONICAL_Q)
     assert.equal(createCalls.length, 2)
-    assert.equal(listItems(after.value.Observations)[0].fields[1], contentHash('drift'))
+    assert.equal(after.value.observations[0].contentHash, casebook.contentHash('drift'))
+    eventStore.EventStoreSurface_dispose(handle)
   } finally {
-    resetSessionPort()
-    setEnabled(undefined)
+    bookkeeper.resetSessionPort()
+    lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -88,17 +81,17 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_cancel_session_cleanup_no_publication', asy
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
-    setEnabled(dir)
+    lifecycle.enable(dir)
     const key = 'cancel-insp'
-    notePrompt(key, 'Q')
-    collect(collector, key, 'read', { path: 'x.txt' }, 'body')
-    noteAnswer(key, 'A')
-    cleanupInspector(key)
-    const store = acquire(gitCommonDir(dir))
-    const fetched = resultOf(await fetch(store, 10, key))
-    assert.equal(fetched.value == null, true)
+    lifecycle.notePrompt(key, 'Q')
+    lifecycle.collect(key, 'read', { path: 'x.txt' }, 'body')
+    lifecycle.noteAnswer(key, 'A')
+    lifecycle.cleanup(key)
+    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'universal-cancel-read')
+    assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
+    eventStore.EventStoreSurface_dispose(handle)
   } finally {
-    setEnabled(undefined)
+    lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }
 })

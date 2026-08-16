@@ -1,57 +1,29 @@
-// rabbit §14.2 — SessionRecovery.combine algebra.
-// Dist-dependent: run after BUILD CLEAR / serial rebuild.
-
+// SessionRecovery priority algebra through the recovery owner surface.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
-import { caseOf } from '../../verification-system/tests/support/domain.mjs'
-
-const mod = await import('../../../dist/Execution/Session/Recovery/Model.js')
-const {
-  SessionRecovery,
-  RecoveryBlock,
-  NonEmpty_one: nonEmptyOne,
-  RecoveryReceiptModule_create: makeReceipt,
-} = mod
-const combine = mod.combine ?? mod.SessionRecovery_combine ?? mod.SessionRecoveryModule_combine
-
-const { SessionIdModule_create: sid } = await import('../../../dist/Foundation/Identity.js')
-
-const receipt = (id = 's') => makeReceipt(sid(id), 1n, null, [], [])
-const blocked = (reason = 'x') =>
-  new SessionRecovery(3, [nonEmptyOne(new RecoveryBlock(0, [sid('b'), reason]))])
-const waiting = (reason = 'w') =>
-  new SessionRecovery(2, [nonEmptyOne(new RecoveryBlock(5, [sid('c'), reason]))])
-const recovered = () => new SessionRecovery(1, [receipt('r')])
-const ready = () => new SessionRecovery(0, [receipt('n')])
+import * as recovery from '../../../dist/Execution/Session/Recovery/Surface.js'
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_export_exists', () => {
-  assert.equal(typeof combine, 'function', 'SessionRecovery.combine missing from dist — rebuild needed')
+  assert.equal(typeof recovery.combine, 'function')
 })
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_blocked_dominates', () => {
-  const out = combine([ready(), waiting(), blocked('hard'), recovered()])
-  assert.equal(caseOf(out), 'Blocked')
+  assert.equal(recovery.combine(['NoRecoveryRequired', 'Waiting', 'Blocked', 'Recovered']), 'Blocked')
 })
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_waiting_dominates_ready', () => {
-  const out = combine([ready(), recovered(), waiting('pending')])
-  assert.equal(caseOf(out), 'Waiting')
+  assert.equal(recovery.combine(['NoRecoveryRequired', 'Recovered', 'Waiting']), 'Waiting')
 })
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_recovered_over_ready', () => {
-  const out = combine([ready(), recovered()])
-  assert.equal(caseOf(out), 'Recovered')
+  assert.equal(recovery.combine(['NoRecoveryRequired', 'Recovered']), 'Recovered')
 })
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_empty_is_no_recovery_required', () => {
-  const out = combine([])
-  assert.equal(caseOf(out), 'NoRecoveryRequired')
+  assert.equal(recovery.combine([]), 'NoRecoveryRequired')
 })
 
 test('WHAT[CRASH-013] RECOVERY_COMBINE_order_independent_for_tier', () => {
-  const a = combine([blocked('a'), waiting(), recovered()])
-  const b = combine([recovered(), blocked('a'), waiting()])
-  assert.equal(caseOf(a), 'Blocked')
-  assert.equal(caseOf(b), 'Blocked')
+  assert.equal(recovery.combine(['Blocked', 'Waiting', 'Recovered']), 'Blocked')
+  assert.equal(recovery.combine(['Recovered', 'Blocked', 'Waiting']), 'Blocked')
 })

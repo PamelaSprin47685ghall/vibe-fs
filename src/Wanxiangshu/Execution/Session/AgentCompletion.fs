@@ -241,7 +241,7 @@ module PtyJoinItem =
     /// never map abort to a generic business AgentFailed without that discriminant.
     let abortedCode = "PTY_ABORTED"
 
-/// Project RunCompletion into typed JoinItem (agent vs PTY).
+/// Canonical RunCompletion → typed JoinItem projection (agent vs PTY).
 module JoinItem =
     /// Agent durable → AgentItem. PTY via isPtyRun; Code=PTY_ABORTED recovers PtyAborted.
     let ofRunCompletion (isPtyRun: bool) (completion: RunCompletion) : JoinItem =

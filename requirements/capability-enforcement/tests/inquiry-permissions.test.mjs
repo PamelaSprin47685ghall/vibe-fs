@@ -13,19 +13,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ProviderRequestKind } from '../../../dist/Context/Prefix/Candidate.js'
-import { toolCapabilitiesFor } from '../../../dist/Interaction/Authority/Model.js'
-import { ToolRegistry_rolePredicate as rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistry.js'
-import { Role, ToolPermission } from '../../../dist/Foundation/Roles.js'
-import { StaticTools_toolName as toolName } from '../../../dist/OpenCode/Tools/StaticTools.js'
+import { capabilityToolNames, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { configure as configureManagedAgents, installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
 import { permissions as rolePermissions, isAllowed as surfaceIsAllowed } from '../../../dist/Foundation/RolesSurface.js'
 
-import { managedAgentConfig, runtimeResources, setItems } from '../../verification-system/tests/support/domain.mjs'
+installDefaultResources()
 
-const names = (permissions) => setItems(permissions).map(toolName).sort()
+const names = (permissions) => permissions
 
 const READ_TOOLS = ['read', 'glob', 'grep']
-const READ_PERMISSIONS = [ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep]
+const READ_PERMISSIONS = ['Read', 'Glob', 'Grep']
 
 test.before(() => {
   runtimeResources.installFromPackage()
@@ -49,7 +46,7 @@ test('WHAT[ENF-006] Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_s
 })
 
 test('WHAT[ENF-001] Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
-  const caps = names(toolCapabilitiesFor(Role.Inquiry, ProviderRequestKind.WorkMain))
+  const caps = capabilityToolNames('inquiry', 'work-main')
   assert.deepEqual(caps, ['fission', 'inspect', 'sphinx_*'])
   for (const tool of READ_TOOLS) {
     assert.equal(caps.includes(tool), false, `toolCapabilitiesFor must omit ${tool}`)
@@ -62,14 +59,11 @@ test('WHAT[ENF-010] Inquiry_rolePredicate_inspector_allow_and_host_native_read_g
   // default deny. The real Inquiry gate for those tools is Roles.permissions /
   // Host permission schema (asserted above), not a ToolRegistry rolePredicate.
   for (const tool of READ_TOOLS) {
-    const allowed = rolePredicate(tool, undefined, 'ses-inquiry')
-    assert.equal(typeof allowed, 'function', `rolePredicate(${tool}) returns default-deny fn`)
-    assert.equal(allowed(Role.Inquiry), false, `default deny for Host-native ${tool}`)
-    assert.equal(allowed(Role.Inspector), false, `not role-gated: even Inspector is denied here`)
+    assert.equal(rolePredicate(tool, 'inquiry'), false, `default deny for Host-native ${tool}`)
+    assert.equal(rolePredicate(tool, 'inspector'), false, `not role-gated: even Inspector is denied here`)
   }
 
-  const inspect = rolePredicate('inspect', undefined, 'ses-inquiry')
-  assert.equal(inspect(Role.Inquiry), true, 'rolePredicate(inspect) must allow Inquiry')
+  assert.equal(rolePredicate('inspect', 'inquiry'), true, 'rolePredicate(inspect) must allow Inquiry')
 })
 
 test('WHAT[ENF-002] Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission', () => {
@@ -97,7 +91,7 @@ test('WHAT[ENF-002] Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission
     }
   }
 
-  const outcome = managedAgentConfig.configure(config)
+  const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
 
   for (const name of ['fast-inquiry', 'deep-inquiry']) {

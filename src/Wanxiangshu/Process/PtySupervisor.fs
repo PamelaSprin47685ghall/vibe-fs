@@ -350,6 +350,7 @@ module PtySupervisor =
             s.Closed <- true
             let residual = s.OutputBuffer.ToString()
             s.OutputBuffer.Clear() |> ignore
+            s.ExitCompleted <- true
             s.ExitCompletion.SetResult(())
             let pending = drop supervisor id
             failPending pending "PTY exited before command was applied"
@@ -383,6 +384,7 @@ module PtySupervisor =
                         OutputBuffer = StringBuilder()
                         Closed = false
                         ExitCompletion = exitTcs
+                        ExitCompleted = false
                         Pending = ResizeArray<_>() }
 
                 supervisor.Sessions.[id] <- live

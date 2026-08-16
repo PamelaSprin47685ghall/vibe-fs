@@ -343,7 +343,7 @@ prompt 字节稳定属 `participant-identity` + `prefix-stability`；T1 文案�
 **规范**：Manager OpeningPolicy = BlindPlan。Pre-T1 = Planning Table：替将要扛路的另一 Manager 写
 诚实计划，可调查，**不得**开始执行所规划之路；可以反复用 `todowrite(planComplete=false, ...)`
 记录当前仍欠的 planning work。只有第一次 accepted `planComplete=true` 才进入 Living Mission。`planComplete=true` 表示**规划判断已经完成并愿意承诺其结论**，不表示一定存在 mission debt；当权威输入明确证明当前没有任务/交付物时，`planComplete=true, obligations=[]` 是合法的零工作 T1，随后仍须按 Finality 协议接受终局评审，不能因为账为空而永久停留在 Pre-T1。
-删除生产路径上的 planning-only → Activation 两阶段：`PlanningTail`、`ManagerWorkActivation`、
+删除生产路径上的 planning-only → Activation 两阶段：`PlanningTail`、
 `WorkActivated` 业务资格、Birth/Labor compression floor、Activation-only suicide gate、
 Planning→Working system prompt 切换均非生产合同（TODO-001/GLORY-074）。
 

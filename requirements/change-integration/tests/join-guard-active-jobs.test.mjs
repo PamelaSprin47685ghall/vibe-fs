@@ -1,44 +1,27 @@
-// Split from tests/unit/execution/join-guard.test.mjs (cutover Wave 2a);
-// owner: change-integration. EXEC-016 outstandingBackground 的 orchestrator 半边：
-// 活跃 ManagerJob 对 Orchestrator 是 outstanding（ORCH-007 job 投影；
-// handle/PTY 判定 → managed-session-lifecycle / process-execution）。
+// CHGINT-006 — active manager jobs remain outstanding until terminal progress.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  commitHash,
-  jobProgress,
-  managerJobId,
-  orchestratorProjection,
-  sessionId,
-  targetRef,
-  worktreeIdentity,
-  worktreePath,
-} from '../../verification-system/tests/support/domain.mjs'
+
+const change = await import('../../../dist/Change/Surface.js')
 
 test('WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
-  let jobs = orchestratorProjection.empty
-  jobs = orchestratorProjection.createJob(
-    {
-      ManagerJobId: managerJobId('job_1'),
-      ManagerSessionId: sessionId('ses_mgr'),
-      ManagerAgent: 'fast-manager',
-      WorktreeIdentity: worktreeIdentity('manager/job_1'),
-      WorktreePath: worktreePath('/tmp/wt'),
-      TargetRef: targetRef('refs/heads/main'),
-      TargetBranchFrozen: 'main',
-    },
-    jobs,
-  )
-  assert.equal(orchestratorProjection.activeJobs(jobs).length, 1)
+  let jobs = change.createJob(change.empty(), {
+    jobId: 'job_1',
+    managerSessionId: 'ses_mgr',
+    managerAgent: 'fast-manager',
+    byname: 'Road',
+    worktreeIdentity: 'manager/job_1',
+    worktreePath: '/tmp/wt',
+    targetRef: 'refs/heads/main',
+    targetBranchFrozen: 'main',
+  })
+  assert.equal(change.activeJobs(jobs).length, 1)
 
-  jobs = orchestratorProjection.recordProgress(
-    managerJobId('job_1'),
-    jobProgress.of('Published', {
-      CandidateCommit: commitHash('c1'),
-      ResultingTargetHead: commitHash('r1'),
-    }),
+  jobs = change.recordProgress(
     jobs,
+    'job_1',
+    change.progress('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   )
-  assert.equal(orchestratorProjection.activeJobs(jobs).length, 0)
+  assert.equal(change.activeJobs(jobs).length, 0)
 })

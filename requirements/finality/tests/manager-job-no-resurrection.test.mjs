@@ -1,126 +1,111 @@
 // FINALITY-028: published/released ManagerJob never revives; an active owned
-// job may receive an Orchestrator append on the same session/worktree (GLORY-068).
+// job may receive an Orchestrator append on the same session/worktree.
 //
-// Algebra lives in OrchestratorProjection: terminal progress leaves the job in
-// the map (replay is recognised) but drops it from activeJobs, recovery is
-// CleanUp (not ResumeManager), later progress cannot reopen it, and a replayed
-// ManagerJobCreated cannot reset it to ManagerStarted. ContinueManager refuses
-// the same terminal cases in Application/Orchestration/Runtime.fs.
+// ManagerJob history is folded by the production FinalitySurface owner. Tests
+// pass plain event objects and assert the JS-native projection only.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  commitHash,
-  idValue,
-  managerJobId,
-  reviewBarrierId,
-  sessionId,
-  targetRef,
-  worktreeIdentity,
-  worktreePath,
-} from '../../verification-system/tests/support/domain/identity.mjs'
-import { isSome } from '../../verification-system/tests/support/domain/interop.mjs'
-import {
-  jobProgress,
-  orchestratorProjection,
-} from '../../verification-system/tests/support/domain/orchestrator.mjs'
 
-const JOB = managerJobId('job_finality_028')
-const MANAGER = sessionId('ses_finality_028')
+const finality = await import('../../../dist/Mission/Manager/FinalitySurface.js')
 
-const created = () =>
-  orchestratorProjection.createJob(
-    {
-      ManagerJobId: JOB,
-      ManagerSessionId: MANAGER,
-      ManagerAgent: 'fast-manager',
-      Byname: 'fast-manager',
-      WorktreeIdentity: worktreeIdentity('wt_finality_028'),
-      WorktreePath: worktreePath('/tmp/wt-finality-028'),
-      TargetRef: targetRef('refs/heads/main'),
-      TargetBranchFrozen: 'refs/heads/main',
-    },
-    orchestratorProjection.empty,
-  )
+const JOB = 'job_finality_028'
+const MANAGER = 'ses_finality_028'
+
+const created = (overrides = {}) => ({
+  kind: 'job-created',
+  jobId: JOB,
+  managerSessionId: MANAGER,
+  managerAgent: 'fast-manager',
+  byname: 'fast-manager',
+  worktreeIdentity: 'wt_finality_028',
+  worktreePath: '/tmp/wt-finality-028',
+  targetRef: 'refs/heads/main',
+  targetBranchFrozen: 'refs/heads/main',
+  ...overrides,
+})
+
+const progress = (kind, attributes = {}) => ({
+  kind: 'job-progress',
+  jobId: JOB,
+  progress: kind,
+  ...attributes,
+})
 
 const terminal = {
-  published: () =>
-    jobProgress.of('Published', {
-      CandidateCommit: commitHash('c1'),
-      ResultingTargetHead: commitHash('r1'),
-    }),
-  failed: () => jobProgress.of('Failed', 'boom'),
-  abandoned: () => jobProgress.of('Abandoned'),
+  published: () => progress('published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
+  failed: () => progress('failed', { reason: 'boom' }),
+  abandoned: () => progress('abandoned'),
 }
 
-// Explicit enumeration: same three terminal progress kinds as the fixture
-// object above, in the same order (no dynamic export discovery).
 const terminalNames = ['published', 'failed', 'abandoned']
 
 const laterProgress = [
-  jobProgress.of('CandidateReady', {
-    CandidateCommit: commitHash('c9'),
-    PreRebaseReviewBarrierId: reviewBarrierId('bar_late'),
-  }),
-  jobProgress.of('Failed', 'late'),
-  jobProgress.of('Abandoned'),
+  progress('candidate-ready', { candidateCommit: 'c9', preRebaseReviewBarrierId: 'bar_late' }),
+  progress('failed', { reason: 'late' }),
+  progress('abandoned'),
 ]
+
+const projectionOf = (events) => {
+  const result = finality.jobProjection(events)
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  return result
+}
+
+const onlyJob = (projection) => {
+  assert.equal(projection.jobs.length, 1)
+  return projection.jobs[0]
+}
 
 test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume', () => {
   for (const name of terminalNames) {
-    const projection = orchestratorProjection.recordProgress(JOB, terminal[name](), created())
-    const job = orchestratorProjection.tryFind(JOB, projection)
-    assert.equal(isSome(job), true, `${name}: terminal job stays in the map`)
-    assert.equal(orchestratorProjection.activeJobs(projection).length, 0, `${name}: not active`)
-    assert.equal(
-      orchestratorProjection.recoveryAction(undefined, job),
-      'CleanUp',
-      `${name}: recovery is CleanUp, never ResumeManager`,
-    )
+    const projection = projectionOf([created(), terminal[name]()])
+    const job = onlyJob(projection)
+    assert.equal(job.progress.kind, name)
+    assert.equal(projection.activeJobs.length, 0, `${name}: not active`)
+    assert.equal(job.recovery.kind, 'clean-up', `${name}: recovery is CleanUp, never ResumeManager`)
   }
 })
 
 test('WHAT[FINALITY-028] later progress cannot reopen a terminal ManagerJob', () => {
   for (const name of terminalNames) {
-    const progress = terminal[name]
-    const sealed = orchestratorProjection.recordProgress(JOB, progress(), created())
-    const sealedName = orchestratorProjection.progressOf(orchestratorProjection.tryFind(JOB, sealed))
+    const sealed = projectionOf([created(), terminal[name]()])
+    const sealedName = onlyJob(sealed).progress.kind
     for (const later of laterProgress) {
-      const after = orchestratorProjection.recordProgress(JOB, later, sealed)
-      assert.equal(orchestratorProjection.progressOf(orchestratorProjection.tryFind(JOB, after)), sealedName)
-      assert.equal(orchestratorProjection.activeJobs(after).length, 0)
+      const after = projectionOf([created(), terminal[name](), later])
+      assert.equal(onlyJob(after).progress.kind, sealedName)
+      assert.equal(after.activeJobs.length, 0)
     }
   }
 })
 
 test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal job', () => {
-  const published = orchestratorProjection.recordProgress(JOB, terminal.published(), created())
-  const replayed = orchestratorProjection.createJob(
-    {
-      ManagerJobId: JOB,
-      ManagerSessionId: sessionId('ses_other'),
-      ManagerAgent: 'deep-manager',
-      Byname: 'deep-manager',
-      WorktreeIdentity: worktreeIdentity('wt_other'),
-      WorktreePath: worktreePath('/tmp/wt-other'),
-      TargetRef: targetRef('refs/heads/other'),
-      TargetBranchFrozen: 'refs/heads/other',
-    },
-    published,
-  )
-  const job = orchestratorProjection.tryFind(JOB, replayed)
-  assert.equal(orchestratorProjection.progressOf(job), 'Published')
-  assert.equal(idValue.session(job.ManagerSessionId), 'ses_finality_028')
-  assert.equal(idValue.worktreeIdentity(job.WorktreeIdentity), 'wt_finality_028')
-  assert.equal(orchestratorProjection.activeJobs(replayed).length, 0)
+  const replayed = projectionOf([
+    created(),
+    terminal.published(),
+    created({
+      managerSessionId: 'ses_other',
+      managerAgent: 'deep-manager',
+      byname: 'deep-manager',
+      worktreeIdentity: 'wt_other',
+      worktreePath: '/tmp/wt-other',
+      targetRef: 'refs/heads/other',
+      targetBranchFrozen: 'refs/heads/other',
+    }),
+  ])
+  const job = onlyJob(replayed)
+  assert.equal(job.progress.kind, 'published')
+  assert.equal(job.managerSessionId, MANAGER)
+  assert.equal(job.worktreeIdentity, 'wt_finality_028')
+  assert.equal(replayed.activeJobs.length, 0)
 })
 
 test('WHAT[FINALITY-028] an active owned job continues on the same session and worktree', () => {
-  const projection = created()
-  const job = orchestratorProjection.tryFind(JOB, projection)
-  assert.equal(orchestratorProjection.activeJobs(projection).length, 1)
-  assert.equal(orchestratorProjection.recoveryAction(undefined, job), 'ResumeManager')
-  assert.equal(idValue.session(job.ManagerSessionId), 'ses_finality_028')
-  assert.equal(idValue.worktreeIdentity(job.WorktreeIdentity), 'wt_finality_028')
-  assert.equal(idValue.worktreePath(job.WorktreePath), '/tmp/wt-finality-028')
+  const projection = projectionOf([created()])
+  const job = onlyJob(projection)
+  assert.equal(projection.activeJobs.length, 1)
+  assert.equal(job.recovery.kind, 'resume-manager')
+  assert.equal(job.managerSessionId, MANAGER)
+  assert.equal(job.worktreeIdentity, 'wt_finality_028')
+  assert.equal(job.worktreePath, '/tmp/wt-finality-028')
 })

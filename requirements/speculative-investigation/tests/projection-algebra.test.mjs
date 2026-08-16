@@ -1,132 +1,56 @@
-// Split from tests/unit/strength/projection-algebra.test.mjs (cutover Wave 2a); owner: speculative-investigation
-//
-// Strength product semantics over the projection algebra: candidate must match
-// its target (wrong target fails closed), promoted replica reflection is
-// rejected, the candidate renders concurrent calls then results with stable
-// ids, promoted frames splice at BeforeMessageIndex without dropping later
-// pair-anchor messages, and the replica mirror replaces the base while local
-// batches append. Pure algebra oracles (constructor surface, mirror conflict
-// rule, registration-order permutation) went to provider-projection.
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
-import * as Intent from '../../../dist/Participant/Provider/Projection/Intent.js'
-import * as Planner from '../../../dist/Participant/Provider/Projection/Planner.js'
-import * as Renderer from '../../../dist/Participant/Provider/Projection/Renderer.js'
-// Fable emits a bare `plan` for the single-module Planner file; keep the
-// historical prefixed name so call sites stay stable.
-const P = { ...Intent, ...Planner, ...Renderer, ProjectionPlanner_plan: Planner.plan }
-import * as Provider from '../../../dist/Participant/Provider/Projection/Model.js'
-import * as Frame from '../../../dist/Strength/Frame.js'
-import * as Id from '../../../dist/Foundation/Identity.js'
-import { toList, listItems } from '../../verification-system/tests/support/domain.mjs'
+import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
+import * as Strength from '../../../dist/Strength/Surface.js'
 
 const H = (text) => `H(${text})`
-const resultOf = (value) => value.tag === 0
-  ? { ok: true, value: value.fields[0] }
-  : { ok: false, error: value.fields[0] }
-const caseOf = (value) => value.cases()[value.tag]
-const session = (value) => Id.SessionIdModule_create(value)
-const run = (value) => Id.ProviderRunIdentityModule_create(value)
-const decision = (value) => Id.StrengthDecisionIdModule_create(value)
-const textPart = (text) => new Provider.WirePart(0, [text])
-const message = (role, parts) => ({ Role: role, Parts: toList(parts) })
-
-const snapshot = new P.ProjectionSnapshot(
-  { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: toList([]) },
-  undefined,
-  toList([]),
-  undefined,
-  undefined,
-)
-
-const bundle = resultOf(
-  Frame.StrengthFrame_tryBuild(
-    H,
-    10000,
-    toList([
-      {
-        RequestOrdinal: 1,
-        Exchanges: toList([
-          { ToolName: 'read', CanonicalArguments: '{"filePath":"a"}', CanonicalResult: 'alpha' },
-          { ToolName: 'grep', CanonicalArguments: '{"pattern":"x"}', CanonicalResult: 'a:1:x' },
-        ]),
-      },
-    ]),
-  ),
-).value
+const bundle = Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }, { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
+const snapshot = (messages = []) => Projection.projectionSnapshot(Projection.semanticProjection(messages), { committedPrefix: null, blogFrames: [], transportMessages: [], hostReanchor: null })
+const text = (textValue) => ({ kind: 'text', text: textValue })
+const message = (role, parts) => ({ role, parts })
 
 test('WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
-  const wrongTarget = P.ProjectionIntentModule_strengthCandidate(
-    session('owner'), decision('d1'), run('target-a'), run('target-b'), bundle,
-  )
-  const plannedWrong = resultOf(P.ProjectionPlanner_plan(toList([wrongTarget])))
-  assert.equal(plannedWrong.ok, false)
-  assert.equal(caseOf(plannedWrong.error), 'StrengthCandidateWrongTarget')
-
-  const reflected = P.ProjectionIntentModule_strengthPromoted(
-    session('owner'), decision('d1'), run('target-a'), 0, true, bundle,
-  )
-  const plannedReflected = resultOf(P.ProjectionPlanner_plan(toList([reflected])))
-  assert.equal(plannedReflected.ok, false)
-  assert.equal(caseOf(plannedReflected.error), 'StrengthPromotedReplicaReflection')
+  const wrongTarget = Projection.strengthCandidate({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
+  assert.equal(Projection.plan([wrongTarget]).ok, false)
+  assert.equal(Projection.plan([wrongTarget]).conflict, 'StrengthCandidateWrongTarget')
+  const reflected = Projection.strengthPromoted({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', beforeIndex: 0, isReplicaRequest: true, bundle })
+  assert.equal(Projection.plan([reflected]).ok, false)
+  assert.equal(Projection.plan([reflected]).conflict, 'StrengthPromotedReplicaReflection')
 })
 
 test('WHAT[SPEC-INV-005] STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stable_ids', () => {
-  const base = toList([message('user', [textPart('base')])])
-  const intent = P.ProjectionIntentModule_strengthCandidate(
-    session('owner'), decision('d1'), run('target'), run('target'), bundle,
-  )
-
-  const first = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([intent]))
-  const second = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([intent]))
-  const messages = listItems(first.Messages)
-  assert.equal(messages.length, 3)
-  assert.equal(messages[0].Role, 'user')
-  assert.equal(messages[1].Role, 'assistant')
-  assert.equal(messages[2].Role, 'tool')
-
-  const calls = listItems(messages[1].Parts)
-  const results = listItems(messages[2].Parts)
-  assert.deepEqual(calls.map(caseOf), ['WireToolCall', 'WireToolCall'])
-  assert.deepEqual(results.map(caseOf), ['WireToolResult', 'WireToolResult'])
-  assert.deepEqual(calls.map((part) => Id.ToolCallIdModule_value(part.fields[0])), results.map((part) => Id.ToolCallIdModule_value(part.fields[0])))
-  assert.equal(Provider.renderWire(
-    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: first.Messages },
-  ), Provider.renderWire(
-    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: second.Messages },
-  ))
+  const base = [message('user', [text('base')])]
+  const intent = Projection.strengthCandidate({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target', currentProviderRun: 'target', bundle })
+  const first = Projection.renderMessagesWithHostIds(H, snapshot(base), base, [intent])
+  const second = Projection.renderMessagesWithHostIds(H, snapshot(base), base, [intent])
+  assert.equal(first.messages.length, 3)
+  assert.equal(first.messages[0].role, 'user')
+  assert.equal(first.messages[1].role, 'assistant')
+  assert.equal(first.messages[2].role, 'tool')
+  const calls = first.messages[1].parts
+  const results = first.messages[2].parts
+  assert.deepEqual(calls.map((part) => part.kind), ['tool-call', 'tool-call'])
+  assert.deepEqual(results.map((part) => part.kind), ['tool-result', 'tool-result'])
+  assert.deepEqual(calls.map((part) => part.callId), results.map((part) => part.callId))
+  assert.equal(Projection.renderWire(first.messages), Projection.renderWire(second.messages))
 })
 
 test('WHAT[SPEC-INV-009] STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
-  // Not the live Host PairProgrammingThought canary. Unit-level: Strength
-  // splice is BeforeMessageIndex and does not drop messages after the target.
-  const base = toList([
-    message('user', [textPart('u1')]),
-    message('assistant', [textPart('target-assistant')]),
-    message('user', [textPart('pair-anchor-stand-in')]),
-  ])
-  const promoted = P.ProjectionIntentModule_strengthPromoted(
-    session('owner'), decision('d1'), run('target-1'), 1, false, bundle,
-  )
-  const rendered = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([promoted]))
-  const roles = listItems(rendered.Messages).map((item) => item.Role)
-  const last = listItems(rendered.Messages).at(-1)
-  assert.deepEqual(roles, ['user', 'assistant', 'tool', 'assistant', 'user'])
-  assert.equal(last.Parts.head.fields[0], 'pair-anchor-stand-in')
+  const base = [message('user', [text('u1')]), message('assistant', [text('target-assistant')]), message('user', [text('pair-anchor-stand-in')])]
+  const promoted = Projection.strengthPromoted({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle })
+  const rendered = Projection.renderMessagesWithHostIds(H, snapshot(base), base, [promoted])
+  assert.deepEqual(rendered.messages.map((item) => item.role), ['user', 'assistant', 'tool', 'assistant', 'user'])
+  assert.equal(rendered.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
 })
 
 test('WHAT[SPEC-INV-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
-  const mirrorMessages = toList([message('user', [textPart('mirror-base')])])
-  const mirror = P.ProjectionIntentModule_useStrengthMirror(decision('d1'), run('target'), 'sem-a', mirrorMessages)
-  const local = P.ProjectionIntentModule_strengthReplicaLocal(session('owner'), decision('d1'), bundle)
-  const base = toList([message('user', [textPart('child-physical')])])
-
-  const rendered = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([mirror, local]))
-  const messages = listItems(rendered.Messages)
-  assert.equal(messages.length, 3)
-  assert.equal(messages[0].Parts.head.fields[0], 'mirror-base')
-  assert.equal(messages[1].Role, 'assistant')
-  assert.equal(messages[2].Role, 'tool')
+  const mirrorMessages = [message('user', [text('mirror-base')])]
+  const mirror = Projection.useStrengthMirror({ decisionId: 'd1', targetProviderRun: 'target', semanticDigest: 'sem-a', messages: mirrorMessages })
+  const local = Projection.strengthReplicaLocal({ ownerSessionId: 'owner', decisionId: 'd1', bundle })
+  const base = [message('user', [text('child-physical')])]
+  const rendered = Projection.renderMessagesWithHostIds(H, snapshot(base), base, [mirror, local])
+  assert.equal(rendered.messages.length, 3)
+  assert.equal(rendered.messages[0].parts[0].text, 'mirror-base')
+  assert.equal(rendered.messages[1].role, 'assistant')
+  assert.equal(rendered.messages[2].role, 'tool')
 })

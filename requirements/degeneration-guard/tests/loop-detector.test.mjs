@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
 
-import { loopDetector, loopEventCodec } from '../../verification-system/tests/support/domain.mjs'
+import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
@@ -118,10 +118,10 @@ test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {
 })
 
 test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
-  assert.equal(loopEventCodec.isLoopTextDelta({ type: 'session.status' }), false)
-  assert.equal(loopEventCodec.tryDecodeTextDelta({ type: 'session.status' }), undefined)
+  assert.equal(loopDetector.isLoopTextDelta({ type: 'session.status' }), false)
+  assert.equal(loopDetector.tryDecodeTextDelta({ type: 'session.status' }), null)
 
-  const ok = loopEventCodec.tryDecodeTextDelta({
+  const ok = loopDetector.tryDecodeTextDelta({
     type: 'message.part.delta',
     properties: {
       sessionID: 'ses_loop',
@@ -141,7 +141,7 @@ test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
   })
 
   assert.equal(
-    loopEventCodec.tryDecodeTextDelta({
+    loopDetector.tryDecodeTextDelta({
       type: 'message.part.delta',
       properties: {
         sessionID: 'ses_loop',
@@ -149,12 +149,12 @@ test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
         delta: 'zzzz',
       },
     }),
-    undefined,
+    null,
   )
 
   for (const field of ['model_thought', 'thinking', 'tool', 'reasoning_content']) {
     assert.equal(
-      loopEventCodec.tryDecodeTextDelta({
+      loopDetector.tryDecodeTextDelta({
         type: 'message.part.delta',
         properties: {
           sessionID: 'ses_loop',
@@ -164,16 +164,16 @@ test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
           delta: 'zzzz',
         },
       }),
-      undefined,
+      null,
       `field=${field} must not decode`,
     )
   }
 
   assert.equal(
-    loopEventCodec.tryDecodeTextDelta({
+    loopDetector.tryDecodeTextDelta({
       type: 'message.part.delta',
       properties: { delta: 'x', field: 'text' },
     }),
-    undefined,
+    null,
   )
 })

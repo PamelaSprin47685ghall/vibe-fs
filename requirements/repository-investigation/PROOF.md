@@ -36,7 +36,7 @@ GAP：    0
 | `requirements/repository-investigation/tests/semble-mcp.test.mjs` | `requirements/repository-investigation/tests/semble-mcp.test.mjs` | 6 pass | 绿 |
 | （NEW） | `requirements/repository-investigation/tests/investigation-resource-laws.test.mjs` | 8 pass（含拆分） | 绿 |
 
-适配说明：`../support/domain.mjs` → `../../../requirements/verification-system/tests/support/domain.mjs`；`semble-mcp.test.mjs` 的 fixture 路径 `../support/semble-mcp-fixture.js` → `../../../requirements/verification-system/tests/support/semble-mcp-fixture.js`。无 `dist/fable_modules` 直接 import。
+适配说明：测试通过 `Repository/Investigation/WarmStartSurface.js` 与 `Repository/Investigation/SembleSurface.js` 进入 owner boundary；Host 配置断言复用已注册 `OpenCode/Host/ManagedAgentConfigSurface.js`。Semble fixture 只以 `../../../requirements/verification-system/tests/support/semble-mcp-fixture.js` 的 opaque path 传入，不导入 shared domain 或 `dist/fable_modules`。
 
 ## semantic anchor 归属（semantic-anchors.mjs）
 

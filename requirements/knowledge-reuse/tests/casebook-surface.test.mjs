@@ -11,9 +11,11 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
-
-const casebook = await import('../../../dist/Repository/Knowledge/Casebook/Surface.js')
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 
 const read = (path, hash) => ({ kind: 'file-read', path, contentHash: hash })
 const glob = (pattern, paths) => ({ kind: 'glob-result', pattern, paths })
@@ -24,6 +26,18 @@ const caseRec = (sessionId, q, a, observations) => ({
   observations,
   lastAccessOrder: 0,
 })
+
+const openStore = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-surface-'))
+  return {
+    dir,
+    handle: eventStore.EventStoreSurface_create(dir, 'casebook-surface'),
+    close() {
+      eventStore.EventStoreSurface_dispose(this.handle)
+      rmSync(dir, { recursive: true, force: true })
+    },
+  }
+}
 
 test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
@@ -89,14 +103,14 @@ test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed',
 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
-  const local = createLocalEventStore()
+  const local = openStore()
   try {
-    const first = await casebook.finalize(local.store, caseRec('scope-1', 'Q', 'A', []))
+    const first = await casebook.finalize(local.handle, caseRec('scope-1', 'Q', 'A', []))
     assert.equal(first.ok, true, JSON.stringify(first.error))
-    const second = await casebook.finalize(local.store, caseRec('scope-1', 'Q', 'A2', []))
+    const second = await casebook.finalize(local.handle, caseRec('scope-1', 'Q', 'A2', []))
     assert.equal(second.ok, false, 'a second finalize for the same scope must be refused')
     assert.match(second.error, /already finalized/)
-    const other = await casebook.finalize(local.store, caseRec('scope-2', 'Q', 'A', []))
+    const other = await casebook.finalize(local.handle, caseRec('scope-2', 'Q', 'A', []))
     assert.equal(other.ok, true, JSON.stringify(other.error))
   } finally {
     local.close()

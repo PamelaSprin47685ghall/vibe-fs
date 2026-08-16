@@ -436,7 +436,8 @@ export async function holdChildC1UntilLabor(scenario) {
   }
   assert.ok(held >= 1, 'long-stroke: holdChildC1UntilLabor needs coder.0 (or legacy child-c1.0)');
 
-  const originalConsume = runtime.consume.bind(runtime);
+  const consume = runtime.consume;
+  const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     originalConsume(body, selection, context);
     if (selection?.entry?.id === 'mgr-labor.0') {
@@ -468,7 +469,8 @@ export async function bindFinalityReviseThenPerfect(scenario) {
   setVerdict('REVISE');
 
   let firstBarrierTerminalSeen = false;
-  const originalConsume = runtime.consume.bind(runtime);
+  const consume = runtime.consume;
+  const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     originalConsume(body, selection, context);
     if (!firstBarrierTerminalSeen && selection?.entry?.id === 'barrier-reviewer.1') {
