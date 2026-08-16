@@ -742,9 +742,6 @@
   "requirements/output-distillation/tests/large-gate.test.mjs": {
     "deep-dist-import": 1
   },
-  "requirements/output-distillation/tests/support/distiller-contract.mjs": {
-    "deep-dist-import": 2
-  },
   "requirements/output-distillation/tests/tool-host-codec-full.test.mjs": {
     "deep-dist-import": 1
   },

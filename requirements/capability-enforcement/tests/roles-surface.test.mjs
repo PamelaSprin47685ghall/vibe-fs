@@ -9,7 +9,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
-const { allRoleLabels, permissions, isAllowed } = await import('../../../dist/Foundation/RolesSurface.js')
+const { allRoleLabels, allPublicRoleLabels, allInternalRoleLabels, managedAgentName, permissions, isAllowed } =
+  await import('../../../dist/Foundation/RolesSurface.js')
 
 // ── surface shape is JS-native ──────────────────────────────────────────────
 
@@ -45,6 +46,18 @@ test('WHAT[ENF-002] P7_SURFACE_permissions_matrix_matches_the_canonical_roles_ma
     assert.deepEqual(permissions(role), expected, `permissions(${role}) must equal the canonical matrix`)
   }
   assert.deepEqual(permissions('not-a-role'), [], 'unknown role fails closed to empty set')
+})
+
+test('WHAT[ENF-002] P7_SURFACE_public_internal_partition_and_managed_agent_name_are_js_native', () => {
+  assertJsData(allPublicRoleLabels, 'allPublicRoleLabels')
+  assertJsData(allInternalRoleLabels, 'allInternalRoleLabels')
+  assert.deepEqual(allPublicRoleLabels, ['browser', 'coder', 'devops', 'inquiry', 'inspector', 'manager', 'orchestrator', 'reviewer'])
+  assert.deepEqual(allInternalRoleLabels, ['blogger', 'distiller'])
+  assert.equal(allPublicRoleLabels.length + allInternalRoleLabels.length, allRoleLabels.length)
+  assert.equal(managedAgentName('fast', 'distiller'), 'fast-distiller')
+  assert.equal(managedAgentName('deep', 'blogger'), 'deep-blogger')
+  assert.equal(managedAgentName('fast', 'not-a-role'), '', 'unknown role fails closed to empty name')
+  assert.equal(managedAgentName('not-a-tier', 'coder'), '', 'unknown tier fails closed to empty name')
 })
 
 test('WHAT[ENF-002] P7_SURFACE_isAllowed_is_default_deny_outside_the_matrix', () => {

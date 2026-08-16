@@ -147,6 +147,30 @@ module Roles =
         | "blogger" -> Some Role.Blogger
         | _ -> None
 
+    /// Wire spelling used in Host agent names (fast / deep).
+    let wireTierLabel (tier: AgentTier) : string =
+        match tier with
+        | AgentTier.Fast -> "fast"
+        | AgentTier.Deep -> "deep"
+
+    let tryParseTier (value: string) : AgentTier option =
+        match value.ToLowerInvariant() with
+        | "fast" -> Some AgentTier.Fast
+        | "deep" -> Some AgentTier.Deep
+        | _ -> None
+
+    /// AGENT-002 identity formula: `fast-coder`, `deep-distiller`, …
+    let managedAgentName (tier: AgentTier) (role: Role) : string =
+        sprintf "%s-%s" (wireTierLabel tier) (roleLabel role)
+
+    /// AGENT-008 / ENF-006: Distiller and Blogger are private runtimes, not
+    /// public fork / horizon vocabulary.
+    let isInternal (role: Role) : bool =
+        match role with
+        | Role.Blogger
+        | Role.Distiller -> true
+        | _ -> false
+
 /// Permissions catalog keyed by Role. Role Law / system prompt SSOT =
 /// PromptCatalog via PromptResources — not this module. No Companion flag;
 /// COMPANION-001 is answered from durable Session kind (HOST-008).

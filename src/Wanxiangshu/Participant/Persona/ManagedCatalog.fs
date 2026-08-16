@@ -46,28 +46,20 @@ module ManagedAgentCatalog =
         | AgentTier.Deep -> "Deep"
 
     /// Wire spelling used in Host agent names (fast / deep).
-    let wireTierLabel (tier: AgentTier) : string =
-        match tier with
-        | AgentTier.Fast -> "fast"
-        | AgentTier.Deep -> "deep"
+    let wireTierLabel (tier: AgentTier) : string = Roles.wireTierLabel tier
 
-    let tryParseTier (value: string) : AgentTier option =
-        match value.ToLowerInvariant() with
-        | "fast" -> Some AgentTier.Fast
-        | "deep" -> Some AgentTier.Deep
-        | _ -> None
+    let tryParseTier (value: string) : AgentTier option = Roles.tryParseTier value
 
     let peerTier (tier: AgentTier) : AgentTier =
         match tier with
         | AgentTier.Fast -> AgentTier.Deep
         | AgentTier.Deep -> AgentTier.Fast
 
-    let nameOf (tier: AgentTier) (role: Role) : string =
-        sprintf "%s-%s" (wireTierLabel tier) (roleLabel role)
+    let nameOf (tier: AgentTier) (role: Role) : string = Roles.managedAgentName tier role
 
     let peerNameOf (tier: AgentTier) (role: Role) : string = nameOf (peerTier tier) role
 
-    let allPublicRoles: Role list =
+    let allRoles: Role list =
         [ Role.Orchestrator
           Role.Manager
           Role.Coder
@@ -75,11 +67,13 @@ module ManagedAgentCatalog =
           Role.DevOps
           Role.Browser
           Role.Inquiry
-          Role.Reviewer ]
+          Role.Reviewer
+          Role.Blogger
+          Role.Distiller ]
 
-    let allInternalRoles: Role list = [ Role.Blogger; Role.Distiller ]
+    let allPublicRoles: Role list = allRoles |> List.filter (Roles.isInternal >> not)
 
-    let allRoles: Role list = allPublicRoles @ allInternalRoles
+    let allInternalRoles: Role list = allRoles |> List.filter Roles.isInternal
 
     /// Manager fork-agent enum (AGENT-009 / GLORY-031): the Reviewer is
     /// Host-owned and does not exist on the Manager's surface. No

@@ -140,8 +140,7 @@ module SessionExecutionBinding =
         | None -> invalidOp "PROMPT-006: accepted external execution has no EffectiveAgent"
         | Some agent ->
             lock gate (fun () ->
-                providerAttemptBindings.[SessionId.value sessionId] <-
-                    exactBinding physicalUserMessageId agent model)
+                providerAttemptBindings.[SessionId.value sessionId] <- exactBinding physicalUserMessageId agent model)
 
     let acceptPromptExecution
         (sessionId: SessionId)

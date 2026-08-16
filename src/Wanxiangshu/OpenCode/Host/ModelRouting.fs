@@ -238,7 +238,8 @@ module ModelRouting =
         // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None
 
-        let running () = activeBySession.Values |> Seq.map _.Target |> Seq.toArray
+        let running () =
+            activeBySession.Values |> Seq.map _.Target |> Seq.toArray
 
         let ensureHealthy () = fatalError |> Option.iter raise
 
@@ -246,7 +247,8 @@ module ModelRouting =
             pending.Remove demand |> ignore
 
             match pendingBySession.TryGetValue demand.SessionId with
-            | true, current when obj.ReferenceEquals(current, demand) -> pendingBySession.Remove demand.SessionId |> ignore
+            | true, current when obj.ReferenceEquals(current, demand) ->
+                pendingBySession.Remove demand.SessionId |> ignore
             | _ -> ()
 
         let cancelDemand demand =
@@ -266,7 +268,8 @@ module ModelRouting =
             pendingBySession.Clear()
             waiting |> Array.iter (failDemand error)
 
-        let trySchedule agent = invokeScheduler scheduler agent (running ())
+        let trySchedule agent =
+            invokeScheduler scheduler agent (running ())
 
         let scheduleOrPoison agent =
             try
@@ -340,7 +343,11 @@ module ModelRouting =
                 Some(Task.FromResult lease.Target)
             | None ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
-                activeBySession.[sessionId] <- { lease with PhysicalUserMessageId = Some physicalUserMessageId }
+
+                activeBySession.[sessionId] <-
+                    { lease with
+                        PhysicalUserMessageId = Some physicalUserMessageId }
+
                 Some(Task.FromResult lease.Target)
             | Some _ -> None
 
@@ -448,9 +455,7 @@ module ModelRouting =
             | Error _ -> None
             | Ok(normSessionId, normAgent) -> lock gate (fun () -> tryReserveLocked normSessionId normAgent)
 
-        member _.TryLease
-            (sessionId: string, physicalUserMessageId: string, agent: string)
-            : ModelRoutingTarget option =
+        member _.TryLease(sessionId: string, physicalUserMessageId: string, agent: string) : ModelRoutingTarget option =
             match normalizeExecutionInput sessionId physicalUserMessageId agent with
             | Error _ -> None
             | Ok(normSessionId, normPhysicalUserMessageId, normAgent) ->
@@ -504,26 +509,20 @@ module ModelRouting =
         | Some runtime -> runtime
         | None -> invalidOp "execution-model-routing: scheduler runtime was not initialized during plugin load"
 
-    let acquireManagedExecution
-        (sessionId: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (agent: string)
-        =
-        current().AcquireManagedExecution(
-            SessionId.value sessionId,
-            PhysicalUserMessageId.value physicalUserMessageId,
-            agent
-        )
+    let acquireManagedExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) (agent: string) =
+        current()
+            .AcquireManagedExecution(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId,
+                agent
+            )
 
     let tryReserveManaged (sessionId: SessionId) (agent: string) =
         current().TryReserveManaged(SessionId.value sessionId, agent)
 
-    let tryLease
-        (sessionId: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (agent: string)
-        =
-        current().TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
+    let tryLease (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) (agent: string) =
+        current()
+            .TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
 
     let releaseExecution (sessionId: SessionId) =
         current().ReleaseExecution(SessionId.value sessionId)

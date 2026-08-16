@@ -503,14 +503,7 @@ module HostSessionNudge =
             if not (quiescence.TryConsume permit) then
                 return IdleRepairFamilyOutcome.Superseded
             else
-                return!
-                    sendIdleRepairFamilyAfterPermit
-                        sessionPort
-                        sessionId
-                        prompt
-                        directory
-                        journal
-                        repairKind
+                return! sendIdleRepairFamilyAfterPermit sessionPort sessionId prompt directory journal repairKind
         }
 
     /// Blogger-request + terminal-scoped idle interaction repair. This narrower

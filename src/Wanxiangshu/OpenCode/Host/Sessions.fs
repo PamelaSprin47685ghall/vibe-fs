@@ -58,6 +58,7 @@ type InjectedSessionPort
             listeners.Remove token |> ignore
             listeners.Count = 0
         | false, _ -> false
+
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     let childParents = Dictionary<SessionId, SessionId>()
     let lockObj = obj ()
@@ -252,6 +253,7 @@ type InjectedSessionPort
             { new IDisposable with
                 member _.Dispose() =
                     sub.Dispose()
+
                     lock lockObj (fun () ->
                         if removeActiveListenerToken sessionId token then
                             activeListeners.Remove(sessionId) |> ignore) }

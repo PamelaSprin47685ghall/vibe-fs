@@ -65,10 +65,10 @@ module ManagedAgent =
     let nameOf = ManagedAgentCatalog.nameOf
 
     let visibilityOf (role: Role) : AgentVisibility =
-        match role with
-        | Role.Blogger
-        | Role.Distiller -> AgentVisibility.Internal
-        | _ -> AgentVisibility.Public
+        if Roles.isInternal role then
+            AgentVisibility.Internal
+        else
+            AgentVisibility.Public
 
     let make (tier: AgentTier) (role: Role) : ManagedAgent =
         { Name = nameOf tier role

@@ -189,6 +189,7 @@ module FinalitySurface =
             )
         | "review-barrier-started" ->
             let reviewerSessionId = SessionId.create (str (event?reviewerSessionId))
+
             Ok(
                 Fact.Agent(
                     AgentFact.Review(
@@ -202,6 +203,7 @@ module FinalitySurface =
             )
         | "confirmed-review-witness" ->
             let reviewerSessionId = SessionId.create (str (event?reviewerSessionId))
+
             Ok(
                 Fact.Agent(
                     AgentFact.Review(
@@ -291,7 +293,10 @@ module FinalitySurface =
         : Result<World, string> =
         let rec loop (seq: int64) (projection: ProjectionSet) (managerSession: SessionId option) (remaining: obj list) =
             match remaining with
-            | [] -> Ok { Projection = projection; SessionId = managerSession }
+            | [] ->
+                Ok
+                    { Projection = projection
+                      SessionId = managerSession }
             | event :: rest ->
                 foldOneEvent seq projection managerSession event
                 |> Result.bind (fun (nextSeq, next, session) -> loop nextSeq next session rest)
@@ -356,16 +361,17 @@ module FinalitySurface =
                providerRun = ProviderRunIdentity.value request.ProviderRun
                toolCallId = ToolCallId.value request.ToolCallId
                members =
-                   request.Members
-                   |> Map.toList
-                   |> List.map (fun (_, memberRef) -> memberView memberRef)
-                   |> List.toArray
+                request.Members
+                |> Map.toList
+                |> List.map (fun (_, memberRef) -> memberView memberRef)
+                |> List.toArray
                resolution = resolutionView request.Resolution |}
 
     /// The current Life as JS-shaped data. `undefined` when the session has no
     /// open Life (archived after LifeCompleted, or never opened).
     let lifeView (world: obj) : obj =
         let world = asWorld world
+
         match currentLife world with
         | None -> null
         | Some life ->
@@ -382,34 +388,38 @@ module FinalitySurface =
                    openingTextDigest = BlobDigest.value life.OpeningTextDigest
                    openingCursorSequence = life.OpeningCursor.Sequence
                    protectedPrefixEnd =
-                       life.ProtectedPrefixEnd
-                       |> Option.map (fun cursor -> box cursor.Sequence)
-                       |> Option.defaultValue null
+                    life.ProtectedPrefixEnd
+                    |> Option.map (fun cursor -> box cursor.Sequence)
+                    |> Option.defaultValue null
                    activeFinality = life.ActiveFinality |> Option.map requestView |> Option.defaultValue null
                    enlistedReviewers =
-                       life.EnlistedReviewers
-                       |> Map.toList
-                       |> List.map (fun (session, standing) ->
-                           box {| sessionId = SessionId.value session; standing = standingView standing |})
-                       |> List.toArray
+                    life.EnlistedReviewers
+                    |> Map.toList
+                    |> List.map (fun (session, standing) ->
+                        box
+                            {| sessionId = SessionId.value session
+                               standing = standingView standing |})
+                    |> List.toArray
                    lastRejectedWorkRecord =
-                       life.LastRejectedWorkRecord |> Option.map BlobRef.value |> Option.defaultValue null
+                    life.LastRejectedWorkRecord
+                    |> Option.map BlobRef.value
+                    |> Option.defaultValue null
                    lastBlessing =
-                       life.LastBlessing
-                       |> Option.map (fun blessing ->
-                           box
-                               {| requestId = FinalityRequestId.value blessing.RequestId
-                                  workRecordBundleRef = BlobRef.value blessing.WorkRecordBundleRef
-                                  workRecordBundleDigest = BlobDigest.value blessing.WorkRecordBundleDigest |})
-                       |> Option.defaultValue null
-                   completedTerminal =
-                       life.CompletedTerminal |> Option.map BlobRef.value |> Option.defaultValue null
+                    life.LastBlessing
+                    |> Option.map (fun blessing ->
+                        box
+                            {| requestId = FinalityRequestId.value blessing.RequestId
+                               workRecordBundleRef = BlobRef.value blessing.WorkRecordBundleRef
+                               workRecordBundleDigest = BlobDigest.value blessing.WorkRecordBundleDigest |})
+                    |> Option.defaultValue null
+                   completedTerminal = life.CompletedTerminal |> Option.map BlobRef.value |> Option.defaultValue null
                    completed = life.Completed |}
 
     /// `{ ok: true, life } | { ok: false, error }` — the Life view, or a typed
     /// reason when the world has no open Life.
     let currentLifeView (world: obj) : obj =
         let world = asWorld world
+
         match currentLife world with
         | None -> box {| ok = false; error = "no open life" |}
         | Some _ -> box {| ok = true; life = lifeView world |}
@@ -433,16 +443,18 @@ module FinalitySurface =
                     {| lifeId = ManagerLifeId.value archived.LifeId
                        completed = archived.Completed
                        completedTerminal =
-                           archived.CompletedTerminal |> Option.map BlobRef.value |> Option.defaultValue null
+                        archived.CompletedTerminal
+                        |> Option.map BlobRef.value
+                        |> Option.defaultValue null
                        activeFinality = archived.ActiveFinality |> Option.map requestView
                        lastBlessing =
-                           archived.LastBlessing
-                           |> Option.map (fun blessing ->
-                               box
-                                   {| requestId = FinalityRequestId.value blessing.RequestId
-                                      workRecordBundleRef = BlobRef.value blessing.WorkRecordBundleRef
-                                      workRecordBundleDigest = BlobDigest.value blessing.WorkRecordBundleDigest |})
-                           |> Option.defaultValue null |})
+                        archived.LastBlessing
+                        |> Option.map (fun blessing ->
+                            box
+                                {| requestId = FinalityRequestId.value blessing.RequestId
+                                   workRecordBundleRef = BlobRef.value blessing.WorkRecordBundleRef
+                                   workRecordBundleDigest = BlobDigest.value blessing.WorkRecordBundleDigest |})
+                        |> Option.defaultValue null |})
             |> List.toArray
 
     let private dispositionView (disposition: ManagerFinality.EndingDisposition) : obj =
@@ -450,7 +462,9 @@ module FinalitySurface =
         | ManagerFinality.EndingDisposition.ContinuePlanning -> box {| kind = "continue-planning" |}
         | ManagerFinality.EndingDisposition.AlreadyCompleted -> box {| kind = "already-completed" |}
         | ManagerFinality.EndingDisposition.ResumeRequest request ->
-            box {| kind = "resume-request"; requestId = FinalityRequestId.value request.RequestId |}
+            box
+                {| kind = "resume-request"
+                   requestId = FinalityRequestId.value request.RequestId |}
         | ManagerFinality.EndingDisposition.RecoverRequestWithoutReviewers request ->
             box
                 {| kind = "recover-request-without-reviewers"
@@ -476,7 +490,12 @@ module FinalitySurface =
     /// obligation-ledger projection (FINALITY-004).
     let classifyEnding (world: obj) (callId: string) (hasPlanCommitment: bool) : obj =
         let world = asWorld world
-        let call = if isNull callId || callId = "" then None else Some(ToolCallId.create callId)
+
+        let call =
+            if isNull callId || callId = "" then
+                None
+            else
+                Some(ToolCallId.create callId)
 
         match currentLife world with
         | Some life -> ManagerFinality.classifyEnding call life hasPlanCommitment |> dispositionView
@@ -528,8 +547,7 @@ module FinalitySurface =
     let private slotView (slot: FinalityReviewCohort.CohortSlot) : obj =
         box
             {| agentId = slot.AgentId
-               session =
-                   slot.ReviewerSessionId |> Option.map SessionId.value |> Option.defaultValue null
+               session = slot.ReviewerSessionId |> Option.map SessionId.value |> Option.defaultValue null
                ordinal = slot.ReviewerOrdinal
                isNew = slot.IsNew |}
 
@@ -572,7 +590,10 @@ module FinalitySurface =
                     if life.LifeId = lifeId then
                         life.ActiveFinality
                         |> Option.bind (fun request ->
-                            if request.RequestId = requestId then Some(life, request) else None)
+                            if request.RequestId = requestId then
+                                Some(life, request)
+                            else
+                                None)
                     else
                         None))
 
@@ -608,13 +629,14 @@ module FinalitySurface =
         (tier: string)
         : PromptAuthority.AuthorityExecutionProfile =
         let kind =
-            if authorityKind = "human-root" then PromptAuthority.RootAuthorityKind.HumanRoot
-            else PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            if authorityKind = "human-root" then
+                PromptAuthority.RootAuthorityKind.HumanRoot
+            else
+                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
 
         let role = Role.Manager
 
-        let tier =
-            if tier = "deep" then AgentTier.Deep else AgentTier.Fast
+        let tier = if tier = "deep" then AgentTier.Deep else AgentTier.Fast
 
         { SessionId = SessionId.create "ses-authority"
           LogicalRunId = LogicalRunId.create "run-authority"
@@ -687,7 +709,10 @@ module FinalitySurface =
 
     let reviewerOutcomeKinds () : string array = [| "Revision"; "Confirmed" |]
 
-    let reviewerOutcomeRevision (workRecord: string) : obj = box {| kind = "revision"; workRecord = workRecord |}
+    let reviewerOutcomeRevision (workRecord: string) : obj =
+        box
+            {| kind = "revision"
+               workRecord = workRecord |}
 
     let reviewerOutcomeConfirmed (reviewerSessionId: string) (barrierId: string) : obj =
         box

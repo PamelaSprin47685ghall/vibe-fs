@@ -1,4 +1,3 @@
 [
-  "requirements/intra-participant-parallelism/tests/support/fission-contract.mjs",
   "requirements/output-distillation/tests/support/distiller-contract.mjs"
 ]

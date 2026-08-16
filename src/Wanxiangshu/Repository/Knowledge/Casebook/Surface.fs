@@ -32,16 +32,25 @@ module CasebookSurface =
     let private observationToJs (observation: Observation) : obj =
         match observation with
         | Observation.FileRead(path, contentHash) ->
-            box {| kind = "file-read"; path = path; contentHash = contentHash |}
+            box
+                {| kind = "file-read"
+                   path = path
+                   contentHash = contentHash |}
         | Observation.GlobResult(pattern, paths) ->
-            box {| kind = "glob-result"; pattern = pattern; paths = List.toArray paths |}
+            box
+                {| kind = "glob-result"
+                   pattern = pattern
+                   paths = List.toArray paths |}
         | Observation.GrepResult(pattern, matches) ->
             let flat =
                 matches
                 |> List.map (fun (path, index, text) -> box [| box path; box index; box text |])
                 |> List.toArray
 
-            box {| kind = "grep-result"; pattern = pattern; matches = flat |}
+            box
+                {| kind = "grep-result"
+                   pattern = pattern
+                   matches = flat |}
 
     let private observationOfJs (value: obj) : Result<Observation, string> =
         let kind = string (value?kind)
@@ -78,6 +87,7 @@ module CasebookSurface =
 
     let private caseOfJs (value: obj) : Result<Case, string> =
         let arrayOf (v: obj) : obj array = unbox<obj array> v
+
         let observations =
             arrayOf (value?observations)
             |> Array.toList
@@ -106,7 +116,10 @@ module CasebookSurface =
         observations
         |> Array.toList
         |> List.map observationOfJs
-        |> List.choose (fun item -> match item with Ok o -> Some o | Error _ -> None)
+        |> List.choose (fun item ->
+            match item with
+            | Ok o -> Some o
+            | Error _ -> None)
         |> Observations.normalize
         |> List.map observationToJs
         |> List.toArray
@@ -118,13 +131,19 @@ module CasebookSurface =
             stored
             |> Array.toList
             |> List.map observationOfJs
-            |> List.choose (fun item -> match item with Ok o -> Some o | Error _ -> None)
+            |> List.choose (fun item ->
+                match item with
+                | Ok o -> Some o
+                | Error _ -> None)
 
         let replayedObs =
             replayed
             |> Array.toList
             |> List.map observationOfJs
-            |> List.choose (fun item -> match item with Ok o -> Some o | Error _ -> None)
+            |> List.choose (fun item ->
+                match item with
+                | Ok o -> Some o
+                | Error _ -> None)
 
         match Observations.classifyReplay storedObs replayedObs with
         | ReplayResult.Fresh -> "fresh"
@@ -147,8 +166,7 @@ module CasebookSurface =
         let kind = string (value?kind)
 
         match kind with
-        | "case-captured" ->
-            caseOfJs (value?``case``) |> Result.map CasebookEvent.CaseCaptured
+        | "case-captured" -> caseOfJs (value?``case``) |> Result.map CasebookEvent.CaseCaptured
         | "case-refreshed" ->
             observationsOfJs (value?observations)
             |> Result.map (fun obs ->
@@ -170,7 +188,12 @@ module CasebookSurface =
         match foldAll CasebookProjection.emptyState (List.ofArray events) with
         | Error message -> box {| ok = false; error = message |}
         | Ok state ->
-            let cases = state.Cases |> Map.toList |> List.map (fun (_, case) -> caseToJs case) |> List.toArray
+            let cases =
+                state.Cases
+                |> Map.toList
+                |> List.map (fun (_, case) -> caseToJs case)
+                |> List.toArray
+
             box {| ok = true; cases = cases |}
 
     /// CASE-008 LRU eviction. JS Cases in, `{ kept, victims }` out.
@@ -179,7 +202,10 @@ module CasebookSurface =
             cases
             |> Array.toList
             |> List.map (fun value -> caseOfJs value |> Result.map (fun case -> case.SessionId, case))
-            |> List.choose (fun item -> match item with Ok c -> Some c | Error _ -> None)
+            |> List.choose (fun item ->
+                match item with
+                | Ok c -> Some c
+                | Error _ -> None)
             |> Map.ofList
 
         let kept, victims = CasebookProjection.evict capacity parsed

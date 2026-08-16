@@ -341,7 +341,8 @@ module EnforcerContinuation =
         (currentCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
-        let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-interrupted-run"
+        let terminalRun =
+            providerRunFromLastAssistant ctx.RawMessages "unknown-interrupted-run"
 
         match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
         | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
@@ -439,7 +440,8 @@ module EnforcerContinuation =
                 let! rebuilt = rebuildFromOption ctx currentCtx
                 return ctx.Project rebuilt
             elif String.IsNullOrWhiteSpace messageId then
-                return! fatalProjectRaw ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
+                return!
+                    fatalProjectRaw ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
             else
                 let liveCtx =
                     EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
@@ -493,12 +495,7 @@ module EnforcerContinuation =
                 return ctx.Project rebuilt
             else
                 return!
-                    decideInvalidTerminal
-                        ctx
-                        sessionKey
-                        currentCtx
-                        liveCtx
-                        "no completed chronicle call (ENFORCER-060)"
+                    decideInvalidTerminal ctx sessionKey currentCtx liveCtx "no completed chronicle call (ENFORCER-060)"
         }
 
     let private resumeWithContext (ctx: Context) (live: BloggerRequestContext) =
@@ -602,7 +599,9 @@ module EnforcerContinuation =
         (caughtUpReason: string)
         : Task<ContinuationOutcome> =
         task {
-            if AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections then
+            if
+                AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections
+            then
                 BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
                 ctx.Scope.ClearCurrentRequest sessionKey
                 return ctx.Stop caughtUpReason
@@ -888,7 +887,8 @@ module EnforcerContinuation =
             | Error reason, Some true when ctx.IsEmptyTextCycleFailure reason ->
                 Diagnostic.emit
                     "enforcer-cycle-aabb-pending"
-                    [ "session_id", sessionKey; "result", "same empty-text terminal re-entry after AABB" ]
+                    [ "session_id", sessionKey
+                      "result", "same empty-text terminal re-entry after AABB" ]
 
                 return CycleDisposition.Working
             | Error reason, Some false when ctx.IsEmptyTextCycleFailure reason ->

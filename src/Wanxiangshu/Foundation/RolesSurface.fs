@@ -3,9 +3,10 @@ namespace Wanxiangshu.Foundation
 /// JS-native semantic surface for the role/permission vocabulary
 /// (P7 wave). Role and ToolPermission cross the boundary as strings — the
 /// canonical labels owned by `Roles.roleLabel` (lowercase role names) and the
-/// DU case names (capitalised permissions). Every DU value is translated here
-/// at the owner boundary; a JS test never touches Fable representation
-/// (JS-SEMANTIC-SURFACE-003/005).
+/// DU case names (capitalised permissions). Public vs internal partition and
+/// the AGENT-002 machine-name formula (`fast-distiller`) are the same
+/// vocabulary. Every DU value is translated here at the owner boundary; a JS
+/// test never touches Fable representation (JS-SEMANTIC-SURFACE-003/005).
 module RolesSurface =
 
     let private roleOf (label: string) : Role option = Roles.tryParseRole label
@@ -63,8 +64,7 @@ module RolesSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.Sphinx -> "Sphinx"
 
-    /// The ten canonical role labels, sorted.
-    let allRoleLabels: string array =
+    let private allRoles =
         [ Role.Manager
           Role.Orchestrator
           Role.Coder
@@ -75,9 +75,28 @@ module RolesSurface =
           Role.Reviewer
           Role.Distiller
           Role.Blogger ]
+
+    let private labelsOf (predicate: Role -> bool) : string array =
+        allRoles
+        |> List.filter predicate
         |> List.map Roles.roleLabel
         |> List.sort
         |> List.toArray
+
+    /// The ten canonical role labels, sorted.
+    let allRoleLabels: string array = labelsOf (fun _ -> true)
+
+    /// AGENT-008 public fork / horizon vocabulary (no Distiller, no Blogger).
+    let allPublicRoleLabels: string array = labelsOf (Roles.isInternal >> not)
+
+    /// Private runtimes: Distiller (map/reduce) and Blogger (companion).
+    let allInternalRoleLabels: string array = labelsOf Roles.isInternal
+
+    /// AGENT-002 machine name (`fast-distiller`). Unknown tier or role → "".
+    let managedAgentName (tierLabel: string) (roleLabel: string) : string =
+        match Roles.tryParseTier tierLabel, roleOf roleLabel with
+        | Some tier, Some role -> Roles.managedAgentName tier role
+        | _ -> ""
 
     /// Sorted permission labels for a role. Unknown role → empty array
     /// (fail closed: no permissions).

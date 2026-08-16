@@ -52,13 +52,7 @@ module HostForkAgentOwner =
 
             match onDetachedFailure with
             | Some callback ->
-                dispatcher.SendAgentOwnerRootDetachedObserved
-                    sessions
-                    childId
-                    prompt
-                    agent
-                    directory
-                    callback
+                dispatcher.SendAgentOwnerRootDetachedObserved sessions childId prompt agent directory callback
             | None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot

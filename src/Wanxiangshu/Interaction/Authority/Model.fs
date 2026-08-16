@@ -61,9 +61,6 @@ module PromptAuthority =
         /// Same-run Fission delivery: predecessor work or a pre-Fission shared
         /// external completion enters a lane only at a safe provider boundary.
         | FissionHandoff
-        /// GLORY-020: the Host asks the Manager to carry out the plan it just
-        /// described. Sent exactly once after a legal planning terminal.
-        | ManagerWorkActivation
         /// GLORY-029: pure encouragement for an idle Manager; carries no work
         /// record and no specific issue.
         | ManagerIdleEncouragement
@@ -253,7 +250,6 @@ module PromptAuthority =
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation NeedHelpEscalation -> "NeedHelpEscalation"
         | Continuation NeedHelpAdvice -> "NeedHelpAdvice"
-        | Continuation ManagerWorkActivation -> "ManagerWorkActivation"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
         | Continuation FinalitySteer -> "FinalitySteer"
@@ -272,7 +268,6 @@ module PromptAuthority =
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "NeedHelpEscalation" -> Some NeedHelpEscalation
         | "NeedHelpAdvice" -> Some NeedHelpAdvice
-        | "ManagerWorkActivation" -> Some ManagerWorkActivation
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
         | "FinalitySteer" -> Some FinalitySteer
@@ -522,11 +517,7 @@ module PromptAuthority =
     /// Life + condition explain the business context, while ProviderRunIdentity
     /// is the exact physical terminal occasion that must be idempotent across
     /// duplicate idle delivery / restart replay.
-    let idlePayloadDigest
-        (lifeId: ManagerLifeId)
-        (conditionKey: string)
-        (terminalProviderRun: ProviderRunIdentity)
-        =
+    let idlePayloadDigest (lifeId: ManagerLifeId) (conditionKey: string) (terminalProviderRun: ProviderRunIdentity) =
         String.Join(
             "\u001f",
             [| ManagerLifeId.value lifeId

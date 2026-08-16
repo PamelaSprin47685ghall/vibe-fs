@@ -24,17 +24,17 @@ module JournalSurface =
     let runtimeDirectory (workspace: string) : string =
         RuntimePath.forWorkspace (str workspace)
 
-    let private sessionIdOf (value: obj) : SessionId =
-        SessionId.create (str value)
+    let private sessionIdOf (value: obj) : SessionId = SessionId.create (str value)
 
     let private providerRunOf (value: obj) : ProviderRunIdentity option =
-        if isNull value then None else Some (ProviderRunIdentity.create (str value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (str value))
 
-    let private blobDigest (value: obj) : BlobDigest =
-        BlobDigest.create (str value)
+    let private blobDigest (value: obj) : BlobDigest = BlobDigest.create (str value)
 
-    let private blobRef (value: obj) : BlobRef =
-        BlobRef.create (str value)
+    let private blobRef (value: obj) : BlobRef = BlobRef.create (str value)
 
     let private agentFactOfJs (value: obj) : AgentFact =
         let family = str (value?family)
@@ -63,13 +63,16 @@ module JournalSurface =
 
     let private streamOfJs (value: obj) : StreamId =
         match str (value?kind) with
-        | "Session" -> StreamId.Session (sessionIdOf (value?session))
+        | "Session" -> StreamId.Session(sessionIdOf (value?session))
         | other -> failwith $"JournalSurface: unknown stream kind '{other}'"
 
     let private journalResultToJs (result: Result<AgentJournal, FoldRejection>) : obj =
         match result with
         | Ok journal -> box {| ok = true; journal = journal |}
-        | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = $"{e.Fact}: {e.Reason}" |}
 
     let private journalOrError (writer: IJournalWriter) (init: Envelope) (projection: ProjectionSet) : obj =
         match AgentJournal.createFromProjection writer projection with
@@ -79,25 +82,36 @@ module JournalSurface =
                    journal = journal
                    localSeq = LocalSeq.value init.LocalSeq
                    filePath = writer.FilePath
-                   release = fun () ->
-                       (journal :> IDisposable).Dispose() |}
-        | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+                   release = fun () -> (journal :> IDisposable).Dispose() |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = $"{e.Fact}: {e.Reason}" |}
 
     let private bootResult (result: Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>) : obj =
         match result with
         | Ok(writer, init, projection) -> journalOrError writer init projection
-        | Error e -> box {| ok = false; error = $"{e.Fact}: {e.Reason}" |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = $"{e.Fact}: {e.Reason}" |}
 
     /// Open a workspace journal directly. Returns `{ ok, journal, filePath }`.
     /// `writerId` is used for the underlying NDJSON file name.
-    let bootWithWriterId (commonDir: string) (writerId: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
+    let bootWithWriterId
+        (commonDir: string)
+        (writerId: string)
+        (runtimeId: string)
+        (processId: int)
+        (startedAt: string)
+        : Task<obj> =
         task {
             let cd = str commonDir
             let integrator = CanonicalIntegrator.create ()
             let store = EventStore.createLocal cd (str writerId) integrator
 
             let! result =
-                EventStoreJournalWriter.resumeOrCreate(
+                EventStoreJournalWriter.resumeOrCreate (
                     RuntimeId.create (str runtimeId),
                     processId,
                     DateTimeOffset.Parse(str startedAt),
@@ -113,15 +127,9 @@ module JournalSurface =
         bootWithWriterId commonDir writerId runtimeId processId startedAt
 
     /// Append an agent fact and return the updated projection.
-    let appendAgent
-        (journal: AgentJournal)
-        (stream: obj)
-        (run: obj)
-        (fact: obj)
-        : Task<obj> =
+    let appendAgent (journal: AgentJournal) (stream: obj) (run: obj) (fact: obj) : Task<obj> =
         task {
-            let! result =
-                AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) journal
+            let! result = AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) journal
 
             return
                 match result with
@@ -130,14 +138,9 @@ module JournalSurface =
         }
 
     /// Append a manager lifecycle fact and return the updated projection.
-    let appendManagerLifecycle
-        (journal: AgentJournal)
-        (stream: obj)
-        (fact: obj)
-        : Task<obj> =
+    let appendManagerLifecycle (journal: AgentJournal) (stream: obj) (fact: obj) : Task<obj> =
         task {
-            let! result =
-                AgentJournal.appendManagerLifecycle (streamOfJs stream) (managerLifecycleOfJs fact) journal
+            let! result = AgentJournal.appendManagerLifecycle (streamOfJs stream) (managerLifecycleOfJs fact) journal
 
             return
                 match result with
@@ -148,7 +151,7 @@ module JournalSurface =
     /// Write a payload and return the receipt. `content` is a UTF-8 string.
     let writePayload (journal: AgentJournal) (content: string) : Task<obj> =
         task {
-            let! result = journal.Writer.BlobWriter.Write (str content)
+            let! result = journal.Writer.BlobWriter.Write(str content)
 
             return
                 match result with
@@ -163,7 +166,7 @@ module JournalSurface =
     /// Read a blob by its `blobs/<digest>` ref.
     let readPayload (journal: AgentJournal) (ref: string) : Task<obj> =
         task {
-            let! result = journal.Writer.BlobWriter.Read (BlobRef.create (str ref))
+            let! result = journal.Writer.BlobWriter.Read(BlobRef.create (str ref))
 
             return
                 match result with
@@ -172,11 +175,11 @@ module JournalSurface =
         }
 
     /// Current projection snapshot.
-    let snapshot (journal: AgentJournal) : obj =
-        AgentJournal.snapshot journal
+    let snapshot (journal: AgentJournal) : obj = AgentJournal.snapshot journal
 
     /// True if the projection contains a session.
     let hasSession (journal: AgentJournal) (sessionId: string) : bool =
         let projection = AgentJournal.snapshot journal
+
         AgentProjection.tryFind (SessionId.create (str sessionId)) projection.AgentProjections
         |> Option.isSome

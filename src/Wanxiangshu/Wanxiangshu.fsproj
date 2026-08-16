@@ -412,6 +412,7 @@
     <Compile Include="Context/Prefix/Wire.fs"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Host.fs"/>
+    <Compile Include="Execution/Fission/Surface.fs"/>
     <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>
@@ -438,6 +439,7 @@
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fs"/>
     <Compile Include="Execution/Session/OpenCode/HorizonTool.fs"/>
     <Compile Include="OpenCode/Tools/ExecutorTool.fs"/>
+    <Compile Include="OpenCode/Tools/ExecutorToolSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fs"/>
     <Compile Include="OpenCode/Tools/InspectorTool.fs"/>
     <Compile Include="OpenCode/Tools/CoderTool.fs"/>

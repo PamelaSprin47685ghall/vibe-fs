@@ -87,7 +87,12 @@ module HostSignalBootstrap =
     type private RoutedChatExecution =
         | NoRoute
         | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
-        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * PhysicalUserMessageId * string * OpencodeModel
+        | PluginManaged of
+            PromptDispatcher.Runtime *
+            PromptAuthority.PromptClaim *
+            PhysicalUserMessageId *
+            string *
+            OpencodeModel
 
     let private managedAgent (value: string option) =
         value
@@ -108,7 +113,8 @@ module HostSignalBootstrap =
     let private externalAdmission sessionId physicalUserMessageId explicitAgent =
         match managedAgent explicitAgent, physicalUserMessageId with
         | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
-        | Some _, None -> ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
+        | Some _, None ->
+            ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
         | None, _ -> ChatExecutionAdmission.NoRoute
 
     let private agentManagedOfClaim
@@ -147,8 +153,7 @@ module HostSignalBootstrap =
 
         match decoded.IsHostCompaction, sessionId, decoded.PromptKey with
         | true, _, _ -> ChatExecutionAdmission.NoRoute
-        | false, Some sid, Some promptKey ->
-            pluginAdmission journal sid decoded.PhysicalUserMessageId promptKey
+        | false, Some sid, Some promptKey -> pluginAdmission journal sid decoded.PhysicalUserMessageId promptKey
         | false, Some sid, None -> externalAdmission sid decoded.PhysicalUserMessageId decoded.ExplicitAgent
         | _ -> ChatExecutionAdmission.NoRoute
 
@@ -164,12 +169,7 @@ module HostSignalBootstrap =
                 let! target = ModelRouting.acquireManagedExecution sessionId physical agent
 
                 return
-                    RoutedChatExecution.ExternalManaged(
-                        sessionId,
-                        physical,
-                        agent,
-                        ModelRouting.toOpenCodeModel target
-                    )
+                    RoutedChatExecution.ExternalManaged(sessionId, physical, agent, ModelRouting.toOpenCodeModel target)
             | ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent) ->
                 let sessionText = SessionId.value claim.SessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore

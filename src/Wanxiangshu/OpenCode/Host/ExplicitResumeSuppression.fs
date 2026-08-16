@@ -53,8 +53,7 @@ module ExplicitResumeSuppression =
 
     /// Cleanup only. Exact-new-material replacement is the correctness boundary.
     let dropSession (sessionId: SessionId) : unit =
-        lock gate (fun () ->
-            markedPhysicalBySession.Remove(SessionId.value sessionId) |> ignore)
+        lock gate (fun () -> markedPhysicalBySession.Remove(SessionId.value sessionId) |> ignore)
 
     /// The provider-facing transform always receives the current user request as
     /// the trailing real message. Historical `/continue` messages may remain in

@@ -91,7 +91,10 @@ module ManagerIdle =
                 |> Option.map (MagicTodoProjection.isPlanCommitted >> not)
                 |> Option.defaultValue true
 
-        if preT1 then IdleEncouragementKind.BeforePlanCommitment else IdleEncouragementKind.AfterPlanCommitment
+        if preT1 then
+            IdleEncouragementKind.BeforePlanCommitment
+        else
+            IdleEncouragementKind.AfterPlanCommitment
 
     let private encouragementKey =
         function

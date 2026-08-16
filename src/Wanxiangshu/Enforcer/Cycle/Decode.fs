@@ -61,7 +61,8 @@ module EnforcerCycleDecode =
     let MaxEvidenceBytes = 128 * 1024
 
     [<Literal>]
-    let EmptyTextError = "blog cycle text is empty after canonicalisation (ENFORCER-043)"
+    let EmptyTextError =
+        "blog cycle text is empty after canonicalisation (ENFORCER-043)"
 
     let private optUnboxString (value: obj) : string option =
         if isNull value then None else Some(unbox<string> value)

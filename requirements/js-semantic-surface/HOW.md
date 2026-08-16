@@ -82,7 +82,6 @@ requirements/<package>/tests/support.mjs
 ```text
 finality/tests/support/finality-contract.mjs
 knowledge-reuse/tests/support/casebook-contract.mjs
-output-distillation/tests/support/distiller-contract.mjs
 intra-participant-parallelism/tests/support/fission-contract.mjs
 epistemic-reasoning/tests/support.mjs
 （PR 6/7/8 各 vertical slice 逐一消除）

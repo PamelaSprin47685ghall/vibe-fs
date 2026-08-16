@@ -708,7 +708,6 @@ export const agentCompletion = (() => {
     completedRun: ({ runId, agentId, agentName, role = 'Coder', workRecord = '' }) =>
       run({
         runId,
-        agentId,
         agentName: agentName ?? agentId,
         role,
         outcome: ofSimpleTextFn(agentId, runId, roleOf(role), workRecord),
@@ -716,7 +715,6 @@ export const agentCompletion = (() => {
     failedRun: ({ runId, agentId, agentName, role = 'Coder', code = 'ERROR', message = 'failed' }) =>
       run({
         runId,
-        agentId,
         agentName: agentName ?? agentId,
         role,
         outcome: failedFn(agentId, runId, roleOf(role), undefined, code, message),
@@ -729,7 +727,6 @@ export const agentCompletion = (() => {
     abandonedRun: ({ runId, agentId, agentName, role = 'Coder', reason = 'ParentCancelled' }) =>
       run({
         runId: runId ?? `abandoned-${agentId}`,
-        agentId,
         agentName: agentName ?? agentId,
         role,
         outcome: abandonedFn(agentId, reason),

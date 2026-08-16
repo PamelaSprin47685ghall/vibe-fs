@@ -27,10 +27,7 @@ module EventStoreSurface =
     let private payloadRefsOf (value: obj) : PayloadRef list =
         match value with
         | null -> []
-        | _ ->
-            unbox<string array> value
-            |> Array.toList
-            |> List.map PayloadRef.create
+        | _ -> unbox<string array> value |> Array.toList |> List.map PayloadRef.create
 
     let private eventOfJs (value: obj) : EventEnvelope =
         { EventId = EventId.create (str (value?id))
@@ -47,6 +44,7 @@ module EventStoreSurface =
     /// the writer file for verification and clean up the temp directory.
     let createLocalStore (commonDir: string) (writerId: string) : obj =
         let integrator = CanonicalIntegrator.create ()
+
         box
             {| commonDir = commonDir
                store = EventStore.createLocal commonDir writerId integrator |}
@@ -75,25 +73,45 @@ module EventStoreSurface =
     let private storageInvalidToJs (error: StorageInvalid) : obj =
         match error with
         | StorageInvalid.IdentityCollision eid ->
-            box {| code = "IdentityCollision"; eventId = EventId.value eid |}
-        | StorageInvalid.NonCanonical reason -> box {| code = "NonCanonical"; reason = reason |}
-        | StorageInvalid.MalformedEnvelope reason -> box {| code = "MalformedEnvelope"; reason = reason |}
+            box
+                {| code = "IdentityCollision"
+                   eventId = EventId.value eid |}
+        | StorageInvalid.NonCanonical reason ->
+            box
+                {| code = "NonCanonical"
+                   reason = reason |}
+        | StorageInvalid.MalformedEnvelope reason ->
+            box
+                {| code = "MalformedEnvelope"
+                   reason = reason |}
         | StorageInvalid.MissingParent eid ->
-            box {| code = "MissingParent"; eventId = EventId.value eid |}
+            box
+                {| code = "MissingParent"
+                   eventId = EventId.value eid |}
         | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
         | StorageInvalid.MissingPayload ref ->
-            box {| code = "MissingPayload"; payloadRef = PayloadRef.value ref |}
+            box
+                {| code = "MissingPayload"
+                   payloadRef = PayloadRef.value ref |}
         | StorageInvalid.UnknownEventType t ->
-            box {| code = "UnknownEventType"; eventType = t |}
+            box
+                {| code = "UnknownEventType"
+                   eventType = t |}
 
     let private appendErrorToJs (error: AppendError) : obj =
         match error with
         | AppendError.StorageInvalid e ->
-            box {| code = "StorageInvalid"; error = storageInvalidToJs e |}
+            box
+                {| code = "StorageInvalid"
+                   error = storageInvalidToJs e |}
         | AppendError.SemanticCut c ->
-            box {| code = "SemanticCut"; cut = cutToJs c |}
+            box
+                {| code = "SemanticCut"
+                   cut = cutToJs c |}
         | AppendError.AppendFailed reason ->
-            box {| code = "AppendFailed"; reason = reason |}
+            box
+                {| code = "AppendFailed"
+                   reason = reason |}
 
     /// Append JS-shaped events to a local store.
     /// Returns `{ ok: true, cuts: [...] }` or `{ ok: false, error: structured }`.
@@ -110,7 +128,11 @@ module EventStoreSurface =
                     box
                         {| ok = true
                            cuts = receipt.Cuts |> List.map cutToJs |> List.toArray |}
-            | Error e -> return box {| ok = false; error = appendErrorToJs e |}
+            | Error e ->
+                return
+                    box
+                        {| ok = false
+                           error = appendErrorToJs e |}
         }
 
     /// The canonical store ref (DURABLE-EVENTS-016).
@@ -131,7 +153,10 @@ module EventStoreSurface =
     let checkIdentity (left: obj) (right: obj) : obj =
         match CanonicalEventCodec.checkIdentity (eventOfJs left) (eventOfJs right) with
         | Ok() -> box {| ok = true |}
-        | Error e -> box {| ok = false; error = storageInvalidToJs e |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = storageInvalidToJs e |}
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// Returns `{ ok: true, events: [...] }` or `{ ok: false, error: structured }`.
@@ -139,8 +164,14 @@ module EventStoreSurface =
         let parsed = events |> Array.toList |> List.map eventOfJs
 
         match CanonicalEventCodec.mergeByIdentity parsed with
-        | Ok merged -> box {| ok = true; events = merged |> List.map envelopeToJs |> List.toArray |}
-        | Error e -> box {| ok = false; error = storageInvalidToJs e |}
+        | Ok merged ->
+            box
+                {| ok = true
+                   events = merged |> List.map envelopeToJs |> List.toArray |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = storageInvalidToJs e |}
 
     /// K-way merge of named writer streams. `streams` is a JS array of
     /// `[writerName, events]` pairs. Returns `{ ok, events }` or
@@ -156,8 +187,14 @@ module EventStoreSurface =
                 writer, events)
 
         match EventKWayMerge.merge parsed with
-        | Ok events -> box {| ok = true; events = events |> List.map envelopeToJs |> List.toArray |}
-        | Error e -> box {| ok = false; error = storageInvalidToJs e |}
+        | Ok events ->
+            box
+                {| ok = true
+                   events = events |> List.map envelopeToJs |> List.toArray |}
+        | Error e ->
+            box
+                {| ok = false
+                   error = storageInvalidToJs e |}
 
     /// Heads for a stream. Returns a JS array of event id strings.
     let tryHeads (store: IEventStore) (streamId: string) : string array =

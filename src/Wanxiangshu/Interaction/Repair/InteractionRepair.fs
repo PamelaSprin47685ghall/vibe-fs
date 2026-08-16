@@ -109,9 +109,7 @@ module InteractionRepairWorkflow =
                 // The one bounded repair already ran and this LogicalRun is still
                 // unusable. This is now a proved recovery exhaustion, not another
                 // invitation to synthesize user input.
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed "INTERACTION_REPAIR_EXHAUSTED")
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "INTERACTION_REPAIR_EXHAUSTED")
                 |> ignore
             | HostSessionNudge.IdleRepairFamilyOutcome.Failed error ->
                 // Journal/authority/transport failures are Wanxiangshu invariant
@@ -121,9 +119,7 @@ module InteractionRepairWorkflow =
                     "interaction-repair-infrastructure-failed"
                     [ "session_id", SessionId.value turn.SessionId; "result", error ]
 
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed("WANXIANGSHU_FATAL: " + error))
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed("WANXIANGSHU_FATAL: " + error))
                 |> ignore
         }
         :> Task
@@ -151,7 +147,8 @@ module InteractionRepairWorkflow =
             "blogger-protocol-repair-failed"
             [ "session_id", SessionId.value turn.SessionId; "result", reason ]
 
-        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason) |> ignore
+        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+        |> ignore
 
     let private exhaustBloggerProtocol
         (host: IParkedTransformHost)
@@ -224,7 +221,8 @@ module InteractionRepairWorkflow =
                         BloggerRecoveryProbe.BloggerAabbRepairKind
                 with
                 | Ok _ -> ()
-                | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 -> ()
+                | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 ->
+                    ()
                 | Error error -> notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
         }
         :> Task
@@ -305,8 +303,9 @@ module InteractionRepairWorkflow =
         with
         | BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery ->
             sendBloggerNudge host quiescence context sessionPort eventPort durable requestId
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun
-            when issuedRun = context.Turn.ProviderRun ->
+        | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun when
+            issuedRun = context.Turn.ProviderRun
+            ->
             AsyncSupport.completedTask ()
         | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued _ ->
             consumeThenSendBloggerAabb
@@ -318,8 +317,9 @@ module InteractionRepairWorkflow =
                 durable
                 requestId
                 "blogger missing chronicle after interaction nudge"
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun
-            when issuedRun = context.Turn.ProviderRun ->
+        | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun when
+            issuedRun = context.Turn.ProviderRun
+            ->
             AsyncSupport.completedTask ()
         | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued _ ->
             exhaustBloggerProtocol host eventPort durable context "blogger protocol repair exhausted"

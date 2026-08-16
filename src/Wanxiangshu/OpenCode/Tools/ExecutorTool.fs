@@ -131,6 +131,11 @@ module ExecutorTool =
             [<Literal>]
             let MissingCommand = "tool/query-shell/missing-command"
 
+    /// Provider-visible execution verb. Distillation is invoked inside this
+    /// tool and is never a separate provider verb (PROC-011 / DISTILL-010).
+    [<Literal>]
+    let RunToolName = "run"
+
     type Request =
         { Command: string
           DeadlineSeconds: float

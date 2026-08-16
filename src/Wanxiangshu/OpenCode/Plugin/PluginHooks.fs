@@ -250,19 +250,21 @@ module PluginHooks =
                       // so the absence of a veto is documented at the boundary
                       // rather than inferred from silence.
                       "experimental.session.compacting",
-                      box
-                          (fatalHook
+                      box (
+                          fatalHook
                               "plugin-hook-session-compacting-failed"
-                              (pairedHook (box HostCompactionGate.onSessionCompacting)))
+                              (pairedHook (box HostCompactionGate.onSessionCompacting))
+                      )
                       // HOST-006: always `enabled = false`. `compaction.auto=false`
                       // already makes the replay branch unreachable, but this is the
                       // one vetoable synthetic-turn injection point, and leaving it
                       // unanswered relies on an upstream default staying harmless.
                       "experimental.compaction.autocontinue",
-                      box
-                          (fatalHook
+                      box (
+                          fatalHook
                               "plugin-hook-compaction-autocontinue-failed"
-                              (pairedHook (box HostCompactionGate.onCompactionAutoContinue)))
+                              (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+                      )
                       // Magic Todo definition/before/after are one V1 Host
                       // membrane. Definition must replace both schema surfaces;
                       // before mutates the original args object in place.
@@ -273,11 +275,9 @@ module PluginHooks =
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then
                       // sees the exact provider-visible result bytes.
-                      "tool.execute.after",
-                      box (fatalHook "plugin-hook-tool-after-failed" (pairedHook (box toolAfter))) ]
+                      "tool.execute.after", box (fatalHook "plugin-hook-tool-after-failed" (pairedHook (box toolAfter))) ]
 
-            hooks?event <-
-                box (fun raw -> fatalSync "plugin-hook-event-failed" (fun () -> wired.ObserveEvent raw))
+            hooks?event <- box (fun raw -> fatalSync "plugin-hook-event-failed" (fun () -> wired.ObserveEvent raw))
 
             // HOST-009 dispose: cancel owned Tasks, kill PTYs/processes, dispose
             // sessions. `scope.Dispose` owns all of it, and the Host awaits this

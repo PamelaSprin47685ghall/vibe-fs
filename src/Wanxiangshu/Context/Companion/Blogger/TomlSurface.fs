@@ -24,7 +24,10 @@ module BloggerTomlSurface =
            Truncated: bool |}
 
     let private optionalMediaType (mediaType: string) =
-        if isNull mediaType || mediaType = "" then None else Some mediaType
+        if isNull mediaType || mediaType = "" then
+            None
+        else
+            Some mediaType
 
     let private partOf (p: PartInput) : BloggerDeltaPart =
         match p.Kind with

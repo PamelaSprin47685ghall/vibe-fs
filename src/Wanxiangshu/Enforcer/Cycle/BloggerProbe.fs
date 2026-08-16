@@ -187,7 +187,8 @@ module BloggerRecoveryProbe =
         (terminalRun: ProviderRunIdentity)
         (repairKind: string)
         : bool =
-        let payloadDigest = PromptAuthority.repairPayloadDigest requestId terminalRun repairKind
+        let payloadDigest =
+            PromptAuthority.repairPayloadDigest requestId terminalRun repairKind
 
         match PromptAuthorityLedger.dispatchStatusFor bloggerSessionId payloadDigest projections with
         | PromptAuthorityLedger.DispatchStatus.Dispatchable -> false
@@ -204,8 +205,17 @@ module BloggerRecoveryProbe =
             None
         else
             let runLength = scope.Length - prefix.Length - suffix.Length
-            let runId = if runLength <= 0 then "" else scope.Substring(prefix.Length, runLength)
-            if System.String.IsNullOrWhiteSpace runId then None else Some runId
+
+            let runId =
+                if runLength <= 0 then
+                    ""
+                else
+                    scope.Substring(prefix.Length, runLength)
+
+            if System.String.IsNullOrWhiteSpace runId then
+                None
+            else
+                Some runId
 
     /// When the claimed terminal is absent from the Host snapshot, recover its run id
     /// from the exact request-scoped ClaimSequences shape:
@@ -265,8 +275,7 @@ module BloggerRecoveryProbe =
         (terminalRun: ProviderRunIdentity)
         : InvalidTerminalRepairState =
         match claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId with
-        | Some claimedRun ->
-            InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun)
+        | Some claimedRun -> InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun)
         | None when repairClaimedFor journal bloggerSessionId requestId terminalRun ->
             InvalidTerminalRepairState.InteractionNudgeIssued terminalRun
         | None ->
@@ -333,14 +342,15 @@ module BloggerRecoveryProbe =
                 && not (isNull info?requestKey)
                 && unbox<string> info?requestKey = requestKey
 
-            if matches then providerRunFromHostValue info?repairTerminalRun else None)
+            if matches then
+                providerRunFromHostValue info?repairTerminalRun
+            else
+                None)
 
     /// Exact terminal targeted by a raw Host AABB repair instruction injected for `requestKey`.
     /// The marker is provider-visible evidence, but its terminal identity is Host-only metadata.
     let private aabbRepairTargetRun (requestKey: string) (rawMessages: obj list) : ProviderRunIdentity option =
-        rawMessages
-        |> List.rev
-        |> List.tryPick (repairMarkerTargetRun requestKey)
+        rawMessages |> List.rev |> List.tryPick (repairMarkerTargetRun requestKey)
 
     /// ENFORCER-153 hot path: derive recovery state from durable claim + visible
     /// transcript. No mutable runtime field is consulted.
@@ -360,9 +370,5 @@ module BloggerRecoveryProbe =
         match aabbRepairTargetRun requestKey rawMessages with
         | Some run -> BloggerToolRecovery.AabbRepairIssued run
         | None ->
-            repairStateForInvalidTerminal
-                journal
-                bloggerSessionId
-                (BloggerRequestId.create requestKey)
-                terminalRun
+            repairStateForInvalidTerminal journal bloggerSessionId (BloggerRequestId.create requestKey) terminalRun
             |> toolRecoveryOfInvalidTerminal
