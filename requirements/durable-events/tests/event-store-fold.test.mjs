@@ -41,7 +41,7 @@ test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_missing_pa
   const child = make({ id: B, parents: [A] })
   const result = eventStore.merge([['writer', [child]]])
   assert.equal(result.ok, false)
-  assert.equal(result.error.tag, 'MissingParent')
+  assert.equal(result.error.code, 'MissingParent')
   assert.equal(result.error.eventId, A)
 })
 
@@ -50,7 +50,7 @@ test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_backward_o
   const b = make({ id: B, parents: [A] })
   const result = eventStore.merge([['writer', [a, b]]])
   assert.equal(result.ok, false)
-  assert.equal(result.error.tag, 'NonCanonical')
+  assert.equal(result.error.code, 'NonCanonical')
 })
 
 test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
@@ -108,8 +108,8 @@ test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_007_unknown_authoritative_event_ty
   try {
     const result = await eventStore.append(local.store, [make({ id: A, eventType: 'TotallyUnknownEventType' })])
     assert.equal(result.ok, false)
-    assert.equal(result.error.tag, 'StorageInvalid')
-    assert.equal(result.error.error.tag, 'UnknownEventType')
+    assert.equal(result.error.code, 'StorageInvalid')
+    assert.equal(result.error.error.code, 'UnknownEventType')
   } finally {
     rmSync(local.commonDir, { recursive: true, force: true })
   }

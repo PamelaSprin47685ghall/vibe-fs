@@ -33,12 +33,12 @@ test('WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_close
 
   const checked = eventStore.checkIdentity(left, right)
   assert.equal(checked.ok, false)
-  assert.equal(checked.error.tag, 'IdentityCollision')
+  assert.equal(checked.error.code, 'IdentityCollision')
   assert.equal(checked.error.eventId, A)
 
   const merged = eventStore.mergeByIdentity([left, right])
   assert.equal(merged.ok, false)
-  assert.equal(merged.error.tag, 'IdentityCollision')
+  assert.equal(merged.error.code, 'IdentityCollision')
 })
 
 test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () => {

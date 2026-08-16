@@ -75,25 +75,25 @@ module EventStoreSurface =
     let private storageInvalidToJs (error: StorageInvalid) : obj =
         match error with
         | StorageInvalid.IdentityCollision eid ->
-            box {| tag = "IdentityCollision"; eventId = EventId.value eid |}
-        | StorageInvalid.NonCanonical reason -> box {| tag = "NonCanonical"; reason = reason |}
-        | StorageInvalid.MalformedEnvelope reason -> box {| tag = "MalformedEnvelope"; reason = reason |}
+            box {| code = "IdentityCollision"; eventId = EventId.value eid |}
+        | StorageInvalid.NonCanonical reason -> box {| code = "NonCanonical"; reason = reason |}
+        | StorageInvalid.MalformedEnvelope reason -> box {| code = "MalformedEnvelope"; reason = reason |}
         | StorageInvalid.MissingParent eid ->
-            box {| tag = "MissingParent"; eventId = EventId.value eid |}
-        | StorageInvalid.CyclicParents -> box {| tag = "CyclicParents" |}
+            box {| code = "MissingParent"; eventId = EventId.value eid |}
+        | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
         | StorageInvalid.MissingPayload ref ->
-            box {| tag = "MissingPayload"; payloadRef = PayloadRef.value ref |}
+            box {| code = "MissingPayload"; payloadRef = PayloadRef.value ref |}
         | StorageInvalid.UnknownEventType t ->
-            box {| tag = "UnknownEventType"; eventType = t |}
+            box {| code = "UnknownEventType"; eventType = t |}
 
     let private appendErrorToJs (error: AppendError) : obj =
         match error with
         | AppendError.StorageInvalid e ->
-            box {| tag = "StorageInvalid"; error = storageInvalidToJs e |}
+            box {| code = "StorageInvalid"; error = storageInvalidToJs e |}
         | AppendError.SemanticCut c ->
-            box {| tag = "SemanticCut"; cut = cutToJs c |}
+            box {| code = "SemanticCut"; cut = cutToJs c |}
         | AppendError.AppendFailed reason ->
-            box {| tag = "AppendFailed"; reason = reason |}
+            box {| code = "AppendFailed"; reason = reason |}
 
     /// Append JS-shaped events to a local store.
     /// Returns `{ ok: true, cuts: [...] }` or `{ ok: false, error: structured }`.
