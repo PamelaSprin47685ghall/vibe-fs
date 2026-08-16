@@ -402,6 +402,9 @@
   "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs": {
     "deep-dist-import": 2
   },
+  "requirements/execution-model-routing/tests/process-shared-routing.test.mjs": {
+    "deep-dist-import": 1
+  },
   "requirements/execution-model-routing/tests/scheduler-module-config.test.mjs": {
     "deep-dist-import": 1
   },

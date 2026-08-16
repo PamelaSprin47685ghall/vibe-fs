@@ -29,6 +29,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const read = (p) => readFileSync(join(ROOT, p), 'utf8')
 
+/** Resolve a relative import target inside a test file to a ROOT-relative path. */
+const normalizeImportTarget = (relFile, target) => {
+  const abs = resolve(dirname(join(ROOT, relFile)), target)
+  return abs.replace(ROOT + '/', '').replace(/\\/g, '/')
+}
+
 // ── 001: 所有 automated tests 使用 JavaScript ───────────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
@@ -44,17 +50,30 @@ test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', 
 // ── 002: 只经正式 semantic surface；gate 已 wire ────────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
-  // Machine face: js-boundary-gate is wired into check.mjs (P2). A semantic
-  // test carrying debt is red unless the baseline explicitly tolerates it.
+  // PR 5 (TASK.md §11): a property check, not a source-text check.
+  // debt.minusApprovedBaseline() must be empty: every forbidden pattern in
+  // the whole semantic-test zone must be pre-approved by the only-shrink
+  // baseline. Beyond the approved baseline, forbidden patterns ARE absent —
+  // this is exactly what the gate enforces, asserted here independently.
+  const all = scanAll()
+  const baseline = JSON.parse(read('scripts/checks/js-boundary-baseline.json'))
+  const excess = []
+  for (const [file, hits] of Object.entries(all)) {
+    const allowed = baseline[file] ?? {}
+    const byRule = {}
+    for (const h of hits) byRule[h.rule] = (byRule[h.rule] ?? 0) + 1
+    for (const [rule, count] of Object.entries(byRule)) {
+      if (count > (allowed[rule] ?? 0)) excess.push(`${file}: ${rule} ${allowed[rule] ?? 0} -> ${count}`)
+    }
+  }
+  for (const file of Object.keys(all)) {
+    if (!(file in baseline)) excess.push(`${file}: NEW debt`)
+  }
+  assert.deepEqual(excess, [], `forbidden patterns beyond the approved baseline must be absent; excess: ${excess.join('; ')}`)
+
+  // The gate remains the wired execution carrier of the ratchet.
   const checkSource = read('scripts/check.mjs')
   assert.match(checkSource, /checks\/js-boundary-gate\.mjs/, 'js-boundary-gate must be wired into check.mjs')
-
-  const gateSource = read('scripts/checks/js-boundary-gate.mjs')
-  assert.match(
-    gateSource,
-    /baseline can only shrink|baseline can be deleted|只减不增|can only shrink/,
-    'gate contract must state the baseline only-shrink rule',
-  )
 })
 
 // ── 002 zone: 整个 semantic-test zone 都被扫描（TASK.md §6/§7/§8）────────────
@@ -150,15 +169,54 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_binds_law_owner_sour
 // ── 004: helper 不直接测试 ──────────────────────────────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', () => {
-  // The representation validator is tested through its own contract (005),
-  // never through a domain helper. No test file in this package may name an
-  // interop helper or import the transition facade.
+  // PR 5 (TASK.md §13): the corpus, not this package's own tests.
+  //
+  // Legal import targets for a .test.mjs:
+  //   - a registered surface (SURFACE_MANIFEST, 002/003);
+  //   - the transition facade verification-system/tests/support/domain.mjs —
+  //     the migration carrier approved by WHAT 002 boundary, not a helper
+  //     being pinned;
+  //   - the representation validator js-contract.mjs (its subject IS the
+  //     rules);
+  //   - a debt-free zone file (pure fixture data, no authority);
+  //   - a zone file carrying debt ONLY if that debt is pre-approved by the
+  //     js-boundary baseline (grandfathered contract adapters — they may only
+  //     shrink; a NEW debt-bearing support file imported by a test is RED).
+  const zoneFiles = walk(join(ROOT, 'requirements'), ['.mjs'])
+    .filter((f) => !f.includes('/tests/e2e/') && !f.includes('/tests/integration/'))
+    .map((f) => f.replace(ROOT + '/', '').replace(/\\/g, '/'))
+
+  const testFiles = zoneFiles.filter((f) => f.includes('/tests/') && f.endsWith('.test.mjs'))
+  const helperFiles = new Set(zoneFiles.filter((f) => f.includes('/tests/') && !f.endsWith('.test.mjs')))
+  const baseline = JSON.parse(read('scripts/checks/js-boundary-baseline.json'))
+  const scan = scanAll()
+
+  const violations = []
+  for (const file of testFiles) {
+    const text = read(file)
+    const re = /from\s+['"](\.[^'"]+)['"]/g
+    let m
+    while ((m = re.exec(text)) !== null) {
+      const target = normalizeImportTarget(file, m[1])
+      if (!helperFiles.has(target)) continue
+      if (target.endsWith('verification-system/tests/support/domain.mjs')) continue // transition facade (WHAT 002)
+      if (target.endsWith('verification-system/tests/support/js-contract.mjs')) continue // validator subject
+      const debt = scan[target] ?? []
+      if (debt.length === 0) continue // pure fixture data, no authority
+      if (target in baseline) continue // grandfathered debt, only-shrink ratchet
+      violations.push(`${file} imports debt-bearing helper ${target} — helper not directly tested (JS-SEMANTIC-SURFACE-004)`)
+    }
+  }
+  assert.deepEqual(violations, [], violations.join('\n'))
+
+  // The charter package itself must not import the transition facade or use
+  // interop helpers (the old self-check remains as the local instance).
   const selfTests = walk(join(ROOT, 'requirements/js-semantic-surface/tests'), ['.mjs']).filter((f) =>
     f.endsWith('.test.mjs'),
   )
   for (const file of selfTests) {
     const text = readFileSync(file, 'utf8')
-    assert.doesNotMatch(text, /support\/domain/, 'charter tests must not import the transition facade')
+    assert.doesNotMatch(text, /from\s+['"][^'"]*support\/domain/, 'charter tests must not import the transition facade')
     assert.doesNotMatch(text, /\b(toList|caseOf|payloadOf|resultOf|unwrapOption)\(/, 'charter tests must not use interop helpers')
   }
 })
@@ -217,19 +275,48 @@ test('WHAT[JS-SEMANTIC-SURFACE-005] JS_SURFACE_005_js_native_representation_rule
 // ── 006: Fable 形状不是 contract；quarantine 单独存在 ───────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract', () => {
-  // Compiler/build verification quarantine exists and is separate from
-  // semantic tests: it names Fable output shape because its subject IS the
-  // compiled artifact (guide-contract emitted-surface pin, domain.meta facade
-  // self-contract). Their presence is the machine face of "Fable knowledge
-  // lives only in quarantine".
-  assert.ok(existsSync(join(ROOT, 'requirements/verification-system/tests/guide-contract.test.mjs')), 'quarantine guide-contract must exist')
-  assert.ok(existsSync(join(ROOT, 'requirements/verification-system/tests/domain.meta.test.mjs')), 'quarantine domain.meta must exist')
-  assert.ok(existsSync(join(ROOT, 'scripts/checks/js-boundary-baseline.json')), 'debt baseline must exist (only-shrink ratchet)')
+  // PR 5 (TASK.md §14): a property check, not a "this file must exist" check.
+  // The terminal state must allow domain.meta.test.mjs and the debt baseline
+  // to disappear — their removal is a VICTORY, not a charter failure. What
+  // must hold forever:
+  //   (1) every build-verification exemption names a real file (no ghost
+  //       exemptions that silently forgive debt);
+  //   (2) every exemption is entitled to know Fable: its subject IS the
+  //       emitted artifact or the forbidden shapes themselves (it spells out
+  //       dist / fable_modules / DU-shape tokens), so a plain semantic test
+  //       cannot be smuggled into the allowlist;
+  //   (3) no exemption lives in a product package's semantic-test zone —
+  //       quarantine files sit in verification-system or are the charter /
+  //       validator themselves.
+  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
+  const block = scannerSource.match(/BUILD_VERIFICATION_FILES = new Set\(\[[\s\S]*?\]\)/)
+  assert.ok(block, 'scanner must declare BUILD_VERIFICATION_FILES')
+  const exempt = [...block[0].matchAll(/'([^']+)'/g)].map((m) => m[1])
+  assert.ok(exempt.length >= 1, 'build-verification quarantine must name at least one file')
 
-  // The baseline is a finite set — inventory and gate share one scanner, so a
-  // debt line cannot hide from the gate.
-  const gate = read('scripts/checks/js-boundary-gate.mjs')
-  assert.match(gate, /test-surface-scan\.mjs/, 'gate must share the inventory scanner')
+  for (const file of exempt) {
+    // (1) No ghost exemptions.
+    assert.ok(existsSync(join(ROOT, file)), `build-verification exemption ${file} must exist — ghost exemption silently forgives debt`)
+    // (2) Entitlement: the file must actually know Fable shapes or dist.
+    const text = read(file)
+    const knowsFable = /fable_modules|\.fields\b|\.tag\b|FSharp|dist\//.test(text)
+    assert.equal(
+      knowsFable,
+      true,
+      `build-verification exemption ${file} carries no Fable/dist knowledge — a semantic test must not be in the quarantine allowlist`,
+    )
+    // (3) Location: quarantine files sit in verification-system, the
+    // distribution artifact oracle (TASK.md §1.E distribution artifact
+    // tests — their subject IS the packed artifact), or the charter /
+    // validator themselves. A product package's semantic tests never
+    // qualify (process-shared-routing was removed on exactly this ground).
+    const inProductZone =
+      file.startsWith('requirements/') &&
+      !file.startsWith('requirements/verification-system/') &&
+      !file.startsWith('requirements/js-semantic-surface/') &&
+      !file.startsWith('requirements/distribution/')
+    assert.equal(inProductZone, false, `exemption ${file} lives in a product package — quarantine is compiler/build verification only`)
+  }
 })
 
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
