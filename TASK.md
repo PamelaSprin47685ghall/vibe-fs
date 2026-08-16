@@ -21,7 +21,7 @@
 * P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
 * P7 — NOT PROVEN：RolesSurface 是 vocabulary/policy surface，不证明 stateful runtime
 * P8 — NOT PROVEN：删 dead compatibility code 不等于 effect boundary 重构
-* P9 — IN PROGRESS：6 dead adapters deleted; 328 domain.mjs consumers remain; exit condition NOT MET
+* P9 — STARTED：6 dead adapters deleted; 355 domain.mjs consumers remain; exit condition NOT MET
 
 这些标记和仓库事实对不上。
 
@@ -4104,14 +4104,14 @@ surface 应跟着 semantic owner 分布。
 
 **现状（PR 0 裁决）：NOT PROVEN。** 删 dead compatibility code 是好事，但它不是 effect decision → effect request → interpreter → result → semantic observation 的重构证据。不得拿别的 cleanup 工作给当前 milestone 充数。
 
-### P9 — Delete legacy adapters — IN PROGRESS
+### P9 — Delete legacy adapters — STARTED
 
 逐 family 删除 `domain/*` adapters。
 
 **完成条件：**semantic tests 不再 import `domain.mjs`。
 **已达成（增量）：**删除六个零引用零依赖死 adapter（forkChildPayload/processEstimate/packageResources/orchestratorProgram/setCount/setContains），-106 行。
 
-**现状（PR 0 裁决）：exit condition NOT MET。** 328 文件仍 import domain.mjs（后续 wave）。
+**现状（PR 0 裁决）：exit condition NOT MET。** 355 文件仍 import domain.mjs（后续 wave）。
 
 ### P10 — Quarantine Fable
 
@@ -4773,3 +4773,15 @@ requirements/<owner>/WHAT.md
 
 我认为这会比传统的“requirements coverage = 100%”强很多。传统 coverage 只能证明**文档没有漏测**；你这个双向闭环还能证明**测试没有偷偷创造第二套需求体系**。而你现有 requirement-system 已经把“WHAT 是唯一合同”和“executable assertion 有唯一 owner”铺好了，实际上只差把这条反向边机器化。 
 
+
+---
+
+# PR 0 完成（2026-08-16）
+
+已将 opening P 状态与 section 18 对齐：
+- P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
+- P7 — NOT PROVEN
+- P8 — NOT PROVEN
+- P9 — STARTED：6 dead adapters deleted; 355 domain.mjs consumers remain; exit condition NOT MET
+
+虚假完成状态已撤销；后续 PR 按新 DoD 推进。
