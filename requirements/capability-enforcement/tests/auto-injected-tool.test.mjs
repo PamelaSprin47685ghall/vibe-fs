@@ -18,7 +18,7 @@ const {
 } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 const { Role } = await import('../../../dist/Foundation/Roles.js')
 
-test('AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', () => {
+test('WHAT[ENF-006] AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', () => {
   assert.equal(toolName, '-')
   const pred = rolePredicate('-', undefined, 'ses-auto')
   assert.equal(pred(Role.Coder), false, 'placeholder - is not a registered role tool')
@@ -26,7 +26,7 @@ test('AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', () => {
   assert.equal(pred(Role.Blogger), false)
 })
 
-test('AUTOINJ_active_call_is_rewritten_from_failed_to_completed_with_reprimand', () => {
+test('WHAT[ENF-006] AUTOINJ_active_call_is_rewritten_from_failed_to_completed_with_reprimand', () => {
   const activeCallMsg = {
     role: 'assistant',
     info: { id: 'asst-active-call' },
@@ -51,7 +51,7 @@ test('AUTOINJ_active_call_is_rewritten_from_failed_to_completed_with_reprimand',
   assert.match(part.state.output, /DENIED.*not an executable tool/, 'result must contain scolding text')
 })
 
-test('AUTOINJ_tryInject_rewrites_active_call_while_preserving_synthetic_injection', async () => {
+test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synthetic_injection', async () => {
   const activeCallMsg = {
     role: 'assistant',
     info: { id: 'asst-1' },

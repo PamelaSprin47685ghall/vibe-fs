@@ -16,7 +16,7 @@ const completed = (sid, run) =>
 const failed = (error) => new TerminalOutcome(2, [error])
 const aborted = (reason) => new TerminalOutcome(1, [reason])
 
-test('EVT_duplicate_completed_for_the_same_provider_run_is_absorbed', () => {
+test('WHAT[HOST-BOUNDARY-016] EVT_duplicate_completed_for_the_same_provider_run_is_absorbed', () => {
   const port = new Events_HostEventPort()
   const received = []
   port.SubscribeTerminalListener((sid, outcome) => received.push([sid.fields[0], outcome.tag]))
@@ -36,7 +36,7 @@ test('EVT_duplicate_completed_for_the_same_provider_run_is_absorbed', () => {
   assert.equal(received.length, 2)
 })
 
-test('EVT_completed_without_provider_run_is_never_a_duplicate', () => {
+test('WHAT[HOST-BOUNDARY-016] EVT_completed_without_provider_run_is_never_a_duplicate', () => {
   const port = new Events_HostEventPort()
   const received = []
   port.SubscribeTerminalListener((_sid, outcome) => received.push(outcome.tag))
@@ -46,7 +46,7 @@ test('EVT_completed_without_provider_run_is_never_a_duplicate', () => {
   assert.equal(received.length, 2, 'run-less completions always go through')
 })
 
-test('EVT_failed_and_aborted_outcomes_are_not_deduped', () => {
+test('WHAT[HOST-BOUNDARY-016] EVT_failed_and_aborted_outcomes_are_not_deduped', () => {
   const port = new Events_HostEventPort()
   const received = []
   port.SubscribeTerminalListener((_sid, outcome) => received.push(outcome.tag))
@@ -57,7 +57,7 @@ test('EVT_failed_and_aborted_outcomes_are_not_deduped', () => {
   assert.deepEqual(received, [2, 2, 1], 'non-Completed outcomes always reach listeners')
 })
 
-test('EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
+test('WHAT[HOST-BOUNDARY-016] EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
   const port = new Events_HostEventPort()
   const sidA = sessionId('ses_replay_a')
   const sidB = sessionId('ses_replay_b')
@@ -78,7 +78,7 @@ test('EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
   )
 })
 
-test('EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
+test('WHAT[HOST-BOUNDARY-016] EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
   const port = new Events_HostEventPort()
   const received = []
   const subscription = port.SubscribeTerminalListener((_sid, outcome) => received.push(outcome.tag))

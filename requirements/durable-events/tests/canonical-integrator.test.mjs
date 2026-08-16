@@ -10,7 +10,7 @@ import test from 'node:test'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_business_rules', async () => {
+test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_business_rules', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
 
   assert.match(source, /type\s+IntegratorBuilder|type\s+CanonicalIntegratorBuilder/)
@@ -33,7 +33,7 @@ test('DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_bu
   assert.doesNotMatch(source, /type\s+\w*(StateMachine|LifecycleState)\b/)
 })
 
-test('DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_loops', async () => {
+test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_loops', async () => {
   const forbiddenOwners = [
     'src/Wanxiangshu/Strength/Persistence/Store.fs',
     'src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs',
@@ -58,7 +58,7 @@ test('DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_
   }
 })
 
-test('DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_program', async () => {
+test('WHAT[DURABLE-EVENTS-013] DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_program', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
 
   assert.match(source, /integrateOne/)
@@ -71,7 +71,7 @@ test('DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_p
   assert.doesNotMatch(source, /replayFold|liveFold|replayReducer|liveReducer/)
 })
 
-test('DURABLE_EVENTS_019_only_CanonicalIntegrator_may_derive_Current_from_event_history', async () => {
+test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_019_only_CanonicalIntegrator_may_derive_Current_from_event_history', async () => {
   const project = await read('src/Wanxiangshu/Wanxiangshu.fsproj')
   assert.match(project, /Persistence\/EventStore\/CanonicalIntegrator\.fs/)
   assert.match(project, /Persistence\/EventStore\/ProcessEventLog\.fs/)

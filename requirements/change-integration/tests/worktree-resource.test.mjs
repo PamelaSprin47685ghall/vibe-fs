@@ -68,7 +68,7 @@ const fakeGit = (behaviour = {}) => {
 
 const PATH = '/repo/.worktrees/job-9'
 
-test('WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
+test('WHAT[CHGINT-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
   const { port, calls } = fakeGit()
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
@@ -79,7 +79,7 @@ test('WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () 
   assert.deepEqual(calls, [['CreateWorktree', 'job-9', PATH]])
 })
 
-test('WORKTREE_create_propagates_port_error', async () => {
+test('WHAT[CHGINT-003] WORKTREE_create_propagates_port_error', async () => {
   const { port } = fakeGit({ CreateWorktree: { tag: 1, fields: ['worktree add exploded'] } })
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
@@ -87,7 +87,7 @@ test('WORKTREE_create_propagates_port_error', async () => {
   assert.equal(created.error, 'worktree add exploded')
 })
 
-test('WORKTREE_release_removes_worktree_and_branch_once', async () => {
+test('WHAT[CHGINT-005] WORKTREE_release_removes_worktree_and_branch_once', async () => {
   const { port, calls } = fakeGit()
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const resource = created.value
@@ -102,7 +102,7 @@ test('WORKTREE_release_removes_worktree_and_branch_once', async () => {
   assert.deepEqual(calls.filter(([name]) => name === 'DeleteBranch'), [['DeleteBranch', 'manager/job-9']])
 })
 
-test('WORKTREE_release_aggregates_both_failures', async () => {
+test('WHAT[CHGINT-005] WORKTREE_release_aggregates_both_failures', async () => {
   const { port } = fakeGit({
     RemoveWorktree: { tag: 1, fields: ['rm failed'] },
     DeleteBranch: { tag: 1, fields: ['branch failed'] },
@@ -114,7 +114,7 @@ test('WORKTREE_release_aggregates_both_failures', async () => {
   assert.equal(result.error, 'worktree=rm failed; branch=branch failed')
 })
 
-test('WORKTREE_release_reports_single_failure_side', async () => {
+test('WHAT[CHGINT-005] WORKTREE_release_reports_single_failure_side', async () => {
   const { port } = fakeGit({ RemoveWorktree: { tag: 1, fields: ['rm failed'] } })
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const result = resultOf(await release(created.value))
@@ -126,7 +126,7 @@ test('WORKTREE_release_reports_single_failure_side', async () => {
   assert.equal(result2.error, 'branch=branch failed')
 })
 
-test('WORKTREE_adopt_never_releases_on_dispose', async () => {
+test('WHAT[CHGINT-006] WORKTREE_adopt_never_releases_on_dispose', async () => {
   const { port, calls } = fakeGit()
   const resource = adopt(port, worktreeIdentity('manager/job-9'), worktreePath(PATH))
 
@@ -140,7 +140,7 @@ test('WORKTREE_adopt_never_releases_on_dispose', async () => {
   )
 })
 
-test('WORKTREE_mark_durable_disposes_without_release', async () => {
+test('WHAT[CHGINT-006] WORKTREE_mark_durable_disposes_without_release', async () => {
   const { port, calls } = fakeGit()
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
   const resource = created.value
@@ -155,7 +155,7 @@ test('WORKTREE_mark_durable_disposes_without_release', async () => {
   )
 })
 
-test('WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
+test('WHAT[CHGINT-005] WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
   const { port, calls } = fakeGit()
   const created = resultOf(await createWorktree(port, managerJobId('job-9'), worktreePath(PATH)))
 
@@ -184,11 +184,11 @@ const fakeRunner = (answers) => {
   return { runner, calls }
 }
 
-test('WORKTREE_CMD_identity_of_is_manager_slash_job', () => {
+test('WHAT[CHGINT-009] WORKTREE_CMD_identity_of_is_manager_slash_job', () => {
   assert.equal(WorktreeCommands_identityOf(managerJobId('job-7')).fields[0], 'manager/job-7')
 })
 
-test('WORKTREE_CMD_create_returns_identity_on_success', async () => {
+test('WHAT[CHGINT-003] WORKTREE_CMD_create_returns_identity_on_success', async () => {
   const { runner, calls } = fakeRunner([])
   const result = resultOf(await WorktreeCommands_create(runner, '/repo', managerJobId('job-3'), worktreePath(PATH)))
 
@@ -198,13 +198,13 @@ test('WORKTREE_CMD_create_returns_identity_on_success', async () => {
   assert.equal(calls[0].cwd, '/repo')
 })
 
-test('WORKTREE_CMD_create_surfaces_stderr_on_failure', async () => {
+test('WHAT[CHGINT-003] WORKTREE_CMD_create_surfaces_stderr_on_failure', async () => {
   const { runner } = fakeRunner([['worktree add', [1, '', 'already exists']]])
   const result = resultOf(await WorktreeCommands_create(runner, '/repo', managerJobId('job-3'), worktreePath(PATH)))
   assert.equal(result.error, 'already exists')
 })
 
-test('WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
+test('WHAT[CHGINT-005] WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
   const { runner, calls } = fakeRunner([])
   const result = resultOf(await WorktreeCommands_remove(runner, worktreePath(PATH)))
 
@@ -213,7 +213,7 @@ test('WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
   assert.equal(calls[0].cwd, undefined)
 })
 
-test('WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
+test('WHAT[CHGINT-002] WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
   const { runner: dirty } = fakeRunner([['status --porcelain', [0, ' M x.fs\n', '']]])
   assert.equal(await WorktreeCommands_isDirty(dirty, worktreePath(PATH)), true)
 
@@ -221,7 +221,7 @@ test('WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
   assert.equal(await WorktreeCommands_isDirty(clean, worktreePath(PATH)), false)
 })
 
-test('WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
+test('WHAT[CHGINT-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
   const porcelain = [
     'worktree /repo',
     'HEAD 0123456789abcdef',
@@ -252,14 +252,14 @@ test('WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
   ])
 })
 
-test('WORKTREE_CMD_list_error_propagates', async () => {
+test('WHAT[CHGINT-006] WORKTREE_CMD_list_error_propagates', async () => {
   const { runner } = fakeRunner([['worktree list --porcelain', [128, '', 'not a git repository']]])
   const result = resultOf(await WorktreeCommands_list(runner, '/repo'))
   assert.equal(result.ok, false)
   assert.equal(result.error, 'not a git repository')
 })
 
-test('WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () => {
+test('WHAT[CHGINT-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () => {
   const { runner } = fakeRunner([
     ['branch --list manager/*', [0, '* manager/active\n+ manager/checked-out-elsewhere\n  manager/plain\n\n', '']],
   ])
@@ -273,7 +273,7 @@ test('WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () 
   )
 })
 
-test('WORKTREE_CMD_delete_branch_uses_force_delete', async () => {
+test('WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_uses_force_delete', async () => {
   const { runner, calls } = fakeRunner([])
   const result = resultOf(await WorktreeCommands_deleteBranch(runner, '/repo', worktreeIdentity('manager/job-3')))
 
@@ -281,7 +281,7 @@ test('WORKTREE_CMD_delete_branch_uses_force_delete', async () => {
   assert.deepEqual(calls[0].args, ['branch', '-D', 'manager/job-3'])
 })
 
-test('WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank', async () => {
+test('WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank', async () => {
   const { runner } = fakeRunner([['branch -D', [1, 'branch not found', '']]])
   const result = resultOf(await WorktreeCommands_deleteBranch(runner, '/repo', worktreeIdentity('manager/job-3')))
   assert.equal(result.error, 'branch not found')

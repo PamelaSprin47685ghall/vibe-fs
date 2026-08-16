@@ -1,4 +1,4 @@
-// MACFG: Host config owns managed agent presence + Wanxiangshu-owned non-model fields.
+// MACFG: Host config hook projects the managed catalog + Wanxiangshu-owned non-model fields.
 // Model routing authority lives exclusively in execution-model-routing.
 
 import assert from 'node:assert/strict'
@@ -38,19 +38,26 @@ function fullConfig() {
   return { agent: Object.fromEntries(NAMES.map((name) => [name, {}])) }
 }
 
-test('MACFG_validate_rejects_null_missing_agent_map_and_missing_managed_agent', () => {
-  assert.match(errOf(validate(null)), /config\.agent/)
-  assert.match(errOf(validate({})), /config\.agent/)
-  assert.match(errOf(validate({ agent: {} })), /fast-orchestrator/)
+test('WHAT[ENF-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => {
+  assert.match(errOf(validate(null)), /Host config object/)
+  assert.match(errOf(validate({ agent: { coder: {} } })), /coder/)
 })
 
-test('MACFG_validate_rejects_legacy_agent_present', () => {
+test('WHAT[ENF-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
+  const empty = okOf(validate({}))
+  assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
+  assert.equal(Object.keys(bindingsOf(empty.value)).length, 20)
+  const blankMap = okOf(validate({ agent: {} }))
+  assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
+})
+
+test('WHAT[ENF-010] MACFG_validate_rejects_legacy_agent_present', () => {
   const cfg = fullConfig()
   cfg.agent.coder = {}
   assert.match(errOf(validate(cfg)), /coder/)
 })
 
-test('MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
+test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
   const cfg = fullConfig()
   cfg.agent['fast-manager'].model = 'provider/shared'
   cfg.agent['deep-manager'].model = 'provider/shared'
@@ -65,7 +72,7 @@ test('MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
   assert.equal('Model' in bindings['fast-manager'], false, 'Host model must not enter the managed inventory')
 })
 
-test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
+test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   const cfg = fullConfig()
   for (const name of NAMES) cfg.agent[name].model = `host/${name}`
   const inventory = okOf(validate(cfg)).value
@@ -81,15 +88,19 @@ test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   }
 })
 
-test('MACFG_applyOwnedFields_skips_null_config_and_does_not_invent_missing_agents', () => {
+test('WHAT[ENF-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missing_catalog_agents', () => {
   applyOwnedFields(null, { Bindings: {} })
   const cfg = fullConfig()
   delete cfg.agent['deep-blogger']
   applyOwnedFields(cfg, { Bindings: {} })
-  assert.equal(cfg.agent['deep-blogger'], undefined)
+  const projected = cfg.agent['deep-blogger']
+  assert.equal(projected.mode, 'primary')
+  assert.equal(projected.hidden, true)
+  assert.equal(projected.permission['*'], 'deny')
+  assert.equal('model' in projected, false, 'projection never invents a model binding')
 })
 
-test('MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
+test('WHAT[ENF-011] MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
   process.env.WANXIANGSHU_CHAT_MAX_RETRIES = '7'
   try {
     const cfg = fullConfig()
@@ -100,7 +111,7 @@ test('MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
   }
 })
 
-test('MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
+test('WHAT[ENF-011] MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
   const cfg = fullConfig()
   cfg.agent['fast-manager'].model = 'provider/shared'
   cfg.agent['deep-manager'].model = 'provider/shared'
@@ -110,9 +121,25 @@ test('MACFG_configureFromHostConfig_returns_role_inventory_without_model_authori
   assert.equal(cfg.compaction.auto, false)
 })
 
-test('MACFG_configureManager_missing_agent_is_fatal_after_owned_fields_land', () => {
+test('WHAT[ENF-011] MACFG_configureFromHostConfig_projects_missing_catalog_without_model_authority', () => {
+  const cfg = {}
+  const result = okOf(configureFromHostConfig(cfg))
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  assert.equal(Object.keys(bindingsOf(result.value)).length, 20)
+  for (const name of NAMES) {
+    const entry = cfg.agent[name]
+    assert.ok(entry.mode !== undefined, `${name} must be projected`)
+    assert.ok(entry.permission !== undefined, `${name} must receive owned permission`)
+    assert.equal('model' in entry, false, `${name} must not receive a model binding`)
+  }
+  assert.equal(cfg.agent['fast-blogger'].hidden, true)
+  assert.equal(cfg.agent['fast-bookkeeper'].hidden, true)
+  assert.equal(cfg.compaction.auto, false)
+})
+
+test('WHAT[ENF-010] MACFG_configureManager_legacy_agent_is_fatal_after_owned_fields_land', () => {
   const cfg = fullConfig()
-  delete cfg.agent['deep-manager']
+  cfg.agent.coder = {}
   const previousNoFatalExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
   const previousConsoleError = console.error
   const errors = []
@@ -120,9 +147,10 @@ test('MACFG_configureManager_missing_agent_is_fatal_after_owned_fields_land', ()
   console.error = (message) => errors.push(String(message))
 
   try {
-    assert.throws(() => configureManager(cfg), /Missing required managed agent 'deep-manager'/)
+    assert.throws(() => configureManager(cfg), /Legacy agent name 'coder'/)
     assert.equal(cfg.compaction.auto, false)
     assert.equal(cfg.agent['fast-manager'].permission['*'], 'deny')
+    assert.equal(cfg.agent['fast-orchestrator'].permission['*'], 'deny')
     assert.equal(errors.length, 1)
   } finally {
     console.error = previousConsoleError

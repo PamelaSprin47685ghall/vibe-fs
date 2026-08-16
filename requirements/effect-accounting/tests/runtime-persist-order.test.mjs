@@ -20,7 +20,7 @@ import {
 // inner Orchestrator fact case sits at fields[0].
 const orchestratorFactName = (fact) => caseOf(fact.fields[0])
 
-test('PERSIST_009_fork_appends_worktree_request_created_then_manager_job', async () => {
+test('WHAT[EFFECT-ACCOUNTING-003] PERSIST_009_fork_appends_worktree_request_created_then_manager_job', async () => {
   const appended = []
 
   const runtime = orchestratorRuntime.create({

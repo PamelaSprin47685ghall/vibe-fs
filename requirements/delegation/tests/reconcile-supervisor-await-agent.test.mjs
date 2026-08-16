@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { forkRuntime } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_fork_runtime_await_agent_timeout', async () => {
+test('WHAT[DELEG-013] EXEC_fork_runtime_await_agent_timeout', async () => {
   // Never settles: no timer handle (child can exit), no late resolution (no
   // asynchronous activity after verdict). AwaitAgent's timeout path races the
   // completion cell via PtyTiming.raceExit and does not depend on the runner.

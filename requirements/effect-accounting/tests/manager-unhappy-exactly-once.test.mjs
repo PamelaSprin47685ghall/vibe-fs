@@ -136,7 +136,7 @@ const env = (seq, f, sid = OWNER_S) => envelope({ seq, stream: stream.session(si
 // owner stream. Enumerate all interleavings of the owner's confirmed failure
 // with those residue facts — owner.failures must stay 1.
 
-test('THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () => {
   const ownerSeq = [
     env(10, rootFact()),
     env(11, advanceFact('run_owner', 0, 1, 1, 'owner_provider_failure')),
@@ -164,7 +164,7 @@ test('THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () =>
   }
 })
 
-test('THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation', () => {
   // Same ProviderRun observed twice (idle reconcile + retry signal) — FALLBACK-003.
   const seq = [
     env(1, rootFact()),
@@ -178,7 +178,7 @@ test('THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation
 
 // ── Theorem 2: counterfactual — why FALLBACK-013 must suppress blogger advance
 
-test('THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () => {
   // Historical bug shape: Host wrote a second FallbackCursorAdvanced on the
   // OWNER stream using the blogger interrupt's distinct ProviderRun. FALLBACK-003
   // dedupe keys on ProviderRunIdentity, so the second advance lands → failures=2.
@@ -211,7 +211,7 @@ test('THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () =>
 // them. The durable half reachable without OpenCode: complete and retire each
 // handle at most once — duplicates absorb; reverse double-apply refuses.
 
-test('THEOREM_join_guard_handle_complete_retire_exactly_once_projection', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_handle_complete_retire_exactly_once_projection', () => {
   let projection = handleProjection.empty
   const linked = handleProjection.link(
     HANDLE,
@@ -241,7 +241,7 @@ test('THEOREM_join_guard_handle_complete_retire_exactly_once_projection', () => 
   assert.equal(handleProjection.joinable(retired.value).length, 0)
 })
 
-test('THEOREM_join_guard_fold_absorbs_duplicate_complete_and_retire', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_fold_absorbs_duplicate_complete_and_retire', () => {
   const linked = fact('HandleLinked', {
     ParentSessionId: OWNER_S,
     ChildSessionId: CHILD_S,
@@ -299,7 +299,7 @@ test('THEOREM_join_guard_fold_absorbs_duplicate_complete_and_retire', () => {
 // Life. (Duplicate FinalityRejected after Resolution=Rejected is fail-closed,
 // not soft-absorb — journal writers must not emit that shape.)
 
-test('THEOREM_manager_lifecycle_activation_and_life_completed_exactly_once', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_manager_lifecycle_activation_and_life_completed_exactly_once', () => {
   const LIFE = managerLifeId('life-1')
   const REQ = finalityRequestId('req-1')
   const REVIEWER = sessionId('ses_rev')
@@ -376,7 +376,7 @@ test('THEOREM_manager_lifecycle_activation_and_life_completed_exactly_once', () 
 
 // ── Theorem 5: permutations of independent owner-advance vs residue commute ─
 
-test('THEOREM_owner_advance_and_blogger_residue_permutations_confluent', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_advance_and_blogger_residue_permutations_confluent', () => {
   // Three atomic steps after root: link, owner-advance, close.
   // All 6 permutations of {link, advance, close} after a fixed root must yield
   // the same owner cursor (failures=1) — race is algebra, not scheduler lottery.

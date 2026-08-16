@@ -24,7 +24,7 @@ const EXPECTED_AGENT_NAME = {
 
 // ── SyncDelegate.tierForOwner ────────────────────────────────────────────────
 
-test('EXEC_026_tierForOwner_is_identity_for_fast_and_deep', () => {
+test('WHAT[DELEG-010] EXEC_026_tierForOwner_is_identity_for_fast_and_deep', () => {
   for (const tierName of TIERS) {
     const ownerTier = roles.tier(tierName)
     const mapped = syncDelegate.tierForOwner(ownerTier)
@@ -35,7 +35,7 @@ test('EXEC_026_tierForOwner_is_identity_for_fast_and_deep', () => {
 
 // ── SyncDelegate.agentNameFor ────────────────────────────────────────────────
 
-test('EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder', () => {
+test('WHAT[DELEG-010] EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder', () => {
   for (const roleName of ['Inspector', 'Coder']) {
     for (const tierName of TIERS) {
       const name = syncDelegate.agentNameFor(syncDelegate.role(roleName), roles.tier(tierName))
@@ -46,7 +46,7 @@ test('EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder', () => {
 
 // ── ReuseScopeId / DedicatedDelegateKey ──────────────────────────────────────
 
-test('EXEC_026_ReuseScopeId_create_value_and_equals', () => {
+test('WHAT[DELEG-010] EXEC_026_ReuseScopeId_create_value_and_equals', () => {
   const a = reuseScopeId.create('owner-reuse-scope')
   const b = reuseScopeId.create('owner-reuse-scope')
   const c = reuseScopeId.create('other-scope')
@@ -56,7 +56,7 @@ test('EXEC_026_ReuseScopeId_create_value_and_equals', () => {
   assert.equal(reuseScopeId.equals(a, c), false)
 })
 
-test('EXEC_026_DedicatedDelegateKey_binds_scope_and_role', () => {
+test('WHAT[DELEG-010] EXEC_026_DedicatedDelegateKey_binds_scope_and_role', () => {
   const scope = reuseScopeId.create('scope-1')
   const key = dedicatedDelegateKey.create(scope, syncDelegate.role('Inspector'))
 

@@ -19,7 +19,7 @@ import { mapEntries } from '../../verification-system/tests/support/domain.mjs'
 const caseOf = (value) => value.cases()[value.tag]
 const permissionNames = (set) => [...set].map(caseOf).sort()
 
-test('STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
+test('WHAT[ENF-005] STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
   // Not the live Host execution-gate canary. Same capability set the schema is
   // built from: forged mutating/network/session tools stay outside the replica.
   const capabilities = toolCapabilitiesFor(Role.Coder, ProviderRequestKind.StrengthReplica)
@@ -46,7 +46,7 @@ test('STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_joi
   assert.equal(Frame.StrengthFrame_isAllowedTool('grep'), true)
 })
 
-test('STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking', () => {
+test('WHAT[ENF-005] STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking', () => {
   // Not the live Host permission-popup canary. `* = false` is the unit stand-in:
   // unknown tools are denied, so there is no permission-ask surface to raise.
   const entries = Object.fromEntries(mapEntries(Runtime.StrengthReplicaTools_exactReadonlyHostToolMap))

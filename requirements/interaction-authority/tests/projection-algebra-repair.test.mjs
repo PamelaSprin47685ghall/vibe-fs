@@ -26,7 +26,7 @@ const stage3Snapshot = (raw, extras = {}) =>
     hostReanchor: extras.hostReanchor,
   })
 
-test('PROJ_008_step4_InsertRepair_text_is_ProjectionConstants_RepairInstruction', () => {
+test('WHAT[INTERACTION-AUTHORITY-010] PROJ_008_step4_InsertRepair_text_is_ProjectionConstants_RepairInstruction', () => {
   assert.equal(typeof projectionConstants.RepairInstruction, 'string')
   assert.equal(projectionConstants.RepairInstruction, REPAIR_INSTRUCTION)
 

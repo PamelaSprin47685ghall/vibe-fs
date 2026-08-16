@@ -26,11 +26,11 @@ import {
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('PERSIST_005_modern_json_has_no_legacy_markers', () => {
+test('WHAT[DURABLE-EVENTS-009] PERSIST_005_modern_json_has_no_legacy_markers', () => {
   assert.equal(journal.containsLegacyFallbackFields('{"RuntimeStarted":{"Runtime":"rt"}}'), false)
 })
 
-test('PERSIST_001_runtime_started_pins_offset_on_serialize_and_deserialize', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_runtime_started_pins_offset_on_serialize_and_deserialize', () => {
   const started = runtimeStartedFact({ startedAt: '2026-01-01T00:00:00Z' })
   const line = journal.serializeFact(started)
   assert.match(line, /StartedAt[^Z]*Z|StartedAt.*\+00:00/, `offset must be pinned to UTC: ${line}`)
@@ -44,7 +44,7 @@ test('PERSIST_001_runtime_started_pins_offset_on_serialize_and_deserialize', () 
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
-test('PERSIST_001_handle_abandoned_pins_abandoned_at_offset', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_handle_abandoned_pins_abandoned_at_offset', () => {
   const value = fact('HandleAbandoned', {
     ParentSessionId: sessionId('ses_pin'),
     Handle: handleId.agent('h-pin'),
@@ -57,7 +57,7 @@ test('PERSIST_001_handle_abandoned_pins_abandoned_at_offset', () => {
   assert.equal(journal.serializeFact(decoded.value), line, 'offset must normalise to +00:00')
 })
 
-test('MIGRATION_handle_completed_without_completion_ref_gets_nulls_injected', () => {
+test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_completed_without_completion_ref_gets_nulls_injected', () => {
   // A 0.5.1 line: no CompletionRef / CompletionDigest keys.
   const modern = fact('HandleCompleted', {
     ParentSessionId: sessionId('ses_hc'),
@@ -82,7 +82,7 @@ test('MIGRATION_handle_completed_without_completion_ref_gets_nulls_injected', ()
   assert.equal(agentFactCaseOf(payloadOf(decoded.value)), 'HandleCompleted')
 })
 
-test('MIGRATION_handle_completed_with_completion_ref_passes_through', () => {
+test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_completed_with_completion_ref_passes_through', () => {
   const withRef = fact('HandleCompleted', {
     ParentSessionId: sessionId('ses_hc2'),
     Handle: handleId.agent('h-hc2'),
@@ -98,7 +98,7 @@ test('MIGRATION_handle_completed_with_completion_ref_passes_through', () => {
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
-test('MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () => {
+test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () => {
   const modern = fact('HandleLinked', {
     ParentSessionId: sessionId('ses_hl'),
     ChildSessionId: sessionId('ses_hl_child'),
@@ -121,7 +121,7 @@ test('MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () 
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
-test('MIGRATION_handle_linked_without_byname_replays_with_machine_name_fallback_marker', () => {
+test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_linked_without_byname_replays_with_machine_name_fallback_marker', () => {
   const modern = fact('HandleLinked', {
     ParentSessionId: sessionId('ses_hl_legacy'),
     ChildSessionId: sessionId('ses_hl_legacy_child'),
@@ -142,13 +142,13 @@ test('MIGRATION_handle_linked_without_byname_replays_with_machine_name_fallback_
   assert.match(migrated, /"TargetAgent":"fast-coder"/)
 })
 
-test('PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {
+test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {
   const decoded = journal.deserializeFact('{not json')
   assert.equal(decoded.ok, false)
   assert.equal(typeof decoded.error, 'string')
 })
 
-test('PERSIST_005_unknown_case_is_a_decode_error', () => {
+test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unknown_case_is_a_decode_error', () => {
   const decoded = journal.deserializeFact('{"NoSuchFactCase":{"X":1}}')
   assert.equal(decoded.ok, false)
 })

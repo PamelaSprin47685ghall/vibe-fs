@@ -54,7 +54,7 @@ const linkChild = async (journal, parent = 'ses_resume_parent', child = 'ses_res
   assert.equal(result.ok, true, JSON.stringify(result.error))
 }
 
-test('CRASH_018_config_registers_visible_continue_command', () => {
+test('WHAT[CRASH-018] CRASH_018_config_registers_visible_continue_command', () => {
   const config = { command: { existing: { template: 'keep me' } } }
   registerCommand(config)
   assert.equal(config.command.existing.template, 'keep me')
@@ -62,7 +62,7 @@ test('CRASH_018_config_registers_visible_continue_command', () => {
   assert.match(config.command.continue.description, /resume.*restart/i)
 })
 
-test('CRASH_018_non_continue_command_is_a_noop', async () => {
+test('WHAT[CRASH-018] CRASH_018_non_continue_command_is_a_noop', async () => {
   let adopted = false
   const output = { parts: [] }
   await continueBefore(undefined, undefined, () => { adopted = true; return okResult(undefined) }, {
@@ -74,7 +74,7 @@ test('CRASH_018_non_continue_command_is_a_noop', async () => {
   assert.deepEqual(output.parts, [])
 })
 
-test('CRASH_018_continue_discloses_restart_keeps_broken_tool_visible_and_process_locally_reenlists_survivor', async () => {
+test('WHAT[CRASH-018] CRASH_018_continue_discloses_restart_keeps_broken_tool_visible_and_process_locally_reenlists_survivor', async () => {
   await withJournal(async (journal) => {
     await linkChild(journal)
     const beforeRevision = journalRevision.value(agentJournal.revision(journal))
@@ -193,7 +193,7 @@ test('CRASH_018_continue_discloses_restart_keeps_broken_tool_visible_and_process
   })
 })
 
-test('CRASH_017_new_process_runtime_dispose_does_not_claim_or_abort_old_active_handle', async () => {
+test('WHAT[CRASH-017] CRASH_017_new_process_runtime_dispose_does_not_claim_or_abort_old_active_handle', async () => {
   await withJournal(async (journal) => {
     await linkChild(journal, 'ses_old_parent', 'ses_old_child', 'old-agent')
     const beforeRevision = journalRevision.value(agentJournal.revision(journal))
@@ -244,7 +244,7 @@ test('CRASH_017_new_process_runtime_dispose_does_not_claim_or_abort_old_active_h
   })
 })
 
-test('CRASH_018_missing_snapshot_is_visible_and_does_not_adopt_or_fail_future_use', async () => {
+test('WHAT[CRASH-018] CRASH_018_missing_snapshot_is_visible_and_does_not_adopt_or_fail_future_use', async () => {
   await withJournal(async (journal) => {
     await linkChild(journal, 'ses_no_snapshot_parent', 'ses_no_snapshot_child', 'no-snapshot-agent')
     const beforeRevision = journalRevision.value(agentJournal.revision(journal))

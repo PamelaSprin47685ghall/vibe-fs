@@ -53,13 +53,13 @@ const openSeeded = async (sid) => {
   } }
 }
 
-test('JNGD_nudge_fails_closed_without_journal', async () => {
+test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_fails_closed_without_journal', async () => {
   const outcome = await nudge(capturingPort([]), null, new Set(), sessionId('ses_jg'), undefined)
   assert.equal(outcomeName(outcome), 'Failed')
   assert.match(outcome.fields[0], /requires an AgentJournal/)
 })
 
-test('JNGD_nudge_fails_without_active_authority_profile', async () => {
+test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_fails_without_active_authority_profile', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
   const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
@@ -73,7 +73,7 @@ test('JNGD_nudge_fails_without_active_authority_profile', async () => {
   }
 })
 
-test('JNGD_nudge_sends_join_guard_continuation_and_claims', async () => {
+test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_sends_join_guard_continuation_and_claims', async () => {
   const sid = sessionId('ses_jg1')
   const { opened, cleanup } = await openSeeded(sid)
   try {

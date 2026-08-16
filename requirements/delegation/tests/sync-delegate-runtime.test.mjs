@@ -204,7 +204,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   assert.equal(handled, true)
 }
 
-test('DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order', async () => {
+test('WHAT[DELEG-008] DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order', async () => {
   await withHarness(async ({ runtime }) => {
     const owner = sessionId('ses_owner_observed_batch')
     const run = providerRun('asst_observed_batch')
@@ -228,7 +228,7 @@ test('DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host
   })
 })
 
-test('EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once', async () => {
+test('WHAT[DELEG-008] EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_batch'
     const run = providerRun('asst_batch')
@@ -276,7 +276,7 @@ test('EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_o
   })
 })
 
-test('EXEC_026_sync_delegate_different_run_overlap_is_rejected_not_queued', async () => {
+test('WHAT[DELEG-009] EXEC_026_sync_delegate_different_run_overlap_is_rejected_not_queued', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_inflight'
     const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'first in flight')
@@ -296,7 +296,7 @@ test('EXEC_026_sync_delegate_different_run_overlap_is_rejected_not_queued', asyn
   })
 })
 
-test('EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names', async () => {
+test('WHAT[DELEG-010] EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_tier'
     const inspectorP = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect please')
@@ -319,7 +319,7 @@ test('EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names', a
   })
 })
 
-test('EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast', async () => {
+test('WHAT[DELEG-010] EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast', async () => {
   await withHarness(async ({ runtime, prompts, createCalls, ownerTier }) => {
     const owner = 'ses_owner_keep_deep'
     const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect deep')
@@ -347,7 +347,7 @@ test('EXEC_026_sync_delegate_reuse_keeps_deep_inspector_when_owner_later_fast', 
 // requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs
 // (`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`). This harness's
 // fake SendPrompt records text/agent only and does not prove ProviderWire.
-test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
+test('WHAT[DELEG-009] G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_g2'
     const inspector = roles.of('Inspector')
@@ -415,7 +415,7 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
 
 // EXEC-031: a Completed turn without a bounded WorkRecord fails closed — the
 // last-message fallback must not count as success (residual OneShot analog).
-test('EXEC_031_completed_without_bounded_work_record_fails_closed', async () => {
+test('WHAT[DELEG-011] EXEC_031_completed_without_bounded_work_record_fails_closed', async () => {
   await withHarness(async ({ runtime, createCalls, prompts }) => {
     const owner = 'ses_owner_failclosed'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect without projector')
@@ -429,7 +429,7 @@ test('EXEC_031_completed_without_bounded_work_record_fails_closed', async () => 
   }, { project: false })
 })
 
-test('EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', async () => {
+test('WHAT[DELEG-012] EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', async () => {
   await withHarness(async ({ runtime, createCalls, prompts, journal }) => {
     const owner = 'ses_owner_bounded'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect module')
@@ -467,7 +467,7 @@ test('EXEC_031_bounded_work_record_answers_in_recent_work_not_raw_message', asyn
   })
 })
 
-test('EXEC_033_sync_delegate_transient_failure_does_not_fail_call_and_returns_after_retry', async () => {
+test('WHAT[DELEG-023] EXEC_033_sync_delegate_transient_failure_does_not_fail_call_and_returns_after_retry', async () => {
   await withHarness(async ({ runtime, createCalls, prompts }) => {
     const owner = 'ses_owner_retry'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect with transient failure')
@@ -503,7 +503,7 @@ test('EXEC_033_sync_delegate_transient_failure_does_not_fail_call_and_returns_af
   })
 })
 
-test('EXEC_033_sync_delegate_exhausted_failure_via_terminal_event_fails_call', async () => {
+test('WHAT[DELEG-023] EXEC_033_sync_delegate_exhausted_failure_via_terminal_event_fails_call', async () => {
   await withHarness(async ({ runtime, createCalls, prompts, notifyTerminal }) => {
     const owner = 'ses_owner_exhausted'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect with exhausted failure')

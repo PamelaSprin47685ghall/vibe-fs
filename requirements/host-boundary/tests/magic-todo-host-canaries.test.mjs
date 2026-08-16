@@ -30,7 +30,7 @@ const CALL = 'call_magic_todo_1'
 
 // ── Canary H — durable call → provider-run/XTrace carrier ───────────────────
 
-test('MAGIC_TODO_CANARY_H_journal_xtrace_uniquely_completes_host_carrier', () => {
+test('WHAT[HOST-BOUNDARY-012] MAGIC_TODO_CANARY_H_journal_xtrace_uniquely_completes_host_carrier', () => {
   const locate = {
     sessionID: SESSION,
     callID: CALL,
@@ -71,7 +71,7 @@ test('MAGIC_TODO_CANARY_H_journal_xtrace_uniquely_completes_host_carrier', () =>
   assert.equal(carrier.carrierMappingComplete, true)
 })
 
-test('MAGIC_TODO_CANARY_H_journal_mapping_fails_closed_on_host_part_mismatch', () => {
+test('WHAT[HOST-BOUNDARY-020] MAGIC_TODO_CANARY_H_journal_mapping_fails_closed_on_host_part_mismatch', () => {
   const locate = {
     sessionID: SESSION,
     callID: CALL,
@@ -103,7 +103,7 @@ test('MAGIC_TODO_CANARY_H_journal_mapping_fails_closed_on_host_part_mismatch', (
 
 // ── Canary A preconditions — registration + positional in-place mutation ────
 
-test('MAGIC_TODO_CANARY_A_PRE_before_in_place_mutation_reaches_executor_replacement_does_not', async () => {
+test('WHAT[HOST-BOUNDARY-019] MAGIC_TODO_CANARY_A_PRE_before_in_place_mutation_reaches_executor_replacement_does_not', async () => {
   const inPlaceArgs = sampleObligationTodoWriteArgs()
   const inPlace = await runHostV1ToolExecutePath({
     toolID: 'todowrite',
@@ -166,7 +166,7 @@ test('MAGIC_TODO_CANARY_A_PRE_before_in_place_mutation_reaches_executor_replacem
   assert.equal('obligations' in replaced.executorSawArgs, true, 'A′: original provider args remain untouched')
 })
 
-test('MAGIC_TODO_CANARY_A_PRE_definition_before_after_accept_host_positional_trigger', async () => {
+test('WHAT[HOST-BOUNDARY-019] MAGIC_TODO_CANARY_A_PRE_definition_before_after_accept_host_positional_trigger', async () => {
   const hooks = createMagicTodoContractHooks()
 
   const defOut = {

@@ -11,7 +11,7 @@ const { render, instructions } = await import('../../../dist/Execution/Delegatio
 
 const en = instructions('en')
 
-test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
+test('WHAT[DELEG-019] EXEC_008_child_background_uses_latest_durable_snapshot', () => {
   const lwrSnapshot = [
     'Opening',
     'LWR snapshot at turn 9',

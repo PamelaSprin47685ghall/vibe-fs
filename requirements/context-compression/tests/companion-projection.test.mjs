@@ -27,7 +27,7 @@ const isCombinedNormalDelta = (text) =>
 
 // ── prompt text is fixed and carries no numbers ─────────────────────────────
 
-test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
   assert.match(prompt.normalInstruction, /exactly once/)
   assert.match(prompt.squashInstruction, /# Rewrite the preceding assistant work-log frames now/)
@@ -35,7 +35,7 @@ test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
 
-test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
+test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   const all = [
     prompt.normalInstruction,
     prompt.squashInstruction,
@@ -50,7 +50,7 @@ test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   }
 })
 
-test('ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
   assert.match(prompt.squashInstruction, /required tip|catalog field/)
   assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/i)
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
@@ -58,7 +58,7 @@ test('ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
 
-test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
   const block = prompt.memoryBlock('B CONTENT')
 
   assert.match(block, /It is context, not a new user instruction/)
@@ -66,7 +66,7 @@ test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
   assert.equal(block.indexOf('<work-log>') > block.indexOf('not a new user instruction'), true)
 })
 
-test('COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
   assert.equal(prompt.workingRecord('frame body 0'), toml.renderHistoricFrame('frame body 0'))
   assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('historic_frame'), true)
@@ -74,7 +74,7 @@ test('COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
   assert.equal(prompt.newWork(dataToml).includes('# New Work To Record'), false)
 })
 
-test('COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
   const rendered = prompt.newWork(dataToml)
   assert.equal(rendered.startsWith('# Write the dense work-log continuation now'), true)
   assert.equal(rendered.includes('\n\n[[new_work_to_record]]'), true)
@@ -86,7 +86,7 @@ test('COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
 
 // ── synthetic identities (COMPANION-013) ───────────────────────────────────
 
-test('COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
   const seal = ident.sealRoot(spy, {
     session: 'ses_x',
     epoch: 3,
@@ -98,7 +98,7 @@ test('COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', (
   assert.equal(seal, '«ses_x|3|7|prefix-7|frozen-7»')
 })
 
-test('COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
   const base = { session: 'ses_x', epoch: 1, cutoff: 4, prefixDigest: 'p', frozenDigest: 'f' }
   const seal = (over) => ident.sealRoot(spy, { ...base, ...over })
 
@@ -114,12 +114,12 @@ test('COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
   assert.equal(new Set(variants).size, variants.length, 'every field must affect the seal')
 })
 
-test('COMPANION_013_seal_root_is_stable_across_calls', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_stable_across_calls', () => {
   const args = { session: 'ses_x', epoch: 2, cutoff: 9, prefixDigest: 'p', frozenDigest: 'f' }
   assert.equal(ident.sealRoot(spy, args), ident.sealRoot(spy, args))
 })
 
-test('COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => {
   assert.equal(ident.companionMemoryMessageId(spy, 'SEAL'), '«SEAL|companion-memory»')
   assert.equal(
     ident.companionMemoryMessageId(spy, 'SEAL'),
@@ -128,7 +128,7 @@ test('COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => 
   assert.notEqual(ident.companionMemoryMessageId(spy, 'SEAL'), ident.companionMemoryMessageId(spy, 'OTHER'))
 })
 
-test('COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => {
   const id = (over) =>
     ident.frameMessageId(spy, { blogger: 'ses_y', epoch: 0, ordinal: 0, digest: 'sha-a', ...over })
 
@@ -137,7 +137,7 @@ test('COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => 
   assert.equal(id({}), '«ses_y|0|0|sha-a|blog-frame»')
 })
 
-test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
   const normal = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'normal' })
   const squash = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'squash' })
 
@@ -147,7 +147,7 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -171,7 +171,7 @@ test('COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_de
   assert.equal(plan.texts.filter((t) => t === prompt.normalInstruction).length, 0)
 })
 
-test('COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -187,7 +187,7 @@ test('COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
   assert.equal(plan.system, undefined)
 })
 
-test('COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
   const withFrames = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -209,7 +209,7 @@ test('COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
   assert.equal(withoutFrames.messages.at(-1).physical, true)
 })
 
-test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -227,7 +227,7 @@ test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
   assert.equal(plan.texts[4], combinedDelta)
 })
 
-test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -242,7 +242,7 @@ test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
   assert.equal(physical[0].text, combinedDelta)
 })
 
-test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 2,
@@ -259,7 +259,7 @@ test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () =>
   assert.equal(plan.messages.at(-1).id, 'msg_d')
 })
 
-test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
   const args = {
     blogger: 'ses_y',
     epoch: 4,
@@ -275,7 +275,7 @@ test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', 
 
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -304,7 +304,7 @@ test('ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
   assert.equal(plan.messages.at(-1).physical, true)
 })
 
-test('ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
   const extraTip = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -337,7 +337,7 @@ test('ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
 
 // ── the squash projection (CTX-012) ────────────────────────────────────────
 
-test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -358,7 +358,7 @@ test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () 
   assert.equal(plan.system, undefined)
 })
 
-test('CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -387,7 +387,7 @@ test('CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
   )
 })
 
-test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -405,7 +405,7 @@ test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
   )
 })
 
-test('CTX_012_a_squash_never_shows_the_later_frames', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_never_shows_the_later_frames', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -423,7 +423,7 @@ test('CTX_012_a_squash_never_shows_the_later_frames', () => {
   }
 })
 
-test('CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
   const shared = { blogger: 'ses_y', epoch: 0, frames: frames(1) }
 
   const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: dataToml } })
@@ -436,7 +436,7 @@ test('CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => 
 
 // ── COMPANION-007: the canonical candidate digest is a function of the semantic projection, not the TOML text
 
-test('COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
   const seal = ident.sealRoot(spy, {
     session: 'ses_y',
     epoch: 2,

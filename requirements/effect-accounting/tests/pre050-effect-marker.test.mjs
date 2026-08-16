@@ -9,7 +9,7 @@ import test from 'node:test'
 
 import { journal } from '../../verification-system/tests/support/domain.mjs'
 
-test('PERSIST_005_pre050_marker_refuses_with_migration_message', () => {
+test('WHAT[EFFECT-ACCOUNTING-010] PERSIST_005_pre050_marker_refuses_with_migration_message', () => {
   for (const marker of [
     '"FailuresOnCurrentSide"',
     '"IsDead"',

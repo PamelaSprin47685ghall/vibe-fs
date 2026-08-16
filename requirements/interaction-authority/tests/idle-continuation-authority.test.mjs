@@ -59,7 +59,7 @@ const capturingPort = (sends) => ({
   ListChildren: async () => ({ tag: 0, fields: [[]] }),
 })
 
-test('HOST_004_idle_manager_continuation_consumes_one_permit_and_claims_once', async () => {
+test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consumes_one_permit_and_claims_once', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'idle-authority-'))
   const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))

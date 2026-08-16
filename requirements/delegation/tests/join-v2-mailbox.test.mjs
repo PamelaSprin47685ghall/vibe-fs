@@ -51,14 +51,14 @@ const ptyIdOfDrained = (item) => completionMailbox.ptyIdOf(item)
 
 // ── MaxJoinBatch constant ────────────────────────────────────────────────────
 
-test('EXEC_018_max_join_batch_is_32', () => {
+test('WHAT[DELEG-013] EXEC_018_max_join_batch_is_32', () => {
   assert.equal(maxJoinBatch, 32)
   assert.equal(completionMailbox.maxJoinBatch, 32)
 })
 
 // ── 5: 33 completions → first drain 32, second drain 1 ───────────────────────
 
-test('EXEC_018_thirty_three_completions_split_across_two_drains', () => {
+test('WHAT[DELEG-013] EXEC_018_thirty_three_completions_split_across_two_drains', () => {
   const box = completionMailbox.create()
   for (let i = 0; i < 33; i += 1) {
     completionMailbox.publish(box, run(`c${i}`))
@@ -79,7 +79,7 @@ test('EXEC_018_thirty_three_completions_split_across_two_drains', () => {
 
 // ── 6: no duplicate handle in a drained batch ────────────────────────────────
 
-test('EXEC_018_drained_batch_has_unique_agent_ids', () => {
+test('WHAT[DELEG-013] EXEC_018_drained_batch_has_unique_agent_ids', () => {
   const box = completionMailbox.create()
   for (const id of ['x', 'y', 'z', 'x2', 'y2']) {
     completionMailbox.publish(box, run(id))
@@ -92,7 +92,7 @@ test('EXEC_018_drained_batch_has_unique_agent_ids', () => {
 
 // ── 7: second drain does not re-deliver consumed completions ─────────────────
 
-test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
+test('WHAT[DELEG-013] EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
   const box = completionMailbox.create()
   completionMailbox.publish(box, run('once'))
   const first = completionMailbox.drainPtyCompletions(box, 1)
@@ -106,7 +106,7 @@ test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
 
 // ── 1: WaitForSignal + operator abort → LocalInterrupt OperatorAbort ─────────
 
-test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async () => {
+test('WHAT[DELEG-015] EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -118,7 +118,7 @@ test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async ()
 
 // ── 1b: WaitForSignal + UserMessageArrived (registry signal, not OperatorAbort)
 
-test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async () => {
+test('WHAT[DELEG-015] EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -129,7 +129,7 @@ test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async
   assert.notEqual(caseOf(payloadOf(reason)), 'OperatorAbort')
 })
 
-test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
+test('WHAT[DELEG-015] EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -144,7 +144,7 @@ test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
 })
 
 // EXEC-017: two active attempts in one session both receive UserMessageArrived.
-test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () => {
+test('WHAT[DELEG-015] EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () => {
   const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-fanout')
   const a1 = registry.Begin(session, undefined)
@@ -166,7 +166,7 @@ test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () =
 
 // EXEC-017: a user message with no active attempt is dropped as a join wake;
 // a future join remains blocked until completion, a new user message, or Esc.
-test('EXEC_017_join_interrupt_registry_signal_with_no_active_attempt_does_not_wake_future_join', async () => {
+test('WHAT[DELEG-015] EXEC_017_join_interrupt_registry_signal_with_no_active_attempt_does_not_wake_future_join', async () => {
   const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-no-future-wake')
 
@@ -183,7 +183,7 @@ test('EXEC_017_join_interrupt_registry_signal_with_no_active_attempt_does_not_wa
 
 // SessionDeleted cleanup: ClearSession removes active attempts without signaling, so a
 // later Begin stays blocked (no residual latch).
-test('EXEC_017_join_interrupt_registry_clear_session_removes_active_attempts', async () => {
+test('WHAT[DELEG-015] EXEC_017_join_interrupt_registry_clear_session_removes_active_attempts', async () => {
   const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-clear')
 
@@ -204,7 +204,7 @@ test('EXEC_017_join_interrupt_registry_clear_session_removes_active_attempts', a
 // mailbox wait setup is recorded on this attempt's
 // own TCS and still wakes the current join. The signal-before-register race is
 // solved by the attempt scope, not by a session-level latch.
-test('EXEC_017_join_attempt_signal_before_mailbox_setup_wakes_current_join', async () => {
+test('WHAT[DELEG-015] EXEC_017_join_attempt_signal_before_mailbox_setup_wakes_current_join', async () => {
   const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-p0-3')
 
@@ -222,7 +222,7 @@ test('EXEC_017_join_attempt_signal_before_mailbox_setup_wakes_current_join', asy
 })
 
 // EXEC-017: after join A disposes, later join B must not inherit A's signal.
-test('EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join', async () => {
+test('WHAT[DELEG-015] EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join', async () => {
   const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-p0-4')
 
@@ -241,7 +241,7 @@ test('EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join', async () 
 
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────
 
-test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async () => {
+test('WHAT[DELEG-015] EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -257,7 +257,7 @@ test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async
 
 // ── 3: after interrupt, next join/drain obtains the later completion ─────────
 
-test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () => {
+test('WHAT[DELEG-015] EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -275,7 +275,7 @@ test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () 
 
 // ── 8: drain-before-interrupt — completion already queued wins ───────────────
 
-test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => {
+test('WHAT[DELEG-013] EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => {
   const box = completionMailbox.create()
   completionMailbox.publish(box, run('already-done'))
 
@@ -301,7 +301,7 @@ test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => 
 
 // ── NonEmptyBatch + JoinWaitOutcome shape ────────────────────────────────────
 
-test('EXEC_018_non_empty_batch_and_join_wait_outcome_constructors', () => {
+test('WHAT[DELEG-013] EXEC_018_non_empty_batch_and_join_wait_outcome_constructors', () => {
   assert.equal(nonEmptyBatch.tryOfList([]), undefined)
   const batch = nonEmptyBatch.tryOfList([run('h'), run('t')])
   assert.ok(batch !== undefined)
@@ -314,7 +314,7 @@ test('EXEC_018_non_empty_batch_and_join_wait_outcome_constructors', () => {
 
 // ── 11: Orchestrator VerdictMailbox FIFO TryJoinBatch ────────────────────────
 
-test('EXEC_019_verdict_mailbox_try_join_batch_preserves_publish_fifo', async () => {
+test('WHAT[DELEG-014] EXEC_019_verdict_mailbox_try_join_batch_preserves_publish_fifo', async () => {
   const box = verdictMailbox.create()
   verdictMailbox.startJob(box)
   verdictMailbox.startJob(box)
@@ -333,7 +333,7 @@ test('EXEC_019_verdict_mailbox_try_join_batch_preserves_publish_fifo', async () 
   assert.equal(verdictMailbox.pendingCount(box), 0)
 })
 
-test('EXEC_019_verdict_mailbox_join_available_interrupt_without_verdict', async () => {
+test('WHAT[DELEG-015] EXEC_019_verdict_mailbox_join_available_interrupt_without_verdict', async () => {
   const box = verdictMailbox.create()
   // Active job keeps JoinAvailable waiting; interrupt returns InterruptedByUserMessage.
   verdictMailbox.startJob(box)
@@ -346,7 +346,7 @@ test('EXEC_019_verdict_mailbox_join_available_interrupt_without_verdict', async 
   assert.equal(caseOf(payloadOf(outcome)), 'OperatorAbort')
 })
 
-test('EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_interrupt', async () => {
+test('WHAT[DELEG-015] EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_interrupt', async () => {
   const box = verdictMailbox.create()
   verdictMailbox.startJob(box)
   verdictMailbox.publish(box, verdictMailbox.rejectedDirty('preloaded'))
@@ -362,7 +362,7 @@ test('EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_inter
 
 // ── Cancel is lifecycle only (still available; interrupt path does not call it)
 
-test('EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
+test('WHAT[DELEG-015] EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
   const box = completionMailbox.create()
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -381,7 +381,7 @@ test('EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
 // human_root_interrupt must not call JoinInterruptReason.OperatorAbort as the
 // primary stimulus. Comments that forbid OperatorAbort are allowed.
 
-test('EXEC_017_anti_cheat_user_message_tests_must_not_use_operator_abort_stimulus', () => {
+test('WHAT[DELEG-015] EXEC_017_anti_cheat_user_message_tests_must_not_use_operator_abort_stimulus', () => {
   const source = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8')
   const titleNeedle = /user_message|UserMessageArrived|human_root_interrupt/i
   const testOpenRe =

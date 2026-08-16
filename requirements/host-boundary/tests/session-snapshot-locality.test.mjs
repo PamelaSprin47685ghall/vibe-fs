@@ -20,7 +20,7 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
   ],
 })
 
-test('TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart', () => {
+test('WHAT[HOST-BOUNDARY-012] TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart', () => {
   const messages = sessionSnapshot.projectMessages([assistantToolMessage()])
   const located = sessionSnapshot.locateToolCall(toolCallId('call_todo'), messages)
 
@@ -33,7 +33,7 @@ test('TODO-004 resolves a tool callback through its persisted assistant run and 
   assert.equal(located.value.InputCanonical, '{"todos":[{"content":"Ship locality","priority":"high","status":"in_progress"}]}')
 })
 
-test('HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
+test('WHAT[HOST-BOUNDARY-006] HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
   const messages = sessionSnapshot.projectMessages([
     {
       info: { id: 'asst_failed', role: 'assistant', finish: 'tool-calls' },
@@ -61,7 +61,7 @@ test('HOST-004 keeps failed session tool state consistent across Parts and ToolP
   assert.equal(caseOf(messages[0].ToolParts[0].State), 'Failed')
 })
 
-test('TODO-004 rejects a call id observed in more than one persisted ToolPart', () => {
+test('WHAT[HOST-BOUNDARY-009] TODO-004 rejects a call id observed in more than one persisted ToolPart', () => {
   const messages = sessionSnapshot.projectMessages([
     assistantToolMessage({ messageID: 'asst_1', partID: 'part_1' }),
     assistantToolMessage({ messageID: 'asst_2', partID: 'part_2' }),

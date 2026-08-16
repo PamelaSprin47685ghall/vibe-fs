@@ -220,7 +220,7 @@ const withHarness = async (selectedAgent, fn) => {
   }
 }
 
-test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_child_lwr_then_returns_to_same_deep_binding', async () => {
+test('WHAT[DELEG-018] AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_child_lwr_then_returns_to_same_deep_binding', async () => {
   await withHarness('deep-coder', async ({ journal, owner, root, sends, creates, ownedChildren, sensor, host, bindRun }) => {
     const run = 'asst_deep_help'
     bindRun(run)
@@ -289,7 +289,7 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
   })
 })
 
-test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_cannot_resurrect_owner', async () => {
+test('WHAT[DELEG-018] AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_cannot_resurrect_owner', async () => {
   await withHarness('deep-coder', async ({ journal, owner, root, sends, creates, sensor, host, bindRun }) => {
     const run = 'asst_cancel_help'
     bindRun(run, 'deep-coder')
@@ -310,7 +310,7 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
   })
 })
 
-test('AGENT_031_consultation_child_transient_failure_does_not_fail_consultation_and_returns_after_retry', async () => {
+test('WHAT[DELEG-023] AGENT_031_consultation_child_transient_failure_does_not_fail_consultation_and_returns_after_retry', async () => {
   await withHarness('deep-coder', async ({ journal, owner, root, sends, creates, ownedChildren, sensor, host, bindRun }) => {
     const run = 'asst_deep_retry_help'
     bindRun(run)

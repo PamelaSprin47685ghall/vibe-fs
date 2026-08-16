@@ -16,7 +16,7 @@ const linked = (pairs, start = assoc.empty) =>
     return result.value
   }, start)
 
-test('PERSIST_008_both_directions_answer_from_one_map_without_a_scan', () => {
+test('WHAT[DURABLE-EVENTS-013] PERSIST_008_both_directions_answer_from_one_map_without_a_scan', () => {
   // The reason both entries live in one map: `isCompanion` and `bloggerOf` are the
   // two questions the transform boundary asks on every request, and a reverse index
   // held separately could disagree with the forward one.

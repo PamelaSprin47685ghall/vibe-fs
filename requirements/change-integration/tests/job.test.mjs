@@ -87,7 +87,7 @@ const payloadAt = (head, job) =>
 
 // ── ORCH-003: one job, one worktree, one Manager, for life ───────────────────
 
-test('ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity', () => {
+test('WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity', () => {
   const job = orchestratorProjection.tryFind(JOB, created())
 
   // `ManagerAgent` is the exact agent, not a bare role: recovery must restore
@@ -117,7 +117,7 @@ test('ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identit
   )
 })
 
-test('ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic', () => {
+test('WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic', () => {
   // Both are recorded, and they are different kinds. A moved worktree must not
   // orphan its job, so recovery keys on the identity; the path is mutable state
   // that exists for a human reading a diagnostic.
@@ -127,7 +127,7 @@ test('ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnost
   assert.equal(idValue.worktreeIdentity(job.WorktreeIdentity), 'wt_1')
 })
 
-test('ORCH_003_only_progress_ever_changes_after_creation', () => {
+test('WHAT[CHGINT-009] ORCH_003_only_progress_ever_changes_after_creation', () => {
   // The worktree and the Manager are fixed for the job's whole life, which is why
   // `recordProgress` replaces exactly one field.
   const before = orchestratorProjection.tryFind(JOB, created())
@@ -147,7 +147,7 @@ test('ORCH_003_only_progress_ever_changes_after_creation', () => {
   assert.notEqual(orchestratorProjection.progressOf(after), orchestratorProjection.progressOf(before))
 })
 
-test('ORCH_003_progress_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
+test('WHAT[CHGINT-006] ORCH_003_progress_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
   // Creating a job on the strength of a progress fact would invent one with no
   // worktree and no Manager — the "unknown-job" sentinel shape the domain avoids.
   const projection = orchestratorProjection.recordProgress(
@@ -160,7 +160,7 @@ test('ORCH_003_progress_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', 
   assert.equal(isSome(orchestratorProjection.tryFind(managerJobId('never'), projection)), false)
 })
 
-test('ORCH_003_a_manager_session_resolves_to_its_one_job', () => {
+test('WHAT[CHGINT-009] ORCH_003_a_manager_session_resolves_to_its_one_job', () => {
   // REVIEW-006 needs `ManagerJobId` and `WorktreeIdentity` inside every confirmed
   // witness, and the reviewer path holds only the session id.
   let projection = created()
@@ -182,7 +182,7 @@ test('ORCH_003_a_manager_session_resolves_to_its_one_job', () => {
 
 // ── ORCH-004: jobs run in parallel; only the ref mutation serialises ─────────
 
-test('ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () => {
+test('WHAT[CHGINT-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () => {
   let projection = created()
   projection = orchestratorProjection.createJob(
     createPayload({ ManagerJobId: managerJobId('job_2'), ManagerSessionId: sessionId('ses_m2') }),
@@ -203,7 +203,7 @@ test('ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () 
   )
 })
 
-test('ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () => {
+test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () => {
   // Removing it would make a replayed `Published` create a fresh entry — the job
   // would reopen at ManagerStarted and its Manager would be resumed.
   const published = orchestratorProjection.recordProgress(JOB, progress.published(), created())
@@ -215,7 +215,7 @@ test('ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () =>
   assert.equal(orchestratorProjection.progressOf(orchestratorProjection.tryFind(JOB, replayed)), 'Published')
 })
 
-test('ORCH_006_a_terminal_job_accepts_no_further_progress', () => {
+test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_accepts_no_further_progress', () => {
   // Not merely idempotent for the same fact: a LATER fact must not reopen it
   // either, or a stale in-flight write could resurrect a finished job.
   const published = orchestratorProjection.recordProgress(JOB, progress.published(), created())
@@ -226,7 +226,7 @@ test('ORCH_006_a_terminal_job_accepts_no_further_progress', () => {
   }
 })
 
-test('ORCH_006_all_three_terminal_cases_end_the_job', () => {
+test('WHAT[CHGINT-006] ORCH_006_all_three_terminal_cases_end_the_job', () => {
   for (const terminal of [progress.published(), progress.failed(), progress.abandoned()]) {
     const projection = orchestratorProjection.recordProgress(JOB, terminal, created())
     assert.equal(orchestratorProjection.activeJobs(projection).length, 0)
@@ -236,7 +236,7 @@ test('ORCH_006_all_three_terminal_cases_end_the_job', () => {
 
 // ── ORCH-007: exactly one recovery action per job ───────────────────────────
 
-test('ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alone', () => {
+test('WHAT[CHGINT-012] ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alone', () => {
   // These three do not read the target ref at all, so passing no head must still
   // produce the real action rather than fail closed.
   assert.equal(actionAt(undefined, jobAt(progress.managerStarted())), 'ResumeManager')
@@ -248,7 +248,7 @@ test('ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alon
   assert.equal(actionAt('h1', jobAt(progress.candidateReady())), 'RebaseReviewPublish')
 })
 
-test('ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files', () => {
+test('WHAT[CHGINT-005] ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files', () => {
   // The clause requires the SAME Manager in the SAME worktree, so the action
   // carries what that Manager needs rather than a flag that says "conflict".
   const job = jobAt(progress.conflictPending(['src/a.fs', 'src/b.fs']))
@@ -262,7 +262,7 @@ test('ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_file
   )
 })
 
-test('ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
+test('WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
   const job = jobAt(progress.rebased('h1'))
 
   // Unchanged: acquire the short gate and attempt the ff against the head the
@@ -277,14 +277,14 @@ test('ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved
   )
 })
 
-test('REVIEW_008_a_moved_target_discards_the_post_rebase_witness', () => {
+test('WHAT[CHGINT-013] REVIEW_008_a_moved_target_discards_the_post_rebase_witness', () => {
   // ORCH-005 explicitly allows the target to move while this job holds no lock.
   // The post-rebase witness is then for the wrong base, so it must not be reused —
   // rebase and review again rather than publish against a base nobody reviewed.
   assert.equal(actionAt('h2', jobAt(progress.rebased('h1'))), 'RebaseAndReviewAgain')
 })
 
-test('ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order', () => {
+test('WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order', () => {
   const job = jobAt(progress.publishClaimed())
 
   // Branch 1 first: the head already IS the rebased commit, so the ff happened
@@ -313,7 +313,7 @@ test('ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_orde
   assert.equal(actionAt('h9', job), 'RebaseAndReviewAgain')
 })
 
-test('ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case', () => {
+test('WHAT[CHGINT-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case', () => {
   // `GetTargetHead` failing must never fall back to HEAD. Both head-dependent
   // cases refuse, and the reason says which clause forbids the fallback.
   for (const value of [progress.rebased(), progress.publishClaimed()]) {
@@ -323,7 +323,7 @@ test('ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_c
   }
 })
 
-test('ORCH_007_every_progress_case_yields_exactly_one_action', () => {
+test('WHAT[CHGINT-003] ORCH_007_every_progress_case_yields_exactly_one_action', () => {
   // Totality, asserted as a table. A new `JobProgress` case with no branch would
   // make `recoveryAction` throw here rather than silently pick a neighbour.
   const table = [
@@ -373,7 +373,7 @@ const foldFacts = (facts) =>
     facts.map((value, index) => envelope({ seq: index + 1, stream: stream.session(MANAGER), fact: value })),
   )
 
-test('ORCH_006_the_journal_replays_into_the_latest_progress_only', () => {
+test('WHAT[CHGINT-006] ORCH_006_the_journal_replays_into_the_latest_progress_only', () => {
   const folded = foldFacts([orchestratorFact.created, orchestratorFact.candidate, orchestratorFact.published])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -386,7 +386,7 @@ test('ORCH_006_the_journal_replays_into_the_latest_progress_only', () => {
   assert.equal(orchestratorProjection.activeJobs(jobs).length, 0)
 })
 
-test('ORCH_006_a_progress_fact_before_its_create_is_dropped_not_promoted', () => {
+test('WHAT[CHGINT-006] ORCH_006_a_progress_fact_before_its_create_is_dropped_not_promoted', () => {
   // No job exists yet, so there is nothing to record against. Inventing one would
   // give it no worktree and no Manager.
   const folded = foldFacts([orchestratorFact.candidate])
@@ -395,7 +395,7 @@ test('ORCH_006_a_progress_fact_before_its_create_is_dropped_not_promoted', () =>
   assert.equal(isSome(orchestratorProjection.tryFind(JOB, fold.orchestrator(folded.value))), false)
 })
 
-test('ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress', () => {
+test('WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress', () => {
   // Restart recovery re-reads the journal from the beginning, and PERSIST-009's
   // durable-effect protocol retries after `CommitUnknown` — so one journal can
   // legitimately carry the same `ManagerJobCreated` twice.
@@ -418,7 +418,7 @@ test('ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress
   assert.equal(actionAt('r1', orchestratorProjection.tryFind(JOB, jobs)), 'CleanUp')
 })
 
-test('ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
+test('WHAT[CHGINT-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
   // The identity is fixed for the job's whole life, so a second create has
   // nothing new to say — including when it disagrees.
   const first = created()
@@ -453,7 +453,7 @@ const worktreeFact = {
   }),
 }
 
-test('PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
+test('WHAT[CHGINT-006] PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
   const folded = foldFacts([worktreeFact.requested, worktreeFact.created])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -461,7 +461,7 @@ test('PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
 })
 
-test('PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested', () => {
+test('WHAT[CHGINT-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested', () => {
   // CommitUnknown retry may rewrite Requested after Accept. Fold must refuse
   // Accepted → Requested regression (PERSIST-009).
   const folded = foldFacts([worktreeFact.requested, worktreeFact.created, worktreeFact.requested])
@@ -471,7 +471,7 @@ test('PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested'
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
 })
 
-test('PERSIST_009_duplicate_created_is_idempotent', () => {
+test('WHAT[CHGINT-006] PERSIST_009_duplicate_created_is_idempotent', () => {
   const folded = foldFacts([worktreeFact.requested, worktreeFact.created, worktreeFact.created])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -479,7 +479,7 @@ test('PERSIST_009_duplicate_created_is_idempotent', () => {
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
 })
 
-test('PERSIST_009_request_alone_is_not_created', () => {
+test('WHAT[CHGINT-006] PERSIST_009_request_alone_is_not_created', () => {
   const folded = foldFacts([worktreeFact.requested])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -487,7 +487,7 @@ test('PERSIST_009_request_alone_is_not_created', () => {
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Requested')
 })
 
-test('PERSIST_009_direct_request_accept_helpers_match_fold', () => {
+test('WHAT[CHGINT-006] PERSIST_009_direct_request_accept_helpers_match_fold', () => {
   let proj = orchestratorProjection.empty
   proj = orchestratorProjection.requestWorktree(WT, WT_PATH, JOB, proj)
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, proj), 'Requested')

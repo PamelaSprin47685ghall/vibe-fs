@@ -16,7 +16,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => new D
   eventId(id(n)), streamId('append/proof'), type, toList(parents.map((p) => eventId(id(p)))), payload, toList([]),
 )
 
-test('append_commits_complete_canonical_line_then_updates_Current', async () => {
+test('WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current', async () => {
   const local = createLocalEventStore({ writerId: 'append-proof' })
   try {
     const e = event(1)
@@ -31,7 +31,7 @@ test('append_commits_complete_canonical_line_then_updates_Current', async () => 
   }
 })
 
-test('semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
+test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
   const local = createLocalEventStore({ writerId: 'semantic-cut-proof' })
   try {
     const bad = event(10, [], 'InspectorCaseCaptured', {})
@@ -66,7 +66,7 @@ test('semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_ne
   }
 })
 
-test('append_rejects_missing_parent_without_writing_bytes', async () => {
+test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_bytes', async () => {
   const local = createLocalEventStore({ writerId: 'missing-parent-proof' })
   try {
     const file = path.join(local.commonDir, 'wanxiang', 'events', 'missing-parent-proof.ndjson')
@@ -79,7 +79,7 @@ test('append_rejects_missing_parent_without_writing_bytes', async () => {
   }
 })
 
-test('append_rejects_cycle_in_one_batch_before_durability', async () => {
+test('WHAT[DURABLE-EVENTS-007] append_rejects_cycle_in_one_batch_before_durability', async () => {
   const local = createLocalEventStore({ writerId: 'cycle-proof' })
   try {
     const a = event(1, [2])
@@ -93,7 +93,7 @@ test('append_rejects_cycle_in_one_batch_before_durability', async () => {
   }
 })
 
-test('append_rejects_unknown_event_type_fail_closed', async () => {
+test('WHAT[DURABLE-EVENTS-007] append_rejects_unknown_event_type_fail_closed', async () => {
   const local = createLocalEventStore()
   try {
     assert.equal(resultOf(await local.store.Append(toList([event(1, [], 'UnknownFutureEvent')]))).ok, false)
@@ -102,7 +102,7 @@ test('append_rejects_unknown_event_type_fail_closed', async () => {
   }
 })
 
-test('append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
+test('WHAT[DURABLE-EVENTS-004] append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
   const local = createLocalEventStore({ writerId: 'lock-release-proof' })
   try {
     assert.equal(resultOf(await local.store.Append(toList([event(1)]))).ok, true)
@@ -116,7 +116,7 @@ test('append_task_does_not_return_until_the_cross_process_store_lock_is_released
   }
 })
 
-test('append_cost_contract_is_independent_of_history_and_EventId_distribution', async () => {
+test('WHAT[DURABLE-EVENTS-017] append_cost_contract_is_independent_of_history_and_EventId_distribution', async () => {
   const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
   const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source + log, /SegmentMaxBytes|EventIdShard|index\/|WriteTree|CompareAndSwapRef|materializeSnapshot/)

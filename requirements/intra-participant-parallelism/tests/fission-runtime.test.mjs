@@ -46,7 +46,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime: createAdmission(deps) }
 }
 
-test('admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input before interrupt', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input', async () => {
   const { events, runtime } = harness()
   const owner = sessionId('old-caller')
   const result = await admit(runtime, owner, parsed())
@@ -59,13 +59,20 @@ test('admission creates fresh sibling sessions with old parent and starts from L
   assert.match(starts[0][3], /CANONICAL-LWR/)
   assert.match(starts[0][3], /lane A  /, 'lane input spaces are preserved')
   assert.match(starts[1][3], /lane B/)
-
-  const interruptAt = events.findIndex(([kind]) => kind === 'silent-interrupt')
-  assert.ok(interruptAt > events.findLastIndex(([kind]) => kind === 'start'), 'old caller interrupts only after every lane started')
   assert.equal(isActive(runtime, owner), true)
 })
 
-test('user-facing root caller is rejected before fission reserves or creates anything', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-005] old caller silent-interrupts only after every lane started', async () => {
+  const { events, runtime } = harness()
+  const owner = sessionId('old-caller-interrupt-order')
+  const result = await admit(runtime, owner, parsed())
+  assert.equal(caseOf(result), 'Ok')
+
+  const interruptAt = events.findIndex(([kind]) => kind === 'silent-interrupt')
+  assert.ok(interruptAt > events.findLastIndex(([kind]) => kind === 'start'), 'old caller interrupts only after every lane started')
+})
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejected before fission reserves or creates anything', async () => {
   const { events, runtime } = harness({ parent: null })
   const owner = sessionId('root-caller')
   const result = await admit(runtime, owner, parsed())
@@ -75,7 +82,7 @@ test('user-facing root caller is rejected before fission reserves or creates any
   assert.equal(isActive(runtime, owner), false)
 })
 
-test('partial create or start failure rolls back every created lane and never interrupts old caller', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-004] partial create or start failure rolls back every created lane and never interrupts old caller', async () => {
   for (const options of [{ failCreateAt: 1 }, { failStartAt: 1 }]) {
     const { events, runtime } = harness(options)
     const owner = sessionId(`owner-${JSON.stringify(options)}`)
@@ -89,13 +96,15 @@ test('partial create or start failure rolls back every created lane and never in
   }
 })
 
-test('failed silent interrupt rolls back lanes; second admission while active is rejected until release', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-005] failed silent interrupt rolls back lanes and old caller stays out of active set', async () => {
   const failed = harness({ failInterrupt: true })
   const failedOwner = sessionId('interrupt-owner')
   assert.equal(caseOf(await admit(failed.runtime, failedOwner, parsed())), 'Error')
   assert.equal(failed.events.filter(([k]) => k === 'rollback').length, 2)
   assert.equal(isActive(failed.runtime, failedOwner), false)
+})
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-011] second admission while active is rejected as AlreadyFissioned until release', async () => {
   const live = harness()
   const owner = sessionId('single-flight-owner')
   assert.equal(caseOf(await admit(live.runtime, owner, parsed())), 'Ok')
@@ -106,7 +115,7 @@ test('failed silent interrupt rolls back lanes; second admission while active is
   assert.equal(isActive(live.runtime, owner), false)
 })
 
-test('FissionRuntime preserves silent interrupt across multiple checks and is cleared only by clearOwner/clearSilentInterrupt', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-005] FissionRuntime preserves silent interrupt across multiple checks and is cleared only by clearOwner/clearSilentInterrupt', async () => {
   const {
     FissionRuntime_markSilentInterrupt: markSilentInterrupt,
     FissionRuntime_isSilentInterrupt: isSilentInterrupt,
@@ -134,7 +143,7 @@ test('FissionRuntime preserves silent interrupt across multiple checks and is cl
   assert.equal(isSilentInterrupt(owner), false)
 })
 
-test('observeLaneTurn and OrdinaryTurnWorkflow absorb Fission-replaced owner turns without sending continuations', async () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] observeLaneTurn and OrdinaryTurnWorkflow absorb Fission-replaced owner turns without sending continuations', async () => {
   const {
     FissionRuntime_markSilentInterrupt: markSilentInterrupt,
     FissionRuntime_clearOwner: clearOwner,

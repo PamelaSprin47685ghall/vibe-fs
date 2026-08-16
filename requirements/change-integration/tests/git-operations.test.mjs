@@ -38,7 +38,7 @@ const WORKTREE = '/repo/.worktrees/job-1'
 
 // ── FreezeTargetBranch ───────────────────────────────────────────────────────
 
-test('GIT_freeze_target_branch_reads_symbolic_ref', async () => {
+test('WHAT[CHGINT-008] GIT_freeze_target_branch_reads_symbolic_ref', async () => {
   const { runner } = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
   const port = createWithRepo(REPO, runner)
 
@@ -47,7 +47,7 @@ test('GIT_freeze_target_branch_reads_symbolic_ref', async () => {
   assert.equal(result.value.fields[0], 'main')
 })
 
-test('GIT_freeze_target_branch_refuses_detached_head', async () => {
+test('WHAT[CHGINT-008] GIT_freeze_target_branch_refuses_detached_head', async () => {
   const { runner } = fakeRunner([['symbolic-ref --short HEAD', [128, '', 'fatal: ref HEAD is not a symbolic ref']]])
   const port = createWithRepo(REPO, runner)
 
@@ -56,7 +56,7 @@ test('GIT_freeze_target_branch_refuses_detached_head', async () => {
   assert.match(result.error, /fatal: ref HEAD is not a symbolic ref/)
 })
 
-test('GIT_freeze_target_branch_blank_stdout_is_detached', async () => {
+test('WHAT[CHGINT-008] GIT_freeze_target_branch_blank_stdout_is_detached', async () => {
   const { runner } = fakeRunner([['symbolic-ref --short HEAD', [0, '  \n', '']]])
   const port = createWithRepo(REPO, runner)
 
@@ -67,7 +67,7 @@ test('GIT_freeze_target_branch_blank_stdout_is_detached', async () => {
 
 // ── IsDirty ──────────────────────────────────────────────────────────────────
 
-test('GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
+test('WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
   const { runner: dirtyRunner } = fakeRunner([['status --porcelain', [0, ' M file.fs\n', '']]])
   assert.equal(await createWithRepo(REPO, dirtyRunner).IsDirty(worktreePath(WORKTREE)), true)
 
@@ -80,14 +80,14 @@ test('GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
 
 // ── Rebase / ConflictedFiles / HasRebaseHead ─────────────────────────────────
 
-test('GIT_rebase_ok_on_zero_exit', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_ok_on_zero_exit', async () => {
   // No rebase-merge / rebase-apply directories → fresh rebase path.
   const { runner } = fakeRunner([['rebase main', [0, '', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
   assert.equal(result.ok, true)
 })
 
-test('GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
   const { runner, calls } = fakeRunner([])
   await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main'))
 
@@ -100,7 +100,7 @@ test('GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => 
   ])
 })
 
-test('GIT_rebase_in_progress_stages_and_continues', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_in_progress_stages_and_continues', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -120,7 +120,7 @@ test('GIT_rebase_in_progress_stages_and_continues', async () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('GIT_rebase_continue_failure_surfaces_stderr', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_continue_failure_surfaces_stderr', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -137,7 +137,7 @@ test('GIT_rebase_continue_failure_surfaces_stderr', async () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('GIT_rebase_stage_failure_is_an_error', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_stage_failure_is_an_error', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -154,28 +154,28 @@ test('GIT_rebase_stage_failure_is_an_error', async () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('GIT_rebase_surfaces_stderr_on_failure', async () => {
+test('WHAT[CHGINT-003] GIT_rebase_surfaces_stderr_on_failure', async () => {
   const { runner } = fakeRunner([['rebase main', [1, 'stdout-noise', 'CONFLICT (content)']]])
   const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CONFLICT (content)')
 })
 
-test('GIT_conflicted_files_parses_lines', async () => {
+test('WHAT[CHGINT-005] GIT_conflicted_files_parses_lines', async () => {
   const { runner } = fakeRunner([['diff --name-only --diff-filter=U', [0, 'a.fs\nb.fs\n', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).ConflictedFiles(worktreePath(WORKTREE)))
   assert.equal(result.ok, true)
   assert.deepEqual(listItems(result.value), ['a.fs', 'b.fs'])
 })
 
-test('GIT_conflicted_files_error_propagates', async () => {
+test('WHAT[CHGINT-005] GIT_conflicted_files_error_propagates', async () => {
   const { runner } = fakeRunner([['diff --name-only --diff-filter=U', [1, '', 'not a repo']]])
   const result = resultOf(await createWithRepo(REPO, runner).ConflictedFiles(worktreePath(WORKTREE)))
   assert.equal(result.ok, false)
   assert.equal(result.error, 'not a repo')
 })
 
-test('GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
+test('WHAT[CHGINT-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -200,21 +200,21 @@ test('GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
 
 // ── ReadHead / GetTargetHead ─────────────────────────────────────────────────
 
-test('GIT_read_head_returns_commit_hash', async () => {
+test('WHAT[CHGINT-008] GIT_read_head_returns_commit_hash', async () => {
   const { runner } = fakeRunner([['rev-parse HEAD', [0, 'deadbeef\n', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).ReadHead(worktreePath(WORKTREE)))
   assert.equal(result.ok, true)
   assert.equal(result.value.fields[0], 'deadbeef')
 })
 
-test('GIT_read_head_empty_stdout_is_missing', async () => {
+test('WHAT[CHGINT-008] GIT_read_head_empty_stdout_is_missing', async () => {
   const { runner } = fakeRunner([['rev-parse HEAD', [0, '  \n', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).ReadHead(worktreePath(WORKTREE)))
   assert.equal(result.ok, false)
   assert.equal(result.error, 'HEAD is empty')
 })
 
-test('GIT_get_target_head_missing_branch', async () => {
+test('WHAT[CHGINT-008] GIT_get_target_head_missing_branch', async () => {
   const { runner } = fakeRunner([['rev-parse refs/heads/main', [128, '', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).GetTargetHead(targetRef('main')))
   assert.equal(result.ok, false)
@@ -232,7 +232,7 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
   ['merge --ff-only', [0, '', '']],
 ]
 
-test('GIT_ff_merge_happy_path_advances_to_candidate', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate', async () => {
   const { runner, calls } = fakeRunner(ffAnswers())
   const port = createWithRepo(REPO, runner)
 
@@ -254,7 +254,7 @@ test('GIT_ff_merge_happy_path_advances_to_candidate', async () => {
   ])
 })
 
-test('GIT_ff_merge_refuses_when_repo_on_wrong_branch', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_refuses_when_repo_on_wrong_branch', async () => {
   const { runner } = fakeRunner(ffAnswers({ branch: 'feature' }))
   const port = createWithRepo(REPO, runner)
 
@@ -266,7 +266,7 @@ test('GIT_ff_merge_refuses_when_repo_on_wrong_branch', async () => {
   assert.match(result.error, /publish branch mismatch: target repo is on 'feature' but publish is frozen to 'main'/)
 })
 
-test('GIT_ff_merge_refuses_detached_with_placeholder', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_refuses_detached_with_placeholder', async () => {
   const { runner } = fakeRunner([['rev-parse HEAD', [0, 'cafe01\n', '']], ['symbolic-ref --short HEAD', [128, '', '']]])
   const port = createWithRepo(REPO, runner)
 
@@ -278,7 +278,7 @@ test('GIT_ff_merge_refuses_detached_with_placeholder', async () => {
   assert.match(result.error, /<detached HEAD>/)
 })
 
-test('GIT_ff_merge_refuses_when_target_moved_since_head_read', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_refuses_when_target_moved_since_head_read', async () => {
   const { runner } = fakeRunner(ffAnswers({ targetHead: 'other9' }))
   const port = createWithRepo(REPO, runner)
 
@@ -290,7 +290,7 @@ test('GIT_ff_merge_refuses_when_target_moved_since_head_read', async () => {
   assert.equal(result.error, 'target ref moved')
 })
 
-test('GIT_ff_merge_refuses_non_fast_forward_candidate', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_refuses_non_fast_forward_candidate', async () => {
   const answers = ffAnswers().map(([prefix, response]) =>
     prefix === 'merge-base --is-ancestor' ? [prefix, [1, '', '']] : [prefix, response],
   )
@@ -305,7 +305,7 @@ test('GIT_ff_merge_refuses_non_fast_forward_candidate', async () => {
   assert.equal(result.error, 'candidate is not a fast-forward of the target branch')
 })
 
-test('GIT_ff_merge_refuses_dirty_target_worktree', async () => {
+test('WHAT[CHGINT-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
   const answers = ffAnswers().map(([prefix, response]) =>
     prefix === 'status --porcelain' ? [prefix, [0, ' M dirty.fs\n', '']] : [prefix, response],
   )
@@ -320,7 +320,7 @@ test('GIT_ff_merge_refuses_dirty_target_worktree', async () => {
   assert.match(result.error, /target worktree is dirty; refusing ff-only merge/)
 })
 
-test('GIT_ff_merge_ref_moved_lock_diagnostic_maps_to_cas_error', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_ref_moved_lock_diagnostic_maps_to_cas_error', async () => {
   const answers = ffAnswers().map(([prefix, response]) =>
     prefix === 'merge --ff-only'
       ? [prefix, [1, '', 'error: cannot lock ref refs/heads/main: is at x but expected y']]
@@ -337,7 +337,7 @@ test('GIT_ff_merge_ref_moved_lock_diagnostic_maps_to_cas_error', async () => {
   assert.equal(result.error, 'target ref moved')
 })
 
-test('GIT_ff_merge_generic_merge_failure_surfaces_message', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_generic_merge_failure_surfaces_message', async () => {
   const answers = ffAnswers().map(([prefix, response]) =>
     prefix === 'merge --ff-only' ? [prefix, [1, '', 'merge exploded']] : [prefix, response],
   )
@@ -352,7 +352,7 @@ test('GIT_ff_merge_generic_merge_failure_surfaces_message', async () => {
   assert.equal(result.error, 'merge exploded')
 })
 
-test('GIT_ff_merge_empty_candidate_head_is_an_error', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_empty_candidate_head_is_an_error', async () => {
   const { runner } = fakeRunner([['rev-parse HEAD', [0, ' \n', '']]])
   const port = createWithRepo(REPO, runner)
 
@@ -364,7 +364,7 @@ test('GIT_ff_merge_empty_candidate_head_is_an_error', async () => {
   assert.equal(result.error, 'candidate HEAD is empty')
 })
 
-test('GIT_ff_merge_verify_head_mismatch_reports_actual', async () => {
+test('WHAT[CHGINT-008] GIT_ff_merge_verify_head_mismatch_reports_actual', async () => {
   // The candidate read returns cafe01; the post-merge verify read returns wrong00.
   const answers = [
     ['symbolic-ref --short HEAD', [0, 'main\n', '']],
@@ -385,7 +385,7 @@ test('GIT_ff_merge_verify_head_mismatch_reports_actual', async () => {
   assert.match(result.error, /ff-only merge did not advance HEAD to candidate cafe01 \(got wrong00\)/)
 })
 
-test('GIT_create_with_runner_binds_dot_repo', async () => {
+test('WHAT[CHGINT-008] GIT_create_with_runner_binds_dot_repo', async () => {
   const { runner, calls } = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
   const port = createWithRunner(runner)
 

@@ -25,7 +25,7 @@ import {
 const SESSION = sessionId('ses_obs')
 const AT = utcOffset('2026-04-01T08:00:00Z')
 
-test('EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
+test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
   const value = fact('HostTurnObserved', {
     SessionId: SESSION,
     ProviderRun: providerRun('run_abc'),
@@ -46,7 +46,7 @@ test('EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
   assert.equal(idValue.providerRun(payload.ProviderRun), 'run_abc')
 })
 
-test('EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
+test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
   const value = fact('HostTurnObserved', {
     SessionId: SESSION,
     ProviderRun: undefined,
@@ -59,7 +59,7 @@ test('EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
-test('EXEC_HostTurnObserved_fold_is_noop_on_agent_projection', () => {
+test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_fold_is_noop_on_agent_projection', () => {
   const observed = fact('HostTurnObserved', {
     SessionId: SESSION,
     ProviderRun: providerRun('run_1'),
@@ -72,7 +72,7 @@ test('EXEC_HostTurnObserved_fold_is_noop_on_agent_projection', () => {
   assert.equal(fold.session(folded.value, 'ses_obs'), undefined)
 })
 
-test('EXEC_HostTurnObserved_identity_key_is_session_plus_provider_run', () => {
+test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_identity_key_is_session_plus_provider_run', () => {
   // Dedupe lives in the future CompletionReactor; this batch asserts both
   // halves are present on the payload so the reactor can key on them.
   const withRun = fact('HostTurnObserved', {

@@ -8,7 +8,7 @@ const { decodeMessageView, toolResultDigests } = providerProjection;
 // "output-available", toolCallId, input, output }`。Projection 必须把它解码成
 // WireToolResult，否则 REVIEW-010 的 seal 永远没有 IncludedToolResultDigests，
 // REVIEW-003 的第二次 PERFECT 必拒（实测 dual-PERFECT 全失败）。
-test('HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
+test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
   const view = decodeMessageView(toList([
     {
       info: { role: 'assistant', sessionID: 'ses_1' },
@@ -29,7 +29,7 @@ test('HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
 });
 
 // 旧形状（tool-result / tool_result 独立消息）保持兼容。
-test('HOST_012_legacy_tool_result_shape_still_decodes', () => {
+test('WHAT[HOST-BOUNDARY-020] HOST_012_legacy_tool_result_shape_still_decodes', () => {
   const view = decodeMessageView(toList([
     {
       info: { role: 'tool', sessionID: 'ses_1' },
@@ -42,7 +42,7 @@ test('HOST_012_legacy_tool_result_shape_still_decodes', () => {
 });
 
 // errorText 分支（工具失败）同样进入 digest。
-test('HOST_012_tool_error_part_enters_digest', () => {
+test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_error_part_enters_digest', () => {
   const view = decodeMessageView(toList([
     {
       info: { role: 'assistant', sessionID: 'ses_1' },

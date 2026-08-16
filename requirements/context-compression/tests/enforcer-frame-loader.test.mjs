@@ -155,7 +155,7 @@ const outcomeMessagesOf = (outcome) => {
 
 // ── loadEffectiveFrames fail-closed paths (direct) ─────────────────────────
 
-test('ENFORCER_load_effective_frames_missing_association', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_association', async () => {
   await withHarness(
     async ({ journal }) => {
       const result = await loadEffectiveFrames(journal, sessionId(MAIN))
@@ -166,7 +166,7 @@ test('ENFORCER_load_effective_frames_missing_association', async () => {
   )
 })
 
-test('ENFORCER_load_effective_frames_empty_ok', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_empty_ok', async () => {
   await withHarness(async ({ journal }) => {
     const result = await loadEffectiveFrames(journal, sessionId(MAIN))
     assert.equal(result.tag, 0)
@@ -174,7 +174,7 @@ test('ENFORCER_load_effective_frames_empty_ok', async () => {
   })
 })
 
-test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
@@ -202,7 +202,7 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
   )
 })
 
-test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
@@ -227,7 +227,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
   )
 })
 
-test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
@@ -252,7 +252,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
   )
 })
 
-test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession, fatals }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
@@ -287,7 +287,7 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
   )
 })
 
-test('ENFORCER_contribution_preserves_raw_identity', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_contribution_preserves_raw_identity', () => {
   // Keep the module import alive for coverage attribution on the frame loader.
   assert.equal(typeof readFileSync, 'function')
   assert.equal(typeof sha256Hex('x'), 'string')

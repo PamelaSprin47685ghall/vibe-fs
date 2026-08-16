@@ -11,7 +11,7 @@ const SESSION = 'ses_frag'
 
 // ── HOST-001: fragment events die at the earliest boundary ────────────────────
 
-test('HOST_001_fragment_events_die_at_earliest_boundary', () => {
+test('WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary', () => {
   const fragments = [
     { type: 'message.updated', properties: { sessionID: SESSION, message: { id: 'msg_1' } } },
     { type: 'part.delta', properties: { sessionID: SESSION, delta: { text: 'x' } } },
@@ -25,7 +25,7 @@ test('HOST_001_fragment_events_die_at_earliest_boundary', () => {
   }
 })
 
-test('HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => {
+test('WHAT[HOST-BOUNDARY-002] HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => {
   const idle = hostSignals.tryDecode({
     type: 'session.status',
     properties: { sessionID: SESSION, status: { type: 'idle' } },

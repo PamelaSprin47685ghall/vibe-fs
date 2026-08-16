@@ -27,7 +27,7 @@ function sourceFiles(dir) {
 
 const files = sourceFiles(NEXT_DIR)
 
-test('CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source', () => {
+test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source', () => {
   // CTX-001's exact forbidden vocabulary, with one allowed exception: the
   // BloggerDeltaLimitBytes input contract (CTX-003) is a byte LIMIT on one
   // delta, not a window estimate — it is tested elsewhere and must stay.
@@ -54,7 +54,7 @@ test('CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source', ()
   }
 })
 
-test('CTX_001_the_only_allowed_byte_metric_is_the_delta_input_contract', () => {
+test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_the_only_allowed_byte_metric_is_the_delta_input_contract', () => {
   // The one legal byte quantity: BloggerDeltaLimitBytes = 200 KiB measured on
   // rendered TOML (CTX-003). It must exist and be a constant, not a query of
   // the provider window.

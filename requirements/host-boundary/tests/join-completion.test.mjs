@@ -9,7 +9,7 @@ import { caseOf, hostEventPort, sessionId } from '../../verification-system/test
 
 // ── sticky terminal ──────────────────────────────────────────────────────────
 
-test('EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
+test('WHAT[HOST-BOUNDARY-016] EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
   const port = hostEventPort.create()
   const child = sessionId('ses_sticky_child')
   const seen = []
@@ -25,7 +25,7 @@ test('EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () =
   assert.equal(seen[0], 'Failed')
 })
 
-test('EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
+test('WHAT[HOST-BOUNDARY-016] EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
   const port = hostEventPort.create()
   const child = sessionId('ses_dedupe')
   let count = 0

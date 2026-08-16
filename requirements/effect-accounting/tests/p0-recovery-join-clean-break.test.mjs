@@ -124,21 +124,21 @@ const NEGATIVES = [
   },
 ]
 
-test('P0_RECOVERY_JOIN_GATE_exports_clean_break_rule_ids', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_exports_clean_break_rule_ids', () => {
   for (const id of EFFECT_RULES) {
     assert.ok(RULE_IDS.includes(id), `missing clean-break rule id: ${id}`)
   }
 })
 
 for (const sample of NEGATIVES) {
-  test(`P0_RECOVERY_JOIN_GATE_negative_${sample.id}_goes_red`, () => {
+  test(`WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_negative_${sample.id}_goes_red`, () => {
     const hits = scanText(sample.source, sample.file)
     const ofId = hits.filter((h) => h.id === sample.id)
     assert.ok(ofId.length >= 1, `expected rule ${sample.id} to fire; got ${hits.map((h) => h.id).join(',')}`)
   })
 }
 
-test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [
     'src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs',
@@ -177,7 +177,7 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   )
 })
 
-test('P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
   const agent = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/AgentCompletion.fs'), 'utf8')
   const codec = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs'), 'utf8')
   const fact = readFileSync(join(ROOT, 'src/Wanxiangshu/Composition/Durable/Fact.fs'), 'utf8')

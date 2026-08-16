@@ -17,12 +17,12 @@ const make = () => Object.entries(Companion).find(([k]) => k.startsWith('Compani
 const startOpportunity = (c) => Companion.Companion__StartRecoveryOpportunity(c)
 const offerMaterial = (c) => Companion.Companion__OfferRecoveryMaterial(c)
 
-test('CTX_006_fresh_companion_has_no_recovery_opportunity', () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_fresh_companion_has_no_recovery_opportunity', () => {
   const c = make()
   assert.equal(offerMaterial(c), false, 'no register → offer is no-op')
 })
 
-test('CTX_006_start_then_offer_consumes_waiter_once', async () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_start_then_offer_consumes_waiter_once', async () => {
   const c = make()
   const opportunity = startOpportunity(c)
   assert.equal(offerMaterial(c), true, 'first offer takes the waiter')
@@ -30,7 +30,7 @@ test('CTX_006_start_then_offer_consumes_waiter_once', async () => {
   assert.equal(offerMaterial(c), false, 'second offer no longer consumed')
 })
 
-test('CTX_006_second_start_reuses_single_opportunity', async () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_second_start_reuses_single_opportunity', async () => {
   const c = make()
   const first = startOpportunity(c)
   const second = startOpportunity(c)
@@ -40,7 +40,7 @@ test('CTX_006_second_start_reuses_single_opportunity', async () => {
   assert.equal(offerMaterial(c), false)
 })
 
-test('CTX_006_offer_without_register_is_noop', () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_offer_without_register_is_noop', () => {
   const c = make()
   assert.equal(offerMaterial(c), false)
   assert.equal(offerMaterial(c), false)

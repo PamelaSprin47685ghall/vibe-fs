@@ -31,7 +31,7 @@ const B = 'b'.repeat(40)
 const C = 'c'.repeat(40)
 const D = 'd'.repeat(40)
 
-test('DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => {
+test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => {
   const child = make({ id: B, parents: [A] })
   const result = resultOf(Merge.merge(toList([['writer', toList([child])]])))
   assert.equal(result.ok, false)
@@ -39,7 +39,7 @@ test('DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => 
   assert.equal(idValue.event(payloadOf(result.error)), A)
 })
 
-test('DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier', () => {
+test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier', () => {
   const a = make({ id: A, parents: [B] })
   const b = make({ id: B, parents: [A] })
   const result = resultOf(Merge.merge(toList([['writer', toList([a, b])]])))
@@ -47,7 +47,7 @@ test('DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier'
   assert.equal(caseOf(result.error), 'NonCanonical')
 })
 
-test('DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
+test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
   const root = make({ id: A })
   const high = make({ id: C, parents: [A], eventType: 'JobAccepted' })
   const low = make({ id: B, parents: [A], eventType: 'JobRejected' })
@@ -65,7 +65,7 @@ test('DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', ()
   assert.deepEqual(second, first)
 })
 
-test('DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
+test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
   const local = createLocalEventStore()
   try {
     const sid = streamId('job/conflict')
@@ -83,7 +83,7 @@ test('DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current'
   }
 })
 
-test('DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
+test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
   const local = createLocalEventStore()
   try {
     const sid = streamId('job/resolution')
@@ -104,7 +104,7 @@ test('DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Curren
   }
 })
 
-test('DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
+test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
   const local = createLocalEventStore()
   try {
     const result = resultOf(await local.store.Append(toList([

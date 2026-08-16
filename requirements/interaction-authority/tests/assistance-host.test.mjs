@@ -202,7 +202,7 @@ const withHarness = async (selectedAgent, fn) => {
   }
 }
 
-test('AGENT_031_fast_needhelp_continues_same_session_as_deep_peer_without_moving_fallback', async () => {
+test('WHAT[INTERACTION-AUTHORITY-012] AGENT_031_fast_needhelp_continues_same_session_as_deep_peer_without_moving_fallback', async () => {
   await withHarness('fast-coder', async ({ journal, owner, root, sends, creates, sensor, host, bindRun, quiescence }) => {
     const run = 'asst_fast_help'
     bindRun(run)
@@ -254,7 +254,7 @@ test('AGENT_031_fast_needhelp_continues_same_session_as_deep_peer_without_moving
   })
 })
 
-test('AGENT_031_snapshot_agent_binding_turns_fast_escalation_into_deep_consultation_even_while_fallback_stays_fast', async () => {
+test('WHAT[INTERACTION-AUTHORITY-013] AGENT_031_snapshot_agent_binding_turns_fast_escalation_into_deep_consultation_even_while_fallback_stays_fast', async () => {
   await withHarness('fast-coder', async ({ journal, owner, root, sends, creates, sensor, host, bindRun }) => {
     const firstRun = 'asst_fast_first'
     bindRun(firstRun, 'fast-coder')

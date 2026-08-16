@@ -13,7 +13,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
   const code = fissionProduction()
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 
@@ -27,7 +27,7 @@ test('V1 Fission has no OpenCode session-fork path and owns durable replay ancho
   assert.match(fold, /FissionConverged/)
 })
 
-test('Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
   const roles = read('src/Wanxiangshu/Foundation/Roles.fs')
   const registry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
   assert.match(registry, /"fission"\s*->\s*fun r -> Roles\.isAllowed r ToolPermission\.Fission/)
@@ -43,7 +43,7 @@ test('Fission role eligibility comes from ToolPermission.Fission for current off
   }
 })
 
-test('sibling creation is a distinct Host capability from managed-child creation', () => {
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] sibling creation is a distinct Host capability from managed-child creation', () => {
   const sessions = read('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const port = read('src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs')
   assert.match(sessions, /CreateSiblingSession/)

@@ -13,7 +13,7 @@ const quiescence = await import('../../../dist/OpenCode/Host/QuiescenceSurface.j
 
 const S = 'ses-q'
 
-test('Q01_normal_stable_idle_yields_one_consumable_permit', () => {
+test('WHAT[CRASH-006] Q01_normal_stable_idle_yields_one_consumable_permit', () => {
   const gate = quiescence.create()
   assertOpaque(gate, 'gate')
   quiescence.beginAttempt(gate, S)
@@ -24,7 +24,7 @@ test('Q01_normal_stable_idle_yields_one_consumable_permit', () => {
   assert.equal(quiescence.tryConsume(gate, permit), false, 'a consumed permit must never send again')
 })
 
-test('Q02_new_provider_attempt_invalidates_the_old_permit', () => {
+test('WHAT[CRASH-006] Q02_new_provider_attempt_invalidates_the_old_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const permit = quiescence.observeIdle(gate, S)
@@ -36,7 +36,7 @@ test('Q02_new_provider_attempt_invalidates_the_old_permit', () => {
   assert.equal(quiescence.tryConsume(gate, permit), false, 'stale permit must be rejected')
 })
 
-test('Q03_repeated_idle_does_not_repeat_send', () => {
+test('WHAT[CRASH-006] Q03_repeated_idle_does_not_repeat_send', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const first = quiescence.observeIdle(gate, S)
@@ -46,7 +46,7 @@ test('Q03_repeated_idle_does_not_repeat_send', () => {
   assert.equal(quiescence.tryConsume(gate, second), false, 'the same idle occasion admits at most one send')
 })
 
-test('Q04_new_attempt_own_idle_can_send_again', () => {
+test('WHAT[CRASH-006] Q04_new_attempt_own_idle_can_send_again', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const aPermit = quiescence.observeIdle(gate, S)
@@ -59,7 +59,7 @@ test('Q04_new_attempt_own_idle_can_send_again', () => {
   assert.equal(quiescence.tryConsume(gate, bPermit), true, 'B must be able to send on its own idle')
 })
 
-test('Q07_restart_gate_holds_no_permit', () => {
+test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
   const before = quiescence.create()
   quiescence.beginAttempt(before, S)
   const oldPermit = quiescence.observeIdle(before, S)
@@ -70,7 +70,7 @@ test('Q07_restart_gate_holds_no_permit', () => {
   assert.equal(quiescence.tryConsume(after, oldPermit), false, 'restart must not inherit idle truth')
 })
 
-test('Q10_session_deleted_drops_every_permit', () => {
+test('WHAT[CRASH-006] Q10_session_deleted_drops_every_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const permit = quiescence.observeIdle(gate, S)
@@ -79,7 +79,7 @@ test('Q10_session_deleted_drops_every_permit', () => {
   assert.equal(quiescence.tryConsume(gate, permit), false, 'a dropped session never sends on an old permit')
 })
 
-test('ESC_P0_2_operator_abort_revokes_unconsumed_idle_permit', () => {
+test('WHAT[CRASH-008] ESC_P0_2_operator_abort_revokes_unconsumed_idle_permit', () => {
   // HOST-004: a permit is minted on fresh idle but not yet consumed; Esc
   // revokes the attempt. A delayed reconcile must NOT be able to consume the
   // old permit (which is what would mint a bare `#` missing-final-report repair).
@@ -92,7 +92,7 @@ test('ESC_P0_2_operator_abort_revokes_unconsumed_idle_permit', () => {
   assert.equal(quiescence.tryConsume(gate, permit), false, 'abort must permanently void the pending idle permit')
 })
 
-test('ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idle', () => {
+test('WHAT[CRASH-008] ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idle', () => {
   // After Esc, a delayed SessionIdle must NOT re-establish a usable idle
   // permit for the aborted attempt; eligibility returns only with the next
   // real BeginProviderAttempt (HOST-004).
@@ -110,7 +110,7 @@ test('ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idle', () => {
   assert.equal(quiescence.tryConsume(gate, freshPermit), true, 'next real BeginProviderAttempt re-establishes idle rights')
 })
 
-test('P4_SURFACE_exports_exact_capability_names', () => {
+test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
   assert.deepEqual(Object.getOwnPropertyNames(quiescence).sort(), [
     'beginAttempt',
     'create',

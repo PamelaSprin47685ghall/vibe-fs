@@ -53,7 +53,7 @@ const readProfile = (profile) => ({
 
 // ── INTERACTION-AUTHORITY-004：continuation 继承 run/root，永不改写 profile ─
 
-test('IA_004_a_continuation_never_replaces_the_authority_root', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] IA_004_a_continuation_never_replaces_the_authority_root', () => {
   const root = profileOf('fast-coder')
   const before = authorityRun.registerAuthority(root, authority.empty)
 
@@ -89,7 +89,7 @@ test('IA_004_a_continuation_never_replaces_the_authority_root', () => {
 
 // ── INTERACTION-AUTHORITY-005：所有 continuation kind 可表示且无一是 root ──
 
-test('IA_005_every_continuation_kind_is_representable_and_none_is_a_root', () => {
+test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_representable_and_none_is_a_root', () => {
   const kinds = [
     'InteractionRepair',
     'JoinGuard',
@@ -119,7 +119,7 @@ test('IA_005_every_continuation_kind_is_representable_and_none_is_a_root', () =>
 
 // ── INTERACTION-AUTHORITY-008/009：来源解析顺序 + 纯函数永不推断 HumanRoot ──
 
-test('IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
+test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
   const root = profileOf('fast-coder', PHYSICAL, rootKind.agentOwner)
   let projection = authorityRun.registerAuthority(root, authority.empty)
 
@@ -171,7 +171,7 @@ test('IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root
   )
 })
 
-test('IA_008_an_accepted_id_outranks_host_compaction', () => {
+test('WHAT[INTERACTION-AUTHORITY-008] IA_008_an_accepted_id_outranks_host_compaction', () => {
   // 顺序是语义：插件自己发出并见到 accepted 的消息必须是 continuation，
   // 即使同一 turn Host 也报告 compaction。
   const root = profileOf()
@@ -188,7 +188,7 @@ test('IA_008_an_accepted_id_outranks_host_compaction', () => {
   assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, true, projection), 'Continuation')
 })
 
-test('IA_009_a_human_root_is_never_inferred_by_a_pure_function', () => {
+test('WHAT[INTERACTION-AUTHORITY-009] IA_009_a_human_root_is_never_inferred_by_a_pure_function', () => {
   // resolveKnownOrigin 无法观测「外部接受 + 显式 agent」，永不返回 HumanRoot；
   // 已激活的 HumanRoot 也不会让后来的未知消息像 root。
   const humanRoot = profileOf('fast-coder', PHYSICAL, rootKind.human)
@@ -204,7 +204,7 @@ test('IA_009_a_human_root_is_never_inferred_by_a_pure_function', () => {
 
 // ── INTERACTION-AUTHORITY-009/015：ingress 结构锁（source-read）────────────
 
-test('IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_active', () => {
+test('WHAT[INTERACTION-AUTHORITY-015] IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_active', () => {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const ingress = readFileSync(join(repoRoot, 'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs'), 'utf8')
 
@@ -225,7 +225,7 @@ test('IA_009_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_activ
 
 // ── INTERACTION-AUTHORITY-016：accepted root claim 不入 continuation map ────
 
-test('IA_016_accepting_an_authority_root_claim_does_not_enter_the_continuation_map', () => {
+test('WHAT[INTERACTION-AUTHORITY-016] IA_016_accepting_an_authority_root_claim_does_not_enter_the_continuation_map', () => {
   const key = promptKey('pk_owner')
   const claim = authorityRun.claimAgentOwnerRoot(key, SESSION, 'pd-owner', 'fast-manager')
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
@@ -245,9 +245,34 @@ test('IA_016_accepting_an_authority_root_claim_does_not_enter_the_continuation_m
   assert.equal(authorityRun.resolveKnownOrigin(physical, undefined, false, projection), 'UnknownOrigin')
 })
 
+// ── INTERACTION-AUTHORITY-007：UnknownOrigin fail-closed ───────────────────
+
+test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_updates_nothing_enables_no_fallback_sends_no_continuation', () => {
+  // 无法证明身份的东西被拒绝，而不是被猜测：UnknownOrigin 不得更新 profile、
+  // 不得启用 Fallback、不得发 continuation。resolveKnownOrigin 是纯函数，
+  // UnknownOrigin 结果不触碰 run-scoped 状态——profile 与映射逐字段不变。
+  const root = profileOf('fast-coder')
+  const projection = authorityRun.registerAuthority(root, authority.empty)
+  const beforeProfile = readProfile(projection.ActiveLogicalRun)
+  const beforePending = mapCount(projection.PendingClaims)
+  const beforeAccepted = mapCount(projection.AcceptedContinuationIds)
+
+  const unknown = authorityRun.resolveKnownOrigin(
+    physicalUser('msg_never_proven'),
+    promptKey('pk_never_proven'),
+    false,
+    projection,
+  )
+  assert.equal(unknown, 'UnknownOrigin')
+
+  assert.deepEqual(readProfile(projection.ActiveLogicalRun), beforeProfile, 'profile 未被 UnknownOrigin 更新')
+  assert.equal(mapCount(projection.PendingClaims), beforePending, '无 claim 被写入')
+  assert.equal(mapCount(projection.AcceptedContinuationIds), beforeAccepted, '无 continuation 被发出/记录')
+})
+
 // ── INTERACTION-AUTHORITY-017：continuation 只接续 active run ──────────────
 
-test('IA_017_unclaimed_continuation_without_active_run_stays_unknown', () => {
+test('WHAT[INTERACTION-AUTHORITY-017] IA_017_unclaimed_continuation_without_active_run_stays_unknown', () => {
   // 无 active run 时，claimed PromptKey 也落 UnknownOrigin（fail-closed）——
   // 绝不凭 key 猜测一个不存在的 continuation。
   const projection = authorityRun.registerAuthority(profileOf(), authority.empty)

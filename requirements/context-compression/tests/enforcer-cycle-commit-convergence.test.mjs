@@ -215,7 +215,7 @@ const manualCtx = (overrides = {}) =>
 
 // ── duplicate provider run across kinds → fold rejection → classifyAppendFailure ──
 
-test('ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
     await primeCycle(scope, journal)
@@ -316,7 +316,7 @@ const materializeOpen = async (journal, { requestId, promptKeyValue, kind = 'mai
   assert.equal(caseOf(res), 'Ok', JSON.stringify(res))
 }
 
-test('ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession, fatals }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open' }))
     await materializeOpen(journal, { requestId: 'req-open' })
@@ -331,7 +331,7 @@ test('ENFORCER_open_without_promptkey_binding_is_unexpected_end', async () => {
   })
 })
 
-test('ENFORCER_open_bound_promptkey_commits_and_clears_open', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', async () => {
   await withHarness(async ({ journal, scope, run, blogStep, mainSession }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx({ requestId: 'req-open-bound' }))
     await materializeOpen(journal, { requestId: 'req-open-bound', promptKeyValue: 'pk-1' })
@@ -345,7 +345,7 @@ test('ENFORCER_open_bound_promptkey_commits_and_clears_open', async () => {
 
 // ── post-commit drain: re-chunk from durable coverage before park ──────────
 
-test('ENFORCER_catchup_drains_next_window_after_idempotent_receipt', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
       // 6 XTrace turns but the FIRST staged window cuts at sequence 1, leaving
@@ -388,7 +388,7 @@ test('ENFORCER_catchup_drains_next_window_after_idempotent_receipt', async () =>
 
 // ── park lifecycle: resume (offer wake) vs expiry ──────────────────────────
 
-test('ENFORCER_park_resumed_without_material_projects_raw', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_without_material_projects_raw', async () => {
   await withHarness(async ({ journal, scope, run, blogStep }) => {
     // No XTrace material: after commit the transform parks; the wake resolves
     // true (main offered), but re-chunk still finds nothing → project raw.
@@ -405,7 +405,7 @@ test('ENFORCER_park_resumed_without_material_projects_raw', async () => {
   })
 })
 
-test('ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       await primeCycle(scope, journal)
@@ -446,7 +446,7 @@ test('ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_witho
   )
 })
 
-test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       await primeCycle(scope, journal)
@@ -480,7 +480,7 @@ test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
   )
 })
 
-test('ENFORCER_park_expired_with_fresh_material_drains', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_expired_with_fresh_material_drains', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       await primeCycle(scope, journal)
@@ -515,7 +515,7 @@ test('ENFORCER_park_expired_with_fresh_material_drains', async () => {
 
 // ── no-journal / first-request fallbacks ───────────────────────────────────
 
-test('ENFORCER_no_journal_projects_raw_messages', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', async () => {
   await withHarness(async ({ scope, run }) => {
     const scope2 = parkedTransform.scope()
     const probe = () => 'NoRecovery'
@@ -528,7 +528,7 @@ test('ENFORCER_no_journal_projects_raw_messages', async () => {
   })
 })
 
-test('ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () => {
   await withHarness(async ({ scope, fatals }) => {
     const probe = () => 'NoRecovery'
     const out = await handleContinuation(
@@ -547,7 +547,7 @@ test('ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () =>
   })
 })
 
-test('ENFORCER_first_request_rebuilds_from_typed_context', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_first_request_rebuilds_from_typed_context', async () => {
   await withHarness(async ({ journal, scope, run, mainSession }) => {
     // COMPANION-005: no assistant step yet (first request) — the transform
     // rebuilds provider frames + typed context, never raw user TOML.

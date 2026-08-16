@@ -56,7 +56,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_030_launch_disabled_fixture_test_local', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_030_launch_disabled_fixture_test_local', () => {
   const entry = defaultServerEntry()
   assert.ok(entry.endsWith(join('dist', 'Sphinx', 'McpServer.js')))
   assert.equal(existsSync(entry), true, 'defaultServerEntry must resolve to a file that exists on disk')
@@ -82,14 +82,14 @@ test('AGENT_030_launch_disabled_fixture_test_local', () => {
   assert.deepEqual(local.command, localCommand(entry))
 })
 
-test('AGENT_030_apply_preserves_other_mcp_servers', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_030_apply_preserves_other_mcp_servers', () => {
   const config = { mcp: { other: { type: 'remote', url: 'https://example.test' } } }
   applyMcp(config, launchFromVars({}))
   assert.equal(config.mcp.other.url, 'https://example.test')
   assert.equal(config.mcp[serverName].type, 'local')
 })
 
-test('AGENT_030_configure_injects_mcp_on_ok_and_error', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_030_configure_injects_mcp_on_ok_and_error', () => {
   const okConfig = buildConfig()
   assert.equal(managedAgentConfig.configure(okConfig).ok, true)
   assert.equal(okConfig.mcp[serverName].type, 'local')

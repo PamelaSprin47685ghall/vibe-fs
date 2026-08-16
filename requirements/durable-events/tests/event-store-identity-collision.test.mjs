@@ -32,7 +32,7 @@ const envelope = ({
     toList(payloadRefs.map(payloadRef)),
   )
 
-test('same_EventId_different_canonical_bytes_fail_closed', () => {
+test('WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed', () => {
   const left = envelope({ payload: { status: 'open' } })
   const right = envelope({ payload: { status: 'closed' } })
 
@@ -47,7 +47,7 @@ test('same_EventId_different_canonical_bytes_fail_closed', () => {
   assert.equal(caseOf(payloadOf(merged)), 'IdentityCollision')
 })
 
-test('same_EventId_same_canonical_bytes_dedupe_ok', () => {
+test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () => {
   const a = envelope({
     parents: [
       'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -73,7 +73,7 @@ test('same_EventId_same_canonical_bytes_dedupe_ok', () => {
   assert.equal(listItems(payloadOf(merged)).length, 1)
 })
 
-test('canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
+test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
   const value = envelope({
     parents: [
       'ffffffffffffffffffffffffffffffffffffffff',
@@ -111,7 +111,7 @@ test('canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
   assert.equal(Codec.encode(value), Codec.encode(value))
 })
 
-test('distinct_EventIds_are_both_retained', () => {
+test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
   const a = envelope({ id: '1111111111111111111111111111111111111111' })
   const b = envelope({
     id: '2222222222222222222222222222222222222222',
@@ -124,7 +124,7 @@ test('distinct_EventIds_are_both_retained', () => {
   assert.equal(listItems(payloadOf(merged)).length, 2)
 })
 
-test('StoreTypes_exposes_canonical_store_ref_and_error_DUs', () => {
+test('WHAT[DURABLE-EVENTS-016] StoreTypes_exposes_canonical_store_ref_and_error_DUs', () => {
   assert.equal(Codec.canonicalStoreRef, 'refs/wanxiang/store')
   assert.equal(Persist.StoreRef_canonical, 'refs/wanxiang/store')
   assert.ok(Persist.StorageInvalid_$reflection)

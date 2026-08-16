@@ -9,7 +9,7 @@ import { join } from 'node:path'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 
-test('RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
+test('WHAT[CRASH-004] RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   assert.match(src, /module SessionRecovery/)
   assert.match(src, /type FamilyRecoveryPermit\s*=\s*\n\s*private/)
@@ -18,7 +18,7 @@ test('RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
   assert.doesNotMatch(src, /fromTask|Flow\.lift/)
 })
 
-test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
+test('WHAT[CRASH-006] RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), 'utf8')
   const code = src
     .split('\n')
@@ -33,7 +33,7 @@ test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
   assert.doesNotMatch(code, /do!\s*this\.AwaitRecovery/)
 })
 
-test('RECOVERY_FAMILY_library_is_detached_from_ordinary_plugin_and_join_uses_current_process_permit', () => {
+test('WHAT[CRASH-017] RECOVERY_FAMILY_library_is_detached_from_ordinary_plugin_and_join_uses_current_process_permit', () => {
   const wiring = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
   const scope = readFileSync(
@@ -56,7 +56,7 @@ test('RECOVERY_FAMILY_library_is_detached_from_ordinary_plugin_and_join_uses_cur
   assert.match(ports, /recoverFamilyDirect/)
 })
 
-test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
+test('WHAT[CRASH-013] RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const workflow = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
@@ -81,7 +81,7 @@ test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   assert.match(fsproj, /Execution\/Session\/Recovery\/Coordinator\.fs/)
 })
 
-test('RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {
+test('WHAT[CRASH-010] RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   assert.match(src, /type HandleFamilyRecovery/)
   assert.match(src, /NoLinkedHandles/)
@@ -99,7 +99,7 @@ test('RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {
   assert.doesNotMatch(child, /\| AwaitingEvidence\b/)
 })
 
-test('RECOVERY_FAMILY_authorize_blocks_on_child_block', async () => {
+test('WHAT[CRASH-005] RECOVERY_FAMILY_authorize_blocks_on_child_block', async () => {
   const {
     caseOf,
     sessionRecovery,
@@ -116,7 +116,7 @@ test('RECOVERY_FAMILY_authorize_blocks_on_child_block', async () => {
   assert.equal(caseOf(family), 'FamilyBlocked')
 })
 
-test('RECOVERY_FAMILY_authorize_ready_issues_private_permit', async () => {
+test('WHAT[CRASH-006] RECOVERY_FAMILY_authorize_ready_issues_private_permit', async () => {
   const { caseOf, sessionRecovery, sessionId, payloadOf } = await import('../../verification-system/tests/support/domain.mjs')
 
   const root = sessionId('parent')
@@ -128,7 +128,7 @@ test('RECOVERY_FAMILY_authorize_ready_issues_private_permit', async () => {
 })
 
 // HandlesWaiting → SessionRecovery.Waiting → FamilyWaiting (no permit, not FamilyBlocked).
-test('RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', async () => {
+test('WHAT[CRASH-005] RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', async () => {
   const { caseOf, sessionRecovery, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
 
   const root = sessionId('parent')
@@ -143,7 +143,7 @@ test('RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', async ()
   assert.notEqual(caseOf(family), 'FamilyReady')
 })
 
-test('RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async () => {
+test('WHAT[CRASH-005] RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   // Extract the HandlesWaiting match arm body (up to the next arm) and assert its outcome.
   const waitingArm = src.match(
@@ -156,7 +156,7 @@ test('RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async 
   assert.match(src, /\| Waiting of NonEmpty<RecoveryBlock>/)
 })
 
-test('RECOVERY_FAMILY_ready_before_business_is_type_enforced', async () => {
+test('WHAT[CRASH-006] RECOVERY_FAMILY_ready_before_business_is_type_enforced', async () => {
   const { caseOf, sessionRecovery, sessionId } = await import('../../verification-system/tests/support/domain.mjs')
   const root = sessionId('p')
   const family = sessionRecovery.authorizeFamilyResume(root, 7, sessionRecovery.recoveredClosure(root, {}))

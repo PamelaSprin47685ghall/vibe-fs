@@ -69,7 +69,7 @@ const loadDictionary = async () => {
 
 // ── Immediate terminal claim (no Ready gate) ────────────────────────────────
 
-test('EXEC_join_complete_claims_run_immediately_without_Ready', async () => {
+test('WHAT[DELEG-013] EXEC_join_complete_claims_run_immediately_without_Ready', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   // Fable Dictionary (MutableMap) requires an iterable AND a comparer for hash access;
   // the Map-backed shim needs neither.

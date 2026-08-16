@@ -184,21 +184,21 @@ const runManager = (spec, name, charge, extra = {}) =>
 
 // ── request validation (refused before the runtime) ─────────────────────────
 
-test('FORK_blank_name_is_refused_without_error_dto', async () => {
+test('WHAT[DELEG-006] FORK_blank_name_is_refused_without_error_dto', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = await runManager(spec, '', 'do work')
   assert.doesNotMatch(result, /\berror\s*=/)
   assert.match(result, /A name is required/)
 })
 
-test('FORK_name_without_calling_is_continuation_only', async () => {
+test('WHAT[DELEG-006] FORK_name_without_calling_is_continuation_only', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = await runManager(spec, 'Ada', 'do work')
   assert.match(result, /No continuing person is known by that name/)
   assert.doesNotMatch(result, /fast-|deep-|agent id/i)
 })
 
-test('DELEG_022_expected_tool_calls_rejects_negative_and_fractional_values_before_fork', async () => {
+test('WHAT[DELEG-022] DELEG_022_expected_tool_calls_rejects_negative_and_fractional_values_before_fork', async () => {
   for (const invalid of [-1, 1.5]) {
     const live = await liveScope()
     const spec = managerSpec(factory, live.scope)
@@ -214,7 +214,7 @@ test('DELEG_022_expected_tool_calls_rejects_negative_and_fractional_values_befor
 
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
 
-test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
+test('WHAT[DELEG-005] FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const text = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
@@ -228,7 +228,7 @@ test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
   live.cleanup()
 })
 
-test('FORK_create_session_failure_surfaces_only_public_consequence', async () => {
+test('WHAT[DELEG-005] FORK_create_session_failure_surfaces_only_public_consequence', async () => {
   const live = await liveScope({ createError: 'host refused the fork' })
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
@@ -237,7 +237,7 @@ test('FORK_create_session_failure_surfaces_only_public_consequence', async () =>
   live.cleanup()
 })
 
-test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
+test('WHAT[DELEG-005] FORK_unknown_byname_does_not_echo_internal_identity', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Nobody Here', 'do work')
@@ -246,7 +246,7 @@ test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
   live.cleanup()
 })
 
-test('DELEG_021_unknown_attachment_is_refused_before_child_creation', async () => {
+test('WHAT[DELEG-021] DELEG_021_unknown_attachment_is_refused_before_child_creation', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Bob', 'do work', { calling: 'coder', attach: 'Ghost' })
@@ -257,7 +257,7 @@ test('DELEG_021_unknown_attachment_is_refused_before_child_creation', async () =
   live.cleanup()
 })
 
-test('DELEG_021_self_attachment_is_refused_before_child_creation', async () => {
+test('WHAT[DELEG-021] DELEG_021_self_attachment_is_refused_before_child_creation', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Bob', 'do work', { calling: 'coder', attach: 'Bob' })
@@ -267,7 +267,7 @@ test('DELEG_021_self_attachment_is_refused_before_child_creation', async () => {
   live.cleanup()
 })
 
-test('DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async () => {
+test('WHAT[DELEG-021] DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
@@ -288,7 +288,7 @@ test('DELEG_021_fresh_fork_materializes_named_person_lwr_as_background', async (
   live.cleanup()
 })
 
-test('DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral', async () => {
+test('WHAT[DELEG-021] DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral', async () => {
   const live = await liveScope({ physicalAccept: true })
   const spec = managerSpec(factory, live.scope)
 
@@ -310,7 +310,7 @@ test('DELEG_021_busy_reuse_does_not_materialize_attachment_and_reports_deferral'
 
 // ── reuse path: create by calling, continue by Byname ───────────────────────
 
-test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
+test('WHAT[DELEG-006] FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
@@ -325,7 +325,7 @@ test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
   live.cleanup()
 })
 
-test('DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', async () => {
+test('WHAT[DELEG-022] DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', async () => {
   const live = await liveScope({ physicalAccept: true })
   const spec = managerSpec(factory, live.scope)
   const child = sessionId('child-1')
@@ -351,7 +351,7 @@ test('DELEG_022_fork_explicit_replace_and_omitted_reuse_retains_remaining', asyn
   live.cleanup()
 })
 
-test('FORK_engineer_continuation_keeps_deep_coder', async () => {
+test('WHAT[DELEG-006] FORK_engineer_continuation_keeps_deep_coder', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
@@ -375,7 +375,7 @@ test('FORK_engineer_continuation_keeps_deep_coder', async () => {
   live.cleanup()
 })
 
-test('FORK_same_byname_cannot_be_reborn_with_a_new_calling', async () => {
+test('WHAT[DELEG-006] FORK_same_byname_cannot_be_reborn_with_a_new_calling', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
 
@@ -483,7 +483,7 @@ const liveOrchestrator = async () => {
   }
 }
 
-test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byname', async () => {
+test('WHAT[DELEG-005] FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byname', async () => {
   const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
@@ -501,7 +501,7 @@ test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byna
   live.cleanup()
 })
 
-test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
+test('WHAT[DELEG-003] FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
   const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
@@ -517,7 +517,7 @@ test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
   live.cleanup()
 })
 
-test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async () => {
+test('WHAT[DELEG-003] FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async () => {
   const live = await liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
   const result = await spec.Execute(makeArgs({ name: 'Unknown Road', charge: 'nobody home' }), context())
@@ -526,7 +526,7 @@ test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async ()
   live.cleanup()
 })
 
-test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', async () => {
+test('WHAT[DELEG-005] FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', async () => {
   const live = await liveOrchestrator()
   live.engine.git.IsDirty = async () => true
   const spec = orchestratorSpec(factory, live.scope)

@@ -14,7 +14,7 @@ const toolResultBound = await import('../../../dist/Host/Contract/ToolResultBoun
 const hostLines = (text) => text.split('\n').length
 const hostBytes = (text) => byteCount(text)
 
-test('TOOL_RESULT_BOUND_constants_match_host_defaults_exactly', () => {
+test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_constants_match_host_defaults_exactly', () => {
   assert.equal(toolResultBound.HostMaxLines, 2000)
   assert.equal(toolResultBound.HostMaxBytes, 51200)
   assert.equal(toolResultBound.MarkerBytes, 34)
@@ -26,12 +26,12 @@ test('TOOL_RESULT_BOUND_constants_match_host_defaults_exactly', () => {
   assert.equal(2 + toolResultBound.ContentMaxLines, toolResultBound.HostMaxLines)
 })
 
-test('TOOL_RESULT_BOUND_under_limit_is_identity', () => {
+test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_under_limit_is_identity', () => {
   const text = 'status = "completed"\nagent = "fast-coder"\n'
   assert.equal(toolResultBound.bound(text), text)
 })
 
-test('TOOL_RESULT_BOUND_over_lines_keeps_tail_and_stays_under_host', () => {
+test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_over_lines_keeps_tail_and_stays_under_host', () => {
   // 2500 lines → over HostMaxLines; tail of ContentMaxLines kept.
   const lines = Array.from({ length: 2500 }, (_, i) => `L${i}`)
   const text = lines.join('\n')
@@ -48,7 +48,7 @@ test('TOOL_RESULT_BOUND_over_lines_keeps_tail_and_stays_under_host', () => {
   assert.equal(hostLines(out), toolResultBound.HostMaxLines)
 })
 
-test('TOOL_RESULT_BOUND_over_bytes_keeps_tail_and_stays_under_host', () => {
+test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_over_bytes_keeps_tail_and_stays_under_host', () => {
   // Single long line over HostMaxBytes.
   const text = 'HEAD' + 'x'.repeat(60000) + 'TAIL'
   const out = toolResultBound.bound(text)
@@ -63,7 +63,7 @@ test('TOOL_RESULT_BOUND_over_bytes_keeps_tail_and_stays_under_host', () => {
   assert.equal(hostBytes(out), toolResultBound.HostMaxBytes)
 })
 
-test('TOOL_RESULT_BOUND_exact_host_edge_is_identity', () => {
+test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_exact_host_edge_is_identity', () => {
   // 2000 short lines under byte limit → identity (Host would also pass through).
   const lines = Array.from({ length: 2000 }, (_, i) => `r${i}`)
   const text = lines.join('\n')

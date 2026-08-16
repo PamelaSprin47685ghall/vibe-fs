@@ -116,7 +116,7 @@ const coverageOf = (s) => ({
 
 // ── the happy path exists and lands in the right projections ────────────────
 
-test('PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
   const s = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
@@ -131,7 +131,7 @@ test('PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
   assert.equal(s.PrefixEpoch, undefined)
 })
 
-test('CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
+test('WHAT[DURABLE-EVENTS-015] CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
   const s = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
@@ -147,7 +147,7 @@ test('CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
 
 // ── the asymmetry ──────────────────────────────────────────────────────────
 
-test('PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   // A squash moved the frame sequence to epoch 1; an entry still carrying epoch 0
   // describes frames that no longer exist. PERSIST-004: refuse the journal.
   const result = fold.apply(fold.empty, [
@@ -162,7 +162,7 @@ test('PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   assert.match(result.error.Reason, /PERSIST-010/)
 })
 
-test('CTX_012_a_replayed_rebase_is_absorbed_so_crash_recovery_is_idempotent', () => {
+test('WHAT[DURABLE-EVENTS-015] CTX_012_a_replayed_rebase_is_absorbed_so_crash_recovery_is_idempotent', () => {
   // The recovery path in CTX-012 cannot know whether the append landed before the
   // crash, so it re-attempts. The replay carries an epoch the projection has left.
   const s = foldOk([
@@ -174,7 +174,7 @@ test('CTX_012_a_replayed_rebase_is_absorbed_so_crash_recovery_is_idempotent', ()
   assert.equal(s.PrefixEpoch.Snapshot.SealRoot, 'seal-P1')
 })
 
-test('CTX_011_a_not_new_candidate_is_absorbed_by_the_fold', () => {
+test('WHAT[DURABLE-EVENTS-015] CTX_011_a_not_new_candidate_is_absorbed_by_the_fold', () => {
   // CTX-011 refuses to build such a probe, so a line carrying one is a replay
   // under a different epoch number. Absorbing it keeps the epoch and its cold
   // boundary from being spent for an identical prefix.
@@ -186,7 +186,7 @@ test('CTX_011_a_not_new_candidate_is_absorbed_by_the_fold', () => {
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 1n)
 })
 
-test('PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed', () => {
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed', () => {
   // Unlike a stale epoch, a skipped one cannot come from a replay — no correct
   // writer produces it, so it is corruption.
   const result = fold.apply(fold.empty, [rebaseFact({ previousEpoch: 0, nextEpoch: 3, cutoff: 2 })])
@@ -196,7 +196,7 @@ test('PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed', () => {
   assert.match(result.error.Reason, /not the successor/)
 })
 
-test('CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
+test('WHAT[DURABLE-EVENTS-015] CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
   const result = fold.apply(fold.empty, [
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 8 }),
     rebaseFact({ previousEpoch: 1, nextEpoch: 2, cutoff: 3 }),
@@ -209,7 +209,7 @@ test('CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
 
 // ── reanchor: one fact, two projections, atomically ────────────────────────
 
-test('HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fact', () => {
+test('WHAT[DURABLE-EVENTS-015] HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fact', () => {
   const before = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
@@ -243,7 +243,7 @@ test('HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fac
   assert.equal(idValue.frameEpoch(after.Blog.FrameEpochId), 0n, 'no frame changed, so the frame epoch stands')
 })
 
-test('HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
+test('WHAT[DURABLE-EVENTS-015] HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
   // The dangerous case. Two observations of one compaction, with real work between
   // them: if the fold re-applied the second, it would wipe PrefixCoverage the session
   // legitimately rebuilt, and the next probe would silently never be built.
@@ -260,7 +260,7 @@ test('HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
   assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 3, cutoff: 2, digest: 'rebuilt-2' }, 'rebuilt coverage survived')
 })
 
-test('HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
+test('WHAT[DURABLE-EVENTS-015] HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
   // End to end: manual /compact, then normal work, then a probe promotes again.
   // This is the "best effort" promise in HOST-006 made concrete.
   const s = foldOk([
@@ -278,7 +278,7 @@ test('HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
 
 // ── the persisted shape survives the round trip ────────────────────────────
 
-test('PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   // The journal is the contract surface. A fact that folds in memory but loses a
   // typed field through serialisation would only fail after a restart.
   const result = fold.replay([

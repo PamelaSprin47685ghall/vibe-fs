@@ -231,7 +231,7 @@ const HOST_FORK_RESTART_MISSING_PROOF = [
   '    runtime.MarkInterrupted(agentId, "no proof path")',
 ].join('\n')
 
-test('P0_RECOVERY_JOIN_GATE_exports_recovery_rule_ids', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_exports_recovery_rule_ids', () => {
   for (const id of CRASH_RULES) {
     assert.ok(RULE_IDS.includes(id), `missing recovery rule id: ${id}`)
   }
@@ -239,16 +239,44 @@ test('P0_RECOVERY_JOIN_GATE_exports_recovery_rule_ids', () => {
   assert.equal(RULES.length, RULE_IDS.length)
 })
 
-for (const sample of NEGATIVES) {
-  const variant = sample.variant === undefined ? '' : `_${sample.variant}`
-  test(`P0_RECOVERY_JOIN_GATE_negative_${sample.id}${variant}_goes_red`, () => {
-    const hits = scanText(sample.source, sample.file)
-    const ofId = hits.filter((h) => h.id === sample.id)
-    assert.ok(ofId.length >= 1, `expected rule ${sample.id} to fire; got ${hits.map((h) => h.id).join(',')}`)
-  })
+// 一 test 一 WHAT：NEGATIVES 按命题归属拆分，checker 只认静态标题里的 WHAT[<ID>]。
+const assertNegative = (sample) => {
+  const hits = scanText(sample.source, sample.file)
+  const ofId = hits.filter((h) => h.id === sample.id)
+  assert.ok(ofId.length >= 1, `expected rule ${sample.id} to fire; got ${hits.map((h) => h.id).join(',')}`)
 }
+const neg = (id, variant) => NEGATIVES.find((s) => s.id === id && (s.variant ?? '') === (variant ?? ''))
 
-test('P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
+// CRASH-010：恢复结果分支穷尽（AwaitingEvidence 被 RecoveryIncomplete|RecoveryBlocked 取代）。
+test('WHAT[CRASH-010] P0_RECOVERY_JOIN_GATE_negative_awaiting-evidence-case_goes_red', () => assertNegative(neg('awaiting-evidence-case')))
+test('WHAT[CRASH-010] P0_RECOVERY_JOIN_GATE_negative_restore-handles-none-no-recovery_goes_red', () => assertNegative(neg('restore-handles-none-no-recovery')))
+test('WHAT[CRASH-010] P0_RECOVERY_JOIN_GATE_negative_recover-job-none-no-recovery_goes_red', () => assertNegative(neg('recover-job-none-no-recovery')))
+
+// CRASH-009：child recovery 无 Aborted 终态；JoinableCompletion 禁止合成/任意 body 证明。
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_negative_lifecycle-aborted-setresult_goes_red', () => assertNegative(neg('lifecycle-aborted-setresult')))
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_negative_fork-recovery-synthetic-restored_goes_red', () => assertNegative(neg('fork-recovery-synthetic-restored')))
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_negative_fork-recovery-synthetic-restored_paren-form_goes_red', () => assertNegative(neg('fork-recovery-synthetic-restored', 'paren-form')))
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_negative_fork-recovery-interrupted-finality_goes_red', () => assertNegative(neg('fork-recovery-interrupted-finality')))
+
+// CRASH-004：恢复不发明程序计数器 / 第二状态机。
+test('WHAT[CRASH-004] P0_RECOVERY_JOIN_GATE_negative_ensure-recovery-unit_goes_red', () => assertNegative(neg('ensure-recovery-unit')))
+test('WHAT[CRASH-004] P0_RECOVERY_JOIN_GATE_negative_host-fork-runtime-recovery-task_goes_red', () => assertNegative(neg('host-fork-runtime-recovery-task')))
+test('WHAT[CRASH-004] P0_RECOVERY_JOIN_GATE_negative_host-fork-runtime-await-recovery-call_goes_red', () => assertNegative(neg('host-fork-runtime-await-recovery-call')))
+
+// CRASH-006：没有 fresh evidence 就没有自动 effect；permit 才可 join。
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_negative_missing-ports-family-ready_goes_red', () => assertNegative(neg('missing-ports-family-ready')))
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_negative_join-tool-no-bare-runtime-join_goes_red', () => assertNegative(neg('join-tool-no-bare-runtime-join')))
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_negative_tools-no-bare-runtime-join_goes_red', () => assertNegative(neg('tools-no-bare-runtime-join')))
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_negative_tools-no-bare-runtime-join_executor-tool_goes_red', () => assertNegative(neg('tools-no-bare-runtime-join', 'executor-tool')))
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_negative_tools-no-bare-runtime-join_distillation-runtime_goes_red', () => assertNegative(neg('tools-no-bare-runtime-join', 'distillation-runtime')))
+
+// CRASH-005：证据不足 / 端口缺失 fail closed。
+test('WHAT[CRASH-005] P0_RECOVERY_JOIN_GATE_negative_executor-tool-empty-session-fail-closed_goes_red', () => assertNegative(neg('executor-tool-empty-session-fail-closed')))
+
+// CRASH-017：plugin load 不是 recovery trigger，普通生命周期不接线。
+test('WHAT[CRASH-017] P0_RECOVERY_JOIN_GATE_negative_spike-restore-handles-none_goes_red', () => assertNegative(neg('spike-restore-handles-none')))
+
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
   const source = [
     'module JoinTool',
     'let execute scope context =',
@@ -259,7 +287,7 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
   assert.ok(hits.some((h) => h.id === 'join-tool-family-blocked'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_join_tool_with_dsl_stays_green_for_positive', () => {
+test('WHAT[CRASH-006] P0_RECOVERY_JOIN_GATE_join_tool_with_dsl_stays_green_for_positive', () => {
   // EXEC-018 / PR5 production shape: direct Join.joinAvailable (no AST).
   const source = [
     'module JoinTool',
@@ -279,7 +307,7 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_with_dsl_stays_green_for_positive', () => 
   assert.ok(!hits.some((h) => h.id === 'join-tool-no-bare-runtime-join'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_join_tool_bare_runtime_join_goes_red', () => {
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_join_tool_bare_runtime_join_goes_red', () => {
   const source = [
     'module JoinTool',
     'let execute scope context =',
@@ -293,7 +321,7 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_bare_runtime_join_goes_red', () => {
   assert.ok(hits.some((h) => h.id === 'join-tool-join-program'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_host_fork_restart_missing_proof_goes_red', () => {
+test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_host_fork_restart_missing_proof_goes_red', () => {
   const hits = scanText(HOST_FORK_RESTART_MISSING_PROOF, 'HostForkRestart.fs')
   assert.ok(
     hits.some((h) => h.id === 'host-fork-restart-proof-structure'),
@@ -301,7 +329,7 @@ test('P0_RECOVERY_JOIN_GATE_host_fork_restart_missing_proof_goes_red', () => {
   )
 })
 
-test('P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_green', () => {
+test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_green', () => {
   // EXEC-021/024: only fromDecoded + PulseAgentHandle; no tryFromDurableCompleted / PublishCompletion.
   const source = [
     'module HostForkRestart',
@@ -322,7 +350,7 @@ test('P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_gree
   assert.ok(!hits.some((h) => h.id === 'publish-completion-agent'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_bare_join_allowlist_host_fork_stays_green', () => {
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_bare_join_allowlist_host_fork_stays_green', () => {
   const source = [
     'module HostForkRuntime',
     'let raceChangeAndMailbox durable fromRev ms =',
@@ -333,7 +361,7 @@ test('P0_RECOVERY_JOIN_GATE_bare_join_allowlist_host_fork_stays_green', () => {
   assert.ok(!hits.some((h) => h.id === 'tools-no-bare-runtime-join'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
   const tool = [
     'module ExecutorTool',
     'if String.IsNullOrWhiteSpace context.SessionId then',
@@ -379,7 +407,7 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
   assert.ok(!scanText(host, 'HostForkRuntime.fs').some((h) => h.id === 'join-with-permit-closure-digest'))
 })
 
-test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
+test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [
     'src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs',
@@ -418,31 +446,47 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   )
 })
 
-test('P0_RECOVERY_JOIN_GATE_positive_recovery_shapes_present', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_GATE_positive_child_recovery_shapes_present', () => {
   const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs'), 'utf8')
+  for (const id of ['joinable-from-decoded', 'child-recovery-result-five-cases']) {
+    const hits = scanText(child, 'ChildRecovery.fs')
+    assert.ok(
+      !hits.some((h) => h.id === id),
+      `positive rule ${id} must be satisfied in ChildRecovery.fs; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
+    )
+  }
+})
+
+test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_positive_mailbox_pulse_shape_present', () => {
   const mailbox = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs'), 'utf8')
+  for (const id of ['mailbox-pulse-agent-handle', 'mailbox-publish-pty-completion']) {
+    const hits = scanText(mailbox, 'CompletionMailbox.fs')
+    assert.ok(
+      !hits.some((h) => h.id === id),
+      `positive rule ${id} must be satisfied in CompletionMailbox.fs; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
+    )
+  }
+})
+
+test('WHAT[CRASH-002] P0_RECOVERY_JOIN_GATE_positive_session_ports_shapes_present', () => {
   const ports = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
     'utf8',
   )
-  const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Join.fs'), 'utf8')
-
-  for (const [file, text, ids] of [
-    ['ChildRecovery.fs', child, ['joinable-from-decoded', 'child-recovery-result-five-cases']],
-    ['CompletionMailbox.fs', mailbox, ['mailbox-pulse-agent-handle', 'mailbox-publish-pty-completion']],
-    [
-      'SessionRecoveryWorkflow.fs',
-      ports,
-      ['session-ports-restore-handles-mandatory', 'session-ports-recover-jobs-mandatory'],
-    ],
-    ['Join.fs', joinOps, ['join-program-requires-permit']],
-  ]) {
-    const hits = scanText(text, file)
-    for (const id of ids) {
-      assert.ok(
-        !hits.some((h) => h.id === id),
-        `positive rule ${id} must be satisfied in ${file}; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
-      )
-    }
+  for (const id of ['session-ports-restore-handles-mandatory', 'session-ports-recover-jobs-mandatory']) {
+    const hits = scanText(ports, 'SessionRecoveryWorkflow.fs')
+    assert.ok(
+      !hits.some((h) => h.id === id),
+      `positive rule ${id} must be satisfied in SessionRecoveryWorkflow.fs; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
+    )
   }
+})
+
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_positive_join_program_requires_permit_shape_present', () => {
+  const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Join.fs'), 'utf8')
+  const hits = scanText(joinOps, 'Join.fs')
+  assert.ok(
+    !hits.some((h) => h.id === 'join-program-requires-permit'),
+    `positive rule join-program-requires-permit must be satisfied in Join.fs; hits=${hits.filter((h) => h.id === 'join-program-requires-permit').map((h) => h.text).join('|')}`,
+  )
 })

@@ -48,7 +48,7 @@ const rel = (abs) => abs.slice(ROOT.length)
 
 // ── production authority ────────────────────────────────────────────────────
 
-test('C0_blogger_lifecycle_authority_is_physical_ownership', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_blogger_lifecycle_authority_is_physical_ownership', () => {
   // PR7 (Blogger runtime) migration is complete: the lifecycle authority is the
   // pure router decideMaterial (parked waiter + physical flight ownership), NOT
   // the transition cell. onMaterial having zero production callers is the
@@ -93,7 +93,7 @@ test('C0_blogger_lifecycle_authority_is_physical_ownership', () => {
   )
 })
 
-test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_physical_HasFlight_is_the_only_busy_definition', () => {
   // Companion send Task must not decide busy. Production busy is host HasFlight only.
   // PR7 D6: BloggerRuntimeState/Cell deleted — zero residual shadow ownership.
   const companion = prodText('src/Wanxiangshu/Context/Companion/Runtime.fs')
@@ -120,7 +120,7 @@ test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
   assert.doesNotMatch(scope, /GetBloggerRuntime|SetBloggerRuntime/, 'scope must not expose cell Get/Set')
 })
 
-test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   // Dual slots: PendingOffer dictionary + flight ownership registry.
   // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
   // Blogger parking/flight/drain state moved to PluginBloggerScope (Wave 2).
@@ -147,7 +147,7 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   )
 })
 
-test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   // Host transform msgs end on the historical last assistant (new outbound shell
   // is not in the list). Commit must peek InFlight only — healing open here
   // rebinds a new RequestId onto an old provider run (stale-cycle race).
@@ -178,7 +178,7 @@ test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   )
 })
 
-test('C0_single_main_material_coordinator_entry', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_single_main_material_coordinator_entry', () => {
   const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainMaterial\b/).map(rel)
   assert.ok(
     hasCoordinator.length > 0,
@@ -194,7 +194,7 @@ test('C0_single_main_material_coordinator_entry', () => {
 
 // ── projection / reset ──────────────────────────────────────────────────────
 
-test('C0_no_BloggerNeedsReset_full_X_replay', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_no_BloggerNeedsReset_full_X_replay', () => {
   const hits = filesContaining(/BloggerNeedsReset/).map(rel)
   assert.equal(
     hits.length,
@@ -203,7 +203,7 @@ test('C0_no_BloggerNeedsReset_full_X_replay', () => {
   )
 })
 
-test('C0_first_request_does_not_extract_raw_user_toml', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_first_request_does_not_extract_raw_user_toml', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const extractsRawToml =
     /Extract the TOML from the raw messages/.test(host) ||
@@ -218,7 +218,7 @@ test('C0_first_request_does_not_extract_raw_user_toml', () => {
 
 // ── squash tool loop ────────────────────────────────────────────────────────
 
-test('C0_squash_path_does_not_SubscribeTerminal', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_path_does_not_SubscribeTerminal', () => {
   const blogger = prodText('src/Wanxiangshu/Context/Companion/HostBlogger.fs')
   assert.equal(
     /SubscribeTerminal/.test(blogger),
@@ -227,7 +227,7 @@ test('C0_squash_path_does_not_SubscribeTerminal', () => {
   )
 })
 
-test('C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
   // Domain type + match arms exist; production must CONSTRUCT Squash context for send/commit.
   // Pattern match (`| BloggerRequestContext.Squash _`) is not construction.
   const constructors = prodFiles.filter((file) => {
@@ -242,7 +242,7 @@ test('C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', ()
 
 // ── commit / park ───────────────────────────────────────────────────────────
 
-test('C0_park_only_after_KnownCommitted', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
@@ -292,7 +292,7 @@ test('C0_park_only_after_KnownCommitted', () => {
     'not-committed paths must still return ContinuationOutcome')
 })
 
-test('C0_commit_drains_via_tryRefresh_before_park', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_drains_via_tryRefresh_before_park', () => {
   // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
   // without waiting for a new main-session wake. Stale PendingOffer is not enough.
@@ -316,7 +316,7 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   )
 })
 
-test('C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const quiet = host.indexOf('| None, None -> return! finishCaughtUpAfterCommit')
   const parkFn = host.indexOf('let private parkAfterCatchUpClear')
@@ -338,7 +338,7 @@ test('C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () =
 
 // ── status / pending ────────────────────────────────────────────────────────
 
-test('C0_adopted_blogger_motion_is_not_active_PENDING', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_adopted_blogger_motion_is_not_active_PENDING', () => {
   // Adopted motion is git history only; no active PENDING/ parking file.
   assert.equal(
     existsSync(join(ROOT, 'PENDING/blogger-prompt-shape-and-parking.md')),

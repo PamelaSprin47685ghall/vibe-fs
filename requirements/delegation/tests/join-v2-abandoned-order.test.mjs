@@ -106,7 +106,7 @@ const linkDurable = async (j, agentId, child, targetAgent = 'fast-coder') => {
 
 // ── EXEC-009: Abandoned wire is flat [[result]] item, not nested [error] ─────
 
-test('EXEC_009_abandoned_item_wire_is_natural_language_not_legacy_dto', () => {
+test('WHAT[DELEG-013] EXEC_009_abandoned_item_wire_is_natural_language_not_legacy_dto', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.abandonedRun({
       agentId: 'h-abandoned',
@@ -121,7 +121,7 @@ test('EXEC_009_abandoned_item_wire_is_natural_language_not_legacy_dto', () => {
   assert.ok(!wire.includes('[error]'))
 })
 
-test('EXEC_009_abandoned_and_completed_share_one_batch_natural_language', () => {
+test('WHAT[DELEG-013] EXEC_009_abandoned_and_completed_share_one_batch_natural_language', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.abandonedRun({
       agentId: 'h1',
@@ -147,7 +147,7 @@ test('EXEC_009_abandoned_and_completed_share_one_batch_natural_language', () => 
 
 // ── EXEC-009: durable mixed batch via production JoinDrain.drainFromJournal ──
 
-test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withhold', async () => {
+test('WHAT[DELEG-013] EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withhold', async () => {
   await withJournal(async (j) => {
     // Link order = CreationOrder. Reverse of agent-id dictionary order so
     // id-sort would put completed first; CreationOrder must put abandoned first.
@@ -238,7 +238,7 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
 
 // ── EXEC-004: failed agent item still carries agent field ────────────────────
 
-test('EXEC_004_failed_item_names_agent_in_natural_language', () => {
+test('WHAT[DELEG-013] EXEC_004_failed_item_names_agent_in_natural_language', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.failedRun({
       runId: 'run-f',
@@ -256,7 +256,7 @@ test('EXEC_004_failed_item_names_agent_in_natural_language', () => {
 
 // ── EXEC-018: production stableJoinKey + orderedCandidates (not JS sort re-impl) ─
 
-test('EXEC_018_stable_sort_key_is_creation_order_then_target_agent', () => {
+test('WHAT[DELEG-013] EXEC_018_stable_sort_key_is_creation_order_then_target_agent', () => {
   let p = handleProjection.empty
   // Link reverse of id dictionary order; TargetAgent also reverse of name order.
   p = link(p, 'z-handle', 'ses_z', 'zebra-agent') // CreationOrder 0
@@ -289,7 +289,7 @@ test('EXEC_018_stable_sort_key_is_creation_order_then_target_agent', () => {
   assert.equal(ordered[1].TargetAgent, 'alpha-agent')
 })
 
-test('EXEC_018_orderedCandidates_prefers_creation_order_over_agent_name_dict', () => {
+test('WHAT[DELEG-013] EXEC_018_orderedCandidates_prefers_creation_order_over_agent_name_dict', () => {
   let p = handleProjection.empty
   // Same CreationOrder direction opposite TargetAgent dictionary order.
   p = link(p, 'id-late', 'ses_late', 'aaa-first-name') // order 0, name would sort first

@@ -137,7 +137,7 @@ async function completedOutcome(terminalText) {
 
 // ── MISSING_FINAL_REPORT is observation-only ─────────────────────────────────
 
-test('EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
+test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
   const gate = {}
@@ -162,7 +162,7 @@ test('EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async (
   assert.equal(resolved, false, 'MISSING_FINAL_REPORT must not resolve the run completion Source')
 })
 
-test('EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
+test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
   const gate = {}
@@ -187,7 +187,7 @@ test('EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
 
 // ── genuine failures still settle the run ────────────────────────────────────
 
-test('EXEC_join_real_Failed_still_claims_run', async () => {
+test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
   const gate = {}

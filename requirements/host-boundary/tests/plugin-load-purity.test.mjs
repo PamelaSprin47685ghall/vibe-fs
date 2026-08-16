@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('HOST_021_plugin_load_graph_has_no_semantic_recovery_or_workspace_mutation', () => {
+test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_graph_has_no_semantic_recovery_or_workspace_mutation', () => {
   const boot = read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const signal = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const workspaceStore = read('src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs')
@@ -24,7 +24,7 @@ test('HOST_021_plugin_load_graph_has_no_semantic_recovery_or_workspace_mutation'
   assert.doesNotMatch(recoveryWiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
 })
 
-test('HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
+test('WHAT[HOST-BOUNDARY-021] HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
   const assistance = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs')
   const fission = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   const jsStore = read('src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs')
@@ -34,7 +34,7 @@ test('HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
   assert.doesNotMatch(jsStore, /let\s+recoverCurrent\b/)
 })
 
-test('HOST_021_ordinary_join_does_not_reenlist_old_durable_tool_state', () => {
+test('WHAT[HOST-BOUNDARY-021] HOST_021_ordinary_join_does_not_reenlist_old_durable_tool_state', () => {
   const join = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs')
   const joinTool = read('src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs')
 
@@ -43,7 +43,7 @@ test('HOST_021_ordinary_join_does_not_reenlist_old_durable_tool_state', () => {
   assert.doesNotMatch(joinTool, /tryMembershipOfLane/)
 })
 
-test('HOST_021_plugin_load_does_not_append_RuntimeStarted', () => {
+test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_does_not_append_RuntimeStarted', () => {
   const boot = read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const journalWriter = read('src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs')
 

@@ -63,12 +63,12 @@ const withJournal = async (facts, fn) => {
   }
 }
 
-test('TPOL_isTopLevelManager_without_journal_uses_parent_map_only', () => {
+test('WHAT[INTERACTION-AUTHORITY-003] TPOL_isTopLevelManager_without_journal_uses_parent_map_only', () => {
   assert.equal(isTopLevelManager(new Map(), null, 'ses_x'), true)
   assert.equal(isTopLevelManager(new Map([['ses_x', 'ses_p']]), null, 'ses_x'), false)
 })
 
-test('TPOL_isTopLevelManager_linked_child_without_authority_is_not_top_level', async () => {
+test('WHAT[INTERACTION-AUTHORITY-003] TPOL_isTopLevelManager_linked_child_without_authority_is_not_top_level', async () => {
   await withJournal([[MAIN, linkFact()]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_child'), false, 'linked child is not top level')
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_other'), true, 'unknown session without parent is top level')
@@ -76,7 +76,7 @@ test('TPOL_isTopLevelManager_linked_child_without_authority_is_not_top_level', a
   })
 })
 
-test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parented', async () => {
+test('WHAT[INTERACTION-AUTHORITY-003] TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parented', async () => {
   await withJournal([[MAIN, rootFact(MAIN, 'manager')]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_main'), true)
     assert.equal(
@@ -99,7 +99,7 @@ test('TPOL_isTopLevelManager_manager_run_is_top_level_unless_orchestrator_parent
   })
 })
 
-test('TPOL_isTopLevelManager_non_manager_run_is_never_top_level', async () => {
+test('WHAT[INTERACTION-AUTHORITY-003] TPOL_isTopLevelManager_non_manager_run_is_never_top_level', async () => {
   await withJournal([[MAIN, rootFact(MAIN, 'coder')]], async (journal) => {
     assert.equal(isTopLevelManager(new Map(), journal, 'ses_main'), false)
   })

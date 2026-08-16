@@ -61,7 +61,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_030_inquiry_only_wildcard_permission', () => {
+test('WHAT[ENF-007] AGENT_030_inquiry_only_wildcard_permission', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
 

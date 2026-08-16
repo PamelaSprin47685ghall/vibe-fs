@@ -31,7 +31,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => prefixProbe({ id, cand
 
 // ── CTX-010: only a work main request carries a probe ─────────────────────
 
-test('CTX_010_a_non_recovery_slot_never_asks_for_a_probe', () => {
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_non_recovery_slot_never_asks_for_a_probe', () => {
   // `selectProbe` throws if called. A slot that may not recover must not pay for a
   // digest recomputation or a blob read to discover it has nothing to do.
   const plan = planner.plan({ kind: requestKind.workMain, mayRecover: false })
@@ -41,7 +41,7 @@ test('CTX_010_a_non_recovery_slot_never_asks_for_a_probe', () => {
   assert.equal(plan.noProbeReason, undefined, 'not asking is not a refusal')
 })
 
-test('CTX_010_a_companion_request_never_asks_for_a_probe_even_when_armed', () => {
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a_probe_even_when_armed', () => {
   // Enforced in the planner, not left to the caller. A Companion request has no prefix
   // to probe — its history is the frame sequence — and a repair reuses whatever the
   // attempt it repairs already sent.
@@ -53,7 +53,7 @@ test('CTX_010_a_companion_request_never_asks_for_a_probe_even_when_armed', () =>
   }
 })
 
-test('CTX_010_an_armed_work_main_carries_the_probe_it_selected', () => {
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_armed_work_main_carries_the_probe_it_selected', () => {
   const plan = planner.plan({
     kind: requestKind.workMain,
     mayRecover: true,
@@ -65,7 +65,7 @@ test('CTX_010_an_armed_work_main_carries_the_probe_it_selected', () => {
   assert.equal(plan.noProbeReason, undefined)
 })
 
-test('CTX_011_a_refused_candidate_falls_back_to_the_committed_epoch_with_a_reason', () => {
+test('WHAT[CONTEXT-COMPRESSION-009] CTX_011_a_refused_candidate_falls_back_to_the_committed_epoch_with_a_reason', () => {
   // The ordinary outcome when an armed slot has nothing to work with. The request still
   // goes out; only the reason is recorded, for diagnostics.
   const plan = planner.plan({

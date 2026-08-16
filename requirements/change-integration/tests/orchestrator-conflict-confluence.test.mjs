@@ -172,7 +172,7 @@ const publishClaimedAgentFact = (job, { expected = 'h1' } = {}) =>
 // Any interleaving of their create+candidate sequences must fold to the same
 // per-job progress. Algebraic shape of concurrent fork-manager races without Host.
 
-test('THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () => {
+test('WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () => {
   const seqA = [
     env(10, MANAGER_A, createFact(JOB_A, MANAGER_A, 'wt_a')),
     env(11, MANAGER_A, candidateFact(JOB_A, 'ca', 'bar_a')),
@@ -209,7 +209,7 @@ test('THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () 
 // E2E conflict feedstock: crash at first conflict-resume; recovery must resume
 // the SAME Manager with conflicted files — not re-fork (ORCH-003 / ORCH-007).
 
-test('THEOREM_conflict_detected_folds_to_resume_conflict_resolution', () => {
+test('WHAT[CHGINT-005] THEOREM_conflict_detected_folds_to_resume_conflict_resolution', () => {
   const folded = foldFacts([
     createFact(JOB_A, MANAGER_A),
     candidateFact(JOB_A),
@@ -237,7 +237,7 @@ test('THEOREM_conflict_detected_folds_to_resume_conflict_resolution', () => {
  // Fixed order: already-published → unchanged expected → else rebase-again.
 // Order matters: checking "unchanged" first would re-attempt a succeeded ff.
 
-test('THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
+test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
   const folded = foldFacts([
     createFact(JOB_A, MANAGER_A),
     candidateFact(JOB_A),
@@ -276,7 +276,7 @@ test('THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
 // ORCH-005 allows target to move while unlocked; REVIEW-008 forbids reusing the
 // post-rebase witness against the wrong base.
 
-test('THEOREM_stale_target_on_rebased_candidate_discards_witness', () => {
+test('WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness', () => {
   const folded = foldFacts([
     createFact(JOB_A, MANAGER_A),
     candidateFact(JOB_A),
@@ -291,7 +291,7 @@ test('THEOREM_stale_target_on_rebased_candidate_discards_witness', () => {
 
 // ── Theorem 5: GetTargetHead failure fails closed (ORCH-008) ────────────────
 
-test('THEOREM_unreadable_target_head_fails_closed', () => {
+test('WHAT[CHGINT-008] THEOREM_unreadable_target_head_fails_closed', () => {
   for (const facts of [
     [createFact(JOB_A, MANAGER_A), candidateFact(JOB_A), rebasedFact(JOB_A)],
     [
@@ -313,7 +313,7 @@ test('THEOREM_unreadable_target_head_fails_closed', () => {
 
 // ── Theorem 6: latest progress only; published is terminal exactly-once ─────
 
-test('THEOREM_latest_progress_wins_and_published_is_terminal', () => {
+test('WHAT[CHGINT-006] THEOREM_latest_progress_wins_and_published_is_terminal', () => {
   const folded = foldFacts([
     createFact(JOB_A, MANAGER_A),
     candidateFact(JOB_A),
@@ -342,7 +342,7 @@ test('THEOREM_latest_progress_wins_and_published_is_terminal', () => {
  // Fold refuses PublishClaimed when no RebasedCandidateReady established the
 // rebased commit (ORCH-004). Race that claims without rebase must fail closed.
 
-test('THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
+test('WHAT[CHGINT-003] THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
   const folded = foldFacts([
     createFact(JOB_A, MANAGER_A),
     candidateFact(JOB_A),
@@ -356,7 +356,7 @@ test('THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
 // G4R §12 + E2E conflict restart: durable ConflictDetected survives crash;
 // recovered projection still yields ResumeConflictResolution (not ManagerStarted).
 
-test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', async () => {
+test('WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', async () => {
   const dir = `temporal-orch-conflict-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const vt1 = createVirtualClock()
   const created1 = await agentJournal.create({
@@ -407,7 +407,7 @@ test('THEOREM_drop_ephemeral_preserves_conflict_pending_recovery', async () => {
 // Crash inside the CAS window (ORCH-005 restart-publish feedstock): durable
 // PublishClaimed survives; recovered recoveryAction still respects branch order.
 
-test('THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', async () => {
+test('WHAT[CHGINT-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', async () => {
   const dir = `temporal-orch-claim-${Date.now()}-${Math.random().toString(16).slice(2)}`
   const vt1 = createVirtualClock()
   const created1 = await agentJournal.create({

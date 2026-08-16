@@ -33,7 +33,7 @@ async function waitUntil(predicate, timeoutMs, stepMs = 10) {
 
 // ── 1. Snapshot Error does not permanently end the pass ─────────────────────
 
-test('EXEC_reconcile_error_does_not_consume_causal_budget', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_error_does_not_consume_causal_budget', async () => {
   const sid = sessionId('ses_reconcile_err')
   const physical = physicalUser('user-1')
   const turns = []
@@ -64,7 +64,7 @@ test('EXEC_reconcile_error_does_not_consume_causal_budget', async () => {
 
 // ── 1b. idle-before-transcript: causal rereads find late terminal ────────────
 
-test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
   const sid = sessionId('ses_reconcile_rekick')
   const physical = physicalUser('user-1')
   const turns = []
@@ -104,7 +104,7 @@ test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
 
 // ── 1c. causal rereads exhausted stops always-incomplete transcripts ─────────
 
-test('EXEC_reconcile_incomplete_rereads_exhausted_stops', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_incomplete_rereads_exhausted_stops', async () => {
   const sid = sessionId('ses_reconcile_rereads')
   const physical = physicalUser('user-1')
   const turns = []
@@ -145,7 +145,7 @@ test('EXEC_reconcile_incomplete_rereads_exhausted_stops', async () => {
 
 // ── 1d. ClearSession during causal reread stops later publish ────────────────
 
-test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   const sid = sessionId('ses_reconcile_clear')
   const physical = physicalUser('user-1')
   const turns = []
@@ -180,7 +180,7 @@ test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   assert.equal(completed.length, 0, 'ClearSession mid-reread must prevent terminal publish')
 })
 
-test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once', async () => {
   const sid = sessionId('ses_reconcile_retry_publish')
   const physical = physicalUser('user-1')
   const attempts = []
@@ -208,7 +208,7 @@ test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once',
   assert.equal(attempts.length, 2, 'successful retry seals exactly once')
 })
 
-test('EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', async () => {
   const sid = sessionId('ses_reconcile_generation_fence')
   const oldPhysical = physicalUser('old-user')
   const newPhysical = physicalUser('new-user')
@@ -240,7 +240,7 @@ test('EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', 
   assert.equal(idValue.physicalUser(turns[0].PhysicalUserMessageId), 'new-user')
 })
 
-test('EXEC_reconcile_clear_rebind_fences_post_on_turn_effects_from_old_binding', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_clear_rebind_fences_post_on_turn_effects_from_old_binding', async () => {
   const sid = sessionId('ses_reconcile_inflight_generation_fence')
   const oldPhysical = physicalUser('old-user')
   const newPhysical = physicalUser('new-user')
@@ -295,7 +295,7 @@ test('EXEC_reconcile_clear_rebind_fences_post_on_turn_effects_from_old_binding',
 
 // ── 2. stickyTerminal capacity 256 with FIFO eviction ────────────────────────
 
-test('EXEC_events_sticky_terminal_bounded', () => {
+test('WHAT[HOST-BOUNDARY-016] EXEC_events_sticky_terminal_bounded', () => {
   const port = hostEventPort.create()
   const cap = hostEventPort.stickyCap
   assert.equal(cap, 256)
@@ -319,7 +319,7 @@ test('EXEC_events_sticky_terminal_bounded', () => {
 
 // ── 3. HostSignalSubscribe transport selection (local-event-hook default) ────
 
-test('HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
   const result = await hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {})
   const decoded = resultOf(result)
   assert.equal(decoded.ok, true, 'local-event-hook must succeed with zero network probes')
@@ -328,7 +328,7 @@ test('HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
   assert.equal(source, 'local-event-hook', 'local signals arrive through the Host event hook')
 })
 
-test('HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
   const fakeListen = { call: () => ({ disposed: false }) }
   const result = await hostSignalSubscribe.trySubscribe(
     { serverUrl: 'http://localhost:4096', client: null, events: { listen: fakeListen } },
@@ -341,7 +341,7 @@ test('HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () 
   assert.equal(source, 'events.listen')
 })
 
-test('HOST_signal_subscribe_bad_listener_fails_closed', async () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_bad_listener_fails_closed', async () => {
   const result = await hostSignalSubscribe.trySubscribe(
     { events: { listen: () => null } },
     () => {},
@@ -350,7 +350,7 @@ test('HOST_signal_subscribe_bad_listener_fails_closed', async () => {
   assert.equal(decoded.ok, false, 'broken events.listen must fail closed')
 })
 
-test('HOST_signal_subscribe_client_events_listen_supported', async () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_client_events_listen_supported', async () => {
   const fakeListen = { call: () => ({ disposed: false }) }
   const result = await hostSignalSubscribe.trySubscribe(
     { client: { events: { listen: fakeListen } } },

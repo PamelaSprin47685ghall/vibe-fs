@@ -51,7 +51,7 @@ after(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
-test('PROMPT_006_production_wires_prompt_acceptance_to_the_exact_provider_attempt', () => {
+test('WHAT[HOST-BOUNDARY-008] PROMPT_006_production_wires_prompt_acceptance_to_the_exact_provider_attempt', () => {
   const hostSignal = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
   const transforms = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url), 'utf8')
   const sessions = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/Sessions.fs', import.meta.url), 'utf8')
@@ -63,7 +63,7 @@ test('PROMPT_006_production_wires_prompt_acceptance_to_the_exact_provider_attemp
   assert.doesNotMatch(bindingSource, /internalBindings|beginInternalSend|endInternalSend/)
 })
 
-test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_stack_returns', async () => {
+test('WHAT[HOST-BOUNDARY-008] PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_stack_returns', async () => {
   const sid = sessionId('ses_binding_async_override')
   const promptKey = { fields: ['prompt-deep-continuation'] }
   const deepModel = { providerID: 'provider', modelID: 'deep-coder-leased', variant: 'none' }
@@ -101,7 +101,7 @@ test('PROMPT_006_provider_attempt_keeps_typed_effective_agent_after_SendPrompt_s
   binding.drop(sid)
 })
 
-test('PROMPT_006_parented_send_overrides_model_but_rejects_agent_drift_before_host', async () => {
+test('WHAT[HOST-BOUNDARY-008] PROMPT_006_parented_send_overrides_model_but_rejects_agent_drift_before_host', async () => {
   const child = sessionId('ses_binding_child')
   const sends = []
   const port = createPort(

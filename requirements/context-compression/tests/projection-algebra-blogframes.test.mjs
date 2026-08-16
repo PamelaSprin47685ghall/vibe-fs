@@ -25,7 +25,7 @@ const planNames = (intents) => {
   return result.intents
 }
 
-test('PROJ_008_step3b_InsertBlogFrames_digest_equiv_to_CompanionProjectionBuilder', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_digest_equiv_to_CompanionProjectionBuilder', () => {
   const spy = (input) => `«${input}»`
   const dataToml = '[[new_work_to_record]]\nuser = "work"'
   const frames = [
@@ -66,7 +66,7 @@ test('PROJ_008_step3b_InsertBlogFrames_digest_equiv_to_CompanionProjectionBuilde
   )
 })
 
-test('PROJ_008_step3b_InsertBlogFrames_squash_digest_equiv_to_Builder', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_squash_digest_equiv_to_Builder', () => {
   const spy = (input) => `«${input}»`
   const frames = [
     projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f0', body: 'frame body 0' }),

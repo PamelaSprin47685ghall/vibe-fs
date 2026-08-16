@@ -164,19 +164,19 @@ const cutoffDigestOf = (rawMessages, cutoff) => {
 
 // ── early exits ─────────────────────────────────────────────────────────────
 
-test('XWIRE_no_journal_is_a_noop', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', async () => {
   const scope = makeScope(undefined)
   await applyTransform(snapshotPort(), undefined, scope, transformOutput())
 })
 
-test('XWIRE_no_session_id_in_output_is_a_noop', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_no_session_id_in_output_is_a_noop', async () => {
   const live = await liveJournal()
   const scope = makeScope(live.journal)
   await applyTransform(snapshotPort(), live.journal, scope, { messages: [{ info: {}, parts: [] }] })
   live.cleanup()
 })
 
-test('XWIRE_unarmed_session_is_a_noop', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_unarmed_session_is_a_noop', async () => {
   const live = await liveJournal()
   await seedAuthority(live.append)
   const scope = makeScope(live.journal)
@@ -184,7 +184,7 @@ test('XWIRE_unarmed_session_is_a_noop', async () => {
   live.cleanup()
 })
 
-test('XWIRE_missing_physical_user_message_throws', async () => {
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_physical_user_message_throws', async () => {
   const live = await liveJournal()
   await seedAuthority(live.append)
   const scope = makeScope(live.journal)
@@ -194,7 +194,7 @@ test('XWIRE_missing_physical_user_message_throws', async () => {
   live.cleanup()
 })
 
-test('XWIRE_missing_snapshot_port_throws', async () => {
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_snapshot_port_throws', async () => {
   const live = await liveJournal()
   await seedAuthority(live.append)
   const scope = makeScope(live.journal)
@@ -203,7 +203,7 @@ test('XWIRE_missing_snapshot_port_throws', async () => {
   live.cleanup()
 })
 
-test('XWIRE_snapshot_error_throws', async () => {
+test('WHAT[HOST-BOUNDARY-020] XWIRE_snapshot_error_throws', async () => {
   const live = await liveJournal()
   await seedAuthority(live.append)
   const scope = makeScope(live.journal)
@@ -215,7 +215,7 @@ test('XWIRE_snapshot_error_throws', async () => {
   live.cleanup()
 })
 
-test('XWIRE_unbindable_run_throws', async () => {
+test('WHAT[HOST-BOUNDARY-020] XWIRE_unbindable_run_throws', async () => {
   const live = await liveJournal()
   await seedAuthority(live.append)
   const scope = makeScope(live.journal)
@@ -228,7 +228,7 @@ test('XWIRE_unbindable_run_throws', async () => {
   live.cleanup()
 })
 
-test('XWIRE_missing_projections_throws', async () => {
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_projections_throws', async () => {
   const live = await liveJournal()
   const scope = makeScope(live.journal)
   armRecovery(scope, session)
@@ -253,7 +253,7 @@ const armedProbeSetup = async ({ cutoff = 2, digest } = {}) => {
   return { live, scope, output, resolvedDigest }
 }
 
-test('XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', async () => {
   const { live, scope, output } = await armedProbeSetup()
 
   await applyTransform(snapshotPort(), live.journal, scope, output)
@@ -272,7 +272,7 @@ test('XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', async () =
   live.cleanup()
 })
 
-test('XWIRE_no_material_spends_slot_without_probe', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_no_material_spends_slot_without_probe', async () => {
   // CTX-011: coverage not ahead of the request start → no candidate → the
   // armed slot must survive so a later main can still probe.
   const live = await liveJournal()
@@ -299,7 +299,7 @@ test('XWIRE_no_material_spends_slot_without_probe', async () => {
   live.cleanup()
 })
 
-test('XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
   const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 
@@ -326,7 +326,7 @@ test('XWIRE_probe_reconcile_promotes_prefix_rebase_fact', async () => {
   live.cleanup()
 })
 
-test('XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
   const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 
@@ -348,7 +348,7 @@ test('XWIRE_failed_attempt_clears_plan_without_promoting', async () => {
   live.cleanup()
 })
 
-test('XWIRE_unknown_reread_keeps_the_plan', async () => {
+test('WHAT[HOST-BOUNDARY-021] XWIRE_unknown_reread_keeps_the_plan', async () => {
   const { live, scope } = await armedProbeSetup({ cutoff: 2 })
   const output = transformOutput()
 

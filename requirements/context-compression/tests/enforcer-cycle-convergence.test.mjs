@@ -330,7 +330,7 @@ const hasFlight = (scope) => parkedTransform.hasFlight(scope, BLOG)
 
 // ── BlogTool execute gate (ENFORCER-061): flight ownership authorises blog ──
 
-test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
   // Request-scoped capability: Role=Blogger alone is insufficient.
   assert.equal(typeof BlogTool.NoLiveCycleError, 'string')
   assert.match(BlogTool.NoLiveCycleError, /CHRONICLE_NO_LIVE_CYCLE/)
@@ -364,7 +364,7 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
 
 // ── historical completed blog tail must never re-enter cycle logic ──────────
 
-test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
   await withHarness(async ({ scope, fatals, run }) => {
     await run(liveBlog('a1', 'c1', { text: '' }))
     await run(liveBlog('a2', 'c2', { text: '' }))
@@ -384,7 +384,7 @@ test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
 
 // ── unexpected = fatal (console.error; kill gated under node:test) ──────────
 
-test('ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', async () => {
   // Live tool-loop blog (assistant not completed) with no InFlight and no open
   // materialization means the plugin never owned this step — programmer gap.
   await withHarness(async ({ scope, fatals, lastFatal, run }) => {
@@ -399,7 +399,7 @@ test('ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', asyn
   })
 })
 
-test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_delta_digest_mismatch_is_fatal', async () => {
   await withHarness(async ({ scope, fatals, lastFatal, run }) => {
     // Corrupt InFlight delta digest so commit path hits unexpectedEnd.
     const bad = bloggerRequestContext.main({
@@ -444,7 +444,7 @@ const runOwnedCommit = async (scope, run, messages) => {
   }
 }
 
-test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage', async () => {
   // Manager real Host trajectory (processor.cleanup):
   //   tool status=completed AND assistant.time.completed set
   // before the next loop transform reloads msgs. Old code treated that as a
@@ -479,7 +479,7 @@ test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_covera
   })
 })
 
-test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', async () => {
   await withHarness(async ({ journal, scope, fatals, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
 
@@ -497,7 +497,7 @@ test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', asy
   })
 })
 
-test('ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', async () => {
   await withHarness(async ({ journal, scope, fatals, run }) => {
     await runOwnedCommit(scope, run, historicalBlog('asst-idem', 'call-idem', { text: 'once' }))
     assert.equal(fatals.length, 0)
@@ -514,7 +514,7 @@ test('ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', async ()
   })
 })
 
-test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', async () => {
   // Two sequential Host-completed cycles with staged next_ingest windows.
   // Fingerprint of the bug: every request restarts at prev=0.
   await withHarness(async ({ journal, scope, fatals, run }) => {
@@ -553,7 +553,7 @@ test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', 
 
 // ── resolveCycleContext does not clobber live InFlight ──────────────────────
 
-test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
   await withHarness(async ({ journal, scope, blog, main, ctx }) => {
     const live = await resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
     assert.ok(live)

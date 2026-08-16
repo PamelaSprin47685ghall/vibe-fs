@@ -69,14 +69,14 @@ const createSensor = (owned) => {
   return { sensor, aborts }
 }
 
-test('HOST_027_control_sentinel_strips_from_persisted_reasoning_without_touching_surrounding_bytes', () => {
+test('WHAT[HOST-BOUNDARY-013] HOST_027_control_sentinel_strips_from_persisted_reasoning_without_touching_surrounding_bytes', () => {
   const { sensor } = createSensor(new Set(['ses_a']))
   assert.equal(sentinelOf(sensor), '[NEEDHELP]')
   assert.equal(stripSentinel('before [NEEDHELP] after'), 'before  after')
   assert.equal(stripSentinel('[needhelp]'), '[needhelp]', 'case variants are ordinary reasoning bytes')
 })
 
-test('HOST_027_codec_correlates_real_host_part_kind_with_text_delta_and_keeps_legacy_direct_field_compat', () => {
+test('WHAT[HOST-BOUNDARY-013] HOST_027_codec_correlates_real_host_part_kind_with_text_delta_and_keeps_legacy_direct_field_compat', () => {
   const updated = partUpdated('ses_a', 'asst_42', 'reasoning')
   assert.equal(isNeedHelpRelevantEvent(updated), true)
   const part = tryDecodePartUpdated(updated)
@@ -101,7 +101,7 @@ test('HOST_027_codec_correlates_real_host_part_kind_with_text_delta_and_keeps_le
   assert.equal(decodedLegacy.Delta, '[NEEDHELP]')
 })
 
-test('HOST_027_exact_sentinel_triggers_across_fragmented_real_host_reasoning_text_deltas', async () => {
+test('WHAT[HOST-BOUNDARY-013] HOST_027_exact_sentinel_triggers_across_fragmented_real_host_reasoning_text_deltas', async () => {
   const { sensor, aborts } = createSensor(new Set(['ses_a']))
   assert.equal(sentinelOf(sensor), '[NEEDHELP]')
 
@@ -120,7 +120,7 @@ test('HOST_027_exact_sentinel_triggers_across_fragmented_real_host_reasoning_tex
   assert.equal(hasArmedSession(sensor, sessionId('ses_other')), false)
 })
 
-test('HOST_027_case_variants_unowned_and_visible_text_do_not_trigger', async () => {
+test('WHAT[HOST-BOUNDARY-013] HOST_027_case_variants_unowned_and_visible_text_do_not_trigger', async () => {
   const { sensor, aborts } = createSensor(new Set(['ses_owned']))
 
   observe(sensor, partUpdated('ses_owned', 'asst_1', 'reasoning'))
@@ -138,7 +138,7 @@ test('HOST_027_case_variants_unowned_and_visible_text_do_not_trigger', async () 
   assert.deepEqual(aborts, [])
 })
 
-test('HOST_027_same_provider_run_aborts_once_but_different_run_is_independent', async () => {
+test('WHAT[HOST-BOUNDARY-013] HOST_027_same_provider_run_aborts_once_but_different_run_is_independent', async () => {
   const { sensor, aborts } = createSensor(new Set(['ses_a']))
 
   observe(sensor, partUpdated('ses_a', 'asst_1', 'reasoning'))

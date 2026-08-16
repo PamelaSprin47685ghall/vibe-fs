@@ -59,20 +59,20 @@ const mustOk = (result, label = 'result') => {
   return payloadOf(result)
 }
 
-test('EventType_is_exactly_JournalEnvelope', () => {
+test('WHAT[DURABLE-EVENTS-002] EventType_is_exactly_JournalEnvelope', () => {
   const encoded = Codec.encode(toList([]), toList([]), env({ seq: 1 }))
   assert.equal(encoded.EventType, 'JournalEnvelope')
   assert.equal(Codec.JournalEnvelopeEventType, 'JournalEnvelope')
   assert.equal(encoded.EventType, Codec.JournalEnvelopeEventType)
 })
 
-test('encode_preserves_EventId', () => {
+test('WHAT[DURABLE-EVENTS-002] encode_preserves_EventId', () => {
   const original = env({ seq: 7 })
   const encoded = Codec.encode(toList([]), toList([]), original)
   assert.equal(idValue.event(encoded.EventId), idValue.event(original.EventId))
 })
 
-test('encodeStreamId_scheme_is_stable_and_deterministic', () => {
+test('WHAT[DURABLE-EVENTS-002] encodeStreamId_scheme_is_stable_and_deterministic', () => {
   assert.equal(
     Domain.EventStreamIdModule_value(Codec.encodeStreamId(stream.workspace())),
     'journal/workspace',
@@ -102,7 +102,7 @@ test('encodeStreamId_scheme_is_stable_and_deterministic', () => {
   }
 })
 
-test('round_trip_preserves_fold_relevant_fields', () => {
+test('WHAT[DURABLE-EVENTS-002] round_trip_preserves_fold_relevant_fields', () => {
   const original = env({
     seq: 4,
     observedAt: '2026-03-04T05:06:07Z',
@@ -116,7 +116,7 @@ test('round_trip_preserves_fold_relevant_fields', () => {
   assert.equal(journal.serialize(decoded), journal.serialize(original))
 })
 
-test('round_trip_fold_equates_with_journal_fold', () => {
+test('WHAT[DURABLE-EVENTS-002] round_trip_fold_equates_with_journal_fold', () => {
   const original = env({ seq: 2, observedAt: '2026-02-03T04:05:06Z', run: 'run_x' })
   const encoded = Codec.encode(toList([]), toList([]), original)
   const decoded = mustOk(Codec.tryDecode(encoded), 'tryDecode')
@@ -134,7 +134,7 @@ test('round_trip_fold_equates_with_journal_fold', () => {
   )
 })
 
-test('parents_are_accepted_and_canonicalized', () => {
+test('WHAT[DURABLE-EVENTS-003] parents_are_accepted_and_canonicalized', () => {
   const parentA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const parentB = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   const encoded = Codec.encode(
@@ -147,7 +147,7 @@ test('parents_are_accepted_and_canonicalized', () => {
   assert.deepEqual(parentIds, [parentB, parentA])
 })
 
-test('payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => {
+test('WHAT[DURABLE-EVENTS-003] payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => {
   const encoded = Codec.encode(
     toList([]),
     toList([payloadRef('ref-z'), payloadRef('ref-a'), payloadRef('ref-z')]),
@@ -160,7 +160,7 @@ test('payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => 
   assert.equal(typeof refs[0], 'string')
 })
 
-test('canonical_identity_bytes_stable_under_section_5_0', () => {
+test('WHAT[DURABLE-EVENTS-003] canonical_identity_bytes_stable_under_section_5_0', () => {
   const original = env({ seq: 3, observedAt: '2026-01-02T03:04:05Z', run: 'run_stable' })
   const parents = [eventId('cccccccccccccccccccccccccccccccccccccccc'), eventId('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')]
   const refs = [payloadRef('oid-2'), payloadRef('oid-1')]
@@ -180,7 +180,7 @@ test('canonical_identity_bytes_stable_under_section_5_0', () => {
   assert.equal(Canonical.encode(redecoded), Canonical.encode(a))
 })
 
-test('tryDecode_rejects_wrong_EventType', () => {
+test('WHAT[DURABLE-EVENTS-002] tryDecode_rejects_wrong_EventType', () => {
   const encoded = Codec.encode(toList([]), toList([]), env({ seq: 1 }))
   const wrong = new Domain.EventEnvelope(
     encoded.EventId,
@@ -195,7 +195,7 @@ test('tryDecode_rejects_wrong_EventType', () => {
   assert.match(payloadOf(result), /JournalEnvelope/)
 })
 
-test('workspace_child_process_streams_round_trip', () => {
+test('WHAT[DURABLE-EVENTS-002] workspace_child_process_streams_round_trip', () => {
   const cases = [
     { stream: stream.workspace(), seq: 1 },
     { stream: stream.child(childId('ch_9')), seq: 2 },

@@ -54,20 +54,20 @@ after(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
-test('CHAT_PARAMS_non_managed_agent_is_out_of_scope_and_output_is_untouched', () => {
+test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_non_managed_agent_is_out_of_scope_and_output_is_untouched', () => {
   const output = outputSeed()
   applyHook({ sessionID: 'ses_unknown', agent: 'build', model: {} }, output)
   assert.deepEqual(output, outputSeed())
 })
 
-test('CHAT_PARAMS_managed_provider_run_without_execution_binding_fails_closed', () => {
+test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_managed_provider_run_without_execution_binding_fails_closed', () => {
   assert.throws(
     () => applyHook(managedInput('ses_unbound', 'deep-coder'), outputSeed()),
     /not recognized as a bound session|no model-routing lease/i,
   )
 })
 
-test('CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', async () => {
+test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', async () => {
   const sid = sessionId('ses_exact')
   binding.observeUserFacingAgent(sid, 'deep-coder')
   await routing.ModelRouting_acquireManaged(sid, 'deep-coder')
@@ -79,7 +79,7 @@ test('CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', asy
   binding.drop(sid)
 })
 
-test('CHAT_PARAMS_reasoning_variant_drift_fails_closed', async () => {
+test('WHAT[HOST-BOUNDARY-019] CHAT_PARAMS_reasoning_variant_drift_fails_closed', async () => {
   const sid = sessionId('ses_variant_drift')
   binding.observeUserFacingAgent(sid, 'fast-coder')
   await routing.ModelRouting_acquireManaged(sid, 'fast-coder')

@@ -30,7 +30,7 @@
 | AGENT-006 精确工具名清单（表内容） | HOW（当前矩阵） | 「矩阵是 enforcement 投影」是 WHAT；每个名字本身是当前实现 vocabulary，随能力演进可重画 |
 | MCP wildcard 字符串（`stealth-browser-mcp_*` / `sphinx_*`） | HOW | Host schema 键；「域能力 token 唯一」才是 WHAT（ENF-007） |
 | `attempt-plan.test.mjs` 中 prefix/probe 断言 | HOW → `prefix-stability` | 该文件是 context family SPLIT；本包只引用 PROMPT-008/AGENT-010 能力断言 |
-| AGENT-002 缺一失败 / AGENT-004 旧名拒绝（`agent-permission-gate` / `managed-agent-config` 中的断言） | HOW（runtime contract / migration ratchet） | COVERAGE：exact catalog = implementation vocabulary；legacy reject = 迁移证明；断言保留作 runtime-contract proof |
+| AGENT-002 缺一则投影补齐 / AGENT-004 旧名拒绝（`agent-permission-gate` / `managed-agent-config` 中的断言） | HOW（runtime contract / migration ratchet） | COVERAGE：exact catalog = implementation vocabulary，由 config hook 投影到 Host live config，不再要求 `opencode.json` 手写 22 名；legacy reject = 迁移证明 |
 | `tool-referential-integrity` 的 LEGACY_FORBIDDEN_NAMES 清单 | HOW | 旧名 ratchet；「同名唯一合同」才是 WHAT（ENF-009） |
 
 ## 历史（考古摘要）

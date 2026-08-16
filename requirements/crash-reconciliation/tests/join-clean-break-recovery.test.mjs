@@ -53,7 +53,7 @@ const durableLink = async (j, parentId, agentId, child, targetAgent, role) => {
 
 // ── 3. Delayed recovery race (unit shape; full E2E later) ────────────────────
 
-test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', async () => {
+test('WHAT[CRASH-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-race-'))
   const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true)
@@ -110,6 +110,36 @@ test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_ter
     )
     const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
     assert.ok(!wire.includes('status = "aborted"'))
+  } finally {
+    created.dispose()
+  }
+})
+
+test('WHAT[CRASH-010] P0_CLEAN_BREAK_aborted_only_observation_is_incomplete_not_blocked', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-wait-'))
+  const created = await agentJournal.create({ directory: dir })
+  assert.equal(created.ok, true)
+
+  try {
+    const j = created.journal
+    const linked = await durableLink(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
+    assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
+
+    // CRASH-010: 缺 terminal 证据（aborted-only + restore in flight）→
+    // RecoveryIncomplete（等待，不发 permit），不是硬 RecoveryBlocked。
+    const resolution = childRecovery.resolveChild(
+      childRecovery.durableActive(),
+      childRecovery.snapshotMissing(),
+      [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
+    )
+    assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+    assert.notEqual(caseOf(resolution), 'RecoveryBlocked')
+
+    // 等待期间 join drain 为空且不 retire。
+    const early = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    assert.equal(early.ok, true)
+    assert.deepEqual(early.items, [])
+    assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), false)
   } finally {
     created.dispose()
   }

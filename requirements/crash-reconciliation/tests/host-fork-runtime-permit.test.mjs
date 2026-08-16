@@ -91,7 +91,7 @@ const validPermit = (j) => {
 
 // ── validatePermit branches (via JoinAvailableWithPermit) ───────────────────
 
-test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
+test('WHAT[CRASH-011] HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
   const liveCtx = await live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
@@ -102,7 +102,7 @@ test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
+test('WHAT[CRASH-011] HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   const liveCtx = await live()
   const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
@@ -113,7 +113,7 @@ test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   liveCtx.cleanup()
 })
 
-test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => {
+test('WHAT[CRASH-011] EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => {
   const liveCtx = await live()
   const sequence = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   // A member the family no longer has: recovery closed over something that has since vanished,
@@ -126,7 +126,7 @@ test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => 
   liveCtx.cleanup()
 })
 
-test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () => {
+test('WHAT[CRASH-011] EXEC_023_permit_survives_family_growth_after_recovery_closed', async () => {
   const liveCtx = await live()
   const permit = validPermit(liveCtx.journal)
 
@@ -145,7 +145,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
   liveCtx.cleanup()
 })
 
-test('HFRT_join_with_valid_permit_passes_validation', async () => {
+test('WHAT[CRASH-011] HFRT_join_with_valid_permit_passes_validation', async () => {
   const liveCtx = await live()
   const permit = validPermit(liveCtx.journal)
   const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
@@ -156,7 +156,7 @@ test('HFRT_join_with_valid_permit_passes_validation', async () => {
 
 // ── AwaitAgent ───────────────────────────────────────────────────────────────
 
-test('HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
+test('WHAT[CRASH-011] HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
   const liveCtx = await live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9', [])

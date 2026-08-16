@@ -18,7 +18,7 @@ const unwrap = (value) => {
   return listItems(r.value)
 }
 
-test('DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent', () => {
+test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent', () => {
   const a = envelope('a'.padStart(40, '0'))
   const b = envelope('b'.padStart(40, '0'))
   const c = envelope('c'.padStart(40, '0'), ['a'.padStart(40, '0')])
@@ -27,7 +27,7 @@ test('DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent', () => {
   assert.deepEqual(left.map((e) => e.EventId.fields?.[0] ?? e.EventId), right.map((e) => e.EventId.fields?.[0] ?? e.EventId))
 })
 
-test('DURABLE_EVENTS_003_same_EventId_same_bytes_dedupes', () => {
+test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_same_bytes_dedupes', () => {
   const id = '1'.padStart(40, '0')
   const sameA = envelope(id, [], 'proof/a', { x: 1 })
   const sameB = envelope(id, [], 'proof/a', { x: 1 })
@@ -35,7 +35,7 @@ test('DURABLE_EVENTS_003_same_EventId_same_bytes_dedupes', () => {
   assert.equal(merged.length, 1)
 })
 
-test('DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
+test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
   const id = '2'.padStart(40, '0')
   const a = envelope(id, [], 'proof/a', { x: 1 })
   const b = envelope(id, [], 'proof/a', { x: 2 })
@@ -43,7 +43,7 @@ test('DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
   assert.equal(r.ok, false)
 })
 
-test('DURABLE_EVENTS_014_missing_parent_fails_closed', () => {
+test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_missing_parent_fails_closed', () => {
   const child = envelope('3'.padStart(40, '0'), ['9'.padStart(40, '0')])
   const r = resultOf(Merge.merge(toList([['a', toList([child])]])))
   assert.equal(r.ok, false)

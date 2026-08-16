@@ -35,7 +35,7 @@ const reviewer = (j, r) => new RecoveryNode(5, [jobId(j), sid(r)])
 const closureOf = (nodes, sequence = 3n) =>
   new RecoveryClosure(root, toList(nodes), 'digest', sequence)
 
-test('CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
+test('WHAT[CRASH-014] CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
   const nodes = [child('p', 'c', 'h1'), companion('m', 'c2'), work('w1')]
   const result = validateClosurePure(closureOf(nodes))
   assert.equal(result.tag, 0, 'unique sessions must validate')
@@ -47,14 +47,14 @@ test('CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
   ])
 })
 
-test('CRASH_CLOSURE_duplicate_session_is_a_cycle_block', () => {
+test('WHAT[CRASH-014] CRASH_CLOSURE_duplicate_session_is_a_cycle_block', () => {
   const duplicated = closureOf([work('w1'), work('w1')])
   const result = validateClosurePure(duplicated)
   assert.equal(result.tag, 1, 'a session listed twice must fail closed')
   assert.equal(caseOf(result.fields[0].Head), 'RecoveryCycle')
 })
 
-test('CRASH_CLOSURE_member_tokens_are_stable_identities', () => {
+test('WHAT[CRASH-014] CRASH_CLOSURE_member_tokens_are_stable_identities', () => {
   const nodes = [work('w'), child('p', 'c', 'h1'), companion('m', 'c2'), blogger('m', 'b3'), managerJob('j1', 'm4'), reviewer('j1', 'r5')]
   assert.equal(RecoveryNodeModule_token(nodes[0]), 'W:w')
   assert.equal(RecoveryNodeModule_token(nodes[1]), 'A:p>c:h1')
@@ -64,7 +64,7 @@ test('CRASH_CLOSURE_member_tokens_are_stable_identities', () => {
   assert.equal(RecoveryNodeModule_token(nodes[5]), 'R:j1:r5')
 })
 
-test('CRASH_CLOSURE_permit_refuses_loss_and_admits_growth', () => {
+test('WHAT[CRASH-011] CRASH_CLOSURE_permit_refuses_loss_and_admits_growth', () => {
   const permit = new FamilyRecoveryPermit(root, 3n, stringSet(['W:w1', 'A:p>c:h1']))
 
   // A member the family no longer has invalidates the permit: recovery closed
@@ -81,7 +81,7 @@ test('CRASH_CLOSURE_permit_refuses_loss_and_admits_growth', () => {
   assert.deepEqual(listItems(grown), [])
 })
 
-test('CRASH_CLOSURE_members_set_matches_tokens', () => {
+test('WHAT[CRASH-014] CRASH_CLOSURE_members_set_matches_tokens', () => {
   const nodes = [work('w1'), child('p', 'c', 'h1')]
   const members = setItems(RecoveryClosureModule_members(closureOf(nodes)))
   assert.deepEqual([...members].sort(), ['A:p>c:h1', 'W:w1'])

@@ -57,24 +57,30 @@ const readProfile = (profile) => ({
 
 // ── INTERACTION-AUTHORITY-001/002：PhysicalUserMessage ≠ AuthorityTurn ──────
 
-test('IA_001_authority_root_id_is_reachable_only_by_promoting_a_physical_message', () => {
+test('WHAT[INTERACTION-AUTHORITY-001] IA_001_authority_root_id_is_reachable_only_by_promoting_a_physical_message', () => {
   // promoteToAuthorityRoot 是唯一 crossing；profile 只记录提升后的 root。
   assert.equal(idValue.authorityRoot(promoteToAuthorityRoot(PHYSICAL)), 'msg_u1')
   assert.equal(readProfile(profileOf()).authorityRoot, 'msg_u1')
 })
 
-test('IA_001_002_no_function_from_transport_receipt_to_authority_root', () => {
-  // `accepted-*` 是 transport 收据形态（dispatch 事实），但收据永远到不了 root：
-  // facade 暴露生产代码的全部 crossing，缺 promoteReceipt 本身就是断言。
-  assert.equal(isAdmissionShaped(transportReceipt('accepted-1a2b')), true)
-  assert.equal(isAdmissionShaped(transportReceipt('msg_real')), false)
+test('WHAT[INTERACTION-AUTHORITY-001] IA_001_promote_is_the_only_crossing_no_receipt_function', () => {
+  // facade 暴露生产代码的全部 crossing：只有 promoteToAuthorityRoot 能把物理
+  // 消息变成 authority root；缺 promoteReceipt 本身就是 001 边界断言——没有
+  // 从 TransportReceipt 到 AuthorityRootUserMessageId 的函数。
   assert.equal(typeof promoteToAuthorityRoot, 'function')
   assert.equal(Object.keys({ ...authorityRun }).includes('promoteReceipt'), false)
 })
 
+test('WHAT[INTERACTION-AUTHORITY-002] IA_002_transport_receipt_shape_is_not_authority_evidence', () => {
+  // `accepted-*` 是 transport 收据形态（dispatch 事实），但形态不是 authority
+  // 身份证据：正文形态分析永远不能替代 provenance 判定。
+  assert.equal(isAdmissionShaped(transportReceipt('accepted-1a2b')), true)
+  assert.equal(isAdmissionShaped(transportReceipt('msg_real')), false)
+})
+
 // ── INTERACTION-AUTHORITY-003：Root 独占权 ──────────────────────────────────
 
-test('IA_003_root_fixes_profile_and_derives_peer_role_tier_from_selected_agent_alone', () => {
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_fixes_profile_and_derives_peer_role_tier_from_selected_agent_alone', () => {
   assert.deepEqual(readProfile(profileOf('fast-coder')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
@@ -99,7 +105,7 @@ test('IA_003_root_fixes_profile_and_derives_peer_role_tier_from_selected_agent_a
   })
 })
 
-test('IA_003_new_root_replaces_the_profile_and_clears_everything_run_scoped', () => {
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_replaces_the_profile_and_clears_everything_run_scoped', () => {
   const first = profileOf('fast-coder')
   let projection = authorityRun.registerAuthority(first, authority.empty)
 
@@ -141,7 +147,7 @@ test('IA_003_new_root_replaces_the_profile_and_clears_everything_run_scoped', ()
 
 // ── INTERACTION-AUTHORITY-006：HumanRoot 必须显式 managed agent ─────────────
 
-test('IA_006_bare_legacy_names_are_refused_with_typed_rejection', () => {
+test('WHAT[INTERACTION-AUTHORITY-006] IA_006_bare_legacy_names_are_refused_with_typed_rejection', () => {
   // 裸 role 名没有 tier，无法确定 peer；准入会让 fallback pair 悬空。typed 拒绝让
   // 调用方可按原因分支，不解析散文。精确 legacy 名单 = 迁移 ratchet（HOW）。
   for (const bare of ['coder', 'manager', 'reviewer', 'orchestrator']) {
@@ -153,14 +159,14 @@ test('IA_006_bare_legacy_names_are_refused_with_typed_rejection', () => {
   assert.equal(caseOf(authority.parseAgentName('unknown-role').error), 'UnknownManagedAgent')
 })
 
-test('IA_006_agent_owner_root_claims_reject_bare_legacy_names_too', () => {
+test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claims_reject_bare_legacy_names_too', () => {
   const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_b'), SESSION, 'pd', 'manager')
   assert.equal(claim.ok, false)
 })
 
 // ── INTERACTION-AUTHORITY-010：禁自激励 / repair 预算 ────────────────────────
 
-test('IA_010_one_terminal_provider_run_earns_exactly_one_repair', () => {
+test('WHAT[INTERACTION-AUTHORITY-010] IA_010_one_terminal_provider_run_earns_exactly_one_repair', () => {
   const root = profileOf()
   const terminal = providerRun('run_term')
   let projection = authorityRun.registerAuthority(root, authority.empty)
@@ -195,7 +201,7 @@ test('IA_010_one_terminal_provider_run_earns_exactly_one_repair', () => {
 
 // ── INTERACTION-AUTHORITY-003 边界：AgentOwnerRoot claim 尚无 run ───────────
 
-test('IA_003_agent_owner_root_claim_has_no_run_until_physical_acceptance', () => {
+test('WHAT[INTERACTION-AUTHORITY-016] IA_003_agent_owner_root_claim_has_no_run_until_physical_acceptance', () => {
   const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_owner'), SESSION, 'pd-owner', 'fast-manager')
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
 
@@ -226,7 +232,7 @@ test('IA_003_agent_owner_root_claim_has_no_run_until_physical_acceptance', () =>
 
 // ── INTERACTION-AUTHORITY：root 建立 run 的身份派生（stableLogicalRunId）─────
 
-test('PROMPT_011_stable_logical_run_id_is_a_function_of_runtime_session_and_root', () => {
+test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_stable_logical_run_id_is_a_function_of_runtime_session_and_root', () => {
   // Split from tests/unit/prompt/authority.test.mjs (cutover Wave 2a): LogicalRunId
   // 是 runtime + session + authority root 的确定函数；任一输入变化必须产生新 id，
   // 否则两个不同 run 会共享一个身份。
@@ -246,7 +252,7 @@ test('PROMPT_011_stable_logical_run_id_is_a_function_of_runtime_session_and_root
 
 // ── INTERACTION-AUTHORITY-016：continuation 用 promptOrigin 构造可解析 ──────
 
-test('IA_005_needhelp_kinds_are_continuations_not_roots', () => {
+test('WHAT[INTERACTION-AUTHORITY-012] IA_005_needhelp_kinds_are_continuations_not_roots', () => {
   for (const name of ['NeedHelpEscalation', 'NeedHelpAdvice']) {
     const origin = promptOrigin.continuation(continuationKind.of(name))
     assert.equal(caseOf(origin), 'Continuation')
@@ -257,7 +263,7 @@ test('IA_005_needhelp_kinds_are_continuations_not_roots', () => {
 
 // ── INTERACTION-AUTHORITY-017：root 必须能成为 continuation 的延续来源 ──────
 
-test('IA_003_root_becomes_the_continuation_source_for_later_defaults', () => {
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_becomes_the_continuation_source_for_later_defaults', () => {
   const root = profileOf('fast-coder')
   const before = authorityRun.registerAuthority(root, authority.empty)
 

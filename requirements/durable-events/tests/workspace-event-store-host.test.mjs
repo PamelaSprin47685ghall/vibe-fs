@@ -33,7 +33,7 @@ const openJournalFactory = (commonDir) => {
   }
 }
 
-test('SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_ndjson_unread', async () => {
+test('WHAT[DURABLE-EVENTS-010] SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_ndjson_unread', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-host-es-'))
   try {
     execFileSync('git', ['init', '--quiet', workspace])
@@ -66,7 +66,7 @@ test('SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_n
   }
 })
 
-test('SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async () => {
+test('WHAT[DURABLE-EVENTS-009] SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-host-es-cache-'))
   try {
     execFileSync('git', ['init', '--quiet', workspace])

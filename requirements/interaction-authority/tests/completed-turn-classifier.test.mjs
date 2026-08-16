@@ -47,7 +47,7 @@ const assistant = ({
 
 // ── partsText / partsSessionText / hasToolCallPart / isAbortErrorName ──────
 
-test('RECON_partsText_null_and_mixed_parts_keep_formal_text_only', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_partsText_null_and_mixed_parts_keep_formal_text_only', () => {
   assert.equal(partsText(null), '')
   assert.equal(partsText(undefined), '')
   assert.equal(partsText([]), '')
@@ -58,7 +58,7 @@ test('RECON_partsText_null_and_mixed_parts_keep_formal_text_only', () => {
   )
 })
 
-test('RECON_partsSessionText_joins_text_and_reasoning_drops_tools', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_partsSessionText_joins_text_and_reasoning_drops_tools', () => {
   assert.equal(partsSessionText(null), '')
   assert.equal(partsSessionText([]), '')
   assert.equal(
@@ -69,7 +69,7 @@ test('RECON_partsSessionText_joins_text_and_reasoning_drops_tools', () => {
   assert.equal(partsSessionText([toolCall('c1', 'exec', '{}')]), '')
 })
 
-test('RECON_hasToolCallPart_detects_calls_and_patch_step_activities', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_hasToolCallPart_detects_calls_and_patch_step_activities', () => {
   assert.equal(hasToolCallPart(null), false)
   assert.equal(hasToolCallPart([]), false)
   assert.equal(hasToolCallPart([text('prose')]), false)
@@ -80,7 +80,7 @@ test('RECON_hasToolCallPart_detects_calls_and_patch_step_activities', () => {
   assert.equal(hasToolCallPart([activity('reasoning')]), false, 'other activity kinds are bookkeeping, not tool calls')
 })
 
-test('RECON_isAbortErrorName_matches_case_insensitive_abort_substring', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_isAbortErrorName_matches_case_insensitive_abort_substring', () => {
   assert.equal(isAbortErrorName(undefined), false)
   assert.equal(isAbortErrorName('AbortError'), true)
   assert.equal(isAbortErrorName('ABORTED'), true)
@@ -90,19 +90,19 @@ test('RECON_isAbortErrorName_matches_case_insensitive_abort_substring', () => {
 
 // ── classifyOutcome decision table ─────────────────────────────────────────
 
-test('RECON_classify_abort_error_name_wins_over_everything', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_abort_error_name_wins_over_everything', () => {
   const outcome = classifyOutcome(true, 'stop', 'AbortError', [text('done')])
   assert.equal(caseOf(outcome), 'TurnAborted')
   assert.equal(payloadOf(outcome), 'AbortError')
 })
 
-test('RECON_classify_completed_with_error_is_failed', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_completed_with_error_is_failed', () => {
   const outcome = classifyOutcome(true, undefined, 'StreamDied', [])
   assert.equal(caseOf(outcome), 'TurnFailed')
   assert.equal(payloadOf(outcome), 'StreamDied')
 })
 
-test('RECON_classify_finish_aborted_is_aborted_regardless_of_case', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_finish_aborted_is_aborted_regardless_of_case', () => {
   for (const finish of ['aborted', 'Aborted', 'ABORTED']) {
     const outcome = classifyOutcome(false, finish, undefined, [text('partial')])
     assert.equal(caseOf(outcome), 'TurnAborted', finish)
@@ -110,7 +110,7 @@ test('RECON_classify_finish_aborted_is_aborted_regardless_of_case', () => {
   }
 })
 
-test('RECON_classify_finish_error_uses_error_name_or_default', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_finish_error_uses_error_name_or_default', () => {
   const named = classifyOutcome(false, 'error', 'ProviderBoom', [])
   assert.equal(caseOf(named), 'TurnFailed')
   assert.equal(payloadOf(named), 'ProviderBoom')
@@ -123,7 +123,7 @@ test('RECON_classify_finish_error_uses_error_name_or_default', () => {
   assert.equal(caseOf(abortNamed), 'TurnAborted', 'finish=error with abort name stays an abort')
 })
 
-test('RECON_classify_stop_requires_valid_formal_text', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_stop_requires_valid_formal_text', () => {
   const valid = classifyOutcome(false, 'stop', undefined, [text('the answer')])
   assert.equal(caseOf(valid), 'TurnCompleted')
 
@@ -139,25 +139,25 @@ test('RECON_classify_stop_requires_valid_formal_text', () => {
   assert.equal(caseOf(reasoningOnly), 'TurnNeedsContinuation', 'reasoning is not formal text (CTX-004)')
 })
 
-test('RECON_classify_tool_calls_is_in_progress', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_tool_calls_is_in_progress', () => {
   const outcome = classifyOutcome(false, 'tool-calls', undefined, [toolCall('c1', 'exec', '{}')])
   assert.equal(caseOf(outcome), 'TurnInProgress')
   assert.equal(caseOf(classifyOutcome(false, 'Tool-Calls', undefined, [])), 'TurnInProgress')
 })
 
-test('RECON_classify_length_is_needs_continuation', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_length_is_needs_continuation', () => {
   const outcome = classifyOutcome(false, 'length', undefined, [text('truncated')])
   assert.equal(caseOf(outcome), 'TurnNeedsContinuation')
   assert.equal(payloadOf(outcome), 'assistant finish=length')
 })
 
-test('RECON_classify_unknown_finish_is_failed_with_finish_name', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_unknown_finish_is_failed_with_finish_name', () => {
   const outcome = classifyOutcome(false, 'content_filter', undefined, [])
   assert.equal(caseOf(outcome), 'TurnFailed')
   assert.equal(payloadOf(outcome), 'assistant finish=content_filter')
 })
 
-test('RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
   const observation = classifyOutcome(false, undefined, undefined, [text('streaming')])
   assert.equal(caseOf(observation), 'TurnUnknown')
 
@@ -184,7 +184,7 @@ test('RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
 
 // ── needsInteractionRepair ─────────────────────────────────────────────────
 
-test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_needs_interactionRepair_role_by_outcome_table', () => {
   const inProgress = classifyOutcome(false, 'tool-calls', undefined, [])
   const inProgressWithRealTool = classifyOutcome(false, 'tool-calls', undefined, [toolCall('c-live', 'write', '{}')])
   const needsMore = classifyOutcome(false, 'length', undefined, [])
@@ -214,7 +214,7 @@ test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
 
 // ── roleOfAgent / buildTurn ────────────────────────────────────────────────
 
-test('RECON_roleOfAgent_prefers_host_agent_name_then_fallback', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_roleOfAgent_prefers_host_agent_name_then_fallback', () => {
   const coder = roles.of('Coder')
   const reviewer = roles.of('Reviewer')
   assert.equal(roleOfAgent(undefined, coder).tag, coder.tag, 'no agent → fallback')
@@ -223,7 +223,7 @@ test('RECON_roleOfAgent_prefers_host_agent_name_then_fallback', () => {
   assert.equal(roleOfAgent('not-a-managed-agent', undefined), undefined, 'unparseable agent and no fallback → no role')
 })
 
-test('RECON_buildTurn_assembles_reconciled_turn_from_assistant_message', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_assembles_reconciled_turn_from_assistant_message', () => {
   const session = sessionId('ses_build_turn')
   const physical = physicalUser('user-1')
   const root = authorityRoot('user-1')
@@ -249,7 +249,7 @@ test('RECON_buildTurn_assembles_reconciled_turn_from_assistant_message', () => {
   assert.equal(turn.Parts, parts)
 })
 
-test('RECON_buildTurn_without_agent_uses_fallback_role_and_classifies_failure', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_without_agent_uses_fallback_role_and_classifies_failure', () => {
   const message = assistant({ id: 'asst-10', finish: 'error', errorName: 'Timeout', completed: true })
   const turn = buildTurn(
     sessionId('ses_build_turn_fail'),
@@ -266,7 +266,7 @@ test('RECON_buildTurn_without_agent_uses_fallback_role_and_classifies_failure', 
   assert.equal(idValue.providerRun(turn.ProviderRun), 'asst-10')
 })
 
-test('RECON_buildTurn_provider_run_identity_uses_message_id', () => {
+test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_provider_run_identity_uses_message_id', () => {
   const message = assistant({ id: 'asst-11', finish: 'stop', parts: [text('x')] })
   const turn = buildTurn(
     sessionId('ses_build_turn_run'),

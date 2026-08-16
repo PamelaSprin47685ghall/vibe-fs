@@ -15,7 +15,7 @@ const {
   clearReviewGuardNudgesForTests,
 } = await import('../../../dist/OpenCode/Host/SharedState.js')
 
-test('SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
+test('WHAT[HOST-BOUNDARY-010] SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
   // A second import of the same module must observe the first import's writes:
   // fork→verdict causality depends on the cross-instance single reference.
   const again = await import('../../../dist/OpenCode/Host/SharedState.js')
@@ -40,7 +40,7 @@ test('SHARED_dictionaries_are_live_singletons_shared_across_importers', async ()
   }
 })
 
-test('SHARED_root_workspace_atom_round_trips_and_restores', () => {
+test('WHAT[HOST-BOUNDARY-010] SHARED_root_workspace_atom_round_trips_and_restores', () => {
   const before = RootWorkspace()
   try {
     RootWorkspace('/tmp/shared-root-workspace')

@@ -15,7 +15,7 @@ import {
   worktreeIdentity,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
+test('WHAT[CHGINT-002] ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
   let removeCalls = 0
 
   const runtime = orchestratorRuntime.create({

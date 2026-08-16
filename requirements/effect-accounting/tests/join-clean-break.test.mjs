@@ -124,7 +124,7 @@ const lifecycleOf = (projection, handle = HANDLE) =>
 
 // ── GREEN-3: agent join wire never renders aborted ───────────────────────────
 
-test('P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.failedRun({
       runId: RUN_ID,
@@ -143,7 +143,7 @@ test('P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
 
 // ── 1a. Weak proof abolished (codec layer) ───────────────────────────────────
 
-test('P0_CLEAN_BREAK_tryFromDurableCompleted_refuses_send_failure_aborted_body', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_tryFromDurableCompleted_refuses_send_failure_aborted_body', () => {
   const body = handleCompletionCodec.legacyAbortedBody({ runId: RUN_ID })
   // tryFromDurableCompleted deleted: facade returns permanent Error (weak proof abolished).
   const weak = childRecovery.tryFromDurableCompleted(
@@ -162,7 +162,7 @@ test('P0_CLEAN_BREAK_tryFromDurableCompleted_refuses_send_failure_aborted_body',
 
 // ── 1b. Real journal blob + restart fold + JoinDrain ─────────────────────────
 
-test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_return_aborted', async () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_return_aborted', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-restart-'))
   const created = await agentJournal.create({ directory: dir, runtime: 'rt_pre' })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
@@ -245,7 +245,7 @@ test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_retur
 
 // ── 2. Already-Retired migration ─────────────────────────────────────────────
 
-test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', async () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-retired-'))
   const created = await agentJournal.create({ directory: dir, runtime: 'rt_pre' })
   assert.equal(created.ok, true)
@@ -338,7 +338,7 @@ test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', async () =>
 
 // ── 4. Full-history property skeleton ────────────────────────────────────────
 
-test('P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => {
   /**
    * ∀ join result AgentItem x → history has v2 terminal blob + HandleCompleted
    * + finality ∈ {completed, failed}.
@@ -384,7 +384,7 @@ test('P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => 
 
 // ── Fold: historical SendFailure cell shape ──────────────────────────────────
 
-test('P0_CLEAN_BREAK_fold_replays_send_failure_as_awaiting_join_no_compensation_fact_yet', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_fold_replays_send_failure_as_awaiting_join_no_compensation_fact_yet', () => {
   const facts = [
     fact('HandleLinked', {
       ParentSessionId: PARENT,

@@ -14,14 +14,14 @@ const { spec: bashHoneypotSpec } =
 const context = (sessionId) =>
   new HostToolContext(sessionId, undefined, undefined, undefined, undefined, () => () => {})
 
-test('BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', () => {
+test('WHAT[ENF-010] BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', () => {
   const spec = bashHoneypotSpec
   assert.equal(spec.Name, 'bash-honeypot')
   assert.match(spec.Description, /[Hh]oneypot/)
   assert.deepEqual(listItems(spec.Arguments), [])
 })
 
-test('BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
+test('WHAT[ENF-010] BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
   const result = await bashHoneypotSpec.Execute(makeArgs({}), context('ses-honey'))
   assert.doesNotMatch(result, /\berror\s*=/)
   assert.match(result, /DENIED/)

@@ -97,14 +97,14 @@ const squash = ({ requestId = 'req-s1', run = 'msg_s1', n = 1 } = {}) =>
     run,
   )
 
-test('C5_materialize_opens_request_queryable_by_blogger', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_opens_request_queryable_by_blogger', () => {
   const s = foldOk([materialize({ requestId: 'req-open' })])
   assert.ok(s.BloggerCycles, 'BloggerCycles projection exists')
   assert.equal(s.BloggerCycles.OpenByRequestId.size, 1)
   assert.equal(s.BloggerCycles.OpenByBlogger.size, 1)
 })
 
-test('C5_entry_commit_records_receipt_and_clears_open_request', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_open_request', () => {
   const s = foldOk([
     materialize({ requestId: 'req-e1' }),
     entry({ requestId: 'req-e1', run: 'msg_e1' }),
@@ -114,7 +114,7 @@ test('C5_entry_commit_records_receipt_and_clears_open_request', () => {
   assert.equal(s.Enforcement.ByProviderRun.size, 1, 'enforcement half still present')
 })
 
-test('C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
   const error = foldErr([
     entry({ requestId: 'req-e1', run: 'msg_same' }),
     // Need a frame for squash — seed with entry first then try same run squash via
@@ -137,7 +137,7 @@ test('C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
   assert.ok(error, 'mixed Entry+Squash on one ProviderRun must fail')
 })
 
-test('C5_same_request_materialize_is_idempotent', () => {
+test('WHAT[EFFECT-ACCOUNTING-004] C5_same_request_materialize_is_idempotent', () => {
   // Same RequestId + same context digest: restart re-materialize must not fail.
   const s = foldOk([
     materialize({ requestId: 'req-idem', n: 1 }),
@@ -146,7 +146,7 @@ test('C5_same_request_materialize_is_idempotent', () => {
   assert.equal(s.BloggerCycles.OpenByRequestId.size, 1)
 })
 
-test('C5_materialize_prompt_key_fill_in_after_send', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send', () => {
   // Pre-send PromptKey=None; post-send same context + Some PromptKey is the
   // RequestId ownership binding. Must not reject as "different context".
   const base = materialize({ requestId: 'req-key', n: 1 })
@@ -171,7 +171,7 @@ test('C5_materialize_prompt_key_fill_in_after_send', () => {
   assert.ok(open.PromptKey, 'PromptKey filled in on open request')
 })
 
-test('C5_materialize_prompt_key_cannot_rebind', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_cannot_rebind', () => {
   const first = next(
     fact('BloggerRequestMaterialized', {
       RequestId: bloggerRequestId('req-rebind'),
@@ -208,7 +208,7 @@ test('C5_materialize_prompt_key_cannot_rebind', () => {
   assert.ok(error, 'PromptKey rebind must fail')
 })
 
-test('C5_duplicate_request_materialize_different_context_rejected', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_duplicate_request_materialize_different_context_rejected', () => {
   const error = foldErr([
     materialize({ requestId: 'req-dup' }),
     materialize({ requestId: 'req-dup', n: 2 }),
@@ -216,7 +216,7 @@ test('C5_duplicate_request_materialize_different_context_rejected', () => {
   assert.ok(error, 'same RequestId with different context digest must fail')
 })
 
-test('C5_abandon_clears_open_request', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_abandon_clears_open_request', () => {
   const abandon = next(
     fact('BloggerRequestAbandoned', {
       RequestId: bloggerRequestId('req-ab'),
@@ -230,7 +230,7 @@ test('C5_abandon_clears_open_request', () => {
   assert.equal(s.BloggerCycles.ByProviderRun.size, 0)
 })
 
-test('C5_request_id_cannot_rebind_to_different_provider_run', () => {
+test('WHAT[EFFECT-ACCOUNTING-008] C5_request_id_cannot_rebind_to_different_provider_run', () => {
   const error = foldErr([
     entry({ requestId: 'req-bind', run: 'msg_a', n: 1 }),
     // Second entry advances coverage but reuses RequestId with a different run.

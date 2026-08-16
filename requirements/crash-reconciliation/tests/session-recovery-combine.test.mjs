@@ -25,31 +25,31 @@ const waiting = (reason = 'w') =>
 const recovered = () => new SessionRecovery(1, [receipt('r')])
 const ready = () => new SessionRecovery(0, [receipt('n')])
 
-test('RECOVERY_COMBINE_export_exists', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_export_exists', () => {
   assert.equal(typeof combine, 'function', 'SessionRecovery.combine missing from dist — rebuild needed')
 })
 
-test('RECOVERY_COMBINE_blocked_dominates', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_blocked_dominates', () => {
   const out = combine([ready(), waiting(), blocked('hard'), recovered()])
   assert.equal(caseOf(out), 'Blocked')
 })
 
-test('RECOVERY_COMBINE_waiting_dominates_ready', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_waiting_dominates_ready', () => {
   const out = combine([ready(), recovered(), waiting('pending')])
   assert.equal(caseOf(out), 'Waiting')
 })
 
-test('RECOVERY_COMBINE_recovered_over_ready', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_recovered_over_ready', () => {
   const out = combine([ready(), recovered()])
   assert.equal(caseOf(out), 'Recovered')
 })
 
-test('RECOVERY_COMBINE_empty_is_no_recovery_required', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_empty_is_no_recovery_required', () => {
   const out = combine([])
   assert.equal(caseOf(out), 'NoRecoveryRequired')
 })
 
-test('RECOVERY_COMBINE_order_independent_for_tier', () => {
+test('WHAT[CRASH-013] RECOVERY_COMBINE_order_independent_for_tier', () => {
   const a = combine([blocked('a'), waiting(), recovered()])
   const b = combine([recovered(), blocked('a'), waiting()])
   assert.equal(caseOf(a), 'Blocked')

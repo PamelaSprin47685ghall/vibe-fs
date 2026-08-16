@@ -146,7 +146,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId) =>
   assert.equal(handled, true)
 }
 
-test('G2_inspector_selects_tier_agent_without_owning_a_static_model_binding', async () => {
+test('WHAT[DELEG-010] G2_inspector_selects_tier_agent_without_owning_a_static_model_binding', async () => {
   const runOnce = async (tier, expectedAgent) => {
     await withHarness(
       async (harness) => {

@@ -129,7 +129,7 @@ const withHarness = async (fn) => {
   }
 }
 
-test('EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
+test('WHAT[DELEG-011] EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_normalize'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'normalize')

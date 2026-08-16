@@ -59,7 +59,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_026_kernel_identity_and_commands', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_026_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'stealth-browser-mcp')
   assert.equal(permissionKey, 'stealth-browser-mcp_*')
   assert.equal(defaultRef, 'master')
@@ -89,7 +89,7 @@ test('AGENT_026_kernel_identity_and_commands', () => {
   assert.deepEqual(fixtureCommand('/tmp/fixture.js'), ['node', '/tmp/fixture.js'])
 })
 
-test('AGENT_026_launch_disabled_fixture_test_uvx', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_026_launch_disabled_fixture_test_uvx', () => {
   const disabled = injected({ STEALTH_BROWSER_MCP_DISABLED: '1' })
   assert.equal(disabled.enabled, false)
   assert.deepEqual(disabled.command, uvxCommand(defaultRef))
@@ -110,14 +110,14 @@ test('AGENT_026_launch_disabled_fixture_test_uvx', () => {
   assert.deepEqual(uvx.command, uvxCommand('release-1'))
 })
 
-test('AGENT_026_apply_preserves_other_mcp_servers', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_026_apply_preserves_other_mcp_servers', () => {
   const config = { mcp: { other: { type: 'remote', url: 'https://example.test' } } }
   applyMcp(config, launchFromVars({ STEALTH_BROWSER_MCP_REF: 'master' }))
   assert.equal(config.mcp.other.url, 'https://example.test')
   assert.equal(config.mcp[serverName].type, 'local')
 })
 
-test('AGENT_026_configure_injects_mcp_on_ok_and_error', () => {
+test('WHAT[HOST-BOUNDARY-017] AGENT_026_configure_injects_mcp_on_ok_and_error', () => {
   const okConfig = buildConfig()
   assert.equal(managedAgentConfig.configure(okConfig).ok, true)
   assert.equal(okConfig.mcp[serverName].type, 'local')

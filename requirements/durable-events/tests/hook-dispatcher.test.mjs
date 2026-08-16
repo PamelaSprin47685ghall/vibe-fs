@@ -19,7 +19,7 @@ const sandboxHooks = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
+test('WHAT[DURABLE-EVENTS-018] HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
   const source = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   assert.match(source, /HookKind\.ReferenceTransaction/)
   assert.match(source, /HookKind\.PrePush/)
@@ -30,7 +30,7 @@ test('HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_withou
     'activation ensure must install the membrane, not perform synchronization')
 })
 
-test('HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () => {
+test('WHAT[DURABLE-EVENTS-018] HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () => {
   const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   const runner = read('resources/git/wanxiang-hook.mjs')
   assert.match(runner, /^#!\/usr\/bin\/env node/)
@@ -40,7 +40,7 @@ test('HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () 
     'shim must resolve Node independently and pass the packaged runner as data, not as the installer executable')
 })
 
-test('HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
+test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
   const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
   const sync = read('src/Wanxiangshu/Git/Hook/Sync.fs')
   const runner = read('resources/git/wanxiang-hook.mjs')
@@ -58,13 +58,13 @@ test('HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_c
   assert.doesNotMatch(runner, /WorkspaceEventStore|CanonicalIntegrator|PluginHost/)
 })
 
-test('HOOK_classification_preserves_foreign_hooks', () => {
+test('WHAT[DURABLE-EVENTS-018] HOOK_classification_preserves_foreign_hooks', () => {
   assert.equal(caseOf(Hook.classifyExistingHook(undefined)), 'Installed')
   assert.equal(caseOf(Hook.classifyExistingHook(`# ${MARKER}\n`)), 'AlreadyOwned')
   assert.equal(caseOf(Hook.classifyExistingHook('#!/bin/sh\necho foreign\n')), 'ForeignHook')
 })
 
-test('HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
+test('WHAT[DURABLE-EVENTS-018] HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
   const { dir, cleanup } = sandboxHooks()
   try {
     const owned = `#!/bin/sh\n# ${MARKER}\nexit 0\n`

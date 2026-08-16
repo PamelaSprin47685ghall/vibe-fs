@@ -151,7 +151,7 @@ const bareScope = ({ orchestratorHost } = {}) => {
 const runManager = (spec, name, charge, extra = {}) =>
   spec.Execute(makeArgs({ name, charge, ...extra }), context())
 
-test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
+test('WHAT[ENF-009] FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
   const live = await liveScope()
   live.scope.disposed = true
   const spec = managerSpec(factory, live.scope)
@@ -161,7 +161,7 @@ test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
   live.cleanup()
 })
 
-test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
+test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   const emptyContext = new HostToolContext('', undefined, undefined, undefined, undefined, () => () => {})
   const result = await spec.Execute(
@@ -172,7 +172,7 @@ test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', 
   assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
 })
 
-test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', () => {
+test('WHAT[ENF-009] FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', () => {
   const fork = managerSpec(factory, bareScope())
   const commission = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   assert.equal(fork.Name, 'fork')
@@ -193,7 +193,7 @@ test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', 
   ])
 })
 
-test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
+test('WHAT[ENF-009] FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
   const live = await liveScope()
   const spec = managerSpec(factory, live.scope)
   const result = await runManager(spec, 'Web Road', 'browse', { calling: 'navigator', keywords: 'repository clue' })

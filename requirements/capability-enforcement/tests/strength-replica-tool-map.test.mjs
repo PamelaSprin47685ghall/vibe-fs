@@ -16,7 +16,7 @@ import { mapEntries } from '../../verification-system/tests/support/domain.mjs'
 const caseOf = (value) => value.cases()[value.tag]
 const setNames = (set) => [...set].map(caseOf).sort()
 
-test('STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly', () => {
+test('WHAT[ENF-005] STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly', () => {
   const entries = Object.fromEntries(mapEntries(Runtime.StrengthReplicaTools_exactReadonlyHostToolMap))
   assert.deepEqual(entries, { '*': false, glob: true, grep: true, read: true })
   assert.deepEqual(setNames(Runtime.StrengthReplicaTools_capabilities(Role.Coder)), ['Glob', 'Grep', 'Read'])

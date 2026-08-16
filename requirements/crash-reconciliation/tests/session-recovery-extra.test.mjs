@@ -37,7 +37,7 @@ const {
 
 const { SessionIdModule_create: sid, AgentHandleIdModule_create: handleId, ManagerJobIdModule_create: jobId } = await import('../../../dist/Foundation/Identity.js')
 
-test('MISC_recovery_of_handle_family_all_branches', () => {
+test('WHAT[CRASH-010] MISC_recovery_of_handle_family_all_branches', () => {
   const s = sid('s1')
   // NoLinkedHandles → NoRecoveryRequired
   let out = ofHandleFamily(s, 7n, HandleFamilyRecovery.NoLinkedHandles)
@@ -67,7 +67,7 @@ test('MISC_recovery_of_handle_family_all_branches', () => {
   assert.match(blockBlocks[0].fields[1], /handle .* blocked: linkage conflict/)
 })
 
-test('MISC_recovery_of_job_family_all_branches', () => {
+test('WHAT[CRASH-010] MISC_recovery_of_job_family_all_branches', () => {
   const s = sid('s1')
   let out = ofJobFamily(s, 1n, JobFamilyRecovery.NoRelatedJobs)
   assert.equal(caseOf(out), 'NoRecoveryRequired')
@@ -84,7 +84,7 @@ test('MISC_recovery_of_job_family_all_branches', () => {
   assert.equal(caseOf(out), 'Blocked')
 })
 
-test('MISC_recovery_validate_closure_pure', () => {
+test('WHAT[CRASH-014] MISC_recovery_validate_closure_pure', () => {
   const s1 = sid('a1')
   const s2 = sid('a2')
   const closure = (nodes) => new RecoveryClosure(s1, toList(nodes), 'dig', 5n)
@@ -99,7 +99,7 @@ test('MISC_recovery_validate_closure_pure', () => {
   assert.equal(caseOf(resultOf(cycle).error.Head), 'RecoveryCycle')
 })
 
-test('MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
+test('WHAT[CRASH-013] MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
   const root = sid('root1')
   const child = sid('child1')
   const blocked = new SessionRecovery(3, [nonEmptyOne(new RecoveryBlock(5, [child, 'nope']))])
@@ -127,7 +127,7 @@ test('MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
   assert.deepEqual(setItems(ready.fields[0].fields[2]), [], 'permit carries the closure members')
 })
 
-test('MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {
+test('WHAT[CRASH-002] MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {
   const s = sid('s1')
   const receipt = makeReceipt(s, 42n, 'snap', toList([1, 2]), toList(['h1']))
   assert.equal(receiptSessionId(receipt).fields[0], 's1')

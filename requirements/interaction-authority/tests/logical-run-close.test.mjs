@@ -26,7 +26,7 @@ const profile = (run, rootId, kind = RootAuthorityKind.HumanRoot) => ({
   SelectedTier: AgentTier.Fast,
 })
 
-test('IA_018_LifeCompleted_derives_HumanRoot_run_closure_without_a_second_durable_fact', () => {
+test('WHAT[INTERACTION-AUTHORITY-018] IA_018_LifeCompleted_derives_HumanRoot_run_closure_without_a_second_durable_fact', () => {
   const first = profile('run-1', 'root-1')
   const active = registerAuthority(first, emptyAuthority)
   const closed = closeCompletedHumanRootManager(active)
@@ -45,7 +45,7 @@ test('IA_018_LifeCompleted_derives_HumanRoot_run_closure_without_a_second_durabl
   assert.doesNotMatch(facts, /AuthorityLogicalRunClosed/)
 })
 
-test('IA_018_AgentOwnerRoot_is_not_closed_by_Manager_LifeCompleted', () => {
+test('WHAT[INTERACTION-AUTHORITY-018] IA_018_AgentOwnerRoot_is_not_closed_by_Manager_LifeCompleted', () => {
   const owner = profile('run-owner', 'root-owner', RootAuthorityKind.AgentOwnerRoot)
   const active = registerAuthority(owner, emptyAuthority)
   const afterLife = closeCompletedHumanRootManager(active)

@@ -30,7 +30,7 @@ const ctx = () =>
     deltaDigest: 'sha-a',
   })
 
-test('HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   let proj = handleProjection.empty
   const h = handleId.agent('agent-1')
   const child = sessionId('ses-child')
@@ -50,7 +50,7 @@ test('HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), true)
 })
 
-test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   let proj = handleProjection.empty
   const h = handleId.agent('agent-ab')
   const child = sessionId('ses-child-ab')
@@ -62,7 +62,7 @@ test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, abandoned.value)), true)
 })
 
-test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
   // DSL-003: handle seal is a durable journal fact read at every entry
   // (blocksNew in the Coordinator). forceSeal only closes the physical drain
   // window; busy is physical HasFlight.
@@ -93,7 +93,7 @@ test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
 })
 
-test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(false, false, false), false)
   assert.equal(bloggerRuntime.blocksNewRequest(true, false, false), true)
 
@@ -104,7 +104,7 @@ test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 })
 
-test('BLOGGER_RUNTIME_parked_waiter_survives_reactivate_so_offer_not_start', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_parked_waiter_survives_reactivate_so_offer_not_start', () => {
   // Authority Root on main must not demote the waiter fact. Idle + parked
   // waiter = Start only when nothing waits; with a waiter the material
   // Offer-resumes it (ENFORCER-050). Drain open does not register flight.
@@ -117,7 +117,7 @@ test('BLOGGER_RUNTIME_parked_waiter_survives_reactivate_so_offer_not_start', () 
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
-test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   // Durable handle sealed + DrainWindow.Open lets one drain window through;
   // once caught up, host forceSeal must permanently re-block.
   // Gate is pure booleans: hasFlight + drainOpen.

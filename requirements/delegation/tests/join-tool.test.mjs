@@ -60,21 +60,21 @@ const run = async (runtimeScope, session = 'ses_join') => {
   return { wire, parsed: parseToml(wire) }
 }
 
-test('JOIN_blank_caller_is_refused_before_recovery_without_identity_leak', async () => {
+test('WHAT[DELEG-005] JOIN_blank_caller_is_refused_before_recovery_without_identity_leak', async () => {
   const { wire } = await run(scope(), '')
 
   assert.doesNotMatch(wire, /sessionID|\berror\s*=/i)
   assert.match(wire, /authority is established/i)
 })
 
-test('JOIN_without_a_recovery_permit_is_blocked_by_natural_consequence', async () => {
+test('WHAT[DELEG-005] JOIN_without_a_recovery_permit_is_blocked_by_natural_consequence', async () => {
   const { wire } = await run(scope())
 
   assert.doesNotMatch(wire, /RECOVERY_BLOCKED|ses_join|\berror\s*=/)
   assert.match(wire, /recovery is blocked/i)
 })
 
-test('JOIN_waiting_recovery_is_retryable_without_machine_state', async () => {
+test('WHAT[DELEG-005] JOIN_waiting_recovery_is_retryable_without_machine_state', async () => {
   const runtimeScope = scope()
   attachFamilyRecovery(runtimeScope, async () =>
     new FamilyRecovery(1, [nonEmptyOne(new RecoveryBlock(1, [sessionId('ses_join')]))]),
@@ -87,7 +87,7 @@ test('JOIN_waiting_recovery_is_retryable_without_machine_state', async () => {
   assert.match(wire, /Join again after the family becomes ready/)
 })
 
-test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
+test('WHAT[DELEG-013] JOIN_ready_permit_maps_empty_join_to_failure', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-'))
   const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')
@@ -117,7 +117,7 @@ test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
   rmSync(directory, { recursive: true, force: true })
 })
 
-test('JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async () => {
+test('WHAT[DELEG-013] JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-pty-name-'))
   const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')
@@ -162,7 +162,7 @@ test('JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async
   rmSync(directory, { recursive: true, force: true })
 })
 
-test('JOIN_ready_invalid_permit_surfaces_not_found', async () => {
+test('WHAT[DELEG-013] JOIN_ready_invalid_permit_surfaces_not_found', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-'))
   const opened = await agentJournal.create({ directory })
   assert.equal(opened.ok, true, 'journal must open')

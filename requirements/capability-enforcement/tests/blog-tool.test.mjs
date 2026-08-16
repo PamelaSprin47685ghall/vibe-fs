@@ -50,7 +50,7 @@ const scope = () => {
   }
 }
 
-test('CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
+test('WHAT[ENF-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
   const tool = spec(factory, scope().scope, undefined)
   assert.equal(tool.Name, 'chronicle')
   const args = listItems(tool.Arguments)

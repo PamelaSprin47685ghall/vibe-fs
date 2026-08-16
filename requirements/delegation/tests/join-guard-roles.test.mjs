@@ -30,7 +30,7 @@ const agentRole = (name) => {
   return value
 }
 
-test('EXEC_016_outstandingBackground_false_for_roles_without_join', () => {
+test('WHAT[DELEG-013] EXEC_016_outstandingBackground_false_for_roles_without_join', () => {
   // No journal, no live PTY: join-less roles must never trip the guard.
   for (const name of ['Coder', 'Reviewer', 'Inspector', 'Browser', 'Inquiry', 'Distiller', 'Blogger']) {
     assert.equal(
@@ -41,7 +41,7 @@ test('EXEC_016_outstandingBackground_false_for_roles_without_join', () => {
   }
 })
 
-test('EXEC_016_devops_live_pty_alone_is_outstanding', () => {
+test('WHAT[DELEG-013] EXEC_016_devops_live_pty_alone_is_outstanding', () => {
   assert.equal(
     outstandingBackground(undefined, () => true, agentRole('DevOps'), sessionId('ses_devops')),
     true,
@@ -52,7 +52,7 @@ test('EXEC_016_devops_live_pty_alone_is_outstanding', () => {
   )
 })
 
-test('EXEC_016_manager_without_journal_is_not_outstanding', () => {
+test('WHAT[DELEG-013] EXEC_016_manager_without_journal_is_not_outstanding', () => {
   assert.equal(
     outstandingBackground(undefined, () => true, agentRole('Manager'), sessionId('ses_mgr')),
     false,

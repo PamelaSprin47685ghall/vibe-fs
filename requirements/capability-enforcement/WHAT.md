@@ -163,7 +163,7 @@ action-affordance 语义合同 + capability-enforcement 名称/结构）+ `scrip
 
 证据：`tests/agent-permission-gate.test.mjs` `AGENT_007_bash_stays_denied_even_when_the_gate_fails` +
 `AGENT_007_validation_error_is_still_reported`（MOVE）+ `tests/managed-agent-config.test.mjs`
-`MACFG_configureManager_validation_failure_is_process_fatal_after_deny_fields_land`（MOVE）+
+`MACFG_configureManager_legacy_agent_is_fatal_after_owned_fields_land`（MOVE）+
 `requirements/capability-enforcement/tests/inquiry-permissions.test.mjs`
 `Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap`（REUSE）+ `requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs`
 `AGENT_007_unresolved_role_denies_all_tools`（REUSE）。

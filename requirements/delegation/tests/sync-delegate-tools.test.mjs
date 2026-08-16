@@ -297,14 +297,14 @@ const withHarness = async (fn, { tier = 'Fast', snapshotMessages, snapshotGetMes
   }
 }
 
-test('INSPECT_spec_exposes_charge_plus_optional_keywords_no_agent', () => {
+test('WHAT[DELEG-017] INSPECT_spec_exposes_charge_plus_optional_keywords_no_agent', () => {
   const tool = inspectSpec(factory, bareScope(), undefined)
   assert.equal(tool.Name, 'inspect')
   assert.match(tool.Description, /WorkRecord/)
   assert.deepEqual(argNames(tool), ['charge', 'keywords', 'expected_tool_calls'])
 })
 
-test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
+test('WHAT[DELEG-017] ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
   const establish = establishSpec(factory, bareScope(), undefined)
   const repair = repairSpec(factory, bareScope(), undefined)
   assert.equal(establish.Name, 'establish-behavior')
@@ -313,13 +313,13 @@ test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
   assert.deepEqual(argNames(repair), ['charge', 'keywords', 'expected_tool_calls'])
 })
 
-test('INSPECT_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
+test('WHAT[DELEG-017] INSPECT_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
   const { text, fields } = await runToml(inspectSpec(factory, bareScope(), undefined), { charge: 'look' }, context())
   assert.match(text, /No Inspector is available from this execution context|当前执行语境中没有可用的 Inspector/)
   assert.equal(fields.error, undefined)
 })
 
-test('ESTABLISH_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
+test('WHAT[DELEG-017] ESTABLISH_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
   const { text, fields } = await runToml(
     establishSpec(factory, bareScope(), undefined),
     { charge: 'establish failing test' },
@@ -329,13 +329,13 @@ test('ESTABLISH_missing_sync_delegate_runtime_is_a_natural_consequence', async (
   assert.equal(fields.error, undefined)
 })
 
-test('INSPECT_missing_charge_is_refused_as_a_natural_consequence', async () => {
+test('WHAT[DELEG-017] INSPECT_missing_charge_is_refused_as_a_natural_consequence', async () => {
   const { text, fields } = await runToml(inspectSpec(factory, bareScope(), sentinelRuntime), {}, context())
   assert.match(text, /inspect needs a charge|inspect 需要一项 charge/)
   assert.equal(fields.error, undefined)
 })
 
-test('INSPECT_blank_charge_is_refused_as_a_natural_consequence', async () => {
+test('WHAT[DELEG-017] INSPECT_blank_charge_is_refused_as_a_natural_consequence', async () => {
   const { text, fields } = await runToml(
     inspectSpec(factory, bareScope(), sentinelRuntime),
     { charge: '   ' },
@@ -345,13 +345,13 @@ test('INSPECT_blank_charge_is_refused_as_a_natural_consequence', async () => {
   assert.equal(fields.error, undefined)
 })
 
-test('ESTABLISH_missing_charge_is_refused_as_a_natural_consequence', async () => {
+test('WHAT[DELEG-017] ESTABLISH_missing_charge_is_refused_as_a_natural_consequence', async () => {
   const { text, fields } = await runToml(establishSpec(factory, bareScope(), sentinelRuntime), {}, context())
   assert.match(text, /establish-behavior needs a charge|establish-behavior 需要一项 charge/)
   assert.equal(fields.error, undefined)
 })
 
-test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_charge', async () => {
+test('WHAT[DELEG-019] EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_charge', async () => {
   await withHarness(async ({ runtime, journal, createCalls, prompts, inspectorPrompts }) => {
     const owner = 'ses_owner_prepared'
     const charge = 'raw semantic question'
@@ -377,7 +377,7 @@ test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_char
   })
 })
 
-test('DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
+test('WHAT[DELEG-022] DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
   const runId = 'asst_inspect_estimate_batch'
   const firstCall = toolCallId('inspect_estimate_1')
   const secondCall = toolCallId('inspect_estimate_2')
@@ -408,7 +408,7 @@ test('DELEG_022_sync_delegate_batch_sums_explicit_estimates_once', async () => {
   }, { snapshotMessages: [message] })
 })
 
-test('DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async () => {
+test('WHAT[DELEG-022] DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async () => {
   await withHarness(async ({ runtime, journal, createCalls, prompts, scope, delegatedRemaining }) => {
     const owner = 'ses_owner_inspect_estimate_reuse'
     const tool = inspectSpec(factory, scope, runtime)
@@ -429,7 +429,7 @@ test('DELEG_022_sync_delegate_omission_retains_reused_delegate_remaining', async
   })
 })
 
-test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', async () => {
+test('WHAT[DELEG-008] EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', async () => {
   const runId = 'asst_inspect_batch'
   const firstCall = toolCallId('inspect_call_1')
   const secondCall = toolCallId('inspect_call_2')
@@ -464,7 +464,7 @@ test('EXEC_026_inspect_tool_uses_host_provider_batch_and_returns_body_once', asy
   }, { snapshotMessages: [message] })
 })
 
-test('DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch', async () => {
+test('WHAT[DELEG-008] DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch', async () => {
   const runId = 'asst_inspect_batch_late_snapshot'
   const firstCall = toolCallId('inspect_late_1')
   const secondCall = toolCallId('inspect_late_2')
@@ -526,7 +526,7 @@ test('DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispa
   })
 })
 
-test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
+test('WHAT[DELEG-008] EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
   const runId = 'asst_coder_batch'
   const establishCall = toolCallId('coder_call_1')
   const repairCall = toolCallId('coder_call_2')
@@ -563,7 +563,7 @@ test('EXEC_026_coder_sync_surfaces_share_one_semantic_batch', async () => {
   }, { snapshotMessages: [message] })
 })
 
-test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () => {
+test('WHAT[DELEG-012] INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () => {
   await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_insp'
     const answer = 'inspector formal answer'
@@ -593,7 +593,7 @@ test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () =>
   })
 })
 
-test('INSPECT_transient_failure_retries_and_returns_successful_work_record', async () => {
+test('WHAT[DELEG-023] INSPECT_transient_failure_retries_and_returns_successful_work_record', async () => {
   await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_insp_retry'
     const tool = inspectSpec(factory, scope, runtime)
@@ -636,7 +636,7 @@ test('INSPECT_transient_failure_retries_and_returns_successful_work_record', asy
   })
 })
 
-test('CODER_establish_behavior_transient_failure_retries_and_returns_successful_work_record', async () => {
+test('WHAT[DELEG-023] CODER_establish_behavior_transient_failure_retries_and_returns_successful_work_record', async () => {
   await withHarness(async ({ runtime, journal, createCalls, prompts, scope }) => {
     const owner = 'ses_owner_coder_retry'
     const tool = establishSpec(factory, scope, runtime)
@@ -673,7 +673,7 @@ test('CODER_establish_behavior_transient_failure_retries_and_returns_successful_
   })
 })
 
-test('INSPECT_exhausted_failure_via_terminal_event_returns_incomplete_error', async () => {
+test('WHAT[DELEG-023] INSPECT_exhausted_failure_via_terminal_event_returns_incomplete_error', async () => {
   await withHarness(async ({ runtime, createCalls, prompts, scope, notifyTerminal }) => {
     const owner = 'ses_owner_insp_exhausted'
     const tool = inspectSpec(factory, scope, runtime)

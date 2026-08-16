@@ -35,7 +35,7 @@ const stateOf = (journal, sid) =>
 const append = (journal, sid, caseName, payload) =>
   agentJournal.appendAgent(stream.session(sid), undefined, agentFact(caseName, payload), journal)
 
-test('DELEG_022_durable_replace_and_tool_observation_fold_incrementally', async () => {
+test('WHAT[DELEG-022] DELEG_022_durable_replace_and_tool_observation_fold_incrementally', async () => {
   await withJournal(async (journal) => {
     const sid = sessionId('ses_delegate')
 
@@ -72,7 +72,7 @@ test('DELEG_022_durable_replace_and_tool_observation_fold_incrementally', async 
   })
 })
 
-test('DELEG_022_durable_replace_resets_the_measurement_without_a_program_stage', async () => {
+test('WHAT[DELEG-022] DELEG_022_durable_replace_resets_the_measurement_without_a_program_stage', async () => {
   await withJournal(async (journal) => {
     const sid = sessionId('ses_delegate_replace')
     await append(journal, sid, 'DelegatedToolEstimateReplaced', { SessionId: sid, ExpectedToolCalls: 1 })

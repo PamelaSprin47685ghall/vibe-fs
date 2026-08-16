@@ -45,7 +45,7 @@ const loadRecovery = async () => {
   return { crash, probe }
 }
 
-test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
+test('WHAT[CRASH-016] C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /module BloggerCrashRecovery/)
   assert.match(recoverySrc, /AbandonedUnsent/)
   assert.match(recoverySrc, /Recommitted/)
@@ -57,13 +57,13 @@ test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(probeModuleSrc, /blogger-missing-tool/)
 })
 
-test('C5_crash_recovery_library_is_not_wired_into_ordinary_plugin_lifecycle', () => {
+test('WHAT[CRASH-017] C5_crash_recovery_library_is_not_wired_into_ordinary_plugin_lifecycle', () => {
   assert.doesNotMatch(spikeSrc, /AttachFamilyRecoveryPorts|BloggerCrashRecovery|recoverFamilyDirect/)
   assert.match(scopeSrc, /Current-process join admission only/)
   assert.match(interpreterSrc, /BloggerCrashRecovery\.reconcile/, 'recovery library may remain for future explicit /continue')
 })
 
-test('C5_classify_open_request_window_A_unsent', async () => {
+test('WHAT[CRASH-016] C5_classify_open_request_window_A_unsent', async () => {
   const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
@@ -76,7 +76,7 @@ test('C5_classify_open_request_window_A_unsent', async () => {
   assert.equal(caseOf(a), 'AbandonedUnsent')
 })
 
-test('C5_classify_open_request_window_C_tool_present', async () => {
+test('WHAT[CRASH-016] C5_classify_open_request_window_C_tool_present', async () => {
   const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
@@ -87,7 +87,7 @@ test('C5_classify_open_request_window_C_tool_present', async () => {
   assert.equal(caseOf(c), 'Recommitted')
 })
 
-test('C5_classify_open_request_window_B_inflight', async () => {
+test('WHAT[CRASH-016] C5_classify_open_request_window_B_inflight', async () => {
   const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
@@ -98,7 +98,7 @@ test('C5_classify_open_request_window_B_inflight', async () => {
   assert.equal(caseOf(b), 'RestoredInFlight')
 })
 
-test('C5_window_D_never_forces_parked_without_a_waiter', () => {
+test('WHAT[CRASH-016] C5_window_D_never_forces_parked_without_a_waiter', () => {
   // DSL-003: forcing `Parked` at restore with no ParkedTransform and
   // NotArmed arming stages the next material as an un-resumable PendingOffer
   // (mayRecover is false after restart, so no squash path starts) — the
@@ -122,14 +122,14 @@ test('C5_window_D_never_forces_parked_without_a_waiter', () => {
   )
 })
 
-test('C5_snapshot_tool_evidence_uses_latest_assistant_and_exactly_one_chronicle', () => {
+test('WHAT[CRASH-016] C5_snapshot_tool_evidence_uses_latest_assistant_and_exactly_one_chronicle', () => {
   assert.match(recoverySrc, /List\.rev/, 'recovery must judge the latest assistant, not stale historical tool calls')
   assert.match(recoverySrc, /ToolParts/, 'recovery must preserve named tool identity')
   assert.match(recoverySrc, /Array\.filter[^\n]*ToolName = "chronicle"/, 'raw chronicle cardinality must be counted')
   assert.match(recoverySrc, /\[\| part \|\]/, 'only exact-one raw chronicle may prove completion')
 })
 
-test('C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
+test('WHAT[CRASH-016] C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
   // PR7 Slice 3: window windows use physical flight ownership.
   // Forbidden: match live.State / BloggerRuntimeState.InFlight as restore authority.
   assert.doesNotMatch(

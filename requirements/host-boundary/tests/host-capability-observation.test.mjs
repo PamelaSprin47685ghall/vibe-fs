@@ -15,7 +15,7 @@ import { hostCompaction, sessionId } from '../../verification-system/tests/suppo
 const { sha256Hex } = await import('../../../dist/Host/Digest.js')
 const { HostSignal, RetrySignal } = await import('../../../dist/OpenCode/Signals/HostSignal.js')
 
-test('HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off', () => {
+test('WHAT[HOST-BOUNDARY-007] HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off', () => {
   // Three keys close the four behaviours: compaction.auto closes both threshold
   // overflow and provider-error compaction; prune deletes persisted rows
   // (COMPANION-009); autocontinue injects an unclaimed synthetic turn.
@@ -27,7 +27,7 @@ test('HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off'
   assert.equal(hostCompaction.autoContinueEnabled, false)
 })
 
-test('HOST_006_first_turn_probe_is_the_only_startup_verdict', () => {
+test('WHAT[HOST-BOUNDARY-007] HOST_006_first_turn_probe_is_the_only_startup_verdict', () => {
   const session = sessionId('ses_probe')
   const satisfied = hostCompaction.judgeFirstTurn({ session, pseudoRuns: 0 })
   assert.equal(satisfied.name, 'Satisfied')
@@ -44,7 +44,7 @@ test('HOST_006_first_turn_probe_is_the_only_startup_verdict', () => {
   assert.match(unavailable.message, /HostContractUnsupported: compaction\.auto/)
 })
 
-test('HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once', () => {
+test('WHAT[HOST-BOUNDARY-007] HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once', () => {
   // The three raw fields fold into one predicate at the snapshot boundary; a
   // caller re-deriving it from raw fields would be a second definition.
   assert.equal(hostCompaction.isContainableCompaction(true), true)
@@ -56,7 +56,7 @@ test('HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once
   assert.equal(hostCompaction.nextReanchor(observed, ['run_1', 'run_2', 'run_3']), undefined, 'nothing left to reanchor')
 })
 
-test('HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier', () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier', () => {
   // RetrySignal carries the Host's own retry counter for diagnostics and wake
   // routing only — no message id, no attempt outcome. HostSignal cases are typed
   // wakes; business facts come from the reconciled snapshot.
@@ -68,7 +68,7 @@ test('HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier', () => {
   assert.equal(signal.fields[0].Reason, 'rate limited')
 })
 
-test('HOST_DIGEST_single_deterministic_sha256_for_durable_identity', () => {
+test('WHAT[HOST-BOUNDARY-019] HOST_DIGEST_single_deterministic_sha256_for_durable_identity', () => {
   assert.equal(sha256Hex('hello'), '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
   assert.equal(sha256Hex('hello'), sha256Hex('hello'), 'deterministic')
   assert.equal(sha256Hex('').length, 64, 'lowercase hex')

@@ -45,7 +45,7 @@ const readEnvelope = (value) => ({
 
 // ── PERSIST-001: the envelope is one self-contained line ─────────────────────
 
-test('PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
+test('WHAT[DURABLE-EVENTS-002] PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
   const line = journal.serialize(env({ seq: 7 }))
 
   // NDJSON's whole contract. A line containing a newline would make append touch
@@ -64,7 +64,7 @@ test('PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
   ])
 })
 
-test('PERSIST_001_serialization_is_deterministic_for_one_envelope', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_serialization_is_deterministic_for_one_envelope', () => {
   // Two folds of one journal must produce one projection, so the bytes cannot
   // depend on iteration order or a clock read at serialize time.
   const value = env({ seq: 3, observedAt: '2026-02-03T04:05:06Z' })
@@ -72,7 +72,7 @@ test('PERSIST_001_serialization_is_deterministic_for_one_envelope', () => {
   assert.equal(journal.serialize(value), journal.serialize(env({ seq: 3, observedAt: '2026-02-03T04:05:06Z' })))
 })
 
-test('PERSIST_001_an_absent_provider_run_is_omitted_rather_than_written_null', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_absent_provider_run_is_omitted_rather_than_written_null', () => {
   // HOST-010: facts belonging to no provider run pass None. A `"ProviderRun":null`
   // would make "observed during no run" and "observed during an unnamed run" the
   // same line.
@@ -83,7 +83,7 @@ test('PERSIST_001_an_absent_provider_run_is_omitted_rather_than_written_null', (
   assert.equal(withRun.includes('"ProviderRun":["ProviderRunIdentity","run_9"]'), true)
 })
 
-test('PERSIST_001_an_envelope_survives_a_round_trip_unchanged', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_envelope_survives_a_round_trip_unchanged', () => {
   const original = env({ seq: 4, observedAt: '2026-03-04T05:06:07Z', run: 'run_1' })
   const line = journal.serialize(original)
   const decoded = journal.deserialize(line)
@@ -98,7 +98,7 @@ test('PERSIST_001_an_envelope_survives_a_round_trip_unchanged', () => {
   assert.equal(journal.serialize(decoded.value), line)
 })
 
-test('PERSIST_001_serialized_bytes_do_not_depend_on_the_writers_utc_offset', () => {
+test('WHAT[DURABLE-EVENTS-003] PERSIST_001_serialized_bytes_do_not_depend_on_the_writers_utc_offset', () => {
   // One instant, three offsets. The line is the durable artifact, so two hosts in
   // different timezones must produce identical bytes for one fact — otherwise a
   // byte comparison of two replicas reports a difference that is not one.
@@ -122,7 +122,7 @@ test('PERSIST_001_serialized_bytes_do_not_depend_on_the_writers_utc_offset', () 
   assert.equal(JSON.parse(line).ObservedAt, '2026-03-04T05:06:07.000+00:00')
 })
 
-test('PERSIST_001_ordering_is_by_local_seq_inside_a_runtime_and_by_time_across', () => {
+test('WHAT[DURABLE-EVENTS-014] PERSIST_001_ordering_is_by_local_seq_inside_a_runtime_and_by_time_across', () => {
   const a1 = env({ runtime: 'rt_a', seq: 1, observedAt: '2026-01-01T00:00:09Z' })
   const a2 = env({ runtime: 'rt_a', seq: 2, observedAt: '2026-01-01T00:00:00Z' })
 
@@ -138,7 +138,7 @@ test('PERSIST_001_ordering_is_by_local_seq_inside_a_runtime_and_by_time_across',
   assert.equal(journal.compareSortKey(b1, a1) < 0, true)
 })
 
-test('PERSIST_001_same_instant_across_runtimes_breaks_the_tie_by_runtime_id', () => {
+test('WHAT[DURABLE-EVENTS-014] PERSIST_001_same_instant_across_runtimes_breaks_the_tie_by_runtime_id', () => {
   // Two runtimes can observe in the same millisecond. Without a total order the
   // fold would depend on which file the reader opened first, so two restarts
   // could disagree about the same history.
@@ -150,7 +150,7 @@ test('PERSIST_001_same_instant_across_runtimes_breaks_the_tie_by_runtime_id', ()
   assert.equal(journal.compareSortKey(b, a) > 0, true)
 })
 
-test('PERSIST_001_k_way_merge_is_a_total_order_regardless_of_input_order', () => {
+test('WHAT[DURABLE-EVENTS-014] PERSIST_001_k_way_merge_is_a_total_order_regardless_of_input_order', () => {
   const at = (s) => `2026-01-01T00:00:0${s}Z`
   const streamA = [
     env({ runtime: 'rt_a', seq: 1, observedAt: at(1) }),
@@ -171,7 +171,7 @@ test('PERSIST_001_k_way_merge_is_a_total_order_regardless_of_input_order', () =>
 
 // ── PERSIST-005: a pre-0.5.0 journal is refused, never guessed ───────────────
 
-test('PERSIST_005_legacy_fallback_counters_and_model_ids_are_fatal', () => {
+test('WHAT[DURABLE-EVENTS-009] PERSIST_005_legacy_fallback_counters_and_model_ids_are_fatal', () => {
   // Two groups, both fatal. The old Fallback projection stored counters and model
   // ids; deriving a modulo-4 cursor from them would be inventing history, and
   // VERIFY-006 lists a journal carrying model ids as a No-Go.
@@ -195,7 +195,7 @@ test('PERSIST_005_legacy_fallback_counters_and_model_ids_are_fatal', () => {
   }
 })
 
-test('PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_error', () => {
+test('WHAT[DURABLE-EVENTS-009] PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_error', () => {
   // Without these names the decoder would fail with an opaque union error, so the
   // operator would read "cannot parse line 3" instead of "this journal predates
   // 0.5.0" — the difference between archiving the file and debugging the codec.
@@ -221,7 +221,7 @@ test('PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_
   }
 })
 
-test('PERSIST_005_the_migration_message_tells_the_operator_what_to_do', () => {
+test('WHAT[DURABLE-EVENTS-009] PERSIST_005_the_migration_message_tells_the_operator_what_to_do', () => {
   // A refusal that does not say what to do gets worked around. This one names the
   // action, so archiving the file is the obvious response.
   assert.equal(
@@ -231,7 +231,7 @@ test('PERSIST_005_the_migration_message_tells_the_operator_what_to_do', () => {
   )
 })
 
-test('PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
+test('WHAT[DURABLE-EVENTS-009] PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
   // The markers are substring matches, so a current name that contains a retired
   // one would be a false positive. `HandleLinked` replaced `AgentLinked` and must
   // stay readable.
@@ -256,7 +256,7 @@ test('PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
   }
 })
 
-test('PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
+test('WHAT[DURABLE-EVENTS-007] PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
   // The caller is a boot loop that must report and stop, so a throw here would
   // turn "refuse to start" into a stack trace.
   for (const bad of ['', '{', '{"unclosed": ', 'null', '[]', 'not json at all']) {
@@ -268,7 +268,7 @@ test('PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
 
 // ── PERSIST-002: two append outcomes, and replay agrees with them ────────────
 
-test('PERSIST_002_a_committed_envelope_replays_into_the_same_projection', () => {
+test('WHAT[DURABLE-EVENTS-001] PERSIST_002_a_committed_envelope_replays_into_the_same_projection', () => {
   // "No partial write" is only meaningful if the written line folds to what the
   // in-memory projection already holds. Replay goes through the NDJSON text, so
   // this covers codec and fold together.
@@ -285,7 +285,7 @@ test('PERSIST_002_a_committed_envelope_replays_into_the_same_projection', () => 
 
 // ── PERSIST-008: projections are O(1) integrations, not history scans ────────
 
-test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
+test('WHAT[DURABLE-EVENTS-013] PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
   const projection = fold.apply(fold.empty, [env({ seq: 1 })])
   assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
 
@@ -316,7 +316,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
   assert.equal(fold.session(projection.value, 'ses_missing'), undefined)
 })
 
-test('PERSIST_008_projection_size_tracks_distinct_sessions_not_history_length', () => {
+test('WHAT[DURABLE-EVENTS-013] PERSIST_008_projection_size_tracks_distinct_sessions_not_history_length', () => {
   // The property the clause actually wants: folding 300 facts for one session
   // leaves one entry. A projection that grew per fact would be a history scan
   // waiting to happen.
@@ -336,7 +336,7 @@ test('PERSIST_008_projection_size_tracks_distinct_sessions_not_history_length', 
   assert.deepEqual(Object.keys(fold.sessions(twoSessions.value)).sort(), ['ses_a', 'ses_b'])
 })
 
-test('PERSIST_008_folding_is_incremental_so_one_envelope_needs_no_replay', () => {
+test('WHAT[DURABLE-EVENTS-013] PERSIST_008_folding_is_incremental_so_one_envelope_needs_no_replay', () => {
   // `foldEnvelope` on an existing projection must equal folding the whole
   // sequence. If it did not, the runtime would have to re-read history on every
   // append to stay correct.

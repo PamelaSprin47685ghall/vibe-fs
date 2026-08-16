@@ -63,7 +63,7 @@ const live = async (behaviour = {}) => {
 
 // ── Join / JoinAvailable ─────────────────────────────────────────────────────
 
-test('HFRT_join_available_without_work_is_nothing_to_join', async () => {
+test('WHAT[DELEG-013] HFRT_join_available_without_work_is_nothing_to_join', async () => {
   const liveCtx = await live()
   const result = await joinAvailable(liveCtx.runtime, 5, new Promise(() => {}))
   assert.equal(result.tag, 1)
@@ -71,7 +71,7 @@ test('HFRT_join_available_without_work_is_nothing_to_join', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
+test('WHAT[DELEG-015] HFRT_join_available_with_interrupt_returns_interrupted', async () => {
   const liveCtx = await live()
   installRun(liveCtx.runtime, 'ag8', sessionId('ses_c8'), Role.Coder)
 
@@ -82,7 +82,7 @@ test('HFRT_join_available_with_interrupt_returns_interrupted', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
+test('WHAT[DELEG-013] HFRT_join_cancelled_runtime_returns_cancelled', async () => {
   const liveCtx = await live()
   cancelRuntime(liveCtx.runtime)
   assert.equal(runtimeIsCancelled(liveCtx.runtime), true)
@@ -94,7 +94,7 @@ test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
 
 // ── AwaitAgent ───────────────────────────────────────────────────────────────
 
-test('HFRT_await_agent_unknown_id_is_error', async () => {
+test('WHAT[DELEG-013] HFRT_await_agent_unknown_id_is_error', async () => {
   const liveCtx = await live()
   const result = await awaitAgent(liveCtx.runtime, 'ghost', [])
   assert.equal(result.tag, 1)

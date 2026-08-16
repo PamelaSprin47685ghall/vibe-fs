@@ -27,7 +27,7 @@ const refsOf = (value) => listItems(value).map((r) => Domain.PayloadRefModule_va
 
 const hex = (ch) => ch.repeat(64)
 
-test('closure_lifts_a_content_addressed_digest_into_payload_refs', () => {
+test('WHAT[DURABLE-EVENTS-012] closure_lifts_a_content_addressed_digest_into_payload_refs', () => {
   const digest = hex('a')
   const f = fact('ParentJoinCorrectionRequested', {
     ParentSessionId: sessionId('ses_p'),
@@ -38,7 +38,7 @@ test('closure_lifts_a_content_addressed_digest_into_payload_refs', () => {
   assert.deepEqual(refsOf(closureOf(f)), [digest])
 })
 
-test('closure_dedupes_a_matching_blob_ref_and_digest_pair', () => {
+test('WHAT[DURABLE-EVENTS-012] closure_dedupes_a_matching_blob_ref_and_digest_pair', () => {
   const digest = hex('b')
   const f = managerLifecycleFact('LifeOpened', {
     SessionId: sessionId('ses_l'),
@@ -51,7 +51,7 @@ test('closure_dedupes_a_matching_blob_ref_and_digest_pair', () => {
   assert.deepEqual(refsOf(closureOf(f)), [digest])
 })
 
-test('closure_ignores_non_content_addressed_placeholder_handles', () => {
+test('WHAT[DURABLE-EVENTS-012] closure_ignores_non_content_addressed_placeholder_handles', () => {
   // Placeholder strings (not sha256) are not EventStore payload dependencies.
   const f = fact('XTracePartAppended', {
     SessionId: sessionId('ses_x'),
@@ -71,7 +71,7 @@ test('closure_ignores_non_content_addressed_placeholder_handles', () => {
   assert.deepEqual(refsOf(closureOf(f)), [])
 })
 
-test('closure_is_empty_for_a_fact_without_blob_fields', () => {
+test('WHAT[DURABLE-EVENTS-012] closure_is_empty_for_a_fact_without_blob_fields', () => {
   const f = fact('CompanionBloggerClosed', { SessionId: sessionId('ses_c') })
   assert.deepEqual(refsOf(closureOf(f)), [])
 })

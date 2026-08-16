@@ -50,7 +50,7 @@ const drainAll = (limit, messages, guard = 50) => {
 
 // ── the contract constant ──────────────────────────────────────────────────
 
-test('CTX_003_delta_limit_is_200_KiB', () => {
+test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_delta_limit_is_200_KiB', () => {
   // An input contract, not an estimate: never compared to a model window, never
   // scaled by provider. Exported as a plain value so this test can read it.
   assert.equal(delta.limitBytes, 200 * 1024)
@@ -58,7 +58,7 @@ test('CTX_003_delta_limit_is_200_KiB', () => {
 
 // ── nothing to consume ─────────────────────────────────────────────────────
 
-test('CTX_011_a_fully_consumed_transcript_yields_no_chunk', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_fully_consumed_transcript_yields_no_chunk', () => {
   const messages = delta.messages([{ role: 'user', parts: [delta.text('one')] }])
 
   assert.equal(delta.nextChunk({ limit: 1024, cursor: delta.cursor(1, 0), messages }), undefined)
@@ -67,7 +67,7 @@ test('CTX_011_a_fully_consumed_transcript_yields_no_chunk', () => {
 
 // ── level one: whole messages ──────────────────────────────────────────────
 
-test('CTX_013_a_small_transcript_becomes_one_chunk', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_small_transcript_becomes_one_chunk', () => {
   const messages = delta.messages([
     { role: 'user', parts: [delta.text('请修复 fallback 的竞态。')] },
     { role: 'assistant', parts: [delta.toolCall('edit', '{"a":1}')] },
@@ -82,7 +82,7 @@ test('CTX_013_a_small_transcript_becomes_one_chunk', () => {
   assert.equal(chunks[0].nextCutoff, 3, 'all three turns are complete')
 })
 
-test('CTX_011_the_cursor_resumes_exactly_where_the_previous_chunk_stopped', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_cursor_resumes_exactly_where_the_previous_chunk_stopped', () => {
   // Each turn here renders to roughly 1 KiB, so a small limit forces several
   // chunks. What matters is that draining loses nothing and repeats nothing.
   const body = 'x'.repeat(900)
@@ -113,7 +113,7 @@ test('CTX_011_the_cursor_resumes_exactly_where_the_previous_chunk_stopped', () =
   }
 })
 
-test('CTX_003_no_chunk_exceeds_the_limit', () => {
+test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit', () => {
   const messages = delta.messages(
     [0, 1, 2, 3, 4, 5].map((n) => ({
       role: n % 2 === 0 ? 'user' : 'assistant',
@@ -130,7 +130,7 @@ test('CTX_003_no_chunk_exceeds_the_limit', () => {
   }
 })
 
-test('CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () => {
   // COMPANION-004: normal deltas are data-only. The behaviour rules live in the
   // system prompt alone, so a normal chunk carries no instruction header and pays
   // nothing for one.
@@ -155,7 +155,7 @@ test('CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () =>
 
 // ── level two: part boundaries within one message ──────────────────────────
 
-test('CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff', () => {
   const body = 'y'.repeat(900)
   const messages = delta.messages([
     {
@@ -184,7 +184,7 @@ test('CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff',
   assert.equal(chunks[2].nextCutoff, 2)
 })
 
-test('CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff', () => {
   // The rule in isolation, with no following turn to pack in: three oversized parts
   // in one turn, so every chunk but the last stops mid-turn.
   const body = 'w'.repeat(1000)
@@ -209,7 +209,7 @@ test('CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff', () 
   )
 })
 
-test('CTX_011_the_cutoff_never_decreases_across_chunks', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_cutoff_never_decreases_across_chunks', () => {
   const body = 'z'.repeat(700)
   const messages = delta.messages([
     { role: 'user', parts: [delta.text('short')] },
@@ -227,7 +227,7 @@ test('CTX_011_the_cutoff_never_decreases_across_chunks', () => {
 
 // ── level three: hard truncation ───────────────────────────────────────────
 
-test('CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
   const huge = 'q'.repeat(20000)
   const messages = delta.messages([{ role: 'user', parts: [delta.text(huge)] }])
 
@@ -240,7 +240,7 @@ test('CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
   assert.equal(chunk.toml.includes(toml.TruncationMarker), true, 'the fixed marker must be present')
 })
 
-test('CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
   // The rule that prevents an infinite loop: an always-oversized part must be
   // passed over entirely, not carried into the next chunk.
   const huge = 'q'.repeat(20000)
@@ -259,7 +259,7 @@ test('CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
   assert.equal(chunks[1].toml.includes('next turn'), true)
 })
 
-test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_boundary', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_boundary', () => {
   // Cutting rendered UTF-8 bytes directly would split a multi-byte sequence. The
   // marker is appended after the cut, so the document must still parse.
   const cjk = '中'.repeat(8000)
@@ -294,7 +294,7 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   assert.equal(syn.byteCount('中'.repeat(retained)), retained * 3)
 })
 
-test('CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
   // A body containing both a newline and `'''` has no legal multi-line form, so
   // renderString falls back to a basic string. That expansion is the non-linearity
   // the search must measure; a character/byte ratio would undershoot the budget.
@@ -313,7 +313,7 @@ test('CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
   assert.equal(parsed.new_work_to_record[0].truncated, true)
 })
 
-test('CTX_013_an_omission_marker_is_never_truncated', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_omission_marker_is_never_truncated', () => {
   // It has no body to cut. A limit it cannot meet means the limit is below the
   // fixed item scaffolding — a configuration error, not something to repair by
   // emitting an invalid item.
@@ -328,7 +328,7 @@ test('CTX_013_an_omission_marker_is_never_truncated', () => {
 
 // ── media: the Companion has no vision ─────────────────────────────────────
 
-test('CTX_013_images_become_markers_carrying_no_content', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_images_become_markers_carrying_no_content', () => {
   const messages = delta.messages([
     {
       role: 'user',
@@ -349,7 +349,7 @@ test('CTX_013_images_become_markers_carrying_no_content', () => {
   assert.doesNotMatch(chunk.toml, /base64|data:|contentDigest/)
 })
 
-test('CTX_013_non_image_media_uses_the_media_marker', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_non_image_media_uses_the_media_marker', () => {
   const messages = delta.messages([
     { role: 'user', parts: [delta.media('application/pdf', 'sha-pdf')] },
     { role: 'user', parts: [delta.media(undefined, 'sha-unknown')] },
@@ -362,7 +362,7 @@ test('CTX_013_non_image_media_uses_the_media_marker', () => {
   assert.equal(chunk.toml.includes('media_omitted = "untyped"'), true)
 })
 
-test('CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {
   // The turn is real and must not stall the cursor just because its content was
   // omitted — otherwise a screenshot would freeze the Companion permanently.
   const messages = delta.messages([
@@ -379,7 +379,7 @@ test('CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {
 
 // ── determinism ────────────────────────────────────────────────────────────
 
-test('CTX_013_the_same_input_produces_the_same_chunks', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_the_same_input_produces_the_same_chunks', () => {
   const build = () =>
     delta.messages([
       { role: 'user', parts: [delta.text('修复竞态'), delta.media('image/png', 'sha-a')] },
@@ -393,7 +393,7 @@ test('CTX_013_the_same_input_produces_the_same_chunks', () => {
   assert.deepEqual(first, second)
 })
 
-test('CTX_013_canonical_args_pass_through_without_re_sorting', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_canonical_args_pass_through_without_re_sorting', () => {
   // `args` is already canonical: it is the value the Host codec put into the wire
   // projection. Re-sorting here would be a second canonicaliser that could
   // disagree with the one the seal digest used.

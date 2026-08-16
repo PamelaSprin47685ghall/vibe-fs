@@ -45,7 +45,7 @@ const errorRaw = (sessionID, name = 'TimeoutError', message = 'slow') => ({
 
 // ── sessionIdOf ──────────────────────────────────────────────────────────────
 
-test('MISC_signals_session_id_of_all_cases', () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_session_id_of_all_cases', () => {
   const s1 = sid('s1')
   assert.equal(sessionIdOf(new HostSignal(0, [s1])).fields[0], 's1')
   assert.equal(sessionIdOf(new HostSignal(1, [new RetrySignal(s1, '1', 'r')])).fields[0], 's1')
@@ -55,7 +55,7 @@ test('MISC_signals_session_id_of_all_cases', () => {
 
 // ── tryAdapt ─────────────────────────────────────────────────────────────────
 
-test('MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
+test('WHAT[HOST-BOUNDARY-002] MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
   const owned = () => true
   assert.equal(caseOf(tryAdapt(owned, idleRaw('s1'))), 'SessionIdle')
   assert.equal(caseOf(tryAdapt(owned, dedicatedIdleRaw('s1'))), 'SessionIdle')
@@ -82,7 +82,7 @@ test('MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
 // Trigger: HostSignalAdapter decodes the event.
 // Expected: typed AttemptAborted reaches capability revocation.
 // Forbidden: dropping it or converting it to ProviderFailure (HOST-002/004).
-test('R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
+test('WHAT[HOST-BOUNDARY-002] R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
   const owned = () => true
   const sig = tryAdapt(owned, {
     type: 'session.error',
@@ -93,7 +93,7 @@ test('R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
   assert.equal(caseOf(sig), 'AttemptAborted')
 })
 
-test('MISC_signals_try_adapt_ownership_gate', () => {
+test('WHAT[HOST-BOUNDARY-002] MISC_signals_try_adapt_ownership_gate', () => {
   const notOwned = () => false
   assert.equal(tryAdapt(notOwned, idleRaw('s1')), undefined, 'foreign idle is dropped')
   assert.equal(tryAdapt(notOwned, retryRaw('s1')), undefined, 'foreign retry is dropped')
@@ -103,7 +103,7 @@ test('MISC_signals_try_adapt_ownership_gate', () => {
 
 // ── Router ───────────────────────────────────────────────────────────────────
 
-test('MISC_signals_router_register_unregister', () => {
+test('WHAT[HOST-BOUNDARY-002] MISC_signals_router_register_unregister', () => {
   const received = []
   const router = makeRouter(new Set(), (s) => received.push(s), undefined)
   const s1 = sid('s1')
@@ -126,7 +126,7 @@ test('MISC_signals_router_register_unregister', () => {
   assert.equal(received.length, 2, 'unregistered session is foreign and dropped')
 })
 
-test('MISC_signals_router_loop_delta_bypasses_adapt', () => {
+test('WHAT[HOST-BOUNDARY-001] MISC_signals_router_loop_delta_bypasses_adapt', () => {
   const received = []
   const loopEvents = []
   const router = makeRouter(new Set(), (s) => received.push(s), (raw) => loopEvents.push(raw))
@@ -139,7 +139,7 @@ test('MISC_signals_router_loop_delta_bypasses_adapt', () => {
 
 // ── subscribeListen ──────────────────────────────────────────────────────────
 
-test('MISC_signals_listen_subscription_lifecycle', async () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_subscription_lifecycle', async () => {
   let unsubscribed = false
   const events = { listen: () => () => { unsubscribed = true } }
   const result = await trySubscribe({ events }, (raw) => {}, undefined)
@@ -152,7 +152,7 @@ test('MISC_signals_listen_subscription_lifecycle', async () => {
   assert.equal(unsubscribed, true)
 })
 
-test('MISC_signals_listen_error_paths', async () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_error_paths', async () => {
   const noListen = await trySubscribe({ events: {} }, () => {}, undefined)
   assert.equal(noListen.tag, 1)
   assert.match(noListen.fields[0], /events\.listen unavailable/)
@@ -168,7 +168,7 @@ test('MISC_signals_listen_error_paths', async () => {
 
 // ── local-event-hook default ────────────────────────────────────────────────
 
-test('MISC_signals_default_input_resolves_to_local_event_hook', async () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_default_input_resolves_to_local_event_hook', async () => {
   const result = await trySubscribe({}, () => {}, undefined)
   assert.equal(result.tag, 0)
   const [sub, source] = result.fields[0]
@@ -176,7 +176,7 @@ test('MISC_signals_default_input_resolves_to_local_event_hook', async () => {
   assert.equal(sub, undefined)
 })
 
-test('MISC_signals_client_events_listen_fallback', async () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_client_events_listen_fallback', async () => {
   let called = false
   const result = await trySubscribe({ client: { events: { listen: () => () => { called = true } } } }, () => {}, undefined)
   assert.equal(result.tag, 0)
@@ -185,7 +185,7 @@ test('MISC_signals_client_events_listen_fallback', async () => {
   assert.equal(called, true)
 })
 
-test('MISC_signals_server_url_ignored_in_favor_of_local_hook', async () => {
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_server_url_ignored_in_favor_of_local_hook', async () => {
   const result = await trySubscribe({ serverUrl: 'http://localhost:4096' }, () => {}, undefined)
   assert.equal(result.tag, 0)
   assert.equal(result.fields[0][1], 'local-event-hook')

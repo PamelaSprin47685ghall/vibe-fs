@@ -19,18 +19,18 @@ import { cursor, recoverySlot as slot, requestKind } from '../../verification-sy
 
 // ── arming is a control-flow fact, not a position ───────────────────────────
 
-test('FALLBACK_012_a_new_sequence_always_starts_unarmed', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_a_new_sequence_always_starts_unarmed', () => {
   // Even when the recovered Offset is odd. That is the whole clause.
   assert.equal(slot.armingName(slot.beginSequence), 'NotArmed')
   assert.equal(slot.isArmed(slot.beginSequence), false)
 })
 
-test('FALLBACK_012_only_a_failure_advance_arms_the_next_slot', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_only_a_failure_advance_arms_the_next_slot', () => {
   assert.equal(slot.armingName(slot.afterFailureAdvance), 'ArmedByAdvance')
   assert.equal(slot.isArmed(slot.afterFailureAdvance), true)
 })
 
-test('FALLBACK_012_arming_is_lost_across_a_restart_and_the_safe_side_is_unarmed', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_arming_is_lost_across_a_restart_and_the_safe_side_is_unarmed', () => {
   // Resuming armed would squash on the first slot after every restart — the
   // parked-cursor failure with a different trigger. Unarmed costs at most one
   // missed compression opportunity.
@@ -38,7 +38,7 @@ test('FALLBACK_012_arming_is_lost_across_a_restart_and_the_safe_side_is_unarmed'
   assert.equal(slot.afterRestart, slot.beginSequence, 'a restart is indistinguishable from a fresh sequence')
 })
 
-test('FALLBACK_012_the_facade_offers_no_way_to_derive_arming_from_an_offset', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_the_facade_offers_no_way_to_derive_arming_from_an_offset', () => {
   // Mirrors the production module. There is no `armingOf(offset)`: arming is a
   // control-flow fact, and a function mapping a position to it would let a test
   // assert the parked-cursor bug as correct behaviour.
@@ -59,7 +59,7 @@ test('FALLBACK_012_the_facade_offers_no_way_to_derive_arming_from_an_offset', ()
 
 // ── CTX-006: armed means "may recover", not "compresses" ───────────────────
 
-test('CTX_006_recovery_needs_arming_a_primed_offset_and_material', () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_recovery_needs_arming_a_primed_offset_and_material', () => {
   // The three conjuncts. Offsets 1 and 3 are the primed slots (A′ / B′).
   assert.equal(slot.mayRecover(slot.afterFailureAdvance, 1, true), true)
   assert.equal(slot.mayRecover(slot.afterFailureAdvance, 3, true), true)
@@ -79,13 +79,13 @@ test('CTX_006_recovery_needs_arming_a_primed_offset_and_material', () => {
   assert.equal(slot.mayRecover(slot.beginSequence, 3, true), false)
 })
 
-test('CTX_006_the_primed_slots_are_exactly_the_odd_offsets', () => {
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_the_primed_slots_are_exactly_the_odd_offsets', () => {
   assert.deepEqual([0, 1, 2, 3].map(cursor.isRecoverySlot), [false, true, false, true])
 })
 
 // ── CTX-007: the squash sub-request ────────────────────────────────────────
 
-test('CTX_012_a_valid_squash_commits_permanently_and_the_slot_continues', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_a_valid_squash_commits_permanently_and_the_slot_continues', () => {
   const decision = slot.onSquash('Completed')
 
   assert.equal(decision.name, 'CommitSquashThenMain')
@@ -95,7 +95,7 @@ test('CTX_012_a_valid_squash_commits_permanently_and_the_slot_continues', () => 
   assert.equal(decision.advancesCursor, false)
 })
 
-test('CTX_012_an_invalid_squash_is_skipped_rather_than_repaired', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_an_invalid_squash_is_skipped_rather_than_repaired', () => {
   // The frames are still there, so spending FALLBACK-008's one repair on a
   // compression would spend it on the wrong thing.
   const decision = slot.onSquash('CompletedInvalid')
@@ -104,7 +104,7 @@ test('CTX_012_an_invalid_squash_is_skipped_rather_than_repaired', () => {
   assert.equal(decision.advancesCursor, false)
 })
 
-test('CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request', () => {
   for (const outcome of ['Failed', 'Aborted']) {
     const decision = slot.onSquash(outcome)
 
@@ -115,7 +115,7 @@ test('CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request', 
 
 // ── CTX-007: the main request ──────────────────────────────────────────────
 
-test('FALLBACK_011_only_a_business_main_success_clears_the_failure_count', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] FALLBACK_011_only_a_business_main_success_clears_the_failure_count', () => {
   const clears = (kind) => slot.onMain({ kind, outcome: 'Completed' }).clearsFailureCount
 
   // A squash produced a better representation, not a completed unit of the run's
@@ -127,7 +127,7 @@ test('FALLBACK_011_only_a_business_main_success_clears_the_failure_count', () =>
   assert.equal(clears(requestKind.interactionRepair), false)
 })
 
-test('CTX_007_a_successful_main_commits_and_does_not_move_the_cursor', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] CTX_007_a_successful_main_commits_and_does_not_move_the_cursor', () => {
   const decision = slot.onMain({ kind: requestKind.workMain, outcome: 'Completed' })
 
   assert.equal(decision.name, 'CommitMain')
@@ -135,7 +135,7 @@ test('CTX_007_a_successful_main_commits_and_does_not_move_the_cursor', () => {
   assert.equal(decision.nextArmingName, 'NotArmed', 'success ends the recovery sequence')
 })
 
-test('FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair', () => {
   const first = slot.onMain({ kind: requestKind.bloggerMain, aabbConsumed: false, outcome: 'CompletedInvalid' })
   assert.equal(first.name, 'RepairOnce')
   assert.equal(first.advancesCursor, false, 'an unusable terminal is not a failed slot')
@@ -149,7 +149,7 @@ test('FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair', () => {
   assert.equal(second.advancesCursor, false)
 })
 
-test('CTX_007_a_failed_main_fails_the_slot_for_every_kind', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] CTX_007_a_failed_main_fails_the_slot_for_every_kind', () => {
   for (const kind of requestKind.all) {
     for (const outcome of ['Failed', 'Aborted']) {
       const decision = slot.onMain({ kind, outcome })
@@ -160,7 +160,7 @@ test('CTX_007_a_failed_main_fails_the_slot_for_every_kind', () => {
   }
 })
 
-test('CTX_005_Failed_and_Aborted_take_the_identical_path', () => {
+test('WHAT[CONTEXT-COMPRESSION-005] CTX_005_Failed_and_Aborted_take_the_identical_path', () => {
   // No error text reaches this module and there is no overflow case. Every failure
   // gets the same recovery protocol, so a discriminator would only grow a branch
   // that never executes.
@@ -173,7 +173,7 @@ test('CTX_005_Failed_and_Aborted_take_the_identical_path', () => {
 
 // ── CTX-008: exactly one advance per failed slot ───────────────────────────
 
-test('CTX_008_only_a_failed_slot_advances_the_cursor', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] CTX_008_only_a_failed_slot_advances_the_cursor', () => {
   const advancing = [
     slot.onSquash('Completed'),
     slot.onSquash('CompletedInvalid'),
@@ -187,7 +187,7 @@ test('CTX_008_only_a_failed_slot_advances_the_cursor', () => {
   assert.deepEqual(advancing.map((d) => d.name), ['FailSlot', 'FailSlot'])
 })
 
-test('FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed', () => {
   assert.equal(slot.onSquash('Failed').nextArmingName, 'ArmedByAdvance')
   assert.equal(slot.onMain({ kind: requestKind.workMain, outcome: 'Failed' }).nextArmingName, 'ArmedByAdvance')
 
@@ -198,7 +198,7 @@ test('FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed', () => {
 
 // ── the acceptance trace ───────────────────────────────────────────────────
 
-test('FALLBACK_012_parked_cursor_does_not_trigger_compression_acceptance_trace', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_parked_cursor_does_not_trigger_compression_acceptance_trace', () => {
   // The shock-anneal archive's verification trace, as a decision sequence.
   //
   // The Offset is threaded through because CTX-006 reads it as one of three
@@ -292,7 +292,7 @@ test('FALLBACK_012_parked_cursor_does_not_trigger_compression_acceptance_trace',
   ])
 })
 
-test('FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes', () => {
   // The invariant the whole design exists to produce: compression is a by-product of
   // recovery, not routine housekeeping. Stated as a property over the decision graph
   // rather than one trace — a squash is only reachable from an armed slot, and the
@@ -318,7 +318,7 @@ test('FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes', () => 
 
 // ── the request kinds themselves ───────────────────────────────────────────
 
-test('CTX_010_only_the_work_main_request_may_carry_a_prefix_probe', () => {
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_only_the_work_main_request_may_carry_a_prefix_probe', () => {
   // A Companion request has no prefix to probe — its history is the frame sequence —
   // and a repair reuses whatever the attempt it repairs already sent.
   assert.equal(requestKind.mayCarryProbe(requestKind.workMain), true)
@@ -327,7 +327,7 @@ test('CTX_010_only_the_work_main_request_may_carry_a_prefix_probe', () => {
   assert.equal(requestKind.mayCarryProbe(requestKind.interactionRepair), false)
 })
 
-test('PROMPT_008_every_request_kind_has_a_distinct_diagnostic_label', () => {
+test('WHAT[CONTEXT-COMPRESSION-007] PROMPT_008_every_request_kind_has_a_distinct_diagnostic_label', () => {
   const labels = requestKind.all.map(requestKind.label)
 
   // Every kind has a distinct diagnostic label, and no two kinds share one.

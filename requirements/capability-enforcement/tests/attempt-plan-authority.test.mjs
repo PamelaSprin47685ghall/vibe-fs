@@ -11,7 +11,7 @@ import { attemptPlanner as planner, requestKind } from '../../verification-syste
 
 // ── PROMPT-008: everything derivable is derived ────────────────────────────
 
-test('PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
+test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
   // The caller supplies an authority profile and a cursor. It cannot supply a role that
   // disagrees with the agent name, or a tool set that disagrees with the role, because
   // neither is a parameter.
@@ -22,7 +22,7 @@ test('PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', 
   assert.deepEqual(plan.toolCapabilities, ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write'])
 })
 
-test('AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
+test('WHAT[ENF-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
   // `permissions(fast-coder) = permissions(deep-coder)` must be structurally true, not
   // a coincidence of two lookup tables agreeing.
   const fast = planner.plan({
@@ -39,7 +39,7 @@ test('AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () =
   assert.deepEqual(fast.toolCapabilities, deep.toolCapabilities)
 })
 
-test('PROMPT_008_the_request_kind_is_carried_not_inferred', () => {
+test('WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred', () => {
   for (const kind of requestKind.all) {
     const plan = planner.plan({ kind })
     assert.equal(plan.requestKind, requestKind.nameOf(kind))

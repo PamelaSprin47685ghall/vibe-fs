@@ -228,7 +228,7 @@ export const assertMagicTodoHookShape = (hooks) => {
   }
 }
 
-test('STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
+test('WHAT[HOST-BOUNDARY-019] STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
   // normalTransform + replica route live in PluginTransforms (Wave 3).
   const source = readFileSync(
     new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url),
@@ -259,7 +259,7 @@ const toolContext = (sessionID, messageID = 'msg_tool_probe') => ({
   abort: new AbortController().signal,
 })
 
-test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
+test('WHAT[HOST-BOUNDARY-019] PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
   await withPlugin(async (hooks) => {
     await hooks['chat.message'](
       { sessionID: SESSION, agent: 'fast-manager' },
@@ -279,7 +279,7 @@ test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
   })
 })
 
-test('AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', async () => {
+test('WHAT[HOST-BOUNDARY-019] AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', async () => {
   const sessionID = 'ses_resume_probe'
   const rootID = 'msg_resume_root'
   const assistantID = 'msg_resume_assistant'
@@ -307,7 +307,7 @@ const triggeredHooks = (hooks) =>
     ([name, value]) => typeof value === 'function' && name !== 'event' && name !== 'dispose',
   )
 
-test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async () => {
+test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async () => {
   const routedSession = 'ses_model_route_hook_probe'
 
   await withPlugin(async (hooks) => {
@@ -342,7 +342,7 @@ test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async 
   })
 })
 
-test('HOST_009_every_registered_hook_has_a_fixture_here', async () => {
+test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here', async () => {
   // The completeness gate. Without it a newly registered hook would be silently
   // uncovered, which is exactly how the transform family went unchecked.
   await withPlugin(async (hooks) => {
@@ -358,7 +358,7 @@ test('HOST_009_every_registered_hook_has_a_fixture_here', async () => {
   })
 })
 
-test('HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
+test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
   await withPlugin(async (hooks) => {
     const failures = []
 
@@ -375,7 +375,7 @@ test('HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
   })
 })
 
-test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () => {
+test('WHAT[HOST-BOUNDARY-014] HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () => {
   // `tool` holds `{ args, execute }` records the Host calls per tool. Sweeping it
   // into the loop above would call a registry object as a function.
   await withPlugin(async (hooks) => {

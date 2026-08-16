@@ -30,7 +30,7 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8')
 
 // ── 001: 所有 automated tests 使用 JavaScript ───────────────────────────────
 
-test('JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
   const testFiles = walk(join(ROOT, 'requirements'), ['.test.mjs', '.test.js', '.test.fs', '.test.ts', '.test.fsx'])
   const nonMjs = testFiles.filter((f) => !f.endsWith('.test.mjs'))
   assert.deepEqual(
@@ -42,7 +42,7 @@ test('JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
 
 // ── 002: 只经正式 semantic surface；gate 已 wire ────────────────────────────
 
-test('JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
   // Machine face: js-boundary-gate is wired into check.mjs (P2). A semantic
   // test carrying debt is red unless the baseline explicitly tolerates it.
   const checkSource = read('scripts/check.mjs')
@@ -58,7 +58,7 @@ test('JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
 
 // ── 003: law → owner → surface 归属被文档化 ─────────────────────────────────
 
-test('JS_SURFACE_003_law_owner_surface_registry', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', () => {
   const what = read('requirements/js-semantic-surface/WHAT.md')
   for (const id of ['001', '002', '003', '004', '005', '006']) {
     assert.match(what, new RegExp(`^## JS-SEMANTIC-SURFACE-${id}：`, 'm'), `WHAT must define JS-SEMANTIC-SURFACE-${id}`)
@@ -75,7 +75,7 @@ test('JS_SURFACE_003_law_owner_surface_registry', () => {
 
 // ── 004: helper 不直接测试 ──────────────────────────────────────────────────
 
-test('JS_SURFACE_004_helper_not_directly_tested', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', () => {
   // The representation validator is tested through its own contract (005),
   // never through a domain helper. No test file in this package may name an
   // interop helper or import the transition facade.
@@ -91,7 +91,7 @@ test('JS_SURFACE_004_helper_not_directly_tested', () => {
 
 // ── 005: JS-native representation 规则直接可红 ───────────────────────────────
 
-test('JS_SURFACE_005_js_native_representation_rules', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-005] JS_SURFACE_005_js_native_representation_rules', () => {
   // JSON-shaped passes.
   assert.equal(isJsData(null), true)
   assert.equal(isJsData('s'), true)
@@ -142,7 +142,7 @@ test('JS_SURFACE_005_js_native_representation_rules', () => {
 
 // ── 006: Fable 形状不是 contract；quarantine 单独存在 ───────────────────────
 
-test('JS_SURFACE_006_fable_representation_not_contract', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract', () => {
   // Compiler/build verification quarantine exists and is separate from
   // semantic tests: it names Fable output shape because its subject IS the
   // compiled artifact (guide-contract emitted-surface pin, domain.meta facade
@@ -158,7 +158,7 @@ test('JS_SURFACE_006_fable_representation_not_contract', () => {
   assert.match(gate, /test-surface-scan\.mjs/, 'gate must share the inventory scanner')
 })
 
-test('JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
   // A registered surface is a legal entry point ONLY because a contract test
   // pins it (JS-SEMANTIC-SURFACE-003: surface exists because a component owns
   // a contract, never because a test wants access). Every entry in the scanner
@@ -183,7 +183,7 @@ test('JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
   }
 })
 
-test('JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree', () => {
   // Allowlist cannot grant immunity to a path that does not exist: every
   // registered surface must map to a real <Compile Include> entry in
   // Wanxiangshu.fsproj. A bogus entry is a silent debt exemption.

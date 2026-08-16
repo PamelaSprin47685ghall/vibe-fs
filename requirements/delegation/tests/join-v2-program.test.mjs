@@ -36,7 +36,7 @@ const link = (handle, child, targetAgent, role, current) => {
     : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
 }
 
-test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
+test('WHAT[DELEG-009] EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
   const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), 'utf8')
   const joinHost = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs'), 'utf8')
   const orchestrator = readFileSync(
@@ -49,11 +49,11 @@ test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
   assert.match(orchestrator, /let joinGate = obj \(\)/)
   assert.match(orchestrator, /JOIN_IN_PROGRESS/)
 })
-test('EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
+test('WHAT[DELEG-013] EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
   assert.equal(typeof joinProgram.joinAvailable, 'function')
 })
 
-test('EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
+test('WHAT[DELEG-013] EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
   const mod = await import(new URL('../../../dist/Execution/Delegation/Join.js', import.meta.url).pathname)
   const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
   assert.equal(
@@ -67,7 +67,7 @@ test('EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
 // Interrupted join must not abandon a still-active child handle (EXEC-017).
 // Pure projection: Active stays Active after an "interrupted join" (no abandon call).
 
-test('EXEC_017_interrupted_join_does_not_abandon_active_child_handle', () => {
+test('WHAT[DELEG-015] EXEC_017_interrupted_join_does_not_abandon_active_child_handle', () => {
   const HANDLE = handleId.agent('child-still-running')
   const CHILD = sessionId('ses_child_running')
   let projection = handleProjection.empty

@@ -37,7 +37,7 @@ const { OrchestratorHost__Cancel: hostCancel } = await import(
 
 // ── initializeEngine / engine() ───────────────────────────────────────────────
 
-test('HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
+test('WHAT[CHGINT-002] HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
   const live = await liveOrchestrator({ seedEngine: false })
   const first = await forkManagerJob(live.host, managerJobId('hostfw1'), 'fast-manager', 'build the thing')
   assert.equal(first.ok, true, first.ok ? '' : first.error)
@@ -55,7 +55,7 @@ test('HOST_initializeEngine_runs_sweep_and_caches_the_engine', async () => {
   live.cleanup()
 })
 
-test('HOST_engine_init_failure_is_reported_and_cached', async () => {
+test('WHAT[CHGINT-008] HOST_engine_init_failure_is_reported_and_cached', async () => {
   const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
@@ -71,7 +71,7 @@ test('HOST_engine_init_failure_is_reported_and_cached', async () => {
   live.cleanup()
 })
 
-test('HOST_sweep_failure_aborts_engine_initialization', async () => {
+test('WHAT[CHGINT-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
   const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
@@ -86,7 +86,7 @@ test('HOST_sweep_failure_aborts_engine_initialization', async () => {
 
 // ── member-level branches over the real engine ───────────────────────────────
 
-test('HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
+test('WHAT[CHGINT-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
   const live = await liveOrchestrator({ journal: false })
   live.host.engineInstance.git.IsDirty = async () => true
 
@@ -96,7 +96,7 @@ test('HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
   live.cleanup()
 })
 
-test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
+test('WHAT[CHGINT-006] HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
   const live = await liveOrchestrator()
   const result = await continueManagerJob(live.host, managerJobId('hostfw6'), 'keep going')
   assert.equal(result.ok, false)
@@ -104,7 +104,7 @@ test('HOST_ContinueManagerJob_unknown_job_is_rejected', async () => {
   live.cleanup()
 })
 
-test('HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
+test('WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(
     source,
@@ -113,7 +113,7 @@ test('HOST_ContinueManagerJob_has_no_detached_pending_waiter', () => {
   )
 })
 
-test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {
+test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () => {
   const live = await liveOrchestrator()
   const forked = await forkManagerJob(live.host, managerJobId('hostfw8'), 'fast-manager', 'first pass')
   assert.equal(forked.ok, true, forked.ok ? '' : forked.error)
@@ -130,7 +130,7 @@ test('HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', async () =>
   live.cleanup()
 })
 
-test('HOST_JoinPublished_renders_a_string', async () => {
+test('WHAT[CHGINT-011] HOST_JoinPublished_renders_a_string', async () => {
   const live = await liveOrchestrator({ journal: false })
   const rendered = await hostJoinPublished(live.host)
   assert.equal(typeof rendered, 'string')
@@ -138,7 +138,7 @@ test('HOST_JoinPublished_renders_a_string', async () => {
   live.cleanup()
 })
 
-test('HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
+test('WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
   const live = await liveOrchestrator({
     seedEngine: false,
     journal: false,
@@ -150,7 +150,7 @@ test('HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async
   live.cleanup()
 })
 
-test('HOST_Cancel_reaches_the_runtime_without_throwing', async () => {
+test('WHAT[CHGINT-004] HOST_Cancel_reaches_the_runtime_without_throwing', async () => {
   const live = await liveOrchestrator({ journal: false })
   hostCancel(live.host)
   live.cleanup()
@@ -158,7 +158,7 @@ test('HOST_Cancel_reaches_the_runtime_without_throwing', async () => {
 
 // ── manager port internals ────────────────────────────────────────────────────
 
-test('HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
+test('WHAT[CHGINT-006] HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
   const live = await liveOrchestrator({ journal: false })
   // Never forked, never registered: AwaitAgent fails fast with unknown agent.
   const result = resultOf(await live.host.managerPort.AwaitManager(managerJobId('hostfw9')))
@@ -167,7 +167,7 @@ test('HOST_awaitManager_with_no_worktree_registered_fails_closed', async () => {
   live.cleanup()
 })
 
-test('HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
+test('WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
   const live = await liveOrchestrator()
   const worktree = gitDir('awm')
   try {
@@ -189,7 +189,7 @@ test('HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', asyn
   }
 })
 
-test('HOST_resumeManager_unknown_job_is_rejected', async () => {
+test('WHAT[CHGINT-005] HOST_resumeManager_unknown_job_is_rejected', async () => {
   const live = await liveOrchestrator({ journal: false })
   const result = resultOf(
     await live.host.managerPort.ResumeManager(managerJobId('hostfw11'), worktreePath('/tmp/wt'), 'resolve the conflict'),
@@ -199,7 +199,7 @@ test('HOST_resumeManager_unknown_job_is_rejected', async () => {
   live.cleanup()
 })
 
-test('HOST_terminateChildren_tears_down_manager_and_reviewer_children', async () => {
+test('WHAT[CHGINT-004] HOST_terminateChildren_tears_down_manager_and_reviewer_children', async () => {
   const live = await liveOrchestrator({ journal: false })
   // Seed the runtime child map directly: manager + one reviewer (job-reviewer-<bar>).
   const managerSid = sessionId('ses_mgr')

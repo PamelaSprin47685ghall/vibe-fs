@@ -31,7 +31,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
+test('WHAT[ENF-006] Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
   const allowed = rolePermissions('inquiry')
   assert.deepEqual(allowed, ['Fission', 'Inspect', 'Sphinx'])
   assert.equal(allowed.includes('Read'), false)
@@ -39,7 +39,7 @@ test('Inquiry_permissions_are_inspect_sphinx_and_fission', () => {
   assert.equal(allowed.includes('Grep'), false)
 })
 
-test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx_fission', () => {
+test('WHAT[ENF-006] Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx_fission', () => {
   assert.equal(surfaceIsAllowed('inquiry', 'Inspect'), true)
   assert.equal(surfaceIsAllowed('inquiry', 'Sphinx'), true)
   assert.equal(surfaceIsAllowed('inquiry', 'Fission'), true)
@@ -48,7 +48,7 @@ test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect_sphinx_fission'
   }
 })
 
-test('Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
+test('WHAT[ENF-001] Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
   const caps = names(toolCapabilitiesFor(Role.Inquiry, ProviderRequestKind.WorkMain))
   assert.deepEqual(caps, ['fission', 'inspect', 'sphinx_*'])
   for (const tool of READ_TOOLS) {
@@ -56,7 +56,7 @@ test('Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
   }
 })
 
-test('Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
+test('WHAT[ENF-010] Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
   // Gap note: read/glob/grep are Host-native builtins — they are NOT ToolRegistry
   // specs, so rolePredicate has no isAllowed cases for them and falls through to
   // default deny. The real Inquiry gate for those tools is Roles.permissions /
@@ -72,7 +72,7 @@ test('Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
   assert.equal(inspect(Role.Inquiry), true, 'rolePredicate(inspect) must allow Inquiry')
 })
 
-test('Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission', () => {
+test('WHAT[ENF-002] Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission', () => {
   const config = {
     agent: {
       'fast-inquiry': { model: 'fast-inquiry-model' },

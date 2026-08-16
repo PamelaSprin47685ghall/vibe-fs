@@ -39,17 +39,17 @@ module ToolRegistry =
         | _ -> fun _ -> false
 `
 
-test('gate_a_documents_legacy_forbidden_names', () => {
+test('WHAT[ENF-009] gate_a_documents_legacy_forbidden_names', () => {
   assert.ok(LEGACY_FORBIDDEN_NAMES.includes('verdict'))
   assert.ok(LEGACY_FORBIDDEN_NAMES.includes('list'))
 })
 
-test('gate_a_legacy_tool_name_is_red', () => {
+test('WHAT[ENF-009] gate_a_legacy_tool_name_is_red', () => {
   const violations = scanEntries([{ file: 'VerdictTool.fs', text: LEGACY_VERDICT }])
   assert.ok(violations.some((v) => v.code === 'legacy-tool-name' && v.detail?.includes('verdict')))
 })
 
-test('gate_a_unknown_tool_not_in_static_is_red', () => {
+test('WHAT[ENF-009] gate_a_unknown_tool_not_in_static_is_red', () => {
   const inspectSpec = `
 module InspectorTool =
     let spec factory scope syncDelegate =
@@ -65,11 +65,11 @@ module InspectorTool =
   assert.ok(violations.some((v) => v.code === 'unknown-tool-not-in-static' && v.detail?.includes('inspect')))
 })
 
-test('gate_a_extract_known_tool_names', () => {
+test('WHAT[ENF-009] gate_a_extract_known_tool_names', () => {
   assert.deepEqual(extractKnownToolNames(STATIC_TOOLS_SNIPPET), ['fork', 'commission', 'join', 'horizon'])
 })
 
-test('gate_a_repo_scan_is_green', () => {
+test('WHAT[ENF-009] gate_a_repo_scan_is_green', () => {
   const result = scanRepo()
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })

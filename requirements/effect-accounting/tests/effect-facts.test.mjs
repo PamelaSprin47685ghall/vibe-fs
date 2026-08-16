@@ -79,7 +79,7 @@ const foldFacts = (facts) => {
 
 const jobOf = (projection) => orchestratorProjection.tryFind(JOB, fold.orchestrator(projection))
 
-test('worktree_requested_created_are_distinct_typed_states_not_one_bool', () => {
+test('WHAT[EFFECT-ACCOUNTING-001] worktree_requested_created_are_distinct_typed_states_not_one_bool', () => {
   // PERSIST-009: Requested（意图）与 Created（物理已发生）是两个 typed 事实；
   // Accepted/Created 存在后不得折回 Requested。
   let proj = orchestratorProjection.empty
@@ -100,7 +100,7 @@ test('worktree_requested_created_are_distinct_typed_states_not_one_bool', () => 
   assert.equal(orchestratorProjection.worktreeEffectOf(WT, fold.orchestrator(viaFold)), 'Created')
 })
 
-test('publish_claimed_recovery_three_branch_order_is_fixed', () => {
+test('WHAT[EFFECT-ACCOUNTING-009] publish_claimed_recovery_three_branch_order_is_fixed', () => {
   // reconciliation 先查物理 effect identity：三分支固定顺序
   // （已发布 → 目标未变 → 其它）。ORCH-007 / PERSIST-009。
   const projection = foldFacts([createFact(), rebasedFact(), publishClaimedFact()])
@@ -117,7 +117,7 @@ test('publish_claimed_recovery_three_branch_order_is_fixed', () => {
   assert.equal(orchestratorProjection.recoveryAction(undefined, job), 'FailClosed')
 })
 
-test('publish_claim_without_durable_rebase_witness_is_rejected', () => {
+test('WHAT[EFFECT-ACCOUNTING-012] publish_claim_without_durable_rebase_witness_is_rejected', () => {
   // PublishClaimed 必须基于已 committed 的 RebasedCandidateReady；
   // 凭空 claim（内存猜测）被 fold 拒绝。
   const result = fold.apply(
@@ -130,7 +130,7 @@ test('publish_claim_without_durable_rebase_witness_is_rejected', () => {
   assert.match(String(result.error), /publish claimed for a job with no rebased candidate/i)
 })
 
-test('typed_effect_facts_replace_the_generic_durable_effect_union', () => {
+test('WHAT[EFFECT-ACCOUNTING-010] typed_effect_facts_replace_the_generic_durable_effect_union', () => {
   // 每个 effect 的 Request/Accepted 是 typed fact（WorktreeCreateRequested /
   // WorktreeCreated / PublishClaimed / Published…），不是通用 bool/status 字段。
   const encoded = journal.serializeFact(requestedFact())

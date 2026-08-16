@@ -213,7 +213,7 @@ const mainJson = (overrides = {}) => ({
 
 // ── reload: Main ────────────────────────────────────────────────────────────
 
-test('ENFORCER_reload_main_context_from_open_materialization', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_main_context_from_open_materialization', async () => {
   await withHarness(async ({ journal, scope }) => {
     await materializeOpen(journal, { requestId: 'req-m', json: mainJson() })
     const reloaded = await resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
@@ -232,7 +232,7 @@ test('ENFORCER_reload_main_context_from_open_materialization', async () => {
   })
 })
 
-test('ENFORCER_reload_squash_context_from_open_materialization', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_squash_context_from_open_materialization', async () => {
   await withHarness(async ({ journal, scope }) => {
     await materializeOpen(journal, {
       requestId: 'req-sq',
@@ -255,7 +255,7 @@ test('ENFORCER_reload_squash_context_from_open_materialization', async () => {
   })
 })
 
-test('ENFORCER_reload_defaults_when_blob_is_sparse', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_defaults_when_blob_is_sparse', async () => {
   await withHarness(async ({ journal, scope }) => {
     // Only kind present: every field falls back to the open-request defaults.
     await materializeOpen(journal, { requestId: 'req-sparse', json: { kind: 'main' } })
@@ -271,7 +271,7 @@ test('ENFORCER_reload_defaults_when_blob_is_sparse', async () => {
   })
 })
 
-test('ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', async () => {
   await withHarness(async ({ journal, scope }) => {
     // JSON numbers can arrive as strings; the decoder must accept both.
     // delta_digest absent → sha256(toml) when toml present.
@@ -297,7 +297,7 @@ test('ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', async () 
   })
 })
 
-test('ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty', async () => {
   await withHarness(async ({ journal, scope }) => {
     const json = mainJson({ toml: '' })
     delete json.delta_digest
@@ -309,7 +309,7 @@ test('ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty',
   })
 })
 
-test('ENFORCER_reload_unreadable_blob_returns_none', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_unreadable_blob_returns_none', async () => {
   await withHarness(async ({ journal, scope }) => {
     const openReq = await materializeOpen(journal, { requestId: 'req-gone', json: mainJson() })
     // EventStore BlobRef is a local content-addressed payload under .git/wanxiang/payloads — not a RuntimePath file.
@@ -319,7 +319,7 @@ test('ENFORCER_reload_unreadable_blob_returns_none', async () => {
   })
 })
 
-test('ENFORCER_reload_corrupt_json_returns_none', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_corrupt_json_returns_none', async () => {
   await withHarness(async ({ journal, scope }) => {
     const openReq = await materializeOpen(journal, { requestId: 'req-badjson', json: mainJson() })
     // Unterminated JSON → JSON.parse throws → decoder returns None (fail closed).
@@ -331,7 +331,7 @@ test('ENFORCER_reload_corrupt_json_returns_none', async () => {
 
 // ── reload: live request wins over open ────────────────────────────────────
 
-test('ENFORCER_resolve_cycle_prefers_live_request_over_open', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolve_cycle_prefers_live_request_over_open', async () => {
   await withHarness(async ({ journal, scope }) => {
     await materializeOpen(journal, { requestId: 'req-open', json: mainJson({ toml: 'open-toml' }) })
     const live = bloggerRequestContext.main({
@@ -379,7 +379,7 @@ const squashRun = async ({ journal, scope, run, blogStep, mainSession, squash })
   assert.equal(listItems(mainSession().Blog.Frames).length, 1, 'no frame appended')
 }
 
-test('ENFORCER_squash_frame_count_beyond_existing_frames_abandons', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_count_beyond_existing_frames_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
       const digest = await seedEntryFrame({ journal, scope, run, blogStep, mainSession })
@@ -403,7 +403,7 @@ test('ENFORCER_squash_frame_count_beyond_existing_frames_abandons', async () => 
   )
 })
 
-test('ENFORCER_squash_frame_epoch_mismatch_abandons', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_epoch_mismatch_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
       const digest = await seedEntryFrame({ journal, scope, run, blogStep, mainSession })
@@ -427,7 +427,7 @@ test('ENFORCER_squash_frame_epoch_mismatch_abandons', async () => {
   )
 })
 
-test('ENFORCER_squash_frame_digests_mismatch_abandons', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
       await seedEntryFrame({ journal, scope, run, blogStep, mainSession })
@@ -451,7 +451,7 @@ test('ENFORCER_squash_frame_digests_mismatch_abandons', async () => {
   )
 })
 
-test('ENFORCER_squash_other_blogger_session_abandons', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_other_blogger_session_abandons', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep, mainSession }) => {
       await seedEntryFrame({ journal, scope, run, blogStep, mainSession })

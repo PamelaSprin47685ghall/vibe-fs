@@ -40,7 +40,7 @@ const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest 
 
 // ── the empty state is a claim, not a placeholder ───────────────────────────
 
-test('PERSIST_010_empty_projection_covers_nothing', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_empty_projection_covers_nothing', () => {
   assert.equal(blog.frameCount(blog.empty), 0)
   assert.equal(blog.hasCoverage(blog.empty), false)
   assert.deepEqual(blog.coverage(blog.empty), {
@@ -53,7 +53,7 @@ test('PERSIST_010_empty_projection_covers_nothing', () => {
 
 // ── entry: append and coverage are one commit ───────────────────────────────
 
-test('COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   const result = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'd1' })
 
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -75,7 +75,7 @@ test('COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   assert.equal(stamped.CoveredThroughSequence, 1n)
 })
 
-test('CTX_011_entry_that_consumed_nothing_is_refused', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_entry_that_consumed_nothing_is_refused', () => {
   // An entry whose ingest sequence did not move would let the same delta be
   // blogged forever: the next offer would compute the identical chunk.
   const same = commitEntry(blog.empty, { from: 0, to: 0, cutoffFrom: 0, cutoffTo: 0 })
@@ -87,7 +87,7 @@ test('CTX_011_entry_that_consumed_nothing_is_refused', () => {
   assert.deepEqual(back, { ok: false, error: 'IngestCursorNotAdvanced' })
 })
 
-test('CTX_011_sequence_advances_within_one_turn', () => {
+test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_sequence_advances_within_one_turn', () => {
   // A large message spans several 200 KiB chunks, so a chunk boundary can fall
   // inside a turn. Those chunks advance the record sequence and must be accepted
   // while the turn cutoff stays put.
@@ -126,7 +126,7 @@ test('CTX_011_sequence_advances_within_one_turn', () => {
   assert.deepEqual(blog.coverableFrameKinds(final.value), ['Entry', 'Entry', 'Entry'])
 })
 
-test('PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
   // The writer's view of where the Companion was must match the projection's.
   // A mismatch means two writers, or a line replayed out of order.
   const first = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
@@ -135,7 +135,7 @@ test('PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
   assert.deepEqual(stale, { ok: false, error: 'IngestCursorMismatch' })
 })
 
-test('CTX_011_coverage_may_not_retreat', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_coverage_may_not_retreat', () => {
   const first = commitEntry(blog.empty, { from: 0, to: 2, cutoffFrom: 0, cutoffTo: 2 }).value
 
   // Claiming an earlier previous-cutoff than the projection holds.
@@ -147,7 +147,7 @@ test('CTX_011_coverage_may_not_retreat', () => {
   assert.deepEqual(backwards, { ok: false, error: 'CoverageRetreated' })
 })
 
-test('PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () => {
   // A squash replaced the frame sequence. An entry still carrying the old epoch
   // describes frames that no longer exist.
   const first = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
@@ -162,7 +162,7 @@ test('PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () =
 
 // ── squash: changes representation, never coverage ──────────────────────────
 
-test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone', () => {
   let state = blog.empty
   for (let i = 1; i <= 4; i += 1) {
     state = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i }).value
@@ -199,7 +199,7 @@ test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alo
   assert.equal(merged.CoveredThroughSequence, 2n, 'squash unions the replaced frames\' coverage interval')
 })
 
-test('CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {
   // The boundary case the arithmetic has to get right. Squashing every covered frame
   // into one means the covered range is now that single frame — not zero, which would
   // silently disable probes, and not the old count, which would overrun the list.
@@ -217,7 +217,7 @@ test('CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverabl
   assert.deepEqual(blog.coverableFrameKinds(collapsed.value), ['Squash'])
 })
 
-test('CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
+test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
   // Mid-turn chunks only: nothing is coverable. A squash rewrites those frames but
   // cannot create coverage the cutoff never claimed.
   const chunk1 = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 0, digest: '' }).value
@@ -233,7 +233,7 @@ test('CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
   assert.equal(blog.hasCoverage(squashed.value), false)
 })
 
-test('CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () => {
   const widthAfter = (count) => {
     let state = blog.empty
     for (let i = 1; i <= count; i += 1) {
@@ -248,7 +248,7 @@ test('CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () =>
   assert.deepEqual([1, 2, 3, 4, 5, 6].map(widthAfter), [1, 1, 2, 2, 3, 3])
 })
 
-test('CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', () => {
   let state = threeEntries()
   // [Entry, Entry, Entry] → squash 2 → [Squash, Entry]
   const first = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: squashFrame(1) }, state).value
@@ -261,7 +261,7 @@ test('CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', 
   assert.equal(Number(blog.frameEpochOf(second.value)), 2)
 })
 
-test('CTX_012_squash_count_outside_available_range_is_refused', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_count_outside_available_range_is_refused', () => {
   let state = blog.empty
   for (let i = 1; i <= 2; i += 1) {
     state = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i }).value
@@ -281,7 +281,7 @@ test('CTX_012_squash_count_outside_available_range_is_refused', () => {
   assert.deepEqual(blog.frameKinds(all.value), ['Squash'])
 })
 
-test('PERSIST_010_squash_epoch_must_be_the_successor', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] PERSIST_010_squash_epoch_must_be_the_successor', () => {
   const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
 
   for (const nextEpoch of [0, 2, 7]) {
@@ -293,7 +293,7 @@ test('PERSIST_010_squash_epoch_must_be_the_successor', () => {
   }
 })
 
-test('PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
   const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
   const once = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: squashFrame(1) }, state).value
 
@@ -304,7 +304,7 @@ test('PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
 
 // ── reanchor: PrefixCoverage voided, RecordCoverage + frames survive ─────────
 
-test('HOST_006_reanchor_zeroes_prefix_coverage_and_keeps_record_coverage', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_reanchor_zeroes_prefix_coverage_and_keeps_record_coverage', () => {
   let state = threeEntries()
   const framesBefore = blog.frameKinds(state)
   const ingestBefore = blog.coverage(state).ingestedThroughSequence
@@ -331,7 +331,7 @@ test('HOST_006_reanchor_zeroes_prefix_coverage_and_keeps_record_coverage', () =>
   assert.deepEqual(blog.coverableFrameKinds(reanchored), [], 'no probe may be built until prefix coverage rebuilds')
 })
 
-test('HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
   // No frame changed, so a squash already written against the current epoch is
   // still valid after a reanchor. Advancing here would reject it.
   const state = threeEntries()
@@ -344,7 +344,7 @@ test('HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
   assert.equal(squash.ok, true, squash.ok ? '' : squash.error)
 })
 
-test('HOST_006_prefix_coverage_rebuilds_after_a_reanchor_without_rewinding_ingest', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_prefix_coverage_rebuilds_after_a_reanchor_without_rewinding_ingest', () => {
   // Probe capability recovers on its own once a new complete-turn boundary is
   // crossed in the NEW Host numbering. RecordCoverage continues from where Y
   // already was — the next entry must advance the XTrace sequence, not restart.
@@ -371,7 +371,7 @@ test('HOST_006_prefix_coverage_rebuilds_after_a_reanchor_without_rewinding_inges
   })
 })
 
-test('HOST_006_reanchor_is_idempotent_on_the_frame_projection', () => {
+test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_reanchor_is_idempotent_on_the_frame_projection', () => {
   // The prefix projection makes a replay stale via its epoch check; here the
   // operation itself must be safe to apply twice, because the two projections
   // move under one fact.
@@ -384,7 +384,7 @@ test('HOST_006_reanchor_is_idempotent_on_the_frame_projection', () => {
 
 // ── COMPANION-006: a squash rewrites the first half of the frames permanently ─
 
-test('COMPANION_006_squash_rewrites_first_half_of_frames_permanently', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] COMPANION_006_squash_rewrites_first_half_of_frames_permanently', () => {
   let state = blog.empty
   for (let i = 1; i <= 4; i += 1) {
     const result = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i })

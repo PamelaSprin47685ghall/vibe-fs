@@ -164,7 +164,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
+test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
   const config = buildConfig()
   const outcome = managedAgentConfig.configure(config)
   assert.equal(outcome.ok, true, `gate must accept distinct models: ${outcome.error}`)
@@ -176,13 +176,24 @@ test('AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
       assert.equal(entry.mode, 'primary', `${agentName(tier, role)} must be primary`)
       assert.ok(entry.permission && entry.permission['*'] === 'deny', `${agentName(tier, role)} must deny by default`)
       assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0, `${agentName(tier, role)} must carry a prompt`)
-      // AGENT-010: fast and deep carry the same permission set.
+    }
+  }
+})
+
+test('WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set', () => {
+  const config = buildConfig()
+  const outcome = managedAgentConfig.configure(config)
+  assert.equal(outcome.ok, true, outcome.error)
+
+  // AGENT-010: fast and deep carry the same permission set.
+  for (const tier of TIERS) {
+    for (const role of ROLES) {
       assert.deepEqual(allowList(config, agentName(tier, role)), allowList(config, agentName(tier === 'fast' ? 'deep' : 'fast', role)))
     }
   }
 })
 
-test('AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
+test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
   const config = buildConfig()
   const outcome = managedAgentConfig.configure(config)
   assert.equal(outcome.ok, true, outcome.error)
@@ -196,7 +207,7 @@ test('AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
   }
 })
 
-test('AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
+test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
   // The live-config regression: a catalog validation failure used to
   // short-circuit BEFORE any write. EMR-008 made duplicate fast/deep models
   // legal, so the error path is a leftover legacy agent name.
@@ -222,7 +233,7 @@ test('AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
   }
 })
 
-test('AGENT_007_validation_error_is_still_reported', () => {
+test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
   const config = buildConfig()
   config.agent.coder = { model: 'some-model' }
   const outcome = managedAgentConfig.validate(config)
@@ -230,15 +241,19 @@ test('AGENT_007_validation_error_is_still_reported', () => {
   assert.match(outcome.error, /Legacy agent name 'coder'/)
 })
 
-test('AGENT_002_missing_agent_fails_validation', () => {
+test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   const config = buildConfig()
   delete config.agent['deep-coder']
-  const outcome = managedAgentConfig.validate(config)
-  assert.equal(outcome.ok, false)
-  assert.match(outcome.error, /deep-coder/)
+  const outcome = managedAgentConfig.configure(config)
+  assert.equal(outcome.ok, true, outcome.error)
+  const entry = config.agent['deep-coder']
+  assert.equal(entry.mode, 'primary')
+  assert.equal(entry.permission['*'], 'deny')
+  assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0)
+  assert.equal('model' in entry, false)
 })
 
-test('AGENT_004_legacy_agent_name_fails_validation', () => {
+test('WHAT[ENF-010] AGENT_004_legacy_agent_name_fails_validation', () => {
   const config = buildConfig()
   config.agent.coder = { model: 'some-model' }
   const outcome = managedAgentConfig.validate(config)
@@ -246,7 +261,7 @@ test('AGENT_004_legacy_agent_name_fails_validation', () => {
   assert.match(outcome.error, /Legacy agent name 'coder'/)
 })
 
-test('AGENT_002_owned_writes_never_touch_the_model_binding', () => {
+test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () => {
   const config = buildConfig()
   const before = Object.fromEntries(Object.entries(config.agent).map(([k, v]) => [k, v.model]))
   const outcome = managedAgentConfig.configure(config)
@@ -256,7 +271,7 @@ test('AGENT_002_owned_writes_never_touch_the_model_binding', () => {
   }
 })
 
-test('roles.permissions_agree_with_the_host_schema_matrix', () => {
+test('WHAT[ENF-002] roles.permissions_agree_with_the_host_schema_matrix', () => {
   // Same matrix, expressed at the domain layer: the Host permission object is
   // built from Roles.permissions, so the two must agree per role.
   const permissionOf = (toolName) =>
@@ -300,7 +315,7 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
   }
 })
 
-test('AGENT_019_external_directory_overrides_host_default_ask', () => {
+test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', () => {
   // AGENT-019: Host agent.ts defaults external_directory:* = ask. Managed agents
   // must emit a trailing allow so findLast cancels the Host ask on any external path.
   const config = buildConfig()

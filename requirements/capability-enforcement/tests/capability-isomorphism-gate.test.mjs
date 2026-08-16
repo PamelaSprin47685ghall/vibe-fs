@@ -49,13 +49,13 @@ type Role =
     | Reviewer
 `
 
-test('capability_iso_documents_required_tokens', () => {
+test('WHAT[ENF-008] capability_iso_documents_required_tokens', () => {
   assert.deepEqual([...REQUIRED_FRAGMENT_CAPS], ['read', 'glob', 'grep', 'rewrite', 'write'])
   assert.deepEqual([...REQUIRED_SURFACE_TEST_TOKENS], ['JS004', 'layersOf', 'memberBinding'])
   assert.deepEqual([...FORBIDDEN_ROLE_TOKENS], ['Student', 'Teacher'])
 })
 
-test('capability_iso_tool_registry_requires_generator', () => {
+test('WHAT[ENF-012] capability_iso_tool_registry_requires_generator', () => {
   const ok = scanToolRegistry(GOOD_TOOL_REGISTRY)
   assert.equal(ok.length, 0)
 
@@ -68,7 +68,7 @@ test('capability_iso_tool_registry_requires_generator', () => {
   assert.ok(handwritten.some((v) => v.code === 'handwritten-js-tool-spec'))
 })
 
-test('capability_iso_js_fragment_registry_requires_member_caps', () => {
+test('WHAT[ENF-008] capability_iso_js_fragment_registry_requires_member_caps', () => {
   assert.equal(scanJsFragmentRegistry(GOOD_JS_TOOLS).length, 0)
 
   const noModule = scanJsFragmentRegistry('module Other\nlet read: int = 1\n')
@@ -86,7 +86,7 @@ module JsFragmentRegistry =
   assert.ok(missingWrite.some((v) => v.code === 'fragment-all-incomplete'))
 })
 
-test('capability_iso_js_surface_test_requires_layer_tokens', () => {
+test('WHAT[ENF-008] capability_iso_js_surface_test_requires_layer_tokens', () => {
   assert.equal(scanJsSurfaceTest(GOOD_SURFACE_TEST).length, 0)
 
   const bare = scanJsSurfaceTest('test("something", () => {})\n')
@@ -98,7 +98,7 @@ test('capability_iso_js_surface_test_requires_layer_tokens', () => {
   }
 })
 
-test('capability_iso_roles_forbids_student_teacher', () => {
+test('WHAT[ENF-008] capability_iso_roles_forbids_student_teacher', () => {
   assert.equal(scanRoles(GOOD_ROLES).length, 0)
 
   const cases = scanRoles('type Role =\n    | Student\n    | Teacher\n')
@@ -109,7 +109,7 @@ test('capability_iso_roles_forbids_student_teacher', () => {
   assert.ok(dotted.some((v) => v.code === 'forbidden-role'))
 })
 
-test('capability_iso_scan_texts_aggregates', () => {
+test('WHAT[ENF-008] capability_iso_scan_texts_aggregates', () => {
   const green = scanTexts({
     toolRegistry: GOOD_TOOL_REGISTRY,
     jsTools: GOOD_JS_TOOLS,
@@ -129,7 +129,7 @@ test('capability_iso_scan_texts_aggregates', () => {
   assert.ok(red.violations.some((v) => v.code === 'missing-js-tool-generator'))
 })
 
-test('capability_iso_repo_scan_is_green', () => {
+test('WHAT[ENF-008] capability_iso_repo_scan_is_green', () => {
   const result = scanRepo()
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
   assert.equal(result.violations.length, 0)

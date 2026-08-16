@@ -20,7 +20,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('GATE_lock_path_is_stable_per_repo_and_branch', () => {
+test('WHAT[CHGINT-004] GATE_lock_path_is_stable_per_repo_and_branch', () => {
   const first = IntegrationGateModule_lockPath('/repo/a', 'main')
   const second = IntegrationGateModule_lockPath('/repo/a', 'main')
   const otherBranch = IntegrationGateModule_lockPath('/repo/a', 'dev')
@@ -32,7 +32,7 @@ test('GATE_lock_path_is_stable_per_repo_and_branch', () => {
   assert.match(first, /wanxiangshu-publish-[0-9a-f]{64}$/)
 })
 
-test('GATE_acquire_and_release_round_trips', async () => {
+test('WHAT[CHGINT-004] GATE_acquire_and_release_round_trips', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
@@ -47,7 +47,7 @@ test('GATE_acquire_and_release_round_trips', async () => {
   cleanup()
 })
 
-test('GATE_dispose_releases_the_lock', async () => {
+test('WHAT[CHGINT-004] GATE_dispose_releases_the_lock', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
@@ -60,7 +60,7 @@ test('GATE_dispose_releases_the_lock', async () => {
   cleanup()
 })
 
-test('GATE_second_acquire_on_held_lock_eventually_fails', async () => {
+test('WHAT[CHGINT-004] GATE_second_acquire_on_held_lock_eventually_fails', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')

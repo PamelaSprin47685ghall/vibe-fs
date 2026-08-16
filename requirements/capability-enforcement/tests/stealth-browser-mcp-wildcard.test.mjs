@@ -63,7 +63,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_026_wildcard_matrix_mechanism', () => {
+test('WHAT[ENF-007] AGENT_026_wildcard_matrix_mechanism', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
 

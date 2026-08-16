@@ -32,7 +32,7 @@ function sourceFiles(dir) {
 
 const FORBIDDEN = ['context_ratio', 'estimated_tokens_remaining', 'compression_needed']
 
-test('CTX_014_forbidden_field_names_never_appear_in_production_source', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_forbidden_field_names_never_appear_in_production_source', () => {
   for (const file of sourceFiles(NEXT_DIR)) {
     // `Diagnostic.fs` declares the forbidden names themselves (the tombstone
     // list); the claim is that no OTHER source uses them.
@@ -48,7 +48,7 @@ test('CTX_014_forbidden_field_names_never_appear_in_production_source', () => {
   }
 })
 
-test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
   // Expected path: whitelist ok, no console side effect required.
   assert.doesNotThrow(() => diag.emit('reanchor_failed', [['session_id', 'ses_x']]))
 
@@ -75,7 +75,7 @@ test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
   )
 })
 
-test('CTX_014_strength_dry_run_visible_replica_identity_is_observation_only_and_whitelisted', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_strength_dry_run_visible_replica_identity_is_observation_only_and_whitelisted', () => {
   assert.doesNotThrow(() =>
     diag.emit('strength-dry-run-finished', [
       ['session_id', 'ses_owner'],
@@ -85,7 +85,7 @@ test('CTX_014_strength_dry_run_visible_replica_identity_is_observation_only_and_
   )
 })
 
-test('CTX_014_diagnostic_emit_is_silent_by_default_and_observable_on_demand', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_emit_is_silent_by_default_and_observable_on_demand', () => {
   const lines = []
   const w = console.warn
   const e = console.error
@@ -111,7 +111,7 @@ test('CTX_014_diagnostic_emit_is_silent_by_default_and_observable_on_demand', ()
   }
 })
 
-test('CTX_014_diagnostic_records_carry_their_fields', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_records_carry_their_fields', () => {
   const lines = []
   const e = console.error
   const previous = process.env.WANXIANGSHU_DIAG
@@ -134,7 +134,7 @@ test('CTX_014_diagnostic_records_carry_their_fields', () => {
   }
 })
 
-test('CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
   const lines = []
   const e = console.error
   console.error = (line) => lines.push(String(line))
@@ -154,7 +154,7 @@ test('CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
   }
 })
 
-test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
+test('WHAT[CONTEXT-COMPRESSION-013] LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
   // LOOP-010 allowlist: session_id / operation / weighted_distinct_token_count /
   // detector_step / result (+ duration, provider_error). Full loop body is forbidden.
   const allowed = [

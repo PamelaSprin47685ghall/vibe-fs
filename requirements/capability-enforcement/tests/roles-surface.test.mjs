@@ -13,7 +13,7 @@ const { allRoleLabels, permissions, isAllowed } = await import('../../../dist/Fo
 
 // ── surface shape is JS-native ──────────────────────────────────────────────
 
-test('P7_SURFACE_role_labels_are_js_native_strings', () => {
+test('WHAT[ENF-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
   assertJsData(allRoleLabels, 'allRoleLabels')
   assert.equal(allRoleLabels.length, 10, 'exactly ten canonical roles')
   assert.deepEqual(
@@ -23,7 +23,7 @@ test('P7_SURFACE_role_labels_are_js_native_strings', () => {
   )
 })
 
-test('P7_SURFACE_permissions_matrix_matches_the_canonical_roles_matrix', () => {
+test('WHAT[ENF-002] P7_SURFACE_permissions_matrix_matches_the_canonical_roles_matrix', () => {
   // AGENT-001/AGENT-025: Manager/Orchestrator/Coder/Inspector/Browser/Inquiry
   // entitlement sets (the same matrix capability-enforcement pins against the
   // host schema). Values are sorted strings. Static array — no Object.entries
@@ -47,7 +47,7 @@ test('P7_SURFACE_permissions_matrix_matches_the_canonical_roles_matrix', () => {
   assert.deepEqual(permissions('not-a-role'), [], 'unknown role fails closed to empty set')
 })
 
-test('P7_SURFACE_isAllowed_is_default_deny_outside_the_matrix', () => {
+test('WHAT[ENF-002] P7_SURFACE_isAllowed_is_default_deny_outside_the_matrix', () => {
   assert.equal(isAllowed('inquiry', 'Inspect'), true)
   assert.equal(isAllowed('inquiry', 'Sphinx'), true)
   assert.equal(isAllowed('inquiry', 'Fission'), true)

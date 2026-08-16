@@ -24,7 +24,7 @@ const contextOf = (messageID) =>
     messageID,
   })
 
-test('HOST-BOUNDARY-008 bindableRun id equals ToolContext.messageID encoding', () => {
+test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 bindableRun id equals ToolContext.messageID encoding', () => {
   const physical = 'msg_user_1'
   const bound = reviewSeal.bindableRun(physical, [
     msg({ id: physical, role: 'user' }),
@@ -36,7 +36,7 @@ test('HOST-BOUNDARY-008 bindableRun id equals ToolContext.messageID encoding', (
   assert.notEqual(contextOf('msg_other_run').providerRunId, bound.id)
 })
 
-test('HOST-BOUNDARY-008 no bindable run means no ToolContext messageID to treat as the sealed run', () => {
+test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 no bindable run means no ToolContext messageID to treat as the sealed run', () => {
   const physical = 'msg_user_1'
   const none = reviewSeal.bindableRun(physical, [
     msg({ id: physical, role: 'user' }),

@@ -175,7 +175,7 @@ const SAMPLE_LWR = [
 
 // ── early refusal (no spawn) ─────────────────────────────────────────────────
 
-test('ONESHOT_blank_session_is_refused_before_spawn', async () => {
+test('WHAT[DELEG-019] ONESHOT_blank_session_is_refused_before_spawn', async () => {
   const sessions = fakeSessions()
   const settled = resultOf(await runOneShot(bareScope({ sessions }), context(''), 'fast-coder', 'work'))
   assert.equal(settled.ok, false)
@@ -183,7 +183,7 @@ test('ONESHOT_blank_session_is_refused_before_spawn', async () => {
   assert.equal(sessions.calls.create, 0)
 })
 
-test('ONESHOT_missing_prompt_is_refused_before_spawn', async () => {
+test('WHAT[DELEG-019] ONESHOT_missing_prompt_is_refused_before_spawn', async () => {
   const sessions = fakeSessions()
   const settled = resultOf(await runOneShot(bareScope({ sessions }), context(), 'fast-coder', ''))
   assert.equal(settled.ok, false)
@@ -191,7 +191,7 @@ test('ONESHOT_missing_prompt_is_refused_before_spawn', async () => {
   assert.equal(sessions.calls.create, 0)
 })
 
-test('ONESHOT_create_session_failure_surfaces_host_error', async () => {
+test('WHAT[DELEG-019] ONESHOT_create_session_failure_surfaces_host_error', async () => {
   const live = await liveScope({ sessions: fakeSessions({ createError: 'host refused' }) })
   try {
     const settled = resultOf(await runOneShot(live.scope, context(), 'fast-coder', 'work'))
@@ -204,7 +204,7 @@ test('ONESHOT_create_session_failure_surfaces_host_error', async () => {
 
 // ── full lifecycle ───────────────────────────────────────────────────────────
 
-test('ONESHOT_success_reports_outcome_and_disposes_the_child', async () => {
+test('WHAT[DELEG-019] ONESHOT_success_reports_outcome_and_disposes_the_child', async () => {
   const sessions = fakeSessions()
   const live = await liveScope({ sessions, childWorkRecord: SAMPLE_LWR })
 
@@ -236,7 +236,7 @@ test('ONESHOT_success_reports_outcome_and_disposes_the_child', async () => {
   }
 })
 
-test('ONESHOT_completed_without_lifecycle_work_record_fails_closed', async () => {
+test('WHAT[DELEG-011] ONESHOT_completed_without_lifecycle_work_record_fails_closed', async () => {
   // EXEC-028: Completed with formal text but missing LWR must not soft-omit to
   // formal-only Ok — surface as Result.Error.
   const sessions = fakeSessions()
@@ -255,7 +255,7 @@ test('ONESHOT_completed_without_lifecycle_work_record_fails_closed', async () =>
   }
 })
 
-test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', async () => {
+test('WHAT[DELEG-011] ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', async () => {
   // EXEC-028: prove Opening→LWR via real journal (fails if captureOpening is removed).
   // Stubbed childWorkRecord strings cannot catch that production break.
   const sessions = fakeSessions()
@@ -299,7 +299,7 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
   }
 })
 
-test('ONESHOT_parent_work_record_lands_in_the_digest_field', async () => {
+test('WHAT[DELEG-012] ONESHOT_parent_work_record_lands_in_the_digest_field', async () => {
   const sessions = fakeSessions()
   const parentBody = 'the parent background record'
   const live = await liveScope({ sessions, parentWorkRecord: parentBody, childWorkRecord: 'child LWR body' })
@@ -317,7 +317,7 @@ test('ONESHOT_parent_work_record_lands_in_the_digest_field', async () => {
   }
 })
 
-test('ONESHOT_child_inherits_the_parent_directory', async () => {
+test('WHAT[DELEG-019] ONESHOT_child_inherits_the_parent_directory', async () => {
   const sessions = fakeSessions()
   const live = await liveScope({
     sessions,
@@ -339,7 +339,7 @@ test('ONESHOT_child_inherits_the_parent_directory', async () => {
   }
 })
 
-test('ONESHOT_send_failure_is_reported_as_output_not_thrown', async () => {
+test('WHAT[DELEG-019] ONESHOT_send_failure_is_reported_as_output_not_thrown', async () => {
   const sessions = fakeSessions()
   // No journal → the prompt claim fails; run still completes the one-shot.
   const pending = runOneShot(bareScope({ sessions }), context(), 'fast-coder', 'work')
@@ -354,7 +354,7 @@ test('ONESHOT_send_failure_is_reported_as_output_not_thrown', async () => {
   assert.equal(sessions.calls.abort, 1, 'the child is still physically aborted')
 })
 
-test('ONESHOT_aborted_terminal_surfaces_an_error', async () => {
+test('WHAT[DELEG-019] ONESHOT_aborted_terminal_surfaces_an_error', async () => {
   const sessions = fakeSessions()
   const live = await liveScope({ sessions })
 
@@ -369,7 +369,7 @@ test('ONESHOT_aborted_terminal_surfaces_an_error', async () => {
   }
 })
 
-test('ONESHOT_failed_terminal_surfaces_an_error', async () => {
+test('WHAT[DELEG-019] ONESHOT_failed_terminal_surfaces_an_error', async () => {
   const sessions = fakeSessions()
   const live = await liveScope({ sessions })
 
@@ -384,7 +384,7 @@ test('ONESHOT_failed_terminal_surfaces_an_error', async () => {
   }
 })
 
-test('ONESHOT_parent_abort_completes_as_cancelled_and_aborts_the_child', async () => {
+test('WHAT[DELEG-019] ONESHOT_parent_abort_completes_as_cancelled_and_aborts_the_child', async () => {
   const sessions = fakeSessions()
   const live = await liveScope({ sessions })
 

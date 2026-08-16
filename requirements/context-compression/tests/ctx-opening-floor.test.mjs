@@ -67,14 +67,14 @@ const foldOk = (envelopes) => {
   return result.value.AgentProjections
 }
 
-test('CTX_016_pre_t1_floor_is_the_xtrace_head_not_an_activation_cursor', () => {
+test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_pre_t1_floor_is_the_xtrace_head_not_an_activation_cursor', () => {
   // LifeOpened + two XTrace parts; no todowrite accepted yet → Opening still
   // open, Blogger must not start before the XTrace head (structural floor).
   const projections = foldOk([lifeOpened(), partFact({ sequence: 1 }), partFact({ sequence: 2 })])
   assert.equal(Number(floorSequence(SESSION, projections)), 2, 'Pre-T1 floor = XTrace head (exclusive)')
 })
 
-test('CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
+test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
   const base = [lifeOpened(), partFact({ sequence: 1 }), partFact({ sequence: 2 })]
   const without = foldOk(base)
   const withLegacy = foldOk([...base, workActivated()])
@@ -85,7 +85,7 @@ test('CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
   assert.notEqual(after, 42, 'the legacy ProtectedPrefixEndSequence (42) must never be read')
 })
 
-test('CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
+test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
   const floor = { Sequence: 3n }
 
   const coverageBehind = { IngestedThrough: { Sequence: 1n } }

@@ -19,7 +19,7 @@ const settle = () => new Promise((r) => setTimeout(r, 10))
 
 // ── 2. causal rereads exhaust is not permanent loss; second Kick recovers ────
 
-test('EXEC_reconcile_idle_early_then_second_signal_completes', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_early_then_second_signal_completes', async () => {
   const sid = sessionId('ses_idle_early_second')
   const physical = physicalUser('user-1')
   const turns = []
@@ -68,7 +68,7 @@ test('EXEC_reconcile_idle_early_then_second_signal_completes', async () => {
 
 // ── 3. consecutive snapshot errors do not consume rereads; Ok resets ─────────
 
-test('EXEC_reconcile_consecutive_errors_retry_until_ok_terminal', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_consecutive_errors_retry_until_ok_terminal', async () => {
   const sid = sessionId('ses_err_reread_reset')
   const physical = physicalUser('user-1')
   const turns = []
@@ -107,7 +107,7 @@ test('EXEC_reconcile_consecutive_errors_retry_until_ok_terminal', async () => {
 // snapshot stays ok:false (production path never builds SnapshotError evidence;
 // GetMessages Error recurses outside decideStep). Default maxConsecutiveErrors=5.
 
-test('EXEC_reconcile_persistent_errors_stop_pass_bounded', async () => {
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_persistent_errors_stop_pass_bounded', async () => {
   const sid = sessionId('ses_err_bounded')
   const physical = physicalUser('user-1')
   const turns = []

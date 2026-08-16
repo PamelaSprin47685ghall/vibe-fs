@@ -84,7 +84,7 @@ const foldErr = (envelopes) => {
 
 // ── ENFORCER-045: coverage laws ─────────────────────────────────────────────
 
-test('ENFORCER_045_coverage_strictly_advances_across_commits', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] ENFORCER_045_coverage_strictly_advances_across_commits', () => {
   const s = foldOk([
     entryWithEnforcement({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1, run: 'msg_r1' }),
     entryWithEnforcement({ from: 1, to: 3, cutoffFrom: 1, cutoffTo: 2, n: 2, run: 'msg_r2' }),
@@ -95,7 +95,7 @@ test('ENFORCER_045_coverage_strictly_advances_across_commits', () => {
   assert.equal(s.Blog.Coverage.CoverableTurnCutoffExclusive, 2)
 })
 
-test('ENFORCER_045_zero_advance_rejected', () => {
+test('WHAT[CONTEXT-COMPRESSION-015] ENFORCER_045_zero_advance_rejected', () => {
   const error = foldErr([
     entryWithEnforcement({ from: 1, to: 1, cutoffFrom: 0, cutoffTo: 0, n: 1, run: 'msg_zero' }),
   ])
@@ -104,7 +104,7 @@ test('ENFORCER_045_zero_advance_rejected', () => {
 
 // ── squash stays coverage-neutral ───────────────────────────────────────────
 
-test('CTX_012_squash_does_not_advance_coverage', () => {
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_does_not_advance_coverage', () => {
   const squash = next(
     fact('BlogObservationsSquashed', {
       SessionId: session,

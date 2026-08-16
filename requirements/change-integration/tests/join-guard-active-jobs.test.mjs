@@ -16,7 +16,7 @@ import {
   worktreePath,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
+test('WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
   let jobs = orchestratorProjection.empty
   jobs = orchestratorProjection.createJob(
     {

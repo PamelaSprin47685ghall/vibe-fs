@@ -49,7 +49,7 @@ const scope = new ToolRuntimeScope(
 
 const names = (spec) => listItems(spec.Arguments).map(([name]) => name)
 
-test('DELEG_021_022_public_delegation_surfaces_are_exact', () => {
+test('WHAT[DELEG-022] DELEG_021_022_public_delegation_surfaces_are_exact', () => {
   assert.deepEqual(names(managerSpec(factory, scope)), [
     'calling',
     'name',
@@ -81,13 +81,13 @@ test('DELEG_021_022_public_delegation_surfaces_are_exact', () => {
   ])
 })
 
-test('DELEG_021_attach_belongs_only_to_fork_not_commission_or_sync_delegate', () => {
+test('WHAT[DELEG-021] DELEG_021_attach_belongs_only_to_fork_not_commission_or_sync_delegate', () => {
   for (const spec of [orchestratorSpec(factory, scope), inspectSpec(factory, scope, undefined), establishSpec(factory, scope, undefined), repairSpec(factory, scope, undefined)]) {
     assert.ok(!names(spec).includes('attach'))
   }
 })
 
-test('DELEG_022_never_reuses_host_maxSteps_as_the_estimate', () => {
+test('WHAT[DELEG-022] DELEG_022_never_reuses_host_maxSteps_as_the_estimate', () => {
   const files = [
     '../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs',
     '../../../src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs',

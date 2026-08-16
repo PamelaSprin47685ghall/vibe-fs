@@ -13,12 +13,12 @@ import {
   runtimeNudge,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_016_join_guard_continuation_kind_is_parseable', () => {
+test('WHAT[INTERACTION-AUTHORITY-014] EXEC_016_join_guard_continuation_kind_is_parseable', () => {
   const kind = continuationKind.of('JoinGuard')
   assert.equal(caseOf(promptOrigin.continuation(kind)), 'Continuation')
 })
 
-test('EXEC_016_join_guard_text_demands_join_before_finish', () => {
+test('WHAT[INTERACTION-AUTHORITY-014] EXEC_016_join_guard_text_demands_join_before_finish', () => {
   assert.deepEqual(runtimeNudge.backgroundJoinGuardInstructions, [
     'Work remains away.',
     '',

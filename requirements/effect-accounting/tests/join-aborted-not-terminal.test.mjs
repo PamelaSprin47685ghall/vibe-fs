@@ -14,7 +14,7 @@ const AGENT = 'fast-coder'
 const HANDLE = handleId.agent('h-abort')
 const CHILD = sessionId('ses_child_abort')
 
-test('P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotMissing(),
@@ -23,7 +23,7 @@ test('P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal', () => {
   assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
-test('P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableUnknown(),
     childRecovery.snapshotActive(),
@@ -33,7 +33,7 @@ test('P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
   assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
-test('P0_RECOVERY_JOIN_001_aborted_with_session_active_is_recovered_active', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_with_session_active_is_recovered_active', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotActive(),
@@ -43,7 +43,7 @@ test('P0_RECOVERY_JOIN_001_aborted_with_session_active_is_recovered_active', () 
 })
 
 // Mid-turn: readable non-terminal snapshot + SessionActive → RecoveredActive (permit-eligible).
-test('P0_RECOVERY_JOIN_001_mid_turn_snapshot_active_with_session_active_is_recovered_active', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_mid_turn_snapshot_active_with_session_active_is_recovered_active', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotActive(),
@@ -53,7 +53,7 @@ test('P0_RECOVERY_JOIN_001_mid_turn_snapshot_active_with_session_active_is_recov
 })
 
 // True unreadable → RecoveryIncomplete (wait); never RecoveryBlocked solely from unreadable.
-test('P0_RECOVERY_JOIN_001_true_unreadable_is_recovery_incomplete', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_true_unreadable_is_recovery_incomplete', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotUnreadable('GetMessages network error'),
@@ -62,13 +62,13 @@ test('P0_RECOVERY_JOIN_001_true_unreadable_is_recovery_incomplete', () => {
   assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
-test('P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
   const empty = childRecovery.evidenceCompleted(AGENT, HANDLE, CHILD, '')
   const result = childRecovery.tryFromProvenTerminal(empty)
   assert.equal(result.ok, false)
 })
 
-test('P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
   // Clean-break: tryFromDurableCompleted deleted; any kind+body is permanent Error.
   const result = childRecovery.tryFromDurableCompleted(
     AGENT,
@@ -81,7 +81,7 @@ test('P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
   assert.match(String(result.error), /deleted|not joinable|Cancelled|fromDecoded/i)
 })
 
-test('P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export', () => {
   const names = childRecovery.joinableCompletionExports()
   assert.ok(
     names.every((n) => !/fromAborted|FromAborted/i.test(n)),
@@ -89,7 +89,7 @@ test('P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export', () =>
   )
 })
 
-test('P0_RECOVERY_JOIN_001_proven_terminal_then_joinable', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_proven_terminal_then_joinable', () => {
   const evidence = childRecovery.evidenceCompleted(AGENT, HANDLE, CHILD, '{"status":"ok"}')
   const proof = childRecovery.tryFromProvenTerminal(evidence)
   assert.equal(proof.ok, true)
@@ -101,7 +101,7 @@ test('P0_RECOVERY_JOIN_001_proven_terminal_then_joinable', () => {
   assert.equal(caseOf(resolution), 'RecoveredTerminal')
 })
 
-test('P0_RECOVERY_JOIN_001_durable_completed_awaiting_join_is_joinable', () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_durable_completed_awaiting_join_is_joinable', () => {
   const evidence = childRecovery.evidenceCompleted(AGENT, HANDLE, CHILD, 'body-ok')
   const proof = childRecovery.tryFromProvenTerminal(evidence)
   assert.equal(proof.ok, true)

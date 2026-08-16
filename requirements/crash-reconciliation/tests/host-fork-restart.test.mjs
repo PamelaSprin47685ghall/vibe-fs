@@ -96,7 +96,7 @@ const recoveredOf = (result) => {
 
 // ── journal-only walk (no live runtime) ──────────────────────────────────────
 
-test('HFR_restart_empty_journal_yields_no_linked_handles', async () => {
+test('WHAT[CRASH-002] HFR_restart_empty_journal_yields_no_linked_handles', async () => {
   await withJournal(async (j) => {
     const result = await restoreLinkedChildrenWithoutRuntime(undefined, j, PARENT)
     assert.equal(caseOf(result), 'NoLinkedHandles')
@@ -105,7 +105,7 @@ test('HFR_restart_empty_journal_yields_no_linked_handles', async () => {
 
 // ── live-runtime walk: children re-enlisted, runtime restored ────────────────
 
-test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () => {
+test('WHAT[CRASH-002] HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'term1', CHILD, 'deep-coder')
     await completeTerminal(j, 'term1', CHILD)
@@ -127,7 +127,7 @@ test('HFR_restart_completed_terminal_re_enlists_child_into_runtime', async () =>
   })
 })
 
-test('HFR_restart_active_with_terminal_snapshot_recovered_terminal', async () => {
+test('WHAT[CRASH-002] HFR_restart_active_with_terminal_snapshot_recovered_terminal', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'snap1', CHILD, 'fast-coder')
 
@@ -152,7 +152,7 @@ test('HFR_restart_active_with_terminal_snapshot_recovered_terminal', async () =>
   })
 })
 
-test('HFR_restart_multiple_children_recovered_in_link_order', async () => {
+test('WHAT[CRASH-015] HFR_restart_multiple_children_recovered_in_link_order', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'a-first', sessionId('ses_a'), 'alpha')
     await linkDurable(j, 'b-second', sessionId('ses_b'), 'beta')
@@ -193,7 +193,7 @@ const recordBlob = async (j, agentId, body) => {
   assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
 }
 
-test('HFR_restart_legacy_false_abort_waits_with_rejection_fact', async () => {
+test('WHAT[CRASH-015] HFR_restart_legacy_false_abort_waits_with_rejection_fact', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'legacy1', CHILD, 'fast-coder')
     await recordBlob(j, 'legacy1', LEGACY_ABORT_BODY('legacy1'))
@@ -212,7 +212,7 @@ test('HFR_restart_legacy_false_abort_waits_with_rejection_fact', async () => {
   })
 })
 
-test('HFR_restart_retired_legacy_false_abort_migrates_replacement_once', async () => {
+test('WHAT[CRASH-015] HFR_restart_retired_legacy_false_abort_migrates_replacement_once', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'legacy2', CHILD, 'fast-coder')
     await recordBlob(j, 'legacy2', LEGACY_ABORT_BODY('legacy2'))
@@ -242,7 +242,7 @@ test('HFR_restart_retired_legacy_false_abort_migrates_replacement_once', async (
   })
 })
 
-test('HFR_restart_invalid_completion_blob_waits', async () => {
+test('WHAT[CRASH-015] HFR_restart_invalid_completion_blob_waits', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'bad1', CHILD, 'fast-coder')
     await recordBlob(j, 'bad1', INVALID_BODY)
@@ -259,7 +259,7 @@ test('HFR_restart_invalid_completion_blob_waits', async () => {
 
 // ── ChildRecoveryWorkflow branches (recoverChild) ────────────────────────────
 
-test('HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', async () => {
+test('WHAT[CRASH-005] HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'unreadable1', CHILD, 'fast-coder')
     const snapshot = reconcileSupervisor.createSnapshot([{ ok: false, error: 'transcript vanished' }])

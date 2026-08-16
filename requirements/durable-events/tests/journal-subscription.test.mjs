@@ -40,7 +40,7 @@ const appendHandleLinked = async (journal, parent = 'ses_p', child = 'ses_c', ag
   return agentJournal.appendAgent(stream.session(sessionId(parent)), undefined, fact, journal)
 }
 
-test('EXEC_journal_revision_advances_only_on_successful_fold', async () => {
+test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful_fold', async () => {
   await withJournal(async (journal) => {
     const before = journalRevision.value(agentJournal.revision(journal))
     assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
@@ -53,7 +53,7 @@ test('EXEC_journal_revision_advances_only_on_successful_fold', async () => {
   })
 })
 
-test('EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
+test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
   await withJournal(async (journal) => {
     const from = agentJournal.revision(journal)
     const linked = await appendHandleLinked(journal)
@@ -69,7 +69,7 @@ test('EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
   })
 })
 
-test('EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
+test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
   await withJournal(async (journal) => {
     const from = agentJournal.revision(journal)
     const pending = agentJournal.awaitChangeFrom(from, journal)

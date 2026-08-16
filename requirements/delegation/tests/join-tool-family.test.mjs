@@ -90,7 +90,7 @@ const scopeFor = async ({ engineTask, mailbox }) => {
 
 const run = async (scope, session = 'ses_join') => spec(scope).Execute({}, context(session))
 
-test('JOINFAM_orchestrator_drains_published_verdicts', async () => {
+test('WHAT[DELEG-014] JOINFAM_orchestrator_drains_published_verdicts', async () => {
   const mailbox = verdictMailbox()
   publish(mailbox, OrchestratorVerdict.Empty)
   const live = await scopeFor({ mailbox })
@@ -99,14 +99,14 @@ test('JOINFAM_orchestrator_drains_published_verdicts', async () => {
   live.cleanup()
 })
 
-test('JOINFAM_orchestrator_empty_mailbox_still_reports_completed', async () => {
+test('WHAT[DELEG-014] JOINFAM_orchestrator_empty_mailbox_still_reports_completed', async () => {
   const live = await scopeFor({ mailbox: verdictMailbox() })
   const wire = await run(live.scope)
   assert.match(wire, /There is nothing away to receive/i)
   live.cleanup()
 })
 
-test('JOINFAM_orchestrator_engine_failure_is_a_natural_consequence', async () => {
+test('WHAT[DELEG-014] JOINFAM_orchestrator_engine_failure_is_a_natural_consequence', async () => {
   const live = await scopeFor({ engineTask: Promise.resolve({ tag: 1, fields: ['engine exploded'] }) })
   const wire = await run(live.scope)
   assert.match(wire, /orchestrator is not ready to join yet/i)

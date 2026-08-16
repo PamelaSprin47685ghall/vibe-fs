@@ -55,7 +55,7 @@ const applyHook = (hook, input, output) => {
   if (typeof next === 'function') next(output)
 }
 
-test('CHAT_PARAMS_parented_session_requires_provider_message_binding', async () => {
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_provider_message_binding', async () => {
   const child = sessionId('ses_chat_params_child')
   const sessions = createSessionPort(
     { CreateChildSession: async () => ({ tag: 0, fields: [child] }) },
@@ -73,7 +73,7 @@ test('CHAT_PARAMS_parented_session_requires_provider_message_binding', async () 
   assert.equal(output.model.modelID, 'fast-haiku', 'chat.params never rewrites Host output')
 })
 
-test('CHAT_PARAMS_agent_less_root_does_not_invent_binding_from_journal', async () => {
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_agent_less_root_does_not_invent_binding_from_journal', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-chat-params-'))
   const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))

@@ -8,7 +8,7 @@ import { childRecovery, sessionId } from '../../verification-system/tests/suppor
 const CHILD = sessionId('ses_trace_child')
 const AGENT = 'fast-coder'
 
-test('P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
   const events = [
     childRecovery.rawAbortObserved(CHILD),
     childRecovery.childRecoveryStarted(CHILD),
@@ -19,7 +19,7 @@ test('P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), true)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
   const events = [
     childRecovery.childRecoveryStarted(CHILD),
     childRecovery.handleCompletionCommitted(AGENT),
@@ -28,7 +28,7 @@ test('P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), false)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
   const events = [
     childRecovery.terminalProofIssued(AGENT),
     childRecovery.joinReturned(AGENT, childRecovery.finalitySucceeded('body')),
@@ -36,7 +36,7 @@ test('P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), false)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
   const events = [
     childRecovery.handleCompletionCommitted(AGENT),
     childRecovery.terminalProofIssued(AGENT),
@@ -45,7 +45,7 @@ test('P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), false)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
   const events = [
     childRecovery.rawAbortObserved(CHILD),
     childRecovery.handleCompletionCommitted(AGENT),
@@ -55,7 +55,7 @@ test('P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), false)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
   const events = [
     childRecovery.terminalProofIssued(AGENT),
     childRecovery.handleCompletionCommitted(AGENT),
@@ -65,7 +65,7 @@ test('P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit(events), false)
 })
 
-test('P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
   assert.equal(childRecovery.joinReturnedImpliesProofBeforeCommit([]), true)
   assert.equal(
     childRecovery.joinReturnedImpliesProofBeforeCommit([childRecovery.rawAbortObserved(CHILD)]),
@@ -73,7 +73,7 @@ test('P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
   )
 })
 
-test('P0_RECOVERY_JOIN_001_trace_wrong_agent_proof_does_not_satisfy_join', () => {
+test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_wrong_agent_proof_does_not_satisfy_join', () => {
   const events = [
     childRecovery.terminalProofIssued('other-agent'),
     childRecovery.handleCompletionCommitted(AGENT),

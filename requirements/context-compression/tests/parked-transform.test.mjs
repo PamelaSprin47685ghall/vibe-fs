@@ -9,7 +9,7 @@ import { bloggerRequestContext as ctx, parkedTransform } from '../../verificatio
 const SHORT_LIFETIME_MS = 200
 const main = (toml = 'delta-1') => ctx.main({ toml })
 
-test('ENFORCER_160_park_resolves_true_on_resume_and_removes_the_entry', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_park_resolves_true_on_resume_and_removes_the_entry', async () => {
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
   assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), true)
@@ -20,7 +20,7 @@ test('ENFORCER_160_park_resolves_true_on_resume_and_removes_the_entry', async ()
   assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('ENFORCER_162_cancel_resolves_false_and_releases_the_waiter', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_resolves_false_and_releases_the_waiter', async () => {
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
 
@@ -29,7 +29,7 @@ test('ENFORCER_162_cancel_resolves_false_and_releases_the_waiter', async () => {
   assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('ENFORCER_160_a_timed_out_park_resolves_false_fail_closed', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_a_timed_out_park_resolves_false_fail_closed', async () => {
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, 'ses-blogger', SHORT_LIFETIME_MS)
 
@@ -37,7 +37,7 @@ test('ENFORCER_160_a_timed_out_park_resolves_false_fail_closed', async () => {
   assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('ENFORCER_050_an_offer_staged_before_the_park_is_consumed_by_the_park', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_staged_before_the_park_is_consumed_by_the_park', async () => {
   const scope = parkedTransform.scope()
   const resumed = parkedTransform.offerParked(scope, 'ses-blogger', main('delta-1'))
   assert.equal(resumed, false)
@@ -51,7 +51,7 @@ test('ENFORCER_050_an_offer_staged_before_the_park_is_consumed_by_the_park', asy
   assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), undefined)
 })
 
-test('ENFORCER_050_an_offer_to_a_parked_transform_resumes_it_with_the_context', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_to_a_parked_transform_resumes_it_with_the_context', async () => {
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
 
@@ -63,7 +63,7 @@ test('ENFORCER_050_an_offer_to_a_parked_transform_resumes_it_with_the_context', 
   assert.equal(staged.toml, 'delta-2')
 })
 
-test('ENFORCER_050_staged_context_is_consumed_only_once', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_staged_context_is_consumed_only_once', async () => {
   const scope = parkedTransform.scope()
   parkedTransform.offerParked(scope, 'ses-blogger', main('once'))
   const first = parkedTransform.consumeStaged(scope, 'ses-blogger')
@@ -72,7 +72,7 @@ test('ENFORCER_050_staged_context_is_consumed_only_once', async () => {
   assert.equal(second, undefined)
 })
 
-test('ENFORCER_160_two_parks_for_one_session_share_one_waiter', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_parks_for_one_session_share_one_waiter', async () => {
   const scope = parkedTransform.scope()
   const first = parkedTransform.park(scope, 'ses-blogger', 60_000)
   const second = parkedTransform.park(scope, 'ses-blogger', 60_000)
@@ -83,7 +83,7 @@ test('ENFORCER_160_two_parks_for_one_session_share_one_waiter', async () => {
   assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('ENFORCER_162_dispose_cancels_every_parked_waiter', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_dispose_cancels_every_parked_waiter', async () => {
   const scope = parkedTransform.scope()
   const a = parkedTransform.park(scope, 'ses-a', 60_000)
   const b = parkedTransform.park(scope, 'ses-b', 60_000)
@@ -95,7 +95,7 @@ test('ENFORCER_162_dispose_cancels_every_parked_waiter', async () => {
   assert.equal(parkedTransform.hasParked(scope, 'ses-b'), false)
 })
 
-test('ENFORCER_162_cancel_clears_staged_context_with_or_without_waiter', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_clears_staged_context_with_or_without_waiter', async () => {
   const scope = parkedTransform.scope()
 
   // Staged only (offer-first, no park yet).
@@ -113,7 +113,7 @@ test('ENFORCER_162_cancel_clears_staged_context_with_or_without_waiter', async (
   assert.equal(await waiter, true)
 })
 
-test('ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
   const scope = parkedTransform.scope()
   const a = parkedTransform.park(scope, 'ses-a', 60_000)
 
@@ -126,7 +126,7 @@ test('ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
   assert.equal(await a, false)
 })
 
-test('ENFORCER_047_CurrentRequest_is_physical_flight_ownership', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flight_ownership', () => {
   // PR7 D6: flight registry is the sole ownership authority (no State.InFlight shadow).
   const scope = parkedTransform.scope()
   const key = 'ses-blogger'

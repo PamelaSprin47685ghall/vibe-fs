@@ -17,7 +17,7 @@ const mustOk = (result) => {
   return payloadOf(result)
 }
 
-test('create_is_read_only_until_the_first_business_append', async () => {
+test('WHAT[DURABLE-EVENTS-020] create_is_read_only_until_the_first_business_append', async () => {
   const local = createLocalEventStore({ writerId: 'journal-writer-proof' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_es'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
@@ -32,7 +32,7 @@ test('create_is_read_only_until_the_first_business_append', async () => {
   }
 })
 
-test('append_adds_one_local_line_and_Current_is_already_integrated', async () => {
+test('WHAT[DURABLE-EVENTS-006] append_adds_one_local_line_and_Current_is_already_integrated', async () => {
   const local = createLocalEventStore({ writerId: 'journal-append-proof' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_es_append'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
@@ -50,7 +50,7 @@ test('append_adds_one_local_line_and_Current_is_already_integrated', async () =>
   }
 })
 
-test('BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
+test('WHAT[DURABLE-EVENTS-012] BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
   const local = createLocalEventStore({ writerId: 'journal-blob-proof' })
   try {
     const [writer] = await createFn(runtimeId('rt_es_blob'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
@@ -65,7 +65,7 @@ test('BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Gi
   }
 })
 
-test('appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
+test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
   const local = createLocalEventStore({ writerId: 'journal-closure-proof' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_es_closure'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
@@ -96,7 +96,7 @@ test('appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async (
   }
 })
 
-test('closure_fails_closed_when_a_real_content_address_is_missing', async () => {
+test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_is_missing', async () => {
   const local = createLocalEventStore({ writerId: 'journal-closure-missing' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_es_missing'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
@@ -124,7 +124,7 @@ test('closure_fails_closed_when_a_real_content_address_is_missing', async () => 
   }
 })
 
-test('journal_writer_source_has_no_snapshot_CAS_or_Git_raw_store', async () => {
+test('WHAT[DURABLE-EVENTS-012] journal_writer_source_has_no_snapshot_CAS_or_Git_raw_store', async () => {
   const { readFile } = await import('node:fs/promises')
   const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /OpenSnapshot|CompareAndSwapRef|IGitRawStore|RootOid|StoreSnapshot/)

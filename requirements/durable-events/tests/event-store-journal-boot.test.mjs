@@ -15,7 +15,7 @@ const SESSION = sessionId('ses_es_boot')
 const CLOSED = agentFact('CompanionBloggerClosed', { SessionId: SESSION })
 const mustOk = (r) => { assert.equal(caseOf(r), 'Ok'); return payloadOf(r) }
 
-test('restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
+test('WHAT[DURABLE-EVENTS-013] restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
   const first = createLocalEventStore({ writerId: 'boot-writer-a' })
   try {
     const [writer, init] = await createFn(runtimeId('rt_before'), 4242, utcOffset('2026-04-01T00:00:00Z'), first.store)
@@ -37,7 +37,7 @@ test('restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1
   }
 })
 
-test('empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
+test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
   const local = createLocalEventStore({ writerId: 'boot-empty' })
   try {
     const resumed = mustOk(await resumeFn(runtimeId('rt_empty'), 6001, utcOffset('2026-05-01T00:00:00Z'), local.store))
@@ -50,7 +50,7 @@ test('empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activatio
   }
 })
 
-test('boot_and_live_use_one_CanonicalIntegrator_program', async () => {
+test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs', import.meta.url), 'utf8')
   const writer = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')

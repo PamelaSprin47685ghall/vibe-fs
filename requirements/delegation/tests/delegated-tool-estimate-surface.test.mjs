@@ -12,13 +12,13 @@ const { replace, observe, remaining, countedCallCount } = await import(
   '../../../dist/Execution/Delegation/DelegatedToolEstimateSurface.js'
 )
 
-test('P9_ESTIMATE_SURFACE_state_is_js_native_data', () => {
+test('WHAT[DELEG-022] P9_ESTIMATE_SURFACE_state_is_js_native_data', () => {
   const state = replace(3)
   assertJsData(state, 'estimate state')
   assert.deepEqual(state, { Remaining: 3, Counted: [] })
 })
 
-test('DELEG_022_replace_sets_exact_remaining_and_clears_prior_counted_calls', () => {
+test('WHAT[DELEG-022] DELEG_022_replace_sets_exact_remaining_and_clears_prior_counted_calls', () => {
   let state = replace(3)
   state = observe('call-1', state)
   state = observe('call-2', state)
@@ -31,7 +31,7 @@ test('DELEG_022_replace_sets_exact_remaining_and_clears_prior_counted_calls', ()
   assert.equal(countedCallCount(replaced), 0)
 })
 
-test('DELEG_022_each_distinct_real_tool_call_decrements_once_and_saturates_at_zero', () => {
+test('WHAT[DELEG-022] DELEG_022_each_distinct_real_tool_call_decrements_once_and_saturates_at_zero', () => {
   let state = replace(2)
   state = observe('call-1', state)
   assert.equal(remaining(state), 1)
@@ -50,7 +50,7 @@ test('DELEG_022_each_distinct_real_tool_call_decrements_once_and_saturates_at_ze
   assert.equal(countedCallCount(state), 2, 'zero stops dedupe evidence growth')
 })
 
-test('DELEG_022_projection_is_incremental_not_a_transcript_or_xtrace_scan', () => {
+test('WHAT[DELEG-022] DELEG_022_projection_is_incremental_not_a_transcript_or_xtrace_scan', () => {
   const source = readFileSync(
     new URL('../../../src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs', import.meta.url),
     'utf8',
