@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. Local EventStore append contract; online Git store removed.
-// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs'

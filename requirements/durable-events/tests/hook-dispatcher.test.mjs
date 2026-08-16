@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. Rewritten for the shock-cut hook architecture.
-// Intentionally NOT executed before implementation.
 // DURABLE-EVENTS-018 / DURABLE-CONVERGENCE-008.
 
 import assert from 'node:assert/strict'

@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. WorkspaceEventStore owns one process writer + one Integrator per git common-dir.
-// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'

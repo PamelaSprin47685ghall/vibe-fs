@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. Shock-cut append-only laws for process NDJSON.
-// Intentionally NOT executed before implementation.
 
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'

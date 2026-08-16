@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. Written before implementation by explicit user request.
-// Intentionally NOT executed before implementation.
 //
 // DURABLE-EVENTS-004/005/010/011/017:
 // local truth is one unbounded .git/wanxiang/events/<WriterId>.ndjson per process;

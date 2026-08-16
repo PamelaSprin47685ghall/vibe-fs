@@ -1,5 +1,3 @@
-// FROZEN — 2026-08-14. Written before implementation by explicit user request.
-// Intentionally NOT executed before implementation.
 //
 // DURABLE-EVENTS-013/014/019: one canonical F# CE Integrator owns history iteration.
 // Business modules register single-event integration rules and read Current; they never replay history themselves.
