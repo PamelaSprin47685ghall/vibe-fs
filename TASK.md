@@ -4080,30 +4080,38 @@ surface 应跟着 semantic owner 分布。
 
 建立统一 JS-native validator。**完成条件：**Fable runtime value 无法意外穿过新 surface。**达成：**`js-contract.mjs`（assertJsData/assertOpaque）+ charter「注册 surface 必有契约测试」门禁。
 
-### P6 — Pure/algebra wave ✅（首批）
+### P6 — Pure/algebra wave — IN PROGRESS
 
-大量迁 projection/decision/codec/policy tests。**完成条件：**`domain.mjs` 使用量明显下降。**达成：**6 个注册 surface（ForkChildPayload/SyntheticToml/BloggerToml/Quiescence/DelegatedToolEstimate），13 个测试文件迁移，债务 3185→3171、文件 316→312。
+大量迁 projection/decision/codec/policy tests。**完成条件：**`domain.mjs` 使用量明显下降。**已达成（首批）：**6 个注册 surface（ForkChildPayload/SyntheticToml/BloggerToml/Quiescence/DelegatedToolEstimate），13 个测试文件迁移，债务 3185→3171、文件 316→312。
 
-### P7 — Resource/runtime wave ✅（首波）
+**现状（PR 0 裁决）：pilot validated; systemic migration not yet achieved。** 债务下降 14 行只证明 pilot 能工作，不证明 pure/algebra 世界已切换到 semantic surfaces；225 文件仍携带债务（js-boundary-baseline），328 文件仍 import domain.mjs。
+
+### P7 — Resource/runtime wave — NOT PROVEN
 
 迁 stateful runtime。
 
 **完成条件：**普通测试不再扫描 instance mangling。
-**达成：**`RolesSurface`（第 7 个注册 surface，Role/ToolPermission 以 string 跨界，default-deny）；label 唯一表示上移 `Roles.fs`，ManagedAgentCatalog 委托；5 个测试文件（agent-permission-gate/inquiry-permissions/prompt-semantic-depth/js-surface/manager-finality-disposition）迁移；`Roles_isAllowed` 与 `roles.permissions` 用法清零，债务 3171→3169。
+**已达成（首波）：**`RolesSurface`（第 7 个注册 surface，Role/ToolPermission 以 string 跨界，default-deny）；label 唯一表示上移 `Roles.fs`，ManagedAgentCatalog 委托；5 个测试文件迁移；`Roles_isAllowed` 与 `roles.permissions` 用法清零，债务 3171→3169。
 
-### P8 — Effect/integration wave ✅（增量）
+**现状（PR 0 裁决）：NOT PROVEN。** `RolesSurface` 是 vocabulary/policy surface，不证明 resource lifecycle（create/mutate/concurrency/lifetime/dispose/observable state transition）。真正能作为 stateful pilot 的是 `QuiescenceSurface`（P4 已达成）；resource/runtime wave 的完成条件（普通测试不再扫描 instance mangling）尚未整体达成——P10 wave-2 未提交改动（已 stash）显示大量 runtime 测试仍依赖 mangled method discovery。
+
+### P8 — Effect/integration wave — NOT PROVEN
 
 迁 Host/effect tests。
 
 **完成条件：**contractual effect 成为 observable，而不是 private choreography。
-**达成：**CLN-08 执行 census 裁决——删除 `FactCodec.migrateManagerJobByname`（零测试零真实数据，decode 链私有步骤退役）；剩余 101 处 `roles.of('X')` 传 Fable API 属 P10 API 层翻译范围。
+**已达成（增量）：**CLN-08 执行 census 裁决——删除 `FactCodec.migrateManagerJobByname`（零测试零真实数据，decode 链私有步骤退役）。
 
-### P9 — Delete legacy adapters ✅（增量）
+**现状（PR 0 裁决）：NOT PROVEN。** 删 dead compatibility code 是好事，但它不是 effect decision → effect request → interpreter → result → semantic observation 的重构证据。不得拿别的 cleanup 工作给当前 milestone 充数。
+
+### P9 — Delete legacy adapters — IN PROGRESS
 
 逐 family 删除 `domain/*` adapters。
 
 **完成条件：**semantic tests 不再 import `domain.mjs`。
-**达成：**删除六个零引用零依赖死 adapter（forkChildPayload/processEstimate/packageResources/orchestratorProgram/setCount/setContains），-106 行；328 文件仍 import domain.mjs（后续 wave）。
+**已达成（增量）：**删除六个零引用零依赖死 adapter（forkChildPayload/processEstimate/packageResources/orchestratorProgram/setCount/setContains），-106 行。
+
+**现状（PR 0 裁决）：exit condition NOT MET。** 328 文件仍 import domain.mjs（后续 wave）。
 
 ### P10 — Quarantine Fable
 
