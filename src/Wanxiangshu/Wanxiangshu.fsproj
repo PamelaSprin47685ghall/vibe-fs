@@ -471,6 +471,7 @@
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
+    <Compile Include="Persistence/Journal/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Lifecycle.fs"/>
     <Compile Include="OpenCode/Tools/FetchTool.fs"/>

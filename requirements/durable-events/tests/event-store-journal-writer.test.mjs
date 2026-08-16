@@ -1,127 +1,138 @@
 // Journal is a semantic adapter over local process NDJSON.
 
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { agentFact, blobDigest, blobRef, caseOf, idValue, managerLifecycle, managerLifeId, payloadOf, physicalUser, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
-const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const CLOSED_AGENT = agentFact('CompanionBloggerClosed', { SessionId: sessionId('ses_es_writer') })
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
-const createFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_create'))?.[1]
-const mustOk = (result) => {
-  assert.equal(caseOf(result), 'Ok', `expected Ok, got ${caseOf(result)}`)
-  return payloadOf(result)
+const CLOSED_AGENT = {
+  family: 'Companion',
+  case: 'CompanionBloggerClosed',
+  payload: { SessionId: 'ses_es_writer' },
+}
+
+const mustOk = (result, label) => {
+  assert.equal(result.ok, true, `${label}: ${JSON.stringify(result.error)}`)
+  return result
+}
+
+const withRepo = (writerId, fn) => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
+  execFileSync('git', ['init', '--quiet', repo])
+  const commonDir = join(repo, '.git')
+  return fn(commonDir)
+    .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
 test('WHAT[DURABLE-EVENTS-020] create_is_read_only_until_the_first_business_append', async () => {
-  const local = createLocalEventStore({ writerId: 'journal-writer-proof' })
-  try {
-    const [writer, init] = await createFn(runtimeId('rt_es'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
-    assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
-    assert.equal(caseOf(init.Stream), 'Workspace')
-    const file = join(local.commonDir, 'wanxiang', 'events', 'journal-writer-proof.ndjson')
+  await withRepo('journal-writer-proof', async (commonDir) => {
+    const booted = mustOk(await journal.boot(commonDir, 'rt_es', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const file = join(commonDir, 'wanxiang', 'events', 'journal-writer-proof.ndjson')
     assert.equal(existsSync(file), false)
-    assert.equal(EsWriter.EventStoreJournalWriter__get_IsPoisoned(writer), false)
-    writer.Release?.()
-  } finally {
-    local.close()
-  }
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-006] append_adds_one_local_line_and_Current_is_already_integrated', async () => {
-  const local = createLocalEventStore({ writerId: 'journal-append-proof' })
-  try {
-    const [writer, init] = await createFn(runtimeId('rt_es_append'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
-    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
-    const file = join(local.commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson')
+  await withRepo('journal-append-proof', async (commonDir) => {
+    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'journal-append-proof', 'rt_es_append', 4242, '2026-04-01T00:00:00Z'), 'boot')
+    const file = join(commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson')
+
     assert.equal(existsSync(file), false)
-    const appended = await AgentJournal.AgentJournalModule_appendAgent(stream.session(sessionId('ses_es_writer')), undefined, CLOSED_AGENT, journal)
-    assert.equal(caseOf(appended), 'Ok')
+    const appended = mustOk(
+      await journal.appendAgent(
+        booted.journal,
+        { kind: 'Session', session: 'ses_es_writer' },
+        null,
+        CLOSED_AGENT,
+      ),
+      'append',
+    )
+
     const after = readFileSync(file, 'utf8')
     assert.equal(after.trim().split('\n').length, 2, 'first business append writes RuntimeStarted then the business fact')
-    assert.ok(local.store.TryCurrent('Journal'))
-    journal.Dispose?.()
-  } finally {
-    local.close()
-  }
+    assert.ok(appended.projection)
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-012] BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
-  const local = createLocalEventStore({ writerId: 'journal-blob-proof' })
-  try {
-    const [writer] = await createFn(runtimeId('rt_es_blob'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
-    const receipt = mustOk(await writer.BlobWriter.Write('large-body\n'))
-    assert.match(idValue.blobRef(receipt.BlobRef), /^blobs\/[0-9a-f]{64}$/)
-    const handle = idValue.blobRef(receipt.BlobRef).slice('blobs/'.length)
-    assert.equal(existsSync(join(local.commonDir, 'wanxiang', 'payloads', handle)), true)
-    assert.equal(mustOk(await writer.BlobWriter.Read(receipt.BlobRef)), 'large-body\n')
-    writer.Release?.()
-  } finally {
-    local.close()
-  }
+  await withRepo('journal-blob-proof', async (commonDir) => {
+    const booted = mustOk(await journal.boot(commonDir, 'rt_es_blob', 4242, '2026-04-01T00:00:00Z'), 'boot')
+
+    const receipt = mustOk(await journal.writePayload(booted.journal, 'large-body\n'), 'write')
+    assert.match(receipt.blobRef, /^blobs\/[0-9a-f]{64}$/)
+
+    const handle = receipt.blobRef.slice('blobs/'.length)
+    assert.equal(existsSync(join(commonDir, 'wanxiang', 'payloads', handle)), true)
+
+    const read = mustOk(await journal.readPayload(booted.journal, receipt.blobRef), 'read')
+    assert.equal(read.content, 'large-body\n')
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
-  const local = createLocalEventStore({ writerId: 'journal-closure-proof' })
-  try {
-    const [writer, init] = await createFn(runtimeId('rt_es_closure'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
-    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
-    const receipt = mustOk(await writer.BlobWriter.Write('part-body\n'))
-    const handle = idValue.blobRef(receipt.BlobRef).slice('blobs/'.length)
+  await withRepo('journal-closure-proof', async (commonDir) => {
+    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'journal-closure-proof', 'rt_es_closure', 4242, '2026-04-01T00:00:00Z'), 'boot')
 
-    const factValue = managerLifecycle('LifeOpened', {
-      SessionId: sessionId('ses_closure'),
-      LifeId: managerLifeId('life_closure'),
-      OpeningUserMessageId: physicalUser('msg_1'),
-      OpeningTextRef: receipt.BlobRef,
-      OpeningTextDigest: receipt.BlobDigest,
-      OpeningCursorSequence: 1n,
-    })
-    const appended = await AgentJournal.AgentJournalModule_appendManagerLifecycle(
-      stream.session(sessionId('ses_closure')),
-      factValue,
-      journal,
+    const receipt = mustOk(await journal.writePayload(booted.journal, 'part-body\n'), 'write')
+    const handle = receipt.blobRef.slice('blobs/'.length)
+
+    const fact = {
+      case: 'LifeOpened',
+      payload: {
+        SessionId: 'ses_closure',
+        LifeId: 'life_closure',
+        OpeningUserMessageId: 'msg_1',
+        OpeningTextRef: receipt.blobRef,
+        OpeningTextDigest: receipt.blobDigest,
+        OpeningCursorSequence: 1,
+      },
+    }
+
+    const appended = mustOk(
+      await journal.appendManagerLifecycle(booted.journal, { kind: 'Session', session: 'ses_closure' }, fact),
+      'append',
     )
-    assert.equal(caseOf(appended), 'Ok')
+    assert.ok(appended.projection)
 
-    const ndjson = readFileSync(join(local.commonDir, 'wanxiang', 'events', 'journal-closure-proof.ndjson'), 'utf8')
+    const ndjson = readFileSync(join(commonDir, 'wanxiang', 'events', 'journal-closure-proof.ndjson'), 'utf8')
     assert.match(ndjson, new RegExp(`"payload_refs":\\["${handle}"\\]`))
-    journal.Dispose?.()
-  } finally {
-    local.close()
-  }
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_is_missing', async () => {
-  const local = createLocalEventStore({ writerId: 'journal-closure-missing' })
-  try {
-    const [writer, init] = await createFn(runtimeId('rt_es_missing'), 4242, utcOffset('2026-04-01T00:00:00Z'), local.store)
-    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
+  await withRepo('journal-closure-missing', async (commonDir) => {
+    const booted = mustOk(await journal.boot(commonDir, 'rt_es_missing', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const missingDigest = 'f'.repeat(64)
 
-    const factValue = managerLifecycle('LifeOpened', {
-      SessionId: sessionId('ses_missing'),
-      LifeId: managerLifeId('life_missing'),
-      OpeningUserMessageId: physicalUser('msg_missing'),
-      OpeningTextRef: blobRef(`blobs/${missingDigest}`),
-      OpeningTextDigest: blobDigest(missingDigest),
-      OpeningCursorSequence: 1n,
-    })
-    const result = await AgentJournal.AgentJournalModule_appendManagerLifecycle(
-      stream.session(sessionId('ses_missing')),
-      factValue,
-      journal,
+    const fact = {
+      case: 'LifeOpened',
+      payload: {
+        SessionId: 'ses_missing',
+        LifeId: 'life_missing',
+        OpeningUserMessageId: 'msg_missing',
+        OpeningTextRef: `blobs/${missingDigest}`,
+        OpeningTextDigest: missingDigest,
+        OpeningCursorSequence: 1,
+      },
+    }
+
+    const result = await journal.appendManagerLifecycle(
+      booted.journal,
+      { kind: 'Session', session: 'ses_missing' },
+      fact,
     )
-    assert.equal(caseOf(result), 'Error')
-    assert.match(JSON.stringify(result), /MissingPayload/)
-    journal.Dispose?.()
-  } finally {
-    local.close()
-  }
+    assert.equal(result.ok, false)
+    assert.match(JSON.stringify(result.error), /MissingPayload/i)
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-012] journal_writer_source_has_no_snapshot_CAS_or_Git_raw_store', async () => {
