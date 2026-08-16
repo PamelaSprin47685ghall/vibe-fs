@@ -38,6 +38,12 @@ export const BUILD_VERIFICATION_FILES = new Set([
   // Charter self-test: its subject IS the forbidden patterns (representation
   // validator), so it must be able to spell them out.
   'requirements/js-semantic-surface/tests/surface-charter.test.mjs',
+  // Representation validator: its subject IS the forbidden Fable shapes
+  // (du-shape / fsharp-type / export-discovery), so it must spell them out.
+  'requirements/verification-system/tests/support/js-contract.mjs',
+  // Test runner: its subject IS the coverage/build denominator itself,
+  // including the literal fable_modules exclusion that keeps coverage honest.
+  'requirements/verification-system/tests/run.mjs',
 ])
 
 /**
@@ -91,11 +97,22 @@ export const scanFile = (absPath, relPath) => {
   return hits
 }
 
-/** All semantic test files under requirements/ (excludes e2e/ and integration/). */
+/**
+ * Semantic-test zone files under requirements: every .mjs under a package's
+ * tests directory (excluding e2e/ and integration/, which own separate
+ * entrypoints and physical-contract gates) — *.test.mjs AND support files,
+ * fixtures, helpers, *-contract.mjs.
+ *
+ * TASK.md §7/§21: forbidden knowledge moved from a test file into test
+ * support does not reduce debt; the whole semantic-test dependency zone is
+ * scanned. The transition facade (support/domain.mjs and its sublayers) and
+ * package-local contract adapters remain legal today only as baseline debt
+ * that must monotonically shrink.
+ */
 export const semanticTestFiles = (root = REQUIREMENTS_ROOT) =>
-  walk(root, ['.test.mjs']).filter((abs) => {
+  walk(root, ['.mjs']).filter((abs) => {
     const rel = relative(process.cwd(), abs).replace(/\\/g, '/')
-    return !rel.includes('/tests/e2e/') && !rel.includes('/tests/integration/')
+    return rel.includes('/tests/') && !rel.includes('/tests/e2e/') && !rel.includes('/tests/integration/')
   })
 
 /** Full inventory: { <rel-file>: [ {line, rule, text}, ... ] } minus allowlist. */

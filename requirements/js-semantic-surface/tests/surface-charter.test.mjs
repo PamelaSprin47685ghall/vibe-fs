@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
+import { scanAll } from '../../../scripts/lib/test-surface-scan.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -54,6 +55,37 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_fro
     /baseline can only shrink|baseline can be deleted|只减不增|can only shrink/,
     'gate contract must state the baseline only-shrink rule',
   )
+})
+
+// ── 002 zone: 整个 semantic-test zone 都被扫描（TASK.md §6/§7/§8）────────────
+
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
+  // The scanner must see support/fixtures/helpers/*-contract.mjs, not only
+  // *.test.mjs — moving forbidden knowledge from a test file into test
+  // support does not reduce debt. The zone fixture below deliberately
+  // deep-imports dist and reads .fields; it must be visible to the scanner
+  // and carry debt. If it ever turns green, the gate is theater.
+  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
+
+  assert.match(
+    scannerSource,
+    /semanticTestFiles =[\s\S]*?walk\(root, \['\.mjs'\]\)/,
+    'scanner must walk every .mjs in the semantic-test zone, not only *.test.mjs',
+  )
+
+  const fixtureRel = 'requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs'
+  assert.ok(existsSync(join(ROOT, fixtureRel)), `zone-debt fixture must exist: ${fixtureRel}`)
+
+  const fixture = read(fixtureRel)
+  assert.match(fixture, /dist\//, 'zone-debt fixture must deep-import dist (deliberate violation)')
+  assert.match(fixture, /\.fields\b/, 'zone-debt fixture must read .fields (deliberate violation)')
+
+  const all = scanAll()
+  const hits = all[fixtureRel]
+  assert.ok(hits && hits.length > 0, `zone-debt fixture must be visible to the scanner with debt, got ${JSON.stringify(all[fixtureRel])}`)
+  const rules = hits.map((h) => h.rule)
+  assert.ok(rules.includes('deep-dist-import'), `zone fixture must carry deep-dist-import, got ${rules.join(',')}`)
+  assert.ok(rules.includes('du-shape'), `zone fixture must carry du-shape, got ${rules.join(',')}`)
 })
 
 // ── 003: law → owner → surface 归属被文档化 ─────────────────────────────────

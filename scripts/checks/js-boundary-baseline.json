@@ -1,13 +1,4 @@
 {
-  "requirements/action-affordance/tests/action-affordance.test.mjs": {
-    "export-discovery": 2
-  },
-  "requirements/action-affordance/tests/prompt-semantic-depth.test.mjs": {
-    "export-discovery": 2
-  },
-  "requirements/action-affordance/tests/tool-description-anchors.test.mjs": {
-    "export-discovery": 1
-  },
   "requirements/behavior-diagnosis/tests/blog-tool.test.mjs": {
     "deep-dist-import": 3,
     "du-shape": 6
@@ -62,6 +53,10 @@
   "requirements/behavior-diagnosis/tests/paired-history-eval.test.mjs": {
     "deep-dist-import": 2
   },
+  "requirements/behavior-diagnosis/tests/support/blogger-recovery.mjs": {
+    "deep-dist-import": 2,
+    "interop-helper": 6
+  },
   "requirements/capability-enforcement/tests/agent-permission-gate.test.mjs": {
     "export-discovery": 4
   },
@@ -86,8 +81,7 @@
     "deep-dist-import": 5
   },
   "requirements/capability-enforcement/tests/managed-agent-config.test.mjs": {
-    "interop-helper": 3,
-    "export-discovery": 1
+    "interop-helper": 3
   },
   "requirements/capability-enforcement/tests/sphinx-mcp-wildcard.test.mjs": {
     "export-discovery": 1
@@ -104,30 +98,14 @@
     "deep-dist-import": 2,
     "du-shape": 1
   },
-  "requirements/causal-wait/tests/causal-frontier.test.mjs": {
-    "interop-helper": 1
-  },
   "requirements/causal-wait/tests/causal-wait-bridge.test.mjs": {
-    "deep-dist-import": 3,
-    "interop-helper": 5
-  },
-  "requirements/causal-wait/tests/causal-wait.test.mjs": {
-    "interop-helper": 3
+    "deep-dist-import": 2
   },
   "requirements/causal-wait/tests/escape-taxonomy.test.mjs": {
-    "deep-dist-import": 2,
-    "du-shape": 2
-  },
-  "requirements/causal-wait/tests/reconcile-idle-observation-non-authoritative.test.mjs": {
-    "interop-helper": 1
-  },
-  "requirements/causal-wait/tests/until-signal-or-deadline.test.mjs": {
-    "interop-helper": 4,
-    "du-shape": 3
+    "deep-dist-import": 2
   },
   "requirements/causal-wait/tests/wait-lifecycle.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 5
+    "deep-dist-import": 1
   },
   "requirements/change-integration/tests/git-operations.test.mjs": {
     "deep-dist-import": 1,
@@ -153,15 +131,6 @@
     "export-discovery": 2,
     "du-shape": 12,
     "interop-helper": 21
-  },
-  "requirements/cognitive-environment/tests/cognitive-environment.test.mjs": {
-    "export-discovery": 2
-  },
-  "requirements/cognitive-environment/tests/pair-thought-transform.test.mjs": {
-    "deep-dist-import": 1
-  },
-  "requirements/cognitive-environment/tests/prompt-semantic-depth.test.mjs": {
-    "export-discovery": 3
   },
   "requirements/context-compression/tests/companion-recovery-slot.test.mjs": {
     "deep-dist-import": 1,
@@ -204,9 +173,7 @@
     "interop-helper": 3
   },
   "requirements/crash-reconciliation/tests/child-recovery-workflow.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 12,
-    "du-shape": 5
+    "interop-helper": 1
   },
   "requirements/crash-reconciliation/tests/explicit-continue.test.mjs": {
     "deep-dist-import": 4,
@@ -230,8 +197,7 @@
   },
   "requirements/crash-reconciliation/tests/join-clean-break-recovery.test.mjs": {
     "deep-dist-import": 2,
-    "du-shape": 1,
-    "interop-helper": 3
+    "du-shape": 1
   },
   "requirements/crash-reconciliation/tests/join-recovery-crash-matrix.test.mjs": {
     "deep-dist-import": 1
@@ -253,9 +219,9 @@
   "requirements/crash-reconciliation/tests/session-recovery-family.test.mjs": {
     "interop-helper": 7
   },
-  "requirements/degeneration-guard/tests/loop-sensor.test.mjs": {
+  "requirements/crash-reconciliation/tests/support/child-recovery-workflow.mjs": {
     "deep-dist-import": 1,
-    "du-shape": 3
+    "interop-helper": 3
   },
   "requirements/delegation/tests/assistance-host.test.mjs": {
     "deep-dist-import": 7,
@@ -264,7 +230,7 @@
     "interop-helper": 3
   },
   "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs": {
-    "deep-dist-import": 2
+    "deep-dist-import": 1
   },
   "requirements/delegation/tests/delegation-tool-contract.test.mjs": {
     "deep-dist-import": 5
@@ -327,6 +293,9 @@
   "requirements/delegation/tests/reconcile-supervisor-await-agent.test.mjs": {
     "du-shape": 3
   },
+  "requirements/delegation/tests/support/detached-fork-host.mjs": {
+    "deep-dist-import": 2
+  },
   "requirements/delegation/tests/sync-delegate-ce-collapse.test.mjs": {
     "deep-dist-import": 6,
     "export-discovery": 3,
@@ -346,28 +315,17 @@
   "requirements/delegation/tests/sync-delegate.test.mjs": {
     "interop-helper": 3
   },
-  "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs": {
-    "export-discovery": 2,
-    "interop-helper": 1
-  },
-  "requirements/dispatch-protocol/tests/fire-and-forget.test.mjs": {
-    "du-shape": 2
-  },
   "requirements/dispatch-protocol/tests/join-guard.test.mjs": {
-    "deep-dist-import": 2,
-    "du-shape": 1,
-    "interop-helper": 1
+    "deep-dist-import": 1
   },
   "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs": {
-    "interop-helper": 7
+    "interop-helper": 1
   },
   "requirements/durable-convergence/tests/event-store-merge.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 8
+    "deep-dist-import": 2
   },
   "requirements/durable-convergence/tests/replica-merge-laws.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 16
+    "deep-dist-import": 2
   },
   "requirements/durable-events/tests/append-only-laws.test.mjs": {
     "deep-dist-import": 1,
@@ -434,48 +392,9 @@
     "deep-dist-import": 4,
     "interop-helper": 3
   },
-  "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs": {
-    "interop-helper": 4
-  },
-  "requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs": {
-    "interop-helper": 8
-  },
-  "requirements/effect-accounting/tests/join-clean-break.test.mjs": {
-    "deep-dist-import": 2,
-    "du-shape": 1,
-    "interop-helper": 3
-  },
-  "requirements/effect-accounting/tests/join-missing-final-report.test.mjs": {
+  "requirements/epistemic-reasoning/tests/support.mjs": {
     "fable-modules": 1,
-    "interop-helper": 1
-  },
-  "requirements/effect-accounting/tests/runtime-persist-order.test.mjs": {
-    "interop-helper": 2,
-    "du-shape": 1
-  },
-  "requirements/epistemic-reasoning/tests/kernel.test.mjs": {
-    "deep-dist-import": 1
-  },
-  "requirements/epistemic-reasoning/tests/mcp-handle.test.mjs": {
-    "deep-dist-import": 1,
-    "export-discovery": 1
-  },
-  "requirements/epistemic-reasoning/tests/mcts.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 1
-  },
-  "requirements/epistemic-reasoning/tests/methodology.test.mjs": {
-    "deep-dist-import": 1
-  },
-  "requirements/epistemic-reasoning/tests/represent.test.mjs": {
-    "deep-dist-import": 1
-  },
-  "requirements/epistemic-reasoning/tests/search.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 1
-  },
-  "requirements/epistemic-reasoning/tests/sphinx-mcp-kernel.test.mjs": {
-    "deep-dist-import": 1
+    "deep-dist-import": 9
   },
   "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs": {
     "deep-dist-import": 1
@@ -486,54 +405,32 @@
   "requirements/execution-model-routing/tests/scheduler-module-config.test.mjs": {
     "deep-dist-import": 1
   },
-  "requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs": {
-    "export-discovery": 1
-  },
-  "requirements/finality/tests/finality-cohort-law.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 10,
-    "du-shape": 2
-  },
-  "requirements/finality/tests/life-admission.test.mjs": {
-    "deep-dist-import": 4,
-    "interop-helper": 1,
-    "du-shape": 2
-  },
-  "requirements/finality/tests/lifecycle.test.mjs": {
+  "requirements/finality/tests/support/finality-contract.mjs": {
     "deep-dist-import": 1,
-    "interop-helper": 8,
-    "fsharp-type": 1
-  },
-  "requirements/finality/tests/manager-finality-disposition.test.mjs": {
-    "deep-dist-import": 2,
-    "du-shape": 3,
-    "interop-helper": 6
-  },
-  "requirements/finality/tests/manager-job-no-resurrection.test.mjs": {
-    "export-discovery": 2
+    "interop-helper": 3,
+    "du-shape": 1
   },
   "requirements/guidance-delivery/tests/guideline-projection.test.mjs": {
-    "deep-dist-import": 2,
-    "du-shape": 13
+    "deep-dist-import": 1
   },
   "requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 4
+    "deep-dist-import": 1
   },
   "requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs": {
-    "deep-dist-import": 2
+    "deep-dist-import": 1
   },
   "requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 1,
-    "du-shape": 3
+    "deep-dist-import": 1
   },
   "requirements/host-boundary/tests/chat-params-hook.test.mjs": {
-    "deep-dist-import": 4
+    "deep-dist-import": 3
   },
   "requirements/host-boundary/tests/events-port.test.mjs": {
     "deep-dist-import": 3,
     "du-shape": 5
+  },
+  "requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs": {
+    "deep-dist-import": 1
   },
   "requirements/host-boundary/tests/host-capability-observation.test.mjs": {
     "deep-dist-import": 2,
@@ -591,6 +488,11 @@
   "requirements/host-boundary/tests/stealth-browser-mcp-launch.test.mjs": {
     "deep-dist-import": 2
   },
+  "requirements/host-boundary/tests/support/listener-refcount.mjs": {
+    "deep-dist-import": 2,
+    "export-discovery": 1,
+    "du-shape": 4
+  },
   "requirements/host-boundary/tests/xwire.test.mjs": {
     "deep-dist-import": 5,
     "export-discovery": 2,
@@ -639,6 +541,10 @@
   "requirements/interaction-authority/tests/projection-algebra-repair.test.mjs": {
     "interop-helper": 2
   },
+  "requirements/interaction-authority/tests/support/repair-family.mjs": {
+    "deep-dist-import": 1,
+    "du-shape": 1
+  },
   "requirements/interaction-authority/tests/terminal-policy.test.mjs": {
     "deep-dist-import": 2,
     "interop-helper": 1
@@ -650,6 +556,14 @@
   "requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs": {
     "deep-dist-import": 10,
     "interop-helper": 8
+  },
+  "requirements/intra-participant-parallelism/tests/support/fission-contract.mjs": {
+    "deep-dist-import": 2,
+    "interop-helper": 2
+  },
+  "requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs": {
+    "du-shape": 2,
+    "deep-dist-import": 1
   },
   "requirements/knowledge-reuse/tests/bookkeeper-mechanical.test.mjs": {
     "deep-dist-import": 7,
@@ -684,7 +598,7 @@
   "requirements/knowledge-reuse/tests/casebook-store.test.mjs": {
     "deep-dist-import": 7,
     "du-shape": 1,
-    "interop-helper": 16
+    "interop-helper": 15
   },
   "requirements/knowledge-reuse/tests/edit-qa-tool.test.mjs": {
     "deep-dist-import": 1
@@ -711,6 +625,10 @@
   "requirements/knowledge-reuse/tests/lifecycle-wiring.test.mjs": {
     "deep-dist-import": 6,
     "interop-helper": 13
+  },
+  "requirements/knowledge-reuse/tests/support/casebook-contract.mjs": {
+    "deep-dist-import": 2,
+    "interop-helper": 3
   },
   "requirements/knowledge-reuse/tests/universal-loop.test.mjs": {
     "deep-dist-import": 9,
@@ -739,7 +657,7 @@
   "requirements/managed-session-lifecycle/tests/host-fork-agent.test.mjs": {
     "deep-dist-import": 7,
     "export-discovery": 3,
-    "du-shape": 29,
+    "du-shape": 28,
     "interop-helper": 3
   },
   "requirements/managed-session-lifecycle/tests/host-fork-busy-nudge.test.mjs": {
@@ -774,14 +692,20 @@
   "requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs": {
     "deep-dist-import": 4,
     "export-discovery": 2,
-    "du-shape": 22,
-    "interop-helper": 1
+    "interop-helper": 1,
+    "du-shape": 19
   },
   "requirements/managed-session-lifecycle/tests/session-flattening.test.mjs": {
     "deep-dist-import": 1,
     "export-discovery": 1,
     "du-shape": 5,
     "interop-helper": 1
+  },
+  "requirements/managed-session-lifecycle/tests/support/satellite-recovery.mjs": {
+    "deep-dist-import": 6,
+    "export-discovery": 2,
+    "du-shape": 3,
+    "interop-helper": 3
   },
   "requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs": {
     "deep-dist-import": 7,
@@ -814,7 +738,7 @@
   },
   "requirements/obligation-ledger/tests/magic-todo.test.mjs": {
     "du-shape": 11,
-    "interop-helper": 12
+    "interop-helper": 11
   },
   "requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs": {
     "deep-dist-import": 1,
@@ -842,6 +766,9 @@
   },
   "requirements/output-distillation/tests/large-gate.test.mjs": {
     "deep-dist-import": 1
+  },
+  "requirements/output-distillation/tests/support/distiller-contract.mjs": {
+    "deep-dist-import": 2
   },
   "requirements/output-distillation/tests/tool-host-codec-full.test.mjs": {
     "deep-dist-import": 1
@@ -875,9 +802,9 @@
     "interop-helper": 10
   },
   "requirements/participant-identity/tests/session-execution-binding.test.mjs": {
-    "deep-dist-import": 5,
+    "deep-dist-import": 4,
     "export-discovery": 1,
-    "du-shape": 15,
+    "du-shape": 13,
     "interop-helper": 1
   },
   "requirements/participant-identity/tests/session-persona.test.mjs": {
@@ -902,9 +829,6 @@
   },
   "requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs": {
     "du-shape": 3
-  },
-  "requirements/prefix-stability/tests/prefix-epoch.test.mjs": {
-    "export-discovery": 1
   },
   "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs": {
     "interop-helper": 3
@@ -960,8 +884,7 @@
     "interop-helper": 9
   },
   "requirements/provider-language/tests/provider-prose-and-preference.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 6
+    "deep-dist-import": 2
   },
   "requirements/provider-language/tests/provider-system-transform.test.mjs": {
     "deep-dist-import": 2
@@ -1035,7 +958,7 @@
     "export-discovery": 3
   },
   "requirements/repository-programming/tests/js-tool-host.test.mjs": {
-    "deep-dist-import": 6,
+    "deep-dist-import": 5,
     "interop-helper": 2
   },
   "requirements/repository-programming/tests/js-tools-fs.test.mjs": {
@@ -1053,7 +976,7 @@
     "du-shape": 1
   },
   "requirements/repository-programming/tests/js-workflow.test.mjs": {
-    "deep-dist-import": 16,
+    "deep-dist-import": 7,
     "interop-helper": 1,
     "du-shape": 5
   },
@@ -1148,7 +1071,7 @@
     "export-discovery": 1
   },
   "requirements/session-ontology/tests/sync-delegate.test.mjs": {
-    "interop-helper": 7
+    "interop-helper": 6
   },
   "requirements/session-ontology/tests/terminal-policy.test.mjs": {
     "deep-dist-import": 2
@@ -1266,6 +1189,75 @@
   "requirements/time-capability/tests/until-signal-or-deadline.test.mjs": {
     "interop-helper": 2,
     "du-shape": 1
+  },
+  "requirements/verification-system/tests/support/domain/context.mjs": {
+    "interop-helper": 123,
+    "du-shape": 7
+  },
+  "requirements/verification-system/tests/support/domain/enforcer.mjs": {
+    "interop-helper": 44,
+    "fsharp-type": 1,
+    "du-shape": 4
+  },
+  "requirements/verification-system/tests/support/domain/execution.mjs": {
+    "interop-helper": 24,
+    "du-shape": 2
+  },
+  "requirements/verification-system/tests/support/domain/host.mjs": {
+    "interop-helper": 76,
+    "export-discovery": 4,
+    "du-shape": 3
+  },
+  "requirements/verification-system/tests/support/domain/identity.mjs": {
+    "export-discovery": 1,
+    "interop-helper": 1
+  },
+  "requirements/verification-system/tests/support/domain/interop.mjs": {
+    "interop-helper": 112,
+    "fsharp-type": 12,
+    "fable-modules": 1,
+    "export-discovery": 3,
+    "du-shape": 5
+  },
+  "requirements/verification-system/tests/support/domain/journal.mjs": {
+    "interop-helper": 30,
+    "export-discovery": 1
+  },
+  "requirements/verification-system/tests/support/domain/orchestrator.mjs": {
+    "interop-helper": 74,
+    "du-shape": 7,
+    "export-discovery": 7
+  },
+  "requirements/verification-system/tests/support/domain/persist.mjs": {
+    "interop-helper": 18,
+    "export-discovery": 1,
+    "du-shape": 2
+  },
+  "requirements/verification-system/tests/support/domain/prompt.mjs": {
+    "interop-helper": 31,
+    "export-discovery": 4
+  },
+  "requirements/verification-system/tests/support/glory.mjs": {
+    "export-discovery": 1
+  },
+  "requirements/verification-system/tests/support/local-event-store.mjs": {
+    "deep-dist-import": 2
+  },
+  "requirements/verification-system/tests/support/orchestrator-host-harness.mjs": {
+    "export-discovery": 3,
+    "interop-helper": 9,
+    "deep-dist-import": 2,
+    "du-shape": 3
+  },
+  "requirements/verification-system/tests/support/plugin-fixture.mjs": {
+    "deep-dist-import": 16,
+    "du-shape": 23
+  },
+  "requirements/verification-system/tests/support/run-inner.mjs": {
+    "fable-modules": 5
+  },
+  "requirements/verification-system/tests/support/temporal-harness.mjs": {
+    "fsharp-type": 1
   },
   "requirements/work-record/tests/lifecycle-work-record-bounded.test.mjs": {
     "deep-dist-import": 1
