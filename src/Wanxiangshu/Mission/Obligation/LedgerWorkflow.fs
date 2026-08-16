@@ -50,8 +50,7 @@ module ObligationLedgerWorkflow =
         let rec settleFirstAttempt firstAttempt =
             match firstAttempt with
             | PreparationAttempt.Prepared prepared -> Task.FromResult(Ok prepared)
-            | PreparationAttempt.Failed failure ->
-                Task.FromResult(Error(PreparationFailure.AttemptFailed failure))
+            | PreparationAttempt.Failed failure -> Task.FromResult(Error(PreparationFailure.AttemptFailed failure))
             | PreparationAttempt.AwaitPreviousReview -> awaitThenRetry ()
 
         and awaitThenRetry () =
@@ -61,7 +60,10 @@ module ObligationLedgerWorkflow =
 
         and retryAfterReview reviewToken =
             taskResult {
-                do! awaitReview reviewToken |> TaskResult.mapError PreparationFailure.ReviewWaitFailed
+                do!
+                    awaitReview reviewToken
+                    |> TaskResult.mapError PreparationFailure.ReviewWaitFailed
+
                 let! secondAttempt = admitNow () |> TaskResultCE.ofTask
 
                 match secondAttempt with

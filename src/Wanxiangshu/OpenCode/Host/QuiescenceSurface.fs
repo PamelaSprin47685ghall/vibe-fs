@@ -18,8 +18,7 @@ module QuiescenceSurface =
     let observeIdle (gate: SessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
         gate.ObserveIdle(SessionId.create sessionId)
 
-    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool =
-        gate.TryConsume permit
+    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool = gate.TryConsume permit
 
     let revoke (gate: SessionQuiescenceGate) (sessionId: string) : unit =
         gate.RevokeCurrentAttempt(SessionId.create sessionId)

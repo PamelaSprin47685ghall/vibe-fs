@@ -20,8 +20,7 @@ module ForkChildPayloadSurface =
     let private isUndefined (value: obj) : bool = jsNative
 
     let private languageOf (lang: string) : ProviderLanguage =
-        ProviderLanguage.tryParse lang
-        |> Option.defaultValue ProviderLanguage.English
+        ProviderLanguage.tryParse lang |> Option.defaultValue ProviderLanguage.English
 
     let private proseOf (lang: string) : ForkChildInstructions =
         let l = languageOf lang
@@ -33,10 +32,13 @@ module ForkChildPayloadSurface =
 
     /// The four localized instruction fragments (JSON-shaped). Base keeps
     /// blank lines as "" so SyntheticToml.document preserves paragraph breaks.
-    let instructions (lang: string) : {| Base: string array
-                                         CommissionerRecord: string
-                                         Attachment: string
-                                         Requirements: string |} =
+    let instructions
+        (lang: string)
+        : {| Base: string array
+             CommissionerRecord: string
+             Attachment: string
+             Requirements: string |}
+        =
         let p = proseOf lang
 
         {| Base = List.toArray p.Base
@@ -48,14 +50,20 @@ module ForkChildPayloadSurface =
     /// Absent fields are `undefined` in JS and decode as F# `None` / `[]`.
     let render
         (lang: string)
-        (input: {| Assignment: string
-                   CommissionerRecord: string option
-                   Attachment: string option
-                   RootRequirements: string array
-                   Payload: string option |})
+        (input:
+            {| Assignment: string
+               CommissionerRecord: string option
+               Attachment: string option
+               RootRequirements: string array
+               Payload: string option |})
         : string =
         let prose = proseOf lang
-        let assignment = if isNull input.Assignment || isUndefined input.Assignment then "" else input.Assignment
+
+        let assignment =
+            if isNull input.Assignment || isUndefined input.Assignment then
+                ""
+            else
+                input.Assignment
 
         let requirements =
             if isNull input.RootRequirements || isUndefined input.RootRequirements then

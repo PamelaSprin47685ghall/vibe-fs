@@ -234,7 +234,9 @@ module JoinResultRenderer =
         (completion: RunCompletion)
         (payload: AgentCompletionPayload)
         : string =
-        let name = byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
+        let name =
+            byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
+
         let instructions = [ bynameLine lang Path.AgentReturned name ]
 
         let body =
@@ -252,7 +254,9 @@ module JoinResultRenderer =
         (completion: RunCompletion)
         (payload: AgentFailurePayload)
         : string =
-        let name = byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
+        let name =
+            byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
+
         let instructions = [ bynameLine lang Path.AgentFailed name ]
 
         let body =

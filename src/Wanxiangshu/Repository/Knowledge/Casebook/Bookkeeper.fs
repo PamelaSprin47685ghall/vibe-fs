@@ -74,13 +74,7 @@ module CasebookBookkeeper =
             let freeze = CasebookReplay.replayAll root case.Observations
 
             let! q', a' =
-                BookkeeperRuntime.runTransaction
-                    BookkeeperRequest.CaseRefresh
-                    sessionId
-                    case.Q
-                    case.A
-                    freeze
-                    None
+                BookkeeperRuntime.runTransaction BookkeeperRequest.CaseRefresh sessionId case.Q case.A freeze None
 
             let verify = CasebookReplay.replayAll root case.Observations
 

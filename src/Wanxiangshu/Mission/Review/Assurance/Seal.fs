@@ -90,7 +90,10 @@ module ReviewSeal =
     /// concurrent runs are indistinguishable, and without the compaction exclusion
     /// the Host's summariser is mistaken for a managed run.
     let private confirmLatestRun single latest =
-        if latest.Id = single.Id then Ok single else Error NotLatestRun
+        if latest.Id = single.Id then
+            Ok single
+        else
+            Error NotLatestRun
 
     let private decideSingleRun single (messages: SessionMessage list) =
         let assistants = messages |> List.filter (fun message -> message.Role = "assistant")

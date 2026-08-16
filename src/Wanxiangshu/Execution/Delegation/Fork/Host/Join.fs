@@ -210,7 +210,8 @@ module HostForkJoin =
         | Error e, _ -> Error e
         | Ok(), None ->
             Error(
-                ForkError.NotFound "family recovery permit requires journal; pure PTY join must not use permit-gated join"
+                ForkError.NotFound
+                    "family recovery permit requires journal; pure PTY join must not use permit-gated join"
             )
         | Ok(), Some durable -> validatePermitAgainstJournal durable root permitSeq permit
 

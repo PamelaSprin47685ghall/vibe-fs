@@ -115,7 +115,7 @@ module JsToolsBindings =
     let private anchorOf (find: obj) : Result<AnchorSpec, JsFailure> =
         if isString find then
             Ok(AnchorSpec.Exact(string find))
-        elif System.String.IsNullOrEmpty (string (find?source)) then
+        elif System.String.IsNullOrEmpty(string (find?source)) then
             Error JsFailure.AnchorEmptyContent
         else
             Ok(AnchorSpec.Regex(string (find?source)))
@@ -123,8 +123,7 @@ module JsToolsBindings =
     /// Exact empty text is a domain guard, separate from anchor parsing.
     let private requireNonEmptyExact (spec: AnchorSpec) : Result<unit, JsFailure> =
         match spec with
-        | AnchorSpec.Exact text when System.String.IsNullOrEmpty text ->
-            Error JsFailure.AnchorEmptyContent
+        | AnchorSpec.Exact text when System.String.IsNullOrEmpty text -> Error JsFailure.AnchorEmptyContent
         | _ -> Ok()
 
     /// Build the api object for one sandbox run. `staging` collects every

@@ -206,9 +206,7 @@ type ToolRuntimeScope
         task {
             let runtime = PromptDispatcher.forJournal durable
 
-            match!
-                runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some agent)
-            with
+            match! runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some agent) with
             | Ok profile -> return Some profile.CanonicalRole
             | Error _ -> return None
         }

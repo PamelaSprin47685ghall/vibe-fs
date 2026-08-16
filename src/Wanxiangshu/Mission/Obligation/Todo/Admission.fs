@@ -23,7 +23,7 @@ open Wanxiangshu.Foundation.Identity
 /// boundary; this module owns only fail-closed Magic checks.
 module MagicTodoAdmission =
 
-    type LocalizedToolCall =
+    type AdmissionLocalizedToolCall =
         {
             ToolCallId: ToolCallId
             ToolPartOrdinal: int
@@ -67,7 +67,7 @@ module MagicTodoAdmission =
         (sha256: string -> string)
         (lifeId: ManagerLifeId)
         (settledCurrent: ObligationList)
-        (localized: LocalizedToolCall)
+        (localized: AdmissionLocalizedToolCall)
         (existing: ExistingPrepared)
         (writeId: TodoWriteId)
         : AdmissionOutcome<ObligationPrepareSuccess> =
@@ -85,13 +85,15 @@ module MagicTodoAdmission =
         (sha256: string -> string)
         (settledCurrent: ObligationList)
         (mayProceedPastLag1: Result<unit, MagicTodoReject>)
-        (localized: LocalizedToolCall)
+        (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         (writeId: TodoWriteId)
         : AdmissionOutcome<ObligationPrepareSuccess> =
-        match mayProceedPastLag1 |> Result.bind (fun () -> MagicTodo.validateObligations submitted) with
-        | Error(MagicTodoReject.AwaitingConsumableReview pending) ->
-            AdmissionOutcome.AwaitingConsumableReview pending
+        match
+            mayProceedPastLag1
+            |> Result.bind (fun () -> MagicTodo.validateObligations submitted)
+        with
+        | Error(MagicTodoReject.AwaitingConsumableReview pending) -> AdmissionOutcome.AwaitingConsumableReview pending
         | Error e -> AdmissionOutcome.Rejected e
         | Ok proposed ->
             AdmissionOutcome.FreshPrepare
@@ -110,7 +112,7 @@ module MagicTodoAdmission =
         (settledCurrent: ObligationList)
         (mayProceedPastLag1: Result<unit, MagicTodoReject>)
         (existingPrepared: ExistingPrepared option)
-        (localized: LocalizedToolCall)
+        (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         : AdmissionOutcome<ObligationPrepareSuccess> =
         let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
@@ -129,17 +131,9 @@ module MagicTodoAdmission =
         (settledCurrent: ObligationList)
         (mayProceedPastLag1: Result<unit, MagicTodoReject>)
         (existingPrepared: ExistingPrepared option)
-        (localized: LocalizedToolCall)
+        (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         : AdmissionOutcome<ObligationPrepareSuccess> =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
-        | Ok() ->
-            admitAfterBatch
-                sha256
-                lifeId
-                settledCurrent
-                mayProceedPastLag1
-                existingPrepared
-                localized
-                submitted
+        | Ok() -> admitAfterBatch sha256 lifeId settledCurrent mayProceedPastLag1 existingPrepared localized submitted

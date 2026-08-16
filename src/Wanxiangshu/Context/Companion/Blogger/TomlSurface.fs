@@ -30,9 +30,19 @@ module BloggerTomlSurface =
         | "toolCall" -> BloggerDeltaPart.ToolCallPart(p.Tool, p.Args)
         | "toolResult" -> BloggerDeltaPart.ToolResultPart p.Text
         | "imageOmitted" ->
-            BloggerDeltaPart.ImageOmitted(if isNull p.MediaType || p.MediaType = "" then None else Some p.MediaType)
+            BloggerDeltaPart.ImageOmitted(
+                if isNull p.MediaType || p.MediaType = "" then
+                    None
+                else
+                    Some p.MediaType
+            )
         | "mediaOmitted" ->
-            BloggerDeltaPart.MediaOmitted(if isNull p.MediaType || p.MediaType = "" then None else Some p.MediaType)
+            BloggerDeltaPart.MediaOmitted(
+                if isNull p.MediaType || p.MediaType = "" then
+                    None
+                else
+                    Some p.MediaType
+            )
         | other -> failwithf "BloggerTomlSurface: unknown part kind %s" other
 
     let private itemOf (item: ItemInput) =
@@ -50,9 +60,7 @@ module BloggerTomlSurface =
         BloggerToml.renderPreviousEnforcerTip tipField cycleId
 
     let renderWith (instructions: string array) (items: ItemInput array) : string =
-        BloggerToml.renderWith
-            (List.ofArray instructions)
-            (Array.toList (Array.map itemOf items))
+        BloggerToml.renderWith (List.ofArray instructions) (Array.toList (Array.map itemOf items))
 
     let render (items: ItemInput array) : string =
         BloggerToml.render (Array.toList (Array.map itemOf items))

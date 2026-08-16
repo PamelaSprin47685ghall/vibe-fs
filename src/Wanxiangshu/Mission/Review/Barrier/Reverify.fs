@@ -157,9 +157,7 @@ module ReviewBarrierWorkflow =
                         ))
                         [ WaitEscape.SessionLifetime
                           WaitEscape.CancelledBy(
-                              CausalOwner.create
-                                  "ReviewBarrierWorkflow"
-                                  [ "manager", SessionId.value managerSessionId ]
+                              CausalOwner.create "ReviewBarrierWorkflow" [ "manager", SessionId.value managerSessionId ]
                           ) ]
                         "ReviewBarrierWorkflow.awaitWitness"
 
@@ -176,7 +174,8 @@ module ReviewBarrierWorkflow =
 
         taskResult {
             let! reviewerSessionId =
-                host.ForkReviewer() |> TaskResult.mapError ReviewBarrierFailure.CannotCreateReviewer
+                host.ForkReviewer()
+                |> TaskResult.mapError ReviewBarrierFailure.CannotCreateReviewer
 
             do!
                 ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree

@@ -16,18 +16,14 @@ module DelegatedToolEstimateSurface =
     let private toJson (state: DelegatedToolEstimateProjectionState) : EstimateState =
         {| Remaining = state.Remaining
            Counted =
-               state.CountedToolCalls
-               |> Set.toList
-               |> List.map ToolCallId.value
-               |> List.toArray |}
+            state.CountedToolCalls
+            |> Set.toList
+            |> List.map ToolCallId.value
+            |> List.toArray |}
 
     let private ofJson (state: EstimateState) : DelegatedToolEstimateProjectionState =
         { Remaining = state.Remaining
-          CountedToolCalls =
-              state.Counted
-              |> Array.toList
-              |> List.map ToolCallId.create
-              |> Set.ofList }
+          CountedToolCalls = state.Counted |> Array.toList |> List.map ToolCallId.create |> Set.ofList }
 
     /// Fresh state with an exact remaining budget and no counted calls.
     let replace (expectedToolCalls: int) : EstimateState =

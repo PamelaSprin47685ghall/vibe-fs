@@ -215,9 +215,7 @@ module CoderTool =
             let instructions = [ workRecord ] |> List.filter (String.IsNullOrWhiteSpace >> not)
             tomlObjectWithInstructions instructions []
         | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
-            tomlObjectWithInstructions
-                [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ]
-                []
+            tomlObjectWithInstructions [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ] []
         | Error _ -> consequence context surface.Incomplete Map.empty
 
     let private execute
@@ -234,17 +232,12 @@ module CoderTool =
             let estimate = DelegatedToolEstimate.decode args
 
             match
-                syncDelegate,
-                String.IsNullOrWhiteSpace context.SessionId,
-                estimate,
-                String.IsNullOrWhiteSpace charge
+                syncDelegate, String.IsNullOrWhiteSpace context.SessionId, estimate, String.IsNullOrWhiteSpace charge
             with
             | None, _, _, _ -> return consequence context surface.Unavailable Map.empty
             | Some _, true, _, _ -> return consequence context surface.AuthorityRequired Map.empty
-            | Some _, false, Error _, _ ->
-                return consequence context DelegatedToolEstimate.InvalidPath Map.empty
-            | Some _, false, Ok _, true ->
-                return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
+            | Some _, false, Error _, _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
+            | Some _, false, Ok _, true -> return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
             | Some sd, false, Ok expectedToolCalls, false ->
                 let prepareProviderPrompt () =
                     RepositoryWarmStart.prepare
@@ -258,14 +251,7 @@ module CoderTool =
                 let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Coder context
 
                 let! result =
-                    invoke
-                        sd
-                        SyncDelegateRole.Coder
-                        context
-                        charge
-                        prepareProviderPrompt
-                        batch
-                        expectedToolCalls
+                    invoke sd SyncDelegateRole.Coder context charge prepareProviderPrompt batch expectedToolCalls
 
                 return renderResult context surface result
         }

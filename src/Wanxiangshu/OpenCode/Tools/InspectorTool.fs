@@ -152,18 +152,13 @@ module InspectorTool =
             )
             |> TaskValue.map (Result.map SyncDelegateInvocationResult.WorkRecord)
 
-    let private renderResult
-        (context: HostToolContext)
-        (result: Result<SyncDelegateInvocationResult, string>)
-        =
+    let private renderResult (context: HostToolContext) (result: Result<SyncDelegateInvocationResult, string>) =
         match result with
         | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
             let instructions = [ workRecord ] |> List.filter (String.IsNullOrWhiteSpace >> not)
             tomlObjectWithInstructions instructions []
         | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
-            tomlObjectWithInstructions
-                [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ]
-                []
+            tomlObjectWithInstructions [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ] []
         | Error _ -> consequence context Path.Incomplete Map.empty
 
     let private execute
@@ -178,17 +173,12 @@ module InspectorTool =
             let estimate = DelegatedToolEstimate.decode args
 
             match
-                syncDelegate,
-                String.IsNullOrWhiteSpace context.SessionId,
-                estimate,
-                String.IsNullOrWhiteSpace charge
+                syncDelegate, String.IsNullOrWhiteSpace context.SessionId, estimate, String.IsNullOrWhiteSpace charge
             with
             | None, _, _, _ -> return consequence context Path.Unavailable Map.empty
             | Some _, true, _, _ -> return consequence context Path.AuthorityRequired Map.empty
-            | Some _, false, Error _, _ ->
-                return consequence context DelegatedToolEstimate.InvalidPath Map.empty
-            | Some _, false, Ok _, true ->
-                return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
+            | Some _, false, Error _, _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
+            | Some _, false, Ok _, true -> return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
             | Some sd, false, Ok expectedToolCalls, false ->
                 let prepareProviderPrompt () =
                     RepositoryWarmStart.prepare
@@ -202,14 +192,7 @@ module InspectorTool =
                 let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Inspector context
 
                 let! result =
-                    invoke
-                        sd
-                        SyncDelegateRole.Inspector
-                        context
-                        charge
-                        prepareProviderPrompt
-                        batch
-                        expectedToolCalls
+                    invoke sd SyncDelegateRole.Inspector context charge prepareProviderPrompt batch expectedToolCalls
 
                 return renderResult context result
         }
