@@ -125,14 +125,14 @@ HumanRoot；未证明的消息落 UnknownOrigin 并 fail-closed。已激活的 H
   mid-run 的 UnknownOrigin + 有效 agent **不得**抬成 HumanRoot。
 - 证据：→ PROOF.md R7、R8。
 
-## INTERACTION-AUTHORITY-010 — 禁自激励；自动 continuation 必须有稳定且有界的 authority budget
+## INTERACTION-AUTHORITY-010 — 自动 continuation 必须有稳定 occasion identity；次数预算由 feature 自己定义
 
 合成/repair/review/synthetic/重试 不得抬权（PROMPT-010）：
 
 ```text
 零宽/repair continuation → HumanRoot
 repair response 的新 terminal → 又获得同类 generic repair
-Manager idle continuation 的新 terminal → 又获得同 phase encouragement
+Manager idle 同一 terminal 的重复 idle → 重复发 encouragement
 Review confirmation → 改 Reviewer SelectedAgent
 synthetic → 重置 Fallback Offset
 B 侧重试 → 下一真人 root 默认 Agent
@@ -142,9 +142,9 @@ B 侧重试 → 下一真人 root 默认 Agent
 
 Blogger exact-one chronicle 协议是显式例外：它的 durable repair occasion = **(SessionId, LogicalRunId, BloggerRequestId, terminal ProviderRunIdentity, repair kind)**。`BloggerRequestId` 隔离同一长寿命 Blogger run 上的连续 request；terminal id 区分“同 terminal 重入”与“nudge 后新的 invalid terminal”。它自己的状态机严格限制为 `nudge once → AABB once → fatal/exhaust`，不能成为 generic repair 的无界后门。ClaimSequence 只证明该 occasion 曾 claim；feature 恢复“已执行 AABB”还必须结合当前 dispatch lifecycle，Abandoned claim 不得冒充 issued。
 
-Manager idle automatic encouragement 的 durable budget = **Manager Life + business condition（plan commitment 前 / 后）**，不是 trigger ProviderRun；同一 business condition 下后续 terminal 不再赚新 encouragement。JoinGuard/ReviewGuard 也必须由稳定 session/barrier occasion key 去重。
+Manager idle automatic encouragement **没有跨 terminal 的次数预算**。它的 durable occasion identity 必须包含 exact `ProviderRunIdentity`；同一 terminal/idle occasion 重放幂等，但每个新的 completed Manager terminal 都获得新的 encouragement occasion，即使仍处同一个 pre-T1/post-T1 condition。Life/condition 只参与语义分类与审计，不得把 fresh terminal 压成 silent no-op。JoinGuard/ReviewGuard 仍由各自稳定 session/barrier occasion key 去重。
 
-- 边界：repair/fallback 的业务结局 → `provider-attempt-recovery` / 各 feature；本包拥有“自动 prompt 不得自我扩张 authority budget”的 claim identity。
+- 边界：repair/fallback 的业务结局与次数预算 → `provider-attempt-recovery` / 各 feature；本包拥有自动 prompt 的 durable occasion identity，并保证同一 occasion 不重复获得 authority。
 - 证据：→ PROOF.md R9、R12。
 
 ## INTERACTION-AUTHORITY-011 — authority 是原子 profile 内的稳定子记录

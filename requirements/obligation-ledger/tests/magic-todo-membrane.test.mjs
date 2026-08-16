@@ -385,6 +385,37 @@ test('WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entr
   })
 })
 
+test('WHAT[OBLIGATION-LEDGER-017] zero-work planComplete=true with empty obligations is a valid T1 commitment', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-zero-work')
+    const life = managerLifeId('life-magic-todo-zero-work')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const t1 = await checkpoint(journal, session, 'call-magic-todo-zero-work', [], true)
+      assert.equal(t1.result.ok, true, 'zero-work T1 prepare must succeed')
+
+      const accepted = await magicTodoMembrane.accept(
+        journal,
+        t1.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t1.digest,
+        sha256Hex('zero-work-t1-physical-output'),
+      )
+      assert.equal(accepted.ok, true, 'zero-work T1 accept must succeed')
+
+      const lifeState = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life-magic-todo-zero-work')
+      assert.ok(lifeState.FirstPlanCommitment, 'empty obligations do not prevent the first accepted true from becoming T1')
+      assert.match(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
 const acceptT1Checkpoint = async (journal, session, life, callText) => {
   const t1 = await checkpoint(journal, session, callText, [
     { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },

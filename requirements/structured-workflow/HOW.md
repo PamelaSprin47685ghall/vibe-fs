@@ -25,8 +25,8 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（owner 的 Open
 
 | 文件 | 内容 |
 |---|---|
-| `src/Wanxiangshu/Kernel/DomainFlow.fs` | `AgentError`（HostFailure / SessionDead / InvalidFork / ParentCancelled）、`CompanionError`、`AgentContext { SessionId; AgentName }`、`CompanionContext { SessionId }` —— 领域错误/上下文词汇，**不是 Flow AST** |
-| `src/Wanxiangshu/Kernel/Outcome.fs` | `AgentRunResult`（SessionId / AuthorityRootUserMessageId / ProviderRun / Role / Directory option / TerminalText / TurnFormalText + `IsValid`，EXEC-006）；`SendOutcome`（AdmittedWithReceipt / AdmittedWithPhysicalMessage / Retryable / AcceptanceUnknown / Fatal，PROMPT-005）；`SessionError`（NoProgress / SessionCancelled / AutoRecoveryExhausted / ReviewExhausted / PromptUncertain / ProjectionBroken / InboxFull / Protocol）；`CommitResult<'e>`（Committed / CommitUnknown，PERSIST-002） |
+| `src/Wanxiangshu/Execution/Agent/Errors.fs` + `src/Wanxiangshu/Context/Companion/Errors.fs` | `AgentError`（HostFailure / SessionDead / InvalidFork / ParentCancelled）、`CompanionError`、`AgentContext { SessionId; AgentName }`、`CompanionContext { SessionId }` —— rotation-2 后由各领域 owner 持有，**不是 Flow AST** |
+| `src/Wanxiangshu/Foundation/Outcome.fs` | `AgentRunResult`（SessionId / AuthorityRootUserMessageId / ProviderRun / Role / Directory option / TerminalText / TurnFormalText + `IsValid`，EXEC-006）；`SendOutcome`（AdmittedWithReceipt / AdmittedWithPhysicalMessage / Retryable / AcceptanceUnknown / Fatal，PROMPT-005）；`SessionError`（NoProgress / SessionCancelled / AutoRecoveryExhausted / ReviewExhausted / PromptUncertain / ProjectionBroken / InboxFull / Protocol）；`CommitResult<'e>`（Committed / CommitUnknown，PERSIST-002） |
 
 `Kernel/Parallel.fs` 是唯一业务并发原语 `mapBounded`（ARCH-009，见 WHAT 010）。
 

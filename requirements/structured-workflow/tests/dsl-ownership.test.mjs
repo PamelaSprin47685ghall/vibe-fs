@@ -8,7 +8,7 @@ import test from 'node:test'
 import {
   FORBIDDEN,
   GATE_NAMES,
-  HOST_BOUNDARY_OPEN_BASENAMES,
+  HOST_BOUNDARY_OPEN_PATHS,
   DSL_CLASSES,
   LARGE_DU_THRESHOLD,
   evaluateThreshold,
@@ -622,23 +622,30 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_control_state_requires_structu
 
 test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SatelliteRuntime.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SyncDelegateRuntime.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('CompletionMailbox.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('ForkRuntime.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('EnforcerHost.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HandleCompletionCodec.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('BloggerCoordinator.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('RuntimePath.fs'))
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SyncDelegateRuntime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Journal/RuntimePath.fs'), true)
+  for (const path of [
+    'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs',
+    'src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs',
+    'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs',
+    'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
+    'src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs',
+    'src/Wanxiangshu/Enforcer/Host.fs',
+    'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs',
+    'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
+  ]) {
+    assert.ok(HOST_BOUNDARY_OPEN_PATHS.has(path), `${path} must be an exact-path Host boundary`)
+    assert.equal(isHostBoundaryOpenPath(path), true)
+  }
+  assert.equal(
+    isHostBoundaryOpenPath('src/Wanxiangshu/Persistence/Journal/RuntimePath.fs'),
+    false,
+    'RuntimePath no longer inherits Host-boundary power merely from its basename',
+  )
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), [])
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs'), [])
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Journal/RuntimePath.fs'), [])
+  assert.ok(
+    scanText(source, 'src/Wanxiangshu/Persistence/Journal/RuntimePath.fs').some((h) => h.gate === 'infrastructure-leak'),
+    'a non-authorized exact path must stay fail-closed',
+  )
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
 

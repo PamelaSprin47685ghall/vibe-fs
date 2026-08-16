@@ -39,7 +39,7 @@ LOOP iff D <= threshold
 2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除。
 3. 所有非空行分别用 o200k 计 token；p99=56，向上取二次幂 → `HALF_LIFE=64`。
 4. 所有可读文字按确定的 git path 顺序连接并 token 化。
-5. calibration 从理论最大 distinct steady prior `1/(1-λ)` 扫完整 token 流，取全程最低 `D` 为正常侧：当前 `19.260533967298734`。
+5. calibration 从理论最大 distinct steady prior `1/(1-λ)` 扫完整 token 流，取全程最低 `D` 为正常侧：当前 `19.2450917506684`。
 6. 异常侧不采样：全为同一 token 时 `D` 的理论极限就是 `1`。
 7. threshold = `(normal + 1) / 2 = 10.130242906171084`。
 

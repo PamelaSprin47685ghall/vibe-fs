@@ -15,12 +15,14 @@ import {
   logicalRunId,
   managerLifeId,
   promptDispatcher,
+  providerRun,
   sessionId,
   stream,
   transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
 import * as HostSessionNudge from '../../../dist/Interaction/Dispatch/OpenCode/SessionNudge.js'
+import { managerIdleOccasionKey } from './support/manager-idle.mjs'
 
 const quiescenceModule = await import('../../../dist/OpenCode/Host/SessionQuiescenceGate.js')
 const { SessionQuiescenceGate } = quiescenceModule
@@ -58,7 +60,7 @@ const capturingPort = (sends) => ({
   ListChildren: async () => ({ tag: 0, fields: [[]] }),
 })
 
-test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consumes_one_permit_and_claims_once', async () => {
+test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_is_idempotent_per_terminal_and_unbounded_across_terminals', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'idle-authority-'))
   const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
@@ -83,6 +85,7 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       created.journal,
       managerLifeId('life-idle'),
       'pre-t1',
+      providerRun('run-idle-1'),
     )
     assert.equal(caseOf(first), 'Sent')
     assert.equal(sends.length, 1, 'fresh idle occasion sends exactly once')
@@ -97,6 +100,7 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       created.journal,
       managerLifeId('life-idle'),
       'pre-t1',
+      providerRun('run-idle-1'),
     )
     assert.equal(caseOf(second), 'Superseded')
     assert.equal(sends.length, 1, 'consumed permit never performs a second transport send')
@@ -113,8 +117,9 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       created.journal,
       managerLifeId('life-idle'),
       'pre-t1',
+      providerRun('run-idle-2'),
     )
-    assert.equal(sends.length, 1, 'a new ProviderRun/idle under the same plan-commitment condition cannot mint another encouragement')
+    assert.equal(sends.length, 2, 'a fresh ProviderRun/idle under the same plan-commitment condition must earn another encouragement')
 
     beginAttempt(gate, sid)
     const nextPhasePermit = observeIdle(gate, sid)
@@ -128,10 +133,39 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_idle_manager_continuation_consume
       created.journal,
       managerLifeId('life-idle'),
       'post-t1',
+      providerRun('run-idle-3'),
     )
-    assert.equal(sends.length, 2, 'a genuine business phase change owns a distinct bounded encouragement')
+    assert.equal(sends.length, 3, 'a later terminal after a business phase change also earns encouragement')
   } finally {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_manager_idle_process_dedupe_is_per_terminal_not_per_life_condition', () => {
+  const first = managerIdleOccasionKey(
+    'ses-manager-idle-process',
+    'life-manager-idle-process',
+    'pre-t1',
+    'run-manager-idle-1',
+  )
+  const sameTerminalReplay = managerIdleOccasionKey(
+    'ses-manager-idle-process',
+    'life-manager-idle-process',
+    'pre-t1',
+    'run-manager-idle-1',
+  )
+  const freshTerminalSameCondition = managerIdleOccasionKey(
+    'ses-manager-idle-process',
+    'life-manager-idle-process',
+    'pre-t1',
+    'run-manager-idle-2',
+  )
+
+  assert.equal(first, sameTerminalReplay, 'same terminal replay must keep the same process dedupe key')
+  assert.notEqual(
+    first,
+    freshTerminalSameCondition,
+    'a fresh terminal in the same Life/pre-T1 condition must have a fresh process dedupe key',
+  )
 })

@@ -3,8 +3,9 @@
 // Structured-workflow positive surface: business programs are direct CE
 // workflows (DSL-001 / FLOW-001 / ARCH-001), their exports are the story
 // entrypoints — never a stored Stage/Phase/NextAction program counter
-// (DSL-002 / ARCH-008). Kernel/DomainFlow + Kernel/Outcome are pure domain
-// fact types consumed by those CE programs, not control-state tags.
+// (DSL-002 / ARCH-008). Execution/Agent/Errors + Context/Companion/Errors +
+// Foundation/Outcome are pure domain fact types consumed by those CE programs,
+// not control-state tags.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -45,14 +46,17 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_co
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', async () => {
-  const flow = await load('Foundation/Flow')
+  const agent = await load('Execution/Agent/Errors')
+  const companion = await load('Context/Companion/Errors')
   const outcome = await load('Foundation/Outcome')
 
-  // AgentContext/CompanionContext are the physical/domain context handed to a
-  // direct CE program; the error types are closed domain vocabularies, not
-  // "which step we are at" tags.
-  for (const t of ['AgentContext', 'CompanionContext', 'AgentError', 'CompanionError']) {
-    assert.equal(typeof flow[t], 'function', `Foundation/Flow must export ${t}`)
+  // Context/error vocabularies now live with their owning domains after the
+  // rotation-2 split; neither module is a Flow AST or program position.
+  for (const t of ['AgentContext', 'AgentError']) {
+    assert.equal(typeof agent[t], 'function', `Execution/Agent/Errors must export ${t}`)
+  }
+  for (const t of ['CompanionContext', 'CompanionError']) {
+    assert.equal(typeof companion[t], 'function', `Context/Companion/Errors must export ${t}`)
   }
 
   // AgentRunResult is the completion payload of a successful agent run

@@ -45,7 +45,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
     const shelfmark = shelfmarkFor('s1', caseRec.q)
 
     const fresh = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(fresh, /没有变化/)
+    assert.match(fresh, /No change was found in the evidence this answer depended on\./)
     assertNoMachineFreshness(fresh)
     assert.equal(fresh.includes('s1'), false)
 
@@ -53,15 +53,15 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
     const { port, createCalls, programCalls } = scriptedBookkeeperPort()
     setSessionPort(port)
     const afterChange = await tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(afterChange, /已经变化/)
+    assert.match(afterChange, /The evidence this case depended on had changed\./)
     assert.equal(afterChange.includes(CANONICAL_A), true)
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
 
     const again = await tool.Execute(hostArgs({ shelfmark: shelfmarkFor('s1', CANONICAL_Q) }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(again, /没有变化/)
+    assert.match(again, /No change was found in the evidence this answer depended on\./)
     const missing = await tool.Execute(hostArgs({ shelfmark: 'Nothing here · 00000000' }), { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.match(missing, /没有条目/)
+    assert.match(missing, /The Casebook contains no entry under that shelfmark\./)
   } finally {
     resetSessionPort()
     local.close()
@@ -115,7 +115,7 @@ test('WHAT[KNOWLEDGE-REUSE-011] CASE011_fetch_single_flight_serializes_same_shel
       tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' }),
       tool.Execute(hostArgs({ shelfmark }), { sessionID: 'ses', agent: 'fast-inspector' }),
     ])
-    assert.match(a, /没有变化/)
+    assert.match(a, /No change was found in the evidence this answer depended on\./)
     assert.equal(b, a)
   } finally {
     local.close()

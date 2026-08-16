@@ -18,7 +18,7 @@ import {
   GuidelineProjection_apply as apply,
   GuidelineProjection_pairs as pairs,
   GuidelineProjection_nextOrdinal as nextOrdinal,
-} from '../../../dist/Composition/Durable/GuidelineProjection.js'
+} from '../../../dist/OpenCode/Host/PairProgramming/GuidelineProjection.js'
 
 const addr = (value) => transcriptAddress.create(value)
 const gapBefore = (value) => transcriptGap.before(addr(value))

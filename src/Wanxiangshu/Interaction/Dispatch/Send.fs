@@ -536,15 +536,16 @@ module PromptDispatcherSend =
                 onAccepted
                 None
 
-        /// GLORY-029: one Manager idle encouragement per Life business condition.
-        /// The condition key, not the triggering ProviderRun, is the durable budget
-        /// identity so an encouragement cannot recursively earn another one.
+        /// GLORY-029: one Manager idle encouragement per exact terminal occasion.
+        /// Fresh ProviderRun identities are deliberately unbounded; the terminal
+        /// identity only prevents duplicate idle delivery from double-sending.
         member this.SendManagerIdleEncouragement
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
             (lifeId: ManagerLifeId)
             (conditionKey: string)
+            (terminalProviderRun: ProviderRunIdentity)
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
@@ -555,7 +556,7 @@ module PromptDispatcherSend =
                 port
                 sessionId
                 text
-                (PromptAuthority.idlePayloadDigest lifeId conditionKey)
+                (PromptAuthority.idlePayloadDigest lifeId conditionKey terminalProviderRun)
                 PromptAuthority.ContinuationKind.ManagerIdleEncouragement
                 profile
                 effectiveAgent
