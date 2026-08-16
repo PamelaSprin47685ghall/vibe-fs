@@ -13,6 +13,7 @@ import test from 'node:test'
 import {
   attachmentKind,
   caseOf,
+  idValue,
   sessionAssociation,
   sessionExecutionClass,
   sessionId,
@@ -88,8 +89,8 @@ test('WHAT[SESSION-ONTOLOGY-002] HOST_008_attached_ownership_carries_exactly_one
   const bloggerView = classify(blogger, current)
   // Attached(ownerSessionId, AttachmentKind): exactly one owner, exactly one kind.
   assert.equal(bloggerView.ownership, 'Attached')
-  assert.equal(bloggerView.ownershipFields[0].fields[0], 'ses_main')
-  assert.equal(caseOf(bloggerView.ownershipFields[1]), 'Companion')
+  assert.equal(idValue.session(bloggerView.ownershipFields[0]), 'ses_main')
+  assert.equal(bloggerView.ownershipFields[1].name, 'Companion')
 })
 
 test('WHAT[SESSION-ONTOLOGY-007] HOST_008_executionClassOf_maps_durable_kind_without_inventing_ownership', () => {

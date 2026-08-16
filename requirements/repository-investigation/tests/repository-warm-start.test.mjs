@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
-import { BUILD_ROOT, listItems, resultOf, roles, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
+import { BUILD_ROOT, FsList, listItems, resultOf, roles, sessionId, toList } from '../../verification-system/tests/support/domain.mjs'
 import {
   RepositoryWarmStartHint,
   RepositoryWarmStartSearch,
@@ -82,7 +82,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_032_renderer_keeps_hostile_hint_b
 })
 
 test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_032_renderer_keeps_charge_authoritative_and_hints_do_not_replace_evidence', () => {
-  const rendered = renderCharge('authoritative charge', toList([search(1, 'first', [hint(1, 1, 'src/a.fs', 'orientation')])]))
+  const rendered = renderCharge('authoritative charge', FsList.ofArray([search(1, 'first', [hint(1, 1, 'src/a.fs', 'orientation')])]))
 
   assert.match(rendered, /Caller charge:/)
   assert.match(rendered, /authoritative charge/)
@@ -176,7 +176,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-008] AGENT_032_nonconsumer_nonempty_keywords
   let calls = 0
   const searchFn = async () => {
     calls += 1
-    return toList([])
+    return FsList.ofArray([])
   }
 
   try {

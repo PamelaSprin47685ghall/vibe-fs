@@ -40,12 +40,12 @@ test('WHAT[SESSION-ONTOLOGY-002] HOST_008_SessionOwnership_attached_carries_owne
   const owner = sessionId('ses_owner')
   const attached = sessionOwnership.attached(owner, attachmentKind.syncInspector())
 
-  assert.equal(caseOf(attached), 'Attached')
+  assert.equal(attached.name, 'Attached')
   assert.equal(idValue.session(sessionOwnership.tryOwner(attached)), 'ses_owner')
-  assert.equal(caseOf(sessionOwnership.attachmentKind(attached)), 'SyncInspector')
+  assert.equal(sessionOwnership.attachmentKind(attached).name, 'SyncInspector')
 
   const coderAttached = sessionOwnership.attached(owner, attachmentKind.syncCoder())
-  assert.equal(caseOf(sessionOwnership.attachmentKind(coderAttached)), 'SyncCoder')
+  assert.equal(sessionOwnership.attachmentKind(coderAttached).name, 'SyncCoder')
 })
 
 test('WHAT[SESSION-ONTOLOGY-012] HOST_008_SessionOwnership_root_and_attached_helpers', () => {

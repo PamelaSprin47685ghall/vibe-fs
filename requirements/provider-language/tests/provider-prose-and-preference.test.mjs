@@ -15,7 +15,6 @@ import {
   ensureRoot,
 } from '../../../dist/OpenCode/Host/ProviderLanguageBinding.js'
 import {
-  caseOf,
   mapOf,
   providerLanguage,
   providerResources,
@@ -60,14 +59,14 @@ test('WHAT[PROVIDER-LANGUAGE-006] require language pair fails closed on missing 
 
 test('WHAT[PROVIDER-LANGUAGE-004] unbound session language is English (first touch)', () => {
   const sid = sessionId('ses_prose_unbound')
-  assert.equal(caseOf(languageOf(sid)), 'English')
+  assert.equal(providerLanguage.nameOf(languageOf(sid)), 'English')
 })
 
 test('WHAT[PROVIDER-LANGUAGE-002] bound session language follows the session binding', () => {
   const sid = sessionId('ses_prose_bound')
   const bound = providerLanguage.bindOnce(sid, providerLanguage.simplifiedChinese)
   assert.equal(bound.ok, true)
-  assert.equal(caseOf(languageOf(sid)), 'SimplifiedChinese')
+  assert.equal(providerLanguage.nameOf(languageOf(sid)), 'SimplifiedChinese')
 })
 
 test('WHAT[PROVIDER-LANGUAGE-004] preference change only affects future sessions', async () => {
@@ -75,12 +74,12 @@ test('WHAT[PROVIDER-LANGUAGE-004] preference change only affects future sessions
   const fresh = sessionId('ses_pref_fresh')
 
   await withPreference('zh-CN', async () => {
-    assert.equal(caseOf(ensureRoot(existing)), 'SimplifiedChinese')
+    assert.equal(providerLanguage.nameOf(ensureRoot(existing)), 'SimplifiedChinese')
     // 全局切到 en：已绑 session 不重绑（bind-once 拒绝异值）。
     return withPreference('en', async () => {
-      assert.equal(caseOf(ensureRoot(existing)), 'SimplifiedChinese')
+      assert.equal(providerLanguage.nameOf(ensureRoot(existing)), 'SimplifiedChinese')
       // 新 session 首触达 → 取新偏好。
-      assert.equal(caseOf(ensureRoot(fresh)), 'English')
+      assert.equal(providerLanguage.nameOf(ensureRoot(fresh)), 'English')
     })
   })
 })
@@ -89,11 +88,11 @@ test('WHAT[PROVIDER-LANGUAGE-003] child inherits owner language without reading 
   const existing = sessionId('ses_pref_existing')
 
   await withPreference('zh-CN', async () => {
-    assert.equal(caseOf(ensureRoot(existing)), 'SimplifiedChinese')
+    assert.equal(providerLanguage.nameOf(ensureRoot(existing)), 'SimplifiedChinese')
     // owner=zh → child=zh，即使全局已是 en。
     return withPreference('en', async () => {
       const child = sessionId('ses_pref_child')
-      assert.equal(caseOf(ensureInherited(existing, child)), 'SimplifiedChinese')
+      assert.equal(providerLanguage.nameOf(ensureInherited(existing, child)), 'SimplifiedChinese')
     })
   })
 })

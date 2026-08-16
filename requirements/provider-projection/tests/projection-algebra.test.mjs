@@ -15,12 +15,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   companionPrompt,
+  FsList,
   listItems,
   prefixEpochProjection as prefix,
   projectionAlgebra,
   projectionConstants,
   projectionIntent,
   projectionSnapshot,
+  ProjectionIntentModule,
+  ProjectionPlannerModule,
+  ProjectionRendererModule,
+  ProviderProj,
   providerProjection,
   reviewChallenge,
   toList,
@@ -657,18 +662,15 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_two_KeepPhysicalPrefix_merge
 // 生命周期动词——不启动/等待 Agent、不执行工具、不写 Journal、不恢复
 // Prompt、不管理 ProviderRunIdentity、不推进生命周期状态。
 
-test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecycle_verbs', async () => {
-  const modules = await Promise.all([
-    import('../../../dist/Participant/Provider/Projection/Intent.js'),
-    import('../../../dist/Participant/Provider/Projection/Planner.js'),
-    import('../../../dist/Participant/Provider/Projection/Renderer.js'),
-    import('../../../dist/Participant/Provider/Projection/Model.js'),
-  ])
+test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecycle_verbs', () => {
+  // domain.mjs facade 句柄即四个 dist 模块的命名空间（同一 Fable module 面），
+  // 无需直接 import dist 内部路径。
+  const modules = [ProjectionIntentModule, ProjectionPlannerModule, ProjectionRendererModule, ProviderProj]
   const names = new Set(modules.flatMap((m) => Object.getOwnPropertyNames(m)))
 
   // 正面：模块确实是纯代数面（plan + render），而非编排运行时。
-  assert.equal(typeof modules[1].plan, 'function')
-  assert.equal(typeof modules[2].ProjectionRenderer_renderMessages, 'function')
+  assert.equal(typeof ProjectionPlannerModule.plan, 'function')
+  assert.equal(typeof ProjectionRendererModule.ProjectionRenderer_renderMessages, 'function')
 
   // 负面：无生命周期动词导出（含子串防御，防 camelCase 拼写变体）。
   const lifecycleVerbs = ['start', 'stop', 'wait', 'join', 'spawn', 'resume', 'abort', 'update', 'advance', 'execute']
@@ -689,7 +691,7 @@ test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecyc
 
 test('WHAT[PROVIDER-PROJECTION-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ', () => {
   const build = (callId) =>
-    providerProjection.decodeMessageView(toList([
+    providerProjection.decodeMessageView(FsList.ofArray([
       { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
       { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'tool-call', callID: callId, name: 'read', args: '{"p":1}' }] },
     ]))

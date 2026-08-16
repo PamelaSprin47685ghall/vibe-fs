@@ -117,10 +117,10 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_integrator_Current_reflects_Prepared_bindi
     const frameRef = await writePayload(local.store, 'frame-material')
     const p = Events.StrengthEvents_prepared(
       session('owner'), decision('d1'), run('run-1'), session('replica'),
-      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, toList([frameRef]),
+      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, [frameRef],
     )
 
-    assert.equal(resultOf(await StrengthStore.append(local.store, H, p)).ok, true)
+    assert.equal((await StrengthStore.append(local.store, H, p)).toJSON()[0], 'Ok')
     const projection = local.store.TryCurrent('Strength')
     assert.equal(Id.StrengthDecisionIdModule_value(StrengthStore.tryDecisionForTarget(run('run-1'), projection)), 'd1')
     assert.equal(StrengthStore.isPromoted(decision('d1'), projection), false)
@@ -135,12 +135,12 @@ test('WHAT[SPEC-INV-007] STRENGTH_007_integrator_Current_reflects_Promoted_witho
     const frameRef = await writePayload(local.store, 'frame-material')
     const p = Events.StrengthEvents_prepared(
       session('owner'), decision('d1'), run('run-1'), session('replica'),
-      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, toList([frameRef]),
+      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, [frameRef],
     )
-    const m = Events.StrengthEvents_promoted(session('owner'), decision('d1'), run('run-1'), 'frame-a', toList([frameRef]))
+    const m = Events.StrengthEvents_promoted(session('owner'), decision('d1'), run('run-1'), 'frame-a', [frameRef])
 
-    assert.equal(resultOf(await StrengthStore.append(local.store, H, p)).ok, true)
-    assert.equal(resultOf(await StrengthStore.append(local.store, H, m)).ok, true)
+    assert.equal((await StrengthStore.append(local.store, H, p)).toJSON()[0], 'Ok')
+    assert.equal((await StrengthStore.append(local.store, H, m)).toJSON()[0], 'Ok')
     const projection = local.store.TryCurrent('Strength')
     assert.equal(StrengthStore.isPromoted(decision('d1'), projection), true)
   } finally {

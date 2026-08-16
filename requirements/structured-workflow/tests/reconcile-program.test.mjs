@@ -254,15 +254,16 @@ test('WHAT[STRUCTURED-WORKFLOW-015] operator abort is a control-plane wake, neve
   // case — otherwise recovery/fallback would branch on "which control event
   // happened" as if it were a world fact.
   const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
-  const wakeCases = Object.create(mod.ReconcileWake.prototype).cases()
+  // Control-plane wake channels are the facade-registered Idle/Retry/Failure/
+  // Abort factories (JS-native surface, not the Fable union shape); the
+  // registered TurnOutcome surface never carries the abort channel.
   assert.deepEqual(
-    wakeCases,
-    ['IdleWake', 'RetryWake', 'FailureWake', 'AbortWake'],
+    Object.getOwnPropertyNames(reconcileWake).sort(),
+    ['abortWake', 'failureWake', 'idleWake', 'retryWake'],
     'control-plane wakes are Idle/Retry/Failure/Abort — never TurnOutcome members',
   )
-  const outcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
   assert.equal(
-    outcomeCases.includes('AbortWake'),
+    reconcileProgram.turnOutcomeCases().includes('AbortWake'),
     false,
     'AbortWake must not be a publishable TurnOutcome case (control/data separation)',
   )
