@@ -131,6 +131,14 @@ export const SURFACE_MANIFEST = [
     representation: 'opaque-capability',
     kind: 'pure',
   },
+  {
+    module: 'Repository/Knowledge/Casebook/Surface.js',
+    owner: 'knowledge-reuse',
+    laws: ['KNOWLEDGE-REUSE-002', 'KNOWLEDGE-REUSE-003', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-008', 'KNOWLEDGE-REUSE-010'],
+    source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
 ]
 
 /** Flat module-path allowlist derived from the manifest (scanner regex input). */

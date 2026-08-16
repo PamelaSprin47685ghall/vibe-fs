@@ -146,9 +146,10 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_binds_law_owner_sour
     const ownerWhat = readFileSync(join(requirementsRoot, entry.owner, 'WHAT.md'), 'utf8')
     const ownerProof = readFileSync(join(requirementsRoot, entry.owner, 'PROOF.md'), 'utf8')
     // Every governing law must exist in the owner's WHAT.md and have a
-    // landing row in the owner's PROOF.md.
+    // landing row in the owner's PROOF.md. Title separators vary across
+    // packages (`：`, `—`, ` — `); all are normative heading forms.
     for (const law of entry.laws) {
-      assert.match(ownerWhat, new RegExp(`^## ${law}[:：]`, 'm'), `${label}: law ${law} must exist in ${entry.owner} WHAT.md`)
+      assert.match(ownerWhat, new RegExp(`^## ${law}[:：—\\s]`, 'm'), `${label}: law ${law} must exist in ${entry.owner} WHAT.md`)
       assert.match(ownerProof, new RegExp(`${law}\\b`), `${label}: ${entry.owner} PROOF must carry a landing row for ${law}`)
     }
     // Production source must exist.

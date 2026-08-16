@@ -460,6 +460,7 @@
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Index.fs"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
