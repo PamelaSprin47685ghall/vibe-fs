@@ -94,12 +94,13 @@ module JournalSurface =
 
             return
                 match result with
-                | Ok(writer, _init, projection) ->
+                | Ok(writer, init, projection) ->
                     match AgentJournal.createFromProjection writer projection with
                     | Ok journal ->
                         box
                             {| ok = true
                                journal = journal
+                               localSeq = LocalSeq.value init.LocalSeq
                                commonDir = cd
                                filePath = writer.FilePath
                                release = fun () ->
@@ -175,3 +176,9 @@ module JournalSurface =
     /// Current projection snapshot.
     let snapshot (journal: AgentJournal) : obj =
         AgentJournal.snapshot journal
+
+    /// True if the projection contains a session.
+    let hasSession (journal: AgentJournal) (sessionId: string) : bool =
+        let projection = AgentJournal.snapshot journal
+        AgentProjection.tryFind (SessionId.create (str sessionId)) projection.AgentProjections
+        |> Option.isSome

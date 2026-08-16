@@ -1,53 +1,59 @@
 // Boot replay is owned by CanonicalIntegrator over local writer files.
 
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { agentFact, caseOf, fold, idValue, payloadOf, runtimeId, sessionId, stream, utcOffset } from '../../verification-system/tests/support/domain.mjs'
-import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
+import test from 'node:test'
 
-const EsWriter = await import('../../../dist/Persistence/Journal/EventStoreJournalWriter.js')
-const AgentJournal = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-const createFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_create'))?.[1]
-const resumeFn = Object.entries(EsWriter).find(([name]) => name.startsWith('EventStoreJournalWriter_resumeOrCreate'))?.[1]
-const SESSION = sessionId('ses_es_boot')
-const CLOSED = agentFact('CompanionBloggerClosed', { SessionId: SESSION })
-const mustOk = (r) => { assert.equal(caseOf(r), 'Ok'); return payloadOf(r) }
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+
+const CLOSED = {
+  family: 'Companion',
+  case: 'CompanionBloggerClosed',
+  payload: { SessionId: 'ses_es_boot' },
+}
+
+const mustOk = (result, label) => {
+  assert.equal(result.ok, true, `${label}: ${JSON.stringify(result.error)}`)
+  return result
+}
+
+const withRepo = (fn) => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-boot-'))
+  execFileSync('git', ['init', '--quiet', repo])
+  const commonDir = join(repo, '.git')
+  return fn(commonDir)
+    .finally(() => rmSync(repo, { recursive: true, force: true }))
+}
 
 test('WHAT[DURABLE-EVENTS-013] restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
-  const first = createLocalEventStore({ writerId: 'boot-writer-a' })
-  try {
-    const [writer, init] = await createFn(runtimeId('rt_before'), 4242, utcOffset('2026-04-01T00:00:00Z'), first.store)
-    assert.equal(Number(idValue.localSeq(init.LocalSeq)), 1)
-    const journal = mustOk(AgentJournal.AgentJournalModule_createFromEventStore(writer, init))
-    assert.equal(caseOf(await AgentJournal.AgentJournalModule_appendAgent(stream.session(SESSION), undefined, CLOSED, journal)), 'Ok')
-    journal.Dispose?.()
+  await withRepo(async (commonDir) => {
+    const first = mustOk(await journal.bootWithWriterId(commonDir, 'boot-writer-a', 'rt_before', 4242, '2026-04-01T00:00:00Z'), 'first boot')
 
-    const restarted = createLocalEventStore({ commonDir: first.commonDir, writerId: 'boot-writer-b' })
-    const resumed = mustOk(await resumeFn(runtimeId('rt_after'), 5252, utcOffset('2026-04-02T00:00:00Z'), restarted.store))
-    const [nextWriter, nextInit, projection] = resumed
-    assert.equal(Number(idValue.localSeq(nextInit.LocalSeq)), 1, 'fresh RuntimeId owns a fresh LocalSeq domain')
-    assert.ok(fold.session(projection, 'ses_es_boot'), 'prior journal fact is rebuilt only through Integrator boot replay')
-    const nextJournal = mustOk(AgentJournal.AgentJournalModule_createFromProjection(nextWriter, projection))
-    assert.ok(fold.session(AgentJournal.AgentJournalModule_snapshot(nextJournal), 'ses_es_boot'))
-    nextJournal.Dispose?.()
-  } finally {
-    first.close()
-  }
+    assert.equal(Number(first.localSeq), 1)
+    const firstAppend = mustOk(
+      await journal.appendAgent(first.journal, { kind: 'Session', session: 'ses_es_boot' }, null, CLOSED),
+      'first append',
+    )
+    assert.ok(journal.hasSession(first.journal, 'ses_es_boot'))
+    first.release?.()
+
+    const restarted = mustOk(await journal.bootWithWriterId(commonDir, 'boot-writer-b', 'rt_after', 5252, '2026-04-02T00:00:00Z'), 'reboot')
+    assert.equal(Number(restarted.localSeq), 1, 'fresh RuntimeId owns a fresh LocalSeq domain')
+    assert.ok(journal.hasSession(restarted.journal, 'ses_es_boot'), 'prior journal fact is rebuilt only through Integrator boot replay')
+    restarted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
-  const local = createLocalEventStore({ writerId: 'boot-empty' })
-  try {
-    const resumed = mustOk(await resumeFn(runtimeId('rt_empty'), 6001, utcOffset('2026-05-01T00:00:00Z'), local.store))
-    assert.equal(Number(idValue.localSeq(resumed[1].LocalSeq)), 1)
-    assert.equal(caseOf(resumed[1].Fact), 'Runtime')
-    assert.equal(existsSync(join(local.commonDir, 'wanxiang', 'events', 'boot-empty.ndjson')), false)
-    resumed[0].Release?.()
-  } finally {
-    local.close()
-  }
+  await withRepo(async (commonDir) => {
+    const booted = mustOk(await journal.bootWithWriterId(commonDir, 'boot-empty', 'rt_empty', 6001, '2026-05-01T00:00:00Z'), 'empty boot')
+    assert.equal(Number(booted.localSeq), 1)
+    assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', 'boot-empty.ndjson')), false)
+    booted.release?.()
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
