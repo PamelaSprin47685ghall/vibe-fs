@@ -14,9 +14,8 @@
   },
   "requirements/behavior-diagnosis/tests/enforcer-153-rejudge.test.mjs": {
     "export-discovery": 1,
-    "interop-helper": 10,
-    "du-shape": 2,
-    "deep-dist-import": 2
+    "interop-helper": 6,
+    "du-shape": 2
   },
   "requirements/behavior-diagnosis/tests/enforcer-cycle-commit-branches.test.mjs": {
     "deep-dist-import": 5,
@@ -54,8 +53,7 @@
     "deep-dist-import": 2
   },
   "requirements/behavior-diagnosis/tests/support/blogger-recovery.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 6
+    "deep-dist-import": 2
   },
   "requirements/capability-enforcement/tests/agent-permission-gate.test.mjs": {
     "export-discovery": 4
@@ -328,30 +326,24 @@
     "deep-dist-import": 2
   },
   "requirements/durable-events/tests/append-only-laws.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 8
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/envelope.test.mjs": {
     "interop-helper": 2,
     "export-discovery": 4
   },
   "requirements/durable-events/tests/event-store-append.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 8
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/event-store-fold.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 22
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/event-store-identity-collision.test.mjs": {
-    "deep-dist-import": 3,
-    "interop-helper": 17,
+    "deep-dist-import": 1,
     "export-discovery": 3
   },
   "requirements/durable-events/tests/event-store-journal-boot.test.mjs": {
-    "deep-dist-import": 2,
-    "export-discovery": 2,
-    "interop-helper": 3
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/event-store-journal-codec.test.mjs": {
     "deep-dist-import": 3,
@@ -359,14 +351,10 @@
     "du-shape": 3
   },
   "requirements/durable-events/tests/event-store-journal-writer.test.mjs": {
-    "deep-dist-import": 2,
-    "export-discovery": 1,
-    "interop-helper": 6
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/event-store-merge.test.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 7,
-    "du-shape": 1
+    "deep-dist-import": 1
   },
   "requirements/durable-events/tests/fact-codec.test.mjs": {
     "interop-helper": 1
@@ -407,11 +395,6 @@
   },
   "requirements/execution-model-routing/tests/scheduler-module-config.test.mjs": {
     "deep-dist-import": 1
-  },
-  "requirements/finality/tests/support/finality-contract.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 3,
-    "du-shape": 1
   },
   "requirements/guidance-delivery/tests/guideline-projection.test.mjs": {
     "deep-dist-import": 1
@@ -588,11 +571,6 @@
     "interop-helper": 3,
     "du-shape": 8
   },
-  "requirements/knowledge-reuse/tests/casebook-domain.test.mjs": {
-    "deep-dist-import": 1,
-    "du-shape": 1,
-    "interop-helper": 11
-  },
   "requirements/knowledge-reuse/tests/casebook-index.test.mjs": {
     "deep-dist-import": 3,
     "du-shape": 1,
@@ -607,9 +585,7 @@
     "deep-dist-import": 1
   },
   "requirements/knowledge-reuse/tests/fetch-tool.test.mjs": {
-    "deep-dist-import": 8,
-    "du-shape": 1,
-    "interop-helper": 4
+    "deep-dist-import": 6
   },
   "requirements/knowledge-reuse/tests/g6-host-reuse-finalize.test.mjs": {
     "deep-dist-import": 12,
@@ -628,10 +604,6 @@
   "requirements/knowledge-reuse/tests/lifecycle-wiring.test.mjs": {
     "deep-dist-import": 6,
     "interop-helper": 13
-  },
-  "requirements/knowledge-reuse/tests/support/casebook-contract.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 3
   },
   "requirements/knowledge-reuse/tests/universal-loop.test.mjs": {
     "deep-dist-import": 9,
