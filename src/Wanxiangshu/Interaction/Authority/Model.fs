@@ -516,24 +516,33 @@ module PromptAuthority =
 
         nextClaimSequence scope projection > 1
 
-    /// GLORY-029: the payload digest of a Manager idle encouragement.
+    /// GLORY-029: the durable occasion identity of one Manager idle encouragement.
     ///
-    /// The budget is one automatic encouragement per Manager Life business
-    /// condition, not per provider terminal. A continuation that itself ends idle
-    /// therefore cannot manufacture another encouragement forever. The condition
-    /// key is business-owned (currently before/after plan commitment); Interaction
-    /// Authority only makes it durable.
-    let idlePayloadDigest (lifeId: ManagerLifeId) (conditionKey: string) =
-        String.Join("\u001f", [| ManagerLifeId.value lifeId; conditionKey |])
+    /// Manager encouragement is intentionally unbounded across fresh terminals.
+    /// Life + condition explain the business context, while ProviderRunIdentity
+    /// is the exact physical terminal occasion that must be idempotent across
+    /// duplicate idle delivery / restart replay.
+    let idlePayloadDigest
+        (lifeId: ManagerLifeId)
+        (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        =
+        String.Join(
+            "\u001f",
+            [| ManagerLifeId.value lifeId
+               conditionKey
+               ProviderRunIdentity.value terminalProviderRun |]
+        )
 
-    /// GLORY-029: has this Life condition already used its one encouragement.
-    /// Derived from ClaimSequences, not process memory, so restart cannot reset
-    /// the automatic nudge budget.
+    /// GLORY-029: has this exact terminal occasion already received its Manager
+    /// encouragement. A new ProviderRun is always a fresh occasion, even when the
+    /// Life and pre/post-T1 condition are unchanged.
     let idleAlreadyClaimed
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
         (lifeId: ManagerLifeId)
         (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
         (projection: PromptAuthorityProjection)
         =
         let scope =
@@ -541,7 +550,7 @@ module PromptAuthority =
                 sessionId
                 (Some logicalRunId)
                 (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
-                (idlePayloadDigest lifeId conditionKey)
+                (idlePayloadDigest lifeId conditionKey terminalProviderRun)
 
         nextClaimSequence scope projection > 1
 

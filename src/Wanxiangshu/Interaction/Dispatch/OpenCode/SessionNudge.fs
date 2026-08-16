@@ -343,9 +343,9 @@ module HostSessionNudge =
                         profile
         }
 
-    /// GLORY-029: one Manager idle encouragement per Life business condition.
-    /// Durable ClaimSequences make the bound survive restart; a new provider
-    /// terminal under the same condition does not mint another automatic nudge.
+    /// GLORY-029: one Manager idle encouragement per exact terminal occasion.
+    /// Durable ClaimSequences dedupe duplicate delivery/restart replay of that
+    /// terminal; fresh ProviderRun identities remain intentionally unbounded.
     let trySendManagerIdleEncouragement
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -354,6 +354,7 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (lifeId: ManagerLifeId)
         (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
         : Task<Result<PromptKey, string>> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
@@ -363,8 +364,8 @@ module HostSessionNudge =
             | false, Some durable, Some profile ->
                 let rt = PromptDispatcher.forJournal durable
 
-                if rt.IdleAlreadyClaimed profile lifeId conditionKey then
-                    return Error "Manager idle encouragement already claimed for this life condition"
+                if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
+                    return Error "Manager idle encouragement already claimed for this terminal"
                 else
                     let agent = agentForActiveCursor journal sessionId profile
 
@@ -376,6 +377,7 @@ module HostSessionNudge =
                             prompt
                             lifeId
                             conditionKey
+                            terminalProviderRun
                             profile
                             agent
                             (liveDirectory directory)
@@ -429,8 +431,8 @@ module HostSessionNudge =
                 | Error error -> return IdleContinuationOutcome.Failed error
         }
 
-    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with Life-condition budget.
-    /// Same admission contract as `trySendIdleContinuation` / interaction repair.
+    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
+    /// idempotency and no cross-terminal count limit.
     let trySendIdleManagerEncouragement
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -441,6 +443,7 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (lifeId: ManagerLifeId)
         (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
         : Task<IdleContinuationOutcome> =
         task {
             if not (quiescence.TryConsume permit) then
@@ -455,6 +458,7 @@ module HostSessionNudge =
                         journal
                         lifeId
                         conditionKey
+                        terminalProviderRun
                 with
                 | Ok key -> return IdleContinuationOutcome.Sent key
                 | Error error -> return IdleContinuationOutcome.Failed error

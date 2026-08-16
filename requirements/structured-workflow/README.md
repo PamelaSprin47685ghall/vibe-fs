@@ -35,8 +35,8 @@ Port Decorator       给一次能力逐层增加 observation / normalization / p
 Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure / Process）
 ```
 
-- 类型：`src/Wanxiangshu/Kernel/DomainFlow.fs`（AgentError/CompanionError/Context）、
-  `src/Wanxiangshu/Kernel/Outcome.fs`（AgentRunResult / SendOutcome / SessionError）
+- 类型：`src/Wanxiangshu/Execution/Agent/Errors.fs` + `src/Wanxiangshu/Context/Companion/Errors.fs`（AgentError/CompanionError/Context）、
+  `src/Wanxiangshu/Foundation/Outcome.fs`（AgentRunResult / SendOutcome / SessionError）
 - 直接 CE：`src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs`（`observe` / `observeIdle`）、
   `src/Wanxiangshu/Application/Review/ReviewerWorkflow.fs`（`observe`）、
   `src/Wanxiangshu/Composition/Turn/Workflow.fs`（薄 router，按 bounded context 委派）

@@ -34,9 +34,9 @@ mechanics（`provider-projection`）；horizon admission general law
 
 | 层 | 位置 | 职责 |
 |---|---|---|
-| 交付决策 | `src/Wanxiangshu/Session/EnforcerTipGuidance.fs` | `resolveTipGuidance`：读 Frontier+Coverage → Full/Identity；只 fold durable facts |
-| 投影 | `src/Wanxiangshu/Journal/{TipDeliveryProjection,GuidelineProjection}.fs` | Full 历史（reanchor 可清）、auto-injected pair 历史（byte 冻结） |
-| marker 注入 | `src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs` | `tryInject`：auto-injected tool pair |
+| 交付决策 | `src/Wanxiangshu/Enforcer/Guidance/Tip.fs` | `resolveTipGuidance`：读 Frontier+Coverage → Full/Identity；只 fold durable facts |
+| 投影 | `src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs` + `src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs` | Full 历史（reanchor 可清）、auto-injected pair 历史（byte 冻结） |
+| marker 注入 | `src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs` | `tryInject`：auto-injected tool pair |
 
 ## Proof 概览（落点表见 `PROOF.md`）
 

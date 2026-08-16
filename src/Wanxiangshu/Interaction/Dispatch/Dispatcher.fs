@@ -324,18 +324,21 @@ module PromptDispatcher =
                 repairKind
                 (this.ProjectionFor profile.SessionId)
 
-        /// GLORY-029: has this Manager Life business condition already used its one
-        /// automatic encouragement. Durable via ClaimSequences.
+        /// GLORY-029: has this exact Manager terminal occasion already received
+        /// its encouragement. Fresh ProviderRun identities are intentionally
+        /// unbounded, even within the same Life/business condition.
         member this.IdleAlreadyClaimed
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (lifeId: ManagerLifeId)
             (conditionKey: string)
+            (terminalProviderRun: ProviderRunIdentity)
             : bool =
             PromptAuthority.idleAlreadyClaimed
                 profile.SessionId
                 profile.LogicalRunId
                 lifeId
                 conditionKey
+                terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
 
         member internal _.Metadata (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) =

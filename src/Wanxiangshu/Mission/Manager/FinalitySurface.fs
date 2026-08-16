@@ -496,6 +496,21 @@ module FinalitySurface =
         |> Option.map (ManagerFinality.admitLabor >> laborAdmissionView)
         |> Option.defaultValue "labor-may-continue"
 
+    /// FINALITY-019 / GLORY-029: JS-native projection of the exact Manager idle
+    /// occasion identity. Same terminal => same key; fresh ProviderRun => fresh
+    /// key even when Life and pre/post-T1 condition are unchanged.
+    let managerIdleOccasionKey
+        (sessionId: string)
+        (lifeId: string)
+        (conditionKey: string)
+        (providerRun: string)
+        : string =
+        ManagerIdle.occasionKey
+            (SessionId.create sessionId)
+            (ManagerLifeId.create lifeId)
+            conditionKey
+            (ProviderRunIdentity.create providerRun)
+
     /// GLORY-070: a Life is archived only by LifeCompleted (CurrentLife cleared
     /// AND CompletedLives non-empty). A fresh session keeps working.
     let isLifeArchived (world: obj) : bool =
@@ -542,7 +557,8 @@ module FinalitySurface =
     /// strings, and the answer is JS-shaped slots. No Fable types cross the
     /// boundary beyond the snapshot handle itself.
     let cohortRosterFromSnapshot (snapshot: obj) (lifeId: string) (requestId: string) : obj array =
-        let ps = unbox<AgentProjectionSet> snapshot
+        let projection = unbox<ProjectionSet> snapshot
+        let ps = projection.AgentProjections
         let lifeId = ManagerLifeId.create lifeId
         let requestId = FinalityRequestId.create requestId
 

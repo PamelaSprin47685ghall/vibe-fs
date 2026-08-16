@@ -106,6 +106,22 @@ module ManagerIdle =
 
         ProviderProse.documentFor sessionId path Map.empty
 
+    /// GLORY-029: process-local dedupe uses the same exact terminal occasion
+    /// identity as the durable claim. Life/condition classify the encouragement;
+    /// ProviderRunIdentity prevents one physical terminal from sending twice.
+    let occasionKey
+        (sessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        =
+        sprintf
+            "manager-idle:%s:%s:%s:%s"
+            (SessionId.value sessionId)
+            (ManagerLifeId.value lifeId)
+            conditionKey
+            (ProviderRunIdentity.value terminalProviderRun)
+
     let encourageLabor
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -120,15 +136,14 @@ module ManagerIdle =
         let kind = encouragementKind journal life
         let kindKey = encouragementKey kind
 
-        let processKey =
-            sprintf "manager-idle:%s:%s:%s" sessionKey (ManagerLifeId.value life.LifeId) kindKey
+        let processKey = occasionKey turn.SessionId life.LifeId kindKey turn.ProviderRun
 
         match context.Quiescence with
         | Some permit when not (nudgeSent.Contains processKey) ->
             let idleAlreadyClaimed =
                 match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
                 | Some durable, Some profile ->
-                    PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey
+                    PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey turn.ProviderRun
                 | _ -> false
 
             if idleAlreadyClaimed then
@@ -148,6 +163,7 @@ module ManagerIdle =
                             journal
                             life.LifeId
                             kindKey
+                            turn.ProviderRun
                     with
                     | HostSessionNudge.IdleContinuationOutcome.Sent _
                     | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()

@@ -46,7 +46,7 @@ type TipDeliveryProjectionState = { FullDeliveredTips: Set<string> }
   （GD-005；`TDP_004/005` 锁定）。
 - `hasFullDelivered`：判定函数，null/空 tipName → false。
 
-## 3. 历史字节：`src/Wanxiangshu/OpenCode/Contract/GuidelineProjection.fs`（GD-011）
+## 3. 历史字节：`src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs`（GD-011）
 
 ```fsharp
 type PairProgrammingGuideline =
@@ -61,7 +61,7 @@ type PairProgrammingGuideline =
 - `MarkerText` 原样存储 → replay byte-identical（HOST-013「当时实际看到的精确
   正文」）。substrate 是 Journal fold，不是私有 delivery 文件。
 
-## 4. marker 注入：`src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs`
+## 4. marker 注入：`src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs`
 
 - `tryInject`：只负责把**已经完成组装的** `MarkerText` 生成 auto-injected tool-call/tool-result pair，并锚到 transcript 的 CallGap/ResultGap；Main 侧没有 fake-user message（GD-009）。
 - occurrence 组装在 `PluginTransforms` + `PairProgrammingCalibration`：`latest tip guidance` → TIME-007 `elapsed` → DELEG-022 `remaining expected tool calls` → canonical pair-programming guideline，各动态 owner 只做 O(1) projection read；无 estimate 时省略该 fragment。
