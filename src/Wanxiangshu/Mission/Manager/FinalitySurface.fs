@@ -355,7 +355,11 @@ module FinalitySurface =
                lastWordsDigest = BlobDigest.value request.LastWordsDigest
                providerRun = ProviderRunIdentity.value request.ProviderRun
                toolCallId = ToolCallId.value request.ToolCallId
-               members = request.Members |> Map.toList |> List.map (fun (_, memberRef) -> memberView memberRef)
+               members =
+                   request.Members
+                   |> Map.toList
+                   |> List.map (fun (_, memberRef) -> memberView memberRef)
+                   |> List.toArray
                resolution = resolutionView request.Resolution |}
 
     /// The current Life as JS-shaped data. `undefined` when the session has no
@@ -377,14 +381,19 @@ module FinalitySurface =
                    openingTextRef = BlobRef.value life.OpeningTextRef
                    openingTextDigest = BlobDigest.value life.OpeningTextDigest
                    openingCursorSequence = life.OpeningCursor.Sequence
-                   protectedPrefixEnd = life.ProtectedPrefixEnd |> Option.map (fun cursor -> cursor.Sequence)
-                   activeFinality = life.ActiveFinality |> Option.map requestView
+                   protectedPrefixEnd =
+                       life.ProtectedPrefixEnd
+                       |> Option.map (fun cursor -> box cursor.Sequence)
+                       |> Option.defaultValue null
+                   activeFinality = life.ActiveFinality |> Option.map requestView |> Option.defaultValue null
                    enlistedReviewers =
                        life.EnlistedReviewers
                        |> Map.toList
                        |> List.map (fun (session, standing) ->
                            box {| sessionId = SessionId.value session; standing = standingView standing |})
-                   lastRejectedWorkRecord = life.LastRejectedWorkRecord |> Option.map BlobRef.value
+                       |> List.toArray
+                   lastRejectedWorkRecord =
+                       life.LastRejectedWorkRecord |> Option.map BlobRef.value |> Option.defaultValue null
                    lastBlessing =
                        life.LastBlessing
                        |> Option.map (fun blessing ->
@@ -392,7 +401,9 @@ module FinalitySurface =
                                {| requestId = FinalityRequestId.value blessing.RequestId
                                   workRecordBundleRef = BlobRef.value blessing.WorkRecordBundleRef
                                   workRecordBundleDigest = BlobDigest.value blessing.WorkRecordBundleDigest |})
-                   completedTerminal = life.CompletedTerminal |> Option.map BlobRef.value
+                       |> Option.defaultValue null
+                   completedTerminal =
+                       life.CompletedTerminal |> Option.map BlobRef.value |> Option.defaultValue null
                    completed = life.Completed |}
 
     /// `{ ok: true, life } | { ok: false, error }` — the Life view, or a typed
@@ -448,18 +459,28 @@ module FinalitySurface =
         | ManagerFinality.EndingDisposition.CompleteBlessedLife _ -> box {| kind = "complete-blessed-life" |}
         | ManagerFinality.EndingDisposition.BeginFinality -> box {| kind = "begin-finality" |}
 
+    /// GLORY-065: an archived Life (LifeCompleted cleared CurrentLife and
+    /// pushed into CompletedLives) replays as AlreadyCompleted — never restarts.
+    let private archivedDisposition (world: World) : obj =
+        let managerLife =
+            world.SessionId
+            |> Option.bind (fun session -> AgentProjection.tryFind session world.Projection.AgentProjections)
+            |> Option.bind (fun projection -> projection.ManagerLife)
+
+        match managerLife with
+        | Some life when not (List.isEmpty life.CompletedLives) -> box {| kind = "already-completed" |}
+        | _ -> box {| kind = "no-life" |}
+
     /// Interpret one suicide call against the durable Life.
     /// `callId` absent → `undefined`; `hasPlanCommitment` is the typed
     /// obligation-ledger projection (FINALITY-004).
     let classifyEnding (world: obj) (callId: string) (hasPlanCommitment: bool) : obj =
         let world = asWorld world
-        match currentLife world with
-        | None -> box {| kind = "no-life" |}
-        | Some life ->
-            let call =
-                if isNull callId || callId = "" then None else Some(ToolCallId.create callId)
+        let call = if isNull callId || callId = "" then None else Some(ToolCallId.create callId)
 
-            ManagerFinality.classifyEnding call life hasPlanCommitment |> dispositionView
+        match currentLife world with
+        | Some life -> ManagerFinality.classifyEnding call life hasPlanCommitment |> dispositionView
+        | None -> archivedDisposition world
 
     let private laborAdmissionView (admission: ManagerFinality.LaborAdmission) : string =
         match admission with
