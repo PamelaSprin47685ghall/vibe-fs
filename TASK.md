@@ -18,10 +18,10 @@
 
 当前 roadmap 写：
 
-* P6 ✅：“大量迁 projection/decision/codec/policy tests”
-* P7 ✅：“Resource/runtime wave”
-* P8 ✅：“Effect/integration wave”
-* P9 ✅：“Delete legacy adapters” 
+* P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
+* P7 — NOT PROVEN：RolesSurface 是 vocabulary/policy surface，不证明 stateful runtime
+* P8 — NOT PROVEN：删 dead compatibility code 不等于 effect boundary 重构
+* P9 — IN PROGRESS：6 dead adapters deleted; 328 domain.mjs consumers remain; exit condition NOT MET
 
 这些标记和仓库事实对不上。
 
