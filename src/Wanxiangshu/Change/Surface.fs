@@ -36,10 +36,13 @@ module ChangeSurface =
 
     let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0[$1]"
 
+    [<Emit("undefined")>]
+    let private jsUndefined: obj = jsNative
+
     let private optionObj (value: 'T option) : obj =
         match value with
         | Some value -> box value
-        | None -> null
+        | None -> jsUndefined
 
     let private stringOf (value: obj) = if isNullish value then "" else string value
 
@@ -399,7 +402,10 @@ module ChangeSurface =
                     |> List.map (fun (path, identity) ->
                         box
                             {| path = WorktreePath.value path
-                               identity = optionObj (identity |> Option.map WorktreeIdentity.value) |})
+                               identity =
+                                   match identity with
+                                   | Some id -> box (WorktreeIdentity.value id)
+                                   | None -> null |})
                     |> List.toArray
                     |> box)
         }

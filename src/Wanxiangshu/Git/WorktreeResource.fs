@@ -73,7 +73,7 @@ type WorktreeResource
                     }
                 )
             else
-                ValueTask()
+                WorktreeDisposal.asValueTask (AsyncSupport.completedTask ())
 
     static member Create(git: GitPort, jobId: ManagerJobId, path: WorktreePath) =
         task {
