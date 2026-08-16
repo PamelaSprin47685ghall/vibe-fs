@@ -10,7 +10,7 @@ import { quiescencePermit, reconcileProgram, reconcileWake } from '../../verific
 
 // ── pure classifiers ─────────────────────────────────────────────────────────
 
-test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', async () => {
   assert.equal(typeof reconcileProgram.isTerminalOutcome, 'function')
 
   assert.equal(reconcileProgram.isTerminalOutcome('TurnCompleted'), true)
@@ -34,7 +34,7 @@ test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisiona
 
 // ── decideStep: bounded causal reread → next pure decision ───────────────────
 
-test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhaustion', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhaustion', () => {
   assert.equal(typeof reconcileProgram.decideStep, 'function')
   assert.equal(typeof reconcileProgram.decisionName, 'function')
 
@@ -114,7 +114,7 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
 
 // ── publishDecision: consumed (terminal) vs provisional maps ─────────────────
 
-test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
   assert.equal(typeof reconcileProgram.publishDecision, 'function')
   assert.equal(typeof reconcileProgram.consumeKey, 'function')
 
@@ -165,7 +165,7 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
   assert.equal(cleared.provisionalHas(provisional), false)
 })
 
-test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', async () => {
   // HOST-004 / rabbit §7: TurnUnknown is type-unreachable for publishDecision
   // (not a TurnOutcome). IdleWake + exhausted Unknown → Publish (observation
   // handoff only); business repair lives in TurnWorkflow / InteractionRepair.
@@ -200,7 +200,7 @@ test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn 
 })
 
 
-test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
   const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
   assert.equal(
@@ -212,7 +212,7 @@ test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST expor
   assert.ok(names.some((n) => n.includes('publishDecision')), `publishDecision missing; ${names.join(', ')}`)
 })
 
-test('RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', async () => {
   const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
   const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
 
@@ -245,4 +245,30 @@ test('RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome
       'outcomeOf("TurnUnknown") must not collapse Unknown into a false TurnFailed terminal',
     )
   }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-015] operator abort is a control-plane wake, never a business outcome', async () => {
+  // EXEC-020 / STRUCTURED-WORKFLOW-015: cancellation/interruption are control
+  // events, not business result data. The abort signal lives in ReconcileWake
+  // (a typed control-plane channel) and must never be minted as a TurnOutcome
+  // case — otherwise recovery/fallback would branch on "which control event
+  // happened" as if it were a world fact.
+  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
+  const wakeCases = Object.create(mod.ReconcileWake.prototype).cases()
+  assert.deepEqual(
+    wakeCases,
+    ['IdleWake', 'RetryWake', 'FailureWake', 'AbortWake'],
+    'control-plane wakes are Idle/Retry/Failure/Abort — never TurnOutcome members',
+  )
+  const outcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+  assert.equal(
+    outcomeCases.includes('AbortWake'),
+    false,
+    'AbortWake must not be a publishable TurnOutcome case (control/data separation)',
+  )
+  assert.notEqual(
+    mod.ReconcileWake,
+    mod.TurnOutcome,
+    'the control-plane wake algebra must stay distinct from the business outcome algebra',
+  )
 })

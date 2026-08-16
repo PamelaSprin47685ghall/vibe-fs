@@ -18,7 +18,7 @@ const { ToolRuntimeScope } = await import('../../../dist/OpenCode/Tools/ToolRunt
 
 const parse = (value) => resultOf(StaticTools_reviewerVerdictOfString(value))
 
-test('REVIEW_001_verdict_schema_allows_only_the_verdict_argument', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_verdict_schema_allows_only_the_verdict_argument', () => {
   // `additionalProperties: false` + exactly one property is the schema-level
   // proof that judge has no description field (and no future companion field).
   const schema = JSON.parse(StaticTools_reviewerVerdictSchemaJson)
@@ -30,7 +30,7 @@ test('REVIEW_001_verdict_schema_allows_only_the_verdict_argument', () => {
   assert.equal(schema.additionalProperties, false, 'additionalProperties must be false: no description field')
 })
 
-test('REVIEW_001_verdict_parse_is_exact_perfect_or_revise', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_verdict_parse_is_exact_perfect_or_revise', () => {
   // The parser is deliberately independent of assistant text: a verdict is a
   // tool argument, never something inferred from a transcript.
   assert.equal(parse('PERFECT').ok, true)
@@ -45,7 +45,7 @@ test('REVIEW_001_verdict_parse_is_exact_perfect_or_revise', () => {
   }
 })
 
-test('REVIEW_001_tool_spec_exposes_judge_with_a_single_verdict_argument', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_tool_spec_exposes_judge_with_a_single_verdict_argument', () => {
   const fakeSchema = { enum: (values) => ({ values }) }
   const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
   const scope = new ToolRuntimeScope(
@@ -73,7 +73,7 @@ test('REVIEW_001_tool_spec_exposes_judge_with_a_single_verdict_argument', () => 
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
-test('REVIEW_001_reviewer_provider_instructions_name_judge_never_the_removed_verdict_tool', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_reviewer_provider_instructions_name_judge_never_the_removed_verdict_tool', () => {
   const reviewerInstructionPaths = [
     'runtime/reviewer-verdict-required',
     'lifecycle/magic-todo/process-reviewer-preamble',
@@ -89,7 +89,7 @@ test('REVIEW_001_reviewer_provider_instructions_name_judge_never_the_removed_ver
   }
 })
 
-test('REVIEW_001_receipt_does_not_echo_the_verdict', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_receipt_does_not_echo_the_verdict', () => {
   // The success receipt is a fixed sentence. It carries no verdict value, so a
   // reviewer cannot learn "what the system recorded" from the tool result — the
   // judgement is the model's own creation, not an echoed state.

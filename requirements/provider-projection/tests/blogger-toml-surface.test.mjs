@@ -24,7 +24,7 @@ const part = {
   mediaOmitted: (mediaType) => ({ Kind: 'mediaOmitted', Text: '', Tool: '', Args: '', MediaType: mediaType }),
 }
 
-test('P6_BLOGGER_SURFACE_exports_exact_schema_names', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_exports_exact_schema_names', () => {
   assert.deepEqual(Object.getOwnPropertyNames(toml).sort(), [
     'DoNotExecTable',
     'NewWorkTable',
@@ -37,7 +37,7 @@ test('P6_BLOGGER_SURFACE_exports_exact_schema_names', () => {
   ])
 })
 
-test('P6_BLOGGER_SURFACE_tool_call_renders_as_new_work_table', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_tool_call_renders_as_new_work_table', () => {
   const rendered = toml.renderItem(item(part.toolCall('edit', '{"filePath":"a.fs"}'), { role: 'assistant' }))
   assertJsData(rendered, 'rendered item')
   assert.equal(
@@ -50,7 +50,7 @@ test('P6_BLOGGER_SURFACE_tool_call_renders_as_new_work_table', () => {
   )
 })
 
-test('P6_BLOGGER_SURFACE_part_kind_is_the_field_name', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_part_kind_is_the_field_name', () => {
   assert.equal(
     toml.renderItem(item(part.text('Fix the race.'))),
     ['[[new_work_to_record]]', 'user = "Fix the race."'].join('\n'),
@@ -61,13 +61,13 @@ test('P6_BLOGGER_SURFACE_part_kind_is_the_field_name', () => {
   )
 })
 
-test('P6_BLOGGER_SURFACE_media_omitted_defaults_to_untyped', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_media_omitted_defaults_to_untyped', () => {
   assert.equal(toml.renderItem(item(part.imageOmitted('image/png'))).includes('media_omitted = "image/png"'), true)
   assert.equal(toml.renderItem(item(part.imageOmitted(undefined))).includes('media_omitted = "untyped"'), true)
   assert.equal(toml.renderItem(item(part.imageOmitted(''))).includes('media_omitted = "untyped"'), true)
 })
 
-test('P6_BLOGGER_SURFACE_render_orders_and_ends_with_single_lf', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_render_orders_and_ends_with_single_lf', () => {
   const rendered = toml.render([
     item(part.text('work')),
     item(part.toolCall('read', '{}'), { role: 'assistant' }),
@@ -79,7 +79,7 @@ test('P6_BLOGGER_SURFACE_render_orders_and_ends_with_single_lf', () => {
   assert.equal(rendered.includes('kind ='), false)
 })
 
-test('P6_BLOGGER_SURFACE_historic_frame_renders_as_do_not_exec', () => {
+test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_historic_frame_renders_as_do_not_exec', () => {
   assert.equal(
     toml.renderHistoricFrame('frame body 0'),
     ['[[do_not_exec]]', 'historic_frame = "frame body 0"', ''].join('\n'),

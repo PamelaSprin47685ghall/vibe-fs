@@ -27,7 +27,7 @@ const EXPECTED_ATTACHMENT = {
 
 // ── SyncDelegate.delegateRoleToAttachment ────────────────────────────────────
 
-test('HOST_008_delegateRoleToAttachment_maps_inspector_and_coder', () => {
+test('WHAT[SESSION-ONTOLOGY-003] HOST_008_delegateRoleToAttachment_maps_inspector_and_coder', () => {
   for (const roleName of ROLES) {
     const attachment = syncDelegate.delegateRoleToAttachment(syncDelegate.role(roleName))
     assert.equal(caseOf(attachment), EXPECTED_ATTACHMENT[roleName])
@@ -36,7 +36,19 @@ test('HOST_008_delegateRoleToAttachment_maps_inspector_and_coder', () => {
 
 // ── SessionOwnership helpers ─────────────────────────────────────────────────
 
-test('HOST_008_SessionOwnership_tryOwner_and_attachmentKind', () => {
+test('WHAT[SESSION-ONTOLOGY-002] HOST_008_SessionOwnership_attached_carries_owner_and_kind', () => {
+  const owner = sessionId('ses_owner')
+  const attached = sessionOwnership.attached(owner, attachmentKind.syncInspector())
+
+  assert.equal(caseOf(attached), 'Attached')
+  assert.equal(idValue.session(sessionOwnership.tryOwner(attached)), 'ses_owner')
+  assert.equal(caseOf(sessionOwnership.attachmentKind(attached)), 'SyncInspector')
+
+  const coderAttached = sessionOwnership.attached(owner, attachmentKind.syncCoder())
+  assert.equal(caseOf(sessionOwnership.attachmentKind(coderAttached)), 'SyncCoder')
+})
+
+test('WHAT[SESSION-ONTOLOGY-012] HOST_008_SessionOwnership_root_and_attached_helpers', () => {
   const owner = sessionId('ses_owner')
   const root = sessionOwnership.root()
   const attached = sessionOwnership.attached(owner, attachmentKind.syncInspector())
@@ -48,12 +60,9 @@ test('HOST_008_SessionOwnership_tryOwner_and_attachmentKind', () => {
   assert.equal(caseOf(attached), 'Attached')
   assert.equal(idValue.session(sessionOwnership.tryOwner(attached)), 'ses_owner')
   assert.equal(caseOf(sessionOwnership.attachmentKind(attached)), 'SyncInspector')
-
-  const coderAttached = sessionOwnership.attached(owner, attachmentKind.syncCoder())
-  assert.equal(caseOf(sessionOwnership.attachmentKind(coderAttached)), 'SyncCoder')
 })
 
-test('HOST_008_SessionExecutionClass_predicates', () => {
+test('WHAT[SESSION-ONTOLOGY-001] HOST_008_SessionExecutionClass_predicates_distinguish_work_from_leaf', () => {
   const work = sessionExecutionClass.of('Work')
   const leaf = sessionExecutionClass.of('InternalLeaf')
 
@@ -63,7 +72,7 @@ test('HOST_008_SessionExecutionClass_predicates', () => {
   assert.equal(sessionExecutionClass.isInternalLeaf(leaf), true)
 })
 
-test('HOST_008_AttachmentKind_bookkeeper_carries_transaction_id', () => {
+test('WHAT[SESSION-ONTOLOGY-012] HOST_008_AttachmentKind_bookkeeper_carries_transaction_id', () => {
   const kind = attachmentKind.bookkeeper('tx-42')
   assert.equal(caseOf(kind), 'Bookkeeper')
   assert.equal(payloadOf(kind), 'tx-42')

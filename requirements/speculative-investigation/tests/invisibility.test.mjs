@@ -33,7 +33,7 @@ const bundle = resultOf(Frame.StrengthFrame_tryBuild(
   ]) }]),
 )).value
 
-test('STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
+test('WHAT[SPEC-INV-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
   const base = toList([
     message('user', [textPart('inspect the file')]),
     message('assistant', [textPart('primary output')]),

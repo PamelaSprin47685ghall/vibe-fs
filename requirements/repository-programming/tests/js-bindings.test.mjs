@@ -32,7 +32,7 @@ const coderCaps = FsSet.ofArray(
   permissionComparer,
 )
 
-test('JS005_bindings_file_reads_utf8', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_bindings_file_reads_utf8', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -50,7 +50,7 @@ test('JS005_bindings_file_reads_utf8', () => {
   }
 })
 
-test('JS007_bindings_path_boundary_denies_escape', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_path_boundary_denies_escape', () => {
   const { dir, cleanup } = sandbox()
   try {
     const staging = []
@@ -66,7 +66,7 @@ test('JS007_bindings_path_boundary_denies_escape', () => {
   }
 })
 
-test('JS007_bindings_glob_lists_matching_paths', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -82,7 +82,7 @@ test('JS007_bindings_glob_lists_matching_paths', () => {
   }
 })
 
-test('JS010_bindings_grep_returns_matches', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
@@ -98,7 +98,23 @@ test('JS010_bindings_grep_returns_matches', () => {
   }
 })
 
-test('JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_012_bindings_rewrite_requires_existing_target', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
+    const staging = []
+    const api = createApi(dir, staging)
+    const result = api.js.edit('a.txt', 'new text')
+    assert.equal(result.ok, true)
+    const missing = api.js.edit('nope.txt', 'x')
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'FILE_NOT_FOUND')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-012] JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
@@ -109,15 +125,12 @@ test('JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
     assert.equal(staging.length, 1)
     const disk = api.js.read('a.txt')
     assert.equal(disk.text, 'old text')
-    const missing = api.js.edit('nope.txt', 'x')
-    assert.equal(missing.ok, false)
-    assert.equal(missing.code, 'FILE_NOT_FOUND')
   } finally {
     cleanup()
   }
 })
 
-test('JS009_012_bindings_write_stages_create', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_012_bindings_write_stages_create', () => {
   const { dir, cleanup } = sandbox()
   try {
     const staging = []
@@ -126,6 +139,18 @@ test('JS009_012_bindings_write_stages_create', () => {
     assert.equal(result.ok, true)
     assert.equal(staging.length, 1)
     assert.equal(staging[0].tag === 0 ? 'Rewrite' : 'Create', 'Create')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-012] JS009_012_bindings_write_leaves_disk_untouched', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const staging = []
+    const api = createApi(dir, staging)
+    const result = api.js.write('new.txt', 'fresh')
+    assert.equal(result.ok, true)
     // disk untouched
     const disk = api.js.read('new.txt')
     assert.equal(disk.ok, false)
@@ -134,7 +159,7 @@ test('JS009_012_bindings_write_stages_create', () => {
   }
 })
 
-test('JS011_sandbox_program_uses_bindings_end_to_end', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_sandbox_program_uses_bindings_end_to_end', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')

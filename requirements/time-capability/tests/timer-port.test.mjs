@@ -1,4 +1,6 @@
-// tests/unit/execution/timer-port.test.mjs — ITimerPort contract (VERIFY-004).
+// requirements/time-capability/tests/timer-port.test.mjs — ITimerPort contract (VERIFY-004).
+// TIME-003 — virtual timer port: Advance fires exactly at the handle deadline,
+// Cancel leaves Delay pending forever, Dispose clears all pending entries.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -8,7 +10,7 @@ import {
 
 const settle = () => new Promise((r) => setImmediate(r))
 
-test('VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline', async () => {
+test('WHAT[TIME-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline', async () => {
   const vt = timerPort.createVirtual()
   let fired = 0
   const handle = vt.port.delay(100)
@@ -27,7 +29,7 @@ test('VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline', async
   assert.equal(vt.nowMs(), 100)
 })
 
-test('VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_callbacks', async () => {
+test('WHAT[TIME-003] VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_callbacks', async () => {
   const vt = timerPort.createVirtual()
   let fired = 0
   const handle = vt.port.delay(50)
@@ -41,7 +43,7 @@ test('VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_callbacks', async 
   assert.equal(fired, 0, 'cancel must leave Delay pending forever')
 })
 
-test('VERIFY_004_virtual_timer_dispose_stops_all_pending_callbacks', async () => {
+test('WHAT[TIME-003] VERIFY_004_virtual_timer_dispose_stops_all_pending_callbacks', async () => {
   const vt = timerPort.createVirtual()
   let fired = 0
   const a = vt.port.delay(10)
@@ -59,7 +61,7 @@ test('VERIFY_004_virtual_timer_dispose_stops_all_pending_callbacks', async () =>
   assert.equal(fired, 0, 'dispose clears pending entries without firing')
 })
 
-test('VERIFY_004_virtual_timer_multiple_handles_fire_independently', async () => {
+test('WHAT[TIME-003] VERIFY_004_virtual_timer_multiple_handles_fire_independently', async () => {
   const vt = timerPort.createVirtual()
   const order = []
   const short = vt.port.delay(10)

@@ -29,7 +29,7 @@ const {
 const { RenderedPrefix } = await import('../../../dist/Participant/Provider/Projection/Renderer.js')
 const { PrefixActivation } = await import('../../../dist/Participant/Provider/Projection/Intent.js')
 
-test('MISC_projection_decode_part_text_reasoning', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_part_text_reasoning', () => {
   assert.equal(decodePart(null), undefined)
   const text = decodePart({ type: 'text', text: 'hi' })
   assert.equal(caseOf(text), 'WireText')
@@ -42,7 +42,7 @@ test('MISC_projection_decode_part_text_reasoning', () => {
   assert.equal(payloadOf(viaText), 't')
 })
 
-test('MISC_projection_decode_part_tool_call_states', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_part_tool_call_states', () => {
   const withState = decodePart({ type: 'tool-call', callID: 'c1', name: 'bash', state: { status: 'completed', output: { ok: 1 } } })
   assert.equal(caseOf(withState), 'WireToolResult')
   assert.equal(payloadOf(withState)[1], '{"ok":1}')
@@ -64,7 +64,7 @@ test('MISC_projection_decode_part_tool_call_states', () => {
   assert.equal(missingName, undefined, 'tool-call without name is dropped')
 })
 
-test('MISC_projection_decode_part_tool_result_and_tool_prefix', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_part_tool_result_and_tool_prefix', () => {
   const r = decodePart({ type: 'tool_result', callID: 'c1', result: { ok: true } })
   assert.equal(caseOf(r), 'WireToolResult')
   assert.equal(payloadOf(r)[1], '{"ok":true}')
@@ -88,7 +88,7 @@ test('MISC_projection_decode_part_tool_result_and_tool_prefix', () => {
   assert.equal(toolNoId, undefined)
 })
 
-test('MISC_projection_decode_part_file_media', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_part_file_media', () => {
   const media = decodePart({ type: 'file', url: 'https://x/y.png', mime: 'image/png' })
   assert.equal(caseOf(media), 'WireMedia')
   assert.equal(payloadOf(media)[0], 'image/png')
@@ -99,7 +99,7 @@ test('MISC_projection_decode_part_file_media', () => {
   assert.equal(decodePart({ type: 'mystery' }), undefined)
 })
 
-test('MISC_projection_decode_message_and_request', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_message_and_request', () => {
   assert.equal(decodeMessage(null), undefined)
   const msg = decodeMessage({ role: 'user', parts: [{ type: 'text', text: 'a' }, { type: 'patch' }, { type: 'text', text: 'b' }] })
   assert.equal(msg.Role, 'user')
@@ -124,14 +124,14 @@ test('MISC_projection_decode_message_and_request', () => {
   assert.equal(listItems(req.Messages).length, 1)
 })
 
-test('MISC_projection_decode_request_falls_back_to_camel_and_id', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_decode_request_falls_back_to_camel_and_id', () => {
   const req = decodeRequest({ model: { providerId: 'p2', modelId: 'm2' }, tools: [{ name: 't' }], system: [], messages: [] })
   assert.equal(req.ProviderId, 'p2')
   assert.equal(req.ModelId, 'm2')
   assert.equal(req.Variant, undefined)
 })
 
-test('MISC_projection_message_view_and_transform_output', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_message_view_and_transform_output', () => {
   const view = decodeMessageView(toList([{ role: 'user', parts: [{ type: 'text', text: 'q' }] }]))
   assert.equal(view.ProviderId, undefined)
   assert.deepEqual(listItems(view.Tools), [])
@@ -141,7 +141,7 @@ test('MISC_projection_message_view_and_transform_output', () => {
   assert.equal(listItems(messagesFromTransformOutput(output)).length, 1)
 })
 
-test('MISC_projection_prepend_companion_memory', () => {
+test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_prepend_companion_memory', () => {
   const raw = [{ info: { id: 'm1' }, role: 'user' }, { info: { id: 'm2' }, role: 'user' }]
   const prefixed = listItems(prependCompanionMemory(toList(raw), 'syn-1', 'remember this', 1))
   assert.equal(prefixed.length, 2)
@@ -152,7 +152,7 @@ test('MISC_projection_prepend_companion_memory', () => {
   assert.throws(() => prependCompanionMemory(toList(raw), 's', 'm', 5), /cutoff exceeds/, 'cutoff beyond snapshot throws')
 })
 
-test('MISC_projection_apply_rendered_prefix_both_shapes', () => {
+test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_shapes', () => {
   const raw = toList([{ info: { id: 'm1' } }])
   const synthetic = new RenderedPrefix(1, [new PrefixActivation('syn-9', 'memory text', 0)])
   const out = listItems(applyRenderedPrefix(raw, synthetic))
@@ -163,13 +163,13 @@ test('MISC_projection_apply_rendered_prefix_both_shapes', () => {
   assert.equal(physical, raw, 'physical prefix returns the list untouched')
 })
 
-test('MISC_projection_host_message_id', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_host_message_id', () => {
   assert.equal(hostMessageId({ info: { id: 'via-info' }, id: 'top' }), 'via-info')
   assert.equal(hostMessageId({ id: 'top' }), 'top')
   assert.equal(hostMessageId({}), undefined)
 })
 
-test('MISC_projection_session_id_from_messages', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_session_id_from_messages', () => {
   assert.equal(projectionSessionIdFromMessages(null), undefined)
   assert.equal(projectionSessionIdFromMessages({}), undefined)
   assert.equal(projectionSessionIdFromMessages({ messages: [{ info: { sessionID: 's1' } }, { info: { sessionID: 's1' } }] }), 's1')
@@ -177,7 +177,7 @@ test('MISC_projection_session_id_from_messages', () => {
   assert.equal(projectionSessionIdFromMessages({ messages: [{ role: 'user' }] }), undefined)
 })
 
-test('MISC_projection_last_user_message_id', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_last_user_message_id', () => {
   const raw = [
     { info: { id: 'a1' }, role: 'assistant', parts: [{ type: 'text', text: 'x' }] },
     { info: { id: 'u1' }, role: 'user', parts: [{ type: 'text', text: 'q' }] },
@@ -191,7 +191,7 @@ test('MISC_projection_last_user_message_id', () => {
   assert.equal(noId, undefined, 'user message without host id contributes nothing')
 })
 
-test('PROMPT_006_provider_attempt_uses_only_the_latest_user_turn_prompt_key', () => {
+test('WHAT[PROVIDER-PROJECTION-003] PROMPT_006_provider_attempt_uses_only_the_latest_user_turn_prompt_key', () => {
   const keyed = {
     info: { id: 'u-keyed', role: 'user', metadata: { wanxiangshu_prompt_key: 'prompt-old' } },
     role: 'user',
@@ -212,7 +212,7 @@ test('PROMPT_006_provider_attempt_uses_only_the_latest_user_turn_prompt_key', ()
   )
 })
 
-test('MISC_projection_formal_text_excludes_non_text_parts', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_formal_text_excludes_non_text_parts', () => {
   const raw = {
     role: 'assistant',
     parts: [

@@ -30,7 +30,7 @@ const exchange = (tool, args, result) => ({
 
 const batch = (ordinal, exchanges) => ({ RequestOrdinal: ordinal, Exchanges: toList(exchanges) })
 
-test('STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', () => {
+test('WHAT[SPEC-INV-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', () => {
   const good = resultOf(
     Frame.StrengthFrame_tryBuild(
       H,
@@ -56,7 +56,7 @@ test('STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', (
   assert.equal(caseOf(empty.error), 'EmptyBatch')
 })
 
-test('STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
   const callId = (value) => Id.ToolCallIdModule_create(value)
   const callPart = (id, name, args) => new Provider.WirePart(2, [callId(id), name, args])
   const resultPart = (id, body) => new Provider.WirePart(3, [callId(id), body])
@@ -121,7 +121,7 @@ test('STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_sema
   assert.equal(caseOf(media.error), 'MediaCannotCrossSession')
 })
 
-test('STRENGTH_005_frame_digest_and_owner_wire_ids_are_restart_stable', () => {
+test('WHAT[SPEC-INV-005] STRENGTH_005_frame_digest_and_owner_wire_ids_are_restart_stable', () => {
   const batches = toList([batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])])
   const first = resultOf(Frame.StrengthFrame_tryBuild(H, 10000, batches)).value
   const second = resultOf(Frame.StrengthFrame_tryBuild(H, 10000, batches)).value
@@ -159,12 +159,8 @@ const promoted = ({ decisionId = 'd1', target = 'run-1', digest = 'frame-a', ref
 
 const apply = (state, event) => resultOf(Projection.StrengthProjectionModule_apply(state, event))
 
-test('STRENGTH_006_007_projection_enforces_Prepared_then_same_target_Promoted', () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_projection_binds_prepared_identity_and_rejects_conflict', () => {
   let state = Projection.StrengthProjectionModule_empty
-
-  const noPrepared = apply(state, promoted())
-  assert.equal(noPrepared.ok, false)
-  assert.equal(caseOf(noPrepared.error), 'PromotionWithoutPrepared')
 
   state = apply(state, prepared()).value
   assert.equal(Projection.StrengthProjectionModule_hasPrepared(decision('d1'), state), true)
@@ -179,7 +175,16 @@ test('STRENGTH_006_007_projection_enforces_Prepared_then_same_target_Promoted', 
   const conflict = apply(state, prepared({ digest: 'frame-b' }))
   assert.equal(conflict.ok, false)
   assert.equal(caseOf(conflict.error), 'PreparedConflict')
+})
 
+test('WHAT[SPEC-INV-007] STRENGTH_007_projection_promotion_requires_prepared_and_exact_target', () => {
+  let state = Projection.StrengthProjectionModule_empty
+
+  const noPrepared = apply(state, promoted())
+  assert.equal(noPrepared.ok, false)
+  assert.equal(caseOf(noPrepared.error), 'PromotionWithoutPrepared')
+
+  state = apply(state, prepared()).value
   const wrongRun = apply(state, promoted({ target: 'run-2' }))
   assert.equal(wrongRun.ok, false)
   assert.equal(caseOf(wrongRun.error), 'PromotionMismatch')
@@ -189,7 +194,7 @@ test('STRENGTH_006_007_projection_enforces_Prepared_then_same_target_Promoted', 
   assert.equal(apply(state, promoted()).ok, true)
 })
 
-test('STRENGTH_008_traced_requires_promotion_and_monotonic_nonempty_range', () => {
+test('WHAT[SPEC-INV-008] STRENGTH_008_traced_requires_promotion_and_monotonic_nonempty_range', () => {
   let state = apply(Projection.StrengthProjectionModule_empty, prepared()).value
 
   const early = apply(state, Events.StrengthEvents_traced(decision('d1'), 10n, 12n))

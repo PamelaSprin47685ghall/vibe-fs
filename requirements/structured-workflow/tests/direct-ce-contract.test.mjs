@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { scanText } from '../../../scripts/checks/dsl-ownership.mjs'
 
-test('FLOW_001_direct_task_workflow_is_allowed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-001] FLOW_001_direct_task_workflow_is_allowed', () => {
   const source = [
     'module Workflow',
     'let run readSnapshot = task {',
@@ -14,7 +14,7 @@ test('FLOW_001_direct_task_workflow_is_allowed', () => {
   assert.deepEqual(scanText(source, 'Application/Workflow.fs'), [])
 })
 
-test('FLOW_006_second_runtime_patterns_are_rejected', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] FLOW_006_second_runtime_patterns_are_rejected', () => {
   const samples = [
     ['type WorkflowCommand =', 'second-runtime-protocol'],
     ['type WorkflowReply =', 'second-runtime-protocol'],

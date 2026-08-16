@@ -20,7 +20,7 @@ const trace = [
   xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('delivered') }),
 ]
 
-test('LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
+test('WHAT[WORK-RECORD-014] LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
   // RecordCoverage consumed through cursor 1 (the reasoning part) — mid-turn
   // relative to any complete-turn boundary. The gap must start at cursor 2.
   const rendered = lifecycleWorkRecord.materialize(
@@ -47,7 +47,7 @@ test('LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
   assert.equal((recent.match(/delivered/g) ?? []).length, 1, 'the statement appears exactly once')
 })
 
-test('LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
+test('WHAT[WORK-RECORD-005] LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
   // With coverage at origin, the gap is the whole trace after the opening end —
   // still NOT turn-bounded: a partial turn is a valid uncovered suffix.
   const rendered = lifecycleWorkRecord.materialize(
@@ -59,6 +59,8 @@ test('LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
     true,
   )
 
+  // WORK-RECORD-005：Recent work = bounded invocation 内 Y 未覆盖的 X-derived suffix，
+  // 不是「最近发生的事」。coverage 在 origin 时 suffix 就是全部历史——包括 partial turn。
   assert.ok(rendered.includes('thinking'))
   assert.ok(rendered.includes('delivered'))
 })

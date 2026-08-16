@@ -23,7 +23,7 @@ const stage3Snapshot = (raw, extras = {}) =>
     hostReanchor: extras.hostReanchor,
   })
 
-test('PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
+test('WHAT[REVIEW-ASSURANCE-002] PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
   assert.equal(reviewChallenge.prompt, REVIEW_CHALLENGE_PROMPT)
   assert.equal(REVIEW_CHALLENGE_PROMPT, `# ${reviewChallenge.text}\n`)
 
@@ -40,7 +40,7 @@ test('PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
   )
 })
 
-test('PROJ_008_step5_AppendReviewChallenge_emits_intent_Prompt', () => {
+test('WHAT[REVIEW-ASSURANCE-002] PROJ_008_step5_AppendReviewChallenge_emits_intent_Prompt', () => {
   const custom = '# localized-challenge\n'
   const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
   const snapshot = stage3Snapshot(raw)

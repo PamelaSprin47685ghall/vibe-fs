@@ -14,13 +14,13 @@ import { walk } from '../../../scripts/lib/walk.mjs'
 const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
-test('ORCHESTRATOR_PROGRAM_001: Application Program is the sole direct-CE entrypoint', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-001] ORCHESTRATOR_PROGRAM_001: Application Program is the sole direct-CE entrypoint', async () => {
   const mod = await load('Change/Program')
   assert.deepEqual(surfaceOf(mod).sort(), ['run'])
   assert.equal(typeof mod.run, 'function')
 })
 
-test('ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', async () => {
   await assert.rejects(
     () => load('Domain/OrchestratorProgram'),
     (error) => {
@@ -36,7 +36,7 @@ test('ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', 
   )
 })
 
-test('ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', async () => {
   await assert.rejects(
     () => load('Application/Orchestration/OrchestratorInterpreter'),
     (error) => {
@@ -52,7 +52,7 @@ test('ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', async () => {
   )
 })
 
-test('ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
   // Fail closed if a second-runtime protocol sneaks back into the vertical slice.
   const files = walk('src/Wanxiangshu/Change', ['.fs'])
   assert.ok(files.length > 0, 'expected Change/*.fs')

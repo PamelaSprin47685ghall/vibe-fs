@@ -51,7 +51,7 @@ const withJournal = async (fn) => {
 const SEM = sessionId('ses_cap')
 const streamSession = (sid) => stream.session(sid)
 
-test('COMPANION_007_capture_projection_is_idempotent_across_transforms', async () => {
+test('WHAT[SEMANTIC-TRACE-007] COMPANION_007_capture_projection_is_idempotent_across_transforms', async () => {
   await withJournal(async (journal) => {
     const projection = xTraceCapture.semantic({
       messages: [
@@ -72,7 +72,7 @@ test('COMPANION_007_capture_projection_is_idempotent_across_transforms', async (
   })
 })
 
-test('COMPANION_007_capture_projection_appends_only_new_turns', async () => {
+test('WHAT[SEMANTIC-TRACE-001] COMPANION_007_capture_projection_appends_only_new_turns', async () => {
   await withJournal(async (journal) => {
     const first = await xTraceCapture.captureProjection(
       journal,
@@ -102,7 +102,7 @@ test('COMPANION_007_capture_projection_appends_only_new_turns', async () => {
   })
 })
 
-test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', async () => {
+test('WHAT[SEMANTIC-TRACE-004] COMPANION_007_capture_projection_provenance_is_stored_verbatim', async () => {
   await withJournal(async (journal) => {
     await xTraceCapture.captureProjection(
       journal,
@@ -132,7 +132,7 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', async () 
   })
 })
 
-test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async () => {
+test('WHAT[SEMANTIC-TRACE-004] HOST_006_capture_projection_after_reanchor_uses_next_generation', async () => {
   // Pre-reanchor turns reuse Host indices after ContextReanchored. Provenance
   // must open g:1 so turn:0/part:0 appends instead of colliding with g:0.
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
@@ -202,7 +202,7 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async ()
   }
 })
 
-test('COMPANION_003_capture_opening_takes_authoritative_requirements', async () => {
+test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_capture_opening_takes_authoritative_requirements', async () => {
   await withJournal(async (journal) => {
     await xTraceCapture.captureOpening(journal, SEM, 'Review the tree.', ['Ship it.', 'Add tests.'])
 
@@ -212,7 +212,7 @@ test('COMPANION_003_capture_opening_takes_authoritative_requirements', async () 
   })
 })
 
-test('COMPANION_003_opening_capture_is_idempotent_for_the_same_text', async () => {
+test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_opening_capture_is_idempotent_for_the_same_text', async () => {
   await withJournal(async (journal) => {
     await xTraceCapture.captureOpening(journal, SEM, 'first task', [])
     // 同文本重放无害（PERSIST-010 幂等语义）。
@@ -220,7 +220,7 @@ test('COMPANION_003_opening_capture_is_idempotent_for_the_same_text', async () =
   })
 })
 
-test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', async () => {
+test('WHAT[SEMANTIC-TRACE-010] COMPANION_003_parent_work_record_renders_the_opening_exactly_once', async () => {
   await withJournal(async (journal) => {
     // A human session: the opening is captured at ingress, and the first
     // transform captures the SAME text again as XTrace part turn:0/part:0.
@@ -254,7 +254,7 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', async 
 })
 
 
-test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', async () => {
+test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_terminal_only_completion_projects_into_recent_work_without_appending_a_trace_part', async () => {
   await withJournal(async (journal) => {
     await xTraceCapture.captureOpening(journal, SEM, 'consult independently', [])
     const before = await xTraceCapture.captureProjection(
@@ -286,7 +286,7 @@ test('COMPANION_003_terminal_only_completion_projects_into_recent_work_without_a
   })
 })
 
-test('COMPANION_003_last_words_land_in_recent_work_not_closing_report', async () => {
+test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_last_words_land_in_recent_work_not_closing_report', async () => {
   await withJournal(async (journal) => {
     await xTraceCapture.captureOpening(journal, SEM, 'finish the life', [])
     await xTraceCapture.captureProjection(

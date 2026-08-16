@@ -11,7 +11,7 @@ const productionFiles = (dir) =>
     return entry.isDirectory() ? productionFiles(path) : entry.name.endsWith('.fs') ? [path] : []
   })
 
-test('CONTROL_PYRAMID_PREREQ_FsToolkit_ErrorHandling_is_the_repo_Result_vocabulary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_PREREQ_FsToolkit_ErrorHandling_is_the_repo_Result_vocabulary', () => {
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
   const decode = read('src/Wanxiangshu/Sphinx/DecodePrimitives.fs')
   const codec = read('src/Wanxiangshu/Sphinx/ObservationCodec.fs')
@@ -25,7 +25,7 @@ test('CONTROL_PYRAMID_PREREQ_FsToolkit_ErrorHandling_is_the_repo_Result_vocabula
   assert.doesNotMatch(decode, /type ResultBuilder\b/)
 })
 
-test('CONTROL_PYRAMID_PREREQ_project_owns_a_Fable_compatible_TaskResult_CE', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_PREREQ_project_owns_a_Fable_compatible_TaskResult_CE', () => {
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
   const source = read('src/Wanxiangshu/Foundation/TaskResult.fs')
 
@@ -46,7 +46,7 @@ test('CONTROL_PYRAMID_PREREQ_project_owns_a_Fable_compatible_TaskResult_CE', () 
   assert.match(source, /let ofTask /)
 })
 
-test('CONTROL_PYRAMID_PREREQ_Fable_async_Result_plumbing_is_repo_owned_not_FsToolkit_dotnet_only_API', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_PREREQ_Fable_async_Result_plumbing_is_repo_owned_not_FsToolkit_dotnet_only_API', () => {
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
   const source = read('src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs')
   const production = productionFiles('src/Wanxiangshu').map(read).join('\n')
@@ -60,7 +60,7 @@ test('CONTROL_PYRAMID_PREREQ_Fable_async_Result_plumbing_is_repo_owned_not_FsToo
   assert.doesNotMatch(production, /\bList\.traverseTaskResultM\b/)
 })
 
-test('CONTROL_PYRAMID_PREREQ_representative_Task_Result_pyramid_uses_the_vocabulary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_PREREQ_representative_Task_Result_pyramid_uses_the_vocabulary', () => {
   const source = read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
   assert.match(source, /open Wanxiangshu\.Foundation/)

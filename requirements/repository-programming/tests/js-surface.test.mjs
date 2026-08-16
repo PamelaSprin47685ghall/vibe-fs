@@ -59,7 +59,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('JS001_generate_none_when_no_filesystem_capability', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_generate_none_when_no_filesystem_capability', () => {
   for (const role of ['Manager', 'Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
@@ -67,7 +67,7 @@ test('JS001_generate_none_when_no_filesystem_capability', () => {
   }
 })
 
-test('JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
   for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
@@ -81,7 +81,7 @@ test('JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
   }
 })
 
-test('JS002_generation_is_deterministic_and_names_js_role', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_generation_is_deterministic_and_names_js_role', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep, ToolPermission.Edit, ToolPermission.Write)
   const a = generate('Coder', perms, jsProse())
   const b = generate('Coder', perms, jsProse())
@@ -93,7 +93,7 @@ test('JS002_generation_is_deterministic_and_names_js_role', () => {
   assert.equal(a.Capabilities.size, 5)
 })
 
-test('JS004_capability_exactness_plus_one_ultra_example_coder', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra_example_coder', () => {
   const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
@@ -113,7 +113,7 @@ test('JS004_capability_exactness_plus_one_ultra_example_coder', () => {
   assert.match(listItems(result.Examples)[0], /oldApi → newApi/)
 })
 
-test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
   assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
@@ -124,7 +124,7 @@ test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
   assert.equal(listItems(result.Examples).some((example) => example.includes('this.rewrite')), false)
 })
 
-test('JS001_generated_name_gate_rejects_forged_names', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-004] JS001_generated_name_gate_rejects_forged_names', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(isGeneratedToolName('Inspector', perms, 'js-inspector'), true)
   assert.equal(isGeneratedToolName('Inspector', perms, 'js-coder'), false)
@@ -133,7 +133,7 @@ test('JS001_generated_name_gate_rejects_forged_names', () => {
   assert.equal(isGeneratedToolName('Coder', caps(ToolPermission.Fork), 'js-coder'), false)
 })
 
-test('JS004_member_gate_binds_present_members_only', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Inspector', perms, 'glob'), 'js.glob')
@@ -143,7 +143,7 @@ test('JS004_member_gate_binds_present_members_only', () => {
   assert.equal(memberBinding('Inquiry', caps(ToolPermission.Inspect), 'file'), undefined)
 })
 
-test('JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
   const shared = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   const inspector = generate('Inspector', shared, jsProse())
   const reviewer = generate('Reviewer', shared, jsProse())
@@ -154,14 +154,14 @@ test('JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example'
   assert.match(reviewer.Description, /staleReferences/)
 })
 
-test('JS001_non_fs_permissions_never_produce_members', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
     const result = generate('Coder', caps(toolPermissionByName[name]), jsProse())
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }
 })
 
-test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-003] JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   // Tier never reaches the generator: capability is role-only (AGENT-001).
   // The same capability set from a deep Coder yields byte-identical output.
   const fast = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob), jsProse())
@@ -170,7 +170,7 @@ test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   assert.equal(fast.Description, deep.Description)
 })
 
-test('JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
   const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   for (const token of [
     'class JsProgram',
@@ -198,7 +198,7 @@ test('JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () 
   assert.equal(inspector.Description.includes('this.rewrite'), false)
 })
 
-test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
   const markers = {
     Coder: /oldApi → newApi/,
     Inspector: /RetryPolicy/,
@@ -212,6 +212,12 @@ test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () =>
     const examples = listItems(result.Examples)
     assert.equal(examples.length, 1, `${role} gets exactly one Ultra Example`)
     assert.match(examples[0], marker, `${role} gets its responsibility-shaped lesson`)
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra_example', () => {
+  for (const role of ['Coder', 'Inspector', 'Reviewer', 'DevOps', 'Browser']) {
+    const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.Description.match(/class Js extends JsProgram/g) ?? []
     assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)
     assert.match(result.Description, /Semantic branches belong between programs/)
@@ -221,7 +227,7 @@ test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () =>
   assert.doesNotMatch(listItems(reviewer.Examples)[0], /verdict\s*:/i, 'reviewer example gathers evidence, never authors judgment')
 })
 
-test('JS004_lying_generator_counterexample_is_rejected', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_lying_generator_counterexample_is_rejected', () => {
   // A "lying" surface advertises a member with no runtime binding — the exact
   // failure mode the four-layer invariant exists to make impossible. The gate
   // must refuse the member: memberBinding returns undefined for it, so a
@@ -242,7 +248,7 @@ test('JS004_lying_generator_counterexample_is_rejected', () => {
   assert.equal(names.includes('rewrite'), false)
 })
 
-test('JS_description_retains_no_unsubstituted_placeholders', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS_description_retains_no_unsubstituted_placeholders', () => {
   const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), jsProse())
   assert.equal(result.Description.includes('{{'), false)
 })

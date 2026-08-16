@@ -45,7 +45,7 @@ const runWorkflow = async (dir, program) => {
 const succeeded = (outcome) => caseOf(outcome) === 'Succeeded'
 const failureText = (outcome) => String(payloadOf(outcome)[0])
 
-test('JS018_generated_surface_teaches_parallel_safety_for_edits_and_reads', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-017] JS018_generated_surface_teaches_parallel_safety_for_edits_and_reads', () => {
   const surface = generate('Coder', coderCaps, loadJsProse(ProviderLanguage.English))
   assert.equal(
     surface.Description.includes('Parallel js-coder calls are absolutely safe for same-file and cross-file edits'),
@@ -66,7 +66,7 @@ test('JS018_generated_surface_teaches_parallel_safety_for_edits_and_reads', () =
   )
 })
 
-test('JS018_consecutive_transactions_re_snapshot_committed_state_no_lost_update', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-017] JS018_consecutive_transactions_re_snapshot_committed_state_no_lost_update', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'step0', 'utf8')
@@ -105,7 +105,7 @@ test('JS018_consecutive_transactions_re_snapshot_committed_state_no_lost_update'
   }
 })
 
-test('JS018_interleaved_reads_are_immutable_snapshots_not_mutation_aliases', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-017] JS018_interleaved_reads_are_immutable_snapshots_not_mutation_aliases', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'original', 'utf8')

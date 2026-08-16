@@ -57,7 +57,7 @@ const bundle = resultOf(
   ),
 ).value
 
-test('STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
   const wrongTarget = P.ProjectionIntentModule_strengthCandidate(
     session('owner'), decision('d1'), run('target-a'), run('target-b'), bundle,
   )
@@ -73,7 +73,7 @@ test('STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_co
   assert.equal(caseOf(plannedReflected.error), 'StrengthPromotedReplicaReflection')
 })
 
-test('STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stable_ids', () => {
+test('WHAT[SPEC-INV-005] STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stable_ids', () => {
   const base = toList([message('user', [textPart('base')])])
   const intent = P.ProjectionIntentModule_strengthCandidate(
     session('owner'), decision('d1'), run('target'), run('target'), bundle,
@@ -99,7 +99,7 @@ test('STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stab
   ))
 })
 
-test('STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
   // Not the live Host PairProgrammingThought canary. Unit-level: Strength
   // splice is BeforeMessageIndex and does not drop messages after the target.
   const base = toList([
@@ -117,7 +117,7 @@ test('STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_i
   assert.equal(last.Parts.head.fields[0], 'pair-anchor-stand-in')
 })
 
-test('STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
   const mirrorMessages = toList([message('user', [textPart('mirror-base')])])
   const mirror = P.ProjectionIntentModule_useStrengthMirror(decision('d1'), run('target'), 'sem-a', mirrorMessages)
   const local = P.ProjectionIntentModule_strengthReplicaLocal(session('owner'), decision('d1'), bundle)

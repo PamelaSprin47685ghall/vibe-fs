@@ -8,12 +8,12 @@ import { clockAt, clockPort, deadline, utcOffset } from '../../verification-syst
 
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 
-test('TIME_003_virtual_clock_starts_at_fixed_epoch', () => {
+test('WHAT[TIME-003] TIME_003_virtual_clock_starts_at_fixed_epoch', () => {
   const vc = clockPort.createVirtual()
   assert.equal(vc.utcNow().getTime(), START_MS)
 })
 
-test('TIME_003_virtual_clock_advance_and_set_are_deterministic', () => {
+test('WHAT[TIME-003] TIME_003_virtual_clock_advance_and_set_are_deterministic', () => {
   const vc = clockPort.createVirtual()
 
   vc.advanceMs(5000)
@@ -26,7 +26,7 @@ test('TIME_003_virtual_clock_advance_and_set_are_deterministic', () => {
   assert.equal(vc.utcNow().getTime(), Date.parse('2026-01-01T00:00:00Z'))
 })
 
-test('TIME_001_virtual_clocks_are_independent_not_ambient', () => {
+test('WHAT[TIME-001] TIME_001_virtual_clocks_are_independent_not_ambient', () => {
   const a = clockPort.createVirtual()
   const b = clockPort.createVirtual()
 
@@ -35,7 +35,7 @@ test('TIME_001_virtual_clocks_are_independent_not_ambient', () => {
   assert.equal(b.utcNow().getTime(), START_MS, 'advancing one clock must not move another')
 })
 
-test('TIME_005_deadline_verdict_uses_injected_clock_view', () => {
+test('WHAT[TIME-005] TIME_005_deadline_verdict_uses_injected_clock_view', () => {
   const vc = clockPort.createVirtual()
   vc.set(utcOffset('2026-01-01T00:00:00Z'))
   const dl = deadline.ofBudget('2026-01-01T00:00:00Z', 5000)

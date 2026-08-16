@@ -14,7 +14,7 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
 /** Every emitted name, minus the reflection metadata Fable adds per type. */
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
-test('SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-001] SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
   const manager = await load('Mission/Manager/Workflow')
   const reviewer = await load('Mission/Review/Judgement/Workflow')
   const turn = await load('Composition/Turn/Workflow')
@@ -29,7 +29,7 @@ test('SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
   assert.equal(typeof turn.observe, 'function')
 })
 
-test('SW_002_workflow_modules_export_no_program_counter_shaped_names', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_counter_shaped_names', async () => {
   // DSL-002 / ARCH-008: a stored business stage would surface here as an
   // exported tag. The workflow modules must expose only story entrypoints.
   const programCounterShape = /(Stage|Phase|NextAction|Disposition|ProgramCounter|ProgramStep)$/
@@ -44,7 +44,7 @@ test('SW_002_workflow_modules_export_no_program_counter_shaped_names', async () 
   }
 })
 
-test('SW_003_domain_flow_and_outcome_types_are_domain_facts', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', async () => {
   const flow = await load('Foundation/Flow')
   const outcome = await load('Foundation/Outcome')
 

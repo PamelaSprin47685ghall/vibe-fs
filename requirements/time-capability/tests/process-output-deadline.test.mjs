@@ -23,13 +23,13 @@ const output = (bytes) => new EstimatedOutput(bytes)
 
 // ── EXEC-011: estimate math ──────────────────────────────────────────────────
 
-test('EXEC_011_output_threshold_uses_provider_willingness_at_face_value', () => {
+test('WHAT[TIME-002] EXEC_011_output_threshold_uses_provider_willingness_at_face_value', () => {
   assert.equal(ProcessEstimateModule_outputThreshold(output(0n)), 0n)
   assert.equal(ProcessEstimateModule_outputThreshold(output(-5n)), 0n)
   assert.equal(ProcessEstimateModule_outputThreshold(output(10n)), 10n)
 })
 
-test('EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit', () => {
+test('WHAT[TIME-002] EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit', () => {
   const oneHour = fromHours(1)
   assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(10), oneHour), fromSeconds(10)), 0)
   assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(100), oneHour), fromSeconds(100)), 0)
@@ -37,13 +37,13 @@ test('EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit', () => {
   assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(5000), oneHour), oneHour), 0)
 })
 
-test('EXEC_011_nonfinite_or_nonpositive_estimate_collapses_to_hard_limit', () => {
+test('WHAT[TIME-002] EXEC_011_nonfinite_or_nonpositive_estimate_collapses_to_hard_limit', () => {
   const hard = fromSeconds(60)
   for (const bad of [NaN, Infinity, -Infinity, 0, -10]) {
     assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(bad), hard), hard), 0, String(bad))
   }
 })
 
-test('EXEC_011_default_hard_limit_is_one_hour', () => {
+test('WHAT[TIME-002] EXEC_011_default_hard_limit_is_one_hour', () => {
   assert.equal(compare(ProcessEstimateModule_DefaultHardLimit, fromHours(1)), 0)
 })

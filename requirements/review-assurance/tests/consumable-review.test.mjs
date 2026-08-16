@@ -132,7 +132,7 @@ const checkpoint = (state) => {
 
 // ── REVIEW-014: VerdictKnown vs ConsumableReview ────────────────────────────
 
-test('REVIEW_014_a_durable_verdict_alone_never_makes_the_review_consumable', () => {
+test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_a_durable_verdict_alone_never_makes_the_review_consumable', () => {
   const state = checkpointState()
   const before = checkpoint(state)
   assert.equal(before.Accepted, true)
@@ -158,7 +158,7 @@ test('REVIEW_014_a_durable_verdict_alone_never_makes_the_review_consumable', () 
   assert.equal(after.Concluded == null, true, 'verdict must not fabricate consumability')
 })
 
-test('REVIEW_014_only_todo_review_concluded_marks_the_review_consumable', () => {
+test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_only_todo_review_concluded_marks_the_review_consumable', () => {
   let state = checkpointState()
   state = foldMagic(state, magicFact('TodoReviewConcluded', concluded)).value
 
@@ -173,7 +173,17 @@ test('REVIEW_014_only_todo_review_concluded_marks_the_review_consumable', () => 
 
 // ── REVIEW-018: the projection cannot fabricate consumability ────────────────
 
-test('REVIEW_018_concluded_without_accepted_is_rejected', () => {
+test('WHAT[REVIEW-ASSURANCE-012] REVIEW_016_the_concluded_review_evidence_is_bounded_to_the_frozen_request_frontier', () => {
+  // REVIEW-016 (GLORY-051): the record identity carries the frozen reviewer
+  // frontier — evidence is bounded to the request, not the session head.
+  let state = checkpointState()
+  state = foldMagic(state, magicFact('TodoReviewConcluded', concluded)).value
+
+  const cp = checkpoint(state)
+  assert.equal(cp.Concluded.ReviewerRecordFrontier.Sequence, 8n)
+})
+
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_without_accepted_is_rejected', () => {
   let state = magicTodoJournal.empty
   state = foldMagic(state, magicFact('TodoWritePrepared', prepared), eventId('prepared-fact-ref')).value
 
@@ -182,7 +192,7 @@ test('REVIEW_018_concluded_without_accepted_is_rejected', () => {
   assert.equal(caseOf(rejected.error), 'ConcludedWithoutAccepted')
 })
 
-test('REVIEW_018_concluded_without_assignment_is_rejected', () => {
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_without_assignment_is_rejected', () => {
   let state = magicTodoJournal.empty
   state = foldMagic(state, magicFact('TodoWritePrepared', prepared), eventId('prepared-fact-ref')).value
   state = foldMagic(state, magicFact('TodoWriteAccepted', accepted)).value
@@ -192,7 +202,7 @@ test('REVIEW_018_concluded_without_assignment_is_rejected', () => {
   assert.equal(caseOf(rejected.error), 'AssignmentWithoutAccepted')
 })
 
-test('REVIEW_018_concluded_must_bind_to_its_assignment_identity', () => {
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_concluded_must_bind_to_its_assignment_identity', () => {
   // REVIEW-006/051: evidence must bind to the reviewed object. A conclusion
   // that names a different review/todo/reviewer than the assignment is a fold
   // rejection — the record cannot be attached to the wrong request.
@@ -222,7 +232,7 @@ test('REVIEW_018_concluded_must_bind_to_its_assignment_identity', () => {
 
 // ── REVIEW-020: a process verdict never enters the terminal witness algebra ──
 
-test('REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection', () => {
+test('WHAT[REVIEW-ASSURANCE-011] REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection', () => {
   // Fold a process REVISE through the reviewer session projection: the guard
   // becomes RevisionWitness. No ConfirmedReviewWitness fact is produced, no
   // dual-PERFECT algebra is entered, and the Magic Todo checkpoint is not
@@ -273,7 +283,7 @@ test('REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection
   assert.equal(checkpoint(checkpointState()).Concluded == null, true)
 })
 
-test('REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_not_a_judge_tool_call_trace', async () => {
+test('WHAT[REVIEW-ASSURANCE-008] REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_not_a_judge_tool_call_trace', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-consumable-projection-verdict-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_consumable_projection_verdict' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -412,7 +422,7 @@ test('REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_n
 
 // ── REVIEW-017/018: record-ready wait is event-driven and fails closed ───────
 
-test('REVIEW_018_await_consumable_review_fails_closed_when_the_producer_is_absent', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_await_consumable_review_fails_closed_when_the_producer_is_absent', async () => {
   // A checkpoint whose reviewer session never materialised must not hang the
   // waiter nor fabricate a Concluded: this is the infra-failure fail-closed
   // path (REVIEW-018), not a semantic REVISE.
@@ -486,7 +496,7 @@ test('REVIEW_018_await_consumable_review_fails_closed_when_the_producer_is_absen
   }
 })
 
-test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedAwaitingJoin', async () => {
+test('WHAT[REVIEW-ASSURANCE-009] REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedAwaitingJoin', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-completed-presence-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_completed_presence' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -581,7 +591,7 @@ test('REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedA
   }
 })
 
-test('REVIEW_017 durable verdict keeps record-ready producer present after the reviewer work-unit is Retired', async () => {
+test('WHAT[REVIEW-ASSURANCE-009] REVIEW_017 durable verdict keeps record-ready producer present after the reviewer work-unit is Retired', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-retired-verdict-presence-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_retired_verdict_presence' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))

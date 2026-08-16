@@ -66,7 +66,7 @@ const runRatchet = (baselinePath, root, cwd) =>
 
 const output = ({ stdout, stderr }) => norm(stdout + stderr)
 
-test('DSL_OWNERSHIP_RATCHET_above_baseline_exits_nonzero_with_hint', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_above_baseline_exits_nonzero_with_hint', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -85,7 +85,7 @@ test('DSL_OWNERSHIP_RATCHET_above_baseline_exits_nonzero_with_hint', async (t) =
   assert.ok(out.includes(`${file} mutable 1 -> 2`), `expected hint in output, got: ${out}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_unlisted_file_with_violation_exits_nonzero', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_unlisted_file_with_violation_exits_nonzero', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -105,7 +105,7 @@ test('DSL_OWNERSHIP_RATCHET_unlisted_file_with_violation_exits_nonzero', async (
   assert.ok(out.includes(`${file} mutable`), `expected unlisted file to be reported, got: ${out}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -123,12 +123,12 @@ test('DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${output(result)}`)
 })
 
-test('DSL_OWNERSHIP_covers_infrastructure_and_journal_production_files', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_covers_infrastructure_and_journal_production_files', () => {
   assert.equal(isProgramFile('src/Wanxiangshu/Infrastructure/Foo.fs'), true)
   assert.equal(isProgramFile('src/Wanxiangshu/Journal/Foo.fs'), true)
 })
 
-test('DSL_OWNERSHIP_RATCHET_rejects_unannotated_mutable_in_infrastructure_and_journal', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_rejects_unannotated_mutable_in_infrastructure_and_journal', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -149,7 +149,7 @@ test('DSL_OWNERSHIP_RATCHET_rejects_unannotated_mutable_in_infrastructure_and_jo
   }
 })
 
-test('DSL_OWNERSHIP_RATCHET_rejects_finality_controller_shaped_bare_mutable', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_rejects_finality_controller_shaped_bare_mutable', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -170,7 +170,7 @@ test('DSL_OWNERSHIP_RATCHET_rejects_finality_controller_shaped_bare_mutable', as
   assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected FinalityController hint in output, got: ${out}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -199,7 +199,7 @@ test('DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', asy
   assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected Distillation hint in output, got: ${out}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_allows_annotated_dsl_mutable_in_tools', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_RATCHET_allows_annotated_dsl_mutable_in_tools', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -220,7 +220,7 @@ test('DSL_OWNERSHIP_RATCHET_allows_annotated_dsl_mutable_in_tools', async (t) =>
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${output(result)}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_direct_task_workflow_is_allowed', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-001] DSL_OWNERSHIP_RATCHET_direct_task_workflow_is_allowed', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
@@ -236,7 +236,7 @@ test('DSL_OWNERSHIP_RATCHET_direct_task_workflow_is_allowed', async (t) => {
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${out}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_application_interpreter_has_no_exemption', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-002] DSL_OWNERSHIP_RATCHET_application_interpreter_has_no_exemption', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 

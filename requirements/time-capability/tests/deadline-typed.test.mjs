@@ -8,7 +8,7 @@ import { clockAt, deadline } from '../../verification-system/tests/support/domai
 
 const ISO_START = '2026-01-01T00:00:00Z'
 
-test('TIME_002_deadline_of_budget_and_remaining_are_pure_clock_functions', () => {
+test('WHAT[TIME-002] TIME_002_deadline_of_budget_and_remaining_are_pure_clock_functions', () => {
   const dl = deadline.ofBudget(ISO_START, 5000)
 
   assert.equal(deadline.remainingMs(clockAt('2026-01-01T00:00:02Z'), dl), 3000)
@@ -18,7 +18,7 @@ test('TIME_002_deadline_of_budget_and_remaining_are_pure_clock_functions', () =>
   assert.equal(deadline.remainingMs(clockAt('2026-01-01T00:00:06Z'), dl), 0)
 })
 
-test('TIME_002_of_budget_clamps_to_datetime_max_no_overflow', () => {
+test('WHAT[TIME-002] TIME_002_of_budget_clamps_to_datetime_max_no_overflow', () => {
   // A ~31k-year budget exceeds the remaining lifetime until DateTimeOffset.MaxValue;
   // the deadline must stay computable, not NaN / negative / wildly wrong.
   const dl = deadline.ofBudget(ISO_START, 1e15)
@@ -29,7 +29,7 @@ test('TIME_002_of_budget_clamps_to_datetime_max_no_overflow', () => {
   assert.ok(remainingAtStart > 0)
 })
 
-test('TIME_002_next_wait_ms_caps_at_js_timer_ceiling', () => {
+test('WHAT[TIME-002] TIME_002_next_wait_ms_caps_at_js_timer_ceiling', () => {
   assert.equal(deadline.maxTimerWaitMs, 2147483647)
 
   // Huge legal estimate → the caller waits in segments at the JS timer ceiling.
@@ -42,7 +42,7 @@ test('TIME_002_next_wait_ms_caps_at_js_timer_ceiling', () => {
   assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:06Z'), short), 0)
 })
 
-test('TIME_005_verdict_follows_injected_clock_not_value', () => {
+test('WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value', () => {
   const dl = deadline.ofBudget(ISO_START, 5000)
 
   // The same typed value, consumed by the same rules under two injected clocks,

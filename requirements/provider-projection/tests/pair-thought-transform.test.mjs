@@ -47,7 +47,7 @@ const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.parts[0].state.output, markerText)
 }
 
-test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
+test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -73,7 +73,7 @@ test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () 
   }
 })
 
-test('C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', async () => {
+test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', async () => {
   const raw = [
     {
       info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } },
@@ -110,7 +110,7 @@ test('C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', a
   assert.deepEqual(replayed, out, 'Cursor replay must reproduce identical NUL+BOM guidance bytes')
 })
 
-test('C_PH_cursor_appends_NUL_BOM_guidance_inside_real_error_tool_result', async () => {
+test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_error_tool_result', async () => {
   const raw = [
     {
       info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } },

@@ -80,14 +80,14 @@ const openSeeded = async (sid, agent = 'reviewer') => {
   } }
 }
 
-test('RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
   clearGuardNudges()
   const outcome = await nudgeReviewer(capturingPort([]), null, sessionId('ses_rv'))
   assert.equal(outcomeName(outcome), 'Failed')
   assert.match(outcome.fields[0], /requires an AgentJournal/)
 })
 
-test('RVGD_nudgeReviewer_fails_without_open_review_barrier', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_without_open_review_barrier', async () => {
   clearGuardNudges()
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })
@@ -108,7 +108,7 @@ test('RVGD_nudgeReviewer_fails_without_open_review_barrier', async () => {
   }
 })
 
-test('RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
   clearGuardNudges()
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })
@@ -126,7 +126,7 @@ test('RVGD_nudgeReviewer_fails_without_active_authority_profile', async () => {
   }
 })
 
-test('RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
+test('WHAT[REVIEW-ASSURANCE-001] RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
   const sid = sessionId('ses_rv1')
   const { opened, cleanup } = await openSeeded(sid)
   try {
@@ -149,7 +149,7 @@ test('RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes', async () => {
   }
 })
 
-test('RVGD_nudgeReviewer_cross_instance_reservation_suppresses_twin_send', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_cross_instance_reservation_suppresses_twin_send', async () => {
   // Two journals = two plugin instances. The reservation is keyed by the durable
   // review barrier, not RuntimeId and not the provider run that happened to expose
   // the missing judge. Both instances therefore compete for one logical repair.
@@ -182,7 +182,7 @@ test('RVGD_nudgeReviewer_cross_instance_reservation_suppresses_twin_send', async
   }
 })
 
-test('RVGD_nudgeReviewer_new_barrier_receives_a_fresh_single_repair_budget', async () => {
+test('WHAT[REVIEW-ASSURANCE-006] RVGD_nudgeReviewer_new_barrier_receives_a_fresh_single_repair_budget', async () => {
   const sid = sessionId('ses_rv_rearm')
   const { opened, cleanup } = await openSeeded(sid)
   try {
@@ -208,7 +208,7 @@ test('RVGD_nudgeReviewer_new_barrier_receives_a_fresh_single_repair_budget', asy
   }
 })
 
-test('RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', async () => {
+test('WHAT[REVIEW-ASSURANCE-002] RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', async () => {
   const sid = sessionId('ses_rv2')
   const { opened, cleanup } = await openSeeded(sid)
   try {
@@ -227,7 +227,7 @@ test('RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', asyn
   }
 })
 
-test('RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', async () => {
   const sid = sessionId('ses_rv3')
   const { opened, cleanup } = await openSeeded(sid)
   const worktree = mkdtempSync(join(tmpdir(), 'wxs-rvgd-wt-'))
@@ -244,7 +244,7 @@ test('RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', asy
   }
 })
 
-test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
+test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
   const sid = sessionId('ses_rv4')
   const { opened, cleanup } = await openSeeded(sid)
   const worktree = mkdtempSync(join(tmpdir(), 'wxs-rvgd-wt-'))
@@ -262,7 +262,7 @@ test('RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive', async () => {
   }
 })
 
-test('RVGD_openBarrier_is_the_shared_review_barrier_writer', async () => {
+test('WHAT[REVIEW-ASSURANCE-006] RVGD_openBarrier_is_the_shared_review_barrier_writer', async () => {
   clearGuardNudges()
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rvgd-'))
   const opened = await agentJournal.create({ directory: dir })

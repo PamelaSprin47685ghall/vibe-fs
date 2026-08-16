@@ -56,21 +56,21 @@ const {
 
 // ── HostToolArguments ────────────────────────────────────────────────────────
 
-test('CODEC_arguments_text_reads_present_and_missing', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_text_reads_present_and_missing', () => {
   const args = makeArgs({ name: 'value', blank: '  ' })
   assert.equal(argText(args, 'name'), 'value')
   assert.equal(argText(args, 'missing'), '')
   assert.equal(argText(args, 'blank'), '  ')
 })
 
-test('CODEC_arguments_optional_text_filters_blank', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_text_filters_blank', () => {
   const args = makeArgs({ name: 'value', blank: '  ' })
   assert.equal(optionalText(args, 'name'), 'value')
   assert.equal(optionalText(args, 'blank'), undefined)
   assert.equal(optionalText(args, 'missing'), undefined)
 })
 
-test('CODEC_arguments_optional_texts_collects_nonempty_strings', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_texts_collects_nonempty_strings', () => {
   const args = makeArgs({ items: ['a', '', '  ', 'b', null, 7] })
   assert.deepEqual(listItems(optionalTexts(args, 'items')), ['a', 'b', '7'])
   assert.equal(optionalTexts(args, 'missing'), undefined)
@@ -79,14 +79,14 @@ test('CODEC_arguments_optional_texts_collects_nonempty_strings', () => {
   assert.equal(optionalTexts(notArray, 'items'), undefined)
 })
 
-test('CODEC_arguments_optional_number_reads_floats', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_number_reads_floats', () => {
   const args = makeArgs({ timeout: 2.5, name: 'x' })
   assert.equal(optionalNumber(args, 'timeout'), 2.5)
   assert.equal(optionalNumber(args, 'missing'), undefined)
   assert.equal(optionalNumber(args, 'name'), undefined, 'a string is not a number')
 })
 
-test('CODEC_arguments_null_raw_is_all_absent', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_null_raw_is_all_absent', () => {
   const args = makeArgs(null)
   assert.equal(argText(args, 'x'), '')
   assert.equal(optionalText(args, 'x'), undefined)
@@ -96,7 +96,7 @@ test('CODEC_arguments_null_raw_is_all_absent', () => {
 
 // ── schema DSL over a fake factory ───────────────────────────────────────────
 
-test('CODEC_schema_dsl_builds_each_shape', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_schema_dsl_builds_each_shape', () => {
   const toolModule = {
     tool: {
       schema: {
@@ -180,7 +180,7 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
 
 // ── register / registry / hide ───────────────────────────────────────────────
 
-test('CODEC_registry_maps_specs_by_name', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_registry_maps_specs_by_name', () => {
   const factory = makeFactory({ tool: (definition) => ({ def: definition }) })
   const first = new ToolSpec('one', 'first', [], async () => '1')
   const second = new ToolSpec('two', 'second', [], async () => '2')
@@ -190,7 +190,7 @@ test('CODEC_registry_maps_specs_by_name', () => {
   assert.ok(built.two)
 })
 
-test('CODEC_hide_defines_non_enumerable_property', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_hide_defines_non_enumerable_property', () => {
   const target = {}
   hide(target, 'secret', () => 'hidden')
   assert.equal(target.secret(), 'hidden')
@@ -199,7 +199,7 @@ test('CODEC_hide_defines_non_enumerable_property', () => {
 
 // ── decodeContext promptText / attachAbort ───────────────────────────────────
 
-test('CODEC_prompt_text_prefers_message_parts', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_prompt_text_prefers_message_parts', () => {
   const ctx = decodeContext({
     sessionID: 'ses_p',
     message: { parts: [{ text: 'hello ' }, { text: 'world' }] },
@@ -208,7 +208,7 @@ test('CODEC_prompt_text_prefers_message_parts', () => {
   assert.equal(ctx.PromptText, 'hello world')
 })
 
-test('CODEC_prompt_text_falls_back_to_prompt_then_input', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_prompt_text_falls_back_to_prompt_then_input', () => {
   const fromPrompt = decodeContext({ sessionID: 's', prompt: 'the prompt' })
   assert.equal(fromPrompt.PromptText, 'the prompt')
 
@@ -219,7 +219,7 @@ test('CODEC_prompt_text_falls_back_to_prompt_then_input', () => {
   assert.equal(none.PromptText, undefined)
 })
 
-test('CODEC_prompt_text_blank_parts_fall_through', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_prompt_text_blank_parts_fall_through', () => {
   const ctx = decodeContext({
     sessionID: 's',
     message: { parts: [{ text: '   ' }] },
@@ -228,7 +228,7 @@ test('CODEC_prompt_text_blank_parts_fall_through', () => {
   assert.equal(ctx.PromptText, 'real prompt')
 })
 
-test('CODEC_attach_abort_without_signal_is_noop_unsubscribe', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_attach_abort_without_signal_is_noop_unsubscribe', () => {
   const ctx = decodeContext({ sessionID: 's' })
   let fired = false
   const unsubscribe = attachAbort(ctx, () => {
@@ -238,7 +238,7 @@ test('CODEC_attach_abort_without_signal_is_noop_unsubscribe', () => {
   assert.equal(fired, false)
 })
 
-test('CODEC_attach_abort_fires_immediately_on_aborted_signal', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_attach_abort_fires_immediately_on_aborted_signal', () => {
   const signal = {
     aborted: true,
     addEventListener: () => {},
@@ -252,7 +252,7 @@ test('CODEC_attach_abort_fires_immediately_on_aborted_signal', () => {
   assert.equal(fired, true, 'an already-aborted signal must fire the callback immediately')
 })
 
-test('CODEC_attach_abort_subscribes_and_unsubscribes', () => {
+test('WHAT[PROVIDER-PROJECTION-005] CODEC_attach_abort_subscribes_and_unsubscribes', () => {
   const listeners = []
   const signal = {
     aborted: false,
@@ -278,7 +278,7 @@ test('CODEC_attach_abort_subscribes_and_unsubscribes', () => {
 
 // ── TOML renderers ───────────────────────────────────────────────────────────
 
-test('CODEC_toml_object_renders_scalar_fields', () => {
+test('WHAT[PROVIDER-PROJECTION-008] CODEC_toml_object_renders_scalar_fields', () => {
   const text = tomlObject(
     toList([
       ['name', new ToolHostCodec_TomlValue(0, ['demo'])],
@@ -293,7 +293,7 @@ test('CODEC_toml_object_renders_scalar_fields', () => {
   assert.match(text, /flag = true/)
 })
 
-test('CODEC_toml_object_renders_nested_table', () => {
+test('WHAT[PROVIDER-PROJECTION-008] CODEC_toml_object_renders_nested_table', () => {
   const text = tomlObject(
     toList([['meta', new ToolHostCodec_TomlValue(4, [toList([['key', new ToolHostCodec_TomlValue(0, ['v'])]])])]]),
   )
@@ -301,12 +301,12 @@ test('CODEC_toml_object_renders_nested_table', () => {
   assert.match(text, /key = "v"/)
 })
 
-test('CODEC_toml_object_with_instructions_prepends_them', () => {
+test('WHAT[PROVIDER-PROJECTION-009] CODEC_toml_object_with_instructions_prepends_them', () => {
   const text = tomlObjectWithInstructions(toList(['do this first']), toList([['name', new ToolHostCodec_TomlValue(0, ['demo'])]]))
   assert.ok(text.indexOf('do this first') < text.indexOf('name = "demo"'))
 })
 
-test('CODEC_toml_table_renders_array_of_tables', () => {
+test('WHAT[PROVIDER-PROJECTION-008] CODEC_toml_table_renders_array_of_tables', () => {
   const text = tomlTable(
     'item',
     toList([
@@ -320,7 +320,7 @@ test('CODEC_toml_table_renders_array_of_tables', () => {
 
 // ── looksLikeHandleId / digest ───────────────────────────────────────────────
 
-test('CODEC_looks_like_handle_id_shape', () => {
+test('WHAT[PROVIDER-PROJECTION-003] CODEC_looks_like_handle_id_shape', () => {
   assert.equal(looksLikeHandleId('ab12cd'), true)
   assert.equal(looksLikeHandleId('zz9900'), true)
   assert.equal(looksLikeHandleId('ab12'), false, 'too short')
@@ -331,7 +331,7 @@ test('CODEC_looks_like_handle_id_shape', () => {
   assert.equal(looksLikeHandleId('      '), false)
 })
 
-test('CODEC_digest_is_true_fnv1a_32bit', () => {
+test('WHAT[PROVIDER-PROJECTION-003] CODEC_digest_is_true_fnv1a_32bit', () => {
   // Independent reference implementation: 32-bit wrapping multiply (BigInt).
   const reference = (text) => {
     let hash = 2166136261n

@@ -31,7 +31,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_027_kernel_identity_and_commands', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'semble')
   assert.equal(defaultRef, 'main')
   assert.equal(repo, 'https://github.com/MinishLab/semble.git')
@@ -42,7 +42,7 @@ test('AGENT_027_kernel_identity_and_commands', () => {
   assert.deepEqual(fixtureCommand('/tmp/fixture.js'), ['node', '/tmp/fixture.js'])
 })
 
-test('AGENT_027_launch_disabled_fixture_test_uvx', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_launch_disabled_fixture_test_uvx', () => {
   assert.equal(caseOf(launchFromVars({ SEMBLE_MCP_DISABLED: '1' })), 'Disabled')
   assert.equal(caseOf(launchFromVars({ SEMBLE_MCP_DISABLED: 'true', SEMBLE_MCP_FIXTURE: '/tmp/x.js' })), 'Disabled')
   const fixture = launchFromVars({ SEMBLE_MCP_FIXTURE: '/tmp/semble-fixture.js', WANXIANGSHU_TEST: 'true' })
@@ -57,7 +57,7 @@ test('AGENT_027_launch_disabled_fixture_test_uvx', () => {
   assert.equal(payloadOf(defaults), defaultRef)
 })
 
-test('AGENT_027_parse_text_and_tool_result', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_parse_text_and_tool_result', () => {
   const hits = listItems(parseText(JSON.stringify({
     results: [
       { file_path: 'src/A.fs', start_line: 2, end_line: 8, content: 'let a = 1\nlet b = 2', score: 0.42, total_lines: 30 },
@@ -88,11 +88,11 @@ test('AGENT_027_parse_text_and_tool_result', () => {
   assert.equal(fromTool[0].TotalLines, 1)
 })
 
-test('AGENT_027_search_disabled_returns_empty_without_spawn', async () => {
+test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_search_disabled_returns_empty_without_spawn', async () => {
   assert.deepEqual(listItems(await search(launchFromVars({ SEMBLE_MCP_DISABLED: '1' }), 'auth', '/repo', 5)), [])
 })
 
-test('AGENT_027_search_fixture_stdio_roundtrip', async () => {
+test('WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_search_fixture_stdio_roundtrip', async () => {
   const hits = listItems(await search(
     launchFromVars({ SEMBLE_MCP_FIXTURE: fixturePath, WANXIANGSHU_TEST: 'true' }),
     'auth handler',
@@ -108,7 +108,7 @@ test('AGENT_027_search_fixture_stdio_roundtrip', async () => {
   assert.equal(hits[0].Content, 'query=auth handler;repo=/tmp/repo;top_k=3;max_snippet_lines=20')
 })
 
-test('AGENT_027_configure_does_not_inject_host_mcp_or_permission_keys', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_027_configure_does_not_inject_host_mcp_or_permission_keys', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
   assert.equal(config.mcp?.[serverName], undefined)

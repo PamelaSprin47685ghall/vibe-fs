@@ -79,7 +79,7 @@ const writeEvidence = (fx, kinds, evidenceFor) => {
   }
 }
 
-test('session_ownership_ratchet_documents_closed_kind_set', () => {
+test('WHAT[SESSION-ONTOLOGY-001] session_ownership_ratchet_documents_closed_kind_set', () => {
   assert.deepEqual([...REQUIRED_KINDS], [
     'Companion',
     'SyncInspector',
@@ -90,6 +90,14 @@ test('session_ownership_ratchet_documents_closed_kind_set', () => {
     'fork agent',
     'Distiller child',
   ])
+  assert.equal(relatedEvidenceToken('hidden Reviewer'), 'Reviewer')
+  assert.equal(relatedEvidenceToken('fork agent'), 'Fork')
+  assert.equal(relatedEvidenceToken('Distiller child'), 'Distiller')
+  assert.equal(relatedEvidenceToken('Bookkeeper'), 'Bookkeeper')
+  assert.equal(SESSION_OWNERSHIP_MATRIX_REL, 'scripts/checks/session-ownership-matrix.json')
+})
+
+test('WHAT[SESSION-ONTOLOGY-002] session_ownership_ratchet_questionnaire_requires_owner_field', () => {
   assert.deepEqual([...MATRIX_FIELDS], [
     'owner',
     'reusable',
@@ -100,6 +108,9 @@ test('session_ownership_ratchet_documents_closed_kind_set', () => {
     'crashReconcile',
     'evidencePath',
   ])
+})
+
+test('WHAT[SESSION-ONTOLOGY-011] session_ownership_ratchet_attachment_tokens_include_strength_replica', () => {
   assert.deepEqual([...REQUIRED_ATTACHMENT_TOKENS], [
     'Companion',
     'SyncInspector',
@@ -107,14 +118,9 @@ test('session_ownership_ratchet_documents_closed_kind_set', () => {
     'Bookkeeper',
     'StrengthReplica',
   ])
-  assert.equal(relatedEvidenceToken('hidden Reviewer'), 'Reviewer')
-  assert.equal(relatedEvidenceToken('fork agent'), 'Fork')
-  assert.equal(relatedEvidenceToken('Distiller child'), 'Distiller')
-  assert.equal(relatedEvidenceToken('Bookkeeper'), 'Bookkeeper')
-  assert.equal(SESSION_OWNERSHIP_MATRIX_REL, 'scripts/checks/session-ownership-matrix.json')
 })
 
-test('session_ownership_attachment_tokens_require_surface', () => {
+test('WHAT[SESSION-ONTOLOGY-001] session_ownership_attachment_tokens_require_surface', () => {
   const good = `
 type AttachmentKind =
     | Companion
@@ -133,7 +139,7 @@ type AttachmentKind =
   assert.ok(missing.missing.includes('StrengthReplica'))
 })
 
-test('session_ownership_matrix_green_fixture', (t) => {
+test('WHAT[SESSION-ONTOLOGY-002] session_ownership_matrix_green_fixture', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix()
@@ -143,7 +149,16 @@ test('session_ownership_matrix_green_fixture', (t) => {
   assert.equal(result.failures.length, 0)
 })
 
-test('session_ownership_matrix_missing_kind_fails_closed', (t) => {
+test('WHAT[SESSION-ONTOLOGY-011] session_ownership_matrix_strength_replica_row_answers_owner', () => {
+  const loaded = loadMatrixFile(join(ROOT, SESSION_OWNERSHIP_MATRIX_REL))
+  assert.equal(loaded.ok, true)
+  const row = loaded.matrix.kinds.StrengthReplica
+  assert.equal(typeof row.owner, 'string')
+  assert.ok(row.owner.trim().length > 0)
+  assert.match(row.owner, /At most one active replica per owner/)
+})
+
+test('WHAT[SESSION-ONTOLOGY-014] session_ownership_matrix_missing_kind_fails_closed', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix()
@@ -154,7 +169,7 @@ test('session_ownership_matrix_missing_kind_fails_closed', (t) => {
   assert.ok(result.failures.some((f) => f.code === 'missing-kind' && f.kind === 'Bookkeeper'))
 })
 
-test('session_ownership_matrix_empty_field_fails_closed', (t) => {
+test('WHAT[SESSION-ONTOLOGY-002] session_ownership_matrix_empty_field_fails_closed', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix({
@@ -170,7 +185,7 @@ test('session_ownership_matrix_empty_field_fails_closed', (t) => {
   )
 })
 
-test('session_ownership_matrix_missing_evidence_file_fails_closed', (t) => {
+test('WHAT[SESSION-ONTOLOGY-014] session_ownership_matrix_missing_evidence_file_fails_closed', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix()
@@ -185,7 +200,7 @@ test('session_ownership_matrix_missing_evidence_file_fails_closed', (t) => {
   )
 })
 
-test('session_ownership_matrix_evidence_without_token_fails_closed', (t) => {
+test('WHAT[SESSION-ONTOLOGY-011] session_ownership_matrix_evidence_without_token_fails_closed', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix()
@@ -203,7 +218,7 @@ test('session_ownership_matrix_evidence_without_token_fails_closed', (t) => {
   )
 })
 
-test('session_ownership_matrix_rejects_special_pleading', (t) => {
+test('WHAT[SESSION-ONTOLOGY-002] session_ownership_matrix_rejects_special_pleading', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix({
@@ -215,7 +230,7 @@ test('session_ownership_matrix_rejects_special_pleading', (t) => {
   assert.ok(result.failures.some((f) => f.code === 'special-pleading' && f.kind === 'Bookkeeper'))
 })
 
-test('session_ownership_matrix_rejects_unexpected_kind', (t) => {
+test('WHAT[SESSION-ONTOLOGY-014] session_ownership_matrix_rejects_unexpected_kind', (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
   const { kinds, evidenceFor } = filledMatrix()
@@ -227,13 +242,13 @@ test('session_ownership_matrix_rejects_unexpected_kind', (t) => {
   assert.ok(result.failures.some((f) => f.code === 'unexpected-kind' && f.kind === 'Teacher'))
 })
 
-test('session_ownership_matrix_invalid_document_fails_closed', () => {
+test('WHAT[SESSION-ONTOLOGY-014] session_ownership_matrix_invalid_document_fails_closed', () => {
   assert.equal(scanMatrix(null).ok, false)
   assert.equal(scanMatrix([]).ok, false)
   assert.ok(scanMatrix({}).failures.some((f) => f.code === 'invalid-matrix'))
 })
 
-test('session_ownership_repo_scan_is_green', () => {
+test('WHAT[SESSION-ONTOLOGY-014] session_ownership_repo_scan_is_green', () => {
   const result = scanRepo(ROOT)
   assert.equal(result.ok, true, JSON.stringify({
     attachment: result.attachment,

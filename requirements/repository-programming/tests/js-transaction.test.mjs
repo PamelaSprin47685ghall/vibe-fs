@@ -34,7 +34,7 @@ const create = (path, text) => mutationCase('Create', [path, text])
 const exists = (existing) => (path) => existing.includes(path)
 const content = (map) => (path) => (path in map ? map[path] : undefined)
 
-test('JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
   const dup = [rewrite('a.txt', 'x', 'y'), create('a.txt', 'z')]
   const result = validateSingleIntent(toList(dup))
   assert.equal(ok(result), false)
@@ -44,7 +44,7 @@ test('JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
   assert.equal(ok(validateSingleIntent(toList(distinct))), true)
 })
 
-test('JS008_009_rewrite_requires_existing_target_create_requires_missing', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_009_rewrite_requires_existing_target_create_requires_missing', () => {
   const existing = ['a.txt']
   assert.equal(ok(validateTargets(exists(existing), toList([rewrite('a.txt', 'x', 'y')]))), true)
   assert.equal(codeOf(validateTargets(exists(existing), toList([rewrite('missing.txt', 'x', 'y')]))), 'FILE_NOT_FOUND')
@@ -52,7 +52,7 @@ test('JS008_009_rewrite_requires_existing_target_create_requires_missing', () =>
   assert.equal(codeOf(validateTargets(exists(existing), toList([create('a.txt', 'n')]))), 'FILE_ALREADY_EXISTS')
 })
 
-test('JS014_stale_rewrite_is_a_conflict_with_no_retry', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no_retry', () => {
   const current = { 'a.txt': 'current' }
   const fresh = [rewrite('a.txt', 'current', 'new')]
   const stale = [rewrite('a.txt', 'old', 'new')]
@@ -62,7 +62,7 @@ test('JS014_stale_rewrite_is_a_conflict_with_no_retry', () => {
   assert.equal(ok(validateFreshness(content(current), toList([create('b.txt', 'n')]))), true)
 })
 
-test('JS013_preflight_orders_rules_and_short_circuits', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_preflight_orders_rules_and_short_circuits', () => {
   const current = { 'a.txt': 'current' }
   // duplicate intent wins over everything
   assert.equal(codeOf(preflight(exists(['a.txt']), content(current), toList([rewrite('a.txt', 'current', 'x'), create('a.txt', 'y')]))), 'DUPLICATE_MUTATION_TARGET')
@@ -72,12 +72,16 @@ test('JS013_preflight_orders_rules_and_short_circuits', () => {
   assert.equal(ok(preflight(exists(['a.txt']), content(current), toList([rewrite('a.txt', 'current', 'x'), create('b.txt', 'y')]))), true)
 })
 
-test('JS013_015_commit_and_rollback_plans_are_exact', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commit_plan_is_exact', () => {
   const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
   assert.deepEqual(listItems(commitPlan(toList(mutations))), [
     ['a.txt', 'newA'],
     ['b.txt', 'newB'],
   ])
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollback_plan_is_exact', () => {
+  const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
   // rollback restores rewrites and marks creates for removal, reversed order
   assert.deepEqual(listItems(rollbackPlan(toList(mutations))), [
     ['b.txt', undefined],

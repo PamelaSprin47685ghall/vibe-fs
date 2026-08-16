@@ -56,14 +56,14 @@ const bundle = resultOf(
   ),
 ).value
 
-test('STRENGTH_009_016_projection_exposes_strength_intent_constructors', () => {
+test('WHAT[PROVIDER-PROJECTION-005] STRENGTH_009_016_projection_exposes_strength_intent_constructors', () => {
   assert.equal(typeof P.ProjectionIntentModule_useStrengthMirror, 'function')
   assert.equal(typeof P.ProjectionIntentModule_strengthCandidate, 'function')
   assert.equal(typeof P.ProjectionIntentModule_strengthPromoted, 'function')
   assert.equal(typeof P.ProjectionIntentModule_strengthReplicaLocal, 'function')
 })
 
-test('STRENGTH_009_mirror_conflicts_with_normal_work_base_selection', () => {
+test('WHAT[PROVIDER-PROJECTION-006] STRENGTH_009_mirror_conflicts_with_normal_work_base_selection', () => {
   const mirror = P.ProjectionIntentModule_useStrengthMirror(
     decision('d1'),
     run('target'),
@@ -75,7 +75,7 @@ test('STRENGTH_009_mirror_conflicts_with_normal_work_base_selection', () => {
   assert.equal(caseOf(planned.error), 'ConflictingPrefixSelection')
 })
 
-test('STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order_independent', () => {
+test('WHAT[PROVIDER-PROJECTION-006] STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order_independent', () => {
   const base = toList([
     message('user', [textPart('u1')]),
     message('assistant', [textPart('target-1')]),

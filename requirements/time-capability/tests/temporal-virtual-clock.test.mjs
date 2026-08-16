@@ -12,7 +12,7 @@ import { createVirtualClock } from '../../verification-system/tests/support/temp
 
 // ── VirtualClock is time as input ──────────────────────────────────────────
 
-test('TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
+test('WHAT[TIME-005] TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
   const vt = createVirtualClock()
   let fired = 0
   const handle = vt.port.delay(100)
@@ -29,7 +29,7 @@ test('TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
   vt.port.dispose()
 })
 
-test('TEMPORAL_virtual_clock_cancel_and_dispose_yield_zero_callbacks', async () => {
+test('WHAT[TIME-005] TEMPORAL_virtual_clock_cancel_and_dispose_yield_zero_callbacks', async () => {
   const vt = createVirtualClock()
   let fired = 0
   const a = vt.port.delay(10)

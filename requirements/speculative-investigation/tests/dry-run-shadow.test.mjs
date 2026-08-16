@@ -17,7 +17,7 @@ const branch = (source, start, end) => {
   return source.slice(from, to)
 }
 
-test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
+test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
   const source = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(source, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
 
@@ -27,7 +27,7 @@ test('SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_te
   assert.doesNotMatch(dry, /StrengthCandidatePromoted|Promoted/)
 })
 
-test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
+test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
   const source = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const start = source.indexOf('member this.StartDryRun')
   assert.ok(start >= 0, 'runtime must expose a distinct StartDryRun capability')
@@ -48,7 +48,7 @@ test('SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_obs
   assert.doesNotMatch(beforeReturn, /completionWins|deadline\.Delay|let!\s+result\s*=\s*.*Completion\.Task/)
 })
 
-test('SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
+test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   assert.match(runtime, /TimedOut/)
   assert.match(runtime, /CancelOwner/)
@@ -60,7 +60,7 @@ test('SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_
   assert.doesNotMatch(dry, /TripStrengthFuse\([^)]*TimedOut/i)
 })
 
-test('SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
+test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
 

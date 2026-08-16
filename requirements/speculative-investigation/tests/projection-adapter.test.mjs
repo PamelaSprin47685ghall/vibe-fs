@@ -18,7 +18,7 @@ const result = (id, value) => new Provider.WirePart(3, [Id.ToolCallIdModule_crea
 const media = (mime, digest) => new Provider.WirePart(4, [mime, digest])
 const msg = (role, parts) => ({ Role: role, Parts: toList(parts) })
 
-test('STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids', () => {
   const rendered = {
     Messages: toList([msg('user', [text('hello')]), msg('assistant', [text('world')])]),
     HostMessageIds: toList([undefined, undefined]),
@@ -43,7 +43,7 @@ test('STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_
   }))
 })
 
-test('STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts', () => {
+test('WHAT[SPEC-INV-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts', () => {
   const rendered = {
     Messages: toList([
       msg('user', [text('owner mirror')]),
@@ -73,7 +73,7 @@ test('STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_
   assert.deepEqual(raw[1].parts.map((part) => part.state.output), ['alpha', 'beta'])
 })
 
-test('STRENGTH_009_media_mirror_fails_closed_instead_of_reconstructing_from_digest', () => {
+test('WHAT[SPEC-INV-005] STRENGTH_009_media_mirror_fails_closed_instead_of_reconstructing_from_digest', () => {
   const rendered = {
     Messages: toList([msg('user', [media('image/png', 'digest-only')])]),
     HostMessageIds: toList([undefined]),

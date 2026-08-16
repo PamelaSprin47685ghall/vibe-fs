@@ -13,7 +13,7 @@ import {
 
 const scan = (text) => scanControlPyramidEntries([{ file: 'Example.fs', text }])
 
-test('CONTROL_PYRAMID_nested_match_is_RED_at_the_inner_decision', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_nested_match_is_RED_at_the_inner_decision', () => {
   const hits = scan(`
 module Example
 
@@ -33,7 +33,7 @@ let decode input =
   assert.deepEqual(hits[0].chain, ['match', 'match'])
 })
 
-test('CONTROL_PYRAMID_mixed_match_if_try_is_aggressively_detected', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_mixed_match_if_try_is_aggressively_detected', () => {
   const hits = scan(`
 let run state =
     match state with
@@ -55,7 +55,7 @@ let run state =
   )
 })
 
-test('CONTROL_PYRAMID_flat_sequential_decisions_are_GREEN', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_flat_sequential_decisions_are_GREEN', () => {
   const hits = scan(`
 let first =
     match a with
@@ -71,7 +71,7 @@ let second =
   assert.equal(hits.length, 0)
 })
 
-test('CONTROL_PYRAMID_tuple_match_is_GREEN', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_tuple_match_is_GREEN', () => {
   const hits = scan(`
 let decide a b =
     match a, b with
@@ -83,7 +83,7 @@ let decide a b =
   assert.equal(hits.length, 0)
 })
 
-test('CONTROL_PYRAMID_if_elif_chain_is_GREEN_because_it_is_one_decision_level', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_if_elif_chain_is_GREEN_because_it_is_one_decision_level', () => {
   const hits = scan(`
 let decide enabled accepted leased =
     if not enabled then
@@ -99,7 +99,7 @@ let decide enabled accepted leased =
   assert.equal(hits.length, 0)
 })
 
-test('CONTROL_PYRAMID_comments_and_multiline_strings_do_not_create_fake_hits', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_comments_and_multiline_strings_do_not_create_fake_hits', () => {
   const hits = scan(`
 let sample = """
 match fake with
@@ -124,7 +124,7 @@ let real x =
   assert.equal(hits.length, 0)
 })
 
-test('CONTROL_PYRAMID_ratchet_accepts_equal_or_lower_per_file_debt', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_ratchet_accepts_equal_or_lower_per_file_debt', () => {
   const baseline = {
     version: 1,
     files: { 'A.fs': 2, 'B.fs': 1 },
@@ -141,7 +141,7 @@ test('CONTROL_PYRAMID_ratchet_accepts_equal_or_lower_per_file_debt', () => {
   assert.equal(result.baselineTotal, 3)
 })
 
-test('CONTROL_PYRAMID_ratchet_rejects_new_or_increased_file_debt', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_ratchet_rejects_new_or_increased_file_debt', () => {
   const baseline = {
     version: 1,
     files: { 'A.fs': 1 },
@@ -162,7 +162,7 @@ test('CONTROL_PYRAMID_ratchet_rejects_new_or_increased_file_debt', () => {
   )
 })
 
-test('CONTROL_PYRAMID_many_hits_print_locations_but_the_long_tutorial_once', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_many_hits_print_locations_but_the_long_tutorial_once', () => {
   const output = renderFailure([
     {
       file: 'a.fs',
@@ -197,7 +197,7 @@ test('CONTROL_PYRAMID_many_hits_print_locations_but_the_long_tutorial_once', () 
   assert.match(output, /match → match!/)
 })
 
-test.skip('CONTROL_PYRAMID_production_baseline_is_exact_and_the_main_check_runner_enforces_it', () => {
+test.skip('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_production_baseline_is_exact_and_the_main_check_runner_enforces_it', () => {
   const hits = scanControlPyramidEntries(collectControlPyramidEntries(ROOT, 'src/Wanxiangshu'))
   const baseline = JSON.parse(
     readFileSync('scripts/checks/fsharp-control-pyramid-baseline.json', 'utf8'),
@@ -210,7 +210,7 @@ test.skip('CONTROL_PYRAMID_production_baseline_is_exact_and_the_main_check_runne
   assert.match(runner, /fsharp-control-pyramid-baseline\.json/)
 })
 
-test('CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {
+test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {
   assert.match(CONTROL_PYRAMID_GUIDE, /FsToolkit\.ErrorHandling/)
   assert.match(CONTROL_PYRAMID_GUIDE, /open FsToolkit\.ErrorHandling/)
   assert.match(CONTROL_PYRAMID_GUIDE, /open Wanxiangshu\.Foundation/)

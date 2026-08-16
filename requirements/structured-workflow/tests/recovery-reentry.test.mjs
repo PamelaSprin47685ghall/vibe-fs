@@ -14,7 +14,7 @@ const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, im
 /** Every emitted name, minus the reflection metadata Fable adds per type. */
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
 
-test('SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async () => {
   const mod = await load('Composition/Turn/Program')
 
   // The pure reconcile surface is bounded reread + publish decisions
@@ -41,7 +41,7 @@ test('SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async
   assert.deepEqual(forbidden, [], 'ReconcileProgram must not export continuation-restore / interpreter shapes')
 })
 
-test('SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () => {
   // Recovery is a permit-gated re-entry into the same named workflows the
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the

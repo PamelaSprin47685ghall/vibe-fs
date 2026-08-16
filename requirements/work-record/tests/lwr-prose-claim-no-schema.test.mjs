@@ -18,7 +18,7 @@ const trace = [
   xTrace.item({ sequence: 3, role: 'assistant', part: xTrace.text('Implemented and verified the fix.') }),
 ]
 
-test('LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
+test('WHAT[WORK-RECORD-011] LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
   const rendered = lifecycleWorkRecord.materialize(
     opening('Rewrite the fallback controller.'),
     [],
@@ -41,7 +41,7 @@ test('LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
   assert.equal(lines[lines.length - 1], 'assistant: Implemented and verified the fix.')
 })
 
-test('LWR_prose_claim_never_renders_fixed_report_headings', () => {
+test('WHAT[WORK-RECORD-012] LWR_prose_claim_never_renders_fixed_report_headings', () => {
   const rendered = lifecycleWorkRecord.materialize(
     opening('Rewrite the fallback controller.'),
     [],

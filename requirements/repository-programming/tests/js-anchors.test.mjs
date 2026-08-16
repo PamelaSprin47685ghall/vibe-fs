@@ -31,7 +31,7 @@ const failureOf = (name, payload) => {
   return new JsFailure(index, payload === undefined ? [] : [payload])
 }
 
-test('JS019_failure_codes_are_stable_and_unique', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_failure_codes_are_stable_and_unique', () => {
   const cases = [
     [failureOf('InvalidProgram'), 'INVALID_PROGRAM'],
     [failureOf('ProgramFailed', ''), 'PROGRAM_FAILED'],
@@ -62,14 +62,14 @@ test('JS019_failure_codes_are_stable_and_unique', () => {
   }
 })
 
-test('JS006_empty_anchor_declaration_is_refused', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_empty_anchor_declaration_is_refused', () => {
   assert.equal(ok(validateDeclaration(declaration(exact(''), undefined))), false)
   assert.equal(ok(validateDeclaration(declaration(regex(''), undefined))), false)
   assert.equal(ok(validateDeclaration(declaration(exact('hello'), undefined))), true)
   assert.equal(ok(validateDeclaration(declaration(regex('^\\s*$'), undefined))), true)
 })
 
-test('JS006_non_positive_occurrence_is_refused', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_non_positive_occurrence_is_refused', () => {
   assert.equal(ok(validateOccurrence(declaration(exact('x'), 0))), false)
   assert.equal(ok(validateOccurrence(declaration(exact('x'), -1))), false)
   assert.equal(ok(validateOccurrence(declaration(exact('x'), 1))), true)

@@ -17,7 +17,7 @@ const { sessionId, physicalUser, sealDigest, toList, listItems, reviewBarrierId,
   '../../verification-system/tests/support/domain.mjs'
 )
 
-test('SHARED_pending_seal_record_carries_the_binding_candidate', () => {
+test('WHAT[REVIEW-ASSURANCE-007] SHARED_pending_seal_record_carries_the_binding_candidate', () => {
   const seal = new PendingSeal(
     sessionId('ses_seal'),
     sessionId('ses_manager'),

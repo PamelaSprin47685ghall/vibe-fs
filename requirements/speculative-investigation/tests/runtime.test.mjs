@@ -35,7 +35,7 @@ const registerFn = Object.entries(Runtime).find(([k]) => k.startsWith('StrengthR
 const tryFindByReplicaFn = Object.entries(Runtime).find(([k]) => k.startsWith('StrengthRuntime__TryFindByReplica_'))?.[1]
 const retireFn = Object.entries(Runtime).find(([k]) => k.startsWith('StrengthRuntime__Retire_'))?.[1]
 
-test('STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
   const runtime = Runtime.StrengthRuntime_$ctor()
   const first = binding('owner', 'replica-1', 'd1')
   const second = binding('owner', 'replica-2', 'd2')
@@ -51,7 +51,7 @@ test('STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
   assert.equal(registerFn(runtime, second).tag, 0)
 })
 
-test('STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority', () => {
   const runtime = Runtime.StrengthRuntime_$ctor()
   const k0 = registerFn(runtime, binding('o1', 'r1', 'd1', Role.Coder, StrengthBudget.K0))
   assert.equal(caseOf(k0.fields[0]), 'EmptyBudget')

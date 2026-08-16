@@ -9,7 +9,7 @@ const LWR_SOURCE = new URL('../../../src/Wanxiangshu/Mission/WorkRecord/Model.fs
 const CANONICAL = ['Opening', 'Chronicle', 'Recent work']
 const LEGACY = ['Opening task', 'Work log', 'Uncompressed tail', 'Final output']
 
-test('WORK_RECORD_SECTIONS_lifecycle_source_declares_three_canonical_headings', () => {
+test('WHAT[WORK-RECORD-011] WORK_RECORD_SECTIONS_lifecycle_source_declares_three_canonical_headings', () => {
   const source = readFileSync(LWR_SOURCE, 'utf8')
   for (const heading of CANONICAL) {
     assert.match(source, new RegExp(`"${heading.replace(' ', ' ')}"`))
