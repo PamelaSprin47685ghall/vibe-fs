@@ -16,7 +16,6 @@ import {
   agentJournal,
   authority,
   authorityRun,
-  caseOf,
   continuationKind,
   idValue,
   isAdmissionShaped,
@@ -245,7 +244,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_runtime_start_stamp_is_audit_only_not_r
 
 test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a_model', () => {
   // 「Model = None always」不是运行时检查——profile 没有该字段，覆盖 model 不可表示。
-  assert.deepEqual(Object.keys(profileOf()), [
+  assert.deepEqual(Object.getOwnPropertyNames(profileOf()), [
     'SessionId',
     'LogicalRunId',
     'AuthorityRootUserMessageId',
@@ -264,7 +263,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effect
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
   assert.deepEqual(
     {
-      origin: caseOf(claim.value.Origin),
+      origin: claim.value.Origin.name,
       payloadDigest: claim.value.PayloadDigest,
       effectiveAgent: claim.value.EffectiveAgent,
       receipt: claim.value.Receipt,
@@ -279,7 +278,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effect
 // （`postPromptFireAndForget` / keyless sender）导出。
 
 test('WHAT[DISPATCH-PROTOCOL-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime', () => {
-  const sendNames = Object.keys(PromptDispatcherSendModule).filter(
+  const sendNames = Object.getOwnPropertyNames(PromptDispatcherSendModule).filter(
     (k) => typeof PromptDispatcherSendModule[k] === 'function',
   )
   assert.ok(sendNames.length >= 6, `send surface must exist, got ${sendNames.length}`)

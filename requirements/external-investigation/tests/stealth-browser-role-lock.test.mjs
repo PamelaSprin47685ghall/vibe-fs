@@ -50,7 +50,8 @@ const wildcardMatch = (input, pattern) => {
 
 const evaluate = (permissionObj, tool) => {
   const rules = []
-  for (const [key, value] of Object.entries(permissionObj)) {
+  for (const key of Object.getOwnPropertyNames(permissionObj)) {
+    const value = permissionObj[key]
     if (typeof value === 'string') rules.push({ permission: key, action: value })
   }
   return (

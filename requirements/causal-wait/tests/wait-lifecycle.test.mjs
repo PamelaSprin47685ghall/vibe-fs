@@ -6,7 +6,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   causalWait,
   causalWaitHub,
   CausalWaitRegistry,
@@ -45,8 +44,8 @@ test('WHAT[CAUSAL-006] CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
   lease.Dispose() // no MarkExit — the lease must still leave with a diagnostic exit
 
   const transition = lastTransition(registry)
-  assert.equal(caseOf(transition.Kind), 'Left')
-  assert.equal(caseOf(transition.Exit), 'WaitDisposed')
+  assert.equal(transition.Kind.name, 'Left')
+  assert.equal(transition.Exit.name, 'WaitDisposed')
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })
 
@@ -56,7 +55,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => 
   lease.MarkExit(causalWait.exit.cancelled())
   lease.Dispose()
 
-  assert.equal(caseOf(lastTransition(registry).Exit), 'WaitCancelled')
+  assert.equal(lastTransition(registry).Exit.name, 'WaitCancelled')
 })
 
 test('WHAT[CAUSAL-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
@@ -66,7 +65,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
   lease.MarkExit(causalWait.exit.failed())
   lease.Dispose()
 
-  assert.equal(caseOf(lastTransition(registry).Exit), 'WaitFailed')
+  assert.equal(lastTransition(registry).Exit.name, 'WaitFailed')
 })
 
 test('WHAT[CAUSAL-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
@@ -75,7 +74,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
   lease.Dispose()
   lease.Dispose() // second dispose must not double-leave
 
-  const leaves = listItems(registry.Snapshot().History).filter((t) => caseOf(t.Kind) === 'Left')
+  const leaves = listItems(registry.Snapshot().History).filter((t) => t.Kind.name === 'Left')
   assert.equal(leaves.length, 1)
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })

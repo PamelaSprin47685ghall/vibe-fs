@@ -8,12 +8,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  FactModule,
+} from '../../verification-system/tests/support/domain.mjs'
+import {
   TipDeliveryProjection_empty as empty,
   TipDeliveryProjection_apply as apply,
   TipDeliveryProjection_applyReanchor as applyReanchor,
   TipDeliveryProjection_hasFullDelivered as hasFullDelivered,
 } from '../../../dist/Enforcer/Guidance/DeliveryProjection.js'
-import { TipPresentation } from '../../../dist/Composition/Durable/Fact.js'
+
+const TipPresentation = FactModule.TipPresentation
 
 test('WHAT[GD-004] TDP_001_empty_state_has_nothing_delivered', () => {
   assert.equal(hasFullDelivered('primitive-obsession', empty), false)

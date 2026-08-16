@@ -11,11 +11,10 @@ import { join } from 'node:path'
 
 import {
   agentJournal, agentFact, sessionId, logicalRunId, authorityRoot,
-  stream, caseOf, promptDispatcher, transportReceipt,
+  stream, promptDispatcher, transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
 const { nudge } = await import('../../../dist/Execution/Delegation/Fork/OpenCode/JoinGuard.js')
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -40,15 +39,15 @@ const rootFact = (sid) =>
     SelectedTier: 'fast',
   })
 
-const outcomeName = (outcome) => outcome.cases()[outcome.tag]
+const outcomeName = (outcome) => outcome.name
 
 test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
   const sid = sessionId('ses_jg2')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
   const opened = await agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const appended = await AgentJournalModule_appendAgent(stream.session(sid), undefined, rootFact(sid), opened.journal)
-  assert.equal(caseOf(appended), 'Ok', 'authority root must fold')
+  const appended = await agentJournal.appendAgent(stream.session(sid), undefined, rootFact(sid), opened.journal)
+  assert.equal(appended.ok, true, 'authority root must fold')
   try {
     const captured = []
     const port = capturingPort(captured, { failFirst: true })

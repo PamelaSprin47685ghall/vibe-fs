@@ -23,10 +23,10 @@ import {
   loopSensor,
   physicalUser,
   promptDispatcher,
+  PromptDispatcherModule,
   runtimeNudge,
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as PromptDispatcher from '../../../dist/Interaction/Dispatch/Dispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // Enough repeated text to drive weighted-distinct tokens below the calibrated midpoint.
@@ -252,14 +252,14 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
   try {
     const journal = created.journal
     const SESSION = 'ses_bridge'
-    const runtime = PromptDispatcher.forJournal(journal)
-    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(
+    const runtime = PromptDispatcherModule.forJournal(journal)
+    const accepted = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
       runtime,
       sessionId(SESSION),
       physicalUser('msg_u1'),
       'fast-coder',
     )
-    assert.equal(accepted.tag, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0]}`)
+    assert.equal(accepted.name, 'Ok', `AcceptHumanRoot failed: ${accepted.toJSON()[1]}`)
 
     // Arm as the sensor would after detecting LOOP.
     assert.equal(loopSensor.tryArm(sensor, SESSION), true)
@@ -328,14 +328,14 @@ test('WHAT[DG-012] LOOP_008_loop_kill_advances_cursor_only_via_fallback_controll
   try {
     const journal = created.journal
     const SESSION = 'ses_008'
-    const runtime = PromptDispatcher.forJournal(journal)
-    const accepted = await PromptDispatcher.Runtime__AcceptHumanRoot(
+    const runtime = PromptDispatcherModule.forJournal(journal)
+    const accepted = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
       runtime,
       sessionId(SESSION),
       physicalUser('msg_u008'),
       'fast-coder',
     )
-    assert.equal(accepted.tag, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0]}`)
+    assert.equal(accepted.name, 'Ok', `AcceptHumanRoot failed: ${accepted.toJSON()[1]}`)
 
     assert.equal(loopSensor.tryArm(sensor, SESSION), true)
     loopSensor.clearArmed(sensor, SESSION)
@@ -395,13 +395,13 @@ test('WHAT[DG-009] LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_
   const SESSION = 'ses_exhaust'
 
   try {
-    const runtime = await PromptDispatcher.Runtime__AcceptHumanRoot(
+    const runtime = await PromptDispatcherModule.Runtime__AcceptHumanRoot(
       promptDispatcher.forJournal(journal),
       sessionId(SESSION),
       physicalUser('msg_u1'),
       'fast-coder',
     )
-    assert.equal(runtime.tag ?? 0, 0)
+    assert.equal(runtime.name, 'Ok')
 
     for (let i = 1; i <= 11; i += 1) {
       const advanced = await fallbackController.recordConfirmedFailure(

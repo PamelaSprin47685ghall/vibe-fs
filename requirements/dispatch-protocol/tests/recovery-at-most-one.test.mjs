@@ -20,22 +20,18 @@ import test from 'node:test'
 
 import {
   agentJournal,
-  caseOf,
   idValue,
   isSome,
-  lib,
   listItems,
   okResult,
   prod,
   promptDispatcher,
+  reviewSeal,
   sessionId,
-  toList,
   transportReceipt,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const Option = await lib('Option.js')
 const { reconcile } = await prod('Interaction/Dispatch/Recovery')
-const { SessionMessage } = await prod('OpenCode/Host/SessionSnapshotPort')
 
 const BOOT_AFTER_CLAIM = '2099-01-01T00:00:00Z'
 
@@ -47,24 +43,18 @@ const capturingPort = (captured) => ({
   },
 })
 
-/** role=user 消息：PromptKey 落在 metadata（PROMPT-011 的物理落地证据）。 */
-const userMessageWithKey = (id, keyValue) =>
-  new SessionMessage(
-    id,
-    'user',
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    false,
-    false,
-    Option.some(keyValue),
-    [],
-    undefined,
-  )
+/** role=user 消息：PromptKey 落在 metadata（PROMPT-011 的物理落地证据）。
+ * Host-raw 形状：reconcile 经 SessionSnapshotPort.projectMessages 投影，
+ * 与真实 Host 转录形状一致（`wanxiangshu_prompt_key` 是 PromptMetadataCodec 字段）。 */
+const userMessageWithKey = (id, keyValue) => ({
+  id,
+  role: 'user',
+  metadata: { wanxiangshu_prompt_key: keyValue },
+})
 
-const snapshotPort = (messages) => ({ GetMessages: async (sid) => okResult(toList(messages)) })
+const snapshotPort = (rawMessages) => ({
+  GetMessages: async (sid) => okResult(reviewSeal.projectMessages(rawMessages)),
+})
 
 test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp008-'))
@@ -96,7 +86,7 @@ test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_re
         const secondRuntime = promptDispatcher.forJournal(second.journal)
         const noMatch = listItems(await reconcile(second.journal, snapshotPort([])))
         assert.equal(noMatch.length, 1, '恰好一条 pending claim 被恢复')
-        assert.equal(caseOf(noMatch[0].Outcome), 'StillPending')
+        assert.equal(noMatch[0].Outcome.name, 'StillPending')
         assert.equal(captured.length, 1, '未证明物理落地 → 绝不自动重发')
         assert.equal(
           promptDispatcher.pendingClaimCount(secondRuntime, 'ses_008'),
@@ -152,7 +142,7 @@ test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_p
           await reconcile(second.journal, snapshotPort([userMessageWithKey('msg_physical_004', key)])),
         )
         assert.equal(matched.length, 1)
-        assert.equal(caseOf(matched[0].Outcome), 'Proven')
+        assert.equal(matched[0].Outcome.name, 'Proven')
         assert.equal(
           promptDispatcher.pendingClaimCount(secondRuntime, 'ses_004'),
           0,
@@ -197,7 +187,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolv
         assert.equal(reopened.ok, true, reopened.ok ? '' : JSON.stringify(reopened.error))
         const outcomes = listItems(await reconcile(reopened.journal, snapshotPort([])))
         assert.equal(outcomes.length, 1)
-        assert.equal(caseOf(outcomes[0].Outcome), 'StillPending', `启动 ${start}：未超预算，保持 Pending`)
+        assert.equal(outcomes[0].Outcome.name, 'StillPending', `启动 ${start}：未超预算，保持 Pending`)
         assert.equal(captured.length, 1, '绝不重发')
         reopened.dispose()
       }
@@ -213,7 +203,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolv
         const fourthRuntime = promptDispatcher.forJournal(fourth.journal)
         const unresolved = listItems(await reconcile(fourth.journal, snapshotPort([])))
         assert.equal(unresolved.length, 1)
-        assert.equal(caseOf(unresolved[0].Outcome), 'StillPending')
+        assert.equal(unresolved[0].Outcome.name, 'StillPending')
         assert.equal(
           promptDispatcher.pendingClaimCount(fourthRuntime, 'ses_011b'),
           1,

@@ -23,8 +23,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { admitLabor, classifyEnding, EndingDisposition, LaborAdmission } from '../../../dist/Mission/Manager/Finality.js'
-import { finalityContract, reviewerOutcomeContract } from './support/finality-contract.mjs'
+import { finalityContract, finalityDisposition, reviewerOutcomeContract } from './support/finality-contract.mjs'
 import { isAllowed } from '../../../dist/Foundation/RolesSurface.js'
 import {
   blobDigest,
@@ -132,7 +131,7 @@ const foldLife = (facts) => {
   return fold.session(out.value, SESSION_KEY)?.ManagerLife
 }
 
-const caseOf = (value) => value.cases()[value.tag]
+// Fable unions expose the case name via `.name` (equivalent to caseOf).
 
 test('WHAT[FINALITY-001] only the Manager holds ToolPermission.Finality', () => {
   assert.equal(isAllowed('manager', 'Finality'), true)
@@ -143,8 +142,8 @@ test('WHAT[FINALITY-001] only the Manager holds ToolPermission.Finality', () => 
 
 test('WHAT[FINALITY-004] no accepted planComplete=true commitment stays at Planning Table', () => {
   const life = foldLife([lifeOpened()]).CurrentLife
-  const ending = classifyEnding(undefined, life, false)
-  assert.equal(ending, EndingDisposition.ContinuePlanning)
+  const ending = finalityDisposition.classifyEnding(undefined, life, false)
+  assert.equal(ending, finalityDisposition.EndingDisposition.ContinuePlanning)
 })
 
 test('WHAT[FINALITY-025] a completed Life replays as AlreadyCompleted, never restarts', () => {
@@ -154,37 +153,37 @@ test('WHAT[FINALITY-025] a completed Life replays as AlreadyCompleted, never res
   assert.equal(completedLives.length, 1)
   const done = completedLives[0]
   assert.equal(done.Completed, true, 'LifeCompleted must archive a completed Life')
-  assert.equal(classifyEnding(CALL, done, true), EndingDisposition.AlreadyCompleted)
+  assert.equal(finalityDisposition.classifyEnding(CALL, done, true), finalityDisposition.EndingDisposition.AlreadyCompleted)
 })
 
 test('WHAT[FINALITY-003] an open request resumes the same ToolCallId replay', () => {
   const life = foldLife([lifeOpened(), finalityRequested()]).CurrentLife
-  const ending = classifyEnding(CALL, life, true)
-  assert.equal(caseOf(ending), 'ResumeRequest')
+  const ending = finalityDisposition.classifyEnding(CALL, life, true)
+  assert.equal(ending.name, 'ResumeRequest')
   // The resumed request is the same durable request, not a new one.
   assert.equal(idValue.finalityRequest(life.ActiveFinality.RequestId), 'req-1')
 })
 
 test('WHAT[FINALITY-003] an open request with no enlisted members is recoverable', () => {
   const life = foldLife([lifeOpened(), finalityRequested()]).CurrentLife
-  assert.equal(caseOf(classifyEnding(toolCallId('call-2'), life, true)), 'RecoverRequestWithoutReviewers')
+  assert.equal(finalityDisposition.classifyEnding(toolCallId('call-2'), life, true).name, 'RecoverRequestWithoutReviewers')
 })
 
 test('WHAT[FINALITY-003] a request already in motion waits for the current cohort', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted()]).CurrentLife
-  assert.equal(classifyEnding(toolCallId('call-2'), life, true), EndingDisposition.WaitForCurrentRequest)
+  assert.equal(finalityDisposition.classifyEnding(toolCallId('call-2'), life, true), finalityDisposition.EndingDisposition.WaitForCurrentRequest)
 })
 
 test('WHAT[FINALITY-014] rejection keeps the same Life and a new suicide begins fresh Finality', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityRejected()]).CurrentLife
-  assert.equal(caseOf(life.ActiveFinality.Resolution), 'Rejected')
+  assert.equal(life.ActiveFinality.Resolution.name, 'Rejected')
   // Same Life continues: no blessing, no new request — next suicide starts a new cohort.
-  assert.equal(classifyEnding(toolCallId('call-2'), life, true), EndingDisposition.BeginFinality)
+  assert.equal(finalityDisposition.classifyEnding(toolCallId('call-2'), life, true), finalityDisposition.EndingDisposition.BeginFinality)
 })
 
 test('WHAT[FINALITY-026] a rejected request does not block labor: labor may continue', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityRejected()]).CurrentLife
-  assert.equal(admitLabor(life), LaborAdmission.LaborMayContinue)
+  assert.equal(finalityDisposition.admitLabor(life), finalityDisposition.LaborAdmission.LaborMayContinue)
 })
 
 test('WHAT[FINALITY-016] a blessing leaves the Life open until the second suicide', () => {
@@ -195,20 +194,20 @@ test('WHAT[FINALITY-016] a blessing leaves the Life open until the second suicid
 
 test('WHAT[FINALITY-017] the second suicide after a blessing is the rest path', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]).CurrentLife
-  assert.equal(finalityContract.endingName(classifyEnding(toolCallId('call-2'), life, true)), 'CompleteBlessedLife')
+  assert.equal(finalityContract.endingName(finalityDisposition.classifyEnding(toolCallId('call-2'), life, true)), 'CompleteBlessedLife')
   // Blessing is resolved, not open: ordinary labor may continue (GLORY-061).
-  assert.equal(admitLabor(life), LaborAdmission.LaborMayContinue)
+  assert.equal(finalityDisposition.admitLabor(life), finalityDisposition.LaborAdmission.LaborMayContinue)
 })
 
 test('WHAT[FINALITY-018] an open request owns the Life: Manager labor is deferred', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted()]).CurrentLife
-  assert.equal(admitLabor(life), LaborAdmission.FinalityOwnsLife)
+  assert.equal(finalityDisposition.admitLabor(life), finalityDisposition.LaborAdmission.FinalityOwnsLife)
 })
 
 test('WHAT[FINALITY-026] resolved historical requests do not block labor', () => {
   // Resolved historical requests do not block labor (GLORY-055).
   const rejected = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityRejected()]).CurrentLife
-  assert.equal(admitLabor(rejected), LaborAdmission.LaborMayContinue)
+  assert.equal(finalityDisposition.admitLabor(rejected), finalityDisposition.LaborAdmission.LaborMayContinue)
 })
 
 test('WHAT[FINALITY-022] a new Life inherits no blessing/roster/request and starts fresh Finality', () => {
@@ -229,21 +228,21 @@ test('WHAT[FINALITY-022] a new Life inherits no blessing/roster/request and star
   assert.equal(idValue.managerLife(current.LifeId), 'life-2')
   assert.equal(current.ActiveFinality, undefined)
   assert.equal(current.LastBlessing, undefined)
-  assert.equal(classifyEnding(undefined, current, true), EndingDisposition.BeginFinality)
+  assert.equal(finalityDisposition.classifyEnding(undefined, current, true), finalityDisposition.EndingDisposition.BeginFinality)
 })
 
 test('WHAT[FINALITY-007] no mechanical terminal-todo completeness gate', () => {
   // A Life without any Finality fact set is still BeginFinality — there is no
   // mechanical obligation-completeness gate in front of Finality.
   const life = foldLife([lifeOpened()]).CurrentLife
-  assert.equal(classifyEnding(undefined, life, true), EndingDisposition.BeginFinality)
+  assert.equal(finalityDisposition.classifyEnding(undefined, life, true), finalityDisposition.EndingDisposition.BeginFinality)
 })
 
 test('WHAT[FINALITY-021] disposition never derives from narrative text', () => {
   // The pure dispatcher only reads typed projections — no obligations, no prose
   // inspection; the commitment gate is typed projection evidence, not narrative.
   const life = foldLife([lifeOpened()]).CurrentLife
-  assert.equal(classifyEnding(undefined, life, true), EndingDisposition.BeginFinality)
+  assert.equal(finalityDisposition.classifyEnding(undefined, life, true), finalityDisposition.EndingDisposition.BeginFinality)
 })
 
 test('WHAT[FINALITY-002] finality eligibility is the combination of commitment, request, and experience typing', () => {
@@ -251,14 +250,14 @@ test('WHAT[FINALITY-002] finality eligibility is the combination of commitment, 
   // single flag — the same Life answers differently as the durable facts move
   // through planning → request → blessing, each stage typed by its own fact.
   const planned = foldLife([lifeOpened()]).CurrentLife
-  assert.equal(classifyEnding(undefined, planned, false), EndingDisposition.ContinuePlanning, 'no accepted plan commitment → planning table')
-  assert.equal(classifyEnding(undefined, planned, true), EndingDisposition.BeginFinality, 'accepted commitment, no request → begin finality')
+  assert.equal(finalityDisposition.classifyEnding(undefined, planned, false), finalityDisposition.EndingDisposition.ContinuePlanning, 'no accepted plan commitment → planning table')
+  assert.equal(finalityDisposition.classifyEnding(undefined, planned, true), finalityDisposition.EndingDisposition.BeginFinality, 'accepted commitment, no request → begin finality')
 
   const inFlight = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted()]).CurrentLife
-  assert.equal(classifyEnding(toolCallId('call-2'), inFlight, true), EndingDisposition.WaitForCurrentRequest, 'open request owns the cohort')
+  assert.equal(finalityDisposition.classifyEnding(toolCallId('call-2'), inFlight, true), finalityDisposition.EndingDisposition.WaitForCurrentRequest, 'open request owns the cohort')
 
   const blessed = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]).CurrentLife
-  assert.equal(caseOf(classifyEnding(toolCallId('call-2'), blessed, true)), 'CompleteBlessedLife', 'accepted → rest path on the second suicide')
+  assert.equal(finalityDisposition.classifyEnding(toolCallId('call-2'), blessed, true).name, 'CompleteBlessedLife', 'accepted → rest path on the second suicide')
 })
 
 test('WHAT[FINALITY-005] the rest-path suicide is a drain, not a new cohort', () => {
@@ -266,10 +265,10 @@ test('WHAT[FINALITY-005] the rest-path suicide is a drain, not a new cohort', ()
   // request: the second suicide after a blessing must classify as the blessed
   // rest drain, excluding every cohort-creating disposition.
   const blessed = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]).CurrentLife
-  const ending = classifyEnding(toolCallId('call-2'), blessed, true)
-  assert.equal(caseOf(ending), 'CompleteBlessedLife')
+  const ending = finalityDisposition.classifyEnding(toolCallId('call-2'), blessed, true)
+  assert.equal(ending.name, 'CompleteBlessedLife')
   for (const disposition of ['BeginFinality', 'ResumeRequest', 'RecoverRequestWithoutReviewers', 'WaitForCurrentRequest']) {
-    assert.notEqual(caseOf(ending), disposition, `${disposition} must not be reachable on the rest path`)
+    assert.notEqual(ending.name, disposition, `${disposition} must not be reachable on the rest path`)
   }
 })
 
@@ -277,7 +276,7 @@ test('WHAT[FINALITY-006] drain outcomes are two-typed: Revision (REVISE) vs Conf
   // TODO-006: a checkpoint drain awaits the latest ConsumableReview whose
   // verdict is exactly one of two typed outcomes — REVISE returns the canonical
   // work record and keeps the Life going; PERFECT proceeds into Finality.
-  assert.deepEqual(reviewerOutcomeContract.cases(), ['Revision', 'Confirmed'])
+  assert.deepEqual(reviewerOutcomeContract.caseNames(), ['Revision', 'Confirmed'])
   assert.deepEqual(
     reviewerOutcomeContract.revision('defect A at src/a.ts'),
     { name: 'Revision', workRecord: 'defect A at src/a.ts' },

@@ -8,11 +8,9 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ManagerLifecycleProjection_isLifeArchived as isLifeArchived } from '../../../dist/Mission/Manager/Life/Projection.js'
 import {
   blobDigest,
   blobRef,
-  caseOf,
   envelope,
   finalityRequestId,
   fold,
@@ -22,7 +20,6 @@ import {
   managerLifecycleFact,
   managerLifeId,
   mapEntries,
-  payloadOf,
   physicalUser,
   promptKey,
   providerRun,
@@ -31,6 +28,7 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
+import { lifeProjection } from './support/finality-contract.mjs'
 
 const SESSION = sessionId('ses_a')
 const LIFE = managerLifeId('life-1')
@@ -172,13 +170,13 @@ test('WHAT[FINALITY-008] a rejected request closes and a new suicide opens a new
     lifecycleEnv(finalityRejected()),
   ])
   assert.equal(rejected.ok, true, JSON.stringify(rejected.error))
-  assert.equal(caseOf(life(rejected.value).CurrentLife.ActiveFinality.Resolution), 'Rejected')
+  assert.equal(life(rejected.value).CurrentLife.ActiveFinality.Resolution.name, 'Rejected')
   assert.ok(life(rejected.value).CurrentLife.LastRejectedWorkRecord != null)
 
   const retry = finalityRequested()
   const out = fold.apply(rejected.value, [lifecycleEnv(retry)])
   assert.equal(out.ok, true, JSON.stringify(out.error))
-  assert.equal(caseOf(life(out.value).CurrentLife.ActiveFinality.Resolution), 'Open')
+  assert.equal(life(out.value).CurrentLife.ActiveFinality.Resolution.name, 'Open')
 })
 
 test('WHAT[FINALITY-016] a blessing leaves the life open until the second suicide', () => {
@@ -194,7 +192,7 @@ test('WHAT[FINALITY-016] a blessing leaves the life open until the second suicid
   const open = life(blessed.value)
   assert.ok(open.CurrentLife != null)
   assert.equal(open.CurrentLife.Completed, false)
-  assert.equal(caseOf(open.CurrentLife.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(open.CurrentLife.ActiveFinality.Resolution.name, 'Blessed')
   assert.ok(open.CurrentLife.LastBlessing != null)
 })
 
@@ -218,7 +216,7 @@ test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives 
   const archived = completed[0]
   assert.equal(archived.Completed, true)
   assert.ok(archived.CompletedTerminal != null)
-  assert.equal(caseOf(archived.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(archived.ActiveFinality.Resolution.name, 'Blessed')
 })
 
 const ManagerLifecycleProjectionLike = {
@@ -241,11 +239,11 @@ test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
     lifecycleEnv(lifeCompleted()),
   ])
   assert.equal(archived.ok, true, JSON.stringify(archived.error))
-  assert.equal(isLifeArchived(life(archived.value)), true)
+  assert.equal(lifeProjection.isLifeArchived(life(archived.value)), true)
 
   // A fresh session that never opened a Life is NOT done (CurrentLife None but
   // CompletedLives empty) — it must keep working.
-  assert.equal(isLifeArchived(ManagerLifecycleProjectionLike.empty()), false)
+  assert.equal(lifeProjection.isLifeArchived(ManagerLifecycleProjectionLike.empty()), false)
 
   // An open / activated-but-unfinished Life is NOT done.
   const open = fold.apply(fold.empty, [
@@ -253,7 +251,7 @@ test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
     lifecycleEnv(workActivated()),
   ])
   assert.equal(open.ok, true, JSON.stringify(open.error))
-  assert.equal(isLifeArchived(life(open.value)), false)
+  assert.equal(lifeProjection.isLifeArchived(life(open.value)), false)
 
   // A blessed Life is still open until the second suicide (GLORY-061/062).
   const blessed = fold.apply(fold.empty, [
@@ -264,7 +262,7 @@ test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
     lifecycleEnv(finalityBlessed()),
   ])
   assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
-  assert.equal(isLifeArchived(life(blessed.value)), false)
+  assert.equal(lifeProjection.isLifeArchived(life(blessed.value)), false)
 })
 
 test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound record', () => {
@@ -285,7 +283,7 @@ test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound re
   ])
   assert.equal(undecided.ok, true, JSON.stringify(undecided.error))
   const request = life(undecided.value).CurrentLife.ActiveFinality
-  assert.equal(caseOf(request.Resolution), 'Undecided')
+  assert.equal(request.Resolution.name, 'Undecided')
   // No wound record is ever fabricated (GLORY-056).
   assert.ok(life(undecided.value).CurrentLife.LastRejectedWorkRecord == null)
 })
@@ -301,15 +299,18 @@ test('WHAT[FINALITY-011] a revise closes finality without confirming the life', 
 
   assert.equal(out.ok, true, JSON.stringify(out.error))
   const request = life(out.value).CurrentLife.ActiveFinality
-  assert.equal(caseOf(request.Resolution), 'Rejected')
+  assert.equal(request.Resolution.name, 'Rejected')
   // The rejection evidence still identifies the rejecting reviewer for cleanup (GLORY-004).
-  const evidence = payloadOf(request.Resolution)
+  // toJSON() = [caseName, payload...]; the single-field Rejected case carries
+  // the rejection evidence.
+  const evidence = request.Resolution.toJSON()[1]
   assert.equal(idValue.session(evidence.RejectingReviewer), 'ses-reviewer')
 })
 
 // Plain-data view of the lifecycle projection. Raw deepEqual of two folds of
-// the same facts fails on FSharpMap comparer closure identity, not on content;
-// this view compares the durable facts (members, standing, evidence) instead.
+// the same facts fails on the projection's map comparer closure identity, not
+// on content; this view compares the durable facts (members, standing,
+// evidence) instead.
 const managerLifeView = (projection) => {
   const lifeView = (life) => ({
     LifeId: idValue.managerLife(life.LifeId),
@@ -320,7 +321,7 @@ const managerLifeView = (projection) => {
         ? null
         : {
             RequestId: idValue.finalityRequest(life.ActiveFinality.RequestId),
-            Resolution: caseOf(life.ActiveFinality.Resolution),
+            Resolution: life.ActiveFinality.Resolution.name,
             Members: mapEntries(life.ActiveFinality.Members).map(([session, member]) => [
               idValue.session(session),
               {

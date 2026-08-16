@@ -5,6 +5,29 @@ import {
   SessionStore__Start_Z721C83C5,
   SessionStore__TryState_Z721C83C5,
 } from '../../../dist/Sphinx/Session.js'
+import { close } from '../../../dist/Sphinx/Closure.js'
+import {
+  serverName,
+  permissionKey,
+  relativeServerEntry,
+  isTool,
+  localCommand,
+  fixtureCommand,
+} from '../../../dist/Sphinx/Mcp.js'
+import { create as createMcpServer } from '../../../dist/Sphinx/McpServer.js'
+import { library, phase0Names } from '../../../dist/Sphinx/Methodology.js'
+import { paretoFrontier } from '../../../dist/Sphinx/Representation.js'
+import { Model, run, uct } from '../../../dist/Sphinx/MonteCarlo.js'
+import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
+import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
+
+export { close }
+export { serverName, permissionKey, relativeServerEntry, isTool, localCommand, fixtureCommand }
+export { createMcpServer }
+export { library, phase0Names }
+export { paretoFrontier }
+export { Model, run, uct, MonteCarloNode }
+export { AStarProblem, GraphEdge, solveGraph }
 
 export const createStore = () => SessionStore_$ctor()
 export const start = (store, question) => SessionStore__Start_Z721C83C5(store, question)

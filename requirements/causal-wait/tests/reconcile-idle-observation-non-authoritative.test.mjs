@@ -6,7 +6,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   physicalUser,
   reconcileSupervisor,
   sessionId,
@@ -49,6 +48,6 @@ test('WHAT[CAUSAL-001] EXEC_reconcile_idle_before_transcript_materializes_within
 
   await settle()
   assert.equal(turns.length, 1, 'exactly one onTurn within same Kick')
-  assert.equal(caseOf(turns[0].Outcome), 'TurnCompleted')
+  assert.equal(turns[0].Outcome.name, 'TurnCompleted')
   assert.ok(snapshot.readCount >= 3, `expect ≥3 reads (initial + rereads); got ${snapshot.readCount}`)
 })

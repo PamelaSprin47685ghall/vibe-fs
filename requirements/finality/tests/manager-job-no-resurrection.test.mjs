@@ -53,6 +53,10 @@ const terminal = {
   abandoned: () => jobProgress.of('Abandoned'),
 }
 
+// Explicit enumeration: same three terminal progress kinds as the fixture
+// object above, in the same order (no dynamic export discovery).
+const terminalNames = ['published', 'failed', 'abandoned']
+
 const laterProgress = [
   jobProgress.of('CandidateReady', {
     CandidateCommit: commitHash('c9'),
@@ -63,8 +67,8 @@ const laterProgress = [
 ]
 
 test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume', () => {
-  for (const [name, progress] of Object.entries(terminal)) {
-    const projection = orchestratorProjection.recordProgress(JOB, progress(), created())
+  for (const name of terminalNames) {
+    const projection = orchestratorProjection.recordProgress(JOB, terminal[name](), created())
     const job = orchestratorProjection.tryFind(JOB, projection)
     assert.equal(isSome(job), true, `${name}: terminal job stays in the map`)
     assert.equal(orchestratorProjection.activeJobs(projection).length, 0, `${name}: not active`)
@@ -77,7 +81,8 @@ test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume
 })
 
 test('WHAT[FINALITY-028] later progress cannot reopen a terminal ManagerJob', () => {
-  for (const progress of Object.values(terminal)) {
+  for (const name of terminalNames) {
+    const progress = terminal[name]
     const sealed = orchestratorProjection.recordProgress(JOB, progress(), created())
     const sealedName = orchestratorProjection.progressOf(orchestratorProjection.tryFind(JOB, sealed))
     for (const later of laterProgress) {

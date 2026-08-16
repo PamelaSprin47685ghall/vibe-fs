@@ -4,7 +4,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   childRecovery,
   handleId,
   sessionId,
@@ -20,7 +19,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_alone_is_not_term
     childRecovery.snapshotMissing(),
     [childRecovery.abortedObserved('host abort')],
   )
-  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.equal(resolution.name, 'RecoveryIncomplete')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
@@ -29,8 +28,8 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_observed_never_jo
     childRecovery.snapshotActive(),
     [childRecovery.abortedObserved('signal only')],
   )
-  assert.notEqual(caseOf(resolution), 'RecoveredTerminal')
-  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.notEqual(resolution.name, 'RecoveredTerminal')
+  assert.equal(resolution.name, 'RecoveryIncomplete')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_with_session_active_is_recovered_active', () => {
@@ -39,7 +38,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_aborted_with_session_acti
     childRecovery.snapshotActive(),
     [childRecovery.abortedObserved('stale abort'), childRecovery.sessionActive()],
   )
-  assert.equal(caseOf(resolution), 'RecoveredActive')
+  assert.equal(resolution.name, 'RecoveredActive')
 })
 
 // Mid-turn: readable non-terminal snapshot + SessionActive → RecoveredActive (permit-eligible).
@@ -49,7 +48,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_mid_turn_snapshot_active_
     childRecovery.snapshotActive(),
     [childRecovery.sessionActive()],
   )
-  assert.equal(caseOf(resolution), 'RecoveredActive')
+  assert.equal(resolution.name, 'RecoveredActive')
 })
 
 // True unreadable → RecoveryIncomplete (wait); never RecoveryBlocked solely from unreadable.
@@ -59,7 +58,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_true_unreadable_is_recove
     childRecovery.snapshotUnreadable('GetMessages network error'),
     [childRecovery.sessionActive()],
   )
-  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.equal(resolution.name, 'RecoveryIncomplete')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
@@ -98,7 +97,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_proven_terminal_then_join
     childRecovery.snapshotTerminal(evidence),
     [childRecovery.abortedObserved('prior abort ignored once terminal proven')],
   )
-  assert.equal(caseOf(resolution), 'RecoveredTerminal')
+  assert.equal(resolution.name, 'RecoveredTerminal')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_durable_completed_awaiting_join_is_joinable', () => {
@@ -110,5 +109,5 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_001_durable_completed_awaitin
     childRecovery.snapshotMissing(),
     [childRecovery.abortedObserved('noise')],
   )
-  assert.equal(caseOf(resolution), 'RecoveredTerminal')
+  assert.equal(resolution.name, 'RecoveredTerminal')
 })

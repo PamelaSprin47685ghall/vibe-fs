@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url'
 import {
   agentFact,
   agentJournal,
-  caseOf,
   runtimeResources,
   providerLanguage,
   sessionId,
@@ -24,7 +23,6 @@ import {
 
 runtimeResources.installFromPackage()
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const {
   EnforcerTipGuidance_latestTipGuidance: latestTipGuidance,
   EnforcerTipGuidance_latestTipNudge: latestTipNudge,
@@ -46,8 +44,8 @@ const blogger = sessionId('ses-tip-delivery-blogger')
 const journalStream = (id) => stream.session(id)
 
 const append = async (journal, id, value, run) => {
-  const result = await AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
-  assert.equal(caseOf(result), 'Ok', `append failed: ${JSON.stringify(result)}`)
+  const result = await agentJournal.appendAgent(journalStream(id), run, value, journal)
+  assert.equal(result.ok, true, `append failed: ${JSON.stringify(result)}`)
 }
 
 const seedOwnerWithTip = async (journal, { tip = 'primitive-obsession', runSuffix = '1' } = {}) => {
@@ -104,12 +102,10 @@ const presentationOf = (guidance) => {
   const p = guidance.Presentation
   if (p == null) return undefined
   if (typeof p === 'string') return p
-  // Fable RequireQualifiedAccess DU compiles to { tag, fields }.
-  // Declaration order: Full = 0, IdentityOnly = 1.
-  if (typeof p.tag === 'number') {
-    if (p.tag === 0) return 'Full'
-    if (p.tag === 1) return 'IdentityOnly'
-  }
+  // Fable RequireQualifiedAccess DU compiles to a Union instance; the case
+  // name is `.name` (never the positional tag ordinal).
+  if (p.name === 'Full') return 'Full'
+  if (p.name === 'IdentityOnly') return 'IdentityOnly'
   if (Object.prototype.hasOwnProperty.call(p, 'Full')) return 'Full'
   if (Object.prototype.hasOwnProperty.call(p, 'IdentityOnly')) return 'IdentityOnly'
   return undefined

@@ -11,32 +11,28 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { toList } from '../../verification-system/tests/support/domain.mjs'
 import {
-  CausalOwner_create,
-  CausalProducerRef,
-  DiagnosticWaitModule_create,
-  WaitEscape,
-} from '../../../dist/Execution/Session/Wait/CausalWait.js'
-import {
+  causalWait,
+  causalWaitHub,
   CausalWaitRegistry,
+} from '../../verification-system/tests/support/domain.mjs'
+import {
   CausalWaitHub_setWorkspace,
-  CausalWaitHub_observer,
   CausalWaitHub_writeToWorkspace,
 } from '../../../dist/Execution/Session/Wait/Registry.js'
 import { writeSnapshot as CausalWaitBridge_writeSnapshot } from '../../../dist/Execution/Session/Wait/Bridge.js'
 
 const mkWait = (waitKind, ownerKind, subjectPairs, producer) =>
-  DiagnosticWaitModule_create(
+  causalWait.create({
     waitKind,
-    CausalOwner_create(ownerKind, toList(subjectPairs.slice(0, 1))),
-    toList(subjectPairs),
+    owner: causalWait.owner(ownerKind, subjectPairs.slice(0, 1)),
+    subject: subjectPairs,
     producer,
-    toList([WaitEscape.ProcessLifetime]),
-    'causal-wait-bridge.test',
-  )
+    escapes: [causalWait.escape.processLifetime()],
+    source: 'causal-wait-bridge.test',
+  })
 
-const externalProducer = (kind, identity) => new CausalProducerRef(1, [kind, toList(identity)])
+const externalProducer = (kind, identity) => causalWait.externalProducer(kind, identity)
 
 test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
@@ -76,9 +72,9 @@ test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
     'manager-job',
     'OrchestratorWorkflow',
     [['job', 'OJ7'], ['manager', 'M4']],
-    new CausalProducerRef(0, [CausalOwner_create('ManagerWorkflow', toList([['session', 'M4']]))]),
+    causalWait.workflowProducer(causalWait.owner('ManagerWorkflow', [['session', 'M4']])),
   )
-  const lease = CausalWaitHub_observer.Enter(wait)
+  const lease = causalWaitHub.observer.Enter(wait)
   try {
     const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)

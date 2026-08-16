@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapOfEntries, toList } from '../../verification-system/tests/support/domain.mjs'
-import { Model, run, uct } from '../../../dist/Sphinx/MonteCarlo.js'
-import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
+import { mapOfEntries } from '../../verification-system/tests/support/domain.mjs'
+import { Model, run, uct, MonteCarloNode, fsharpList } from './support.mjs'
 
 const map = (entries) => mapOfEntries(entries)
-const childMap = (entries) => map(entries.map(([key, children]) => [key, toList(children)]))
+const childMap = (entries) => map(entries.map(([key, children]) => [key, fsharpList(children)]))
 
 test('WHAT[EPI-010] mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
   const model = new Model(

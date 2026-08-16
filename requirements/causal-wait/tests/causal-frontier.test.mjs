@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, causalWait, listItems } from '../../verification-system/tests/support/domain.mjs'
+import { causalWait, listItems } from '../../verification-system/tests/support/domain.mjs'
 
 const flow = (id) => causalWait.owner('flow', [['id', id]])
 
@@ -28,7 +28,7 @@ const waitExternal = (ownerId, externalId) =>
 const viewFrontiers = (active) => {
   const snapshot = causalWait.snapshotOf({ active, history: [], sequence: 1n })
   return causalWait.frontiersOf(snapshot).map((frontier) => ({
-    kind: caseOf(frontier.Kind),
+    kind: frontier.Kind.name,
     chainKeys: listItems(frontier.Chain).map((node) => causalWait.ownerKey(node.Owner)),
     cycleKeys: listItems(frontier.Cycle).map((owner) => causalWait.ownerKey(owner)),
     producerKey:

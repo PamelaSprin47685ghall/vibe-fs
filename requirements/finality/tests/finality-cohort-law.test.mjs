@@ -22,13 +22,10 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { rosterOf, graduatedReviewer } from '../../../dist/Composition/Bridges/FinalityReview/FinalityReviewCohort.js'
-import { AgentJournalModule_appendManagerLifecycle } from '../../../dist/Persistence/Journal/AgentJournal.js'
 import {
   agentJournal,
   blobDigest,
   blobRef,
-  caseOf,
   envelope,
   fact,
   finalityRequestId,
@@ -39,7 +36,6 @@ import {
   managerLifeId,
   managerLifecycleFact,
   mapEntries,
-  payloadOf,
   physicalUser,
   promptKey,
   providerRun,
@@ -49,6 +45,7 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
+import { finalityCohort } from './support/finality-contract.mjs'
 import {
   DeterministicEventQueue,
   createDurableWorld,
@@ -190,12 +187,15 @@ const standingOf = (life, reviewer) =>
   mapEntries(life.EnlistedReviewers).find(([sid]) => idValue.session(sid) === idValue.session(reviewer))?.[1]
 
 const appendLifecycle = async (journal, lifecycleFact) => {
-  const result = await AgentJournalModule_appendManagerLifecycle(
+  // `toJSON()[1]` is the single payload field of the top-level Fact wrapper
+  // (Fable unions serialize as [name, payload...]) — the ManagerLifecycleFact
+  // the AgentJournal append expects, without exposing union shape here.
+  const result = await agentJournal.appendManagerLifecycle(
     stream.session(MGR),
-    payloadOf(lifecycleFact),
+    lifecycleFact.toJSON()[1],
     journal,
   )
-  assert.equal(result.tag, 0, `appendManagerLifecycle rejected: ${JSON.stringify(result.fields)}`)
+  assert.equal(result.ok, true, `appendManagerLifecycle rejected: ${JSON.stringify(result.error)}`)
   return result
 }
 
@@ -206,7 +206,7 @@ const uniqueDirectory = (label) =>
 
 test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', () => {
   // Trace T0: open Life → request1 enlist hist-a → reject → request2 open.
-  // rosterOf(request2) MUST be [hist-a reused, exactly one new slot].
+  // finalityCohort.rosterOf(request2) MUST be [hist-a reused, exactly one new slot].
   const opened = fold.apply(fold.empty, [
     mgrEnv(lifeOpened()),
     mgrEnv(workActivated()),
@@ -219,10 +219,10 @@ test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', ()
 
   const life = currentLife(opened.value)
   const request = life.ActiveFinality
-  assert.equal(caseOf(request.Resolution), 'Open')
+  assert.equal(request.Resolution.name, 'Open')
   assert.equal(mapEntries(request.Members).length, 0, 'new request starts with empty Members')
 
-  const roster = slotView(rosterOf(opened.value.AgentProjections, life, request))
+  const roster = slotView(finalityCohort.rosterOf(opened.value.AgentProjections, life, request))
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
     { agentId: 'finality-new-req-2', session: null, ordinal: 1, isNew: true },
@@ -230,7 +230,7 @@ test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', ()
 
   // Exactly-once new-slot law: rosterOf is a pure function of durable facts —
   // calling it twice yields the same algebra (no ephemeral fork counter).
-  assert.deepEqual(slotView(rosterOf(opened.value.AgentProjections, life, request)), roster)
+  assert.deepEqual(slotView(finalityCohort.rosterOf(opened.value.AgentProjections, life, request)), roster)
 })
 
 test('WHAT[FINALITY-010] graduated reviewer excluded from roster', () => {
@@ -253,12 +253,12 @@ test('WHAT[FINALITY-010] graduated reviewer excluded from roster', () => {
   const standing = standingOf(life, HIST_A)
   assert.ok(standing, 'hist-a standing must survive across requests')
   assert.equal(
-    graduatedReviewer(confirmed.value.AgentProjections, HIST_A, standing),
+    finalityCohort.graduatedReviewer(confirmed.value.AgentProjections, HIST_A, standing),
     true,
     'Confirmed witness on enlisted barrier graduates hist-a',
   )
 
-  const roster = slotView(rosterOf(confirmed.value.AgentProjections, life, life.ActiveFinality))
+  const roster = slotView(finalityCohort.rosterOf(confirmed.value.AgentProjections, life, life.ActiveFinality))
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-2', session: null, ordinal: 1, isNew: true },
   ])
@@ -277,7 +277,7 @@ test('WHAT[FINALITY-009] crash reentry reuses already created new slot exactly o
   assert.equal(enlisted.ok, true, enlisted.ok ? '' : JSON.stringify(enlisted.error))
 
   const life = currentLife(enlisted.value)
-  const roster = slotView(rosterOf(enlisted.value.AgentProjections, life, life.ActiveFinality))
+  const roster = slotView(finalityCohort.rosterOf(enlisted.value.AgentProjections, life, life.ActiveFinality))
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-1', session: 'ses-new', ordinal: 0, isNew: false },
   ])
@@ -327,7 +327,7 @@ test('WHAT[FINALITY-009] historical enlist order confluent for roster', () => {
         }))
         .sort((a, b) => a.session.localeCompare(b.session)),
     )
-    rosterViews.push(slotView(rosterOf(folded.value.AgentProjections, life, life.ActiveFinality)))
+    rosterViews.push(slotView(finalityCohort.rosterOf(folded.value.AgentProjections, life, life.ActiveFinality)))
   }
 
   assert.deepEqual(memberViews[0], memberViews[1], 'enlist A;B vs B;A must converge standing')
@@ -355,13 +355,13 @@ test('WHAT[FINALITY-016] blessed exactly once: second completion rejected', () =
   ])
   assert.equal(blessed.ok, true, blessed.ok ? '' : JSON.stringify(blessed.error))
   const once = currentLife(blessed.value)
-  assert.equal(caseOf(once.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(once.ActiveFinality.Resolution.name, 'Blessed')
   assert.equal(idValue.finalityRequest(once.LastBlessing.RequestId), 'req-1')
 
   const again = fold.apply(blessed.value, [mgrEnv(finalityBlessed(REQ1))])
   assert.equal(again.ok, false, 'second FinalityBlessed must be rejected by production fold')
   // Projection from the successful fold remains the sole completion evidence.
-  assert.equal(caseOf(once.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(once.ActiveFinality.Resolution.name, 'Blessed')
   assert.equal(idValue.finalityRequest(once.LastBlessing.RequestId), 'req-1')
 })
 
@@ -387,7 +387,7 @@ test('WHAT[FINALITY-008] drop ephemeral preserves durable finality facts: no dup
   }
 
   const before = currentLife(agentJournal.snapshot(world1.journal))
-  assert.equal(caseOf(before.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(before.ActiveFinality.Resolution.name, 'Blessed')
   const beforeMembers = membersView(before.ActiveFinality)
   assert.deepEqual(beforeMembers, [
     { session: 'ses-new', ordinal: 1, barrier: 'bar-2', isNew: true },
@@ -396,27 +396,27 @@ test('WHAT[FINALITY-008] drop ephemeral preserves durable finality facts: no dup
 
   const world2 = await dropEphemeral(world1, { runtime: 'rt_finality_recovered', pid: 5102 })
   const after = currentLife(agentJournal.snapshot(world2.journal))
-  assert.equal(caseOf(after.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(after.ActiveFinality.Resolution.name, 'Blessed')
   assert.deepEqual(membersView(after.ActiveFinality), beforeMembers)
   assert.equal(idValue.finalityRequest(after.ActiveFinality.RequestId), 'req-2')
   assert.equal(idValue.finalityRequest(after.LastBlessing.RequestId), 'req-2')
   assert.equal(mapEntries(after.EnlistedReviewers).length, 2)
 
   // Resume must not accept a second Blessed completion for the same request.
-  const duplicate = await AgentJournalModule_appendManagerLifecycle(
+  const duplicate = await agentJournal.appendManagerLifecycle(
     stream.session(MGR),
-    payloadOf(finalityBlessed(REQ2)),
+    finalityBlessed(REQ2).toJSON()[1],
     world2.journal,
   )
-  assert.notEqual(duplicate.tag, 0, 'duplicate FinalityBlessed after resume must be refused')
+  assert.notEqual(duplicate.ok, true, 'duplicate FinalityBlessed after resume must be refused')
   const still = currentLife(agentJournal.snapshot(world2.journal))
-  assert.equal(caseOf(still.ActiveFinality.Resolution), 'Blessed')
+  assert.equal(still.ActiveFinality.Resolution.name, 'Blessed')
   assert.deepEqual(membersView(still.ActiveFinality), beforeMembers)
 
   // Roster algebra still reachable from recovered durable projection:
   // ungraduated hist-a (not in Members) + crash-reentry new slot (IsNew=false).
   const recoveredRoster = slotView(
-    rosterOf(agentJournal.snapshot(world2.journal).AgentProjections, still, still.ActiveFinality),
+    finalityCohort.rosterOf(agentJournal.snapshot(world2.journal).AgentProjections, still, still.ActiveFinality),
   )
   assert.deepEqual(recoveredRoster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
@@ -446,9 +446,9 @@ test('WHAT[FINALITY-009] drop ephemeral preserves open finality roster source', 
 
   const beforeSnap = agentJournal.snapshot(world1.journal)
   const beforeLife = currentLife(beforeSnap)
-  assert.equal(caseOf(beforeLife.ActiveFinality.Resolution), 'Open')
+  assert.equal(beforeLife.ActiveFinality.Resolution.name, 'Open')
   const beforeRoster = slotView(
-    rosterOf(beforeSnap.AgentProjections, beforeLife, beforeLife.ActiveFinality),
+    finalityCohort.rosterOf(beforeSnap.AgentProjections, beforeLife, beforeLife.ActiveFinality),
   )
   assert.deepEqual(beforeRoster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
@@ -458,11 +458,11 @@ test('WHAT[FINALITY-009] drop ephemeral preserves open finality roster source', 
   const world2 = await dropEphemeral(world1, { runtime: 'rt_finality_open_recovered', pid: 5202 })
   const afterSnap = agentJournal.snapshot(world2.journal)
   const afterLife = currentLife(afterSnap)
-  assert.equal(caseOf(afterLife.ActiveFinality.Resolution), 'Open')
+  assert.equal(afterLife.ActiveFinality.Resolution.name, 'Open')
   assert.equal(idValue.finalityRequest(afterLife.ActiveFinality.RequestId), 'req-2')
   assert.equal(mapEntries(afterLife.ActiveFinality.Members).length, 0)
   assert.deepEqual(
-    slotView(rosterOf(afterSnap.AgentProjections, afterLife, afterLife.ActiveFinality)),
+    slotView(finalityCohort.rosterOf(afterSnap.AgentProjections, afterLife, afterLife.ActiveFinality)),
     beforeRoster,
   )
 

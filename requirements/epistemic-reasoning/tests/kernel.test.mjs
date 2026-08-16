@@ -4,8 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { close } from '../../../dist/Sphinx/Closure.js'
-import { createStore, start, resume, state, assessWhy } from './support.mjs'
+import { close, createStore, start, resume, state, assessWhy } from './support.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')

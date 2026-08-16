@@ -8,7 +8,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   commitHash,
   orchestratorRuntime,
   sessionId,
@@ -16,9 +15,10 @@ import {
   worktreeIdentity,
 } from '../../verification-system/tests/support/domain.mjs'
 
-// AgentFact is a single-case dispatch: caseOf(fact) === 'Orchestrator' and the
-// inner Orchestrator fact case sits at fields[0].
-const orchestratorFactName = (fact) => caseOf(fact.fields[0])
+// AgentFact is a single-case dispatch union over the OrchestratorFactCases
+// family; the inner union's case name is the appended fact's business name.
+// toJSON() = [caseName, ...payload], so [1] is the inner Orchestrator fact.
+const orchestratorFactName = (fact) => fact.toJSON()[1].name
 
 test('WHAT[EFFECT-ACCOUNTING-003] PERSIST_009_fork_appends_worktree_request_created_then_manager_job', async () => {
   const appended = []

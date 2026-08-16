@@ -28,7 +28,6 @@ import {
   agentFactCaseNames,
   agentJournal,
   bootSnapshot,
-  caseOf,
   childRecovery,
   completionKind,
   envelope,
@@ -38,6 +37,7 @@ import {
   handleCompletionCodec,
   handleController,
   handleId,
+  handleOwnership,
   handleProjection,
   idValue,
   joinDrain,
@@ -48,8 +48,6 @@ import {
   sessionId,
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
-import * as HandleControllerModule from '../../../dist/Execution/Delegation/Handle/Controller.js'
-import { HandleOwnership } from '../../../dist/Composition/Durable/Fact.js'
 
 const PARENT = sessionId('ses_parent_clean_break')
 const CHILD = sessionId('ses_child_clean_break')
@@ -59,19 +57,9 @@ const TARGET = 'fast-coder'
 const RUN_ID = 'run-legacy-abort'
 
 /** Production HandleController.link takes Ownership (GREEN-7); the domain.mjs
- *  facade bind is stale, so tests call the dist entry directly. */
-const durableLink = async (j, parentId, agentId, child, targetAgent, role) => {
-  const result = await HandleControllerModule.HandleController_link(
-    j,
-    parentId,
-    agentId,
-    child,
-    targetAgent,
-    role,
-    HandleOwnership.DurableParentHandle,
-  )
-  return result.tag === 0 ? { ok: true, value: result.fields[0] } : { ok: false, error: result.fields[0] }
-}
+ *  facade exposes it as handleController.link with handleOwnership. */
+const durableLink = async (j, parentId, agentId, child, targetAgent, role) =>
+  handleController.link(j, parentId, agentId, child, targetAgent, role, handleOwnership.durableParentHandle())
 
 /** Plant historical false terminal: blob status=aborted + HandleCompleted(SendFailure). */
 const plantLegacyFalseAbort = async (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
@@ -182,7 +170,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_legacy_aborted_blob_after_resta
       message: 'host abort observation written as finality',
       childSessionId: idValue.session(CHILD),
     })
-    assert.equal(caseOf(handleCompletionCodec.decodeBody(body)), 'LegacyFalseAbort')
+    assert.equal(handleCompletionCodec.decodeBody(body).name, 'LegacyFalseAbort')
   }
 
   created.dispose()
@@ -358,7 +346,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_property_join_agent_item_implie
   const legacyDecoded = handleCompletionCodec.tryDecode(record, 'a', legacy)
   assert.equal(legacyDecoded.ok, false, 'legacy abort must not materialise RunCompletion')
   const legacyBranch = handleCompletionCodec.decodeBody(legacy)
-  assert.equal(caseOf(legacyBranch), 'LegacyFalseAbort')
+  assert.equal(legacyBranch.name, 'LegacyFalseAbort')
 
   const completedBody = handleCompletionCodec.encodeOutcome(
     'r2',
@@ -371,7 +359,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_property_join_agent_item_implie
   )
   const decoded = handleCompletionCodec.tryDecode(record, 'a', completedBody)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  const outcomeCase = caseOf(decoded.value.Outcome)
+  const outcomeCase = decoded.value.Outcome.name
   assert.ok(
     outcomeCase === 'AgentCompleted' || outcomeCase === 'AgentFailed' || outcomeCase === 'AgentAbandoned',
     `agent outcome must be completed|failed|abandoned; got ${outcomeCase}`,
