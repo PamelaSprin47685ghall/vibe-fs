@@ -23,26 +23,17 @@ module BloggerTomlSurface =
            Part: PartInput
            Truncated: bool |}
 
+    let private optionalMediaType (mediaType: string) =
+        if isNull mediaType || mediaType = "" then None else Some mediaType
+
     let private partOf (p: PartInput) : BloggerDeltaPart =
         match p.Kind with
         | "text" -> BloggerDeltaPart.TextPart p.Text
         | "reasoning" -> BloggerDeltaPart.ReasoningPart p.Text
         | "toolCall" -> BloggerDeltaPart.ToolCallPart(p.Tool, p.Args)
         | "toolResult" -> BloggerDeltaPart.ToolResultPart p.Text
-        | "imageOmitted" ->
-            BloggerDeltaPart.ImageOmitted(
-                if isNull p.MediaType || p.MediaType = "" then
-                    None
-                else
-                    Some p.MediaType
-            )
-        | "mediaOmitted" ->
-            BloggerDeltaPart.MediaOmitted(
-                if isNull p.MediaType || p.MediaType = "" then
-                    None
-                else
-                    Some p.MediaType
-            )
+        | "imageOmitted" -> BloggerDeltaPart.ImageOmitted(optionalMediaType p.MediaType)
+        | "mediaOmitted" -> BloggerDeltaPart.MediaOmitted(optionalMediaType p.MediaType)
         | other -> failwithf "BloggerTomlSurface: unknown part kind %s" other
 
     let private itemOf (item: ItemInput) =

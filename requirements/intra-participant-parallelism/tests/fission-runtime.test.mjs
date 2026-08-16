@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { caseOf, listItems, payloadOf } from '../../verification-system/tests/support/domain.mjs'
+import { parseFissionPrompt } from './support/fission-contract.mjs'
 import { SessionIdModule_create as sessionId, SessionIdModule_value as sessionValue } from '../../../dist/Foundation/Identity.js'
 
 const Fission = await import('../../../dist/Execution/Fission/Model.js')
@@ -11,7 +12,7 @@ import {
   FissionAdmissionModule_release as release,
 } from '../../../dist/Execution/Fission/Admission.js'
 
-const parsed = () => payloadOf(Fission.FissionPrompt_parse(' lane A  \nlane B'))
+const parsed = () => parseFissionPrompt(' lane A  \nlane B')
 
 const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'old-parent' } = {}) => {
   const events = []

@@ -14,6 +14,7 @@ import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.j
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { listItems, toList, resultOf } from '../../verification-system/tests/support/domain.mjs'
 import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import { casebookContract } from './support/casebook-contract.mjs'
 import { BookkeeperRuntime_setSessionPort as setSessionPort, BookkeeperRuntime_resetSessionPort as resetSessionPort } from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRuntime.js'
 import { HostToolArguments_$ctor_4E60E31B as hostArgs } from '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 
@@ -40,7 +41,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', hash('hello'))])
-    assert.equal(resultOf(await archive(local.store, caseRec)).ok, true)
+    assert.equal((await casebookContract.archive(local.store, caseRec)).ok, true)
     const tool = await buildTool(dir, local.store)
     assert.equal(tool.Name, 'fetch')
     assert.deepEqual(listItems(tool.Arguments).map(([name]) => name), ['shelfmark'])

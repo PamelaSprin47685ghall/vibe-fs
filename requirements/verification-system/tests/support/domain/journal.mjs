@@ -489,7 +489,7 @@ export const prefixEpochProjection = (() => {
     'isReanchored',
   ])
 
-  return {
+  const publicApi = {
     empty: m.empty,
     hasSnapshot: (state) => m.hasSnapshot(state),
     epochOf: (state) => idValue.prefixEpoch(state.EpochId),
@@ -526,4 +526,11 @@ export const prefixEpochProjection = (() => {
 
     reanchoredRuns: (state) => [...state.ReanchoredRuns].map(idValue.providerRun).sort(),
   }
+
+  publicApi.forbiddenApiFragments = (fragments) =>
+    Object.keys(publicApi).filter((key) =>
+      fragments.some((fragment) => key.toLowerCase().includes(fragment.toLowerCase())),
+    )
+
+  return publicApi
 })()

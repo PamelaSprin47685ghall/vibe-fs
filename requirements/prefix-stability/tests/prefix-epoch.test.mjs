@@ -135,7 +135,7 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo'
   // pattern rather than by enumerating every key. An enumeration breaks whenever an
   // unrelated accessor is added — it did, when `isReanchored` arrived — and each such
   // break teaches the reader to update the list rather than to think about the rule.
-  const rollbackShaped = Object.keys(prefix).filter((key) => /rollback|revert|undo|restore|clear|discard/i.test(key))
+  const rollbackShaped = prefix.forbiddenApiFragments(['rollback', 'revert', 'undo', 'restore', 'clear', 'discard'])
 
   assert.deepEqual(rollbackShaped, [], 'CTX-010 forbids a rollback: a failed probe was never committed')
 
@@ -265,7 +265,7 @@ test('WHAT[PREFIX-STABILITY-012] PREFIX_STABILITY_committed_reanchor_survives_su
   // （PrefixRebaseCommitted）不因后续 provider failure 回滚。投影层没有
   // provider 结局输入；「失败后回滚」在类别上不存在（同 CTX-010 的
   // 无 rollback 断言模式），且失败的重试（refusal）不触碰已提交状态。
-  const rollbackShaped = Object.keys(prefix).filter((key) => /rollback|revert|undo|restore|clear|discard/i.test(key))
+  const rollbackShaped = prefix.forbiddenApiFragments(['rollback', 'revert', 'undo', 'restore', 'clear', 'discard'])
   assert.deepEqual(rollbackShaped, [], 'no rollback category exists on the epoch projection')
 
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value

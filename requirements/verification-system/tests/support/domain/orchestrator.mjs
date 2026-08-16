@@ -936,7 +936,35 @@ export const reconcileProgram = (() => {
       [name],
     )
 
+  const unionCases = (ctor, label) => {
+    if (typeof ctor !== 'function') throw new Error(`${label} union constructor missing`)
+    return Object.create(ctor.prototype).cases()
+  }
+
+  const publishOutcomeFieldType = () => {
+    const reflection = mod?.PublishTurn_$reflection
+    if (typeof reflection !== 'function') throw new Error('PublishTurn reflection missing')
+    const fields = reflection().fields() ?? []
+    return JSON.stringify(fields.find(([name]) => name === 'Outcome')?.[1] ?? '')
+  }
+
+  const tryOutcome = (name) => {
+    try {
+      const value = outcomeOf(name)
+      return { accepted: true, name: caseOf(value) }
+    } catch (error) {
+      return { accepted: false, error: error?.message ?? String(error) }
+    }
+  }
+
   return {
+    decisionCases: () => unionCases(mod?.ReconcileDecision, 'ReconcileDecision'),
+    turnOutcomeCases: () => unionCases(mod?.TurnOutcome, 'TurnOutcome'),
+    snapshotObservationCases: () => unionCases(mod?.SnapshotObservation, 'SnapshotObservation'),
+    snapshotUnknownIsInstance: () =>
+      mod?.SnapshotObservation?.TurnUnknown instanceof mod?.SnapshotObservation,
+    publishOutcomeFieldType,
+    tryOutcome,
     get isTerminalOutcome() {
       const fn = resolve(
         [

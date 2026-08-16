@@ -18,7 +18,8 @@ const { configureManager } = await import(join(here, '../../../dist/OpenCode/Hos
 
 const okOf = (r) => resultOf(r)
 const errOf = (r) => resultOf(r).error
-const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindings))
+const bindingEntries = (inventory) => mapEntries(inventory.Bindings)
+const bindingsOf = (inventory) => Object.fromEntries(bindingEntries(inventory))
 
 const NAMES = [
   'fast-orchestrator', 'deep-orchestrator',
@@ -46,7 +47,7 @@ test('WHAT[ENF-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => 
 test('WHAT[ENF-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
-  assert.equal(Object.keys(bindingsOf(empty.value)).length, 20)
+  assert.equal(bindingEntries(empty.value).length, 20)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
@@ -67,7 +68,7 @@ test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fie
   const result = okOf(validate(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   const bindings = bindingsOf(result.value)
-  assert.equal(Object.keys(bindings).length, 20, 'bookkeepers are presence-checked but have no Role binding')
+  assert.equal(bindingEntries(result.value).length, 20, 'bookkeepers are presence-checked but have no Role binding')
   assert.equal(caseOf(bindings['deep-blogger'].Agent.Role), 'Blogger')
   assert.equal('Model' in bindings['fast-manager'], false, 'Host model must not enter the managed inventory')
 })
@@ -125,7 +126,7 @@ test('WHAT[ENF-011] MACFG_configureFromHostConfig_projects_missing_catalog_witho
   const cfg = {}
   const result = okOf(configureFromHostConfig(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(Object.keys(bindingsOf(result.value)).length, 20)
+  assert.equal(bindingEntries(result.value).length, 20)
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must be projected`)

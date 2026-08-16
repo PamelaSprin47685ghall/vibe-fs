@@ -48,12 +48,30 @@ test('REPRO_blogger_pure_prose_terminal_sends_interaction_nudge_through_real_plu
     const initialPrompt = runtime.prompts[0]
     const initialPromptKey = promptKeyOf(initialPrompt)
     assert.ok(initialPromptKey, 'initial Blogger prompt must carry a PromptKey')
-    await acceptChildAgentOwnerRoot(runtime, bloggerSessionId, initialPromptKey)
+    const physicalPrompt = runtime.messages.find(
+      (candidate) => candidate?.metadata?.wanxiangshu_prompt_key === initialPromptKey,
+    )
+    assert.ok(physicalPrompt, 'fixture must expose the physical Blogger prompt message')
+    await hooks['chat.message'](
+      { sessionID: bloggerSessionId, agent: 'fast-blogger' },
+      {
+        message: {
+          id: physicalPrompt.id,
+          role: 'user',
+          sessionID: bloggerSessionId,
+          agent: 'fast-blogger',
+        },
+        parts: physicalPrompt.parts,
+      },
+    )
 
     const sendsBeforePureProse = runtime.prompts.length
     const bloggerView = {
       messages: [
-        message(bloggerSessionId, 'msg-blogger-user', 'user', promptTextOf(initialPrompt)),
+        {
+          info: { id: physicalPrompt.id, role: 'user', sessionID: bloggerSessionId, agent: 'fast-blogger' },
+          parts: physicalPrompt.parts,
+        },
         message(
           bloggerSessionId,
           'asst-blogger-prose-only',

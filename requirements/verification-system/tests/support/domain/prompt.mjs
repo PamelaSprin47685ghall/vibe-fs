@@ -372,6 +372,7 @@ export const promptResources = (() => {
   return {
     load: () => api.load(),
     loadForLanguage: (lang) => api.loadForLanguage(lang),
+    allForLanguage: (lang) => Object.values(api.loadForLanguage(lang)),
     loadForSession: (sessionId) => api.loadForSession(sessionId),
     loadBookkeeperSystem: () => api.loadBookkeeperSystem(),
     loadBookkeeperSystemFor: (lang) => api.loadBookkeeperSystemFor(lang),

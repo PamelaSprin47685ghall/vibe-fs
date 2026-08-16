@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, childRecovery, handleId, sessionId } from '../../verification-system/tests/support/domain.mjs'
+import { childRecovery, handleId, sessionId } from '../../verification-system/tests/support/domain.mjs'
 
 const AGENT = 'fast-coder'
 const HANDLE = handleId.agent('h-reconcile')
@@ -16,23 +16,21 @@ const CHILD = sessionId('ses_child_reconcile')
 test('WHAT[EFFECT-ACCOUNTING-005] requested_only_without_physical_evidence_stays_pending_not_blind_retry', () => {
   // durableActive（Requested-only，无 Accepted）+ snapshotMissing（无物理 terminal 证据）
   // → RecoveryIncomplete：未知 ≠ 未发生，不盲重试、不假完成。
-  const resolution = childRecovery.resolveChild(
+  const resolution = childRecovery.resolutionName(
     childRecovery.durableActive(),
     childRecovery.snapshotMissing(),
-    [],
   )
-  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.equal(resolution, 'RecoveryIncomplete')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-005] outcome_unknown_without_physical_evidence_never_becomes_terminal', () => {
   // durableUnknown（连 Requested 都未见证）+ snapshotMissing → 同样保持等待；
   // 「函数没返回/没证据」不得被当作成功或失败。
-  const resolution = childRecovery.resolveChild(
+  const resolution = childRecovery.resolutionName(
     childRecovery.durableUnknown(),
     childRecovery.snapshotMissing(),
-    [],
   )
-  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.equal(resolution, 'RecoveryIncomplete')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-005] terminal_issued_only_after_proven_physical_evidence', () => {
@@ -41,10 +39,9 @@ test('WHAT[EFFECT-ACCOUNTING-005] terminal_issued_only_after_proven_physical_evi
   const evidence = childRecovery.evidenceCompleted(AGENT, HANDLE, CHILD, '{"status":"ok"}')
   const proof = childRecovery.tryFromProvenTerminal(evidence)
   assert.equal(proof.ok, true)
-  const resolution = childRecovery.resolveChild(
+  const resolution = childRecovery.resolutionName(
     childRecovery.durableActive(),
     childRecovery.snapshotTerminal(evidence),
-    [],
   )
-  assert.equal(caseOf(resolution), 'RecoveredTerminal')
+  assert.equal(resolution, 'RecoveredTerminal')
 })

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { caseOf, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { fissionLaneContract } from './support/fission-contract.mjs'
 
 import {
   FissionPrompt_parse as parsePrompt,
@@ -18,8 +19,6 @@ import {
   FissionWorkBundleModule_entries as workBundleEntries,
   FissionConvergence_ready as convergenceReady,
 } from '../../../dist/Execution/Fission/Model.js'
-import { FissionStartup_render as renderStartup, FissionStartedLane } from '../../../dist/Execution/Fission/Admission.js'
-import { SessionIdModule_create as sessionId } from '../../../dist/Foundation/Identity.js'
 
 const parse = (text) => parsePrompt(text)
 const lanePrompts = (parsed) => listItems(parsed.Lanes).map((lane) => [lane.Index, lane.Prompt])
@@ -88,13 +87,14 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane reco
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
-  const lane = new FissionStartedLane(1, sessionId('lane-session-1'), 'lane input')
-  assert.deepEqual(Object.keys(lane), ['Index', 'SessionId', 'Prompt'])
-  assert.equal('AgentId' in lane, false, 'lane record must not expose a provider-visible AgentId')
-  assert.equal('Handle' in lane, false, 'lane record must not expose a provider-visible handle')
-  assert.equal('Parent' in lane, false, 'lane record must not add a parent join obligation of its own')
+  const lane = fissionLaneContract.view(fissionLaneContract.started(1, 'lane-session-1', 'lane input'))
+  assert.equal(lane.index, 1)
+  assert.equal(lane.prompt, 'lane input')
+  assert.equal(lane.hasAgentId, false, 'lane record must not expose a provider-visible AgentId')
+  assert.equal(lane.hasHandle, false, 'lane record must not expose a provider-visible handle')
+  assert.equal(lane.hasParent, false, 'lane record must not add a parent join obligation of its own')
 
-  const startup = renderStartup(2, new FissionLanePrompt(0, 'lane A'), 'CANONICAL-LWR')
+  const startup = fissionLaneContract.startup(2, 0, 'lane A', 'CANONICAL-LWR')
   assert.match(startup, /same logical participant/, 'startup keeps the lanes under one logical identity')
   assert.match(startup, /Do not treat sibling lanes as delegated agents/, 'startup must not turn lanes into new delegation identities')
 })

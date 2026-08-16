@@ -22,8 +22,7 @@ import {
   ROLE_SEMANTIC_ANCHORS,
   TOOL_DESCRIPTION_ANCHORS,
 } from '../../../scripts/checks/semantic-anchors.mjs'
-import { Role, Roles_isAllowed, ToolPermission } from '../../../dist/Foundation/Roles.js'
-import { ToolRegistry_rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistry.js'
+import { roles } from '../../verification-system/tests/support/domain.mjs'
 
 const PROVIDER_ROOT = join(fileURLToPath(new URL('../../..', import.meta.url)), 'resources', 'provider')
 
@@ -72,31 +71,29 @@ test('WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness', (
 
   // 同一工具名在任何地方命名同一个 contract：fork 与 commission 的角色门不同
   // ⇒ 二者是不同 contract，不允许同名混用。
-  const forkGate = ToolRegistry_rolePredicate('fork', undefined, 'ses_x')
-  const commissionGate = ToolRegistry_rolePredicate('commission', undefined, 'ses_x')
-  assert.notEqual(forkGate(Role.Manager), commissionGate(Role.Manager))
-  assert.equal(forkGate(Role.Manager), true, 'fork belongs to Manager')
-  assert.equal(commissionGate(Role.Orchestrator), true, 'commission belongs to Orchestrator')
+  assert.notEqual(roles.toolAllows('fork', 'Manager', 'ses_x'), roles.toolAllows('commission', 'Manager', 'ses_x'))
+  assert.equal(roles.toolAllows('fork', 'Manager', 'ses_x'), true, 'fork belongs to Manager')
+  assert.equal(roles.toolAllows('commission', 'Orchestrator', 'ses_x'), true, 'commission belongs to Orchestrator')
 })
 
 test('WHAT[DELEG-007] sync_delegate_edges_are_the_allowed_dag_only', () => {
   // 007 规范：允许的同步委托边 Inquiry/Coder/DevOps → Inspector、
   // DevOps → Coder；禁止反向/成环边；图必须是 DAG。
-  const canInspect = (role) => Roles_isAllowed(role, ToolPermission.Inspect)
-  const canDelegateBehavior = (role) => Roles_isAllowed(role, ToolPermission.Behavior)
+  const canInspect = (role) => roles.allows(role, 'Inspect')
+  const canDelegateBehavior = (role) => roles.allows(role, 'Behavior')
 
   // 正向边全部存在。
-  assert.equal(canInspect(Role.Inquiry), true, 'Inquiry → Inspector allowed')
-  assert.equal(canInspect(Role.Coder), true, 'Coder → Inspector allowed')
-  assert.equal(canInspect(Role.DevOps), true, 'DevOps → Inspector allowed')
-  assert.equal(canDelegateBehavior(Role.DevOps), true, 'DevOps → Coder allowed')
+  assert.equal(canInspect('Inquiry'), true, 'Inquiry → Inspector allowed')
+  assert.equal(canInspect('Coder'), true, 'Coder → Inspector allowed')
+  assert.equal(canInspect('DevOps'), true, 'DevOps → Inspector allowed')
+  assert.equal(canDelegateBehavior('DevOps'), true, 'DevOps → Coder allowed')
 
   // 反向/成环边全部被拒：Inspector/Coder 无 Behavior（→ Coder 委托禁止），
   // Inspector 无 Inspect（→ Inspector 自环禁止），无向 Inquiry 的 sync 委托面。
-  for (const role of [Role.Inspector, Role.Coder, Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer, Role.Distiller, Role.Blogger]) {
+  for (const role of ['Inspector', 'Coder', 'Manager', 'Orchestrator', 'Browser', 'Reviewer', 'Distiller', 'Blogger']) {
     assert.equal(canDelegateBehavior(role), false, `no role other than DevOps may delegate to Coder`)
   }
-  for (const role of [Role.Inspector, Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer, Role.Distiller, Role.Blogger]) {
+  for (const role of ['Inspector', 'Manager', 'Orchestrator', 'Browser', 'Reviewer', 'Distiller', 'Blogger']) {
     assert.equal(canInspect(role), false, `only Inquiry/Coder/DevOps may delegate to Inspector`)
   }
 

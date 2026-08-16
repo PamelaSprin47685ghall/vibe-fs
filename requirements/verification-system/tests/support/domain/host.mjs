@@ -70,6 +70,13 @@ import {
 } from './identity.mjs'
 import { completionKind, handleAbandonReason, handleOwnership } from './journal.mjs'
 
+const TerminalPolicyModule = await prod('OpenCode/Host/TerminalPolicy')
+
+export const terminalPolicy = {
+  outstandingBackground: (journal, hasLivePty, role, session) =>
+    TerminalPolicyModule.outstandingBackground(journal, hasLivePty, role, session),
+}
+
 // ── host signals (docs/what/host.md) ───────────────────────────────────────────────────
 
 export const hostSignals = (() => {
@@ -280,6 +287,8 @@ export const childRecovery = (() => {
 
     resolveChild: (durable, snapshot, observations) =>
       resolveChild(durable, snapshot, toList(observations)),
+    resolutionName: (durable, snapshot, observations = []) =>
+      caseOf(resolveChild(durable, snapshot, toList(observations))),
 
     /** JoinableCompletion cases — no fromAborted export exists on production module. */
     joinableCompletionExports: () =>

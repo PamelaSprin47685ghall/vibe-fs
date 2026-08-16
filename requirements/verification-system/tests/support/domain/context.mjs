@@ -69,6 +69,7 @@ import {
 } from './identity.mjs'
 import { reviewChallenge } from './enforcer.mjs'
 
+const ToolRegistryModule = await prod('OpenCode/Tools/ToolRegistry')
 const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
 const readProviderLines = (semanticPath) =>
   readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
@@ -222,6 +223,7 @@ export const magicTodoAdmission = (() => {
   const m = bind(MagicTodoAdmissionModule, 'MagicTodoAdmission', ['admitObligations'])
 
   return {
+    outcomeName: (outcome) => caseOf(outcome),
     admitObligations: (sha256, life, current, lagAdmission, existingPrepared, localized, submitted) =>
       m.admitObligations(
         sha256,
@@ -232,7 +234,7 @@ export const magicTodoAdmission = (() => {
         localized,
         toList(submitted),
       ),
-    LocalizedToolCall: MagicTodoAdmissionModule.LocalizedToolCall,
+    AdmissionLocalizedToolCall: MagicTodoAdmissionModule.AdmissionLocalizedToolCall,
     ExistingPrepared: MagicTodoAdmissionModule.ExistingPrepared,
     ObligationPrepareSuccess: MagicTodoAdmissionModule.ObligationPrepareSuccess,
   }
@@ -267,11 +269,31 @@ export const magicTodoJournal = (() => {
   const m = bind(MagicTodoProjectionModule, 'MagicTodoProjection', ['fold', 'foldConcluded'])
   const codec = bind(MagicTodoFactCodecModule, 'MagicTodoFactCodec', ['encode', 'tryDecode'])
 
+  const physicalSuccessEvidence = unionCase(MagicTodoFactsModule.PhysicalSuccessEvidence, 'PhysicalSuccessEvidence')
+
   return {
     ...m,
     ...codec,
     fold: (event, state, value) => m.fold(event, state, value),
+    foldView: (event, state, value) => {
+      const folded = resultOf(m.fold(event, state, value))
+      return folded.ok
+        ? { ok: true, state: folded.value }
+        : { ok: false, error: caseOf(folded.error) }
+    },
     empty: MagicTodoProjectionModule.empty,
+    fact: (caseName, payload) => fact(caseName, [payload]),
+    cursor: (sequence) => new XTraceModule.XTraceCursor(BigInt(sequence)),
+    prepared: (args) => new MagicTodoFactsModule.TodoWritePrepared(...args),
+    accepted: (args) => new MagicTodoFactsModule.TodoWriteAccepted(...args),
+    physicalSuccess: (name) => physicalSuccessEvidence(name, []),
+    currentObligationRefs: (state, life) => {
+      const lifeState = state.ByLife.get(idValue.managerLife(life))
+      return {
+        ref: idValue.blobRef(lifeState.CurrentObligationsRef[0]),
+        digest: idValue.blobDigest(lifeState.CurrentObligationsRef[1]),
+      }
+    },
     MagicTodoFact: fact,
     PhysicalSuccessEvidence: MagicTodoFactsModule.PhysicalSuccessEvidence,
     TodoWritePrepared: MagicTodoFactsModule.TodoWritePrepared,
@@ -868,11 +890,19 @@ export const roles = (() => {
   const buildRole = unionCase(RolesModule.Role, 'Role')
   const buildTier = unionCase(RolesModule.AgentTier, 'AgentTier')
 
+  const roleOf = (roleOrName) => typeof roleOrName === 'string' ? buildRole(roleOrName, []) : roleOrName
+  const rolePredicate = ToolRegistryModule.ToolRegistry_rolePredicate
+  if (typeof rolePredicate !== 'function') throw new Error('ToolRegistry.rolePredicate missing')
+
   return {
     of: (name) => buildRole(name, []),
     tier: (name) => buildTier(name, []),
     nameOf: (role) => caseOf(role),
-    permissions: (role) => [...RolesModule.Roles_permissions(role)].map(caseOf).sort(),
+    permissions: (roleOrName) => [...RolesModule.Roles_permissions(roleOf(roleOrName))].map(caseOf).sort(),
+    allows: (roleOrName, permissionName) =>
+      [...RolesModule.Roles_permissions(roleOf(roleOrName))].some((permission) => caseOf(permission) === permissionName),
+    toolAllows: (toolName, roleOrName, session = 'ses-test') =>
+      rolePredicate(toolName, undefined, session)(roleOf(roleOrName)),
   }
 })()
 

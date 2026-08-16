@@ -11,8 +11,6 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import * as TerminalPolicyModule from '../../../dist/OpenCode/Host/TerminalPolicy.js'
-import { Role } from '../../../dist/Foundation/Roles.js'
 import {
   agentFact,
   agentJournal,
@@ -21,20 +19,10 @@ import {
   roles,
   sessionId,
   stream,
+  terminalPolicy,
 } from '../../verification-system/tests/support/domain.mjs'
 
-const outstandingBackground = (() => {
-  const names = Object.keys(TerminalPolicyModule)
-  const key =
-    names.find((n) => n === 'TerminalPolicy_outstandingBackground') ||
-    names.find((n) => n.endsWith('_outstandingBackground') || n === 'outstandingBackground')
-  if (!key || typeof TerminalPolicyModule[key] !== 'function') {
-    throw new Error(
-      `TerminalPolicy.outstandingBackground missing. Near: ${names.filter((n) => /outstanding|Terminal/.test(n)).join(', ')}`,
-    )
-  }
-  return TerminalPolicyModule[key]
-})()
+const outstandingBackground = terminalPolicy.outstandingBackground
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-finality-bg-'))
@@ -62,7 +50,7 @@ const appendHandleLinked = async (journal, parent = 'ses_mgr', child = 'ses_chil
 
 test('WHAT[FINALITY-027] Manager without journal or handles is never outstanding', () => {
   // No journal: no join obligation for the Manager (GLORY-038/EXEC-016).
-  assert.equal(outstandingBackground(undefined, () => true, Role.Manager, sessionId('ses_mgr')), false)
+  assert.equal(outstandingBackground(undefined, () => true, roles.of('Manager'), sessionId('ses_mgr')), false)
 })
 
 test('WHAT[FINALITY-027] Manager with a listable child handle has a join obligation', async () => {
@@ -70,7 +58,7 @@ test('WHAT[FINALITY-027] Manager with a listable child handle has a join obligat
     const linked = await appendHandleLinked(journal)
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
     assert.equal(
-      outstandingBackground(journal, () => true, Role.Manager, sessionId('ses_mgr')),
+      outstandingBackground(journal, () => true, roles.of('Manager'), sessionId('ses_mgr')),
       true,
       'a durable listable child handle is an outstanding background resource',
     )

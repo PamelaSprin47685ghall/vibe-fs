@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   errorResult,
   magicTodo,
   magicTodoAdmission,
@@ -91,7 +90,7 @@ test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint eve
     new magicTodo.PreparedIdentity(life, 'provider-input', magicTodo.obligationListDigest(sha256, current), 1),
     write,
   )
-  const localized = new magicTodoAdmission.LocalizedToolCall(
+  const localized = new magicTodoAdmission.AdmissionLocalizedToolCall(
     firstCall,
     1,
     toList([firstCall]),
@@ -108,7 +107,7 @@ test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint eve
     localized,
     current,
   )
-  assert.equal(caseOf(outcome), 'IdempotentReplay')
+  assert.equal(magicTodoAdmission.outcomeName(outcome), 'IdempotentReplay')
 })
 
 test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted without a merge preview', () => {
@@ -117,7 +116,7 @@ test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted wit
     obligation('implementation', 'Implement the requested behavior.'),
     obligation('verification', 'Verify the behavior with evidence.'),
   ])
-  const localized = new magicTodoAdmission.LocalizedToolCall(
+  const localized = new magicTodoAdmission.AdmissionLocalizedToolCall(
     secondCall,
     2,
     toList([secondCall]),
@@ -134,7 +133,7 @@ test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted wit
     localized,
     submitted,
   )
-  assert.equal(caseOf(outcome), 'FreshPrepare')
+  assert.equal(magicTodoAdmission.outcomeName(outcome), 'FreshPrepare')
   const prepared = outcome.fields[0]
   assert.equal(Array.from(prepared.Base).length, 1)
   assert.equal(Array.from(prepared.Proposed).length, 2)
