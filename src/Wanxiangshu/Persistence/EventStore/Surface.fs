@@ -15,21 +15,19 @@ module EventStoreSurface =
     let private str (value: obj) : string = string value
 
     let private payloadJson (value: obj) : string =
-        if isNull value then
-            "null"
-        else
-            match value with
-            | :? string as s -> s
-            | _ -> JS.JSON.stringify value
+        match value with
+        | null -> "null"
+        | :? string as s -> s
+        | _ -> JS.JSON.stringify value
 
     let private parentIds (value: obj) : EventId list =
         let arr = unbox<string array> value
         arr |> Array.toList |> List.map EventId.create
 
     let private payloadRefsOf (value: obj) : PayloadRef list =
-        if isNull value then
-            []
-        else
+        match value with
+        | null -> []
+        | _ ->
             unbox<string array> value
             |> Array.toList
             |> List.map PayloadRef.create
