@@ -4785,3 +4785,16 @@ requirements/<owner>/WHAT.md
 - P9 — STARTED：6 dead adapters deleted; 355 domain.mjs consumers remain; exit condition NOT MET
 
 虚假完成状态已撤销；后续 PR 按新 DoD 推进。
+
+---
+
+# PR 1 / PR 3 / PR 4 / PR 5 / PR 8 完成（2026-08-16）
+
+- PR 1：semantic-test zone scanner 已覆盖 `requirements/**/tests/**/*.mjs`（含 support/fixtures/helpers）；regression fixture `requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs` 已存在并持续被扫描。
+- PR 3：FinalitySurface 已就位，`manager-finality-disposition.test.mjs` 仅使用 `dist/Mission/Manager/FinalitySurface.js` 与 `dist/Foundation/RolesSurface.js`，无 Fable 内部知识。
+- PR 4：CasebookSurface 已就位，`casebook-domain.test.mjs` 仅使用 `dist/Repository/Knowledge/Casebook/Surface.js`。
+- PR 5：EventStoreSurface / JournalSurface 已就位，替代旧的 monolithic event-store support；相关 durable-events 测试使用 surface。
+- PR 8：requirement-trace 双向闭环已达成（666 WHAT / 3087 tests / 0 orphan / 0 unproved）。
+- js-boundary-baseline 已重新生成，从 310 条降到 307 条（删除 stale finality-contract / casebook-contract 条目）。
+
+剩余主战线：PR 2（Fission/Distiller surface）、PR 6（domain.mjs 迁移）、PR 7（legacy cleanup）。
