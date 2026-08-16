@@ -16,6 +16,7 @@
 | INTRA-PARTICIPANT-PARALLELISM-010 | `tests/fission-source-ratchet.test.mjs` | Fission durable fact/projection/recovery anchor 存在；禁止 session-fork guessing path |
 | INTRA-PARTICIPANT-PARALLELISM-011 | `tests/fission-runtime.test.mjs` | same owner second active admission → AlreadyFissioned |
 | INTRA-PARTICIPANT-PARALLELISM-012 | `tests/fission-source-ratchet.test.mjs` | role matrix entitlement 与 registry gate 同一 `ToolPermission.Fission` source；fast/deep 不分叉 |
+| INTRA-PARTICIPANT-PARALLELISM-013 | `tests/fission-runtime.test.mjs` | physical parent absent 的 user-facing/root caller fail closed；只允许 parent lookup，未 reserve、未读 LWR、未 create lane、未 interrupt |
 
 ## Focused acceptance
 

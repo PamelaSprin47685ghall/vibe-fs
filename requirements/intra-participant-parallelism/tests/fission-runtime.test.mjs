@@ -65,11 +65,14 @@ test('admission creates fresh sibling sessions with old parent and starts from L
   assert.equal(isActive(runtime, owner), true)
 })
 
-test('root caller produces sibling roots rather than making lanes children of old caller', async () => {
+test('user-facing root caller is rejected before fission reserves or creates anything', async () => {
   const { events, runtime } = harness({ parent: null })
   const owner = sessionId('root-caller')
-  assert.equal(caseOf(await admit(runtime, owner, parsed())), 'Ok')
-  assert.deepEqual(events.filter(([k]) => k === 'create').map((e) => e[2]), [null, null])
+  const result = await admit(runtime, owner, parsed())
+
+  assert.equal(caseOf(result), 'Error')
+  assert.deepEqual(events, [['parent', 'root-caller']])
+  assert.equal(isActive(runtime, owner), false)
 })
 
 test('partial create or start failure rolls back every created lane and never interrupts old caller', async () => {

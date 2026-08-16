@@ -143,6 +143,13 @@ module FissionAdmission =
             release runtime ownerSessionId
         }
 
+    let private dependency prefix (operation: Task<Result<'a, string>>) : Task<Result<'a, FissionRejectReason>> =
+        task {
+            match! operation with
+            | Ok value -> return Ok value
+            | Error error -> return dependencyError (prefix + error)
+        }
+
     let private dependencyOrRelease
         (runtime: FissionAdmissionRuntime)
         ownerSessionId
@@ -150,11 +157,11 @@ module FissionAdmission =
         (operation: Task<Result<'a, string>>)
         : Task<Result<'a, FissionRejectReason>> =
         task {
-            match! operation with
+            match! dependency prefix operation with
             | Ok value -> return Ok value
             | Error error ->
                 release runtime ownerSessionId
-                return dependencyError (prefix + error)
+                return Error error
         }
 
     let private mapCreateLaneError createdRev (operation: Task<Result<SessionId, string>>) =
@@ -257,16 +264,10 @@ module FissionAdmission =
     let private admitReserved
         (runtime: FissionAdmissionRuntime)
         (ownerSessionId: SessionId)
+        (parentSessionId: SessionId)
         (parsed: ParsedFissionPrompts)
         =
         taskResult {
-            let! parentSessionId =
-                dependencyOrRelease
-                    runtime
-                    ownerSessionId
-                    "physical parent lookup failed: "
-                    (runtime.Dependencies.ParentOf ownerSessionId)
-
             let! ownerWorkRecord =
                 dependencyOrRelease
                     runtime
@@ -278,17 +279,30 @@ module FissionAdmission =
                 release runtime ownerSessionId
                 return! dependencyError "owner LWR materialization returned empty"
             else
-                let! created = createAllLanes runtime ownerSessionId parentSessionId parsed.Lanes
-                do! commitLanesCreated runtime ownerSessionId parentSessionId ownerWorkRecord created
+                let physicalParent = Some parentSessionId
+                let! created = createAllLanes runtime ownerSessionId physicalParent parsed.Lanes
+                do! commitLanesCreated runtime ownerSessionId physicalParent ownerWorkRecord created
                 do! startAllLanes runtime ownerSessionId parsed ownerWorkRecord created
                 do! silentInterruptOwner runtime ownerSessionId created
 
                 return
                     { OwnerSessionId = ownerSessionId
-                      ParentSessionId = parentSessionId
+                      ParentSessionId = Some parentSessionId
                       OwnerWorkRecord = ownerWorkRecord
                       Lanes = created }
         }
+
+    let private admitFromPhysicalParent
+        (runtime: FissionAdmissionRuntime)
+        (ownerSessionId: SessionId)
+        (parsed: ParsedFissionPrompts)
+        parentSessionId
+        =
+        match parentSessionId with
+        | None -> Task.FromResult(Error FissionRejectReason.InvalidOrigin)
+        | Some _ when not (reserve runtime ownerSessionId) ->
+            Task.FromResult(Error FissionRejectReason.AlreadyFissioned)
+        | Some parent -> admitReserved runtime ownerSessionId parent parsed
 
     let admit
         (runtime: FissionAdmissionRuntime)
@@ -298,8 +312,9 @@ module FissionAdmission =
         taskResult {
             if parsed.Count < 2 then
                 return! Error FissionRejectReason.TooFewLanes
-            elif not (reserve runtime ownerSessionId) then
-                return! Error FissionRejectReason.AlreadyFissioned
             else
-                return! admitReserved runtime ownerSessionId parsed
+                let! parentSessionId =
+                    dependency "physical parent lookup failed: " (runtime.Dependencies.ParentOf ownerSessionId)
+
+                return! admitFromPhysicalParent runtime ownerSessionId parsed parentSessionId
         }

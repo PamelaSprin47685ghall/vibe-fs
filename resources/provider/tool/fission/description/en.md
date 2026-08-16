@@ -1,6 +1,6 @@
 Temporarily divide this same logical participant into several coequal execution presents.
 
-Use fission when your own assigned work contains multiple genuinely separable slices and parallel execution will reduce latency. Fission separable work, not merely plentiful work.
+Use fission only when this agent is running in a subsession and its own assigned work contains multiple genuinely separable slices whose parallel execution will reduce latency. A user-facing/root session must not fission. Fission separable work, not merely plentiful work.
 
 prompts is one string: one non-empty line per lane, at least two lanes. Each line becomes that lane's exact local charge.
 

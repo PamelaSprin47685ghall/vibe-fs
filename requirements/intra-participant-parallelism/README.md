@@ -8,12 +8,12 @@
 
 - Fission 只增加 execution presents，不增加 logical participant（IPP-001）。
 - `fission(prompts)` 以 canonical line parser 定义 lane set；N≥2，空 lane fail closed（IPP-002）。
-- V1 物理替换使用 fresh sibling Host sessions：`parent(lane)=parent(old caller)`；启动材料是 caller canonical LWR + exact lane input，不使用 Host session fork（IPP-003）。
+- V1 只允许已有 physical parent 的 subsession Fission；user-facing/root caller fail closed。物理替换使用 fresh sibling Host sessions：`parent(lane)=parent(old caller)`；启动材料是 caller canonical LWR + exact lane input，不使用 Host session fork（IPP-003/013）。
 - admission all-or-none；全部 lanes 成功建立后 old caller 才 silent interrupt（IPP-004/005）。
 - fission 前已 outstanding 的 subagent/PTY completion 属于 logical owner，exactly-once-per-lane 广播；fission 后新发起的 completion 绑定 initiating lane（IPP-006/007）。
 - lane work 用 keyed bundle / deterministic forwarding 收敛；parent 只收到一次 terminal completion（IPP-008/009）。
 - active group、lane identity、delivery/convergence facts 可 durable replay；restart 不猜 lane（IPP-010）。
-- V1 禁 nested fission；office entitlement 与 runtime/schema gate 同源（IPP-011/012）。
+- V1 禁 nested fission；office entitlement 与 runtime/schema role gate 同源；subsession origin 另由 admission 强制（IPP-011/012/013）。
 
 ## DEPENDS ON
 

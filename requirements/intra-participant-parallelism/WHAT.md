@@ -12,7 +12,7 @@ Fission 只增加同一 logical participant 的并发 execution presents。所�
 
 ## INTRA-PARTICIPANT-PARALLELISM-003：fresh sibling replacement transport
 
-V1 不使用 OpenCode session fork，也不在同一 physical SessionId 上并发 provider streams。每条 lane 使用 fresh Host session；其 physical Host parent 必须等于 old caller 的 physical Host parent：`parent(lane[k]) = parent(oldCaller)`。lane 的首个 assignment 由 old caller 当时的 canonical Lifecycle Work Record 与该 lane 的 exact fission input 组成；lane physical session 不因此成为新的 delegation identity。
+V1 不使用 OpenCode session fork，也不在同一 physical SessionId 上并发 provider streams。Fission caller 必须是已有 physical Host parent 的 subsession；user-facing/root session 不允许 Fission。每条 lane 使用 fresh Host session；其 physical Host parent 必须等于 old caller 的 physical Host parent：`parent(lane[k]) = parent(oldCaller)`。lane 的首个 assignment 由 old caller 当时的 canonical Lifecycle Work Record 与该 lane 的 exact fission input 组成；lane physical session 不因此成为新的 delegation identity。
 
 ## INTRA-PARTICIPANT-PARALLELISM-004：all-or-none admission
 
@@ -48,7 +48,11 @@ Fission admission 后由 lane `k` 新发起的 subagent run/PTY completion 绑�
 
 ## INTRA-PARTICIPANT-PARALLELISM-012：eligibility 单一 consequence source
 
-Fission availability 必须从 office consequence/capability 的单一 production source 同时投影到 provider-visible schema 与 runtime gate；fast/deep 同 office 不得分叉。当前 role vocabulary 中 V1 entitlement 为 Manager、Coder、Inspector、Browser、Inquiry；Orchestrator、DevOps、Reviewer、Blogger、Distiller 不具备该 consequence。
+Fission 的 role entitlement 必须从 office consequence/capability 的单一 production source 同时投影到 provider-visible schema 与 runtime role gate；fast/deep 同 office 不得分叉。当前 role vocabulary 中 V1 entitlement 为 Manager、Coder、Inspector、Browser、Inquiry；Orchestrator、DevOps、Reviewer、Blogger、Distiller 不具备该 consequence。该 role consequence 不替代 INTRA-PARTICIPANT-PARALLELISM-013 的 subsession origin gate。
+
+## INTRA-PARTICIPANT-PARALLELISM-013：subsession-only origin
+
+Fission 的 origin gate 与 role entitlement 正交：caller 必须能证明自己是 physical subsession（`parent(oldCaller)=Some _`）。`parent(oldCaller)=None` 的 user-facing/root session 必须在任何 lane create、LWR materialization、durable admission 或 owner interrupt 之前 fail closed；不得把 root 替换成 sibling roots。该拒绝不得占用 active-group slot。
 
 ## DEPENDS ON
 

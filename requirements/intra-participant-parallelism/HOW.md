@@ -9,12 +9,13 @@
 Fission tool 在 old caller tool context 中：
 
 1. 解析 prompts；解析失败立即返回，无副作用。
-2. 从 Authority/Profile 取 current managed agent/role；从 `sessionParents` 取 old physical parent；从 canonical LWR port 取 old caller record。
-3. 预留一个 process-local admission slot，防同 owner 两次并发 fission。
-4. 对每 lane 创建 fresh Host session，创建参数里的 `parentID` 使用 **old caller 的 parentID**，而不是 old caller id。root caller 则 parentID absent。
-5. lane session 继承 old caller selected managed agent、directory、provider language；首 prompt = canonical LWR envelope + exact lane input + lane index/count guidance。不要用 Host session fork。
-6. 所有 lane 都完成 create + subscribe/bind + prompt admission 后，commit group；失败则 abort/delete 已建 lanes、release slot、old caller 继续。
-7. commit 后给 old caller 写 Fission-owned interrupt mark，再调用 physical abort。Ordinary abort workflow 先消费此 mark：不 terminal、不 cascade children/PTY、不 provider recovery。
+2. 读取 old caller physical parent。`None` = user-facing/root，立即 `InvalidOrigin`；不得 reserve、读 LWR、写 durable fact、create lane 或 interrupt。
+3. 从 Authority/Profile 取 current managed agent/role；从 canonical LWR port 取 old caller record。
+4. 预留一个 process-local admission slot，防同 owner 两次并发 fission。
+5. 对每 lane 创建 fresh Host session，创建参数里的 `parentID` 使用 **old caller 的 parentID**，而不是 old caller id。
+6. lane session 继承 old caller selected managed agent、directory、provider language；首 prompt = canonical LWR envelope + exact lane input + lane index/count guidance。不要用 Host session fork。
+7. 所有 lane 都完成 create + subscribe/bind + prompt admission 后，commit group；失败则 abort/delete 已建 lanes、release slot、old caller 继续。
+8. commit 后给 old caller 写 Fission-owned interrupt mark，再调用 physical abort。Ordinary abort workflow 先消费此 mark：不 terminal、不 cascade children/PTY、不 provider recovery。
 
 ## 3. Logical-owner alias
 
@@ -36,7 +37,11 @@ lane own LWR 只登记一次为 `index -> canonical ref/digest`。ring successor
 
 Fission-specific durable facts建议最小化为 admission、lane materialized/closed、completion source/delivery、bundle contribution 与 converged/failed。事实存统一 durable substrate；physical subscriptions、abort callbacks、locks 是可重建资源，不持久化。恢复先 fold group，再 reconcile physical sessions；无法证明 alias/membership 时 fail closed。
 
-## 7. 当前 vocabulary 映射
+## 7. Tool surface 与 prefix stability
+
+Fission 的 provider-visible schema 不按 turn 动态增删。一个 session 的 tool set 必须稳定，避免破坏 provider prefix/KV cache。subsession-only 是 execute admission 的 origin invariant；tool description 同步声明该限制，减少 root agent 误调用。若未来要让 root 与 subsession 拥有不同 schema，必须在 session 创建/agent binding 时一次冻结，而不是在后续 turn 改 tools。
+
+## 8. 当前 vocabulary 映射
 
 历史 Proposal 中的 `Meditator` 已不在当前 Role vocabulary；其现行 reasoning office 是 `Inquiry`。因此 V1 entitlement 使用 `Role.Inquiry`。历史 `Executor` 也不是当前 Role case；hidden execution helper不获得 fission office consequence。
 
