@@ -44,7 +44,7 @@ const capturingPort = (captured) => ({
   },
 })
 
-test('PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
+test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-'))
   try {
     const opened = await agentJournal.create({ directory: base })
@@ -100,15 +100,48 @@ test('PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
         'SendContinuation must carry Agent = Some effectiveAgent and Model = None',
       )
 
-      // PROMPT-006 requires Metadata at every send. `undefined` here would mean
-      // the PromptKey anchor (PROMPT-011) was dropped on the way out.
-      assert.ok(isSome(captured[0].options.Metadata), 'the owner-root send must carry Metadata')
-      assert.ok(isSome(captured[1].options.Metadata), 'the continuation send must carry Metadata')
-
       // Directory is passed through untouched: `None` stays None (no default
       // workspace injected at the dispatcher), so an absent directory cannot
       // silently switch the send to another workspace.
       assert.ok(isNone(captured[0].options.Directory), 'no directory was given')
+    } finally {
+      opened.dispose()
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_metadata', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-send-meta-'))
+  try {
+    const opened = await agentJournal.create({ directory: base })
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const runtime = promptDispatcher.forJournal(opened.journal)
+      const captured = []
+      const port = capturingPort(captured)
+
+      const ownerRoot = await promptDispatcher.sendAgentOwnerRoot(runtime, port, {
+        session: 'ses_006m',
+        text: 'dispatch this',
+        agent: 'fast-coder',
+      })
+      assert.equal(ownerRoot.ok, true, ownerRoot.ok ? '' : ownerRoot.error)
+
+      const continuation = await promptDispatcher.sendContinuation(runtime, port, {
+        session: 'ses_006m',
+        text: 'retry on the other side',
+        continuation: continuationKind.of('ProviderRetryAttempt'),
+        profile: attemptPlanner.authority({ session: 'ses_006m' }),
+        effectiveAgent: 'deep-coder',
+      })
+      assert.equal(continuation.ok, true, continuation.ok ? '' : continuation.error)
+
+      // PROMPT-006 requires Metadata at every send. `undefined` here would mean
+      // the PromptKey anchor (PROMPT-011) was dropped on the way out.
+      assert.ok(isSome(captured[0].options.Metadata), 'the owner-root send must carry Metadata')
+      assert.ok(isSome(captured[1].options.Metadata), 'the continuation send must carry Metadata')
     } finally {
       opened.dispose()
     }

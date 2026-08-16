@@ -43,7 +43,7 @@ const rawDelta = (session, field, text) => ({
   },
 })
 
-test('LOOP_001_kill_arm_is_process_local_not_persisted', () => {
+test('WHAT[DG-008] LOOP_001_kill_arm_is_process_local_not_persisted', () => {
   // Facade construct takes only {owned, abort} — no journal / store / path.
   // Two independent sensors share nothing; TryArm is local HashSet state.
   const first = loopSensor.create({ owned: ['ses_a'], abort: () => {} })
@@ -60,7 +60,7 @@ test('LOOP_001_kill_arm_is_process_local_not_persisted', () => {
   assert.equal(loopSensor.isArmed(second, 'ses_a'), true)
 })
 
-test('LOOP_002_sensor_observes_text_delta_only', async () => {
+test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_text'],
@@ -93,7 +93,7 @@ test('LOOP_002_sensor_observes_text_delta_only', async () => {
   // Sensor construct has no journal port; arm mark is the only side effect.
 })
 
-test('LOOP_007_unowned_and_reasoning_deltas_are_ignored', async () => {
+test('WHAT[DG-010] LOOP_007_unowned_and_armed_deltas_are_ignored', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_owned'],
@@ -109,15 +109,6 @@ test('LOOP_007_unowned_and_reasoning_deltas_are_ignored', async () => {
   assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
   assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), false)
 
-  // Reasoning never reaches the detector (codec fail-closed).
-  assert.equal(
-    loopEventCodec.tryDecodeTextDelta(rawDelta('ses_owned', 'reasoning', loopText('q'))),
-    undefined,
-  )
-  loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
-  await wait(8)
-  assert.deepEqual(aborts, [])
-
   // Owned text loop arms once; subsequent deltas on the same attempt are ignored.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_owned', loopText('v')))
   await wait(15)
@@ -129,7 +120,26 @@ test('LOOP_007_unowned_and_reasoning_deltas_are_ignored', async () => {
   assert.deepEqual(aborts, ['ses_owned'])
 })
 
-test('LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
+test('WHAT[DG-002] LOOP_007_reasoning_deltas_are_ignored', async () => {
+  const aborts = []
+  const sensor = loopSensor.create({
+    owned: ['ses_owned'],
+    abort: (sid) => {
+      aborts.push(sid)
+    },
+  })
+
+  // Reasoning never reaches the detector (codec fail-closed).
+  assert.equal(
+    loopEventCodec.tryDecodeTextDelta(rawDelta('ses_owned', 'reasoning', loopText('q'))),
+    undefined,
+  )
+  loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
+  await wait(8)
+  assert.deepEqual(aborts, [])
+})
+
+test('WHAT[DG-007] LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_loop'],
@@ -150,7 +160,7 @@ test('LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
   assert.deepEqual(aborts, ['ses_loop'])
 })
 
-test('LOOP_006_unowned_session_never_aborts', async () => {
+test('WHAT[DG-007] LOOP_006_unowned_session_never_aborts', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_owned'],
@@ -166,7 +176,7 @@ test('LOOP_006_unowned_session_never_aborts', async () => {
   assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
 })
 
-test('LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
+test('WHAT[DG-006] LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
   // Production SessionIdle calls ResetDetector BEFORE reconcile/TurnAborted.
   // If ResetDetector cleared LoopKillArmed, the AABB bridge would always miss.
   const aborts = []
@@ -191,7 +201,7 @@ test('LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
   assert.deepEqual(aborts, ['ses_idle'])
 })
 
-test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
+test('WHAT[DG-007] LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_loop'],
@@ -214,7 +224,7 @@ test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   assert.deepEqual(aborts, ['ses_loop', 'ses_loop'])
 })
 
-test('LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
+test('WHAT[DG-011] LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
   assert.deepEqual(runtimeNudge.loopContinueInstructions, [
     'Continue from the interruption.',
     '',
@@ -226,7 +236,7 @@ test('LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
   assert.match(runtimeNudge.providerRetry, /The previous physical attempt did not complete/)
 })
 
-test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', async () => {
+test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async () => {
   // Layer-2 half of TurnCompletionProgram on TurnAborted:
   //   isArmed → ClearArmed → FallbackController.recordConfirmedFailure("loop-kill")
   // The sensor only arms; the controller is the single cursor writer.
@@ -304,7 +314,7 @@ test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', async () => {
   }
 })
 
-test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', async () => {
+test('WHAT[DG-012] LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', async () => {
   // LOOP-008: sensor never mutates Offset. Cursor arithmetic stays in
   // FallbackController (FALLBACK-003). Same ProviderRun is deduped once.
   // (Reuses the bridge shape already proven by LOOP_006_armed_abort_bridges_….)
@@ -374,7 +384,7 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', async ()
   }
 })
 
-test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', async () => {
+test('WHAT[DG-009] LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', async () => {
   // FALLBACK-005: the 12th consecutive failure is immediately final — the
   // controller returns Exhausted and writes FallbackExhausted; a 13th
   // confirmed failure on the same run stays AlreadyRecorded (nothing written).

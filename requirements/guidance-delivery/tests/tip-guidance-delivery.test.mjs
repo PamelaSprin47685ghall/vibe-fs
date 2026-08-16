@@ -117,7 +117,7 @@ const presentationOf = (guidance) => {
 
 const textOf = (guidance) => guidance?.Text ?? guidance?.text
 
-test('ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
+test('WHAT[GD-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const guidance = await resolveTipGuidance(journal, main)
@@ -133,7 +133,7 @@ test('ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async () => {
+test('WHAT[GD-003] ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const first = await resolveTipGuidance(journal, main)
@@ -154,20 +154,31 @@ test('ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', async () => {
+test('WHAT[GD-004] ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const viaResolve = textOf(await resolveTipGuidance(journal, main))
-    // second call after Full already recorded
+    // second call after Full already recorded: the decision substrate is the
+    // durable TipDeliveryProjection fold, so latest returns the identity text
+    // (restart-safe — no process-local delivered set).
     const viaLatest = await latestTipGuidance(journal, main)
-    const viaAlias = await latestTipNudge(journal, main)
     assert.equal(viaLatest, 'tip: primitive-obsession')
-    assert.equal(viaAlias, viaLatest)
     assert.ok(viaResolve.includes('primitive-obsession'))
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async () => {
+test('WHAT[GD-007] ENFORCER_TIP_DELIVERY_003b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
+  await withJournal(async (journal) => {
+    await seedOwnerWithTip(journal)
+    await resolveTipGuidance(journal, main) // record Full so latest is identity
+    const viaLatest = await latestTipGuidance(journal, main)
+    const viaAlias = await latestTipNudge(journal, main)
+    // latestTipNudge is the same-byte alias of latestTipGuidance (GD-007).
+    assert.equal(viaAlias, viaLatest)
+  })
+})
+
+test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const viaBlogger = await resolveTipGuidance(journal, blogger)
@@ -177,7 +188,7 @@ test('ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async (
   })
 })
 
-test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
+test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
   await withJournal(async (journal) => {
     await append(
       journal,
@@ -193,7 +204,7 @@ test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
   })
 })
 
-test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
+test('WHAT[GD-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
   providerLanguage.clearAllForTests()
   try {
     const bound = providerLanguage.bindOnce(main, providerLanguage.simplifiedChinese)
@@ -213,7 +224,7 @@ test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', 
   }
 })
 
-test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', async () => {
+test('WHAT[GD-005] ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const first = await resolveTipGuidance(journal, main)

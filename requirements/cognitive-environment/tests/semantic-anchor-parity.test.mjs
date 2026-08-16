@@ -30,7 +30,7 @@ const makeProviderFixture = () => {
   }
 }
 
-test('gate_c_semantic_anchor_parity_detects_missing_zh_id', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-002] gate_c_semantic_anchor_parity_detects_missing_zh_id', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair('role/demo', 'Waiting is justified by dependency.', '等待是一种习惯。')
@@ -47,7 +47,7 @@ test('gate_c_semantic_anchor_parity_detects_missing_zh_id', () => {
   }
 })
 
-test('gate_c_semantic_anchor_catalog_requires_every_role_law', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-008] gate_c_semantic_anchor_catalog_requires_every_role_law', () => {
   const violations = scanSemanticAnchorCatalog(['role/manager', 'role/unknown-office'])
   assert.ok(violations.some((v) => v.code === 'semantic-anchor-catalog' && /unknown-office/.test(v.path)))
   assert.equal(

@@ -23,7 +23,7 @@ const lifecycle = ({ current, completed = [] } = {}) => ({
   CompletedLives: toList(completed),
 })
 
-test('FINALITY_022_AgentOwner_migration_is_admitted_only_before_any_Life_history', () => {
+test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life history', () => {
   const trace = { Opening: { AssignmentText: 'work' } }
 
   const first = ManagerLifeAdmission_ending(
@@ -45,7 +45,7 @@ test('FINALITY_022_AgentOwner_migration_is_admitted_only_before_any_Life_history
   )
 })
 
-test('FINALITY_022_HumanRoot_opening_requires_the_exact_authority_root_message_id', () => {
+test('WHAT[FINALITY-022] HumanRoot opening requires the exact authority root message id', () => {
   const active = profile(RootAuthorityKind.HumanRoot, 'root-1')
 
   const exact = ManagerLifeAdmission_tryHumanRootOpening(lifecycle(), active, physicalUser('root-1'))

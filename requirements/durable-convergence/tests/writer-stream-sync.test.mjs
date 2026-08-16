@@ -11,7 +11,7 @@ import test from 'node:test'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('DURABLE_CONVERGENCE_002_003_one_k_way_primitive_is_shared_by_integrator_and_sync', async () => {
+test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync', async () => {
   const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
   const integrator = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
@@ -24,7 +24,7 @@ test('DURABLE_CONVERGENCE_002_003_one_k_way_primitive_is_shared_by_integrator_an
   assert.doesNotMatch(sync, /observed_at.*runtime_id.*local_seq/is, 'sync must not invent a second event-ordering algorithm')
 })
 
-test('DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_without_segments_or_index', async () => {
+test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file once without segments or index', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
   assert.match(source, /WriterId|writerId/)
@@ -36,7 +36,7 @@ test('DURABLE_CONVERGENCE_003_sync_blobifies_each_complete_writer_file_once_with
   assert.doesNotMatch(source, /split|rotate/i)
 })
 
-test('DURABLE_CONVERGENCE_008_activation_only_ensures_hooks_and_user_Git_process_runs_full_sync', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] activation only ensures hooks and user Git process runs full sync', async () => {
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const hook = await read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
@@ -69,7 +69,7 @@ test('DURABLE_CONVERGENCE_008_activation_only_ensures_hooks_and_user_Git_process
   assert.doesNotMatch(persistSources, /Converge\(|Fetch\(|Pull\(|Push\(/, 'ordinary local append/replay must not trigger remote sync')
 })
 
-test('DURABLE_CONVERGENCE_003_runtime_append_and_external_hook_share_one_physical_store_gate', async () => {
+test('WHAT[DURABLE-CONVERGENCE-003] runtime append and external hook share one physical store gate', async () => {
   const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
   const store = await read('src/Wanxiangshu/Persistence/EventStore/Store.fs')
   const hook = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
@@ -80,7 +80,7 @@ test('DURABLE_CONVERGENCE_003_runtime_append_and_external_hook_share_one_physica
   assert.match(log, /"forever"\s*==>|forever.*true/s, 'physical lock wait must not inherit a business timeout window')
 })
 
-test('DURABLE_CONVERGENCE_007_sync_does_not_integrate_business_history', async () => {
+test('WHAT[DURABLE-CONVERGENCE-007] sync does not integrate business history', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
   assert.doesNotMatch(source, /StrengthProjection|CasebookProjection|AgentProjection|MagicTodo|JsTransactionPrepared/)
   assert.doesNotMatch(source, /Fold\.apply|StrengthProjection\.fold|CasebookProjection\.fold/)

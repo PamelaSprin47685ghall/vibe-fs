@@ -1,5 +1,9 @@
 // requirements/distribution/tests/cwd-independent-resources.test.mjs
 // DISTRIBUTION-002 oracle：runtime resource lookup 必须独立于 caller cwd。
+// DISTRIBUTION-005 oracle：资源单份发布（fixed path 解析到包根 resources/，无 dist
+// 双副本、无 fallback）。
+// DISTRIBUTION-006 oracle：资源缺失 fail fast（package resource missing），无 fallback
+// catalog、无静默降级。
 //
 // 生产实现是 fixed package-relative lookup（import.meta.url → ../../../resources），
 // 见 src/Wanxiangshu/Resources/PackageResources.fs。无 cwd walk、
@@ -35,7 +39,7 @@ const RESOURCE_SAMPLES = [
   'enforcer/primitive-obsession/main.md',
 ]
 
-test('DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd', async () => {
+test('WHAT[DISTRIBUTION-002] DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd', async () => {
   const previous = process.cwd()
   try {
     process.chdir('/')
@@ -52,7 +56,7 @@ test('DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd',
   }
 })
 
-test('DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources', () => {
+test('WHAT[DISTRIBUTION-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources', () => {
   // 干净子进程 + cwd=/：既不能靠 cwd 找到 resources，也不能靠源码树。唯一能成功
   // 的路径是包内 fixed-relative lookup（import.meta.url → ../../../resources）。
   const script = `
@@ -72,7 +76,7 @@ test('DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resour
   assert.match(result.stdout, /ok/)
 })
 
-test('DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', () => {
+test('WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', () => {
   // PackageResources 的 ../../../resources 必须恰好是仓库/安装根的 resources/。
   // 这是「单份发布、无 dist 双副本、无 fallback」的实现证据（docs/why/enforcer.md）。
   const moduleDir = path.dirname(fileURLToPath(packageResourcesUrl))
@@ -85,4 +89,32 @@ test('DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', (
     assert.ok(existsSync(full), `expected fixed path must exist: ${full}`)
     assert.ok(readFileSync(full, 'utf8').trim().length > 0, `expected fixed path non-empty: ${full}`)
   }
+
+  // DISTRIBUTION-005：资源单份发布——resources/ 只存在于包根，不得复制进 dist/ 形成双副本。
+  assert.equal(
+    existsSync(path.join(root, 'dist', 'resources')),
+    false,
+    'resources must not be duplicated into dist/ (single-copy publish)',
+  )
+})
+
+test('WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_missing_fails_fast_no_fallback', async () => {
+  // 资源缺失必须抛错终止（package resource missing: <full>），不得 fallback、不得静默降级；
+  // rulebook 元数据不以 catalog.json 为第二真源（目录即清单）。
+  const { readText } = await import(packageResourcesUrl)
+  assert.throws(
+    () => readText('enforcer/does-not-exist-rule/enforcer.md'),
+    (err) => {
+      const message = String(err?.message ?? err)
+      assert.match(message, /package resource missing/)
+      assert.match(message, /does-not-exist-rule/)
+      return true
+    },
+    'missing resource must throw package resource missing, never fall back',
+  )
+  assert.equal(
+    existsSync(path.join(root, 'resources', 'catalog.json')),
+    false,
+    'catalog.json must not exist — directory is the single source of truth for the rulebook',
+  )
 })

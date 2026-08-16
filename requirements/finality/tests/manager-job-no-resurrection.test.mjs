@@ -62,7 +62,7 @@ const laterProgress = [
   jobProgress.of('Abandoned'),
 ]
 
-test('FINALITY-028 a terminal ManagerJob is not active and does not resume', () => {
+test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume', () => {
   for (const [name, progress] of Object.entries(terminal)) {
     const projection = orchestratorProjection.recordProgress(JOB, progress(), created())
     const job = orchestratorProjection.tryFind(JOB, projection)
@@ -76,7 +76,7 @@ test('FINALITY-028 a terminal ManagerJob is not active and does not resume', () 
   }
 })
 
-test('FINALITY-028 later progress cannot reopen a terminal ManagerJob', () => {
+test('WHAT[FINALITY-028] later progress cannot reopen a terminal ManagerJob', () => {
   for (const progress of Object.values(terminal)) {
     const sealed = orchestratorProjection.recordProgress(JOB, progress(), created())
     const sealedName = orchestratorProjection.progressOf(orchestratorProjection.tryFind(JOB, sealed))
@@ -88,7 +88,7 @@ test('FINALITY-028 later progress cannot reopen a terminal ManagerJob', () => {
   }
 })
 
-test('FINALITY-028 replaying ManagerJobCreated cannot re-enlist a terminal job', () => {
+test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal job', () => {
   const published = orchestratorProjection.recordProgress(JOB, terminal.published(), created())
   const replayed = orchestratorProjection.createJob(
     {
@@ -110,7 +110,7 @@ test('FINALITY-028 replaying ManagerJobCreated cannot re-enlist a terminal job',
   assert.equal(orchestratorProjection.activeJobs(replayed).length, 0)
 })
 
-test('FINALITY-028 an active owned job continues on the same session and worktree', () => {
+test('WHAT[FINALITY-028] an active owned job continues on the same session and worktree', () => {
   const projection = created()
   const job = orchestratorProjection.tryFind(JOB, projection)
   assert.equal(orchestratorProjection.activeJobs(projection).length, 1)

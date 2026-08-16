@@ -39,7 +39,7 @@ const textOf = (messages, id) => {
 const ACTIVATION =
   '# Now complete it yourself.\n# Carry out the work you described until the final goal is fully achieved.\n#\n# Planning is not completion.\n# Delegation is not completion.\n# A child finishing is not completion.\n# A successful command is not completion while meaningful uncertainty remains.\n# An explanation of the work is not the work itself.\n# A partial implementation is not completion merely because the remaining work is difficult.\n# As long as any useful action remains, continue.\n'
 
-test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => {
+test('WHAT[FINALITY-023] opening rewrite is byte identical across requests', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
@@ -76,7 +76,7 @@ test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => 
   })
 })
 
-test('GLORY_012_host_title_request_never_opens_a_life', async () => {
+test('WHAT[FINALITY-022] host title request never opens a life', async () => {
   // Host 1.18 title requests carry the marker on the message's top-level
   // `content` field; they are Host-synthesized and must not open a Life or be
   // rewritten (measured e2e regression: the title request opened the Life, the
@@ -110,7 +110,7 @@ test('GLORY_012_host_title_request_never_opens_a_life', async () => {
   })
 })
 
-test('FINALITY_022_active_HumanRoot_profile_does_not_make_another_user_message_a_root', async () => {
+test('WHAT[FINALITY-022] active HumanRoot profile does not make another user message a root', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
 
@@ -125,7 +125,7 @@ test('FINALITY_022_active_HumanRoot_profile_does_not_make_another_user_message_a
   })
 })
 
-test('GLORY_015_rewrite_survives_a_persisted_rewritten_message', async () => {
+test('WHAT[FINALITY-023] opening rewrite survives a persisted rewritten message', async () => {
   // Worst case: the Host persisted the transform output (the rewritten opening).
   // Re-transforming must not stack a second tail — the narrative derives from
   // the durable blob, never from the message text.
@@ -148,6 +148,25 @@ test('GLORY_015_rewrite_survives_a_persisted_rewritten_message', async () => {
 
     const re = textOf(out2.messages, ROOT)
     assert.equal(re, rewritten, 'no stacked tail on a persisted rewritten message')
+  })
+})
+
+test('WHAT[FINALITY-024] work-time messages are never rewritten', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, SESSION, 'fast-manager')
+
+    const out1 = { messages: [userMessage(ROOT, 'Start manager work.')] }
+    await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out1)
+
+    const out2 = {
+      messages: [
+        userMessage(ROOT, textOf(out1.messages, ROOT)),
+        assistantMessage('asst-1', 'Plan.'),
+        userMessage('msg-work-1', 'Continue working.'),
+      ],
+    }
+    await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, out2)
+
     assert.equal(textOf(out2.messages, 'msg-work-1'), 'Continue working.', 'work-time message never rewritten')
   })
 })

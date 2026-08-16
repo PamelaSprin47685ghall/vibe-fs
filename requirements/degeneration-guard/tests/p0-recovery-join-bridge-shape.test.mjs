@@ -19,13 +19,13 @@ const ROOT = new URL('../../../', import.meta.url).pathname
 /** LOOP-006 桥接静态形状规则（degeneration-guard owner）。 */
 const BRIDGE_RULES = new Set(['lifecycle-aborted-record', 'record-completion-single-owner'])
 
-test('P0_RECOVERY_JOIN_GATE_exports_bridge_shape_rule_ids', () => {
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_exports_bridge_shape_rule_ids', () => {
   for (const id of BRIDGE_RULES) {
     assert.ok(RULE_IDS.includes(id), `missing bridge-shape rule id: ${id}`)
   }
 })
 
-test('P0_RECOVERY_JOIN_GATE_negative_lifecycle_aborted_record_goes_red', () => {
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_negative_lifecycle_aborted_record_goes_red', () => {
   // Abort 是控制面，不是业务数据：aborted 分支不得把 completion 记录进 journal。
   const source = [
     'module HostForkRunLifecycle',
@@ -40,7 +40,7 @@ test('P0_RECOVERY_JOIN_GATE_negative_lifecycle_aborted_record_goes_red', () => {
   )
 })
 
-test('P0_RECOVERY_JOIN_GATE_negative_record_completion_single_owner_goes_red', () => {
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_negative_record_completion_single_owner_goes_red', () => {
   // 只有 ChildRecoveryWorkflow 是 recordCompletion 的单一 owner；HostForkRunLifecycle
   // 直接调用即越权。
   const source = [
@@ -55,7 +55,7 @@ test('P0_RECOVERY_JOIN_GATE_negative_record_completion_single_owner_goes_red', (
   )
 })
 
-test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
   const owner = [
     'module ChildRecoveryWorkflow',
     'let commitJoinable journal parentId proof =',
@@ -70,7 +70,7 @@ test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
   assert.equal(scanText(def, 'HandleController.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
 })
 
-test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [
     'src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs',

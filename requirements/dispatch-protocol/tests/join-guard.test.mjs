@@ -42,7 +42,7 @@ const rootFact = (sid) =>
 
 const outcomeName = (outcome) => outcome.cases()[outcome.tag]
 
-test('JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
+test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
   const sid = sessionId('ses_jg2')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
   const opened = await agentJournal.create({ directory: dir })

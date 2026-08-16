@@ -32,14 +32,14 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('CAUSAL_002_descriptor_carries_typed_owner_producer_subject', () => {
+test('WHAT[CAUSAL-002] CAUSAL_002_descriptor_carries_typed_owner_producer_subject', () => {
   const wait = descriptor('A')
   assert.equal(causalWait.ownerKey(wait.Owner), 'flow:id=A')
   assert.equal(causalWait.producerKey(wait.Producer), 'external:capability:id=A')
   assert.equal(wait.WaitKind, 'lifecycle-wait')
 })
 
-test('CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
   const registry = new CausalWaitRegistry()
   const lease = registry.Enter(descriptor('A'))
   lease.Dispose() // no MarkExit — the lease must still leave with a diagnostic exit
@@ -50,7 +50,7 @@ test('CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })
 
-test('CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => {
   const registry = new CausalWaitRegistry()
   const lease = registry.Enter(descriptor('A'))
   lease.MarkExit(causalWait.exit.cancelled())
@@ -59,7 +59,7 @@ test('CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => {
   assert.equal(caseOf(lastTransition(registry).Exit), 'WaitCancelled')
 })
 
-test('CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
   const registry = new CausalWaitRegistry()
   const lease = registry.Enter(descriptor('A'))
   lease.MarkExit(causalWait.exit.resolved())
@@ -69,7 +69,7 @@ test('CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
   assert.equal(caseOf(lastTransition(registry).Exit), 'WaitFailed')
 })
 
-test('CAUSAL_006_dispose_is_idempotent_single_leave', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
   const registry = new CausalWaitRegistry()
   const lease = registry.Enter(descriptor('A'))
   lease.Dispose()
@@ -80,7 +80,7 @@ test('CAUSAL_006_dispose_is_idempotent_single_leave', () => {
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })
 
-test('CAUSAL_006_reenter_is_fresh_observation_not_revival', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_reenter_is_fresh_observation_not_revival', () => {
   const registry = new CausalWaitRegistry()
   const first = registry.Enter(descriptor('A'))
   const seqAfterEnter = registry.Snapshot().Sequence
@@ -97,12 +97,12 @@ test('CAUSAL_006_reenter_is_fresh_observation_not_revival', () => {
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })
 
-test('CAUSAL_006_history_default_capacity_is_256', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_history_default_capacity_is_256', () => {
   const registry = new CausalWaitRegistry()
   assert.equal(CausalWaitRegistry__get_HistoryCapacity(registry), 256)
 })
 
-test('CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
+test('WHAT[CAUSAL-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
   const registry = new CausalWaitRegistry()
   const snapshot = registry.Snapshot()
   assert.equal(listItems(snapshot.Active).length, 0)
@@ -110,7 +110,7 @@ test('CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
   assert.equal(snapshot.Sequence, 0n, 'nothing persisted at construction — process-local only')
 })
 
-test('CAUSAL_004_observer_surface_has_no_snapshot', () => {
+test('WHAT[CAUSAL-004] CAUSAL_004_observer_surface_has_no_snapshot', () => {
   // Application holds IWaitObserver (Enter only); reading requires the
   // separate IWaitSnapshotReader surface — a business workflow cannot observe.
   assert.equal(typeof causalWaitHub.observer.Enter, 'function')

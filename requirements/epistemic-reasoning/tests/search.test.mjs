@@ -7,7 +7,7 @@ import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search
 const map = (entries) => mapOfEntries(entries)
 const edges = (rows) => toList(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))
 
-test('graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
+test('WHAT[EPI-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
   const problem = new AStarProblem(
     'S',
     'G',
@@ -32,7 +32,7 @@ test('graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
   assert.deepEqual([...solved.Path], ['S', 'A', 'C', 'G'])
 })
 
-test('graph_astar_reopens_closed_node_when_better_g_is_discovered', () => {
+test('WHAT[EPI-010] graph_astar_reopens_closed_node_when_better_g_is_discovered', () => {
   const problem = new AStarProblem(
     'S',
     'G',
@@ -58,7 +58,7 @@ test('graph_astar_reopens_closed_node_when_better_g_is_discovered', () => {
   assert.ok([...solved.Expanded].filter((node) => node === 'C').length >= 2)
 })
 
-test('graph_astar_rejects_negative_cost_graph', () => {
+test('WHAT[EPI-010] graph_astar_rejects_negative_cost_graph', () => {
   const problem = new AStarProblem('S', 'G', edges([['S', 'G', -1]]), map([['S', 0], ['G', 0]]))
   assert.equal(solveGraph(problem), undefined)
 })

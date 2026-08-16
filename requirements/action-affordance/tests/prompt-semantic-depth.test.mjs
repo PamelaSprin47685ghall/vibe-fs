@@ -17,7 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const toolPath = (tool, locale) => join(root, 'resources/provider/tool', tool, 'description', locale)
 const readTool = (tool, locale) => readFileSync(toolPath(tool, locale), 'utf8')
 
-test('PROMPT_depth_tool_anchor_catalog_covers_high_risk_verbs', () => {
+test('WHAT[ACTION-AFFORDANCE-002] PROMPT_depth_tool_anchor_catalog_covers_high_risk_verbs', () => {
   assert.ok(TOOL_DESCRIPTION_ANCHORS.inspect.some((a) => a.id === 'no-implement-or-repair'))
   assert.ok(TOOL_DESCRIPTION_ANCHORS['establish-behavior'].some((a) => a.id === 'coder-writes-source'))
   assert.ok(TOOL_DESCRIPTION_ANCHORS['establish-behavior'].some((a) => a.id === 'not-execution-evidence'))
@@ -31,7 +31,7 @@ test('PROMPT_depth_tool_anchor_catalog_covers_high_risk_verbs', () => {
   assert.ok(TOOL_DESCRIPTION_ANCHORS.commission.some((a) => a.id === 'not-lifecycle-stage'))
 })
 
-test('PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors', () => {
+test('WHAT[ACTION-AFFORDANCE-001] PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors', () => {
   for (const [tool, anchors] of Object.entries(TOOL_DESCRIPTION_ANCHORS)) {
     const text = readTool(tool, 'en.md')
     for (const { id, en } of anchors) {
@@ -40,7 +40,7 @@ test('PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors', () => {
   }
 })
 
-test('PROMPT_depth_ZH_tool_descriptions_carry_matching_cognition_anchors', () => {
+test('WHAT[ACTION-AFFORDANCE-001] PROMPT_depth_ZH_tool_descriptions_carry_matching_cognition_anchors', () => {
   for (const [tool, anchors] of Object.entries(TOOL_DESCRIPTION_ANCHORS)) {
     const text = readTool(tool, 'zh-CN.md')
     for (const { id, zh } of anchors) {

@@ -18,7 +18,7 @@ const settle = () => new Promise((r) => setTimeout(r, 10))
 
 // ── 1. terminal materializes inside the same Kick via causal rereads ─────────
 
-test('EXEC_reconcile_idle_before_transcript_materializes_within_causal_rereads', async () => {
+test('WHAT[CAUSAL-001] EXEC_reconcile_idle_before_transcript_materializes_within_causal_rereads', async () => {
   const sid = sessionId('ses_idle_early_causal')
   const physical = physicalUser('user-1')
   const turns = []

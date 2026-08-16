@@ -18,7 +18,7 @@ const MANAGED = [
   'fast-bookkeeper', 'deep-bookkeeper',
 ]
 
-test('EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
+test('WHAT[EMR-001] EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
   const source = await readFile(templateUrl, 'utf8')
   assert.match(source, /export default function route/)
   const { default: route } = await import(`${templateUrl.href}?test=${Date.now()}`)
@@ -34,7 +34,7 @@ test('EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_se
   assert.match(route('deep-browser', []).model, /minimax-m3/)
 })
 
-test('EMR_005_recommended_resource_is_only_a_policy_template', async () => {
+test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', async () => {
   const { default: route } = await import(`${templateUrl.href}?policy=${Date.now()}`)
   const first = route('fast-coder', [])
   const occupied = Array.from({ length: 8 }, () => ({ ...first }))

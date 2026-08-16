@@ -7,13 +7,13 @@ const { compose, renderToolEstimate } = await import(
   '../../../dist/OpenCode/Host/PairProgrammingCalibration.js'
 )
 
-test('GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
+test('WHAT[GD-012] GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
   const guideline = 'canonical pair guideline'
   assert.equal(compose(undefined, undefined, guideline), guideline)
   assert.equal(compose('tip guidance', undefined, guideline), `tip guidance\n\n${guideline}`)
 })
 
-test('CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
   const en = renderToolEstimate(providerLanguage.english, 4)
   assert.match(en, /4/)
   assert.match(en, /delegator|commissioner/i)
@@ -27,7 +27,7 @@ test('CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', (
   assert.match(zh, /范围|并行|委派|分裂/)
 })
 
-test('GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text', () => {
+test('WHAT[GD-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text', () => {
   const guideline = 'canonical pair guideline'
   const oldMarker = compose(undefined, renderToolEstimate(providerLanguage.english, 3), guideline)
   const newMarker = compose(undefined, renderToolEstimate(providerLanguage.english, 0), guideline)
@@ -38,7 +38,7 @@ test('GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_ol
   assert.match(oldMarker, /3/, 'the previously materialized string remains unchanged')
 })
 
-test('GD_012_dynamic_fragment_is_between_tip_and_canonical_guideline', () => {
+test('WHAT[GD-012] GD_012_dynamic_fragment_is_between_tip_and_canonical_guideline', () => {
   const tip = 'tip guidance'
   const estimate = renderToolEstimate(providerLanguage.english, 2)
   const guideline = 'canonical pair guideline'

@@ -16,7 +16,7 @@ import {
   fixtureCommand,
 } from '../../../dist/Sphinx/Mcp.js'
 
-test('AGENT_030_kernel_identity_and_commands', () => {
+test('WHAT[EPI-004] AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')
   assert.equal(permissionKey, 'sphinx_*')
   assert.equal(relativeServerEntry, 'dist/Sphinx/McpServer.js')

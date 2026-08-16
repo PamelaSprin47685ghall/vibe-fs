@@ -124,7 +124,7 @@ const life = (session) => fold.session(session, 'ses_a')?.ManagerLife
 
 // ── GLORY-010/011: the fact algebra folds into the session projection ────────
 
-test('GLORY_010_LifeOpened_opens_the_first_life', () => {
+test('WHAT[FINALITY-021] LifeOpened opens the first life', () => {
   const out = fold.apply(fold.empty, [lifecycleEnv(lifeOpened())])
   assert.equal(out.ok, true, JSON.stringify(out.error))
   const current = life(out.value).CurrentLife
@@ -135,7 +135,7 @@ test('GLORY_010_LifeOpened_opens_the_first_life', () => {
   assert.ok(current.ActiveFinality == null)
 })
 
-test('GLORY_012_a_second_life_cannot_open_while_one_is_active', () => {
+test('WHAT[FINALITY-022] a second life cannot open while one is active', () => {
   const first = fold.apply(fold.empty, [lifecycleEnv(lifeOpened())])
   const secondLife = managerLifecycleFact('LifeOpened', {
     SessionId: SESSION,
@@ -150,7 +150,7 @@ test('GLORY_012_a_second_life_cannot_open_while_one_is_active', () => {
   assert.match(JSON.stringify(out.error), /GLORY-012/)
 })
 
-test('GLORY_045_FinalityRequested_is_rejected_while_a_request_is_open', () => {
+test('WHAT[FINALITY-008] FinalityRequested is rejected while a request is open', () => {
   const opened = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -163,7 +163,7 @@ test('GLORY_045_FinalityRequested_is_rejected_while_a_request_is_open', () => {
   assert.equal(out.ok, false)
 })
 
-test('GLORY_055_a_rejected_request_closes_and_a_new_suicide_opens_a_new_one', () => {
+test('WHAT[FINALITY-008] a rejected request closes and a new suicide opens a new one', () => {
   const rejected = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -181,7 +181,7 @@ test('GLORY_055_a_rejected_request_closes_and_a_new_suicide_opens_a_new_one', ()
   assert.equal(caseOf(life(out.value).CurrentLife.ActiveFinality.Resolution), 'Open')
 })
 
-test('GLORY_060_a_blessing_leaves_the_life_open_until_the_second_suicide', () => {
+test('WHAT[FINALITY-016] a blessing leaves the life open until the second suicide', () => {
   const blessed = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -196,6 +196,17 @@ test('GLORY_060_a_blessing_leaves_the_life_open_until_the_second_suicide', () =>
   assert.equal(open.CurrentLife.Completed, false)
   assert.equal(caseOf(open.CurrentLife.ActiveFinality.Resolution), 'Blessed')
   assert.ok(open.CurrentLife.LastBlessing != null)
+})
+
+test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives the Life', () => {
+  const blessed = fold.apply(fold.empty, [
+    lifecycleEnv(lifeOpened()),
+    lifecycleEnv(workActivated()),
+    lifecycleEnv(finalityRequested()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityBlessed()),
+  ])
+  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
 
   // The second suicide is the rest in peace: LifeCompleted archives the Life.
   const glory = fold.apply(blessed.value, [lifecycleEnv(lifeCompleted())])
@@ -214,7 +225,7 @@ const ManagerLifecycleProjectionLike = {
   empty: () => ({ CurrentLife: undefined, CompletedLives: [] }),
 }
 
-test('GLORY_062_isLifeArchived_true_only_after_life_completed', () => {
+test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
   // GLORY-070: an idle earns encouragement for any Life state EXCEPT a completed
   // one. The production bug re-sent `IdleEncouragement` after the final
   // rest-in-peace suicide, because the leftover turn saw `CurrentLife = None`
@@ -256,7 +267,7 @@ test('GLORY_062_isLifeArchived_true_only_after_life_completed', () => {
   assert.equal(isLifeArchived(life(blessed.value)), false)
 })
 
-test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', () => {
+test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound record', () => {
   const undecided = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -279,7 +290,7 @@ test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', ()
   assert.ok(life(undecided.value).CurrentLife.LastRejectedWorkRecord == null)
 })
 
-test('GLORY_057_a_revise_closes_finality_without_confirming_the_life', () => {
+test('WHAT[FINALITY-011] a revise closes finality without confirming the life', () => {
   const out = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -332,7 +343,7 @@ const managerLifeView = (projection) => {
   }
 }
 
-test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
+test('WHAT[FINALITY-021] lifecycle facts round trip through ndjson', () => {
   const envelopes = [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
@@ -353,7 +364,7 @@ test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
 
 // ── golden byte fixtures (proof/glory.md) ────────────────────────────────────
 
-test('GLORY_014_first_birth_golden_bytes', async () => {
+test('WHAT[FINALITY-004] first birth golden bytes: planning commitment is irreversible', async () => {
   const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
   const birth = managerNarrative.firstBirth('Fix the retry race.')
   assert.equal(birth.parts.length, 2)
@@ -368,7 +379,7 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
 })
 
-test('GLORY_064_reawakening_golden_bytes', async () => {
+test('WHAT[FINALITY-022] reawakening golden bytes', async () => {
   const { managerNarrative } = await import('../../verification-system/tests/support/glory.mjs')
   const reawakening = managerNarrative.reawakening('Add Windows support.')
   assert.equal(reawakening.parts.length, 3)
@@ -381,7 +392,7 @@ test('GLORY_064_reawakening_golden_bytes', async () => {
   assert.ok(reawakening.parts[2].text.includes('# The Planning Table'))
 })
 
-test('GLORY_019_activation_golden_bytes', async () => {
+test('WHAT[FINALITY-024] activation golden bytes: planning is not completion', async () => {
   const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.workActivation(),
@@ -389,14 +400,14 @@ test('GLORY_019_activation_golden_bytes', async () => {
   )
 })
 
-test('GLORY_029_idle_encouragement_golden_bytes', async () => {
+test('WHAT[FINALITY-019] idle encouragement golden bytes', async () => {
   const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
   assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('planComplete=false'))
   assert.ok(managerLifecyclePrompt.idleEncouragementPostT1().includes('# You have done useful work'))
 })
 
-test('GLORY_057_host_undecidable_golden_bytes', async () => {
+test('WHAT[FINALITY-026] host undecidable golden bytes', async () => {
   const { managerLifecyclePrompt } = await import('../../verification-system/tests/support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.finalityUndecidable(),
@@ -404,17 +415,25 @@ test('GLORY_057_host_undecidable_golden_bytes', async () => {
   )
 })
 
-test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', async () => {
+test('WHAT[FINALITY-012] finality rejection renders work record as guidance comments', async () => {
   const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const record = 'Chronicle\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
   assert.ok(rendered.includes('# The work before you is finite.'), rendered)
-  assert.ok(!rendered.includes('unfinished_work_record'), rendered)
   assert.ok(rendered.includes('# - defect A at src/a.ts'), rendered)
 })
 
-test('GLORY_076_finality_three_experiences', async () => {
+test('WHAT[FINALITY-020] rejection rendering exposes no mechanism vocabulary', async () => {
+  const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
+  const record = 'Chronicle\n- defect A at src/a.ts'
+  const rendered = finalityPrompt.rejected(record)
+  // The rejection evidence is guidance, not an explanation of the hidden review
+  // mechanism: no unfinished_work_record identifier leaks.
+  assert.ok(!rendered.includes('unfinished_work_record'), rendered)
+})
+
+test('WHAT[FINALITY-013] finality three experiences', async () => {
   const { finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const rejected = finalityPrompt.rejected('')
   assert.ok(rejected.includes('# Your ending has not accepted you.'))
@@ -425,7 +444,7 @@ test('GLORY_076_finality_three_experiences', async () => {
   assert.ok(rest.includes('# Rest in peace.'))
 })
 
-test('GLORY_075_manager_system_prompt_stable_role_law', async () => {
+test('WHAT[PREFIX-STABILITY-007] manager system prompt stable role law', async () => {
   const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   assert.equal(prompt.includes('carrying one task'), false)
@@ -434,7 +453,7 @@ test('GLORY_075_manager_system_prompt_stable_role_law', async () => {
   assert.ok(prompt.includes('The system prompt names the office'))
 })
 
-test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
+test('WHAT[FINALITY-020] manager surface has no forbidden words', async () => {
   const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const forbidden = [/\breview\b/i, /\breviewer\b/i, /\bverdict\b/i, /\bPERFECT\b/, /\bREVISE\b/, /\bbarrier\b/i, /\bwitness\b/i, /\bconfirmation\b/i]
   for (const re of forbidden) {
@@ -442,7 +461,7 @@ test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
   }
 })
 
-test('SURFACE_006_manager_role_law_does_not_name_foreign_tools', async () => {
+test('WHAT[FINALITY-020] manager role law does not name foreign tools', async () => {
   const { managerSystemPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   const prompt = managerSystemPrompt()
   for (const tool of [
@@ -460,7 +479,7 @@ test('SURFACE_006_manager_role_law_does_not_name_foreign_tools', async () => {
 
 // ── SURFACE-002: LF-only line endings ────────────────────────────────────────
 
-test('SURFACE_002_frozen_texts_use_lf_only', async () => {
+test('WHAT[PROVIDER-LANGUAGE-005] frozen texts use lf only', async () => {
   const { managerNarrative, managerLifecyclePrompt, finalityPrompt } = await import('../../verification-system/tests/support/glory.mjs')
   for (const text of [
     managerNarrative.firstBirthText('X'),

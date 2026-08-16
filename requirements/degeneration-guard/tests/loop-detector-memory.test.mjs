@@ -13,7 +13,7 @@ const diverse = () =>
       `let value_${index} = repository_${index % 31}.load("entity-${index}", ${index * 7919}); // owner-${index % 47}`,
   ).join('\n')
 
-test('LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
+test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
   const detector = loopDetector.create()
   const text = diverse()
   const distinct = new Set(encode(text)).size
@@ -30,7 +30,7 @@ test('LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_len
   )
 })
 
-test('LOOP_003_threshold_crossing_is_a_single_event_with_no_latch', () => {
+test('WHAT[DG-003] LOOP_003_threshold_crossing_is_a_single_event_with_no_latch', () => {
   const detector = loopDetector.create()
   const degenerate = loopDetector.pushText(detector, ' retry'.repeat(1000))
   assert.equal(degenerate.isLoop, true)
@@ -42,7 +42,7 @@ test('LOOP_003_threshold_crossing_is_a_single_event_with_no_latch', () => {
   assert.ok(recovered.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
 })
 
-test('LOOP_003_judgement_does_not_require_consecutive_hits', () => {
+test('WHAT[DG-003] LOOP_003_judgement_does_not_require_consecutive_hits', () => {
   const detector = loopDetector.create()
   let result = loopDetector.evaluate(detector)
 
@@ -54,7 +54,7 @@ test('LOOP_003_judgement_does_not_require_consecutive_hits', () => {
   assert.ok(result.step < 100, `single-token repetition crossed at step ${result.step}`)
 })
 
-test('LOOP_005_two_detectors_are_independent_attempts', () => {
+test('WHAT[DG-006] LOOP_005_two_detectors_are_independent_attempts', () => {
   const a = loopDetector.create()
   const b = loopDetector.create()
 

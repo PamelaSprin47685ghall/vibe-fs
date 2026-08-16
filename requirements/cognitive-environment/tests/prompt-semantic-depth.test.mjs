@@ -21,7 +21,7 @@ const rolePath = (role, locale) => join(root, 'resources/provider/role', role, l
 
 const readRole = (role, locale) => readFileSync(rolePath(role, locale), 'utf8')
 
-test('PROMPT_depth_EN_role_laws_carry_cognition_anchors', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-002] PROMPT_depth_EN_role_laws_carry_cognition_anchors', () => {
   for (const [role, anchors] of Object.entries(ROLE_SEMANTIC_ANCHORS)) {
     const text = readRole(role, 'en.md')
     for (const { id, en } of anchors) {
@@ -30,7 +30,7 @@ test('PROMPT_depth_EN_role_laws_carry_cognition_anchors', () => {
   }
 })
 
-test('PROMPT_depth_ZH_role_laws_carry_matching_cognition_anchors', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-002] PROMPT_depth_ZH_role_laws_carry_matching_cognition_anchors', () => {
   for (const [role, anchors] of Object.entries(ROLE_SEMANTIC_ANCHORS)) {
     const text = readRole(role, 'zh-CN.md')
     for (const { id, zh } of anchors) {
@@ -39,7 +39,7 @@ test('PROMPT_depth_ZH_role_laws_carry_matching_cognition_anchors', () => {
   }
 })
 
-test('PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-012] PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model', () => {
   const inquiryPermissions = permissions('inquiry')
   assert.ok(
     inquiryPermissions.some((n) => /Sphinx/i.test(n)),
@@ -55,7 +55,7 @@ test('PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model', () => 
   assert.doesNotMatch(zh, /sphinx_start|sphinx_resume/)
 })
 
-test('PROMPT_depth_no_universal_closing_report_schema_in_role_laws', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-012] PROMPT_depth_no_universal_closing_report_schema_in_role_laws', () => {
   for (const role of Object.keys(ROLE_SEMANTIC_ANCHORS)) {
     const en = readRole(role, 'en.md')
     assert.doesNotMatch(

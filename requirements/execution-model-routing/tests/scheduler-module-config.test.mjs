@@ -25,7 +25,7 @@ const withTemp = async (run) => {
   }
 }
 
-test('EMR_001_missing_scheduler_is_created_once_then_loaded_from_disk', async () => {
+test('WHAT[EMR-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_disk', async () => {
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), template)
@@ -35,7 +35,7 @@ test('EMR_001_missing_scheduler_is_created_once_then_loaded_from_disk', async ()
   })
 })
 
-test('EMR_001_existing_scheduler_is_never_overwritten', async () => {
+test('WHAT[EMR-001] EMR_001_existing_scheduler_is_never_overwritten', async () => {
   await withTemp(async (path) => {
     const existing = `export default () => ({ model: 'provider/user-choice', reasoning: 'high' })\n`
     await import('node:fs/promises').then(({ mkdir }) => mkdir(join(path, '..'), { recursive: true }))
@@ -47,7 +47,7 @@ test('EMR_001_existing_scheduler_is_never_overwritten', async () => {
   })
 })
 
-test('EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async () => {
+test('WHAT[EMR-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async () => {
   await withTemp(async (path) => {
     const [left, right] = await Promise.all([
       bootstrapAndLoadAt(path, template),
@@ -60,7 +60,7 @@ test('EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async
   })
 })
 
-test('EMR_002_scheduler_preserves_running_duplicates_and_null', async () => {
+test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_and_null', async () => {
   await withTemp(async (path) => {
     const body = `export default function route(role, running) {
       if (running.length !== 2) throw new Error('duplicates lost')
@@ -76,7 +76,7 @@ test('EMR_002_scheduler_preserves_running_duplicates_and_null', async () => {
   })
 })
 
-test('EMR_002_scheduler_program_errors_fail_closed', async () => {
+test('WHAT[EMR-002] EMR_002_scheduler_program_errors_fail_closed', async () => {
   await withTemp(async (path) => {
     const invalidDefault = `export default 42\n`
     await assert.rejects(() => bootstrapAndLoadAt(path, invalidDefault), /default export.*function/i)

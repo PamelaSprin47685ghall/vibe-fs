@@ -4,12 +4,12 @@ import test from 'node:test'
 
 const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('EMR_005_runtime_contains_no_product_lane_or_max_sessions_policy', async () => {
+test('WHAT[EMR-005] EMR_005_runtime_contains_no_product_lane_or_max_sessions_policy', async () => {
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   assert.doesNotMatch(routing, /ExecutionLane|ModelLaneConfig|max_sessions|firstFree|first-free/)
 })
 
-test('EMR_008_host_inventory_no_longer_exposes_model_binding_authority', async () => {
+test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_authority', async () => {
   const managed = await source('src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs')
   const port = await source('src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs')
   const wiring = await source('src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs')
@@ -21,7 +21,7 @@ test('EMR_008_host_inventory_no_longer_exposes_model_binding_authority', async (
   assert.doesNotMatch(strengthScope, /ManagedAgentInventory|RecordManagedAgentInventory/)
 })
 
-test('EMR_009_chat_message_mutates_managed_user_model_from_model_routing_lease', async () => {
+test('WHAT[EMR-009] EMR_009_chat_message_mutates_managed_user_model_from_model_routing_lease', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const params = await source('src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs')
 
@@ -31,7 +31,7 @@ test('EMR_009_chat_message_mutates_managed_user_model_from_model_routing_lease',
   assert.doesNotMatch(params, /observeUserFacing\s/)
 })
 
-test('SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {
+test('WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {
   const policy = await source('src/Wanxiangshu/Strength/Policy.fs')
   const speculate = await source('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
 

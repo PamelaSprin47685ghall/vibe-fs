@@ -4,7 +4,7 @@ import test from 'node:test'
 import { library, phase0Names } from '../../../dist/Sphinx/Methodology.js'
 import { createStore, start, resume } from './support.mjs'
 
-test('method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics', () => {
+test('WHAT[EPI-007] method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics', () => {
   const names = [...library].map((definition) => definition.Name)
   assert.deepEqual([...phase0Names].sort(), [
     'Abduction',
@@ -20,7 +20,7 @@ test('method_library_preserves_phase0_kernel_and_extends_without_pipeline_semant
   assert.ok(names.includes('OntologyRepair'))
 })
 
-test('why_question_activates_multiple_generators_from_distribution_and_facets', () => {
+test('WHAT[EPI-007] why_question_activates_multiple_generators_from_distribution_and_facets', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   const result = resume(store, started.handle, {
@@ -36,7 +36,7 @@ test('why_question_activates_multiple_generators_from_distribution_and_facets', 
   assert.equal(result.request.methods.includes('Synthesis'), false)
 })
 
-test('predictive_polar_question_activates_base_rate_and_falsification', () => {
+test('WHAT[EPI-007] predictive_polar_question_activates_base_rate_and_falsification', () => {
   const store = createStore()
   const started = start(store, '明天白银会涨吗？')
   const result = resume(store, started.handle, {

@@ -25,7 +25,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('LOOP_004_constants_are_token_calibrated', () => {
+test('WHAT[DG-004] LOOP_004_constants_are_token_calibrated', () => {
   assert.equal(loopDetector.tokenizerVocabularySize, vocabularySize)
   assert.equal(loopDetector.halfLife, 64)
   close(loopDetector.lambda, 2 ** (-1 / 64))
@@ -36,7 +36,7 @@ test('LOOP_004_constants_are_token_calibrated', () => {
   )
 })
 
-test('LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
+test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
   assert.equal(result.isLoop, false)
@@ -44,7 +44,7 @@ test('LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
 })
 
-test('LOOP_003_push_text_is_o200k_token_based', () => {
+test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {
   const text = 'const π = await repository.load("订单-42");\nreturn { ok: true, revision: 17 };'
   const expected = referenceScore(text)
   const result = loopDetector.pushText(loopDetector.create(), text)
@@ -54,14 +54,14 @@ test('LOOP_003_push_text_is_o200k_token_based', () => {
   close(result.weightedDistinctTokens, expected.weightedDistinctTokens)
 })
 
-test('LOOP_003_whitespace_and_punctuation_are_tokens_not_character_exceptions', () => {
+test('WHAT[DG-003] LOOP_003_whitespace_and_punctuation_are_tokens_not_character_exceptions', () => {
   const text = ' \n\t\r-'.repeat(200)
   const result = loopDetector.pushText(loopDetector.create(), text)
   assert.equal(result.step, encode(text).length)
   assert.ok(result.step > 0)
 })
 
-test('LOOP_003_single_token_repetition_converges_to_theoretical_loop', () => {
+test('WHAT[DG-001] LOOP_003_single_token_repetition_converges_to_theoretical_loop', () => {
   const unit = ' retry'
   assert.equal(encode(unit).length, 1, 'fixture must be one o200k token')
 
@@ -72,7 +72,7 @@ test('LOOP_003_single_token_repetition_converges_to_theoretical_loop', () => {
   close(result.weightedDistinctTokens, 1, 1e-3)
 })
 
-test('LOOP_003_diverse_programmatic_text_stays_normal', () => {
+test('WHAT[DG-001] LOOP_003_diverse_programmatic_text_stays_normal', () => {
   const body = Array.from(
     { length: 500 },
     (_, index) =>
@@ -84,7 +84,7 @@ test('LOOP_003_diverse_programmatic_text_stays_normal', () => {
   assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
 })
 
-test('LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', () => {
+test('WHAT[DG-001] LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', () => {
   const body = [
     '| Component | Owner | Revision | Evidence |',
     '| --- | --- | ---: | --- |',
@@ -99,7 +99,7 @@ test('LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', 
   assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
 })
 
-test('LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', () => {
+test('WHAT[DG-001] LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', () => {
   const body = Array.from(
     { length: 500 },
     (_, index) =>
@@ -110,14 +110,14 @@ test('LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', ()
   assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
 })
 
-test('LOOP_005_empty_push_is_noop', () => {
+test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {
   const detector = loopDetector.create()
   const before = loopDetector.evaluate(detector)
   const after = loopDetector.pushText(detector, '')
   assert.deepEqual(after, before)
 })
 
-test('LOOP_009_text_delta_decodes_fail_closed', () => {
+test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
   assert.equal(loopEventCodec.isLoopTextDelta({ type: 'session.status' }), false)
   assert.equal(loopEventCodec.tryDecodeTextDelta({ type: 'session.status' }), undefined)
 

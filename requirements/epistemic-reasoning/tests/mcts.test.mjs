@@ -8,7 +8,7 @@ import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
 const map = (entries) => mapOfEntries(entries)
 const childMap = (entries) => map(entries.map(([key, children]) => [key, toList(children)]))
 
-test('mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
+test('WHAT[EPI-010] mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
   const model = new Model(
     'root',
     childMap([
@@ -31,7 +31,7 @@ test('mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => 
   assert.equal(result.Iterations, 40)
 })
 
-test('graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
+test('WHAT[EPI-010] graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
   const model = new Model(
     'root',
     childMap([
@@ -53,7 +53,7 @@ test('graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
   assert.ok(result.Nodes.size <= 4)
 })
 
-test('uct_for_unvisited_node_is_infinite', () => {
+test('WHAT[EPI-010] uct_for_unvisited_node_is_infinite', () => {
   const node = new MonteCarloNode('new', 0, 0, 0.5)
   assert.equal(uct(10, Math.SQRT2, node), Number.POSITIVE_INFINITY)
 })

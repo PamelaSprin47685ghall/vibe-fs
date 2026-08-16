@@ -13,7 +13,7 @@ import {
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
 
-test('LOOP_004_repository_text_calibrates_every_detector_constant', () => {
+test('WHAT[DG-004] LOOP_004_repository_text_calibrates_every_detector_constant', () => {
   const readable = readableRepositoryTexts()
   assert.ok(readable.length > 2000, `readable files=${readable.length}`)
 

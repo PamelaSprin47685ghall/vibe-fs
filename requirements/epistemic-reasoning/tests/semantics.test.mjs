@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { createStore, start, resume, state, assessWhy } from './support.mjs'
 
-test('ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence', () => {
+test('WHAT[EPI-003] ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
@@ -48,7 +48,7 @@ test('ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_eviden
   assert.ok(answered.answer.uncertainties.includes('ungrounded-finding:finding:model-only'))
 })
 
-test('synthesis_is_information_propagation_not_information_acquisition', () => {
+test('WHAT[EPI-005] synthesis_is_information_propagation_not_information_acquisition', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
@@ -96,7 +96,7 @@ test('synthesis_is_information_propagation_not_information_acquisition', () => {
   assert.equal(state(store, started.handle).Evidence.size, before)
 })
 
-test('later_semantic_assessment_updates_control_belief_without_creating_evidence', () => {
+test('WHAT[EPI-007] later_semantic_assessment_updates_control_belief_without_creating_evidence', () => {
   const store = createStore()
   const started = start(store, '为什么程序卡住？')
   assessWhy(store, started.handle)
@@ -130,7 +130,7 @@ test('later_semantic_assessment_updates_control_belief_without_creating_evidence
   assert.equal(current.Findings.size, 0)
 })
 
-test('gateway_gain_can_make_low_immediate_gain_question_worth_asking', () => {
+test('WHAT[EPI-008] gateway_gain_can_make_low_immediate_gain_question_worth_asking', () => {
   const store = createStore()
   const started = start(store, '复杂问题为什么发生？')
   assessWhy(store, started.handle)

@@ -4,7 +4,7 @@ import test from 'node:test'
 import { create } from '../../../dist/Sphinx/McpServer.js'
 import { createStore, start, resume, assessWhy } from './support.mjs'
 
-test('handle_is_opaque_process_local_session_key', () => {
+test('WHAT[EPI-002] handle_is_opaque_process_local_session_key', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assert.equal(typeof started.handle, 'string')
@@ -20,7 +20,7 @@ test('handle_is_opaque_process_local_session_key', () => {
   )
 })
 
-test('full_co_yield_path_preserves_kernel_continuation_and_grounded_basis', () => {
+test('WHAT[EPI-002] full_co_yield_path_preserves_kernel_continuation', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   const handle = started.handle
@@ -71,6 +71,56 @@ test('full_co_yield_path_preserves_kernel_continuation_and_grounded_basis', () =
   })
   assert.equal(regenerated.status, 'yield')
   assert.equal(regenerated.request.type, 'SynthesizeRequest')
+})
+
+test('WHAT[EPI-003] full_co_yield_path_preserves_grounded_epistemic_basis', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
+  const handle = started.handle
+  assessWhy(store, handle)
+
+  const candidate = resume(store, handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'CausalMechanism',
+        question: '花青素合成及其光谱吸收是否解释红色？',
+        semanticKey: 'question:anthocyanin',
+        dependencyKey: 'source:pigment-study',
+        expectedRootGain: 0.95,
+        cost: 0.2,
+      },
+    ],
+  })
+
+  const investigated = resume(store, handle, {
+    type: 'Investigation',
+    actionKey: candidate.request.action.id,
+    findings: [
+      {
+        semanticKey: 'finding:anthocyanin',
+        text: '花青素的吸收谱与组织酸碱环境共同决定可见红色。',
+        evidenceKeys: ['evidence:pigment-study'],
+        provenance: ['investigation:pigment'],
+      },
+    ],
+    evidence: [
+      {
+        semanticKey: 'evidence:pigment-study',
+        proposition: '独立色素研究支持花青素机制。',
+        source: { id: 'pigment-study', kind: 'document' },
+        dependencyKey: 'pigment-study',
+        provenance: ['document:pigment-study'],
+      },
+    ],
+  })
+  assert.equal(investigated.request.type, 'GenerateCandidatesRequest')
+
+  const regenerated = resume(store, handle, {
+    type: 'Candidates',
+    items: [],
+  })
+  assert.equal(regenerated.request.type, 'SynthesizeRequest')
 
   const answered = resume(store, handle, {
     type: 'Synthesis',
@@ -86,7 +136,7 @@ test('full_co_yield_path_preserves_kernel_continuation_and_grounded_basis', () =
   assert.equal(answered.answer.synthesis.findingKeys[0], 'finding:anthocyanin')
 })
 
-test('mcp_server_surface_is_exactly_start_and_resume', async () => {
+test('WHAT[EPI-004] mcp_server_surface_is_exactly_start_and_resume', async () => {
   const server = create(createStore())
   assert.deepEqual(Object.keys(server._registeredTools).sort(), ['resume', 'start'])
 

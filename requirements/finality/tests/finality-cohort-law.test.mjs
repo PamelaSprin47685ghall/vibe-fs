@@ -204,7 +204,7 @@ const uniqueDirectory = (label) =>
 
 // ── Theorem 1: roster algebra — ungraduated history + exactly one new ───────
 
-test('THEOREM_finality_roster_is_ungraduated_history_plus_exactly_one_new', () => {
+test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', () => {
   // Trace T0: open Life → request1 enlist hist-a → reject → request2 open.
   // rosterOf(request2) MUST be [hist-a reused, exactly one new slot].
   const opened = fold.apply(fold.empty, [
@@ -233,7 +233,7 @@ test('THEOREM_finality_roster_is_ungraduated_history_plus_exactly_one_new', () =
   assert.deepEqual(slotView(rosterOf(opened.value.AgentProjections, life, request)), roster)
 })
 
-test('THEOREM_finality_graduated_reviewer_excluded_from_roster', () => {
+test('WHAT[FINALITY-010] graduated reviewer excluded from roster', () => {
   // Trace T1: same as T0, then ConfirmedReviewWitness on hist-a's enlisted barrier.
   // Graduation is DERIVED (GLORY-045); roster drops hist-a and keeps exactly one new.
   const base = fold.apply(fold.empty, [
@@ -264,7 +264,7 @@ test('THEOREM_finality_graduated_reviewer_excluded_from_roster', () => {
   ])
 })
 
-test('THEOREM_finality_crash_reentry_reuses_already_created_new_slot_exactly_once', () => {
+test('WHAT[FINALITY-009] crash reentry reuses already created new slot exactly once', () => {
   // Trace T2 (GLORY-045 crash re-entry): after the new Reviewer is enlisted,
   // rosterOf must reuse that session under IsNew=false and MUST NOT invent a
   // second new slot (exactly-once new Reviewer per request).
@@ -291,7 +291,7 @@ test('THEOREM_finality_crash_reentry_reuses_already_created_new_slot_exactly_onc
 
 // ── Theorem 2: multi-historical enlistment order is confluent for roster ────
 
-test('THEOREM_finality_historical_enlist_order_confluent_for_roster', () => {
+test('WHAT[FINALITY-009] historical enlist order confluent for roster', () => {
   // Two independent historical enlistments on request1. Any interleaving of
   // (enlist A, enlist B) must fold to the same Members and, after reject +
   // request2, the same rosterOf algebra. Enumerate traces explicitly.
@@ -343,7 +343,7 @@ test('THEOREM_finality_historical_enlist_order_confluent_for_roster', () => {
 
 // ── Theorem 3: terminal completion is exactly-once under fold ───────────────
 
-test('THEOREM_finality_blessed_exactly_once_second_completion_rejected', () => {
+test('WHAT[FINALITY-016] blessed exactly once: second completion rejected', () => {
   // Trace T3: Open → enlist → Blessed. A second Blessed on the same request
   // must not flip / double-write LastBlessing (fold rejects; projection stable).
   const blessed = fold.apply(fold.empty, [
@@ -367,7 +367,7 @@ test('THEOREM_finality_blessed_exactly_once_second_completion_rejected', () => {
 
 // ── Theorem 4: dropEphemeral preserves durable finality; no second completion
 
-test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', async () => {
+test('WHAT[FINALITY-008] drop ephemeral preserves durable finality facts: no duplicate completion', async () => {
   // G4R §12: world1 → durable FinalityBlessed F; DROP EPHEMERAL; world2 := recover(F)
   // → same Resolution/Members; re-append Blessed is refused (no second completion).
   const dir = uniqueDirectory('bless')
@@ -426,7 +426,7 @@ test('THEOREM_drop_ephemeral_preserves_finality_facts_no_duplicate_completion', 
   world2.dispose()
 })
 
-test('THEOREM_drop_ephemeral_preserves_open_finality_roster_source', async () => {
+test('WHAT[FINALITY-009] drop ephemeral preserves open finality roster source', async () => {
   // Open request (not yet terminal): crash/resume must keep ActiveFinality Open
   // and the same EnlistedReviewers so rosterOf after resume still yields
   // ungraduated history + exactly one new — no re-enlist / no duplicate Members.

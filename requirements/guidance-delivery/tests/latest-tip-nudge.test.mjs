@@ -30,6 +30,9 @@ const { AgentJournalModule_appendAgent } = await import('../../../dist/Persisten
 const { EnforcerTipGuidance_latestTipNudge: latestTipNudge } = await import(
   '../../../dist/Enforcer/Guidance/Tip.js',
 )
+const { EnforcerTipGuidance_latestTipGuidance: latestTipGuidance } = await import(
+  '../../../dist/Enforcer/Guidance/Tip.js',
+)
 const { tryInject } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const main = sessionId('ses-nudge-main')
@@ -87,7 +90,7 @@ const seed = async ({ withAssociation = true, withTip = true } = {}) => {
   }
 }
 
-test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async () => {
+test('WHAT[GD-004] ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async () => {
   const fixture = await seed()
   try {
     const result = await latestTipNudge(fixture.journal, blogger)
@@ -102,7 +105,22 @@ test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async (
   }
 })
 
-test('ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
+test('WHAT[GD-007] ENFORCER_TIP_NUDGE_001b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
+  const fixture = await seed()
+  try {
+    // 先交付一次 Full（推进 durable Frontier），之后 latest 稳定为 Identity 文本。
+    await latestTipNudge(fixture.journal, blogger)
+    // GD-007: latestTipNudge 是 latestTipGuidance 的同字节别名（同一时刻
+    // 两者返回同一字节——Full/Identity 文本，不是旧 Nudge 字段）。
+    const viaNudge = await latestTipNudge(fixture.journal, blogger)
+    const viaGuidance = await latestTipGuidance(fixture.journal, blogger)
+    assert.equal(viaGuidance, viaNudge)
+  } finally {
+    fixture.dispose()
+  }
+})
+
+test('WHAT[GD-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
   const fixture = await seed({ withTip: false })
   try {
     assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
@@ -111,7 +129,7 @@ test('ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
   }
 })
 
-test('ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
+test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
   const fixture = await seed({ withAssociation: false })
   try {
     assert.equal(await latestTipNudge(fixture.journal, blogger), undefined)
@@ -129,13 +147,13 @@ const markerOutput = (messages) => {
   return result?.parts?.[0]?.state?.output
 }
 
-test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
+test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
   const result = resultOf(await tryInject(undefined, 'ses-auto-injected', guideline, anchor))
   assert.equal(result.ok, true, result.error ?? '')
   assert.equal(markerOutput(result.value), guideline)
 })
 
-test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
+test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
   const result = resultOf(await tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor))
   assert.equal(result.ok, true, result.error ?? '')

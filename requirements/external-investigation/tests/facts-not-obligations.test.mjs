@@ -42,7 +42,7 @@ const makeFixture = () => {
   return { providerAbs: join(dir, PROVIDER_ROOT), dispose: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('EXTERNAL-INVESTIGATION-011 observation-not-obligation is pinned', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-011] observation-not-obligation is pinned', () => {
   assert.equal(ANCHOR.id, 'observation-not-obligation')
   assert.deepEqual(
     BROWSER_OBLIGATION_BOUNDARY_ANCHORS.browser.map((a) => a.id),
@@ -50,12 +50,12 @@ test('EXTERNAL-INVESTIGATION-011 observation-not-obligation is pinned', () => {
   )
 })
 
-test('EXTERNAL-INVESTIGATION-011 Role Law hits observation-not-obligation in both locales', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-011] Role Law hits observation-not-obligation in both locales', () => {
   const violations = scanSemanticAnchorParity(realProvider, BROWSER_OBLIGATION_BOUNDARY_ANCHORS)
   assert.deepEqual(violations, [], JSON.stringify(violations, null, 2))
 })
 
-test('EXTERNAL-INVESTIGATION-011 removing the distinction turns red', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-011] removing the distinction turns red', () => {
   const fx = makeFixture()
   try {
     const enPath = join(fx.providerAbs, 'role', 'browser', 'en.md')
@@ -70,7 +70,7 @@ test('EXTERNAL-INVESTIGATION-011 removing the distinction turns red', () => {
   }
 })
 
-test('EXTERNAL-INVESTIGATION-011 is not a word-level obligation regex', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-011] is not a word-level obligation regex', () => {
   assert.doesNotMatch(
     'A web finding that the project should change is therefore a repository obligation.',
     ANCHOR.en,

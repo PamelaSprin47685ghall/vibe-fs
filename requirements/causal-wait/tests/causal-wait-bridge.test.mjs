@@ -38,7 +38,7 @@ const mkWait = (waitKind, ownerKind, subjectPairs, producer) =>
 
 const externalProducer = (kind, identity) => new CausalProducerRef(1, [kind, toList(identity)])
 
-test('CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
+test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
   fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
   const registry = new CausalWaitRegistry()
@@ -69,7 +69,7 @@ test('CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
   }
 })
 
-test('CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
+test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-hub-'))
   CausalWaitHub_setWorkspace(workspace)
   const wait = mkWait(

@@ -59,7 +59,7 @@ const routeMessage = async (hooks, sessionID) => {
   return output.message.model
 }
 
-test('EMR_003_two_plugin_instances_share_one_process_running_multiset', async () => {
+test('WHAT[EMR-003] EMR_003_two_plugin_instances_share_one_process_running_multiset', async () => {
   const previousHome = process.env.HOME
   process.env.HOME = home
   let first

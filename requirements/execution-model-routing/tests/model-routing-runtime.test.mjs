@@ -15,12 +15,8 @@ const {
 const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
 const key = (value) => `${value.Model}|${value.Reasoning}`
 
-test('EMR_003_each_session_agent_lease_contributes_one_running_occurrence', async () => {
-  const seen = []
-  const runtime = new ModelRoutingRuntime((_role, running) => {
-    seen.push(running.map((item) => `${item.model}|${item.reasoning}`))
-    return target()
-  })
+test('WHAT[EMR-003] EMR_003_each_session_agent_lease_contributes_one_running_occurrence', async () => {
+  const runtime = new ModelRoutingRuntime(() => target())
 
   const first = await acquireManaged(runtime, 'session-a', 'fast-coder')
   const same = await acquireManaged(runtime, 'session-a', 'fast-coder')
@@ -30,10 +26,23 @@ test('EMR_003_each_session_agent_lease_contributes_one_running_occurrence', asyn
   assert.equal(key(same), 'provider/shared|none')
   assert.equal(key(peer), 'provider/shared|none')
   assert.equal(snapshotOccupied(runtime).length, 2, 'A and B are two leases even on the same target')
+})
+
+test('WHAT[EMR-006] EMR_006_reusing_one_lease_does_not_rerun_the_scheduler', async () => {
+  const seen = []
+  const runtime = new ModelRoutingRuntime((_role, running) => {
+    seen.push(running.map((item) => `${item.model}|${item.reasoning}`))
+    return target()
+  })
+
+  await acquireManaged(runtime, 'session-a', 'fast-coder')
+  await acquireManaged(runtime, 'session-a', 'fast-coder')
+  await acquireManaged(runtime, 'session-a', 'deep-coder')
+
   assert.deepEqual(seen, [[], ['provider/shared|none']], 'reusing one lease must not re-run the scheduler')
 })
 
-test('EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async () => {
+test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async () => {
   const route = (_role, running) => running.filter((item) => item.model === 'provider/only').length < 1
     ? target('provider/only')
     : null
@@ -56,7 +65,7 @@ test('EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async ()
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 
-test('EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
+test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
   const runtime = new ModelRoutingRuntime((role) => role === 'blocked' ? null : target(`provider/${role}`))
 
   const blocked = acquireManaged(runtime, 'blocked-session', 'blocked')
@@ -71,14 +80,14 @@ test('EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', 
   await assert.rejects(blocked)
 })
 
-test('EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
+test('WHAT[EMR-004] EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
   const runtime = new ModelRoutingRuntime(() => null)
   assert.equal(tryAcquireManaged(runtime, 'replica', 'fast-coder'), undefined)
   assert.equal(pendingCount(runtime), 0)
   assert.deepEqual(snapshotOccupied(runtime), [])
 })
 
-test('EMR_006_lease_is_stable_even_when_scheduler_would_choose_differently_later', async () => {
+test('WHAT[EMR-006] EMR_006_lease_is_stable_even_when_scheduler_would_choose_differently_later', async () => {
   let calls = 0
   const runtime = new ModelRoutingRuntime(() => target(`provider/model-${++calls}`, 'low'))
 
@@ -90,7 +99,7 @@ test('EMR_006_lease_is_stable_even_when_scheduler_would_choose_differently_later
   assert.equal(calls, 1)
 })
 
-test('EMR_007_release_is_idempotent_and_wakes_waiters_once', async () => {
+test('WHAT[EMR-007] EMR_007_release_is_idempotent_and_wakes_waiters_once', async () => {
   const runtime = new ModelRoutingRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
   await acquireManaged(runtime, 'holder', 'fast-coder')
   const waiting = acquireManaged(runtime, 'waiter', 'deep-coder')
@@ -104,7 +113,7 @@ test('EMR_007_release_is_idempotent_and_wakes_waiters_once', async () => {
   assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s lease')
 })
 
-test('EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
+test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
   const runtime = new ModelRoutingRuntime((role) => {
     if (role === 'waiting') return null
     throw new Error('bad scheduler program')

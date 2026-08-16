@@ -16,7 +16,7 @@ const promptOptions = (overrides = {}) => ({
   ...overrides,
 })
 
-test('EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant', async () => {
+test('WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant', async () => {
   let payload
   const client = {
     session: {
@@ -40,7 +40,7 @@ test('EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_
   assert.deepEqual(payload.model, { providerID: 'provider', modelID: 'model' })
 })
 
-test('EMR_008_sdk_prompt_never_recovers_a_model_from_agent_or_host_inventory', async () => {
+test('WHAT[EMR-008] EMR_008_sdk_prompt_never_recovers_a_model_from_agent_or_host_inventory', async () => {
   let payload
   const client = {
     session: {

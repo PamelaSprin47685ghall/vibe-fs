@@ -7,7 +7,7 @@ import test from 'node:test'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('reference_transaction_and_pre_push_both_call_the_same_full_bidirectional_converge', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction and pre-push both call the same full bidirectional converge', async () => {
   const sync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
   assert.match(sync, /let runPrePush/)
   assert.match(sync, /converge remote None/)
@@ -16,7 +16,7 @@ test('reference_transaction_and_pre_push_both_call_the_same_full_bidirectional_c
   assert.doesNotMatch(sync, /ConvergeObserved|downloadOnly|uploadOnly/i)
 })
 
-test('reference_transaction_observed_root_changes_discovery_only_not_sync_direction', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction observed root changes discovery only not sync direction', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(gateway, /let converge/)
   assert.match(gateway, /match observedRemote with/)
@@ -26,7 +26,7 @@ test('reference_transaction_observed_root_changes_discovery_only_not_sync_direct
   assert.doesNotMatch(gateway, /IEventStore|CanonicalIntegrator|WorkspaceEventStore/)
 })
 
-test('lease_race_refetches_and_repeats_the_same_k_way_sync_boundedly', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] lease race refetches and repeats the same k-way sync boundedly', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(gateway, /--force-with-lease/)
   assert.match(gateway, /retriesLeft/)
@@ -34,7 +34,7 @@ test('lease_race_refetches_and_repeats_the_same_k_way_sync_boundedly', async () 
   assert.match(gateway, /ConvergeRetryExhausted/)
 })
 
-test('product_process_has_no_fetch_pull_push_remote_api', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] product process has no fetch pull push remote API', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
@@ -44,7 +44,7 @@ test('product_process_has_no_fetch_pull_push_remote_api', async () => {
   assert.doesNotMatch(activation, /GitGateway\.converge|\.(Fetch|Pull|Push)\(/i)
 })
 
-test('hook_internal_Git_commands_are_recursion_guarded_and_pre_push_is_not_reentered', async () => {
+test('WHAT[DURABLE-CONVERGENCE-008] hook-internal Git commands are recursion guarded and pre-push is not reentered', async () => {
   const runner = await read('resources/git/wanxiang-hook.mjs')
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(runner, /WANXIANG_GIT_SYNC_ACTIVE/)

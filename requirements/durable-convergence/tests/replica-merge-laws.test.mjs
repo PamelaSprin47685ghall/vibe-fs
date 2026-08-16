@@ -15,12 +15,12 @@ const make = (id, parents = [], stream = 'replica/law', type = 'JobRequested', p
 const ids = (r) => listItems(resultOf(r).value).map((e) => idValue.event(e.EventId))
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40), R = 'd'.repeat(40)
 
-test('set_union_never_drops_concurrent_events', () => {
+test('WHAT[DURABLE-CONVERGENCE-001] set union never drops concurrent events', () => {
   const merged = ids(Merge.merge(toList([['a', toList([make(A)])], ['b', toList([make(B)])]])))
   assert.deepEqual(new Set(merged), new Set([A, B]))
 })
 
-test('merge_is_commutative_associative_idempotent_at_writer_stream_level', () => {
+test('WHAT[DURABLE-CONVERGENCE-002] merge is commutative associative idempotent at writer stream level', () => {
   const sa = ['a', toList([make(A)])]
   const sb = ['b', toList([make(B)])]
   const sc = ['c', toList([make(C)])]
@@ -30,13 +30,13 @@ test('merge_is_commutative_associative_idempotent_at_writer_stream_level', () =>
   assert.deepEqual(ids(Merge.merge(toList([sa, ['copy', toList([make(A)])]]))), [A])
 })
 
-test('convergence_is_a_function_of_event_truth_not_arrival_wall_clock', () => {
+test('WHAT[DURABLE-CONVERGENCE-006] convergence is a function of event truth not arrival wall clock', () => {
   const streams1 = toList([['a', toList([make(A), make(C, [A])])], ['b', toList([make(B)])]])
   const streams2 = toList([['b', toList([make(B)])], ['a', toList([make(A), make(C, [A])])]])
   assert.deepEqual(ids(Merge.merge(streams1)), ids(Merge.merge(streams2)))
 })
 
-test('concurrent_heads_are_preserved_as_structural_DomainConflict_frontier', async () => {
+test('WHAT[DURABLE-CONVERGENCE-004] concurrent heads are preserved as structural DomainConflict frontier', async () => {
   const local = createLocalEventStore()
   try {
     const sid = streamId('replica/conflict')
@@ -52,7 +52,7 @@ test('concurrent_heads_are_preserved_as_structural_DomainConflict_frontier', asy
   }
 })
 
-test('resolution_with_all_competing_heads_collapses_structural_frontier', async () => {
+test('WHAT[DURABLE-CONVERGENCE-005] resolution with all competing heads collapses structural frontier', async () => {
   const local = createLocalEventStore()
   try {
     const sid = streamId('replica/resolution')

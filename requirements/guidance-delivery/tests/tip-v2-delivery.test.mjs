@@ -21,7 +21,7 @@ const bloggerRoleLawPath = join(ROOT, 'resources/provider/role/blogger/en.md')
 
 // ── 13. work record previous_enforcer_tip blocks (paired with frames) ───────
 
-test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => {
+test('WHAT[GD-008] ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => {
   const block = toml.renderPreviousEnforcerTip('primitive-obsession', 'msg_c1')
   assert.match(block, /\[\[do_not_exec\]\]/)
   assert.match(block, /kind = "previous_enforcer_tip"/)
@@ -58,7 +58,7 @@ test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => 
 
 // ── 14. prompt anti-repeat + severe exception ───────────────────────────────
 
-test('ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
+test('WHAT[GD-008] ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
   const roleLaw = readFileSync(bloggerRoleLawPath, 'utf8')
   assert.match(roleLaw, /One observation[\s\S]*One lesson[\s\S]*One listener/)
   assert.match(roleLaw, /Do not avoid a repeated lesson/)

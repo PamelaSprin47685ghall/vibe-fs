@@ -24,7 +24,7 @@ const readDiagnostic = (workspace) => {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
 
-test('CAUSAL_006_wait_escape_has_five_typed_cases', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_wait_escape_has_five_typed_cases', () => {
   assert.deepEqual(caseNames(WaitEscape), [
     'DeadlineAt',
     'CancelledBy',
@@ -34,7 +34,7 @@ test('CAUSAL_006_wait_escape_has_five_typed_cases', () => {
   ])
 })
 
-test('CAUSAL_006_escapes_render_distinctly_in_diagnostics', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_escapes_render_distinctly_in_diagnostics', () => {
   const wait = causalWait.create({
     waitKind: 'escape-taxonomy',
     owner: owner('A'),
@@ -65,7 +65,7 @@ test('CAUSAL_006_escapes_render_distinctly_in_diagnostics', () => {
   }
 })
 
-test('CAUSAL_006_deadline_escape_carries_typed_instant', () => {
+test('WHAT[CAUSAL-006] CAUSAL_006_deadline_escape_carries_typed_instant', () => {
   const wait = causalWait.create({
     waitKind: 'deadline-escape',
     owner: owner('A'),

@@ -27,12 +27,12 @@ const marker = 'tip: primitive-obsession'
 
 const resultTag = (r) => r.tag
 
-test('GP_001_empty_state_starts_ordinal_at_one', () => {
+test('WHAT[GD-011] GP_001_empty_state_starts_ordinal_at_one', () => {
   assert.equal(nextOrdinal(empty), 1n)
   assert.deepEqual(listItems(pairs(empty)), [])
 })
 
-test('GP_002_apply_records_pair_and_restores_marker_bytes', () => {
+test('WHAT[GD-011] GP_002_apply_records_pair_and_restores_marker_bytes', () => {
   const callGap = gapBefore('msg-3')
   const resultGap = gapAfter('msg-3')
   const result = apply(1n, toolCallId('call-1'), marker, callGap, resultGap, empty)
@@ -50,7 +50,7 @@ test('GP_002_apply_records_pair_and_restores_marker_bytes', () => {
   assert.equal(restored[0].ResultGap.tag, resultGap.tag)
 })
 
-test('GP_003_non_sequential_ordinal_is_rejected', () => {
+test('WHAT[GD-011] GP_003_non_sequential_ordinal_is_rejected', () => {
   const result = apply(3n, toolCallId('call-1'), marker, gapBefore('m'), gapAfter('m'), empty)
   assert.equal(resultTag(result), 1)
   const rejection = result.fields[0]
@@ -59,7 +59,7 @@ test('GP_003_non_sequential_ordinal_is_rejected', () => {
   assert.equal(rejection.fields[1], 3n, 'actual ordinal')
 })
 
-test('GP_004_duplicate_call_id_is_rejected', () => {
+test('WHAT[GD-011] GP_004_duplicate_call_id_is_rejected', () => {
   const first = apply(1n, toolCallId('call-x'), marker, gapBefore('a'), gapAfter('a'), empty)
   assert.equal(resultTag(first), 0)
   const second = apply(2n, toolCallId('call-x'), marker, gapBefore('b'), gapAfter('b'), first.fields[0])
@@ -67,7 +67,7 @@ test('GP_004_duplicate_call_id_is_rejected', () => {
   assert.equal(second.fields[0].tag, 1, 'GuidelineFoldRejection.DuplicateCallId')
 })
 
-test('GP_005_duplicate_placement_is_rejected', () => {
+test('WHAT[GD-011] GP_005_duplicate_placement_is_rejected', () => {
   const first = apply(1n, toolCallId('call-1'), marker, gapBefore('p'), gapAfter('p'), empty)
   assert.equal(resultTag(first), 0)
   const second = apply(2n, toolCallId('call-2'), marker, gapBefore('p'), gapAfter('p'), first.fields[0])
@@ -75,7 +75,7 @@ test('GP_005_duplicate_placement_is_rejected', () => {
   assert.equal(second.fields[0].tag, 2, 'GuidelineFoldRejection.DuplicatePlacement')
 })
 
-test('GP_006_replay_restores_pairs_oldest_first', () => {
+test('WHAT[GD-011] GP_006_replay_restores_pairs_oldest_first', () => {
   let state = empty
   for (let n = 1n; n <= 3n; n++) {
     const result = apply(n, toolCallId(`call-${n}`), `${marker} ${n}`, gapBefore(`m${n}`), gapAfter(`m${n}`), state)

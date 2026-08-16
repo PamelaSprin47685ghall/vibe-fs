@@ -21,7 +21,7 @@ import {
   stream,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session', () => {
+test('WHAT[DISPATCH-PROTOCOL-002] PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session', () => {
   const sesA = sessionId('ses_a')
   const sesB = sessionId('ses_b')
   const keyA = promptKey('pk_a')

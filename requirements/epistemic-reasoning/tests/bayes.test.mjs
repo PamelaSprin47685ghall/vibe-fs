@@ -21,7 +21,7 @@ const preparePolarInvestigation = (store) => {
   return { handle: started.handle, actionKey: candidate.request.action.id }
 }
 
-test('bayesian_posterior_requires_explicit_numeric_qualification', () => {
+test('WHAT[EPI-009] bayesian_posterior_requires_explicit_numeric_qualification', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -47,7 +47,7 @@ test('bayesian_posterior_requires_explicit_numeric_qualification', () => {
   assert.equal(state(store, handle).Bayesian, undefined)
 })
 
-test('qualified_independent_evidence_updates_posterior', () => {
+test('WHAT[EPI-009] qualified_independent_evidence_updates_posterior', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -84,7 +84,7 @@ test('qualified_independent_evidence_updates_posterior', () => {
   assert.ok(Math.abs(posterior.down - 0.3) < 1e-12)
 })
 
-test('unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group', () => {
+test('WHAT[EPI-009] unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -120,7 +120,7 @@ test('unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group
   assert.ok(Math.abs(posterior.down - 0.1) < 1e-12)
 })
 
-test('same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice', () => {
+test('WHAT[EPI-006] same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -158,7 +158,7 @@ test('same_semantic_evidence_from_independent_dependency_groups_is_preserved_twi
   assert.ok(Math.abs(posterior.down - 1 / 13) < 1e-12)
 })
 
-test('same_dependency_group_is_not_counted_as_independent_evidence_twice', () => {
+test('WHAT[EPI-006] same_dependency_group_is_not_counted_as_independent_evidence_twice', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 

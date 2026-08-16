@@ -8,7 +8,7 @@ import test from 'node:test'
 
 const { text } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
-test('PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
   assert.match(text, /\[NEEDHELP\]/)
   assert.match(text, /并行|parallel/i)
   assert.match(text, /依赖|dependenc/i)

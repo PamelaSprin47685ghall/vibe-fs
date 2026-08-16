@@ -37,7 +37,7 @@ const viewFrontiers = (active) => {
   }))
 }
 
-test('RED_5_nested_graph_walks_to_external_frontier', () => {
+test('WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier', () => {
   // A waits B; B waits External C  →  A → B → C
   const frontiers = viewFrontiers([waitWorkflow('A', 'B'), waitExternal('B', 'C')])
 
@@ -48,7 +48,7 @@ test('RED_5_nested_graph_walks_to_external_frontier', () => {
   assert.match(frontiers[0].detail, /FRONTIER: waiting for external producer/)
 })
 
-test('RED_6_missing_producer_reports_broken_causal_edge', () => {
+test('WHAT[CAUSAL-007] RED_6_missing_producer_reports_broken_causal_edge', () => {
   // A waits B; B has no active wait
   const frontiers = viewFrontiers([waitWorkflow('A', 'B')])
 
@@ -58,7 +58,7 @@ test('RED_6_missing_producer_reports_broken_causal_edge', () => {
   assert.match(frontiers[0].detail, /BROKEN CAUSAL EDGE/)
 })
 
-test('RED_7_cycle_reports_without_hanging', () => {
+test('WHAT[CAUSAL-007] RED_7_cycle_reports_without_hanging', () => {
   // A → B → C → A
   const frontiers = viewFrontiers([
     waitWorkflow('A', 'B'),
@@ -77,7 +77,7 @@ test('RED_7_cycle_reports_without_hanging', () => {
   }
 })
 
-test('empty_snapshot_yields_empty_frontier', () => {
+test('WHAT[CAUSAL-007] empty_snapshot_yields_empty_frontier', () => {
   const frontiers = viewFrontiers([])
   assert.equal(frontiers.length, 1)
   assert.equal(frontiers[0].kind, 'Empty')

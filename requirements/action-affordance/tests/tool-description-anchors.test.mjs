@@ -31,7 +31,7 @@ const makeProviderFixture = () => {
   }
 }
 
-test('gate_c_tool_description_anchor_parity_detects_missing_zh_id', () => {
+test('WHAT[ACTION-AFFORDANCE-013] gate_c_tool_description_anchor_parity_detects_missing_zh_id', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -52,7 +52,7 @@ test('gate_c_tool_description_anchor_parity_detects_missing_zh_id', () => {
   }
 })
 
-test('gate_c_tool_description_anchor_catalog_requires_high_risk_verbs', () => {
+test('WHAT[ACTION-AFFORDANCE-002] gate_c_tool_description_anchor_catalog_requires_high_risk_verbs', () => {
   assert.deepEqual(
     Object.keys(TOOL_DESCRIPTION_ANCHORS).sort(),
     [

@@ -30,7 +30,7 @@ const descriptor = () =>
 
 const activeCount = (registry) => listItems(registry.Snapshot().Active).length
 
-test('THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', async () => {
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', async () => {
   const registry = new CausalWaitRegistry()
   const { rawPort } = timerPort.createVirtual()
   const handle = rawPort.Delay(10_000)
@@ -46,7 +46,7 @@ test('THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', asy
   assert.equal(activeCount(registry), 0)
 })
 
-test('THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
   const registry = new CausalWaitRegistry()
   const { rawPort, advance } = timerPort.createVirtual()
   const handle = rawPort.Delay(5_000)
@@ -74,7 +74,7 @@ test('THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async (
   assert.equal(activeCount(registry), 0)
 })
 
-test('THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
   const registry = new CausalWaitRegistry()
   const { rawPort, advance } = timerPort.createVirtual()
   const handle = rawPort.Delay(250)

@@ -25,7 +25,7 @@ const tipNames = () =>
     .map((entry) => entry.name)
     .sort()
 
-test('AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
+test('WHAT[GD-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
   const composed = enforcerCatalogResource.composeBloggerSystemPrompt('base', enforcer.rules)
 
   // `## What To Do Now` is the main.md-only remediation section (0/120
@@ -35,7 +35,7 @@ test('AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
   assert.equal(composed.includes('# Enforcer Tip'), false)
 })
 
-test('AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak', () => {
+test('WHAT[GD-008] AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak', () => {
   for (const name of tipNames()) {
     const enforcerText = readFileSync(join(RULEBOOK, name, 'enforcer.md'), 'utf8')
     const mainText = readFileSync(join(RULEBOOK, name, 'main.md'), 'utf8')
@@ -57,7 +57,7 @@ test('AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak', () => {
   }
 })
 
-test('AUDIENCE_003_previous_tip_history_is_not_main_authority', () => {
+test('WHAT[GD-008] AUDIENCE_003_previous_tip_history_is_not_main_authority', () => {
   // ENFORCER-071 Y side: Blogger's own history is rendered as low-trust
   // previous_enforcer_tip ([[do_not_exec]], role=assistant) — it must not be
   // repurposed as Main instruction. The Main surface is TipGuidance only.

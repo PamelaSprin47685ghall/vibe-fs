@@ -47,7 +47,7 @@ const lastExit = (snapshot) => {
   return caseOf(exit)
 }
 
-test('RED_1_active_wait_visible_after_enter', () => {
+test('WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter', () => {
   const registry = new CausalWaitRegistry()
   const descriptor = waitFor('A', 'X')
   const lease = registry.Enter(descriptor)
@@ -62,7 +62,7 @@ test('RED_1_active_wait_visible_after_enter', () => {
   lease.Dispose()
 })
 
-test('RED_2_resolve_clears_active_and_records_resolved', async () => {
+test('WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved', async () => {
   const registry = new CausalWaitRegistry()
   const pending = taskSource()
   const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
@@ -76,7 +76,7 @@ test('RED_2_resolve_clears_active_and_records_resolved', async () => {
   assert.equal(lastExit(snap), 'WaitResolved')
 })
 
-test('RED_3_fail_clears_active_and_records_failed', async () => {
+test('WHAT[CAUSAL-006] RED_3_fail_clears_active_and_records_failed', async () => {
   const registry = new CausalWaitRegistry()
   const pending = taskSource()
   const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
@@ -89,7 +89,7 @@ test('RED_3_fail_clears_active_and_records_failed', async () => {
   assert.equal(lastExit(snap), 'WaitFailed')
 })
 
-test('RED_4_cancel_clears_active_and_records_cancelled', async () => {
+test('WHAT[CAUSAL-006] RED_4_cancel_clears_active_and_records_cancelled', async () => {
   const registry = new CausalWaitRegistry()
   const pending = taskSource()
   const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
@@ -102,7 +102,7 @@ test('RED_4_cancel_clears_active_and_records_cancelled', async () => {
   assert.equal(lastExit(snap), 'WaitCancelled')
 })
 
-test('RED_4_cancel_message_also_classifies_as_cancelled', async () => {
+test('WHAT[CAUSAL-006] RED_4_cancel_message_also_classifies_as_cancelled', async () => {
   const registry = new CausalWaitRegistry()
   const pending = taskSource()
   const awaited = causalAwait.awaitTask(registry, waitFor('A', 'X'), pending.task())
@@ -114,7 +114,7 @@ test('RED_4_cancel_message_also_classifies_as_cancelled', async () => {
   assert.equal(listItems(registry.Snapshot().Active).length, 0)
 })
 
-test('history_capacity_bounds_ring_buffer', () => {
+test('WHAT[CAUSAL-006] history_capacity_bounds_ring_buffer', () => {
   const registry = new CausalWaitRegistry(2)
   for (let i = 0; i < 3; i += 1) {
     const lease = registry.Enter(waitFor('A', `X${i}`))
@@ -127,7 +127,7 @@ test('history_capacity_bounds_ring_buffer', () => {
   assert.ok(history.length <= 2)
 })
 
-test('RED_8_application_observer_enter_only_snapshot_via_reader', () => {
+test('WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
   assert.equal(typeof causalWaitHub.observer.Enter, 'function')
   assert.equal(typeof causalWaitHub.snapshot, 'function')
   assert.equal(typeof causalWaitHub.reader.Snapshot, 'function')

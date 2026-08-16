@@ -8,24 +8,24 @@
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
-| 001 | `tests/action-affordance.test.mjs::AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales`（五问经 anchor 全覆盖） | NEW | `node --test requirements/action-affordance/tests/action-affordance.test.mjs` |
-| 002 | `tests/action-affordance.test.mjs::AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog`；REUSE：`requirements/action-affordance/tests/tool-description-anchors.test.mjs::gate_c_tool_description_anchor_catalog_requires_high_risk_verbs`（anchor-parity 机制面归 `provider-language`） | NEW + REUSE | 同上 / `node --test requirements/action-affordance/tests/tool-description-anchors.test.mjs` |
+| 001 | `tests/action-affordance.test.mjs::AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales`（五问经 anchor 全覆盖）；`tests/prompt-semantic-depth.test.mjs::PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors` / `PROMPT_depth_ZH_tool_descriptions_carry_matching_cognition_anchors`（双语文档逐 id 命中） | NEW | `node --test requirements/action-affordance/tests/action-affordance.test.mjs` |
+| 002 | `tests/action-affordance.test.mjs::AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog`；`tests/prompt-semantic-depth.test.mjs::PROMPT_depth_tool_anchor_catalog_covers_high_risk_verbs`；`tests/tool-description-anchors.test.mjs::gate_c_tool_description_anchor_catalog_requires_high_risk_verbs`（anchor-parity 机制面归 `provider-language`） | NEW | 同上 |
 | 003 | `tests/action-affordance.test.mjs::AA_prompt_020_inspect_contract_names_the_not_performed_act` | NEW | 同上 |
 | 004 | `tests/action-affordance.test.mjs::AA_prompt_020_repair_behavior_contract_defines_mechanical` | NEW | 同上 |
 | 005 | `tests/action-affordance.test.mjs::AA_prompt_020_establish_behavior_contract_separates_mutation_from_execution` | NEW | 同上 |
-| 006 | `tests/action-affordance.test.mjs::AA_prompt_020_run_contract_grounds_command_as_act_with_bounded_consequence` | NEW | 同上 |
-| 007 | `tests/action-affordance.test.mjs::AA_arch_006_007_distinct_semantics_have_distinct_names_and_contracts` | NEW | 同上 |
-| 008 | REUSE：`requirements/action-affordance/tests/tool-referential-integrity.test.mjs::gate_a_duplicate_tool_name_is_red`（same name = 唯一 semantic contract；schema/name 执行面 SPLIT@cutover → `capability-enforcement`）；`tests/action-affordance.test.mjs::AA_arch_006_007_distinct_semantics_have_distinct_names_and_contracts` | REUSE + NEW | `node --test requirements/action-affordance/tests/tool-referential-integrity.test.mjs` |
-| 009 | `tests/action-affordance.test.mjs::AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to`（两个 calling 名只差 persona/深度）；REUSE：`requirements/office-capability/tests/office-capability-gate.test.mjs::gate_f_catalog_names_five_forkable_offices`（canonical 面归 `office-capability`） | NEW + REUSE | 同上 |
-| 010 | `tests/action-affordance.test.mjs::AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to`（五 Office 后果） | NEW | 同上 |
+| 006 | `tests/action-affordance.test.mjs::AA_prompt_020_run_contract_grounds_command_as_act_with_bounded_consequence`（含 query-shell observation, not execution 断言） | NEW | 同上 |
+| 007 | `tests/action-affordance.test.mjs::AA_arch_006_007_distinct_semantics_have_distinct_names` | NEW | 同上 |
+| 008 | REUSE：`tests/tool-referential-integrity.test.mjs::gate_a_duplicate_tool_name_is_red`（same name = 唯一 semantic contract；schema/name 执行面 SPLIT@cutover → `capability-enforcement`）；`tests/tool-referential-integrity.test.mjs::gate_a_extracts_tool_spec_record_names`；`tests/action-affordance.test.mjs::AA_arch_007_same_tool_name_means_same_contract`（commission 合同面） | REUSE + NEW | `node --test requirements/action-affordance/tests/tool-referential-integrity.test.mjs` |
+| 009 | `tests/action-affordance.test.mjs::AA_prompt_020_fork_calling_names_differ_in_persona_not_authority`（两个 calling 名只差 persona/深度）；REUSE：`requirements/office-capability/tests/office-capability-gate.test.mjs::gate_f_catalog_names_five_forkable_offices`（canonical 面归 `office-capability`） | NEW + REUSE | 同上 |
+| 010 | `tests/action-affordance.test.mjs::AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to`（五 Office 后果逐个断言） | NEW | 同上 |
 | 011 | `tests/action-affordance.test.mjs::AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law` | NEW | 同上 |
-| 012 | REUSE：`requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::office_boundary_eval_corpus_has_id_setup_oracles_and_synthetic_traces`（case `coder-inspect-ownership`：inspect charge 不得要求 mutation；SPLIT@cutover：caller 面 → 本包，consequence 面 → `office-capability`，可看性 → `participant-horizon`）；`tests/action-affordance.test.mjs::AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law` | REUSE + NEW | `node --test requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs` |
-| 013 | `tests/action-affordance.test.mjs::AA_prompt_020_success_returns_establish_bounded_consequence`（description 语义）；REUSE：`requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::TODO-002 Manager Role Law rejects meta-work without owning tool timing`（todowrite description 覆盖纪律面，SPLIT@cutover 按断言归本包 / `obligation-ledger` / `participant-horizon`）；`requirements/action-affordance/tests/tool-description-anchors.test.mjs::gate_c_tool_description_anchor_parity_detects_missing_zh_id`（双语同 ID） | NEW + REUSE | 同上 |
+| 012 | `tests/action-affordance.test.mjs::AA_prompt_020_inspect_caller_forbidden_charge_is_named`（inspect charge 不得含「修复」）；`tests/action-affordance.test.mjs::AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law`；REUSE：`requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::office_boundary_eval_corpus_has_id_setup_oracles_and_synthetic_traces`（case `coder-inspect-ownership`；SPLIT@cutover：consequence 面 → `office-capability`，可看性 → `participant-horizon`） | NEW + REUSE | 同上 |
+| 013 | `tests/action-affordance.test.mjs::AA_prompt_020_success_returns_establish_bounded_consequence`（description 语义）；REUSE：`requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::TODO-002 Manager Role Law rejects meta-work without owning tool timing`（todowrite description 覆盖纪律面，SPLIT@cutover 按断言归本包 / `obligation-ledger` / `participant-horizon`）；`tests/tool-description-anchors.test.mjs::gate_c_tool_description_anchor_parity_detects_missing_zh_id`（双语同 ID） | NEW + REUSE | 同上 |
 
 ## 统计
 
 - 命题数：13
-- NEW：1 个文件（`action-affordance.test.mjs`），10 个断言
+- NEW：1 个文件（`action-affordance.test.mjs`），13 个 test（含拆分出的 008/009/012 面）
 - MOVE：0（tool-referential-integrity.test.mjs 是 SPLIT：本包 + `capability-enforcement`）
 - REUSE：3 处（language-parity-gate、tool-referential-integrity、magic-todo-provider-boundary）+ 1 处 eval（office-boundary）
 

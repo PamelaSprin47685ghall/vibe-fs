@@ -15,11 +15,11 @@ import {
 } from '../../../dist/Enforcer/Guidance/DeliveryProjection.js'
 import { TipPresentation } from '../../../dist/Composition/Durable/Fact.js'
 
-test('TDP_001_empty_state_has_nothing_delivered', () => {
+test('WHAT[GD-004] TDP_001_empty_state_has_nothing_delivered', () => {
   assert.equal(hasFullDelivered('primitive-obsession', empty), false)
 })
 
-test('TDP_002_full_marks_tip_delivered_identity_only_does_not', () => {
+test('WHAT[GD-003] TDP_002_full_marks_tip_delivered_identity_only_does_not', () => {
   let state = apply('primitive-obsession', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 
@@ -29,7 +29,7 @@ test('TDP_002_full_marks_tip_delivered_identity_only_does_not', () => {
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 })
 
-test('TDP_003_blank_or_null_tip_name_is_ignored', () => {
+test('WHAT[GD-003] TDP_003_blank_or_null_tip_name_is_ignored', () => {
   const afterBlank = apply('   ', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('   ', afterBlank), false)
   assert.deepEqual(afterBlank, empty)
@@ -37,7 +37,7 @@ test('TDP_003_blank_or_null_tip_name_is_ignored', () => {
   assert.deepEqual(afterNull, empty)
 })
 
-test('TDP_004_reanchor_voids_full_history_so_next_resolve_refulls', () => {
+test('WHAT[GD-005] TDP_004_reanchor_voids_full_history_so_next_resolve_refulls', () => {
   let state = apply('primitive-obsession', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 
@@ -51,7 +51,7 @@ test('TDP_004_reanchor_voids_full_history_so_next_resolve_refulls', () => {
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 })
 
-test('TDP_005_reanchor_does_not_advance_occurrence_frontier', () => {
+test('WHAT[GD-005] TDP_005_reanchor_does_not_advance_occurrence_frontier', () => {
   // applyReanchor only clears the horizon-relative Full history. The
   // occurrence-based frontier is a different axis (TipDeliveryProjection
   // tracks FullDeliveredTips per Main session; reanchor never mints a new
@@ -66,3 +66,19 @@ test('TDP_005_reanchor_does_not_advance_occurrence_frontier', () => {
   const refilled = apply('primitive-obsession', TipPresentation.Full, state)
   assert.deepEqual(refilled, before)
 })
+
+test('WHAT[GD-001] TDP_006_frontier_and_coverage_are_two_axes_not_one_bool', () => {
+  // GD-001 两轴分离：Frontier（哪些 occurrence 已交付，durable/monotonic）与
+  // Coverage（全文此刻是否可恢复，horizon-relative）不得压成单一 durable bool。
+  // 前沿轴：Full 交付被记录（monotonic 前进）。
+  const firstFull = apply('primitive-obsession', TipPresentation.Full, empty)
+  assert.equal(hasFullDelivered('primitive-obsession', firstFull), true)
+  // 覆盖轴：reanchor 清 Coverage 表达（FullDeliveredTips 投影被 void），
+  // 但 re-Full 后的状态与首次 Full 逐字节相同——既不误删已交付事实，
+  // 也不把语义恢复记成新 occurrence（单一 bool 必然在二选一上失败）。
+  const afterReanchor = applyReanchor(firstFull)
+  assert.equal(hasFullDelivered('primitive-obsession', afterReanchor), false)
+  const refilled = apply('primitive-obsession', TipPresentation.Full, afterReanchor)
+  assert.deepEqual(refilled, firstFull)
+})
+

@@ -4,7 +4,7 @@ import test from 'node:test'
 import { paretoFrontier } from '../../../dist/Sphinx/Representation.js'
 import { createStore, start, resume, state, assessWhy, fsharpList } from './support.mjs'
 
-test('wire_equivalence_hint_cannot_force_kernel_merge', () => {
+test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -36,7 +36,7 @@ test('wire_equivalence_hint_cannot_force_kernel_merge', () => {
   assert.ok(actions.every((action) => action.EquivalenceKey === undefined))
 })
 
-test('same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', () => {
+test('WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -70,7 +70,7 @@ test('same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', (
   assert.deepEqual([...actions[0].Provenance].sort(), ['generator:abduction', 'generator:counterexample'])
 })
 
-test('same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
+test('WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -109,7 +109,7 @@ const kernelAction = ({ id, gain, gateway = 0, cost, value, provenance = [] }) =
   Provenance: fsharpList(provenance),
 })
 
-test('kernel_owned_equivalence_class_removes_only_truly_dominated_representation', () => {
+test('WHAT[EPI-011] kernel_owned_equivalence_class_removes_only_truly_dominated_representation', () => {
   const frontier = paretoFrontier(
     fsharpList([
       kernelAction({ id: 'expensive', gain: 0.9, cost: 0.4, value: 0.5 }),
@@ -120,7 +120,7 @@ test('kernel_owned_equivalence_class_removes_only_truly_dominated_representation
   assert.deepEqual([...frontier].map((action) => action.Id), ['cheap'])
 })
 
-test('pareto_incomparable_equivalent_representations_both_survive', () => {
+test('WHAT[EPI-011] pareto_incomparable_equivalent_representations_both_survive', () => {
   const frontier = paretoFrontier(
     fsharpList([
       kernelAction({ id: 'high', gain: 1, cost: 0.4, value: 0.6 }),

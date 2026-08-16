@@ -23,7 +23,7 @@ CognitiveActions、Budget、PendingRequest；A*/MCTS/Bayes/Representation 只作
 **边界**：不规定状态的具体 record 布局（HOW）；只规定「sufficient state 这一事实 + 权威
 状态必须显式拥有认识基底」。
 
-**证据**：PROOF.md EPI-001 行（kernel `start_yields_semantic_assessment_and_contract_keeps_distribution`、
+**证据**：PROOF.md EPI-001 行（kernel `start_yields_semantic_assessment_request`、
 semantics）。
 
 ## EPI-002：Kernel 拥有 continuation、closure 与停止
@@ -40,7 +40,7 @@ Stop 与其它动作处于同一比较空间。
 「谁拥有决策权」是命题。
 
 **证据**：PROOF.md EPI-002 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`、
-mcp-handle `full_co_yield_path_preserves_kernel_continuation_and_grounded_basis`）。
+mcp-handle `full_co_yield_path_preserves_kernel_continuation`）。
 
 ## EPI-003：权威状态显式拥有认识基底
 
@@ -57,7 +57,7 @@ claim 无法伪装成证据。
 ungrounded 标记」是命题。
 
 **证据**：PROOF.md EPI-003 行（semantics `ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence`、
-mcp-handle `full_co_yield_path_preserves_kernel_continuation_and_grounded_basis`）。
+mcp-handle `full_co_yield_path_preserves_grounded_epistemic_basis`）。
 
 ## EPI-004：Pending Request 契约
 
@@ -136,7 +136,7 @@ AnswerContract belief；Facets 独立多标签参与方法适用度。该 belief
 **边界**：form/facet 的具体权重与派生产物（当前 `deriveRootContract`）是 HOW；「保留分布 +
 可更新 + 不增证据」是命题。
 
-**证据**：PROOF.md EPI-007 行（kernel `start_yields_semantic_assessment_and_contract_keeps_distribution`、
+**证据**：PROOF.md EPI-007 行（kernel `contract_keeps_distribution_after_semantic_assessment`、
 semantics `later_semantic_assessment_updates_control_belief_without_creating_evidence`、
 methodology `why_question_activates_multiple_generators_from_distribution_and_facets`）。
 

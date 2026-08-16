@@ -62,7 +62,7 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_026_browser_is_the_only_network_office', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
 

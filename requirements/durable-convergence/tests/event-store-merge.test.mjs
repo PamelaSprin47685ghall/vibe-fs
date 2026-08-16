@@ -17,24 +17,24 @@ const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
 const C = 'c'.repeat(40)
 
-test('DURABLE_CONVERGENCE_001_set_union_never_drops_distinct_events', () => {
+test('WHAT[DURABLE-CONVERGENCE-001] set union never drops distinct events', () => {
   const result = Merge.merge(toList([['writer-a', toList([make(A)])], ['writer-b', toList([make(B)])]]))
   assert.deepEqual(ids(result).sort(), [A, B].sort())
 })
 
-test('DURABLE_CONVERGENCE_002_writer_enumeration_is_commutative', () => {
+test('WHAT[DURABLE-CONVERGENCE-002] writer enumeration is commutative', () => {
   const a = ['writer-a', toList([make(A), make(C, [A])])]
   const b = ['writer-b', toList([make(B)])]
   assert.deepEqual(ids(Merge.merge(toList([a, b]))), ids(Merge.merge(toList([b, a]))))
 })
 
-test('DURABLE_CONVERGENCE_002_duplicate_stream_input_is_idempotent_by_EventId', () => {
+test('WHAT[DURABLE-CONVERGENCE-002] duplicate stream input is idempotent by EventId', () => {
   const event = make(A, [], 'merge/main', { x: 1 })
   const result = Merge.merge(toList([['a', toList([event])], ['copy', toList([event])]]))
   assert.deepEqual(ids(result), [A])
 })
 
-test('DURABLE_CONVERGENCE_003_identity_collision_is_fail_closed_not_LWW', () => {
+test('WHAT[DURABLE-CONVERGENCE-003] identity collision is fail closed not LWW', () => {
   const left = make(A, [], 'merge/main', { x: 1 })
   const right = make(A, [], 'merge/main', { x: 2 })
   const result = resultOf(Merge.merge(toList([['left', toList([left])], ['right', toList([right])]])))

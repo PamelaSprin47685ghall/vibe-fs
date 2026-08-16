@@ -66,8 +66,8 @@ const userMessageWithKey = (id, keyValue) =>
 
 const snapshotPort = (messages) => ({ GetMessages: async (sid) => okResult(toList(messages)) })
 
-test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message', async () => {
-  const base = mkdtempSync(join(tmpdir(), 'wxs-dp011-'))
+test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp008-'))
   try {
     // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt —— claim 挂起。
     const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2026-01-01T00:00:00Z' })
@@ -76,13 +76,12 @@ test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message'
       const runtime = promptDispatcher.forJournal(first.journal)
       const captured = []
       const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, capturingPort(captured), {
-        session: 'ses_011',
+        session: 'ses_008',
         text: 'crash before acceptance',
         agent: 'fast-coder',
       })
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.ok(isSome(sent.key), 'Detached 仍返回 PromptKey')
-      const key = sent.key
       assert.equal(captured.length, 1, '发送只发生一次')
 
       // 启动 2（崩溃后重开同目录）：快照找不到匹配物理消息 → StillPending，
@@ -100,36 +99,12 @@ test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message'
         assert.equal(caseOf(noMatch[0].Outcome), 'StillPending')
         assert.equal(captured.length, 1, '未证明物理落地 → 绝不自动重发')
         assert.equal(
-          promptDispatcher.pendingClaimCount(secondRuntime, 'ses_011'),
+          promptDispatcher.pendingClaimCount(secondRuntime, 'ses_008'),
           1,
           '未找到时 claim 保持 Pending',
         )
       } finally {
         second.dispose()
-      }
-
-      // 启动 3：快照里出现 role=user 且携带同一 PromptKey 的物理消息 → Proven。
-      const third = await agentJournal.createFromBoot({
-        directory: base,
-        runtime: 'rt_3',
-        startedAt: BOOT_AFTER_CLAIM,
-      })
-      assert.equal(third.ok, true, third.ok ? '' : JSON.stringify(third.error))
-      try {
-        const thirdRuntime = promptDispatcher.forJournal(third.journal)
-        const matched = listItems(
-          await reconcile(third.journal, snapshotPort([userMessageWithKey('msg_physical_011', key)])),
-        )
-        assert.equal(matched.length, 1)
-        assert.equal(caseOf(matched[0].Outcome), 'Proven')
-        assert.equal(
-          promptDispatcher.pendingClaimCount(thirdRuntime, 'ses_011'),
-          0,
-          '找到物理证据 → 补写 PhysicalAccepted，claim 解决',
-        )
-        assert.equal(captured.length, 1, '恢复只证明，从不重发')
-      } finally {
-        third.dispose()
       }
     } finally {
       first.dispose()
@@ -139,7 +114,63 @@ test('DP_011_recovery_never_resends_and_proves_acceptance_from_physical_message'
   }
 })
 
-test('DP_011_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
+test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_physical_message', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp004-'))
+  try {
+    // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt（accepted-*）。
+    // accepted-* 永远不够：claim 保持 pending，未解决。
+    const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2026-01-01T00:00:00Z' })
+    assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
+    try {
+      const runtime = promptDispatcher.forJournal(first.journal)
+      const captured = []
+      const sent = await promptDispatcher.sendAgentOwnerRoot(runtime, capturingPort(captured), {
+        session: 'ses_004',
+        text: 'crash before acceptance',
+        agent: 'fast-coder',
+      })
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      assert.ok(isSome(sent.key), 'Detached 仍返回 PromptKey')
+      const key = sent.key
+      assert.equal(captured.length, 1, '发送只发生一次')
+      assert.equal(
+        promptDispatcher.pendingClaimCount(runtime, 'ses_004'),
+        1,
+        'accepted-* 收据不解决 claim —— 物理证据尚未建立',
+      )
+
+      // 启动 2：快照里出现 role=user 且携带同一 PromptKey 的物理消息 → Proven。
+      const second = await agentJournal.createFromBoot({
+        directory: base,
+        runtime: 'rt_2',
+        startedAt: BOOT_AFTER_CLAIM,
+      })
+      assert.equal(second.ok, true, second.ok ? '' : JSON.stringify(second.error))
+      try {
+        const secondRuntime = promptDispatcher.forJournal(second.journal)
+        const matched = listItems(
+          await reconcile(second.journal, snapshotPort([userMessageWithKey('msg_physical_004', key)])),
+        )
+        assert.equal(matched.length, 1)
+        assert.equal(caseOf(matched[0].Outcome), 'Proven')
+        assert.equal(
+          promptDispatcher.pendingClaimCount(secondRuntime, 'ses_004'),
+          0,
+          '找到物理证据 → 补写 PhysicalAccepted，claim 解决',
+        )
+        assert.equal(captured.length, 1, '恢复只证明，从不重发')
+      } finally {
+        second.dispose()
+      }
+    } finally {
+      first.dispose()
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
     const first = await agentJournal.create({ directory: base, runtime: 'rt_1', startedAt: '2020-01-01T00:00:00Z' })

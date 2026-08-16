@@ -10,11 +10,16 @@ import { createStore, start, resume, state, assessWhy } from './support.mjs'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('start_yields_semantic_assessment_and_contract_keeps_distribution', () => {
+test('WHAT[EPI-001] start_yields_semantic_assessment_request', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assert.equal(started.status, 'yield')
   assert.equal(started.request.type, 'SemanticAssessmentRequest')
+})
+
+test('WHAT[EPI-007] contract_keeps_distribution_after_semantic_assessment', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
 
   const assessed = assessWhy(store, started.handle)
   assert.equal(assessed.status, 'yield')
@@ -25,7 +30,7 @@ test('start_yields_semantic_assessment_and_contract_keeps_distribution', () => {
   assert.equal(assessed.request.contract.contractBelief.Plan, 0.2)
 })
 
-test('semantic_assessment_and_candidates_are_control_observations_not_world_evidence', () => {
+test('WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_not_world_evidence', () => {
   const store = createStore()
   const started = start(store, '为什么天空是蓝色？')
   assessWhy(store, started.handle)
@@ -53,7 +58,7 @@ test('semantic_assessment_and_candidates_are_control_observations_not_world_evid
   assert.equal(current.Findings.size, 0)
 })
 
-test('candidate_question_must_be_investigated_before_it_can_affect_answer', () => {
+test('WHAT[EPI-005] candidate_question_must_be_investigated_before_it_can_affect_answer', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
@@ -77,7 +82,7 @@ test('candidate_question_must_be_investigated_before_it_can_affect_answer', () =
   assert.equal(candidate.request.action.semanticKey, 'question:anthocyanin-chain')
 })
 
-test('resume_rejects_observation_that_does_not_match_pending_kernel_request', () => {
+test('WHAT[EPI-004] resume_rejects_observation_that_does_not_match_pending_kernel_request', () => {
   const store = createStore()
   const started = start(store, '为什么程序卡住？')
   const before = state(store, started.handle).Revision
@@ -92,7 +97,7 @@ test('resume_rejects_observation_that_does_not_match_pending_kernel_request', ()
   assert.equal(state(store, started.handle).Revision, before)
 })
 
-test('closure_is_idempotent_at_fixed_point', () => {
+test('WHAT[EPI-012] closure_is_idempotent_at_fixed_point', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
@@ -100,7 +105,7 @@ test('closure_is_idempotent_at_fixed_point', () => {
   assert.deepEqual(close(current), current)
 })
 
-test('fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {
+test('WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {
   const sourceDir = join(root, 'src/Wanxiangshu/Sphinx')
   const files = readdirSync(sourceDir).filter((name) => name.endsWith('.fs')).sort()
   assert.ok(files.length >= 10)
