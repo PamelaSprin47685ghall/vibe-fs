@@ -1,5 +1,10 @@
 // tests/unit/tools/list-tool.test.mjs — horizon(): natural-language roster, no id/status DTO.
 
+// The roster copy is asserted in English; pin the provider language so the
+// assertions are stable regardless of the caller's environment (same pattern as
+// horizon-surface.test.mjs).
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 

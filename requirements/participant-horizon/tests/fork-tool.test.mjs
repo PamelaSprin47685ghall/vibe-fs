@@ -6,6 +6,11 @@
 // capability-enforcement): the fork tool's visible set and consequence copy are the
 // horizon-facing surface; `Reviewer`/`fast-`/`deep-` names must never appear.
 
+// The consequence copy is asserted in English; pin the provider language so the
+// assertions are stable regardless of the caller's environment (same pattern as
+// horizon-surface.test.mjs).
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
