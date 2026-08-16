@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+- Managed agent 默认温度硬编码为 1.0：`chat.params` hook 在校验 observed provider 绑定的同时，对 managed agent provider request 输出投影 `temperature = 1.0`；非 managed 会话保持 untouched。
+
 - Managed model routing 改为 `~/.config/opencode/wanxiangshu.mjs` 单一 authority：同步 `route(role, running)` 返回 `{ model, reasoning } | null`；`running` 是同一 OpenCode process 跨 root/worktree plugin instance 共享的 session×EffectiveAgent lease multiset，`null` 形成事件驱动 backpressure，不推进 provider AABB failure。
   - 文件缺失时以原子 create-if-absent 生成可编辑推荐模板；已有文件永不覆盖。模板只承载推荐七组策略，runtime 不拥有 lane / capacity / candidate 算法。
   - `opencode.json` managed agent `model` 不再参与路由，也不再要求 fast/deep 物理 model 不同；managed request 在 `chat.message` 被 lease model+variant 覆盖，`chat.params` 只验证真实 provider binding。
+  - 缺 catalog 名由 `config` hook 投影到 live Host config，不再要求 `opencode.json` 手写 22 个 agent；旧名仍 fail-closed。
   - `fast-browser` / `deep-browser` 独立配置；Host `title` / `compaction` 不属于此 model-routing 合同。
 
 - 机械检查瘦身（2026-08-15，用户要求）：删除 `kolmogorov-size` 行数 advisory（`scripts/checks/kolmogorov-size.mjs` + baseline + `kolmogorov-size-advisory.test.mjs`）与 `enforcer-cross-family-collision` A40 机械替代（gate + GD-010 条款 + 本体测试）。

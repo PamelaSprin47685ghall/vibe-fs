@@ -39,7 +39,7 @@ import { withPlugin, withPluginClient } from '../../verification-system/tests/su
 const SESSION = 'ses_hook_probe'
 const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)
 
-/** AGENT-002/003: the Host-final `opencode.json` names every managed agent. */
+/** AGENT-002/003: the plugin projects every managed catalog name onto Host config. */
 const ROLES = [
   'orchestrator',
   'manager',
@@ -144,14 +144,17 @@ const HOOK_FIXTURES = {
   },
 
   // The odd one out: `config` receives the live instance-state object ALONE and the
-  // plugin writes agent prompts into it. AGENT-004/005 fail closed on a config with
-  // no agent map, so the fixture has to be Host-final.
+  // plugin projects managed catalog names + owned prompts onto it. An empty Host
+  // config is enough; opencode.json is not the inventory.
   config: {
-    input: hostFinalConfig(),
+    input: {},
     output: undefined,
     assert: (_output, input) => {
+      assert.equal(typeof input.agent['fast-orchestrator'].prompt, 'string')
       assert.equal(typeof input.agent['fast-manager'].prompt, 'string')
       assert.equal(typeof input.agent['fast-coder'].prompt, 'string')
+      assert.equal(input.agent['fast-blogger'].hidden, true)
+      assert.equal('model' in input.agent['fast-orchestrator'], false)
     },
   },
 
@@ -335,7 +338,7 @@ test('CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', async 
       },
       output,
     )
-    assert.deepEqual(output, { temperature: 0, options: { sentinel: true } }, 'chat.params is observation-only')
+    assert.deepEqual(output, { temperature: 1, options: { sentinel: true } }, 'chat.params pins managed request temperature = 1.0')
   })
 })
 

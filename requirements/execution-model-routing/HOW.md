@@ -208,11 +208,11 @@ wanxiangshu.mjs default route
 
 `OpenCodePort` 不再根据 `Agent` 反查 `ManagedAgentConfig.tryBoundModel`；发送边界只接受上游已经解析好的 explicit target。
 
-`ManagedAgentConfig` 退回 Host projection/guard owner：确保 managed agent 的 mode/permission/prompt 等 Wanxiangshu-owned 字段存在，不再把 Host-final `agent.model` 收进 inventory。若 Host schema 强制要求静态 model，应由 Host adapter 选择一个不具 authority 的合法占位/guardrail，真实发送必须被 explicit lease 覆盖；该能力需 canary 证明。
+`ManagedAgentConfig` 退回 Host projection/guard owner：把 22 个 managed catalog 名投影到 live Host config（缺则创建），并写入 mode/permission/prompt 等 Wanxiangshu-owned 字段，不再把 Host-final `agent.model` 收进 inventory，也不再要求用户在 `opencode.json` 手写 agent map。若 Host schema 强制要求静态 model，应由 Host adapter 选择一个不具 authority 的合法占位/guardrail，真实发送必须被 explicit lease 覆盖；当前 Host `AgentConfig.model` 可选，因此投影不写 model。该能力需 canary 证明。
 
 ## 7. root/user-facing 路径
 
-`chat.message`/等价可变 request hook 先解析真实用户选中的 managed EffectiveAgent，再 acquire `(session, agent)` lease，并把输出 message/request 的 model/reasoning 改成 lease target。`chat.params` 只做 observed-provider validation：实际 provider target 必须等于 lease。
+`chat.message`/等价可变 request hook 先解析真实用户选中的 managed EffectiveAgent，再 acquire `(session, agent)` lease，并把输出 message/request 的 model/reasoning 改成 lease target。`chat.params` 做 observed-provider validation（实际 provider target 必须等于 lease）并统一投影 managed 请求的默认温度 `temperature = 1.0`。
 
 这条 Host mutation 能力必须由 `host-boundary` physical canary 证明，不能只测 DTO 被改了。
 

@@ -1,6 +1,5 @@
-// host-boundary: chat.params is an observation barrier only. Routing authority is
-// execution-model-routing; this hook validates the physical provider binding and
-// never mutates Host output.
+// host-boundary: chat.params validates the physical provider binding and
+// pins managed request temperature = 1.0.
 
 import assert from 'node:assert/strict'
 import { after } from 'node:test'
@@ -75,7 +74,8 @@ test('CHAT_PARAMS_exact_managed_lease_is_accepted_without_rewriting_output', asy
 
   const output = outputSeed()
   assert.doesNotThrow(() => applyHook(managedInput('ses_exact', 'deep-coder'), output))
-  assert.deepEqual(output, outputSeed())
+  assert.equal(output.temperature, 1)
+  assert.deepEqual(output.options, { sentinel: true })
   binding.drop(sid)
 })
 

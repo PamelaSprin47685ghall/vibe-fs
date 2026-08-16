@@ -42,8 +42,10 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 
-/// Managed agent Host-config gate. This owns only catalog presence and Wanxiangshu-owned
+/// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned
 /// non-model fields. Physical model routing is exclusively owned by ModelRouting.
+/// Missing catalog names are created on the live Host config; opencode.json is not
+/// the inventory, and Host agent.model is never routing truth.
 module ManagedAgentConfig =
 
     type ManagedAgentBinding = { Agent: ManagedAgent }
@@ -52,8 +54,7 @@ module ManagedAgentConfig =
         { Bindings: Map<string, ManagedAgentBinding> }
 
     type ConfigGateError =
-        | MissingAgentMap
-        | MissingManagedAgent of string
+        | MissingHostConfig
         | LegacyAgentPresent of string
         | InvalidManagedAgent of string * detail: string
 
@@ -66,15 +67,9 @@ module ManagedAgentConfig =
 
     let private formatError (err: ConfigGateError) : string =
         match err with
-        | MissingAgentMap -> "Managed agents require config.agent from the Host-final opencode.json."
-        | MissingManagedAgent name -> sprintf "Missing required managed agent '%s' in opencode.json agent map." name
+        | MissingHostConfig -> "Managed agent projection requires a Host config object."
         | LegacyAgentPresent name -> ManagedAgentCatalog.formatLegacyNameInConfig name
         | InvalidManagedAgent(name, detail) -> sprintf "Invalid managed agent '%s': %s" name detail
-
-    let private requireAgents (config: obj) : Result<obj, ConfigGateError> =
-        if isNull config then Error MissingAgentMap
-        elif isNull (config?agent) then Error MissingAgentMap
-        else Ok(config?agent)
 
     let private rejectLegacy (agents: obj) : Result<unit, ConfigGateError> =
         match
@@ -84,47 +79,27 @@ module ManagedAgentConfig =
         | Some legacy -> Error(LegacyAgentPresent legacy)
         | None -> Ok()
 
-    let private validateBookkeeperPresence (agents: obj) (name: string) : Result<unit, ConfigGateError> =
-        agentEntry agents name
-        |> Result.requireSome (MissingManagedAgent name)
-        |> Result.map ignore
-
-    let private validateRoleBinding
-        (agents: obj)
-        (name: string)
-        : Result<string * ManagedAgentBinding, ConfigGateError> =
-        result {
-            let! managed =
-                ManagedAgent.tryParse name
-                |> Result.requireSome (InvalidManagedAgent(name, "failed to parse required name"))
-
-            do!
-                agentEntry agents name
-                |> Result.requireSome (MissingManagedAgent name)
-                |> Result.map ignore
-
-            return name, { Agent = managed }
-        }
-
-    let private validateRequiredName
-        (agents: obj)
-        (name: string)
-        : Result<(string * ManagedAgentBinding) option, ConfigGateError> =
+    let private catalogBinding (name: string) : Result<(string * ManagedAgentBinding) option, ConfigGateError> =
         if ManagedAgentCatalog.isBookkeeperName name then
-            validateBookkeeperPresence agents name |> Result.map (fun () -> None)
+            Ok None
         else
-            validateRoleBinding agents name |> Result.map Some
+            ManagedAgent.tryParse name
+            |> Result.requireSome (InvalidManagedAgent(name, "failed to parse required name"))
+            |> Result.map (fun managed -> Some(name, { Agent = managed }))
 
-    let private collectBindings (agents: obj) : Result<Map<string, ManagedAgentBinding>, ConfigGateError> =
+    let private catalogBindings () : Result<Map<string, ManagedAgentBinding>, ConfigGateError> =
         ManagedAgent.requiredNames
-        |> List.traverseResultM (validateRequiredName agents)
+        |> List.traverseResultM catalogBinding
         |> Result.map (List.choose id >> Map.ofList)
+
+    let private requireHostConfig (config: obj) : Result<unit, ConfigGateError> =
+        if isNull config then Error MissingHostConfig else Ok()
 
     let validate (config: obj) : Result<ManagedAgentInventory, string> =
         result {
-            let! agents = requireAgents config
-            do! rejectLegacy agents
-            let! bindings = collectBindings agents
+            do! requireHostConfig config
+            do! rejectLegacy config?agent
+            let! bindings = catalogBindings ()
             return { Bindings = bindings }
         }
         |> Result.mapError formatError
@@ -154,26 +129,39 @@ module ManagedAgentConfig =
         | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
         | Role.Distiller -> StaticTools.distillerAgentConfig prompts.DistillerSystemPrompt
 
-    let private applyRoleBinding (entry: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
+    let private dynamicConfigForName (inventory: ManagedAgentInventory) (name: string) : obj option =
         match Map.tryFind name inventory.Bindings with
+        | Some binding -> Some(ownedConfigForRole binding.Agent.Role)
+        | None ->
+            ManagedAgent.tryParse name
+            |> Option.map (fun managed -> ownedConfigForRole managed.Role)
+
+    let private ownedConfigForName (inventory: ManagedAgentInventory) (name: string) : obj option =
+        if ManagedAgentCatalog.isBookkeeperName name then
+            Some(StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystem ()))
+        else
+            dynamicConfigForName inventory name
+
+    let private ensureAgents (config: obj) : obj =
+        if isNull config?agent then
+            let created: obj = createEmpty
+            config?agent <- created
+            created
+        else
+            config?agent
+
+    let private ensureAgentEntry (agents: obj) (name: string) : obj =
+        match agentEntry agents name with
+        | Some entry -> entry
+        | None ->
+            let created: obj = createEmpty
+            agents?(name) <- created
+            created
+
+    let private applyNamedOwnedFields (agents: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
+        match ownedConfigForName inventory name with
         | None -> ()
-        | Some binding -> assignOwnedFields entry (ownedConfigForRole binding.Agent.Role)
-
-    let private applyAgentOwnedFields (agents: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
-        match agentEntry agents name, ManagedAgentCatalog.isBookkeeperName name with
-        | None, _ -> ()
-        | Some entry, true ->
-            assignOwnedFields entry (StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystem ()))
-        | Some entry, false -> applyRoleBinding entry inventory name
-
-    let private applyPresentAgent
-        (agents: obj)
-        (keys: string array)
-        (inventory: ManagedAgentInventory)
-        (name: string)
-        : unit =
-        if Array.contains name keys then
-            applyAgentOwnedFields agents inventory name
+        | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned
 
     let private parseNonNegativeInt (raw: string) : int option =
         match System.Int32.TryParse raw with
@@ -197,45 +185,31 @@ module ManagedAgentConfig =
             |> Option.iter (fun n -> (ensureExperimental config)?chatMaxRetries <- n)
 
     let private applyAgentsOwnedFields (config: obj) (agents: obj) (inventory: ManagedAgentInventory) : unit =
-        let keys: string array = emitJsExpr agents "Object.keys($0)"
-
         for name in ManagedAgent.requiredNames do
-            applyPresentAgent agents keys inventory name
+            applyNamedOwnedFields agents inventory name
 
         config?compaction <- createObj [ "auto" ==> false ]
         applyChatMaxRetries config
 
-    /// Apply Wanxiangshu-owned non-model fields onto Host agent entries.
-    /// Never creates missing agents, never writes/overwrites model.
-    /// Walks the full required 22-name inventory (not just validated bindings):
-    /// AGENT-007's first layer is fail-closed, so a validation failure elsewhere
-    /// in the config must not silently drop every permission write. Missing
-    /// agents stay untouched (no invented agents).
+    /// Project Wanxiangshu-owned non-model fields onto Host agent entries.
+    /// Creates missing catalog names on the live config object, never writes/overwrites model.
+    /// AGENT-007's first layer is fail-closed: a validation failure elsewhere in the
+    /// config must not silently drop every permission write.
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
         StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFromEnvironment ())
         SphinxMcpConfig.apply config (SphinxMcpConfig.launchFromEnvironment ())
 
-        if isNull config then ()
-        elif isNull (config?agent) then ()
-        else applyAgentsOwnedFields config (config?agent) inventory
-
-    /// Best-effort bindings for the Error path: role knowledge only. Enough to write
-    /// owned fields so AGENT-007's fail-closed first layer survives a catalog error.
-    let private tryRoleBinding (agents: obj) (name: string) : (string * ManagedAgentBinding) option =
-        match agentEntry agents name, ManagedAgent.tryParse name with
-        | Some _, Some managed -> Some(name, { Agent = managed })
-        | _ -> None
-
-    let private roleBindings (agents: obj) : Map<string, ManagedAgentBinding> =
-        ManagedAgent.requiredNames |> List.choose (tryRoleBinding agents) |> Map.ofList
+        if isNull config then
+            ()
+        else
+            applyAgentsOwnedFields config (ensureAgents config) inventory
 
     let configureFromHostConfig (config: obj) : Result<ManagedAgentInventory, string> =
         match validate config with
         | Error err ->
             // AGENT-007 fail-closed: a catalog validation failure must not silently
-            // drop every permission/mode/prompt write. Apply what the config names.
-            let agents = if isNull config then null else config?agent
-            applyOwnedFields config { Bindings = if isNull agents then Map.empty else roleBindings agents }
+            // drop every permission/mode/prompt write. Project the catalog anyway.
+            applyOwnedFields config { Bindings = catalogBindings () |> Result.defaultValue Map.empty }
             Error err
         | Ok inventory ->
             applyOwnedFields config inventory
