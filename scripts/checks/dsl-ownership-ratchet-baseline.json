@@ -29,12 +29,6 @@
   "Context/Companion/Blogger/BloggerCrashRecovery.fs": {
     "infrastructure-leak": 1
   },
-  "Context/Companion/CompanionTransform.fs": {
-    "infrastructure-leak": 1
-  },
-  "Context/Prefix/XWire.fs": {
-    "infrastructure-leak": 1
-  },
   "Context/Trace/Capture.fs": {
     "infrastructure-leak": 1
   },
@@ -42,12 +36,6 @@
     "infrastructure-leak": 1
   },
   "Execution/Delegation/ChildRecoveryWorkflow.fs": {
-    "infrastructure-leak": 1
-  },
-  "Execution/Session/SessionRecoveryWorkflow.fs": {
-    "infrastructure-leak": 1
-  },
-  "Feedback/Enforcer/BloggerRecoveryProbe.fs": {
     "infrastructure-leak": 1
   },
   "Interaction/Dispatch/Recovery.fs": {
@@ -66,12 +54,6 @@
     "infrastructure-leak": 1
   },
   "Mission/Review/Assurance/Seal.fs": {
-    "infrastructure-leak": 1
-  },
-  "OpenCode/Contract/GuidelineProjection.fs": {
-    "infrastructure-leak": 1
-  },
-  "OpenCode/Contract/HostFactFold.fs": {
     "infrastructure-leak": 1
   }
 }

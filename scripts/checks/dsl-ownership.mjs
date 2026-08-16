@@ -110,81 +110,78 @@ export const CONTROL_STATE_EXEMPT = new Set([])
  * Basename allowlist only — other Session/Application files stay fail-closed.
  * These files compose Host ports / PromptDispatcher extensions / Pty backends.
  */
-export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
-  'BloggerCoordinator.fs',
-  'CompanionHost.fs',
-  'CompanionHostBlogger.fs',
-  'CompletionMailbox.fs',
-  'EnforcerHost.fs',
-  'EnforcerTipGuidance.fs',
-  'EnforcerCycleDecode.fs',
-  'EnforcerCycleCommit.fs',
-  'EnforcerFrameRecovery.fs',
-  'EnforcerRepair.fs',
-  'ForkRuntime.fs',
-  'HandleCompletionCodec.fs',
-  'HostForkAgent.fs',
-  'HostForkAgentOwner.fs',
-  'HostForkBusyNudge.fs',
-  'HostForkChildDispatch.fs',
-  'HostForkPty.fs',
-  'HostForkRestart.fs',
-  'HostForkRunLifecycle.fs',
-  'HostForkRuntime.fs',
-  'HostForkJoin.fs',
-  'ParkedTransform.fs',
-  'RecordWorkflow.fs',
-  'RuntimePath.fs',
-  'SatelliteRuntime.fs',
-  'SyncDelegateRuntime.fs',
-  // W1 EventStore-backed journal adapter (Journal IJournalWriter over IEventStore).
-  'EventStoreJournalWriter.fs',
-  // Host-facing dispatch/nudge/repair adapters
-  'Dispatcher.fs',
-  'Send.fs',
-  'Ingress.fs',
-  'Host.fs',
-  'Tip.fs',
-  'Decode.fs',
-  'Continuation.fs',
-  'Repair.fs',
-  'Background.fs',
-  'Idle.fs',
-  'JobHandoff.fs',
-  'Workflow.fs',
-  'DedicatedTodoRuntime.fs',
-  'TodoProcess.fs',
-  'BookkeeperRuntime.fs',
-  'Transform.fs',
-  'Runtime.fs',
-  'Speculate.fs',
-  'Index.fs',
-  'Lifecycle.fs',
-  'SessionDirectories.fs',
-  'ReviewRunner.fs',
-  'WorktreeCleanup.fs',
-  'Types.fs',
-  'TurnEvidence.fs',
-  'BloggerCrashRecovery.fs',
-  'Capture.fs',
-  'TerminalReporter.fs',
-  'BloggerProbe.fs',
-  'ChildRecoveryWorkflow.fs',
-  'CompletionCodec.fs',
-  'Recovery.fs',
-  'CompletedTurn.fs',
-  'InteractionRepair.fs',
-  'MagicTodoLocality.fs',
-  'MagicTodoMembrane.fs',
-  'Seal.fs',
-  'Wire.fs',
-  'Coordinator.fs',
-  'HostBlogger.fs',
+/**
+ * Host-facing Session adapters may open OpenCode/Process/Infrastructure.
+ *
+ * TASK.md §4 (PR 0 rotation): basename allowlist is too wide — any file named
+ * Runtime.fs / Host.fs / Workflow.fs / Types.fs would inherit physical-boundary
+ * power. Authorization is now exact-path: a new Host adapter must be named
+ * here explicitly, and a rename/move turns RED until the entry is updated.
+ * The 54 paths below are exactly the files that today open
+ * Wanxiangshu.Infrastructure|OpenCode|Process (probed 2026-08-16); the
+ * previous 24 needless basename entries (files that never touch those
+ * namespaces) were dropped — they carried phantom authority.
+ */
+export const HOST_BOUNDARY_OPEN_PATHS = new Set([
+  'src/Wanxiangshu/Change/Host/Host.fs',
+  'src/Wanxiangshu/Change/Host/ReviewRunner.fs',
+  'src/Wanxiangshu/Change/Host/SessionDirectories.fs',
+  'src/Wanxiangshu/Change/Host/Types.fs',
+  'src/Wanxiangshu/Composition/Turn/Workflow.fs',
+  'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs',
+  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
+  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs',
+  'src/Wanxiangshu/Context/Companion/Host.fs',
+  'src/Wanxiangshu/Context/Companion/HostBlogger.fs',
+  'src/Wanxiangshu/Context/Companion/Transform.fs',
+  'src/Wanxiangshu/Context/Prefix/Wire.fs',
+  'src/Wanxiangshu/Context/Trace/Capture.fs',
+  'src/Wanxiangshu/Context/Trace/TerminalReporter.fs',
+  'src/Wanxiangshu/Enforcer/Continuation.fs',
+  'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs',
+  'src/Wanxiangshu/Enforcer/Cycle/Decode.fs',
+  'src/Wanxiangshu/Enforcer/Guidance/Tip.fs',
+  'src/Wanxiangshu/Enforcer/Host.fs',
+  'src/Wanxiangshu/Enforcer/Repair.fs',
+  'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs',
+  'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs',
+  'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs',
+  'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs',
+  'src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs',
+  'src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs',
+  'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
+  'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/Recovery.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/Send.fs',
+  'src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs',
+  'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
+  'src/Wanxiangshu/Mission/Manager/Background.fs',
+  'src/Wanxiangshu/Mission/Manager/Idle.fs',
+  'src/Wanxiangshu/Mission/Manager/JobHandoff.fs',
+  'src/Wanxiangshu/Mission/Manager/Workflow.fs',
+  'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs',
+  'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
+  'src/Wanxiangshu/Mission/Review/Assurance/Seal.fs',
+  'src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
+  'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
+  'src/Wanxiangshu/Mission/Review/TodoProcess.fs',
+  'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs',
+  'src/Wanxiangshu/Strength/OpenCode/Speculate.fs',
+  'src/Wanxiangshu/Strength/Replica/Runtime.fs',
+  'src/Wanxiangshu/Strength/Replica/Transform.fs',
+  'src/Wanxiangshu/Strength/TurnEvidence.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {
-  const base = String(file).replace(/\\/g, '/').split('/').pop()
-  return HOST_BOUNDARY_OPEN_BASENAMES.has(base)
+  const rel = norm(String(file))
+  return HOST_BOUNDARY_OPEN_PATHS.has(rel)
 }
 
 export const FORBIDDEN = [
