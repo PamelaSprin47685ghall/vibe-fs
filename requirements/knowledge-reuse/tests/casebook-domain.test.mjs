@@ -9,86 +9,87 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  Observation,
-  Observations_classifyReplay as classifyReplay,
-  CasebookEvent,
-  CasebookProjection_emptyState as emptyState,
-  CasebookProjection_apply as apply,
-  CasebookProjection_evict as evict,
-} from '../../../dist/Repository/Knowledge/Casebook/Model.js'
-import { caseOf, listItems, mapEntries, toList } from '../../verification-system/tests/support/domain.mjs'
-import { casebookContract } from './support/casebook-contract.mjs'
+import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 
-const caseIndex = (cls, name) => Object.create(cls.prototype).cases().indexOf(name)
-const observation = (name, payload) => new Observation(caseIndex(Observation, name), payload)
-const read = (path, hash) => observation('FileRead', [path, hash])
-const glob = (pattern, paths) => observation('GlobResult', [pattern, toList(paths)])
+const read = (path, hash) => ({ kind: 'file-read', path, contentHash: hash })
+const glob = (pattern, paths) => ({ kind: 'glob-result', pattern, paths })
 
-const event = (name, payload) => new CasebookEvent(caseIndex(CasebookEvent, name), payload)
-const fold = (events) => listItems(events).reduce((state, item) => apply(state, item), emptyState).Cases
-const captured = (sessionId, q, a, observations) =>
-  event('CaseCaptured', [{ SessionId: sessionId, Q: q, A: a, Observations: toList(observations), LastAccessOrder: 0 }])
-const refreshed = (sessionId, q, a, observations) => event('CaseRefreshed', [sessionId, q, a, toList(observations)])
-const accessed = (sessionId) => event('CaseAccessed', [sessionId])
-const evicted = (sessionId) => event('CaseEvicted', [sessionId])
+const fold = (events) => casebook.foldEvents(events).cases
+const captured = (sessionId, q, a, observations) => ({
+  kind: 'case-captured',
+  case: { sessionId, q, a, observations, lastAccessOrder: 0 },
+})
+const refreshed = (sessionId, q, a, observations) => ({
+  kind: 'case-refreshed',
+  sessionId,
+  q,
+  a,
+  observations,
+})
+const accessed = (sessionId) => ({ kind: 'case-accessed', sessionId })
+const evicted = (sessionId) => ({ kind: 'case-evicted', sessionId })
 
 test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
   // same identity → one entry; glob paths order-insensitive
-  assert.equal(casebookContract.normalizedCount(obs), 2)
+  assert.equal(casebook.normalize(obs).length, 2)
 })
 
 test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
   const stored = [read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y'])]
   // exact replay (order-insensitive glob) → Fresh
-  assert.equal(caseOf(classifyReplay(toList(stored), toList([glob('**/*.fs', ['y', 'x']), read('a.txt', 'h1')]))), 'Fresh')
+  assert.equal(
+    casebook.classifyReplay(stored, [glob('**/*.fs', ['y', 'x']), read('a.txt', 'h1')]),
+    'fresh',
+  )
   // content changed → Stale
-  assert.equal(caseOf(classifyReplay(toList(stored), toList([read('a.txt', 'h2'), glob('**/*.fs', ['x', 'y'])]))), 'Stale')
+  assert.equal(casebook.classifyReplay(stored, [read('a.txt', 'h2'), glob('**/*.fs', ['x', 'y'])]), 'stale')
   // file deleted → Stale
-  assert.equal(caseOf(classifyReplay(toList(stored), toList([glob('**/*.fs', ['x', 'y'])]))), 'Stale')
+  assert.equal(casebook.classifyReplay(stored, [glob('**/*.fs', ['x', 'y'])]), 'stale')
   // extra result → Stale
-  assert.equal(caseOf(classifyReplay(toList(stored), toList([read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y', 'z'])]))), 'Stale')
+  assert.equal(casebook.classifyReplay(stored, [read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y', 'z'])]), 'stale')
 })
 
 test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
-  const cases = fold(
-    toList([
-      captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
-      captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
-      refreshed('s1', 'Q1b', 'A1b', [read('a.txt', 'h1'), read('c.txt', 'h3')]),
-    ]),
-  )
-  assert.equal(mapEntries(cases).length, 2)
-  const s1 = mapEntries(cases).find(([k]) => k === 's1')[1]
-  assert.equal(s1.A, 'A1b')
-  assert.equal(listItems(s1.Observations).length, 2)
+  const cases = fold([
+    captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
+    captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
+    refreshed('s1', 'Q1b', 'A1b', [read('a.txt', 'h1'), read('c.txt', 'h3')]),
+  ])
+  assert.equal(cases.length, 2)
+  const s1 = cases.find((c) => c.sessionId === 's1')
+  assert.equal(s1.a, 'A1b')
+  assert.equal(s1.observations.length, 2)
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
-  const cases = fold(
-    toList([
-      captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
-      captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
-      accessed('s2'),
-    ]),
-  )
-  assert.equal(mapEntries(cases).length, 2)
+  const cases = fold([
+    captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
+    captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
+    accessed('s2'),
+  ])
+  assert.equal(cases.length, 2)
   // Evicted removes the Case (captured+evicted in one fold)
-  const combined = fold(toList([captured('s2', 'Q2', 'A2', []), evicted('s2')]))
-  assert.equal(mapEntries(combined).length, 0)
+  const combined = fold([captured('s2', 'Q2', 'A2', []), evicted('s2')])
+  assert.equal(combined.length, 0)
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
-  const cases = fold(
-    toList([captured('s1', 'Q1', 'A1', []), captured('s2', 'Q2', 'A2', []), captured('s3', 'Q3', 'A3', []), accessed('s1')]),
-  )
-  const [kept, victims] = evict(2, cases)
+  const cases = fold([
+    captured('s1', 'Q1', 'A1', []),
+    captured('s2', 'Q2', 'A2', []),
+    captured('s3', 'Q3', 'A3', []),
+    accessed('s1'),
+  ])
+  const { kept, victims } = casebook.evict(2, cases)
   // s2 was accessed first (order 1), s3 second (2), s1 last (3) → evict s2
-  assert.deepEqual(listItems(victims), ['s2'])
-  assert.deepEqual(mapEntries(kept).map(([k]) => k).sort(), ['s1', 's3'])
+  assert.deepEqual(victims, ['s2'])
+  assert.deepEqual(
+    kept.map((c) => c.sessionId).sort(),
+    ['s1', 's3'],
+  )
   // capacity >= count → no eviction
-  const [keptAll, none] = evict(3, cases)
-  assert.deepEqual(listItems(none), [])
-  assert.equal(mapEntries(keptAll).length, 3)
+  const { kept: keptAll, victims: none } = casebook.evict(3, cases)
+  assert.deepEqual(none, [])
+  assert.equal(keptAll.length, 3)
 })
