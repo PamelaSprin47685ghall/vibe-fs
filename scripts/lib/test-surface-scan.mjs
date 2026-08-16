@@ -42,6 +42,7 @@ export const BUILD_VERIFICATION_FILES = new Set([
   // Test runner: its subject is the coverage/build denominator itself,
   // including the literal fable_modules exclusion that keeps coverage honest.
   'requirements/verification-system/tests/run.mjs',
+  'requirements/verification-system/tests/support/run-inner.mjs',
 ])
 
 /**
@@ -944,7 +945,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Codec/ProviderProjectionSurface.js',
     owner: 'provider-projection',
-    laws: ['PROVIDER-PROJECTION-003'],
+    laws: ['PROVIDER-PROJECTION-003', 'HOST-BOUNDARY-020'],
     source: 'src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -952,7 +953,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Codec/ToolHostSurface.js',
     owner: 'provider-projection',
-    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009'],
+    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009'],
     source: 'src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1100,6 +1101,14 @@ export const SURFACE_MANIFEST = [
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Interaction/Dispatch/OpenCode/NeedHelpSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-013'],
+    source: 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

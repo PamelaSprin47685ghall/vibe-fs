@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { toolCodec } from './support/host-surface.mjs'
+import * as toolHost from '../../../dist/OpenCode/Codec/ToolHostSurface.js'
 
 const decode = (input) => {
-  const result = toolCodec.decodeContext(input)
+  const result = toolHost.contextView(toolHost.contextDecode(input))
   return {
-    sessionId: result.sessionID,
-    agent: input.agent,
-    toolCallId: result.callID,
-    providerRunId: result.messageID,
+    sessionId: result.sessionId,
+    agent: result.agent ?? undefined,
+    toolCallId: result.toolCallId ?? undefined,
+    providerRunId: result.providerRunId ?? undefined,
   }
 }
 

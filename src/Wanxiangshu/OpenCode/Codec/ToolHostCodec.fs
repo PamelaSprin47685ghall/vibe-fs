@@ -297,10 +297,17 @@ module ToolHostCodec =
         |> Option.orElse (contextString raw "input")
 
     let decodeContext (raw: obj) =
+        let callId = contextString raw "callID"
+        let messageId = contextString raw "messageID"
+        let callId, messageId =
+            match callId, messageId with
+            | Some call, Some message -> Some call, Some message
+            | _ -> None, None
+
         { SessionId = contextString raw "sessionID" |> Option.defaultValue ""
           Agent = contextString raw "agent"
-          ToolCallId = contextString raw "callID" |> Option.map ToolCallId.create
-          ProviderRunId = contextString raw "messageID" |> Option.map ProviderRunIdentity.create
+          ToolCallId = callId |> Option.map ToolCallId.create
+          ProviderRunId = messageId |> Option.map ProviderRunIdentity.create
           PromptText = promptText raw
           AttachAbort = attachAbort raw }
 

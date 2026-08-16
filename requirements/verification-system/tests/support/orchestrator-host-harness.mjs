@@ -36,17 +36,10 @@ export const fakeSessions = (behaviour = {}) => {
   const terminalListeners = new Map()
   const stickyTerminals = new Map()
 
-  const sessionKey = (value) => (typeof value === 'object' && value !== null ? (value.fields?.[0] ?? value.value ?? String(value)) : String(value))
-  const toTerminalOutcome = (outcome) => {
-    if (outcome && typeof outcome.tag === 'number') return outcome
-    if (outcome?.kind === 'Failed' || outcome?.error) return { tag: 2, fields: [outcome.error ?? outcome.reason ?? 'failed'] }
-    if (outcome?.kind === 'Aborted' || outcome?.reason) return { tag: 1, fields: [outcome.reason ?? 'aborted'] }
-    return { tag: 0, fields: [outcome?.result ?? outcome?.value ?? outcome] }
-  }
+  const sessionKey = (value) => String(value)
   const invokeTerminalCallback = (callback, session, outcome) => {
-    const norm = toTerminalOutcome(outcome)
-    const res = callback(session, norm)
-    if (typeof res === 'function') res(norm)
+    const first = callback(session, outcome)
+    if (typeof first === 'function') first(outcome)
   }
   const notifyTerminal = (session, outcome) => {
     const key = sessionKey(session)

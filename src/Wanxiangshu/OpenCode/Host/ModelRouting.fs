@@ -525,7 +525,11 @@ module ModelRouting =
             .TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
 
     let releaseExecution (sessionId: SessionId) =
-        current().ReleaseExecution(SessionId.value sessionId)
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.ReleaseExecution(SessionId.value sessionId)
+        | None -> ()
 
     let cancelUnacquiredExecution (sessionId: SessionId) =
-        current().CancelPendingExecution(SessionId.value sessionId)
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.CancelPendingExecution(SessionId.value sessionId)
+        | None -> ()

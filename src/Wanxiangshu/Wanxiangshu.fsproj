@@ -334,6 +334,7 @@
     <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
     <Compile Include="Execution/Session/LoopDetectorSurface.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpSurface.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/HostCodec.fs"/>

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import test from 'node:test'
 import * as calibration from '../../../dist/OpenCode/Host/PairProgrammingCalibrationSurface.js'
 
 const { compose, renderToolEstimate } = calibration

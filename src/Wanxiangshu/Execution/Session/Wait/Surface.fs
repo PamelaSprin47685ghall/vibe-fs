@@ -149,7 +149,7 @@ module CausalWaitSurface =
         box
             {| active = snapshot.Active |> List.map waitObject |> List.toArray
                history = snapshot.History |> List.map transitionObject |> List.toArray
-               sequence = snapshot.Sequence |}
+               sequence = int snapshot.Sequence |}
 
     let private frontierKindName =
         function

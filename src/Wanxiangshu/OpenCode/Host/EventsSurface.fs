@@ -49,6 +49,11 @@ module EventsSurface =
     let subscribe (port: obj) (listener: obj -> obj -> unit) : obj =
         let typed = port :?> IEventObservationPort
         typed.SubscribeTerminalListener(fun sessionId outcome -> listener (box (SessionId.value sessionId)) (snapshot outcome))
+
+    let dispose (subscription: obj) : unit =
+        match subscription with
+        | :? IDisposable as disposable -> disposable.Dispose()
+        | _ -> ()
     let notifyCompleted
         (port: obj)
         (sessionId: string)

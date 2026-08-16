@@ -25,7 +25,7 @@ test('WHAT[ENF-009] FORK_disposed_or_unbound_execution_surfaces_natural_executio
       { calling: 'coder', name: 'Ada', charge: 'do work' },
       { sessionID: '', agent: 'fast-coder' },
     )
-    assert.match(result, /cannot be placed from this execution context|caller's authority is established/i)
+    assert.match(result, /cannot be placed from this execution context|caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
   })
 })
@@ -36,7 +36,7 @@ test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_sessi
       { calling: 'coordinator', name: 'North Road', charge: 'x' },
       { sessionID: '', agent: 'fast-orchestrator' },
     )
-    assert.match(result, /caller's authority is established/i)
+    assert.match(result, /caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
   })
 })
@@ -48,7 +48,7 @@ test('WHAT[ENF-009] FORK_non_repository_target_rejects_nonempty_warm_start_keywo
       { calling: 'navigator', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
       { sessionID: 'ses-fork', agent: 'fast-manager' },
     )
-    assert.match(result, /only available when fork targets Coder, Inspector, or DevOps/i)
+    assert.match(result, /only available when fork targets Coder, Inspector, or DevOps|仅当 fork 目标为 Coder、Inspector 或 DevOps/i)
     assert.doesNotMatch(result, /\berror\s*=/i)
     assert.equal(createdIds.length, 0)
   })

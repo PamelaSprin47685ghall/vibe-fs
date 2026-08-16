@@ -14,7 +14,7 @@ migration or bounded to a named external/durable/deployment creditor.
 | LEGACY-005 | FactCodec historical decoders | historical durable journal bytes | per-migration inventory required | decode only | BOUNDED-COMPAT | retention horizon/sample inventory proves no old bytes | persistence |
 | LEGACY-006 | Host V1 TodoTable sink | OpenCode Host V1 contract | current Host V1 projection contract | no canonical writer | BOUNDED-COMPAT | Host V1 TodoTable removed from supported host contract | host-boundary |
 | LEGACY-007 | `false abort` runtime migration | historical retired records | durable sample inventory required | no new writer | INVESTIGATE | convert to decode-only/refusal or delete after evidence | execution |
-| LEGACY-008 | `js-boundary-baseline.json` | none | terminal goal is absolute zero | no | DELETE | scanner debt reaches zero | js-surface |
+| LEGACY-008 | `js-boundary-baseline.json` | none | scanner debt reached absolute zero; baseline file deleted | no | DELETE | complete; ledger disappeared after zero debt | js-surface |
 | LEGACY-009 | `verification-system/tests/support/domain.mjs` | none as a test contract | repository search: zero semantic-zone imports; all callers use production owner surfaces | no | DELETE | facade and family adapters deleted after zero-consumer proof | semantic-owners |
 
 The ledger is not a permanent architecture document. Delete it after all

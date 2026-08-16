@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as binding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import { runListenerRefcountScenario } from './support/listener-refcount.mjs'
+
+await routing.initialize()
 
 const model = { providerID: 'openai', modelID: 'gpt-5' }
 

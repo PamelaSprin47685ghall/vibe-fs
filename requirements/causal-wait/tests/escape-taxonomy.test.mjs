@@ -72,9 +72,9 @@ test('WHAT[CAUSAL-006] CAUSAL_006_deadline_escape_carries_typed_instant', () => 
 
   const { workspace, lease } = write(wait)
   try {
-    const [{ tag }] = readDiagnostic(workspace).active[0].escapes
-    assert.equal(tag, 'deadlineAt')
-    assert.match(escape.at, /^2026-01-01T00:00:00(\.\d+)?(Z|\+00:00)$/)
+    const [deadline] = readDiagnostic(workspace).active[0].escapes
+    assert.equal(deadline.tag, 'deadlineAt')
+    assert.match(deadline.at, /^2026-01-01T00:00:00(\.\d+)?(Z|\+00:00)$/)
   } finally {
     causal.dispose(lease)
     fs.rmSync(workspace, { recursive: true, force: true })

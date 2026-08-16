@@ -31,7 +31,7 @@ test('WHAT[ENF-006] AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', asyn
   assert.equal(rolePredicate('-', 'blogger'), false)
 
   await withPlugin(async (hooks) => {
-    assert.equal(hooks.tool.auto-injected, undefined, 'auto-injected must not be in hooks.tool')
+    assert.equal(hooks.tool['auto-injected'], undefined, 'auto-injected must not be in hooks.tool')
     assert.equal(hooks.tool['-'], undefined, '- must not be in hooks.tool')
   })
 })
