@@ -302,7 +302,6 @@ export const acceptAuthorityRoot = async (runtime, sessionId, agent) => {
   if (!result?.ok) {
     throw new Error(`AcceptHumanRoot(${sessionId}, ${agent}) rejected: ${result?.error ?? 'unknown error'}`)
   }
-  await new Promise((resolve) => setImmediate(resolve))
 }
 
 /**
