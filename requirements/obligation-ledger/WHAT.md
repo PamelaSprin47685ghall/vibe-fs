@@ -292,6 +292,20 @@ account；Accepted 后 canonical 与 sink 指向同一个 Pk。Process review ve
 reviewing 降级 in_progress 等）是**兼容性实现**，属 HOW「历史与弃权」——compatibility 不写成
 永久需求；未来 sink 替换不改变 canonical 语义。
 
+**Exit（COMPAT-001 裁决，TASK.md §七/§十四）**：兼容性必须带债权人、边界与退出条件。
+
+```text
+Creditor:  OpenCode Host V1 TodoTable（当前 supported host contract 的具名消费者）
+Boundary:  Mission/Obligation/Todo/Surface（CompatibilityTodoRow / obligationsToCompatibilityRows）
+           + MagicTodoMembrane 投影 + HostCodec.replaceCompatibilityArgs，单向 canonical → V1
+Forbidden: V1 → canonical 反推（本条永久）
+Exit:      Host V1 TodoTable 不再属于 supported host contract
+Removal:   删 CompatibilityTodoRow / obligationsToCompatibilityRows / replaceCompatibilityArgs
+           / V1 canaries
+```
+
+Exit 达成前 sink 合法但只有 bounded 居留权；达成即删，不设第二兼容层。
+
 **证据** → PROOF.md 行 O-15。
 
 ## OBLIGATION-LEDGER-016：T1 commitment 与 Opening 关闭

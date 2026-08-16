@@ -197,3 +197,17 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
    观察、不建 process registry」是并发模型；正向 replica 收敛律归 `durable-convergence`。
 6. **`schemaVersion` 例外站点 —— HOW**：`NON_STORE_SCHEMA_VERSION_SITES`（HandleCompletionCodec
    等）是产品发布面字段，不是 durable store 版本；unified-store-gate 只拦 store 上下文。
+7. **FactCodec 文本 migration —— decode-only bounded compat（CLN-07 census / CLN-08..N 裁决）**：
+   `deserializeFact` 链的四个文本修复是 **decode-only ingress**，无旧 writer（新 writer 永远
+   写完整字段）。census 2026-08-16：`.git/wanxiang/events/` 26 journals 全部现代形状，零缺字段行。
+
+   | 步骤 | 修复 | Exit condition |
+   |---|---|---|
+   | `migrateHandleCompleted` | 缺 `CompletionRef` 注入 null | 真实旧数据为零（census / instrumentation）→ DELETE |
+   | `migrateHandleOwnership` | 缺 `Ownership` 注入 `DurableParentHandle`（pre-change 语义） | 同上 → DELETE |
+   | `migrateHandleByname` | 缺 `Byname` 注入 `""`（回退 TargetAgent） | 同上 → DELETE |
+   | `rewriteLegacyObservationTags` | 旧 Observation tag 双解码（tip-v2 clean break 配套，Envelope.fs:93 同用） | tip-v2 clean break 完成 → 删双解码 + 对应测试 |
+
+   每项都有 fixture 测试契约（`MIGRATION_*`）；删除时同步删 fixture 与测试。
+   **禁止**：把任何文本修复升级为双向 adapter 或旧 writer。
+

@@ -87,6 +87,20 @@ agent 终态只有 `Completed | Failed | Abandoned`。`LegacyFalseAbort` 永不�
 false finality）。
 **边界**：崩溃后从 snapshot 恢复的流程 → `crash-reconciliation`（p0-recovery-join
 gate 的 recovery 侧规则归它）；本命题拥有 aborted≠terminal 半边。
+
+**Exit（CLN-X / LEGACY-030 裁决）**：`tryMigrateRetiredFalseAbort` 的确定性 replacement
+路径是 **decode-only bounded compat**（census 2026-08-16：26 个真实 journal 零
+`status:aborted` blob；坏数据有限集合 = 历史 `SendFailure` cell + aborted blob 组合）。
+它保留的唯一理由是可观察坏数据可能存在于未纳入 census 的部署 journal。
+
+```text
+Creditor:  历史部署中可能存在的 retired false-abort tombstone（无真实样本）
+Boundary:  JoinDrain 内部 decode-only；replacement handle 幂等（recovery:<agent>:<digest>）
+Forbidden: 新 writer 制造 aborted finality（本命题永久）；migration 路径不向 canonical 引入新语义
+Exit:      可观察坏数据为零（census / instrumentation 证据）→ 删 migrateRetiredFalseAbort
+           / tryMigrateRetiredFalseAbort / migrateOutcomeToUnit，保留 detect → refuse
+```
+
 **证据**：→ PROOF.md 007。
 
 ## EFFECT-ACCOUNTING-008 —— typed 效果家族实例（Worktree/Publish/Blogger）
