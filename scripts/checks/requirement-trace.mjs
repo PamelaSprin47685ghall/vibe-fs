@@ -229,6 +229,7 @@ if (report) {
     if (t.whatIds.length === 0 && t.state === 'active') row.orphan++
   }
   for (const w of graph.unproved) {
+    if (w.deleted) continue
     const row = perPackage.get(w.package) ?? { active: 0, tagged: 0, orphan: 0, unproved: 0 }
     row.unproved++
     perPackage.set(w.package, row)
