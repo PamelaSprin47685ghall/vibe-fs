@@ -175,6 +175,22 @@ export const SURFACE_MANIFEST = [
     representation: 'json',
     kind: 'pure',
   },
+  {
+    module: 'Persistence/EventStore/Surface.js',
+    owner: 'durable-events',
+    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006'],
+    source: 'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
+    module: 'Persistence/Journal/Surface.js',
+    owner: 'durable-events',
+    laws: ['DURABLE-EVENTS-006', 'DURABLE-EVENTS-012', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-020'],
+    source: 'src/Wanxiangshu/Persistence/Journal/Surface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
 ]
 
 /** Flat module-path allowlist derived from the manifest (scanner regex input). */
