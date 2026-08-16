@@ -465,6 +465,7 @@
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
+    <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
