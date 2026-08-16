@@ -202,10 +202,15 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
 无有效 cycle（`chronicle` 0 次 / 2+ 次、纯散文、缺 tip、空 entry）→ 进入
 InteractionRepair/nudge 路径：每个逻辑请求至多一次 Nudge；同一 terminal run 重放幂等（同一观察
 重放，不发送、不推进）；新 terminal 再次无效才证明 repair 失败 → 统一 Fallback/AABB；abort 清理
-残留只注入一次 repair、不推进主 cursor、不消耗 AABB 预算。恢复重判必须从 durable claim +
-provider-visible `SessionToolPart` 证据派生，且只有 terminal 中**恰好一个 completed `chronicle`** 才能
-证明 repair 后协议恢复；不得从丢失 tool name 的 `MessagePart.ToolResult` 猜测，也不得保留旧工具名
-`blog` alias。`BloggerToolRecovery` 不退化成整数计数器。
+残留只注入一次 repair、不推进主 cursor、不消耗 AABB 预算。**0-call/pure-prose terminal 不得依赖
+“下一次 provider transform”才能开始修复**：它没有 tool loop，自然也没有下一次 transform；Host
+`SessionIdle` 的 reconciled turn 是该失败后的可靠唤醒点，必须直接驱动 Blogger 专用 nudge，而不是
+ordinary `MissingClosingReport`（后者会错误要求 Blogger 继续输出自然语言）。若 nudge 后新的 0-call
+terminal 再次 idle，则该 idle 机会消费一次 Fallback/AABB 并发出 AABB repair；AABB 阶段用 durable
+`blogger-aabb` InteractionRepair claim 记录，使 crash/re-entry 能恢复“预算已花掉”，第三次无效不得
+继续自动 nudge/AABB。恢复重判必须从 durable claim + provider-visible `SessionToolPart` 证据派生，且
+只有 terminal 中**恰好一个 completed `chronicle`** 才能证明 repair 后协议恢复；不得从丢失 tool name
+的 `MessagePart.ToolResult` 猜测，也不得保留旧工具名 `blog` alias。`BloggerToolRecovery` 不退化成整数计数器。
 
 - 含义：诊断机制自己不变成第二控制循环；修复机会有界（ENFORCER-060/061/062/063/
   065/066/067/068/153）。

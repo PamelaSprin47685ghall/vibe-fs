@@ -43,6 +43,8 @@ type CanonicalBlogCall = { Text: string option; Evidence: string option; Tip: En
 
 Provider cycle 的 cardinality gate 位于 Host continuation 边界：raw assistant step 必须恰好一个
 `chronicle` part。0 次与 2+ 次不进入 merge/commit；terminal 后直接复用 BD-017 的 protocol repair。
+其中 2+ 次通常仍会因 Host tool loop 进入下一次 transform；**0 次不会**，所以 zero-tool terminal 的
+repair 入口由 `SessionIdle → ReconcilePass → HostTurnObserver` 驱动，不能等一个不存在的后续 transform。
 `EnforcerCycle` 只处理已通过该 gate 的单调用 canonical value，不再承担多调用业务归并语义。
 
 ### 1.4 `src/Wanxiangshu/Domain/RulebookObservation.fs`（BD-015）
@@ -96,8 +98,14 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 - `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；0/2+ chronicle 与
   completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。同一 terminal 重放
   只投影，不重复 nudge；下一 invalid terminal 才进入 AABB。
+- `HostTurnObserver`：`Role.Blogger` 的 zero-tool idle terminal 不再进入 ordinary
+  `MissingClosingReport`。它调用 `InteractionRepairWorkflow.repairBloggerProtocol`：第一次 invalid
+  terminal 通过 fresh idle permit 发送 `blogger-missing-tool` nudge；同 terminal 重放幂等；新的
+  invalid terminal 消费 fresh idle permit、由 `FallbackLedger` 推进一步并发送 `blogger-aabb` repair；
+  AABB durable claim 已存在后再失败则终止该 Blogger cycle，不再自动提示。
 - cold/reconcile recovery 只从 `SessionMessage.ToolParts` 读取 `ToolName=chronicle` + completed state；
-  `MessagePart.ToolResult` 已丢 tool name，禁止用于判断修复是否成功。
+  `MessagePart.ToolResult` 已丢 tool name，禁止用于判断修复是否成功。`blogger-aabb` claim 是 idle AABB
+  的 durable 阶段证据；纯 transcript `rejudgeFromEvidence` 仍不得凭空发明 AABB。
 - `EnforcerFrameRecovery.fs`：`tryLiveCycleContext`（commit 只用 live InFlight）、
   `tryReloadRequestContext`（durable open materialization 恢复）、
   `lastCoveredSequence` / `coveredPrefixDigest`（出生门，BD-013）。

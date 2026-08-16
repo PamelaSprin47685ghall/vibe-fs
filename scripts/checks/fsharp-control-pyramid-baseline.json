@@ -17,7 +17,7 @@
     "src/Wanxiangshu/Context/Trace/TerminalReporter.fs": 1,
     "src/Wanxiangshu/Enforcer/Catalog.fs": 3,
     "src/Wanxiangshu/Enforcer/Codec.fs": 3,
-    "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs": 5,
+    "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs": 4,
     "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs": 1,
     "src/Wanxiangshu/Enforcer/Host.fs": 3,
     "src/Wanxiangshu/Enforcer/Projection.fs": 2,

@@ -124,6 +124,182 @@ module InteractionRepairWorkflow =
         | None -> AsyncSupport.completedTask ()
         | Some permit -> sendRepair quiescence permit sessionPort eventPort journal context.Turn prompt repairKind
 
+    let private notifyBloggerProtocolFailure
+        (eventPort: IEventObservationPort)
+        (turn: ReconciledTurn)
+        (reason: string)
+        =
+        Diagnostic.fatal
+            "blogger-protocol-repair-failed"
+            [ "session_id", SessionId.value turn.SessionId; "result", reason ]
+
+        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason) |> ignore
+
+    let private exhaustBloggerProtocol
+        (host: IParkedTransformHost)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal)
+        (context: ReconciledTurnContext)
+        (reason: string)
+        : Task =
+        task {
+            let turn = context.Turn
+            let key = SessionId.value turn.SessionId
+            let live = host.TryPeekCurrentRequest key
+
+            match live with
+            | Some request ->
+                do!
+                    BloggerAbandon.openRequest
+                        journal
+                        (BloggerRequestContext.mainSessionId request)
+                        turn.SessionId
+                        (Some request)
+                        reason
+            | None -> ()
+
+            host.ClearCurrentRequest key
+            notifyBloggerProtocolFailure eventPort turn reason
+        }
+        :> Task
+
+    let private sendBloggerAabbAfterPermitConsumed
+        (host: IParkedTransformHost)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal)
+        (context: ReconciledTurnContext)
+        (reason: string)
+        : Task =
+        task {
+            let turn = context.Turn
+
+            match!
+                FallbackLedger.recordConfirmedFailure
+                    journal
+                    AgentPairCursor.DefaultAutoRecoveryBudget
+                    turn.SessionId
+                    turn.ProviderRun
+                    reason
+            with
+            | Error error -> notifyBloggerProtocolFailure eventPort turn error
+            | Ok ConfirmedFailureOutcome.NoActiveRun ->
+                notifyBloggerProtocolFailure eventPort turn "blogger AABB has no active logical run"
+            | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
+                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+            | Ok ConfirmedFailureOutcome.AlreadyRecorded
+            | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
+                match!
+                    HostSessionNudge.trySendInteractionRepair
+                        sessionPort
+                        turn.SessionId
+                        EnforcerRepair.RepairInstruction
+                        turn.Directory
+                        (Some journal)
+                        turn.ProviderRun
+                        BloggerRecoveryProbe.BloggerAabbRepairKind
+                with
+                | Ok _ -> ()
+                | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 -> ()
+                | Error error -> notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
+        }
+        :> Task
+
+    let private consumeThenSendBloggerAabb
+        (host: IParkedTransformHost)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal)
+        (reason: string)
+        : Task =
+        match context.Quiescence with
+        | Some permit when quiescence.TryConsume permit ->
+            sendBloggerAabbAfterPermitConsumed host sessionPort eventPort journal context reason
+        | _ -> AsyncSupport.completedTask ()
+
+    let private sendBloggerNudge
+        (host: IParkedTransformHost)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal)
+        : Task =
+        task {
+            match context.Quiescence with
+            | None -> ()
+            | Some permit ->
+                match!
+                    HostSessionNudge.trySendIdleInteractionRepair
+                        quiescence
+                        permit
+                        sessionPort
+                        context.Turn.SessionId
+                        EnforcerRepair.RepairInstruction
+                        context.Turn.Directory
+                        (Some journal)
+                        context.Turn.ProviderRun
+                        BloggerRecoveryProbe.BloggerMissingToolRepairKind
+                with
+                | HostSessionNudge.IdleContinuationOutcome.Sent _
+                | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+                | HostSessionNudge.IdleContinuationOutcome.Failed error ->
+                    do!
+                        sendBloggerAabbAfterPermitConsumed
+                            host
+                            sessionPort
+                            eventPort
+                            journal
+                            context
+                            ("blogger nudge failed: " + error)
+        }
+        :> Task
+
+    /// Blogger has a stricter terminal protocol than ordinary agents: prose-only
+    /// completion is not a closing report. Idle is the only guaranteed wake after
+    /// a zero-tool terminal, so it owns the missing-chronicle nudge → AABB state
+    /// machine instead of the generic MissingClosingReport continuation.
+    let repairBloggerProtocol
+        (host: IParkedTransformHost)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        : Task =
+        match journal with
+        | None ->
+            notifyBloggerProtocolFailure eventPort context.Turn "blogger protocol repair requires an AgentJournal"
+            AsyncSupport.completedTask ()
+        | Some durable ->
+            match
+                BloggerRecoveryProbe.repairStateForInvalidTerminal
+                    durable
+                    context.Turn.SessionId
+                    context.Turn.ProviderRun
+            with
+            | BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery ->
+                sendBloggerNudge host quiescence context sessionPort eventPort durable
+            | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun
+                when issuedRun = context.Turn.ProviderRun ->
+                AsyncSupport.completedTask ()
+            | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued _ ->
+                consumeThenSendBloggerAabb
+                    host
+                    quiescence
+                    context
+                    sessionPort
+                    eventPort
+                    durable
+                    "blogger missing chronicle after interaction nudge"
+            | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun
+                when issuedRun = context.Turn.ProviderRun ->
+                AsyncSupport.completedTask ()
+            | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued _ ->
+                exhaustBloggerProtocol host eventPort durable context "blogger protocol repair exhausted"
+
     /// CTX-010 recovery continue owns the physical run until its own terminal is
     /// published. Missing-final-report / interaction-repair on that run hijacks the
     /// recovery slot: the interleaved idle reads finish=None (Unknown) or a

@@ -151,16 +151,18 @@ test('ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
 })
 
 test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
-  // AABB is derived from the visible transcript, not a memory mark. Cold rejudge
-  // (rejudgeFromEvidence / rejudgeToolRecovery in BloggerRecoveryProbe) must
-  // restore InteractionNudgeIssued at most, never AabbRepairConsumed.
+  // Transcript evidence alone still cannot invent AABB. The idle path now writes
+  // a durable blogger-aabb InteractionRepair claim, so rejudgeToolRecovery may
+  // restore AabbRepairConsumed only when that claim exists.
   const probeSrc = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'),
     'utf8',
   )
-  const coldRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
-  assert.ok(coldRejudge)
-  assert.doesNotMatch(coldRejudge[0], /BloggerToolRecovery\.AabbRepairConsumed/)
+  const pureRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let private isCompletedChronicle/)
+  assert.ok(pureRejudge)
+  assert.doesNotMatch(pureRejudge[0], /BloggerToolRecovery\.AabbRepairConsumed/)
+  assert.match(probeSrc, /BloggerAabbRepairKind = "blogger-aabb"/)
+  assert.match(probeSrc, /aabbClaimed[\s\S]*?BloggerToolRecovery\.AabbRepairConsumed/)
 })
 
 test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {

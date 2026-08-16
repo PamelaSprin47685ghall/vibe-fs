@@ -164,6 +164,63 @@ module HostTurnObserver =
         FissionRuntime.isSilentInterrupt sessionId
         || isDurableFissionOwner journal sessionId
 
+    let private hasBloggerToolEvidence (parts: MessagePart array) =
+        parts
+        |> Array.exists (function
+            | MessagePart.ToolCall _
+            | MessagePart.ToolResult _ -> true
+            | _ -> false)
+
+    let private needsBloggerIdleProtocolRepair (context: ReconciledTurnContext) =
+        context.Quiescence.IsSome
+        && context.Turn.Role = Some Role.Blogger
+        && not (hasBloggerToolEvidence context.Turn.Parts)
+        && match context.Turn.Outcome with
+           | ReconcileProgram.TurnFailed _
+           | ReconcileProgram.TurnAborted _ -> false
+           | ReconcileProgram.TurnCompleted
+           | ReconcileProgram.TurnInProgress
+           | ReconcileProgram.TurnNeedsContinuation _ -> true
+
+    let private observeApplicationTurn
+        (recoveryTimerPort: ITimerPort)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (reviewerContinuationPort: ReviewerContinuationPort)
+        (context: ReconciledTurnContext)
+        : Task =
+        if needsBloggerIdleProtocolRepair context then
+            // A prose-only Blogger terminal has no tool-loop request after it,
+            // so provider transform cannot own recovery. The idle wake is the
+            // causal boundary that can still send exact-one nudge / AABB.
+            InteractionRepairWorkflow.repairBloggerProtocol
+                scope.ParkedTransformHost
+                scope.Sessions.Quiescence
+                context
+                sessionPort
+                eventPort
+                journal
+        else
+            // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+            // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+            TurnWorkflow.observe
+                recoveryTimerPort
+                Pty.abortParent
+                sessionPort
+                eventPort
+                journal
+                scope.SyncDelegateRuntime
+                reviewerContinuationPort
+                scope.Sessions.NudgeSent
+                scope.Sessions.JoinGuardNudges
+                scope.HasLivePty
+                scope.Sessions.AbortedSessions
+                (Some scope.LoopSensor)
+                scope.Sessions.Quiescence
+                context
+
     let private observeFamilyReady
         (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
@@ -184,23 +241,14 @@ module HostTurnObserver =
                 FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn
 
             if not isFissionOwner && not fissionHandled then
-                // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
                 do!
-                    TurnWorkflow.observe
+                    observeApplicationTurn
                         recoveryTimerPort
-                        Pty.abortParent
                         sessionPort
                         eventPort
                         journal
-                        scope.SyncDelegateRuntime
+                        scope
                         reviewerContinuationPort
-                        scope.Sessions.NudgeSent
-                        scope.Sessions.JoinGuardNudges
-                        scope.HasLivePty
-                        scope.Sessions.AbortedSessions
-                        (Some scope.LoopSensor)
-                        scope.Sessions.Quiescence
                         context
         }
 

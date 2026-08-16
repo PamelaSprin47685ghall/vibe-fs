@@ -75,6 +75,16 @@ module BloggerRecoveryProbe =
     [<Literal>]
     let BloggerMissingToolRepairKind = "blogger-missing-tool"
 
+    /// Durable marker for the one fallback/AABB continuation that may follow the nudge.
+    [<Literal>]
+    let BloggerAabbRepairKind = "blogger-aabb"
+
+    [<RequireQualifiedAccess>]
+    type InvalidTerminalRepairState =
+        | NoRecovery
+        | InteractionNudgeIssued of ProviderRunIdentity
+        | AabbRepairIssued of ProviderRunIdentity
+
     /// ENFORCER-153 pure rejudge from already-resolved evidence.
     ///
     /// `claimedTerminalRun`: durable InteractionRepair claim for blogger-missing-tool
@@ -88,11 +98,10 @@ module BloggerRecoveryProbe =
     ///   InteractionNudgeIssued claimed
     /// - claim + valid blog after claim → NoRecovery (cycle completed / success)
     ///
-    /// AabbRepairConsumed is never derived on cold rejudge: AABB is memory-only
-    /// (markAabbRepairConsumed + transform injection, no journal fact). A second
-    /// pure-prose terminal is the trigger for aabbRepair (ENFORCER-067), not its
-    /// receipt — deriving consumed here would let the hot path fatalEnd without
-    /// ever injecting the AABB repair (budget stolen across a crash).
+    /// Pure transcript evidence never derives AabbRepairConsumed. Idle-issued
+    /// AABB has a separate durable `blogger-aabb` InteractionRepair claim; the
+    /// journal-aware probes below may restore that stage, but this pure function
+    /// must never invent it from prose terminals alone.
     let rejudgeFromEvidence
         (claimedTerminalRun: string option)
         (completedAssistants: (string * bool) list)
@@ -145,10 +154,11 @@ module BloggerRecoveryProbe =
                 None)
 
     /// Durable claim for repairKind against a terminal run (ClaimSequences read).
-    let private repairClaimedFor
+    let private repairClaimedForKind
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
         (terminalRun: ProviderRunIdentity)
+        (repairKind: string)
         : bool =
         let projections = (AgentJournal.snapshot journal).AgentProjections
 
@@ -161,24 +171,44 @@ module BloggerRecoveryProbe =
                 profile.SessionId
                 profile.LogicalRunId
                 terminalRun
-                BloggerMissingToolRepairKind
+                repairKind
                 authProj
         | _ -> false
 
+    let private repairClaimedFor journal bloggerSessionId terminalRun =
+        repairClaimedForKind journal bloggerSessionId terminalRun BloggerMissingToolRepairKind
+
     /// When the claimed terminal is absent from the Host snapshot, recover its run id
     /// from ClaimSequences scopes (session \u001f run \u001f InteractionRepair \u001f run \u001f kind).
-    let private claimedRunFromSequences (journal: AgentJournal) (bloggerSessionId: SessionId) : string option =
+    let private claimedRunFromSequencesFor
+        (repairKind: string)
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        : string option =
         let projections = (AgentJournal.snapshot journal).AgentProjections
 
-        match PromptAuthorityLedger.projectionFor bloggerSessionId projections with
-        | None -> None
-        | Some authProj ->
-            let suffix = "\u001f" + BloggerMissingToolRepairKind
+        match
+            PromptAuthorityLedger.activeProfile bloggerSessionId projections,
+            PromptAuthorityLedger.projectionFor bloggerSessionId projections
+        with
+        | Some profile, Some authProj ->
+            let prefix =
+                System.String.Join(
+                    "\u001f",
+                    [| SessionId.value profile.SessionId
+                       LogicalRunId.value profile.LogicalRunId
+                       "InteractionRepair" |]
+                )
+                + "\u001f"
+
+            let suffix = "\u001f" + repairKind
 
             authProj.ClaimSequences
             |> Map.toList
             |> List.tryPick (fun (scope, seq) ->
                 if seq < 1 then
+                    None
+                elif not (scope.StartsWith(prefix, System.StringComparison.Ordinal)) then
                     None
                 elif not (scope.EndsWith(suffix, System.StringComparison.Ordinal)) then
                     None
@@ -195,6 +225,38 @@ module BloggerRecoveryProbe =
                             None
                         else
                             Some runId)
+        | _ -> None
+
+    let private claimedRunFromSequences journal bloggerSessionId =
+        claimedRunFromSequencesFor BloggerMissingToolRepairKind journal bloggerSessionId
+
+    let private aabbClaimed journal bloggerSessionId =
+        claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId |> Option.isSome
+
+    /// Invalid-terminal stage preserves WHICH terminal received the AABB. Idle
+    /// may be delivered repeatedly for one terminal, so stage identity is part
+    /// of the idempotency proof.
+    let repairStateForInvalidTerminal
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (terminalRun: ProviderRunIdentity)
+        : InvalidTerminalRepairState =
+        match claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId with
+        | Some claimedRun ->
+            InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun)
+        | None when repairClaimedFor journal bloggerSessionId terminalRun ->
+            InvalidTerminalRepairState.InteractionNudgeIssued terminalRun
+        | None ->
+            match claimedRunFromSequences journal bloggerSessionId with
+            | Some claimedRun ->
+                InvalidTerminalRepairState.InteractionNudgeIssued(ProviderRunIdentity.create claimedRun)
+            | None -> InvalidTerminalRepairState.NoRecovery
+
+    let private toolRecoveryOfInvalidTerminal =
+        function
+        | InvalidTerminalRepairState.NoRecovery -> BloggerToolRecovery.NoRecovery
+        | InvalidTerminalRepairState.InteractionNudgeIssued run -> BloggerToolRecovery.InteractionNudgeIssued run
+        | InvalidTerminalRepairState.AabbRepairIssued _ -> BloggerToolRecovery.AabbRepairConsumed
 
     /// ENFORCER-153: rejudge BloggerToolRecovery from claim + Host transcript.
     let rejudgeToolRecovery
@@ -219,7 +281,10 @@ module BloggerRecoveryProbe =
             | Some _ as hit -> hit
             | None -> claimedRunFromSequences journal bloggerSessionId
 
-        rejudgeFromEvidence claimedTerminalRun terminals
+        if aabbClaimed journal bloggerSessionId then
+            BloggerToolRecovery.AabbRepairConsumed
+        else
+            rejudgeFromEvidence claimedTerminalRun terminals
 
     /// True when a raw Host message is an AABB repair instruction we injected for `requestKey`.
     let private aabbRepairInjected (requestKey: string) (rawMessages: obj list) : bool =
@@ -262,13 +327,6 @@ module BloggerRecoveryProbe =
         : BloggerToolRecovery =
         if aabbRepairInjected requestKey rawMessages then
             BloggerToolRecovery.AabbRepairConsumed
-        elif repairClaimedFor journal bloggerSessionId terminalRun then
-            BloggerToolRecovery.InteractionNudgeIssued terminalRun
         else
-            // A claim exists for an earlier terminal: nudge was accepted, this is
-            // a new failure terminal → semantic failure, AABB applies. The payload
-            // must be the CLAIMED run — handleContinuation compares it against the
-            // current terminal to tell re-entry from a new failure.
-            match claimedRunFromSequences journal bloggerSessionId with
-            | Some claimedRun -> BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimedRun)
-            | None -> BloggerToolRecovery.NoRecovery
+            repairStateForInvalidTerminal journal bloggerSessionId terminalRun
+            |> toolRecoveryOfInvalidTerminal
