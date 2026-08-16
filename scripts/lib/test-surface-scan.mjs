@@ -29,6 +29,9 @@ export const REQUIREMENTS_ROOT = join(
 export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/verification-system/tests/guide-contract.test.mjs',
   'requirements/verification-system/tests/domain.meta.test.mjs',
+  // Its subject is the coverage/build runner itself, including the literal
+  // fable_modules exclusion that keeps the coverage denominator honest.
+  'requirements/verification-system/tests/coverage-gate.test.mjs',
   'requirements/execution-model-routing/tests/process-shared-routing.test.mjs',
   'requirements/distribution/tests/pack-closure.test.mjs',
   'requirements/distribution/tests/cwd-independent-resources.test.mjs',

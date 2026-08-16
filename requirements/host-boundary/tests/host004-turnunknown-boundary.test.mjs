@@ -13,11 +13,10 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
-const mod = await import('../../../dist/Composition/Turn/Program.js')
+import { reconcileProgram } from '../../verification-system/tests/support/domain.mjs'
 
 test('WHAT[HOST-BOUNDARY-004] TurnUnknown is not a TurnOutcome case', () => {
-  const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+  const turnOutcomeCases = reconcileProgram.turnOutcomeCases()
   assert.equal(
     turnOutcomeCases.includes('TurnUnknown'),
     false,
@@ -26,15 +25,13 @@ test('WHAT[HOST-BOUNDARY-004] TurnUnknown is not a TurnOutcome case', () => {
 })
 
 test('WHAT[HOST-BOUNDARY-004] TurnUnknown lives only in SnapshotObservation', () => {
-  const observationCases = Object.create(mod.SnapshotObservation.prototype).cases()
+  const observationCases = reconcileProgram.snapshotObservationCases()
   assert.deepEqual(observationCases, ['TurnUnknown'], 'SnapshotObservation is the private carrier for TurnUnknown only')
-  assert.equal(mod.SnapshotObservation.TurnUnknown instanceof mod.SnapshotObservation, true)
+  assert.equal(reconcileProgram.snapshotUnknownIsInstance(), true)
 })
 
 test('WHAT[HOST-BOUNDARY-004] outcomeOf refuses TurnUnknown instead of minting a TurnOutcome', () => {
-  assert.throws(
-    () => mod.outcomeOf('TurnUnknown'),
-    /TurnUnknown is SnapshotObservation, not a TurnOutcome/,
-    'minting TurnUnknown as a TurnOutcome must fail closed, never silently collapse',
-  )
+  const outcome = reconcileProgram.tryOutcome('TurnUnknown')
+  assert.equal(outcome.accepted, false)
+  assert.match(outcome.error, /TurnUnknown is SnapshotObservation, not a TurnOutcome/)
 })

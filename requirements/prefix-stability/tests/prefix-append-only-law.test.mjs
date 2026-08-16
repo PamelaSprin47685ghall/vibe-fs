@@ -94,14 +94,12 @@ test('WHAT[PREFIX-STABILITY-011] PREFIX_STABILITY_epoch_switches_are_fact_driven
 
   // 无估算/修补通道：与 CTX-010 的「无 rollback 类别」同一断言模式，投影的
   // 输入面就是它暴露的键集合；出现估算键即证明 epoch 可被非事实驱动。
-  const api = Object.keys(prefix)
-  for (const forbidden of ['estimate', 'limit', 'token', 'elapsed', 'repair', 'mask', 'drift']) {
-    assert.equal(
-      api.some((key) => key.toLowerCase().includes(forbidden)),
-      false,
-      `projection must not expose a ${forbidden} channel for epoch switching`,
-    )
-  }
+  const forbidden = ['estimate', 'limit', 'token', 'elapsed', 'repair', 'mask', 'drift']
+  assert.deepEqual(
+    prefix.forbiddenApiFragments(forbidden),
+    [],
+    'projection must expose no estimate/limit/token/repair channel for epoch switching',
+  )
 
   // 提交一个新 epoch 也不改写已呈现字节：rebase 输入是 candidate 事实
   // （cutoff/digest/seal），不是 wire 内容——漂移的 wire 与 epoch 状态无关。

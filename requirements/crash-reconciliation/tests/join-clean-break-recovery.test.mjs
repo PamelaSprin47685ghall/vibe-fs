@@ -14,7 +14,6 @@ import test from 'node:test'
 import {
   agentCompletion,
   agentJournal,
-  caseOf,
   childRecovery,
   forkRuntime,
   handleCompletionCodec,
@@ -64,17 +63,13 @@ test('WHAT[CRASH-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_jo
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
     // Host Aborted observation while recovery still incomplete → never Joinable.
-    const resolution = childRecovery.resolveChild(
+    const resolution = childRecovery.resolutionName(
       childRecovery.durableActive(),
       childRecovery.snapshotMissing(),
       [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
     )
-    assert.notEqual(caseOf(resolution), 'RecoveredTerminal')
-    assert.equal(
-      caseOf(resolution),
-      'RecoveryIncomplete',
-      `expected RecoveryIncomplete, got ${caseOf(resolution)}`,
-    )
+    assert.notEqual(resolution, 'RecoveredTerminal')
+    assert.equal(resolution, 'RecoveryIncomplete')
 
     // Before true terminal: drain empty, HandleRetired=0, no aborted item.
     const early = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
@@ -127,13 +122,13 @@ test('WHAT[CRASH-010] P0_CLEAN_BREAK_aborted_only_observation_is_incomplete_not_
 
     // CRASH-010: 缺 terminal 证据（aborted-only + restore in flight）→
     // RecoveryIncomplete（等待，不发 permit），不是硬 RecoveryBlocked。
-    const resolution = childRecovery.resolveChild(
+    const resolution = childRecovery.resolutionName(
       childRecovery.durableActive(),
       childRecovery.snapshotMissing(),
       [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
     )
-    assert.equal(caseOf(resolution), 'RecoveryIncomplete')
-    assert.notEqual(caseOf(resolution), 'RecoveryBlocked')
+    assert.equal(resolution, 'RecoveryIncomplete')
+    assert.notEqual(resolution, 'RecoveryBlocked')
 
     // 等待期间 join drain 为空且不 retire。
     const early = await joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)

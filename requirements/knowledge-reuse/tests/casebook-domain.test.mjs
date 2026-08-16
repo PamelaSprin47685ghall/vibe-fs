@@ -11,7 +11,6 @@ import test from 'node:test'
 
 import {
   Observation,
-  Observations_normalize as normalize,
   Observations_classifyReplay as classifyReplay,
   CasebookEvent,
   CasebookProjection_emptyState as emptyState,
@@ -19,6 +18,7 @@ import {
   CasebookProjection_evict as evict,
 } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { caseOf, listItems, mapEntries, toList } from '../../verification-system/tests/support/domain.mjs'
+import { casebookContract } from './support/casebook-contract.mjs'
 
 const caseIndex = (cls, name) => Object.create(cls.prototype).cases().indexOf(name)
 const observation = (name, payload) => new Observation(caseIndex(Observation, name), payload)
@@ -35,9 +35,8 @@ const evicted = (sessionId) => event('CaseEvicted', [sessionId])
 
 test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
-  const normalized = listItems(normalize(toList(obs)))
   // same identity → one entry; glob paths order-insensitive
-  assert.equal(normalized.length, 2)
+  assert.equal(casebookContract.normalizedCount(obs), 2)
 })
 
 test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {

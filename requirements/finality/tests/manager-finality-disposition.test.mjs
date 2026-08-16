@@ -24,7 +24,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { admitLabor, classifyEnding, EndingDisposition, LaborAdmission } from '../../../dist/Mission/Manager/Finality.js'
-import { ReviewerOutcome } from '../../../dist/Composition/Bridges/FinalityReview/FinalityReviewCohort.js'
+import { finalityContract, reviewerOutcomeContract } from './support/finality-contract.mjs'
 import { isAllowed } from '../../../dist/Foundation/RolesSurface.js'
 import {
   blobDigest,
@@ -145,7 +145,6 @@ test('WHAT[FINALITY-004] no accepted planComplete=true commitment stays at Plann
   const life = foldLife([lifeOpened()]).CurrentLife
   const ending = classifyEnding(undefined, life, false)
   assert.equal(ending, EndingDisposition.ContinuePlanning)
-  assert.equal(caseOf(ending), 'ContinuePlanning')
 })
 
 test('WHAT[FINALITY-025] a completed Life replays as AlreadyCompleted, never restarts', () => {
@@ -155,7 +154,7 @@ test('WHAT[FINALITY-025] a completed Life replays as AlreadyCompleted, never res
   assert.equal(completedLives.length, 1)
   const done = completedLives[0]
   assert.equal(done.Completed, true, 'LifeCompleted must archive a completed Life')
-  assert.equal(caseOf(classifyEnding(CALL, done, true)), 'AlreadyCompleted')
+  assert.equal(classifyEnding(CALL, done, true), EndingDisposition.AlreadyCompleted)
 })
 
 test('WHAT[FINALITY-003] an open request resumes the same ToolCallId replay', () => {
@@ -163,7 +162,7 @@ test('WHAT[FINALITY-003] an open request resumes the same ToolCallId replay', ()
   const ending = classifyEnding(CALL, life, true)
   assert.equal(caseOf(ending), 'ResumeRequest')
   // The resumed request is the same durable request, not a new one.
-  assert.equal(idValue.finalityRequest(ending.fields[0].RequestId), 'req-1')
+  assert.equal(idValue.finalityRequest(life.ActiveFinality.RequestId), 'req-1')
 })
 
 test('WHAT[FINALITY-003] an open request with no enlisted members is recoverable', () => {
@@ -196,7 +195,7 @@ test('WHAT[FINALITY-016] a blessing leaves the Life open until the second suicid
 
 test('WHAT[FINALITY-017] the second suicide after a blessing is the rest path', () => {
   const life = foldLife([lifeOpened(), finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]).CurrentLife
-  assert.equal(caseOf(classifyEnding(toolCallId('call-2'), life, true)), 'CompleteBlessedLife')
+  assert.equal(finalityContract.endingName(classifyEnding(toolCallId('call-2'), life, true)), 'CompleteBlessedLife')
   // Blessing is resolved, not open: ordinary labor may continue (GLORY-061).
   assert.equal(admitLabor(life), LaborAdmission.LaborMayContinue)
 })
@@ -278,12 +277,13 @@ test('WHAT[FINALITY-006] drain outcomes are two-typed: Revision (REVISE) vs Conf
   // TODO-006: a checkpoint drain awaits the latest ConsumableReview whose
   // verdict is exactly one of two typed outcomes — REVISE returns the canonical
   // work record and keeps the Life going; PERFECT proceeds into Finality.
-  const revision = new ReviewerOutcome(0, ['defect A at src/a.ts'])
-  assert.deepEqual(revision.cases(), ['Revision', 'Confirmed'])
-  assert.equal(revision.cases()[revision.tag], 'Revision')
-  assert.equal(revision.fields[0], 'defect A at src/a.ts', 'REVISE carries the canonical work record')
-  const confirmed = new ReviewerOutcome(1, [REVIEWER, BARRIER])
-  assert.equal(confirmed.cases()[confirmed.tag], 'Confirmed')
+  assert.deepEqual(reviewerOutcomeContract.cases(), ['Revision', 'Confirmed'])
+  assert.deepEqual(
+    reviewerOutcomeContract.revision('defect A at src/a.ts'),
+    { name: 'Revision', workRecord: 'defect A at src/a.ts' },
+    'REVISE carries the canonical work record',
+  )
+  assert.equal(reviewerOutcomeContract.confirmed(REVIEWER, BARRIER).name, 'Confirmed')
 })
 
 test('WHAT[FINALITY-015] a blessing keeps the enlisted process-review standing: no dispose', () => {

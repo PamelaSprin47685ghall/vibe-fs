@@ -124,7 +124,7 @@ test('WHAT[HOST-BOUNDARY-017] AGENT_026_configure_injects_mcp_on_ok_and_error', 
   assert.equal(typeof okConfig.mcp[serverName].enabled, 'boolean')
 
   const bad = buildConfig()
-  delete bad.agent['fast-browser']
+  bad.agent.coder = {}
   assert.equal(managedAgentConfig.configure(bad).ok, false)
   assert.equal(bad.mcp[serverName].type, 'local')
 })

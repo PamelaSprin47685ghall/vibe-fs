@@ -21,6 +21,7 @@ import {
   blobDigest,
   blobRef,
   hostToolPartId,
+  idValue,
   magicTodo,
   magicTodoHost,
   magicTodoJournal,
@@ -492,8 +493,8 @@ test('WHAT[OBLIGATION-LEDGER-010] T1 accept makes the proposed account Current i
       const { t1 } = await acceptT1Checkpoint(journal, session, life, 'call-magic-todo-t1')
 
       const lifeState = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life-magic-todo-t1-t2-lag1')
-      assert.equal(lifeState.CurrentObligationsRef[0].fields[0], t1.result.value.Prepared.ProposedTodoRef.fields[0])
-      assert.equal(lifeState.CurrentObligationsRef[1].fields[0], t1.result.value.Prepared.ProposedTodoDigest.fields[0])
+      assert.equal(idValue.blobRef(lifeState.CurrentObligationsRef[0]), idValue.blobRef(t1.result.value.Prepared.ProposedTodoRef))
+      assert.equal(idValue.blobDigest(lifeState.CurrentObligationsRef[1]), idValue.blobDigest(t1.result.value.Prepared.ProposedTodoDigest))
     } finally {
       providerLanguage.clearAllForTests()
     }

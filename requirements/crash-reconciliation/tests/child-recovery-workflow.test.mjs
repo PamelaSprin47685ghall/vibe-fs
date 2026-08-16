@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   agentJournal,
-  caseOf,
   childRecovery,
   clockPort,
   errorResult,
@@ -17,7 +16,7 @@ import {
   sessionId,
   toList,
 } from '../../verification-system/tests/support/domain.mjs'
-import { Ports, resolveAndCommit } from '../../../dist/Execution/Delegation/ChildRecoveryWorkflow.js'
+import { childRecoveryWorkflow } from './support/child-recovery-workflow.mjs'
 
 const PARENT = sessionId('ses_child_recovery_parent')
 const CHILD = sessionId('ses_child_recovery_child')
@@ -38,19 +37,19 @@ const linkedPorts = async (journal, messages, observations, pulse = undefined, s
   const linked = await handleController.link(journal, PARENT, AGENT_ID, CHILD, 'fast-coder', roles.of('Coder'))
   assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
   const clock = clockPort.createVirtual()
-  return new Ports(
+  return childRecoveryWorkflow.ports({
     journal,
-    PARENT,
-    { GetMessages: () => Promise.resolve(snapshotResult) },
-    AGENT_ID,
-    HANDLE,
-    CHILD,
-    roles.of('Coder'),
-    'fast-coder',
-    toList(observations),
+    parent: PARENT,
+    snapshotResult,
+    agentId: AGENT_ID,
+    handle: HANDLE,
+    child: CHILD,
+    role: roles.of('Coder'),
+    targetAgent: 'fast-coder',
+    observations,
     pulse,
-    clock.rawPort,
-  )
+    clock: clock.rawPort,
+  })
 }
 
 test('WHAT[CRASH-002] VERIFY_008_child_recovery_workflow_commits_terminal_snapshot_then_pulses', async () => {
@@ -68,10 +67,10 @@ test('WHAT[CRASH-002] VERIFY_008_child_recovery_workflow_commits_terminal_snapsh
       },
     )
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveredTerminal')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveredTerminal')
     assert.equal(pulses, 1)
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'CompletedAwaitingJoin')
   })
@@ -88,10 +87,10 @@ test('WHAT[CRASH-010] VERIFY_008_child_recovery_workflow_returns_active_without_
       [childRecovery.sessionActive()],
     )
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveredActive')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveredActive')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Active')
   })
 })
@@ -100,10 +99,10 @@ test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_waits_without_committin
   await withJournal(async (journal) => {
     const ports = await linkedPorts(journal, [], [], undefined, errorResult('snapshot unavailable'))
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryIncomplete')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryIncomplete')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Active')
   })
 })
@@ -118,10 +117,10 @@ test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_blocks_retired_handle',
     const retired = await handleController.retire(journal, PARENT, AGENT_ID)
     assert.equal(retired.ok, true, retired.ok ? '' : retired.error)
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryBlocked')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryBlocked')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Retired')
   })
 })
@@ -137,13 +136,13 @@ test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_incomplete_when_termina
       [],
     )
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
     // A whitespace-only terminal body is not a legal terminal: isTerminalCompleted
     // treats it as an active child, and no session-active observation is present,
     // so resolution is RecoveryIncomplete (no permit issued, handle stays Active).
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryIncomplete')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryIncomplete')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Active')
   })
 })
@@ -165,10 +164,10 @@ test('WHAT[CRASH-012] VERIFY_008_child_recovery_workflow_commits_terminal_then_p
       },
     )
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveredTerminal')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveredTerminal')
     assert.equal(pulses, 1, 'recordCompletion 后仅 Pulse 唤醒一次，不重复投递')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'CompletedAwaitingJoin')
   })
@@ -178,13 +177,13 @@ test('WHAT[CRASH-010] VERIFY_008_child_recovery_workflow_unreadable_snapshot_is_
   await withJournal(async (journal) => {
     const ports = await linkedPorts(journal, [], [], undefined, errorResult('snapshot unavailable'))
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
     // CRASH-010: Waiting ≠ Blocked —— 真读错误是 Incomplete（等待，不发 permit），
     // 不是硬 RecoveryBlocked。
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryIncomplete')
-    assert.notEqual(caseOf(result.fields[0]), 'RecoveryBlocked')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryIncomplete')
+    assert.notEqual(result.resolution, 'RecoveryBlocked')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Active')
   })
 })
@@ -197,12 +196,12 @@ test('WHAT[CRASH-010] VERIFY_008_child_recovery_workflow_retired_handle_is_block
     const retired = await handleController.retire(journal, PARENT, AGENT_ID)
     assert.equal(retired.ok, true, retired.ok ? '' : retired.error)
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
     // CRASH-010: 冲突 / retired 证据 → RecoveryBlocked（硬失败分支，与 Incomplete 互斥）。
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryBlocked')
-    assert.notEqual(caseOf(result.fields[0]), 'RecoveryIncomplete')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryBlocked')
+    assert.notEqual(result.resolution, 'RecoveryIncomplete')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Retired')
   })
 })
@@ -218,12 +217,12 @@ test('WHAT[CRASH-010] VERIFY_008_child_recovery_workflow_blank_terminal_body_is_
       [],
     )
 
-    const result = await resolveAndCommit(ports)
+    const result = await childRecoveryWorkflow.resolve(ports)
 
     // CRASH-010: 缺 terminal 证据 → RecoveryIncomplete（必须等），不是 Blocked。
-    assert.equal(caseOf(result), 'Ok')
-    assert.equal(caseOf(result.fields[0]), 'RecoveryIncomplete')
-    assert.notEqual(caseOf(result.fields[0]), 'RecoveryBlocked')
+    assert.equal(result.ok, true)
+    assert.equal(result.resolution, 'RecoveryIncomplete')
+    assert.notEqual(result.resolution, 'RecoveryBlocked')
     assert.equal(handleProjection.read(agentJournal.handleProjection(journal, PARENT).Handles.get(HANDLE)).lifecycle, 'Active')
   })
 })

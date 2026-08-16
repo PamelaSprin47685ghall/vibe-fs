@@ -31,7 +31,17 @@ import {
   stringSet,
   mapCount,
   BUILD_ROOT,
+  prod,
 } from './interop.mjs'
+const EnforcerRepairModule = await prod('Enforcer/Repair')
+
+export const blogAttemptEvidence = {
+  classify: (rawMessages) => ({
+    aborted: EnforcerRepairModule.hasAbortedBlogAttempt(toList(rawMessages)),
+    errored: EnforcerRepairModule.hasErroredBlogAttempt(toList(rawMessages)),
+  }),
+}
+
 import {
   providerRun,
   toolCallId,

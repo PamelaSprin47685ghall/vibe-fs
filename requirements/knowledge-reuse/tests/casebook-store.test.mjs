@@ -16,6 +16,7 @@ import {
 import { Observation } from '../../../dist/Repository/Knowledge/Casebook/Model.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 import { caseOf, listItems, mapEntries, resultOf, toList } from '../../verification-system/tests/support/domain.mjs'
+import { casebookContract } from './support/casebook-contract.mjs'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, hash) => new Observation(obsIndex('FileRead'), [path, hash])
@@ -147,14 +148,13 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_refresh_and_needsRefresh_replay_the_same
 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
-  const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const local = createLocalEventStore()
   try {
-    assert.equal(resultOf(await finalizeCase(local.store, caseRec('scope-1', 'Q', 'A', []))).ok, true)
-    const second = resultOf(await finalizeCase(local.store, caseRec('scope-1', 'Q', 'A2', [])))
+    assert.equal((await casebookContract.finalize(local.store, caseRec('scope-1', 'Q', 'A', []))).ok, true)
+    const second = await casebookContract.finalize(local.store, caseRec('scope-1', 'Q', 'A2', []))
     assert.equal(second.ok, false)
     assert.match(second.error, /already finalized/)
-    assert.equal(resultOf(await finalizeCase(local.store, caseRec('scope-2', 'Q', 'A', []))).ok, true)
+    assert.equal((await casebookContract.finalize(local.store, caseRec('scope-2', 'Q', 'A', []))).ok, true)
   } finally {
     local.close()
   }

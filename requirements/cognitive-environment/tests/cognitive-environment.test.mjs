@@ -59,14 +59,12 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 const LANGUAGE = 'English'
 
 test('WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role', () => {
-  const catalog = promptResources.loadForLanguage(LANGUAGE)
-  const prompts = Object.values(catalog)
+  const prompts = promptResources.allForLanguage(LANGUAGE)
   assert.equal(prompts.length, 10, 'exactly one canonical system prompt per public office')
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates', () => {
-  const catalog = promptResources.loadForLanguage(LANGUAGE)
-  const prompts = Object.values(catalog)
+  const prompts = promptResources.allForLanguage(LANGUAGE)
   const unique = new Set(prompts)
   assert.equal(unique.size, 10, 'no two offices share a prompt; no tier-split duplicates')
 })
@@ -86,8 +84,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-004] CE_prompt_015_system_prompt_does_not_enumerate_runtime_tool_surface', () => {
-  const catalog = promptResources.loadForLanguage(LANGUAGE)
-  for (const prompt of Object.values(catalog)) {
+  for (const prompt of promptResources.allForLanguage(LANGUAGE)) {
     assert.doesNotMatch(prompt, /\b(fast|deep)-[a-z]+/, 'machine binding names must not appear in system prompts')
     assert.doesNotMatch(prompt, /auto-injected|ToolPermission/, 'runtime tool-surface machinery must not enter Role Law')
   }

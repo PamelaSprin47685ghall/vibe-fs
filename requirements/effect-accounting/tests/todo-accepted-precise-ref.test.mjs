@@ -8,7 +8,6 @@ import test from 'node:test'
 import {
   blobDigest,
   blobRef,
-  caseOf,
   eventId,
   magicTodo,
   magicTodoJournal,
@@ -21,11 +20,11 @@ const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('manager-life-011')
 const managerSession = sessionId('manager-session-011')
 const call = toolCallId('todo-call-011')
-const cursor = (sequence) => new magicTodoJournal.XTraceCursor(BigInt(sequence))
+const cursor = (sequence) => magicTodoJournal.cursor(sequence)
 const write = magicTodo.todoWriteId(sha256, life, call)
 const preparedFactRef = eventId('prepared-fact-ref-011')
 
-const prepared = new magicTodoJournal.TodoWritePrepared(
+const prepared = magicTodoJournal.prepared([
   managerSession,
   life,
   write,
@@ -39,67 +38,58 @@ const prepared = new magicTodoJournal.TodoWritePrepared(
   'provider-input-digest-011',
   cursor(10),
   'magic-v1',
-)
+])
 
 const accepted = (ref = preparedFactRef) =>
-  new magicTodoJournal.TodoWriteAccepted(
+  magicTodoJournal.accepted([
     life,
     write,
     call,
     ref,
     'provider-input-digest-011',
     'output-digest-011',
-    magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+    magicTodoJournal.physicalSuccess('LiveAfterSuccess'),
     'magic-v1',
-  )
+  ])
 
-const fact = (caseName, payload) => magicTodoJournal.MagicTodoFact(caseName, [payload])
-const ok = (result) => {
-  assert.equal(result.tag, 0, `expected Ok, got ${JSON.stringify(result.fields?.[0])}`)
-  return result.fields[0]
-}
-const error = (result) => {
-  assert.equal(result.tag, 1, 'expected Error')
-  return result.fields[0]
+const fact = (caseName, payload) => magicTodoJournal.fact(caseName, payload)
+const fold = (event, state, value) => magicTodoJournal.foldView(event, state, value)
+const acceptedState = (result) => {
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.state
 }
 
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_without_any_prepared_is_rejected', () => {
   // 没有 TodoWritePrepared 就 Accept：Prepared 缺失 → 拒绝，绝不静默接受。
-  const rejected = error(
-    magicTodoJournal.fold(eventId('env-011-1'), magicTodoJournal.empty, fact('TodoWriteAccepted', accepted())),
-  )
-  assert.equal(rejected.cases()[rejected.tag], 'PreparedMissingForAccept')
+  const rejected = fold(eventId('env-011-1'), magicTodoJournal.empty, fact('TodoWriteAccepted', accepted()))
+  assert.deepEqual(rejected, { ok: false, error: 'PreparedMissingForAccept' })
 })
 
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_another_prepared_envelope_is_identity_corruption', () => {
   // Prepared 存在但 Accepted 指名另一个 envelope：PreparedFactRef 失配 → IdentityCorruption。
   let state = magicTodoJournal.empty
-  state = ok(magicTodoJournal.fold(preparedFactRef, state, fact('TodoWritePrepared', prepared)))
-  const rejected = error(
-    magicTodoJournal.fold(
-      eventId('env-011-2'),
-      state,
-      fact('TodoWriteAccepted', accepted(eventId('different-prepared-fact-ref-011'))),
-    ),
+  state = acceptedState(fold(preparedFactRef, state, fact('TodoWritePrepared', prepared)))
+  const rejected = fold(
+    eventId('env-011-2'),
+    state,
+    fact('TodoWriteAccepted', accepted(eventId('different-prepared-fact-ref-011'))),
   )
-  assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
+  assert.deepEqual(rejected, { ok: false, error: 'IdentityCorruption' })
 })
 
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_exact_prepared_switches_current_immediately', () => {
   // 精确指名 Prepared 的 Accepted 通过，且 Current 立即切换为 proposal list。
   let state = magicTodoJournal.empty
-  state = ok(magicTodoJournal.fold(preparedFactRef, state, fact('TodoWritePrepared', prepared)))
-  state = ok(
-    magicTodoJournal.fold(
+  state = acceptedState(fold(preparedFactRef, state, fact('TodoWritePrepared', prepared)))
+  state = acceptedState(
+    fold(
       eventId('env-011-3'),
       state,
       fact('TodoWriteAccepted', accepted(preparedFactRef)),
     ),
   )
-  const lifeState = state.ByLife.get(managerLifeIdValue(life))
-  assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list-011')
-  assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest-011')
+  assert.deepEqual(magicTodoJournal.currentObligationRefs(state, life), {
+    ref: 'proposal-list-011',
+    digest: 'proposal-digest-011',
+  })
 })
-
-// facade 的 managerLifeId 值提取（Fable union 单 case 包装）。
-const managerLifeIdValue = (value) => value.fields?.[0] ?? value

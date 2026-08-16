@@ -166,8 +166,8 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
     sequence: { ...base, sequence: 2 },
   }
 
-  for (const [name, variant] of Object.entries(variants)) {
-    assert.notEqual(derive(variant), derive(base), `${name} must participate in the PromptKey`)
+  for (const name of ['session', 'origin', 'agent', 'payload', 'sequence']) {
+    assert.notEqual(derive(variants[name]), derive(base), `${name} must participate in the PromptKey`)
   }
 })
 

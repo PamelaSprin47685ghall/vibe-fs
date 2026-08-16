@@ -45,11 +45,10 @@ test('WHAT[CRASH-003] unknown_effect_without_quiescence_is_not_replayed', () => 
   assert.equal(name(3, reconcileProgram.evidence.unknown(), reconcileWake.retryWake()), 'Reread')
 })
 
-test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', async () => {
+test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', () => {
   // ReconcileDecision 只有 observation vocabulary：Reread / Publish / StopPass。
   // 不含任何业务 repair 名字（CRASH-003/004 同一契约面）。
-  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
-  const decisionCases = Object.create(mod.ReconcileDecision.prototype).cases()
+  const decisionCases = reconcileProgram.decisionCases()
   assert.deepEqual(
     decisionCases,
     ['Reread', 'Publish', 'StopPass'],
@@ -62,11 +61,9 @@ test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', asy
   )
 })
 
-test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', async () => {
-  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
-
+test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', () => {
   // TurnUnknown 不在 TurnOutcome case 列表里：publishDecision 在类型上不可接收它。
-  const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+  const turnOutcomeCases = reconcileProgram.turnOutcomeCases()
   assert.deepEqual(
     turnOutcomeCases,
     ['TurnInProgress', 'TurnNeedsContinuation', 'TurnCompleted', 'TurnAborted', 'TurnFailed'],
@@ -74,42 +71,25 @@ test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', as
   )
 
   // TurnUnknown 只作为 reconciliation 私有 SnapshotObservation 存在。
-  assert.equal(typeof mod.SnapshotObservation, 'function')
   assert.deepEqual(
-    Object.create(mod.SnapshotObservation.prototype).cases(),
+    reconcileProgram.snapshotObservationCases(),
     ['TurnUnknown'],
     'SnapshotObservation must carry TurnUnknown only',
   )
 
   // outcomeOf 拒绝把 TurnUnknown 铸成 TurnOutcome（不得静默 mint，也不得塌缩成
   // TurnFailed 假 terminal）。
-  let minted
-  let refused = false
-  try {
-    minted = mod.outcomeOf('TurnUnknown')
-  } catch {
-    refused = true
-  }
-  if (!refused) {
-    assert.notEqual(
-      minted.cases()[minted.tag],
-      'TurnUnknown',
-      'outcomeOf("TurnUnknown") must not return a TurnOutcome.TurnUnknown case',
-    )
-    assert.notEqual(
-      minted.cases()[minted.tag],
-      'TurnFailed',
-      'outcomeOf("TurnUnknown") must not collapse Unknown into a false TurnFailed terminal',
-    )
+  const minted = reconcileProgram.tryOutcome('TurnUnknown')
+  if (minted.accepted) {
+    assert.notEqual(minted.name, 'TurnUnknown')
+    assert.notEqual(minted.name, 'TurnFailed')
   }
 })
 
-test('WHAT[CRASH-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', async () => {
+test('WHAT[CRASH-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', () => {
   // publishDecision 的交接面 PublishTurn.Outcome 的 reflection 类型是 TurnOutcome；
   // 结构上不可能携带 SnapshotObservation。
-  const mod = await import(new URL('../../../dist/Composition/Turn/Program.js', import.meta.url).pathname)
-  const publishTurnRef = mod.PublishTurn_$reflection()
-  const outcomeFieldType = JSON.stringify((publishTurnRef.fields() ?? []).find(([name]) => name === 'Outcome')?.[1] ?? '')
+  const outcomeFieldType = reconcileProgram.publishOutcomeFieldType()
   assert.match(outcomeFieldType, /TurnOutcome/, 'PublishTurn.Outcome must be typed TurnOutcome')
   assert.doesNotMatch(
     outcomeFieldType,
