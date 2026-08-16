@@ -21,7 +21,7 @@
 * P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
 * P7 — NOT PROVEN：RolesSurface 是 vocabulary/policy surface，不证明 stateful runtime
 * P8 — NOT PROVEN：删 dead compatibility code 不等于 effect boundary 重构
-* P9 — STARTED：6 dead adapters deleted; 355 domain.mjs consumers remain; exit condition NOT MET
+* P9 — STARTED：6 dead adapters deleted; 331 domain.mjs consumers remain; exit condition NOT MET
 
 这些标记和仓库事实对不上。
 
@@ -127,7 +127,7 @@ P9 完成条件：
 
 紧接着“达成”：
 
-> **328 文件仍 import domain.mjs**。
+> **331 文件仍 import domain.mjs**。
 
 这种情况下打 ✅ 是不可接受的。
 
@@ -136,7 +136,7 @@ P9 完成条件：
 ```text
 P9 — STARTED
 6 dead adapters deleted
-328 domain.mjs consumers remain
+331 domain.mjs consumers remain
 exit condition NOT MET
 ```
 
@@ -4782,19 +4782,50 @@ requirements/<owner>/WHAT.md
 - P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
 - P7 — NOT PROVEN
 - P8 — NOT PROVEN
-- P9 — STARTED：6 dead adapters deleted; 355 domain.mjs consumers remain; exit condition NOT MET
+- P9 — STARTED：6 dead adapters deleted; 331 domain.mjs consumers remain; exit condition NOT MET
 
 虚假完成状态已撤销；后续 PR 按新 DoD 推进。
 
 ---
 
-# PR 1 / PR 3 / PR 4 / PR 5 / PR 8 完成（2026-08-16）
+# 第一轮整改进度（2026-08-16，待集成验证）
 
-- PR 1：semantic-test zone scanner 已覆盖 `requirements/**/tests/**/*.mjs`（含 support/fixtures/helpers）；regression fixture `requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs` 已存在并持续被扫描。
-- PR 3：FinalitySurface 已就位，`manager-finality-disposition.test.mjs` 仅使用 `dist/Mission/Manager/FinalitySurface.js` 与 `dist/Foundation/RolesSurface.js`，无 Fable 内部知识。
-- PR 4：CasebookSurface 已就位，`casebook-domain.test.mjs` 仅使用 `dist/Repository/Knowledge/Casebook/Surface.js`。
-- PR 5：EventStoreSurface / JournalSurface 已就位，替代旧的 monolithic event-store support；相关 durable-events 测试使用 surface。
-- PR 8：requirement-trace 双向闭环已达成（666 WHAT / 3087 tests / 0 orphan / 0 unproved）。
-- js-boundary-baseline 已重新生成，从 310 条降到 307 条（删除 stale finality-contract / casebook-contract 条目）。
+已完成代码切片，尚未宣称 milestone 完成：
 
-剩余主战线：PR 2（Fission/Distiller surface）、PR 6（domain.mjs 迁移）、PR 7（legacy cleanup）。
+- Boundary scanner 已改为覆盖 `requirements/**/tests/**/*.mjs`；tracked forbidden fixture 已删除，charter 改为运行时临时 fixture；manifest 当前 21 个 surface，重复项已修正。boundary gate 仍需修复 empty-baseline 终态并跑到 0。
+- Finality vertical slice 已切断 `finality-contract.mjs`，测试通过 `FinalitySurface` 使用 JS-native history/state；manifest 已补 FINALITY-001/027/028。
+- EventStore slice 已拆 EventStore/Journal resource、codec、merge、FactCodec surface；指定 durable tests 已迁移，仍有未迁移 durable tests。
+- Fission/Distiller slice 已切断指定 role/runtime 测试的 Fable 表示；owner source 与 manifest 已补。
+- Provider projection algebra slice 已新增 `ProjectionSurface`，两组代数测试已迁移；fsproj/manifest 已补。
+- Join cleanup 已删除 `renderCompletedBatch` / `renderCompletionItem` 过渡路径；`JoinItem.ofAgentRunCompletion` 保留为仍有生产债权人的 canonical projection。
+- Composition/Durable/Fact ownership rotation 已完成第一轮 owner files、GuidelineProjection owner relocation 与静态路径更新。
+- Participant identity/deadline slice 已新增 JS-native Persona、Session、Prompt、Deadline、SessionBinding、ModelRouting surfaces；三组 participant tests 与 deadline tests 已迁移，仍需编译与 package-wide proof。
+
+当前实测债务（不可视为完成）：
+
+```text
+semantic test files with debt = 318
+violating lines             = 3488
+requirement-trace findings  = 180
+registered surfaces         = 21
+```
+
+因此 P6/P7/P8/P9 仍保持：
+
+```text
+P6 — IN PROGRESS
+P7 — NOT PROVEN
+P8 — NOT PROVEN
+P9 — STARTED; internal authority/domain.mjs debt remains
+```
+
+下一步必须先完成：
+
+```text
+[ ] requirement-trace findings → 0
+[ ] boundary debt → 0；删除 baseline 机制
+[ ] support/domain 与 package-local contract authority → 0
+[ ] remaining durable/provider/host/effect semantic tests → surfaces
+[ ] compile + focused tests + full gate proof
+```
+
