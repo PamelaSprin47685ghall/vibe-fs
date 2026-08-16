@@ -10,6 +10,7 @@ import test from 'node:test'
 import {
   authority,
   authorityRun,
+  bloggerRequestId,
   caseOf,
   continuationKind,
   idValue,
@@ -169,10 +170,11 @@ test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claims_reject_bare
 test('WHAT[INTERACTION-AUTHORITY-010] IA_010_one_terminal_provider_run_earns_exactly_one_repair', () => {
   const root = profileOf()
   const terminal = providerRun('run_term')
+  const request = bloggerRequestId('req-empty')
   let projection = authorityRun.registerAuthority(root, authority.empty)
 
   const alreadyClaimed = () =>
-    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, terminal, 'empty', projection)
+    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, terminal, 'empty', projection)
 
   assert.equal(alreadyClaimed(), false)
 
@@ -182,17 +184,31 @@ test('WHAT[INTERACTION-AUTHORITY-010] IA_010_one_terminal_provider_run_earns_exa
     continuationKind.of('InteractionRepair'),
     root,
     'fast-coder',
-    authority.repairPayloadDigest(terminal, 'empty'),
+    authority.repairPayloadDigest(request, terminal, 'empty'),
   )
   projection = authorityRun.registerClaim(repair, projection)
   assert.equal(alreadyClaimed(), true, '预算由 ClaimSequences 派生，跨 restart 存活')
 
   // 不同 terminal 是不同 occasion；同一 terminal 不同 repair kind 也是。
   assert.equal(
-    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, providerRun('run_other'), 'empty', projection),
+    authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, providerRun('run_other'), 'empty', projection),
     false,
   )
-  assert.equal(authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, terminal, 'xml_only', projection), false)
+  assert.equal(authority.repairAlreadyClaimed(SESSION, root.LogicalRunId, request, terminal, 'xml_only', projection), false)
+
+  // A different Blogger request on the same long-lived LogicalRun owns a fresh
+  // protocol-repair occasion even when terminal/kind happen to match.
+  assert.equal(
+    authority.repairAlreadyClaimed(
+      SESSION,
+      root.LogicalRunId,
+      bloggerRequestId('req-next'),
+      terminal,
+      'empty',
+      projection,
+    ),
+    false,
+  )
 
   // abandon 后不得再 claim 同一 occasion：repair 不会因此获得第二次预算。
   projection = authorityRun.abandonClaim(promptKey('pk_rep'), projection)

@@ -7,6 +7,7 @@ import {
   withExecutablePlugin,
 } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 import { fallbackProjection, fold, idValue } from '../../../verification-system/tests/support/domain.mjs'
+import { fallbackController } from '../../../verification-system/tests/support/domain/host.mjs'
 import { AgentJournalModule_snapshot } from '../../../../dist/Persistence/Journal/AgentJournal.js'
 
 const message = (sessionID, id, role, text, completed = false) => ({
@@ -183,6 +184,120 @@ test('REPRO_blogger_pure_prose_terminal_idle_should_nudge_without_another_transf
     const idleNudge = runtime.prompts.at(-1)
     assert.equal(idleNudge?.path?.id, bloggerSessionId)
     assert.match(promptTextOf(idleNudge), /chronicle tool exactly once|Protocol repair/i)
+  })
+})
+
+test('REPRO_blogger_aabb_is_sent_even_when_generic_fallback_reaches_exhaustion_on_that_failure', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const mainSessionId = 'ses-repro-idle-aabb-generic-exhausted-main'
+    await acceptAuthorityRoot(runtime, mainSessionId, 'fast-coder')
+
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [message(mainSessionId, 'msg-aabb-exhaust-main-user', 'user', 'Please inspect this work.')],
+    })
+
+    const bloggerSessionId = createdIds[0]
+    const initialPrompt = runtime.prompts[0]
+    const initialPromptKey = promptKeyOf(initialPrompt)
+    const physicalPrompt = runtime.messages.find(
+      (candidate) => candidate?.metadata?.wanxiangshu_prompt_key === initialPromptKey,
+    )
+    assert.ok(physicalPrompt)
+
+    const acceptPrompt = async (promptMessage, agent) => {
+      await hooks['chat.message'](
+        { sessionID: bloggerSessionId, agent },
+        {
+          message: {
+            id: promptMessage.id,
+            role: 'user',
+            sessionID: bloggerSessionId,
+            agent,
+          },
+          parts: promptMessage.parts,
+        },
+      )
+      await hooks['experimental.chat.messages.transform']({}, {
+        messages: [{
+          info: { id: promptMessage.id, role: 'user', sessionID: bloggerSessionId, agent },
+          parts: promptMessage.parts,
+        }],
+      })
+    }
+
+    await acceptPrompt(physicalPrompt, 'fast-blogger')
+
+    for (let i = 1; i <= 11; i += 1) {
+      const advanced = await fallbackController.recordConfirmedFailure(
+        runtime.journal,
+        12,
+        bloggerSessionId,
+        `pre-blogger-protocol-failure-${i}`,
+        'unrelated provider failure before Blogger protocol repair',
+      )
+      assert.equal(advanced.ok, true)
+      assert.equal(advanced.outcome, 'Advanced')
+    }
+
+    runtime.pushHostMessage(
+      bloggerSessionId,
+      message(bloggerSessionId, 'asst-generic-exhaust-p1', 'assistant', 'first prose-only response', true),
+    )
+    hooks.event({ type: 'session.idle', properties: { sessionID: bloggerSessionId } })
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    assert.equal(runtime.prompts.length, 2, 'first invalid terminal must still send the protocol nudge')
+    const nudge = runtime.prompts[1]
+    const nudgeKey = promptKeyOf(nudge)
+    const nudgeMessage = runtime.messages.find(
+      (candidate) => candidate?.metadata?.wanxiangshu_prompt_key === nudgeKey,
+    )
+    assert.ok(nudgeMessage)
+    await acceptPrompt(nudgeMessage, nudge?.body?.agent ?? 'deep-blogger')
+
+    runtime.pushHostMessage(
+      bloggerSessionId,
+      message(bloggerSessionId, 'asst-generic-exhaust-p2', 'assistant', 'still prose-only after nudge', true),
+    )
+    hooks.event({ type: 'session.idle', properties: { sessionID: bloggerSessionId } })
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    assert.equal(
+      runtime.prompts.length,
+      3,
+      'generic fallback exhaustion must not steal the Blogger request\'s one AABB send',
+    )
+    const aabb = runtime.prompts[2]
+    assert.match(promptTextOf(aabb), /chronicle tool exactly once|Protocol repair/i)
+
+    const projection = fold.session(AgentJournalModule_snapshot(runtime.journal), bloggerSessionId)
+    const fallback = fallbackProjection.read(projection.Fallback)
+    assert.equal(fallback.failures, 12, 'the generic fallback ledger may still record/exhaust independently')
+
+    const aabbKey = promptKeyOf(aabb)
+    const aabbMessage = runtime.messages.find(
+      (candidate) => candidate?.metadata?.wanxiangshu_prompt_key === aabbKey,
+    )
+    assert.ok(aabbMessage, 'the one AABB must physically enter Host before Blogger protocol exhaustion is possible')
+    await acceptPrompt(aabbMessage, aabb?.body?.agent ?? 'fast-blogger')
+
+    const exhaustedTerminal = new Promise((resolve) => {
+      runtime.terminalPort.SubscribeTerminalListener((sid, outcome) => {
+        if (sid?.fields?.[0] === bloggerSessionId) resolve(outcome)
+      })
+    })
+    runtime.pushHostMessage(
+      bloggerSessionId,
+      message(bloggerSessionId, 'asst-generic-exhaust-p3', 'assistant', 'third prose-only response after AABB', true),
+    )
+    hooks.event({ type: 'session.idle', properties: { sessionID: bloggerSessionId } })
+
+    const exhausted = await Promise.race([
+      exhaustedTerminal,
+      new Promise((resolve) => setTimeout(() => resolve('no-terminal'), 250)),
+    ])
+    assert.notEqual(exhausted, 'no-terminal', 'only a new invalid terminal after the accepted AABB may exhaust Blogger repair')
+    assert.equal(runtime.prompts.length, 3, 'protocol exhaustion after AABB must not send a fourth automatic prompt')
   })
 })
 

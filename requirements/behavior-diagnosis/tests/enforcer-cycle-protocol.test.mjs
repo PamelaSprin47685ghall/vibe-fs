@@ -27,6 +27,7 @@ import {
   payloadOf,
   idValue,
   bloggerRequestContext,
+  bloggerRequestId,
   parkedTransform,
   fold,
   runtimeResources,
@@ -68,8 +69,8 @@ const repairNudgeOf = (sessionPort) => {
   if (typeof send !== 'function') {
     throw new Error('HostSessionNudge.trySendInteractionRepair missing from dist')
   }
-  return (sessionId, prompt, directory, journal, terminalRun, repairKind) =>
-    send(sessionPort, sessionId, prompt, directory, journal, terminalRun, repairKind)
+  return (sessionId, prompt, directory, journal, requestId, terminalRun, repairKind) =>
+    send(sessionPort, sessionId, prompt, directory, journal, requestId, terminalRun, repairKind)
 }
 
 /**
@@ -603,7 +604,7 @@ test('WHAT[BD-017] ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_
 
     // Pre-claim InteractionRepair for asst-preclaim (same shape as SendInteractionRepair).
     const terminal = providerRun('asst-preclaim')
-    const digest = authority.repairPayloadDigest(terminal, 'blogger-missing-tool')
+    const digest = authority.repairPayloadDigest(bloggerRequestId('req-1'), terminal, 'blogger-missing-tool')
     const claimed = await AgentJournalModule_appendAgent(
       streamSession(BLOG),
       undefined,

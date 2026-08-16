@@ -5,11 +5,13 @@
 // crash-reconciliation (blogger-crash-recovery.test.mjs).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { caseOf } from '../../verification-system/tests/support/domain.mjs'
-import { snapshotRejudgeChronicleCardinality } from './support/blogger-recovery.mjs'
+import {
+  repairStateRequestIsolationAndAbandonLifecycle,
+  snapshotRejudgeChronicleCardinality,
+} from './support/blogger-recovery.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
@@ -176,59 +178,23 @@ test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity
 })
 
 test('WHAT[BD-017] ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run', async () => {
-  // Hot path derivation: a claim on terminal A + a NEW pure-prose terminal B
-  // must read as InteractionNudgeIssued(A) — handleContinuation then takes the
-  // AABB branch (issued run != current terminal), never a second nudge.
-  const { agentFact, agentJournal, authorityRoot, idValue, logicalRunId, payloadOf, promptKey, providerRun, sessionId, stream } = await import('../../verification-system/tests/support/domain.mjs')
-  const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
-  const probe = await import('../../../dist/Enforcer/Cycle/BloggerProbe.js')
-  const repairState =
-    probe.BloggerRecoveryProbe_repairState ||
-    probe.repairState
+  const result = await repairStateRequestIsolationAndAbandonLifecycle()
 
-  const directory = mkdtempSync(join(tmpdir(), 'enforcer-153-repairstate-'))
-  const created = await agentJournal.create({ directory })
-  assert.equal(created.ok, true)
-  const journal = created.journal
-  const blog = sessionId('ses-blog')
-  const root = await AgentJournalModule_appendAgent(
-    stream.session(blog),
-    undefined,
-    agentFact('AuthorityRootAccepted', {
-      SessionId: blog,
-      LogicalRunId: logicalRunId('blog-run-1'),
-      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
-      AuthorityKind: 'AgentOwnerRoot',
-      SelectedAgent: 'fast-blogger',
-      PeerAgent: 'deep-blogger',
-      CanonicalRole: 'blogger',
-      SelectedTier: 'fast',
-    }),
-    journal,
+  assert.equal(result.sameRequest, 'InteractionNudgeIssued')
+  assert.equal(result.sameRequestClaimedRun, 'asst-p1', 'payload is the CLAIMED run, not the new terminal')
+  assert.equal(
+    result.otherRequestAfterNudge,
+    'NoRecovery',
+    'a nudge claim from another BloggerRequestId on the same Session/LogicalRun must be invisible',
   )
-  assert.equal(caseOf(root), 'Ok')
-
-  const digest = (await import('../../verification-system/tests/support/domain.mjs')).authority.repairPayloadDigest(providerRun('asst-p1'), 'blogger-missing-tool')
-  const claimed = await AgentJournalModule_appendAgent(
-    stream.session(blog),
-    undefined,
-    agentFact('PluginPromptClaimed', {
-      PromptKey: promptKey('pk-claimed'),
-      SessionId: blog,
-      ContinuationKind: 'InteractionRepair',
-      LogicalRunId: logicalRunId('blog-run-1'),
-      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
-      EffectiveAgent: 'fast-blogger',
-      PayloadDigest: digest,
-    }),
-    journal,
+  assert.equal(
+    result.otherRequestAfterAabb,
+    'NoRecovery',
+    'an AABB claim from an older BloggerRequestId must not exhaust the new request',
   )
-  assert.equal(caseOf(claimed), 'Ok')
-
-  const stage = repairState(journal, blog, 'req-1', providerRun('asst-p2'), [])
-  assert.equal(caseOf(stage), 'InteractionNudgeIssued')
-  const claimedRun = payloadOf(stage)
-  assert.equal(idValue.providerRun(claimedRun), 'asst-p1', 'payload is the CLAIMED run, not the new terminal')
-  created.dispose()
-  rmSync(directory, { recursive: true, force: true })
+  assert.equal(
+    result.afterAbandonedAabb,
+    'InteractionNudgeIssued',
+    'an abandoned AABB claim proves no AABB landed and must not restore AabbRepairIssued',
+  )
 })

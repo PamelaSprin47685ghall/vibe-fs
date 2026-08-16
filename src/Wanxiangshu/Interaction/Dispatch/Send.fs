@@ -500,12 +500,12 @@ module PromptDispatcherSend =
                 onAccepted
                 None
 
-        /// FALLBACK-008: the one terminal-scoped interaction repair an unusable terminal earns.
+        /// FALLBACK-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///
-        /// Its payload digest names the occasion (terminal provider run + repair
-        /// kind), not the prompt text. Repair prompts are fixed per kind, so
-        /// digesting the text would make every repair of that kind one logical act
-        /// and the per-terminal budget would be a per-session budget.
+        /// Its payload digest names the occasion (BloggerRequestId + terminal
+        /// provider run + repair kind), not the prompt text. Request identity
+        /// prevents an earlier Blogger request on the same long-lived run from
+        /// spending the next request's nudge/AABB budget.
         ///
         /// Deriving the digest this way is also what makes the budget durable: it
         /// enters the claim scope, so the `ClaimSequences` that PROMPT-005 `Claimed`
@@ -514,6 +514,7 @@ module PromptDispatcherSend =
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
+            (requestId: BloggerRequestId)
             (terminalProviderRun: ProviderRunIdentity)
             (repairKind: string)
             (profile: PromptAuthority.AuthorityExecutionProfile)
@@ -526,7 +527,7 @@ module PromptDispatcherSend =
                 port
                 sessionId
                 text
-                (PromptAuthority.repairPayloadDigest terminalProviderRun repairKind)
+                (PromptAuthority.repairPayloadDigest requestId terminalProviderRun repairKind)
                 PromptAuthority.ContinuationKind.InteractionRepair
                 profile
                 effectiveAgent

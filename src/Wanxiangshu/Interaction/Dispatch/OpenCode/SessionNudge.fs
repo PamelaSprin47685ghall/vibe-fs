@@ -223,10 +223,9 @@ module HostSessionNudge =
 
     /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
     ///
-    /// `terminalProviderRun` is the provider run that produced the unusable
-    /// terminal, which is what FALLBACK-008 counts against — not the session and
-    /// not the Logical Run, both of which would let one bad run consume or reset
-    /// another's budget.
+    /// `requestId + terminalProviderRun` names the exact Blogger repair occasion.
+    /// Neither the long-lived session nor LogicalRun alone may spend another
+    /// Blogger request's protocol budget.
     ///
     /// The budget check is a read of durable `ClaimSequences`, so a repair claimed
     /// before a crash is still spent after it.
@@ -236,6 +235,7 @@ module HostSessionNudge =
         (prompt: string)
         (directory: string option)
         (journal: AgentJournal option)
+        (requestId: BloggerRequestId)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
         : Task<Result<PromptKey, string>> =
@@ -247,7 +247,7 @@ module HostSessionNudge =
             | false, Some durable, Some profile ->
                 let rt = PromptDispatcher.forJournal durable
 
-                if rt.RepairAlreadyClaimed profile terminalProviderRun repairKind then
+                if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
                     return Error "Interaction repair already claimed for this provider run"
                 else
                     let agent = agentForActiveCursor journal sessionId profile
@@ -261,6 +261,7 @@ module HostSessionNudge =
                             sessionPort
                             sessionId
                             prompt
+                            requestId
                             terminalProviderRun
                             repairKind
                             profile
@@ -508,9 +509,9 @@ module HostSessionNudge =
                         repairKind
         }
 
-    /// Terminal-scoped idle interaction repair. Blogger uses this narrower
-    /// occasion identity to distinguish same-terminal re-entry from a new bad
-    /// terminal before moving to AABB.
+    /// Blogger-request + terminal-scoped idle interaction repair. This narrower
+    /// occasion identity distinguishes same-terminal re-entry from a new bad
+    /// terminal without leaking repair budget across Blogger requests.
     let trySendIdleInteractionRepair
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -519,6 +520,7 @@ module HostSessionNudge =
         (prompt: string)
         (directory: string option)
         (journal: AgentJournal option)
+        (requestId: BloggerRequestId)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
         : Task<IdleContinuationOutcome> =
@@ -533,6 +535,7 @@ module HostSessionNudge =
                         prompt
                         directory
                         journal
+                        requestId
                         terminalProviderRun
                         repairKind
                 with

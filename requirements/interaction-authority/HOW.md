@@ -12,7 +12,7 @@
 | 005 | `Domain/PromptAuthority.fs` → `PromptOrigin`、`RootAuthorityKind`、`ContinuationKind`、`originLabel`、`tryParseContinuationKind` | 闭世界枚举 |
 | 006 | `Domain/PromptAuthority.fs` → `parseAgentNameTyped` / `AgentNameRejection`；`Domain/ManagedAgentCatalog.fs` → `legacyAgentNames`、`peerNameOf` | 显式 agent 才可成 root |
 | 007/008/009/017 | `Domain/PromptAuthorityRun.fs` → `resolveKnownOrigin`（accepted → claimed → compaction → AgentOwnerRoot → UnknownOrigin）；`Application/Prompting/PromptIngress.fs` → `resolveOrigin`（唯一可授予 HumanRoot 的边界） | 纯函数永不返回 HumanRoot；ingress 只在 ActiveProfile 缺席 + 显式有效 agent 时授予 |
-| 010 | `Interaction/Authority/Model.fs` → `repairFamilyPayloadDigest/repairFamilyAlreadyClaimed`（ordinary LogicalRun+family）、`repairPayloadDigest/repairAlreadyClaimed`（Blogger terminal-scoped special case）、`idlePayloadDigest/idleAlreadyClaimed`（Manager Life+business condition）；均由 `ClaimSequences` 派生 | 自动 continuation budget durable 且不能由自己产生的新 ProviderRun 扩张 |
+| 010 | `Interaction/Authority/Model.fs` → `repairFamilyPayloadDigest/repairFamilyAlreadyClaimed`（ordinary LogicalRun+family）、`repairPayloadDigest/repairAlreadyClaimed`（Blogger `BloggerRequestId + terminal + kind` special case）、`idlePayloadDigest/idleAlreadyClaimed`（Manager Life+business condition）；ClaimSequence 提供 durable occasion，feature recovery 再结合 Pending/Accepted/Abandoned dispatch lifecycle | 自动 continuation budget durable；旧 Blogger request/自身新 ProviderRun 都不能扩张或污染下一 request |
 | 011 | `Domain/PromptAuthority.fs` → `AttemptExecutionProfile`、`buildAttemptExecutionProfile`（唯一 builder） | authority 子记录原子携带 |
 | 012/013 | `Domain/PromptAuthority.fs` → `ContinuationKind.NeedHelpEscalation | NeedHelpAdvice`；`Infrastructure/OpenCode/Host/AssistanceHost.fs` | assistance 续推同 run；该同步交互只 Await Host transport result（便于本调用判断拒绝），不等 provider execution/slot；abort 不推进 fallback |
 | 014 | `Execution/Delegation/Fork/OpenCode/JoinGuard.fs`、`Mission/Manager/Idle.fs`；`ContinuationKind.JoinGuard | ManagerIdleEncouragement` | join/idle 续推 = continuation；JoinGuard Await transport result，以便拒绝时释放 reservation；Manager idle process key + durable claim 都按 Life + plan-commitment condition |
@@ -46,7 +46,7 @@ resolveOrigin（journal 已知 provenance）
   durability 前提）。
 - continuation 归属只读 `ActiveLogicalRun`（不回退 `LastAuthorityProfile`）。
 - root 的 `registerAuthority` 清空 run-scoped 映射（PendingClaims/AcceptedContinuationIds/ClaimSequences），使 PERSIST-008 有界。
-- ordinary repair 的 claim scope payload 只含 repair family；LogicalRunId 已是 scope 组件，所以同 run 后续 terminal 不会重置预算。Blogger 仅因 exact-one 协议需要 terminal identity 而保留 terminal-scoped digest，并由 nudge→AABB→exhaust 状态机单独限界。
+- ordinary repair 的 claim scope payload 只含 repair family；LogicalRunId 已是 scope 组件，所以同 run 后续 terminal 不会重置预算。Blogger exact-one special digest = `BloggerRequestId + terminal ProviderRunIdentity + repair kind`：request axis 隔离长寿命 Blogger session 上连续的工作请求，terminal axis 只负责同 terminal 幂等；再由 nudge→AABB→exhaust 状态机单独限界。
 - Manager idle digest = `LifeId + conditionKey`；condition 由 Manager 是否已有 plan commitment 决定，ProviderRunIdentity 不参与自动 encouragement budget。
 
 ## 历史与弃权
