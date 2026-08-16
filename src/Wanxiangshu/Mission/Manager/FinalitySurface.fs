@@ -580,22 +580,17 @@ module FinalitySurface =
         let lifeId = ManagerLifeId.create lifeId
         let requestId = FinalityRequestId.create requestId
 
+        let tryFindRequest managerLife =
+            managerLife.CurrentLife
+            |> Option.bind (fun life ->
+                life.ActiveFinality
+                |> Option.filter (fun request -> life.LifeId = lifeId && request.RequestId = requestId)
+                |> Option.map (fun request -> life, request))
+
         let found =
             ps.Sessions
             |> Map.toList
-            |> List.tryPick (fun (_, projection) ->
-                projection.ManagerLife
-                |> Option.bind (fun managerLife -> managerLife.CurrentLife)
-                |> Option.bind (fun life ->
-                    if life.LifeId = lifeId then
-                        life.ActiveFinality
-                        |> Option.bind (fun request ->
-                            if request.RequestId = requestId then
-                                Some(life, request)
-                            else
-                                None)
-                    else
-                        None))
+            |> List.tryPick (fun (_, projection) -> projection.ManagerLife |> Option.bind tryFindRequest)
 
         match found with
         | None -> [||]

@@ -1,100 +1,88 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, listItems, payloadOf, toList } from '../../verification-system/tests/support/domain.mjs'
-import { fissionLaneContract } from './support/fission-contract.mjs'
 
-import {
-  FissionPrompt_parse as parsePrompt,
-  FissionLanePrompt,
-  FissionCompletionAffinity,
-  FissionCompletionAffinityModule_lane as affinityLane,
-  FissionCompletionRouting_targets as completionTargets,
-  FissionDeliveryModule_empty as deliveryEmpty,
-  FissionDeliveryModule_mark as deliveryMark,
-  FissionDeliveryModule_pendingTargets as deliveryPendingTargets,
-  FissionWorkBundleModule_empty as workBundleEmpty,
-  FissionWorkBundleModule_add as workBundleAdd,
-  FissionWorkBundleModule_merge as workBundleMerge,
-  FissionWorkBundleModule_keys as workBundleKeys,
-  FissionWorkBundleModule_entries as workBundleEntries,
-  FissionConvergence_ready as convergenceReady,
-} from '../../../dist/Execution/Fission/Model.js'
-
-const parse = (text) => parsePrompt(text)
-const lanePrompts = (parsed) => listItems(parsed.Lanes).map((lane) => [lane.Index, lane.Prompt])
+const fission = await import('../../../dist/Execution/Fission/Surface.js')
 
 const mustOk = (result) => {
-  assert.equal(caseOf(result), 'Ok')
-  return payloadOf(result)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  return result
 }
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical parser normalizes only newline shape and preserves lane text', () => {
-  const parsed = mustOk(parse('  A  \r\nB\r\n'))
-  assert.deepEqual(lanePrompts(parsed), [[0, '  A  '], [1, 'B']])
-  assert.equal(parsed.Count, 2)
+  const parsed = mustOk(fission.parsePrompt('  A  \r\nB\r\n'))
+  assert.deepEqual(
+    parsed.lanes.map((lane) => [lane.index, lane.prompt]),
+    [
+      [0, '  A  '],
+      [1, 'B'],
+    ],
+  )
+  assert.equal(parsed.count, 2)
 
-  const internalBlank = parse('A\n   \nC')
-  assert.equal(caseOf(internalBlank), 'Error')
-  const reason = payloadOf(internalBlank)
-  assert.equal(caseOf(reason), 'EmptyLanePrompt')
-  assert.equal(payloadOf(reason), 1)
+  const internalBlank = fission.parsePrompt('A\n   \nC')
+  assert.equal(internalBlank.ok, false)
+  assert.equal(internalBlank.reason, 'EmptyLanePrompt')
+  assert.equal(internalBlank.laneIndex, 1)
 
-  assert.equal(caseOf(parse('A')), 'Error')
-  assert.equal(caseOf(payloadOf(parse('A'))), 'TooFewLanes')
+  const tooFew = fission.parsePrompt('A')
+  assert.equal(tooFew.ok, false)
+  assert.equal(tooFew.reason, 'TooFewLanes')
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-006] pre-fission completion broadcasts to every lane exactly once with idempotent delivery', () => {
-  const preFissionAffinity = FissionCompletionAffinity.PreFissionBroadcast
-  assert.deepEqual(listItems(completionTargets(4, preFissionAffinity)), [0, 1, 2, 3])
+  assert.deepEqual(fission.completionTargets(4, { kind: 'pre-fission' }), [0, 1, 2, 3])
 
-  let delivery = deliveryEmpty(3)
-  delivery = mustOk(deliveryMark('child-A', 0, delivery))
-  delivery = mustOk(deliveryMark('child-A', 0, delivery)) // idempotent
-  delivery = mustOk(deliveryMark('child-A', 2, delivery))
-  assert.deepEqual(listItems(deliveryPendingTargets('child-A', delivery)), [1])
+  let delivery = fission.deliveryEmpty(3)
+  delivery = mustOk(fission.deliveryMark('child-A', 0, delivery)).delivery
+  delivery = mustOk(fission.deliveryMark('child-A', 0, delivery)).delivery // idempotent
+  delivery = mustOk(fission.deliveryMark('child-A', 2, delivery)).delivery
+  assert.deepEqual(fission.deliveryPendingTargets('child-A', delivery), [1])
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-007] post-fission completion has exactly one affinity target: the initiating lane', () => {
-  assert.deepEqual(listItems(completionTargets(4, affinityLane(2))), [2])
+  assert.deepEqual(fission.completionTargets(4, { kind: 'lane', index: 2 }), [2])
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-008] keyed work bundle is idempotent and rejects conflicting records for one lane', () => {
-  const empty = workBundleEmpty
-  const a = mustOk(workBundleAdd(2, 'ref-c', empty))
-  const b = mustOk(workBundleAdd(0, 'ref-a', a))
-  const same = mustOk(workBundleAdd(0, 'ref-a', b))
-  assert.deepEqual(listItems(workBundleKeys(same)), [0, 2])
+  const empty = fission.workBundleEmpty
+  const a = mustOk(fission.workBundleAdd(2, 'ref-c', empty)).bundle
+  const b = mustOk(fission.workBundleAdd(0, 'ref-a', a)).bundle
+  const same = mustOk(fission.workBundleAdd(0, 'ref-a', b)).bundle
+  assert.deepEqual(fission.workBundleKeys(same), [0, 2])
 
-  const conflict = workBundleAdd(0, 'ref-other', same)
-  assert.equal(caseOf(conflict), 'Error')
-  assert.equal(caseOf(payloadOf(conflict)), 'ConflictingLaneRecord')
+  const conflict = fission.workBundleAdd(0, 'ref-other', same)
+  assert.equal(conflict.ok, false)
+  assert.equal(conflict.reason, 'ConflictingLaneRecord')
 
-  const left = mustOk(workBundleAdd(1, 'ref-b', b))
-  const right = mustOk(workBundleAdd(1, 'ref-b', mustOk(workBundleAdd(0, 'ref-a', empty))))
-  const merged1 = mustOk(workBundleMerge(left, right))
-  const merged2 = mustOk(workBundleMerge(right, left))
-  assert.deepEqual(listItems(workBundleEntries(merged1)), listItems(workBundleEntries(merged2)))
+  const left = mustOk(fission.workBundleAdd(1, 'ref-b', b)).bundle
+  const right = mustOk(fission.workBundleAdd(1, 'ref-b', mustOk(fission.workBundleAdd(0, 'ref-a', empty)).bundle)).bundle
+  const merged1 = mustOk(fission.workBundleMerge(left, right)).bundle
+  const merged2 = mustOk(fission.workBundleMerge(right, left)).bundle
+  assert.deepEqual(fission.workBundleEntries(merged1), fission.workBundleEntries(merged2))
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane records and all completion deliveries', () => {
-  const bundle = [0, 1, 2].reduce((state, lane) => mustOk(workBundleAdd(lane, `ref-${lane}`, state)), workBundleEmpty)
-  let delivery = deliveryEmpty(3)
-  for (const lane of [0, 1, 2]) delivery = mustOk(deliveryMark('pre-child', lane, delivery))
+  const bundle = [0, 1, 2].reduce(
+    (state, lane) => mustOk(fission.workBundleAdd(lane, `ref-${lane}`, state)).bundle,
+    fission.workBundleEmpty,
+  )
+  let delivery = fission.deliveryEmpty(3)
+  for (const lane of [0, 1, 2]) delivery = mustOk(fission.deliveryMark('pre-child', lane, delivery)).delivery
 
-  assert.equal(convergenceReady(3, toList(['pre-child']), bundle, delivery), true)
-  const incomplete = mustOk(workBundleAdd(0, 'ref-0', workBundleEmpty))
-  assert.equal(convergenceReady(3, toList(['pre-child']), incomplete, delivery), false)
+  assert.equal(fission.convergenceReady(3, ['pre-child'], bundle, delivery), true)
+  const incomplete = mustOk(fission.workBundleAdd(0, 'ref-0', fission.workBundleEmpty)).bundle
+  assert.equal(fission.convergenceReady(3, ['pre-child'], incomplete, delivery), false)
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
-  const lane = fissionLaneContract.view(fissionLaneContract.started(1, 'lane-session-1', 'lane input'))
+  const lane = fission.startedLane(1, 'lane-session-1', 'lane input')
   assert.equal(lane.index, 1)
   assert.equal(lane.prompt, 'lane input')
   assert.equal(lane.hasAgentId, false, 'lane record must not expose a provider-visible AgentId')
   assert.equal(lane.hasHandle, false, 'lane record must not expose a provider-visible handle')
   assert.equal(lane.hasParent, false, 'lane record must not add a parent join obligation of its own')
 
-  const startup = fissionLaneContract.startup(2, 0, 'lane A', 'CANONICAL-LWR')
+  const startup = fission.startup(2, 0, 'lane A', 'CANONICAL-LWR')
   assert.match(startup, /same logical participant/, 'startup keeps the lanes under one logical identity')
   assert.match(startup, /Do not treat sibling lanes as delegated agents/, 'startup must not turn lanes into new delegation identities')
 })

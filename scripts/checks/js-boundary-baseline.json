@@ -535,18 +535,6 @@
     "deep-dist-import": 2,
     "interop-helper": 1
   },
-  "requirements/intra-participant-parallelism/tests/fission-domain.test.mjs": {
-    "deep-dist-import": 1,
-    "interop-helper": 12
-  },
-  "requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs": {
-    "deep-dist-import": 10,
-    "interop-helper": 8
-  },
-  "requirements/intra-participant-parallelism/tests/support/fission-contract.mjs": {
-    "deep-dist-import": 2,
-    "interop-helper": 2
-  },
   "requirements/js-semantic-surface/tests/fixtures/zone-debt.mjs": {
     "du-shape": 2,
     "deep-dist-import": 1

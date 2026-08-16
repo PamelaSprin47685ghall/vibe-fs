@@ -96,6 +96,17 @@ module BloggerRecoveryProbe =
     /// nudge when claim exists):
     /// - no claim → NoRecovery
     /// - claim + no blog after claim (any number of pure-prose terminals) →
+    let private recoveryAfterClaimed (claimed: string) (afterClaimed: (string * bool) list) : BloggerToolRecovery =
+        let hasBlogAfter = afterClaimed |> List.exists (fun (_, hasBlog) -> hasBlog)
+
+        if hasBlogAfter then
+            BloggerToolRecovery.NoRecovery
+        else
+            // No durable AABB evidence exists here: never invent AabbRepairIssued. Restore as
+            // InteractionNudgeIssued claimed; the hot path re-runs aabbRepair
+            // on the next *new* pure-prose terminal (issuedRun <> terminalRun).
+            BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimed)
+
     ///   InteractionNudgeIssued claimed
     /// - claim + valid blog after claim → NoRecovery (cycle completed / success)
     ///
@@ -119,15 +130,7 @@ module BloggerRecoveryProbe =
                         // Claimed run absent from transcript: keep nudge stage, never invent AABB.
                         []
 
-            let hasBlogAfter = afterClaimed |> List.exists (fun (_, hasBlog) -> hasBlog)
-
-            if hasBlogAfter then
-                BloggerToolRecovery.NoRecovery
-            else
-                // No durable AABB evidence exists here: never invent AabbRepairIssued. Restore as
-                // InteractionNudgeIssued claimed; the hot path re-runs aabbRepair
-                // on the next *new* pure-prose terminal (issuedRun <> terminalRun).
-                BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimed)
+            recoveryAfterClaimed claimed afterClaimed
 
     let private isCompletedChronicle (part: SessionToolPart) =
         part.ToolName = "chronicle"
@@ -196,21 +199,18 @@ module BloggerRecoveryProbe =
         | PromptAuthorityLedger.DispatchStatus.Accepted _ -> true
 
     let private claimRunCandidate (prefix: string) (suffix: string) (scope: string) (sequence: int) : string option =
-        let structuralMatch =
-            sequence >= 1
-            && scope.StartsWith(prefix, System.StringComparison.Ordinal)
-            && scope.EndsWith(suffix, System.StringComparison.Ordinal)
+        let runLength = scope.Length - prefix.Length - suffix.Length
 
-        if not structuralMatch then
+        if sequence <= 0 then
+            None
+        elif runLength <= 0 then
+            None
+        elif not (scope.StartsWith(prefix, System.StringComparison.Ordinal)) then
+            None
+        elif not (scope.EndsWith(suffix, System.StringComparison.Ordinal)) then
             None
         else
-            let runLength = scope.Length - prefix.Length - suffix.Length
-
-            let runId =
-                if runLength <= 0 then
-                    ""
-                else
-                    scope.Substring(prefix.Length, runLength)
+            let runId = scope.Substring(prefix.Length, runLength)
 
             if System.String.IsNullOrWhiteSpace runId then
                 None
@@ -274,15 +274,22 @@ module BloggerRecoveryProbe =
         (requestId: BloggerRequestId)
         (terminalRun: ProviderRunIdentity)
         : InvalidTerminalRepairState =
-        match claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId with
-        | Some claimedRun -> InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun)
-        | None when repairClaimedFor journal bloggerSessionId requestId terminalRun ->
-            InvalidTerminalRepairState.InteractionNudgeIssued terminalRun
-        | None ->
-            match claimedRunFromSequences journal bloggerSessionId requestId with
-            | Some claimedRun ->
-                InvalidTerminalRepairState.InteractionNudgeIssued(ProviderRunIdentity.create claimedRun)
-            | None -> InvalidTerminalRepairState.NoRecovery
+        let aabb =
+            claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId
+            |> Option.map (fun claimedRun ->
+                InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun))
+
+        let nudge =
+            if repairClaimedFor journal bloggerSessionId requestId terminalRun then
+                Some(InvalidTerminalRepairState.InteractionNudgeIssued terminalRun)
+            else
+                claimedRunFromSequences journal bloggerSessionId requestId
+                |> Option.map (fun claimedRun ->
+                    InvalidTerminalRepairState.InteractionNudgeIssued(ProviderRunIdentity.create claimedRun))
+
+        aabb
+        |> Option.orElse nudge
+        |> Option.defaultValue InvalidTerminalRepairState.NoRecovery
 
     let private toolRecoveryOfInvalidTerminal =
         function

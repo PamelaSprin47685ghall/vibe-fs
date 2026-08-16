@@ -413,6 +413,7 @@
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Host.fs"/>
     <Compile Include="Execution/Fission/Surface.fs"/>
+    <Compile Include="OpenCode/Host/FissionHostSurface.fs"/>
     <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>

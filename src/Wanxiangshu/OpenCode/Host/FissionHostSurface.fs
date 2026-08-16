@@ -1,0 +1,116 @@
+namespace Wanxiangshu.OpenCode.Host
+
+open System
+open System.Collections.Generic
+open System.Threading.Tasks
+open Fable.Core
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.OpenCode
+
+/// Host boundary surface for Fission turn absorption tests.
+///
+/// This module lives in OpenCode/Host because it composes host session/event
+/// ports and the ordinary turn workflow to observe a Fission-replaced owner
+/// turn. It is not part of the public Fission semantic surface; it exposes a
+/// single test-only probe for WHAT[INTRA-PARTICIPANT-PARALLELISM-009].
+module FissionHostSurface =
+
+    type private CallFlags() =
+        member val ContinuationSent = false with get, set
+        member val TerminalNotified = false with get, set
+
+    type private DummyTimer() =
+        interface ITimerPort with
+            member _.Delay _ = Unchecked.defaultof<_>
+            member _.Dispose() = ()
+
+    type private DummySessionPort(flags: CallFlags) =
+        interface ISessionHostPort with
+            member _.SubscribeTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SendPrompt(_, _, _) =
+                flags.ContinuationSent <- true
+                Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt"))
+
+            member _.AbortSession _ = Task.FromResult(Ok())
+            member _.InterruptSessionOnly _ = Task.FromResult(Ok())
+            member _.AbortChildren _ = AsyncSupport.completedTask ()
+            member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
+            member _.TryGetParentSession _ = Task.FromResult(Ok None)
+            member _.CreateChildSession(_, _) = Task.FromResult(Error "unused")
+            member _.ListChildren _ = Task.FromResult(Ok [])
+            member _.FamilyRootOf sessionId = sessionId
+
+    type private DummyEventPort(flags: CallFlags) =
+        interface IEventObservationPort with
+            member _.SubscribeTerminalListener _ =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.NotifyTerminal _ _ =
+                flags.TerminalNotified <- true
+                true
+
+    let private dummyTurn (owner: SessionId) : ReconciledTurn =
+        { SessionId = owner
+          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-1"
+          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-0"
+          ProviderRun = ProviderRunIdentity.create "run-1"
+          Role = None
+          Directory = None
+          Parts = [||]
+          Finish = None
+          ErrorName = None
+          Model = None
+          Outcome = ReconcileProgram.TurnInProgress
+          Observation = None }
+
+    /// Absorb a Fission-replaced owner turn through Host + ordinary-turn observe.
+    /// Caller must have already `markSilentInterrupt`'d the owner.
+    let observeReplacedOwner (ownerSessionId: string) : Task<obj> =
+        task {
+            let flags = CallFlags()
+            let sessionPort = DummySessionPort flags :> ISessionHostPort
+            let eventPort = DummyEventPort flags :> IEventObservationPort
+            let owner = SessionId.create ownerSessionId
+            let turn = dummyTurn owner
+            let! handled = FissionHost.observeLaneTurn sessionPort eventPort None (HashSet<string>()) turn
+
+            let context =
+                { Turn = turn
+                  Quiescence = None
+                  Delivery = ReconciledTurnDelivery.Observation }
+
+            do!
+                OrdinaryTurnWorkflow.observe
+                    (DummyTimer() :> ITimerPort)
+                    (fun _ -> ())
+                    sessionPort
+                    eventPort
+                    None
+                    (HashSet<string>())
+                    (fun _ -> false)
+                    (HashSet<string>())
+                    None
+                    (SessionQuiescenceGate())
+                    context
+
+            let idleContext =
+                { context with
+                    Delivery = ReconciledTurnDelivery.IdleRevisit }
+
+            do! OrdinaryTurnWorkflow.observeIdle (SessionQuiescenceGate()) sessionPort eventPort None idleContext
+
+            return
+                box
+                    {| handled = handled
+                       continuationSent = flags.ContinuationSent
+                       terminalNotified = flags.TerminalNotified |}
+        }
