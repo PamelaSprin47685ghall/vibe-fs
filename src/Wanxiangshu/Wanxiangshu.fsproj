@@ -392,6 +392,7 @@
     <Compile Include="Mission/Manager/JobHandoff.fs"/>
     <Compile Include="Mission/Manager/Life/Workflow.fs"/>
     <Compile Include="Mission/Manager/Finality.fs"/>
+    <Compile Include="Mission/Manager/FinalitySurface.fs"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Mission/Manager/OpenCode/NarrativeTransform.fs"/>
     <Compile Include="Mission/Finality/Types.fs"/>

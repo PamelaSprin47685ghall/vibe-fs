@@ -113,6 +113,24 @@ export const SURFACE_MANIFEST = [
     representation: 'opaque-capability',
     kind: 'resource',
   },
+  {
+    module: 'Mission/Manager/FinalitySurface.js',
+    owner: 'finality',
+    laws: [
+      'FINALITY-002',
+      'FINALITY-003',
+      'FINALITY-004',
+      'FINALITY-005',
+      'FINALITY-006',
+      'FINALITY-009',
+      'FINALITY-017',
+      'FINALITY-022',
+      'FINALITY-026',
+    ],
+    source: 'src/Wanxiangshu/Mission/Manager/FinalitySurface.fs',
+    representation: 'opaque-capability',
+    kind: 'pure',
+  },
 ]
 
 /** Flat module-path allowlist derived from the manifest (scanner regex input). */
