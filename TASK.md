@@ -2,6 +2,1632 @@
 
 ---
 
+看完这版仓库后，可以下一个相当明确的判断：
+
+> **工程师理解了“把 Fable 痕迹藏起来”，但没有真正理解“测试必须失去访问实现的权力”。**
+>
+> 现在做出来的主要是 **access consolidation**，不是 **semantic boundary reconstruction**。
+
+这不是小偏差。继续按当前方向推进，会得到一个更整齐、更有文档、更有 gate、但本质仍然是 white-box testing 的第二代体系。
+
+而且现在最危险的地方是：仓库开始给这种表面进展打 ✅，这会让真正的重构反而更难发生。
+
+---
+
+# 一、先停止自我庆祝：P6/P7/P8/P9 的 ✅ 必须撤掉
+
+当前 roadmap 写：
+
+* P6 ✅：“大量迁 projection/decision/codec/policy tests”
+* P7 ✅：“Resource/runtime wave”
+* P8 ✅：“Effect/integration wave”
+* P9 ✅：“Delete legacy adapters” 
+
+这些标记和仓库事实对不上。
+
+## P6：3185 → 3171 不能叫“大量迁移”
+
+文档自己写：
+
+> 债务 3185 → 3171，文件 316 → 312。
+
+这只是证明了 pilot 能工作。
+
+它没有证明：
+
+> pure/algebra 世界已经切换到 semantic surfaces。
+
+**正确状态：**
+
+```text
+P6 — IN PROGRESS
+pilot validated; systemic migration not yet achieved
+```
+
+---
+
+## P7：拿 `RolesSurface` 宣布 resource/runtime wave，类别都错了
+
+P7 的目标是：
+
+> stateful runtime / resource abstraction。
+
+实际“达成”拿出来的是：
+
+```text
+RolesSurface
+Role
+ToolPermission
+permissions
+isAllowed
+```
+
+
+
+这是 vocabulary/policy surface。
+
+它不是 resource lifecycle，不证明：
+
+```text
+create
+mutate
+concurrency
+lifetime
+dispose
+observable state transition
+```
+
+这些问题已经解决。
+
+真正能作为 stateful pilot 的反而是之前的 `QuiescenceSurface`。
+
+所以：
+
+```text
+P7 — NOT PROVEN
+```
+
+---
+
+## P8 更离谱：删一个 FactCodec migration，不等于 effect boundary 重构
+
+P8 的完成条件明明写着：
+
+> contractual effect 成为 observable，而不是 private choreography。
+
+然后“达成”是：
+
+> 删除 `FactCodec.migrateManagerJobByname`。
+
+这两件事基本没有证明关系。
+
+删 dead compatibility code 是好事。
+
+但它不是：
+
+```text
+effect decision
+→ effect request
+→ interpreter
+→ result
+→ semantic observation
+```
+
+的重构证据。
+
+**不要拿别的 cleanup 工作给当前 milestone 充数。**
+
+---
+
+## P9 是直接自相矛盾
+
+P9 完成条件：
+
+> semantic tests 不再 import `domain.mjs`
+
+紧接着“达成”：
+
+> **328 文件仍 import domain.mjs**。
+
+这种情况下打 ✅ 是不可接受的。
+
+正确写法只有：
+
+```text
+P9 — STARTED
+6 dead adapters deleted
+328 domain.mjs consumers remain
+exit condition NOT MET
+```
+
+这不是文字洁癖。
+
+**milestone 的 checkbox 本身就是工程控制面。**
+
+当“完成”可以意味着“还剩 328 个调用方”，整个 roadmap 就失去了约束力。
+
+---
+
+# 二、当前最大的错误：把 white-box access 搬进 `support/*-contract.mjs`
+
+这是现在必须立刻叫停的模式。
+
+典型例子：
+
+```text
+requirements/finality/tests/support/finality-contract.mjs
+```
+
+文件宣称：
+
+> “the one place finality semantic tests may reach the compiled dist modules”
+
+听起来很漂亮。
+
+实际上它做的是：
+
+```js
+import { caseOf, payloadOf } from domain.mjs
+
+import InternalFinalityModule
+import InternalLifeAdmission
+import InternalProjection
+
+new ReviewerOutcome(0, [workRecord])
+
+Object.create(ReviewerOutcome.prototype).cases()
+```
+
+并且把 internal functions 原样放进：
+
+```js
+finalityDisposition
+lifeAdmission
+lifeProjection
+finalityCohort
+```
+
+
+
+这是什么？
+
+不是 semantic surface。
+
+这是：
+
+```text
+以前：
+
+test
+ ↓
+Fable internal
+
+
+现在：
+
+test
+ ↓
+finality-contract.mjs
+ ↓
+Fable internal
+```
+
+**权限一点都没收回。只多了一层布。**
+
+---
+
+# 三、这正是我们之前明确禁止的“第二代 domain.mjs”
+
+工程师似乎形成了一个错误推理：
+
+> test 文件本身不出现 `.cases()` 就行。
+
+不对。
+
+真正规则是：
+
+> **semantic test dependency graph 中不应该存在这种 authority。**
+
+`caseOf()` 躲在：
+
+```text
+support/finality-contract.mjs
+```
+
+和躲在：
+
+```text
+support/domain.mjs
+```
+
+架构性质完全一样。
+
+测试还是可以间接做到：
+
+```text
+construct arbitrary F# DU
+call arbitrary internal function
+read implementation-specific outcome
+```
+
+只是 test 文件看起来干净了。
+
+---
+
+# 四、`casebook-contract.mjs` 同样没有过关
+
+当前：
+
+```js
+import {
+  listItems,
+  resultOf,
+  toList
+} from domain.mjs
+
+import Model from dist/.../Casebook/Model.js
+import Workflow from dist/.../Casebook/Workflow.js
+
+export const casebookContract = {
+  normalizedCount: observations =>
+    listItems(Model.Observations_normalize(toList(observations))).length,
+
+  finalize: (...) =>
+    resultOf(await Workflow.CasebookWorkflow_finalizeCase(...))
+}
+```
+
+
+
+这仍然在回答：
+
+> “F# 的 `Observations_normalize` emitted function 怎么调？”
+
+而我们要求测试回答的是：
+
+> “Casebook 对 observation set 承诺什么？”
+
+正确方向应当是生产侧真正存在：
+
+```js
+casebook.normalize(observations)
+casebook.finalize(input)
+casebook.archive(input)
+```
+
+输入输出都是 semantic JS data。
+
+不是 test support 替 F# ABI 擦屁股。
+
+---
+
+# 五、`event-store.mjs` 更严重：这是一个新 `domain.mjs`
+
+这里甚至明确写：
+
+> dist import knowledge and Fable representation stays inside this support file. 
+
+这句话本身就是错误目标。
+
+**Fable representation 不应该“stay inside another semantic-test support file”。**
+
+它应该：
+
+```text
+不存在于 semantic-test dependency graph
+```
+
+当前这个 support 里直接 import 大量：
+
+```text
+Persistence/EventStore/Model.js
+EventKWayMerge.js
+CanonicalEventCodec.js
+ProcessEventLog.js
+AgentJournal.js
+WorkspaceEventStore.js
+...
+```
+
+然后继续 re-export：
+
+```text
+sessionId
+providerRun
+fact
+envelope
+journal
+fold
+listItems
+utcOffset
+...
+```
+
+甚至：
+
+```js
+export const EventEnvelopeClass = Model.EventEnvelope
+```
+
+以及手工：
+
+```js
+new Model.EventEnvelope(
+  ...,
+  toList(...),
+  ...
+)
+```
+
+
+
+这已经不是“边界尚未完成”。
+
+这是明确地在**复制旧架构**。
+
+停止这种 migration。
+
+---
+
+# 六、真正的问题：你们的 gate 根本没扫描这些 support 文件
+
+这是当前实现最严重的机械漏洞。
+
+scanner 定义 semantic files 为：
+
+```js
+walk(root, ['.test.mjs'])
+```
+
+只扫描 `.test.mjs`。
+
+所以：
+
+```text
+requirements/finality/tests/support/finality-contract.mjs
+requirements/durable-events/tests/support/event-store.mjs
+requirements/knowledge-reuse/tests/support/casebook-contract.mjs
+```
+
+全部可以自由：
+
+```text
+deep import dist
+read .tag
+read .fields
+call .cases()
+use toList
+use caseOf
+construct F# classes
+```
+
+gate 完全看不见。
+
+于是工程师发现：
+
+```text
+test 文件触发 gate
+```
+
+解决办法变成：
+
+```text
+把违规代码搬到非 *.test.mjs
+```
+
+这就是典型的：
+
+> **满足检测器，而不是满足架构。**
+
+---
+
+# 七、第一条整改命令：gate 必须扫描整个 semantic-test dependency zone
+
+今天就改。
+
+不要：
+
+```js
+semanticTestFiles =
+  walk(..., ['.test.mjs'])
+```
+
+至少要覆盖：
+
+```text
+requirements/**/tests/**/*.mjs
+```
+
+包括：
+
+```text
+support/**/*.mjs
+fixtures/**/*.mjs
+helpers/**/*.mjs
+*-contract.mjs
+```
+
+然后只有**真正的 compiler/build quarantine** 有豁免。
+
+概念上：
+
+```text
+semantic-test zone
+├── *.test.mjs
+├── support/*.mjs
+├── fixtures/*.mjs
+└── helpers/*.mjs
+
+全部：
+    禁止 Fable knowledge
+    禁止 internal dist deep import
+```
+
+而不是只检查最外层测试文件。
+
+---
+
+# 八、把这一条做成硬 invariant
+
+应该明确写：
+
+> **Moving forbidden knowledge from a test file into test support does not reduce debt.**
+
+甚至 gate 加一个 regression test：
+
+建立 fixture：
+
+```text
+test.mjs
+  → support.mjs
+      → ../../../dist/Internal.js
+      → .fields
+```
+
+预期：
+
+```text
+FAIL
+```
+
+如果这个 fixture 能 green：
+
+> gate 是假的。
+
+---
+
+# 九、第二个严重问题：`SURFACE_MODULES` 现在是“合法化名单”
+
+当前：
+
+```js
+export const SURFACE_MODULES = [
+  ...
+]
+```
+
+然后 deep-import regex 对这些路径直接豁免。
+
+问题不是 allowlist 本身。
+
+问题是：
+
+> **加入 allowlist 的门槛太低。**
+
+现在 charter 验证的基本是：
+
+1. 路径出现在 registry；
+2. source tree 存在；
+3. 某个 test import 了它。
+
+这意味着我可以：
+
+```text
+把 RandomUglyInternal.js
+加入 SURFACE_MODULES
+
+写 random-ugly-internal-surface.test.mjs
+import 它
+
+Done.
+```
+
+然后 gate 宣布合法。
+
+这恰恰违反了：
+
+> surface exists because semantic owner owns a contract, never because test wants access.
+
+---
+
+# 十、注册 surface 不能只是一个字符串
+
+把：
+
+```js
+SURFACE_MODULES = [
+  'Foo.js'
+]
+```
+
+升级成**真实 manifest**。
+
+例如：
+
+```js
+{
+  module: 'Execution/Delegation/Fork/Surface.js',
+  owner: 'delegation',
+  laws: [
+    'DELEG-xxx',
+    'DELEG-yyy'
+  ],
+  source: 'src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs',
+  representation: 'json',
+  kind: 'pure'
+}
+```
+
+stateful：
+
+```js
+{
+  module: 'OpenCode/Host/QuiescenceSurface.js',
+  owner: 'crash-reconciliation',
+  laws: ['CRASH-006'],
+  representation: 'opaque-capability',
+  kind: 'resource'
+}
+```
+
+然后 gate 至少机械证明：
+
+```text
+owner requirement 存在
+WHAT law 存在
+PROOF 有该 law
+source 存在
+surface contract test 存在
+test 只 import surface
+```
+
+这还不能证明语义设计优秀，但至少不能随手给 internal path 发通行证。
+
+---
+
+# 十一、当前 META tests 也有不少“测试了自己写了规则”，而不是测试规则成立
+
+例如：
+
+```text
+JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests
+```
+
+名字说：
+
+> forbidden patterns absent
+
+实际测试只是：
+
+```text
+check.mjs 引用了 gate
+gate 源码里写了 “baseline can only shrink”
+```
+
+
+
+这没有证明 forbidden patterns absent。
+
+甚至仓库明确还有大量 forbidden patterns。
+
+这是 **false gate / coverage theater**。
+
+测试名必须改，或者测试必须升级。
+
+真正应该：
+
+```js
+const debt = scanAllSemanticDependencyZone()
+
+assert.deepEqual(
+  debt.minusApprovedMigrationBaseline(),
+  []
+)
+```
+
+并逐步到：
+
+```js
+assert.deepEqual(debt, [])
+```
+
+---
+
+# 十二、003 的 “law → owner → surface” 也没真的测
+
+当前所谓：
+
+```text
+JS_SURFACE_003_law_owner_surface_registry
+```
+
+实际只是：
+
+```text
+WHAT 包含 001..006
+PROOF 包含 001..006
+```
+
+
+
+这证明：
+
+> 文档写了六个编号。
+
+没有证明：
+
+```text
+DELEG-022
+ → delegation
+ → DelegatedToolEstimateSurface
+
+CRASH-006
+ → crash-reconciliation
+ → QuiescenceSurface
+```
+
+之类的关系。
+
+测试名和实际 evidence 不匹配。
+
+---
+
+# 十三、004 更明显：只检查自己包没有 helper
+
+`JS_SURFACE_004_helper_not_directly_tested` 当前只扫描：
+
+```text
+requirements/js-semantic-surface/tests
+```
+
+检查这个 META 包自己的测试有没有：
+
+```text
+toList
+caseOf
+payloadOf
+...
+```
+
+
+
+但我们关心的是：
+
+> **整个 semantic test corpus。**
+
+这相当于消防法规测试只检查消防局办公室有没有易燃物。
+
+而隔壁所有楼都不查。
+
+---
+
+# 十四、006 甚至在强制旧世界必须存在
+
+当前测试：
+
+```js
+assert.ok(domain.meta.test.mjs exists)
+assert.ok(js-boundary-baseline.json exists)
+```
+
+
+
+但 roadmap 最终又要求：
+
+```text
+P11 — remove baseline
+```
+
+所以现在的 charter **会阻止自己的终态成立**。
+
+更不应该永久要求：
+
+```text
+domain.meta.test.mjs 必须存在
+```
+
+因为它测试的是旧 `domain.mjs` anti-corruption facade。
+
+终态应该允许：
+
+```text
+domain.mjs deleted
+domain.meta deleted
+```
+
+这应该是胜利，不应该是 charter failure。
+
+---
+
+# 十五、哪些现有工作是对的？不要一刀切重做
+
+不是所有新东西都要删。
+
+有几个 pilot 实际上已经比较接近精髓。
+
+## `QuiescenceSurface`：方向基本对
+
+它让 JS：
+
+```js
+const gate = create()
+beginAttempt(gate, 's1')
+const permit = observeIdle(gate, 's1')
+tryConsume(gate, permit)
+```
+
+测试只把 gate/permit 当 opaque capability，不 inspect。
+
+生产 surface 将 string 转为 typed `SessionId`，调用 coherent `SessionQuiescenceGate`。
+
+如果 `SessionQuiescenceGate` 本身确实就是单一语义 owner，这种薄 boundary **可以合法**。
+
+因为薄不等于坏。
+
+判断标准不是行数，是它有没有：
+
+```text
+representation translation
+authority narrowing
+stable semantic vocabulary
+```
+
+---
+
+## `BloggerTomlSurface` 也有真正 translation
+
+它不是只 rename emitted member。
+
+它把：
+
+```js
+{ Kind: "text", Text: ... }
+```
+
+转为内部：
+
+```fsharp
+BloggerDeltaPart.TextPart
+```
+
+并把 arrays 转为 F# lists。
+
+这是合理的语言边界。
+
+---
+
+## `SyntheticTomlSurface` 可以接受，但不要把它吹成“深层重构”
+
+它主要是：
+
+```fsharp
+renderString -> SyntheticToml.renderString
+comment -> SyntheticToml.comment
+field -> SyntheticToml.field
+array -> List.ofArray
+```
+
+
+
+这是一个合法 JS API normalization。
+
+但它证明的只是：
+
+> SyntheticToml 本来就已经是 coherent semantic component，只差 JS-friendly representation。
+
+它不证明复杂 subsystem 已经成功重构。
+
+要准确描述。
+
+---
+
+# 十六、工程师接下来不能再按“测试文件迁移”工作
+
+现在最大的认知问题，就是在做：
+
+```text
+找一个 test
+→ 让 import 变好看
+→ 搬 helper
+→ gate 少一条
+```
+
+必须改成：
+
+```text
+选一个 semantic law
+        ↓
+定位 owner
+        ↓
+重构 owner
+        ↓
+找到最小 semantic algebra
+        ↓
+设计 JS-native representation
+        ↓
+建立正式 surface
+        ↓
+JS tests 全部经 surface
+        ↓
+删除旧 access path
+```
+
+**工作单位必须从“测试文件”切换成“semantic law / owner”。**
+
+---
+
+# 十七、每个 engineer 开工前必须填这一张表
+
+任何 migration PR，没有这张表就退回。
+
+```text
+LAW
+  Requirement:
+  Law ID:
+  One-sentence promise:
+
+OWNER
+  Semantic owner:
+  Why this owner:
+  Current competing owners:
+
+INPUT
+  Legal semantic inputs:
+  JS representation:
+
+OUTPUT
+  Observable result:
+  JS representation:
+
+EFFECTS
+  Required effects:
+  Observable contractual effects:
+  Non-contractual choreography:
+
+INTERNALS TO HIDE
+  F# types:
+  F# modules:
+  mutable state:
+  helper functions:
+  Fable representation:
+
+REFACTOR
+  What must move/split before surface exists:
+  What becomes private:
+  What disappears:
+
+SURFACE
+  Module:
+  Operations:
+  Representation:
+  Why this is not a forwarding facade:
+
+DELETION
+  Old imports removed:
+  Old adapters removed:
+  baseline entries removed:
+
+CANARIES
+  semantic-preserving internal refactor that must stay GREEN:
+  semantic violation that must turn RED:
+```
+
+任何一栏写不出来：
+
+**不允许开始写 `Surface.fs`。**
+
+---
+
+# 十八、具体示范：Finality 应该怎么重做
+
+不要继续维护：
+
+```text
+finality-contract.mjs
+```
+
+先问 `classifyEnding` 的 law 是什么。
+
+测试已经描述得很清楚：
+
+```text
+no commitment → ContinuePlanning
+completed life → AlreadyCompleted
+same open request → ResumeRequest
+...
+```
+
+
+
+那么应该设计：
+
+```js
+finality.classifyEnding({
+  life: {
+    ...
+  },
+  request: {
+    ...
+  }
+})
+```
+
+返回：
+
+```js
+{ kind: 'continue-planning' }
+```
+
+或者：
+
+```js
+{
+  kind: 'resume-request',
+  requestId: '...'
+}
+```
+
+而不是返回：
+
+```text
+EndingDisposition F# DU
+```
+
+然后 test 再 `caseOf()`。
+
+---
+
+## durable history 也不要让 JS 构造 F# Envelope
+
+目前 finality test 还在：
+
+```js
+sessionId(...)
+managerLifeId(...)
+blobRef(...)
+envelope(...)
+managerLifecycleFact(...)
+fold(...)
+mapEntries(...)
+```
+
+
+
+这还是整个内部 durable model 的 construction authority。
+
+更合理：
+
+```js
+const state = finality.project([
+  {
+    kind: 'life-opened',
+    sessionId: '...',
+    lifeId: '...',
+    ...
+  },
+  {
+    kind: 'finality-requested',
+    ...
+  }
+])
+```
+
+surface 内部：
+
+```text
+JS event
+→ typed F# fact
+→ production fold
+→ semantic state
+```
+
+然后：
+
+```js
+finality.classifyEnding(state, ...)
+```
+
+或者进一步把 projector 封起来：
+
+```js
+finality.classifyHistory({
+  events: [...],
+  currentCallId: '...'
+})
+```
+
+根据真正 contract 决定。
+
+**JS 不再拥有 `ManagerLifecycleFact` constructor。**
+
+这才叫收权。
+
+---
+
+# 十九、Casebook 的正确改法
+
+删除：
+
+```text
+casebook-contract.mjs → internal Model/Workflow
+```
+
+生产 owner 提供：
+
+```js
+casebook.normalize(observations)
+```
+
+返回：
+
+```js
+[
+  {
+    ...
+  }
+]
+```
+
+如果测试只关心 count：
+
+仍然让 surface 返回 normalized semantic values，而不是为了测试特制：
+
+```js
+normalizedCount()
+```
+
+除非 count 本身就是 contract。
+
+另外：
+
+```js
+casebook.finalize(input)
+```
+
+返回：
+
+```js
+{
+  ok: true,
+  ...
+}
+```
+
+不允许 `FSharpResult` 穿界。
+
+---
+
+# 二十、EventStore 要做真正的大手术，不要再造万能 support
+
+EventStore 是最适合逼出 architecture 的地方。
+
+先按 law 拆：
+
+```text
+append
+read
+merge
+canonical encode/decode
+CAS/ref
+journal projection
+workspace lifecycle
+```
+
+不要一个 JS support 一次加载：
+
+```text
+Model
+Merge
+Codec
+StoreTypes
+LocalLog
+JournalWriter
+AgentJournal
+Workspace
+Hook
+...
+```
+
+这说明 support file **重新聚合了一个本来就不该是单一测试 abstraction 的巨大区域**。
+
+这是红灯。
+
+每个 law 要有自己的 owner surface。
+
+例如：
+
+```js
+eventCodec.encode(event)
+eventCodec.decode(bytes)
+
+eventMerge.merge(streams)
+
+eventStore.append(store, event)
+eventStore.read(store, stream)
+
+journal.project(events)
+```
+
+只有真实 resource 才用 opaque handle：
+
+```js
+const store = eventStore.create(...)
+await eventStore.append(store, event)
+eventStore.dispose(store)
+```
+
+不要暴露：
+
+```js
+EventEnvelopeClass
+FSharpList
+typed ID runtime classes
+```
+
+---
+
+# 二十一、禁止新的 package-local `*-contract.mjs` 访问 internal dist
+
+从现在开始新增硬规则：
+
+```text
+requirements/**/tests/support/**/*.mjs
+```
+
+**不得**：
+
+```text
+import dist/Internal...
+import domain.mjs
+caseOf
+payloadOf
+toList
+resultOf
+.fields
+.tag
+.cases()
+```
+
+如果 support 是纯 fixture：
+
+```js
+export const userMessage = ...
+export const fakeClock = ...
+```
+
+没问题。
+
+如果它必须调用 production：
+
+> 它调用的必须是 registered semantic surface。
+
+也就是说：
+
+```text
+support
+  → semantic surface
+```
+
+允许。
+
+```text
+support
+  → internal F# ABI
+```
+
+禁止。
+
+---
+
+# 二十二、surface source 也要过反 forwarding 检查
+
+不是自动禁止 thin wrapper。
+
+而是 reviewer 必须回答：
+
+> **如果删除这个 Surface 文件，下面是否已经存在一个 coherent semantic boundary？**
+
+两种情况。
+
+### 合法
+
+```text
+JS representation
+   ↓ translation
+coherent F# semantic owner
+```
+
+保留 surface。
+
+### 非法
+
+```text
+Surface
+ ↓
+Internal A
+ ↓
+Internal B
+ ↔ Internal C
+ ↓
+legacy adapter
+```
+
+只是把烂 graph 藏起来。
+
+先重构内部 ownership。
+
+你仓库自己的 `facade-hides-mess` 已经写得非常准确：真正 structural repair 要求 owner coherent、dependency direction intelligible、state fact 有 rightful writer；clean API 不能充当 unresolved architecture 的幕布。
+
+工程师现在应该真正执行这条，而不是只把它收录进 enforcer。
+
+---
+
+# 二十三、重新定义 milestone：不用“建了几个 surface”计数
+
+现在类似：
+
+```text
+7 个 registered surface
+13 个 test files migrated
+```
+
+太容易驱动错误优化。
+
+新的 progress dashboard 应该是：
+
+```text
+semantic laws total
+laws with identified owner
+laws with JS-native surface
+laws with zero internal test access
+legacy Fable-authority edges remaining
+domain.mjs consumers remaining
+support-contract internal imports remaining
+Fable runtime value crossings remaining
+```
+
+最重要的是三个数字：
+
+```text
+internal authority edges
+domain.mjs consumers
+semantic laws lacking proper surface
+```
+
+Surface 数量本身不是 KPI。
+
+越多甚至可能越糟。
+
+---
+
+# 二十四、对每个迁移必须做“破坏实现实验”
+
+这一步工程师目前做得远远不够。
+
+一个 surface 宣称完成后，必须实际做一次临时 mutation。
+
+## Positive mutation
+
+例如：
+
+```text
+rename internal module
+rename helper
+inline helper
+Map → Dictionary
+split module
+move file
+reorder DU cases if internal
+```
+
+JS test 必须不动、继续 green。
+
+如果测试需要改：
+
+> boundary 失败。
+
+---
+
+## Negative mutation
+
+保持 internal shape 不动，只改语义：
+
+```text
+accept stale permit
+publish twice
+return wrong finality disposition
+forget dedupe
+choose wrong identity
+skip durable write
+```
+
+对应 JS test 必须 red。
+
+否则：
+
+> test 被 surface 弄弱了。
+
+这两面缺一不可。
+
+---
+
+# 二十五、接下来 PR 顺序，我会强制这样排
+
+## PR 0 — 撤销虚假完成状态
+
+只改 roadmap：
+
+```text
+P6 IN PROGRESS
+P7 NOT PROVEN
+P8 NOT PROVEN
+P9 IN PROGRESS
+```
+
+不允许继续靠 ✅ 自我麻醉。
+
+---
+
+## PR 1 — 修 scanner 漏洞
+
+扫描：
+
+```text
+requirements/**/tests/**/*.mjs
+```
+
+不是只扫 `.test.mjs`。
+
+新增 regression fixture：
+
+```text
+test → support → internal dist
+```
+
+必须红。
+
+---
+
+## PR 2 — 禁止 test-side Fable quarantine
+
+正式声明：
+
+```text
+Fable quarantine only exists under compiler/build verification.
+```
+
+**不允许**：
+
+```text
+product-package/tests/support
+```
+
+成为第二 quarantine。
+
+---
+
+## PR 3 — 冻结 package-local internal contracts
+
+以下模式进入 migration debt：
+
+```text
+finality-contract.mjs
+event-store.mjs
+casebook-contract.mjs
+distiller-contract.mjs
+...
+```
+
+不能再新增。
+
+现存只能减少。
+
+---
+
+## PR 4 — 重做 registry
+
+从字符串 allowlist 改成：
+
+```text
+surface manifest
+= owner + laws + source + representation + kind
+```
+
+---
+
+## PR 5 — 修 META false gates
+
+特别是：
+
+```text
+002
+003
+004
+006
+```
+
+让 test 真正测 property，而不是“检查某文件存在/某文字出现”。
+
+---
+
+## PR 6 — Finality vertical slice
+
+不要再碰别的 family。
+
+一口气做完：
+
+```text
+law
+→ owner
+→ JS surface
+→ JS-native events/state
+→ remove finality-contract Fable authority
+→ remove relevant domain.mjs imports
+→ canaries
+```
+
+完成后才算一个真正 migration exemplar。
+
+---
+
+## PR 7 — Casebook vertical slice
+
+同样完全切断。
+
+---
+
+## PR 8 — EventStore 按 law 拆分
+
+不要“一次做万能 EventStoreSurface”。
+
+一个 law 一个 coherent capability。
+
+---
+
+# 二十六、工程师的 Definition of Done 必须改成这种形式
+
+一个 test migration **不允许**因为下面任何一项成立就宣布完成：
+
+```text
+[ ] test 不再直接 import internal dist
+[ ] test 文件里看不到 .fields
+[ ] 新增了 *Surface.fs
+[ ] 新增了 *-contract.mjs
+[ ] gate debt 数少了 1
+```
+
+这些都是过程指标。
+
+真正 DoD：
+
+```text
+[ ] law 有一句与 F#/Fable 无关的定义
+
+[ ] law 有唯一 semantic owner
+
+[ ] owner 本身 coherent，不依靠 surface 遮住 ownership mess
+
+[ ] JS 调用只使用 semantic vocabulary
+
+[ ] semantic input 是 JS-native
+
+[ ] semantic output 是 JS-native
+
+[ ] resource 只以 opaque capability 穿界
+
+[ ] 整个 test dependency graph 不知道 Fable
+
+[ ] 没有 test-side adapter deep-import internal dist
+
+[ ] 没有 test-side constructor 能制造 production-illegal F# state
+
+[ ] 原 internal access path 已删除，不只是绕开
+
+[ ] positive internal-refactor canary green
+
+[ ] negative semantic mutation canary red
+
+[ ] baseline 实际减少
+
+[ ] 没有新增第二个 compatibility/facade layer
+```
+
+少一个：
+
+**不完成。**
+
+---
+
+# 二十七、给工程师一句必须真正理解的话
+
+不是：
+
+> “请把 Fable interop 集中起来。”
+
+也不是：
+
+> “请把 test imports 换成 surface imports。”
+
+更不是：
+
+> “请确保测试文件看起来都是 JS-native。”
+
+真正要求是：
+
+> **测试没有资格知道 F# 内部存在什么。**
+
+如果为了写测试你需要：
+
+```text
+ReviewerOutcome
+ManagerLifecycleFact
+EventEnvelope
+FSharpList
+internal module path
+case ordinal
+private projection state
+```
+
+那么不要问：
+
+> “我把它包装到哪个 support 文件里？”
+
+要问：
+
+> **“为什么这个 semantic law 没有一个无需这些知识就能表达的边界？”**
+
+然后去改生产 architecture。
+
+---
+
+# 最后给这版一个评价
+
+目前不是零进展。
+
+`QuiescenceSurface`、`BloggerTomlSurface`、JS representation validator、ratchet 的概念都说明工程师已经摸到了正确方向。 
+
+但**执行层面正在明显退化成“通过包装隐藏违规”**：
+
+```text
+global domain.mjs
+      ↓
+package-local *-contract.mjs
+
+direct Fable knowledge
+      ↓
+indirect Fable knowledge
+
+ugly import
+      ↓
+pretty import
+
+white-box
+      ↓
+white-box behind one curtain
+```
+
+这必须现在纠正。
+
+否则等几十个 package 都长出自己的 `*-contract.mjs` 后，你们会发现：
+
+> 原来的一个 `domain.mjs` 变成了二十个小 `domain.mjs`。
+
+那不是 clean architecture。
+
+只是把一个垃圾场分成了二十个有门牌号的小垃圾场。
+
+---
+
 你这个方向是对的，而且从这份仓库看，已经到了一个非常适合做 **“Refactor Closure / 旧世界清仓”** 的节点。
 
 更关键的是：你们仓库自己的设计原则其实已经写出了这次行动的理论依据——**兼容性必须有明确债权人；说不出谁会 break、持有什么旧 contract、何时退出，就不应该永久存在。**  另一个规则甚至已经把完成态定义得很漂亮：**新架构不再是 preferred architecture，而 simply is the architecture。** 
