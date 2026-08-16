@@ -47,7 +47,7 @@ cross-boundary invariant；本包拥有 capture 侧，promotion 因果归 `specu
 
 ### 4.2 `cursor-pair-hint.md` / `cache.md` —— XTrace 与 HOST-013 的互斥
 
-HOST-013 synthetic pair 是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史**，但
+HOST-013 synthetic pair 是**会影响 prompt bytes 与 Prefix Cache 的合成历史**，但
 pair 正文**不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input**
 （HOST-013 行为约束 4）。XTrace 只记真实语义材料；合成 marker 的 durable 投影事实单独存在。
 这条排除线属于 prefix-stability 的 HOST-013 部分（见该包），本包负责「XTrace 里没有 synthetic 正文」这一半。

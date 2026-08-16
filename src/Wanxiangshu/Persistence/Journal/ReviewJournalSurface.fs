@@ -94,27 +94,20 @@ module ReviewJournalSurface =
                    ProviderRun = ProviderRunIdentity.create (strField payload "ProviderRun")
                    ToolCallId = ToolCallId.create (strField payload "ToolCallId")
                    FrozenFrontierSequence = int64 (unbox<int> (field payload "FrozenFrontierSequence")) |}
-        | "PerfectChallengeIssued" ->
-            ReviewFact.PerfectChallengeIssued
-                {| BarrierId = ReviewBarrierId.create (strField payload "BarrierId")
-                   GitTreeHash = GitTreeHash.create (strField payload "GitTreeHash")
+        | "ConfirmedReviewWitness" ->
+            ReviewFact.ConfirmedReviewWitness
+                {| ManagerJobId = optionalText payload "ManagerJobId" |> Option.map ManagerJobId.create
+                   ManagerSessionId = SessionId.create (strField payload "ManagerSessionId")
                    ReviewerSessionId = SessionId.create (strField payload "ReviewerSessionId")
+                   WorktreeIdentity = optionalText payload "WorktreeIdentity" |> Option.map WorktreeIdentity.create
+                   BarrierId = ReviewBarrierId.create (strField payload "BarrierId")
+                   GitTreeHash = GitTreeHash.create (strField payload "GitTreeHash")
                    FirstProviderRun = ProviderRunIdentity.create (strField payload "FirstProviderRun")
                    FirstToolCallId = ToolCallId.create (strField payload "FirstToolCallId")
-                   ChallengeTextVersion = unbox<int> (field payload "ChallengeTextVersion")
-                   ChallengeContentDigest = SealDigest.create (strField payload "ChallengeContentDigest") |}
-        | "ProviderInputSealed" ->
-            let included: obj array =
-                let value = field payload "IncludedToolResultDigests"
-                if isNull value then [||] else unbox<obj array> value
-
-            ReviewFact.ProviderInputSealed
-                {| SessionId = SessionId.create (strField payload "SessionId")
-                   ProviderRun = ProviderRunIdentity.create (strField payload "ProviderRun")
-                   PhysicalUserMessageId = PhysicalUserMessageId.create (strField payload "PhysicalUserMessageId")
-                   SealDigest = SealDigest.create (strField payload "SealDigest")
-                   CanonicalVersion = unbox<int> (field payload "CanonicalVersion")
-                   IncludedToolResultDigests = included |> Array.toList |> List.map (fun value -> SealDigest.create (text value)) |}
+                   FirstPhysicalUserMessageId = PhysicalUserMessageId.create (strField payload "FirstPhysicalUserMessageId")
+                   SecondProviderRun = ProviderRunIdentity.create (strField payload "SecondProviderRun")
+                   SecondToolCallId = ToolCallId.create (strField payload "SecondToolCallId")
+                   SecondPhysicalUserMessageId = PhysicalUserMessageId.create (strField payload "SecondPhysicalUserMessageId") |}
         | other -> failwith $"ReviewJournalSurface: unknown Review fact '{other}'"
 
     let private promptFactOf (caseName: string) (payload: obj) : AgentFact =
@@ -219,7 +212,6 @@ module ReviewJournalSurface =
                     match guard.Witness with
                     | ReviewWitness.NoReview -> "NoReview"
                     | ReviewWitness.RevisionWitness _ -> "RevisionWitness"
-                    | ReviewWitness.PerfectPending _ -> "PerfectPending"
                     | ReviewWitness.Confirmed _ -> "Confirmed"
 
             let xTraceHead = session.XTrace |> Option.map XTraceProjection.head |> Option.defaultValue 0L
@@ -247,7 +239,6 @@ module ReviewJournalSurface =
                     match guard.Witness with
                     | ReviewWitness.NoReview -> "NoReview"
                     | ReviewWitness.RevisionWitness _ -> "RevisionWitness"
-                    | ReviewWitness.PerfectPending _ -> "PerfectPending"
                     | ReviewWitness.Confirmed _ -> "Confirmed"
 
             box

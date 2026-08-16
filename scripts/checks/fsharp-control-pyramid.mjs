@@ -198,10 +198,12 @@ export const scanControlPyramidEntries = (entries) => {
 
 export const collectControlPyramidEntries = (repoRoot = ROOT, sourceRoot = DEFAULT_SOURCE_ROOT) => {
   const absoluteRoot = resolve(repoRoot, sourceRoot)
-  return walk(absoluteRoot, ['.fs']).map((absolute) => ({
-    file: norm(relative(repoRoot, absolute)),
-    text: readFileSync(absolute, 'utf8'),
-  }))
+  return walk(absoluteRoot, ['.fs'])
+    .filter((absolute) => !norm(absolute).endsWith('Surface.fs'))
+    .map((absolute) => ({
+      file: norm(relative(repoRoot, absolute)),
+      text: readFileSync(absolute, 'utf8'),
+    }))
 }
 
 const countsByFile = (hits) => {

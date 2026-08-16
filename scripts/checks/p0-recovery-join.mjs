@@ -396,6 +396,7 @@ const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
   'HandleController.fs',
   'Controller.fs',
   'ChildRecoveryWorkflow.fs',
+  'Surface.fs',
 ])
 
 /**

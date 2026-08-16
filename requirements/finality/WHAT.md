@@ -366,9 +366,9 @@ semantic-trace；Magic Todo canonical 空账属 obligation-ledger。
 
 ## FINALITY-023：Opening durable 顺序与改写幂等
 
-**规范**：原始 HumanRoot 先写 XTrace 与 `LifeOpened`，后改 provider surface（若有），再
-ReviewSeal。改写 identity = SessionId + ManagerLifeId + PhysicalUserMessageId + narrative
-source；禁止由文本后缀推断。重复 transform 不重复注入（GLORY-013/015）。
+**规范**：原始 HumanRoot 先写 XTrace 与 `LifeOpened`，后改 provider surface（若有）。改写
+identity = SessionId + ManagerLifeId + PhysicalUserMessageId + narrative source；禁止由文本后缀
+推断。重复 transform 不重复注入（GLORY-013/015）。
 
 **含义 / 动机**：durable Opening 永远是原始 `[X]`；provider-facing 改写不得先于落盘。
 

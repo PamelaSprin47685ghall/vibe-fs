@@ -42,20 +42,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// The skeptical challenge issued by a first PERFECT (REVIEW-003).
-///
-/// Kept as durable evidence so the second run's input seal can be checked for
-/// the digest. Without this the only available comparison was "same authority
-/// root", which REVIEW-003 explicitly forbids.
-type PerfectChallenge =
-    { BarrierId: ReviewBarrierId
-      GitTreeHash: GitTreeHash
-      ReviewerSessionId: SessionId
-      FirstProviderRun: ProviderRunIdentity
-      FirstToolCallId: ToolCallId
-      ChallengeTextVersion: int
-      ChallengeContentDigest: SealDigest }
-
 /// The XTrace boundary captured by a terminal while this review barrier is active.
 /// It is projection-only: replay reconstructs it from the barrier and terminal facts.
 type ReviewTerminalFrontier =
@@ -63,20 +49,6 @@ type ReviewTerminalFrontier =
       TerminalRef: BlobRef
       TerminalDigest: BlobDigest
       Sequence: int64 }
-
-/// REVIEW-010: the canonical provider input for one run, sealed at
-/// `messages.transform` time and bound to that run per HOST-010.
-type ProviderInputSeal =
-    {
-        SessionId: SessionId
-        ProviderRun: ProviderRunIdentity
-        PhysicalUserMessageId: PhysicalUserMessageId
-        SealDigest: SealDigest
-        CanonicalVersion: int
-        /// The causal evidence. A challenge digest is either in this set or the
-        /// second PERFECT does not confirm.
-        IncludedToolResultDigests: Set<string>
-    }
 
 /// REVIEW-013/017: one reviewer attempt's reconciled turn fully closed.
 ///
@@ -87,10 +59,8 @@ type ClosedAttempt =
     { Attempt: ReviewAttemptIdentity
       FrozenFrontier: XTraceCursor }
 
-/// Review state for one session.
-///
-/// PERSIST-008: bounded. Seals are kept per provider run within a window, and
-/// attempt keys within a window; neither grows with history length.
+/// Completed review facts for one session. Attempt/closure audit windows are bounded;
+/// no field encodes where the Finality review CE is currently executing.
 type ReviewGuardProjection =
     {
         CurrentBarrierId: ReviewBarrierId option
@@ -100,11 +70,6 @@ type ReviewGuardProjection =
         /// Frozen once the barrier reaches REVISE or Confirmed. Before that, a
         /// later terminal replaces an earlier provisional one from this barrier.
         TerminalFrontier: ReviewTerminalFrontier option
-        /// Set once the first PERFECT issued its challenge; cleared by REVISE or a
-        /// tree change.
-        PendingChallenge: PerfectChallenge option
-        /// Seals observed recently, keyed by provider run. Bounded window.
-        Seals: Map<ProviderRunIdentity, ProviderInputSeal>
         /// REVIEW-004 bounded typed verdict evidence, newest first. The unique
         /// integrator records the exact attempt identity once; consumers never
         /// reconstruct it from Journal bytes or semantic trace parts.
@@ -152,41 +117,17 @@ module ReviewProjection =
     [<Literal>]
     let private AttemptWindow = 8
 
-    /// Seals matter only until the verdict that consumes them.
-    [<Literal>]
-    let private SealWindow = 8
-
     let empty =
         { CurrentBarrierId = None
           CurrentManagerSessionId = None
           LastGitTreeHash = None
           Witness = ReviewWitness.NoReview
           TerminalFrontier = None
-          PendingChallenge = None
-          Seals = Map.empty
           ObservedAttempts = []
           ClosedAttempts = [] }
 
     let private remember key keys =
         key :: (keys |> List.filter ((<>) key)) |> List.truncate AttemptWindow
-
-    /// Drop the oldest seals once the window overflows. Map has no insertion
-    /// order, so the bound is by provider run count, which is what the window is
-    /// about.
-    let private rememberSeal (seal: ProviderInputSeal) seals =
-        let next = Map.add seal.ProviderRun seal seals
-
-        if Map.count next <= SealWindow then
-            next
-        else
-            let dropped =
-                next
-                |> Map.toList
-                |> List.map fst
-                |> List.filter (fun run -> run <> seal.ProviderRun)
-                |> List.truncate (Map.count next - SealWindow)
-
-            dropped |> List.fold (fun acc run -> Map.remove run acc) next
 
     /// A new barrier discards the previous barrier's pending challenge and
     /// attempt window. REVIEW-008: a confirmed witness stays auditable (validity
@@ -207,21 +148,13 @@ module ReviewProjection =
                 CurrentManagerSessionId = Some managerSessionId
                 LastGitTreeHash = Some gitTreeHash
                 TerminalFrontier = None
-                PendingChallenge = None
                 ObservedAttempts = []
                 ClosedAttempts = []
                 Witness =
                     match current.Witness with
                     | ReviewWitness.Confirmed _ -> current.Witness
                     | ReviewWitness.NoReview
-                    | ReviewWitness.RevisionWitness _
-                    | ReviewWitness.PerfectPending _ -> ReviewWitness.NoReview }
-
-    /// REVIEW-010: record a seal. Pure storage; the causal judgement happens at
-    /// verdict time.
-    let applySeal (seal: ProviderInputSeal) (current: ReviewGuardProjection) =
-        { current with
-            Seals = rememberSeal seal current.Seals }
+                    | ReviewWitness.RevisionWitness _ -> ReviewWitness.NoReview }
 
     /// GLORY-072/073: bind a terminal's exclusive XTrace frontier to the barrier
     /// that was active when the terminal fact folded. ProviderRun is deliberately
@@ -239,8 +172,7 @@ module ReviewProjection =
                 match current.Witness with
                 | ReviewWitness.RevisionWitness _
                 | ReviewWitness.Confirmed _ -> current.TerminalFrontier.IsSome
-                | ReviewWitness.NoReview
-                | ReviewWitness.PerfectPending _ -> false
+                | ReviewWitness.NoReview -> false
 
             if frozen then
                 current
@@ -253,30 +185,6 @@ module ReviewProjection =
                               TerminalDigest = terminalDigest
                               Sequence = sequence } }
 
-    /// REVIEW-003: the first PERFECT issued its challenge.
-    ///
-    /// This is also what makes the witness pending. The previous version stored
-    /// only `PendingChallenge`, so `ReviewWitness.isPerfectPending` was never
-    /// true and both readers of it — the reviewer guard's confirmation nudge and
-    /// the Orchestrator's `PendingConfirmation` branch — waited for a state the
-    /// fold could not produce. A first PERFECT looked indistinguishable from no
-    /// review at all.
-    ///
-    /// The pending witness is built from the challenge rather than passed in: the
-    /// challenge already carries the whole first `VerdictWitness`, and a second
-    /// parameter would let the two disagree.
-    let applyChallengeIssued (challenge: PerfectChallenge) (current: ReviewGuardProjection) =
-        let first =
-            { ProviderRun = challenge.FirstProviderRun
-              ToolCallId = challenge.FirstToolCallId
-              GitTreeHash = challenge.GitTreeHash
-              ReviewerSessionId = challenge.ReviewerSessionId }
-
-        { current with
-            PendingChallenge = Some challenge
-            LastGitTreeHash = Some challenge.GitTreeHash
-            Witness = ReviewWitness.PerfectPending first }
-
     /// REVIEW-002: any REVISE clears an unfinished PERFECT confirmation.
     let private applyRevise (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
         { current with
@@ -284,8 +192,7 @@ module ReviewProjection =
             Witness =
                 ReviewWitness.RevisionWitness
                     {| Report = ""
-                       GitTreeHash = gitTreeHash |}
-            PendingChallenge = None }
+                       GitTreeHash = gitTreeHash |} }
 
     /// Apply one verdict.
     ///
@@ -293,11 +200,8 @@ module ReviewProjection =
     /// unfinished confirmation (REVIEW-002). It deliberately does NOT judge
     /// REVIEW-003's causal proof or build a `Confirmed` witness.
     ///
-    /// Confirmation arrives as its own fact. Re-proving it here would mean asking
-    /// the seal window at replay time, and `Seals` is bounded to `SealWindow`
-    /// entries — an old journal's seal has long rolled out, so the fold would
-    /// reject a line that was fully proven when written and the whole replay
-    /// would fail. A writer proves; a fold applies.
+    /// Confirmation arrives as its own completed fact. The fold applies that fact;
+    /// it never reconstructs the direct CE's first/challenge/second call order.
     let applyVerdict
         (attempt: ReviewAttemptIdentity)
         (verdict: ReviewGuardVerdict)
@@ -317,27 +221,25 @@ module ReviewProjection =
 
     /// REVIEW-003/006: the confirmed witness, already proven by its writer.
     ///
-    /// Takes the two witnesses and both digests as given. That is the point of
-    /// REVIEW-006's self-containment: every identity the Guard needs is inline in
-    /// the fact, so this function never consults a surrounding map to complete
-    /// one. `ReviewWitness.confirm` still enforces conditions 1–5, which are pure
-    /// comparisons of the two witnesses and stay valid at any replay time.
+    /// Takes the two witnesses and their physical prompt identities as given.
+    /// REVIEW-006's self-containment keeps every identity the Guard needs inline
+    /// in the completed fact, so replay never consults a surrounding map or
+    /// reconstructs the CE's execution position.
     let applyConfirmedWitness
         (barrierId: ReviewBarrierId)
-        (challengeResultDigest: SealDigest)
-        (secondProviderInputDigest: SealDigest)
+        (firstPhysicalUserMessageId: PhysicalUserMessageId)
+        (secondPhysicalUserMessageId: PhysicalUserMessageId)
         (first: VerdictWitness)
         (second: VerdictWitness)
         (current: ReviewGuardProjection)
         : Result<ReviewGuardProjection, VerdictRejection> =
-        match ReviewWitness.confirm barrierId challengeResultDigest secondProviderInputDigest first second with
+        match ReviewWitness.confirm barrierId firstPhysicalUserMessageId secondPhysicalUserMessageId first second with
         | None -> Error NotDistinctAttempt
         | Some confirmed ->
             Ok
                 { current with
                     Witness = confirmed
-                    LastGitTreeHash = Some second.GitTreeHash
-                    PendingChallenge = None }
+                    LastGitTreeHash = Some second.GitTreeHash }
 
     /// REVIEW-004: has this exact attempt already counted.
     ///

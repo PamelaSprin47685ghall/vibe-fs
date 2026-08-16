@@ -245,52 +245,6 @@ module ProviderProjection =
         && List.length previous.Messages <= List.length next.Messages
         && (next.Messages |> List.truncate (List.length previous.Messages)) = previous.Messages
 
-    /// REVIEW-010 `CanonicalVersion`. Bump when `renderWire` changes shape, so an
-    /// old seal is recognisable as having been produced by a different renderer
-    /// rather than silently compared against new bytes.
-    ///
-    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export.
-    let CanonicalVersion = 1
-
-    /// REVIEW-010: the digest that becomes a `ProviderInputSeal`.
-    ///
-    /// Takes the hash as a parameter so this module stays pure — Domain owns what
-    /// gets hashed, the Host boundary owns how.
-    let sealDigest (sha256: string -> string) (wire: ProviderWireProjection) : SealDigest =
-        SealDigest.create (sha256 (renderWire wire))
-
-    /// REVIEW-010: the digest of ONE tool result, as the wire projection renders it.
-    ///
-    /// REVIEW-003's challenge digest and REVIEW-010's seal contents must both come
-    /// from this function. If either side applied its own normalisation, a single
-    /// character of drift would make every confirmation fail closed — a defect that
-    /// is indistinguishable from correct fail-closed behaviour and therefore nearly
-    /// invisible. `resultCanonical` is already canonical: it is the value the codec
-    /// put into `WireToolResult`.
-    let toolResultDigest (sha256: string -> string) (resultCanonical: string) : SealDigest =
-        SealDigest.create (sha256 resultCanonical)
-
-    /// REVIEW-010: which parts this request carried, as digests.
-    ///
-    /// The set a second PERFECT is checked against. Tool results are digested
-    /// as the challenge's delivery shape (REVIEW-003). Host 1.18.10's assembled
-    /// view may carry the tool result as a TEXT part instead (`message-v2.ts`
-    /// flattens completed tool outputs into assistant text), so text parts are
-    /// digested too: the proof is "the model's input contained the challenge
-    /// text", and a specific digest only matches that exact text — other text
-    /// cannot impersonate it. Reasoning/media/tool-calls are not input the
-    /// model could quote, so they stay out.
-    let toolResultDigests (sha256: string -> string) (wire: ProviderWireProjection) : SealDigest list =
-        wire.Messages
-        |> List.collect (fun message -> message.Parts)
-        |> List.choose (fun part ->
-            match part with
-            | WireToolResult(_callId, result) -> Some(toolResultDigest sha256 result)
-            | WireText text -> Some(toolResultDigest sha256 text)
-            | WireReasoning _
-            | WireMedia _
-            | WireToolCall _ -> None)
-
     /// VERIFY-003: the fixture key. Semantic by construction, so a fixture
     /// written once matches on every later run of the same conversation.
     let fixtureKey (semantic: ProviderSemanticProjection) : string = renderSemantic semantic

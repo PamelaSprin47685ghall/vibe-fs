@@ -168,14 +168,14 @@ id 并证明 `ProviderSemanticProjection` 不变；media/孤儿 result 等无法
 旧 Replica transcript；过去已经 Promoted 的历史作为 owner 正常语义可以出现在未来 decision
 mirror。
 
-Strength frame 插入必须早于 PairProgrammingThought marker；ReviewSeal 仍覆盖最终 provider
-bytes。Candidate wrong-target render、同 anchor 不同 payload、Strength mirror 与普通 Work
+Strength frame 插入必须早于 PairProgrammingThought marker；Host sanitization 仍在最终 provider
+bytes 发送前执行。Candidate wrong-target render、同 anchor 不同 payload、Strength mirror 与普通 Work
 base selection 同时出现均为 ProjectionConflict。
 
 **含义/动机**：投影是跨 Session 唯一可比的面；wire id 是本地表示。Replica 不能看见自己
 正在被预读这件事。
 
-**边界**：ProjectionAlgebra 通用性质 → `provider-projection`；Pair marker / ReviewSeal 的
+**边界**：ProjectionAlgebra 通用性质 → `provider-projection`；Pair marker / Host sanitization 的
 writer 顺序 → 各自 owner（本命题只规定 Strength frame 的相对位置）。
 
 **证据**：PROOF.md SPEC-INV-009 行（projection-algebra、projection-adapter、frame-projection

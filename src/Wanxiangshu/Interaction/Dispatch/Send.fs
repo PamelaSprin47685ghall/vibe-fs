@@ -88,15 +88,35 @@ module PromptDispatcherSend =
     let private handleAdmittedPhysical
         (submitted: TransportReceipt -> Task<Result<unit, string>>)
         (acceptPhysical: PhysicalUserMessageId -> Task<Result<unit, string>>)
-        (acceptanceCallback: (PhysicalUserMessageId -> unit) option)
         (physicalId: PhysicalUserMessageId)
         (key: PromptKey)
         : Task<Result<PromptKey, string>> =
         taskResult {
             let! _ = submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId))
             let! _ = acceptPhysical physicalId
-            acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
             return key
+        }
+
+    let private cancelPhysicalOnError (key: PromptKey) (result: Result<PromptKey, string>) =
+        match result with
+        | Ok _ -> result
+        | Error _ ->
+            PromptPhysicalAcceptance.cancel key
+            result
+
+    let private awaitPhysicalAwareSend
+        (key: PromptKey)
+        (sendTask: Task<SendOutcome>)
+        (record: SendOutcome -> Task<Result<PromptKey, string>>)
+        : Task<Result<PromptKey, string>> =
+        task {
+            try
+                let! outcome = sendTask
+                let! result = record outcome
+                return cancelPhysicalOnError key result
+            with ex ->
+                PromptPhysicalAcceptance.cancel key
+                return raise ex
         }
 
     type PromptDispatcher.Runtime with
@@ -111,17 +131,9 @@ module PromptDispatcherSend =
             (key: PromptKey)
             (sessionId: SessionId)
             (outcome: SendOutcome)
-            (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
             (acceptPhysical: PhysicalUserMessageId -> Task<Result<unit, string>>)
             : Task<Result<PromptKey, string>> =
             task {
-                // PROMPT-007: Detached never observes PhysicalAccepted at the caller.
-                let acceptanceCallback =
-                    match awaitMode with
-                    | PromptDispatcher.AwaitMode.Detached -> None
-                    | PromptDispatcher.AwaitMode.Await -> onAccepted
-
                 let submitted (receipt: TransportReceipt) =
                     PromptFact.PluginPromptSubmitted
                         {| PromptKey = key
@@ -152,7 +164,7 @@ module PromptDispatcherSend =
                     // The Host answered with a real id. That answer is still the
                     // transport receipt — it is simply not admission-shaped — so the
                     // four-stage chain stays intact instead of skipping Submitted.
-                    return! handleAdmittedPhysical submitted acceptPhysical acceptanceCallback physicalId key
+                    return! handleAdmittedPhysical submitted acceptPhysical physicalId key
 
                 | Retryable error -> return! abandon (PromptAbandonReason.SendFailed error) error
                 | Fatal error -> return! abandon (PromptAbandonReason.SendFailed error) error
@@ -214,7 +226,8 @@ module PromptDispatcherSend =
 
                     Diagnostic.fatal
                         "detached-prompt-dispatch-failed"
-                        [ "session_id", SessionId.value sessionId; "result", error ]
+                        [ "session_id", SessionId.value sessionId
+                          "result", error ]
                 }
 
             task {
@@ -279,6 +292,10 @@ module PromptDispatcherSend =
                       Tools = tools
                       BindingIntent = SessionBindingIntent.Preserve }
 
+                match awaitMode, onAccepted with
+                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
+                | _ -> ()
+
                 let sendTask = port.SendPrompt(sessionId, text, options)
 
                 let acceptFn physicalId =
@@ -291,8 +308,9 @@ module PromptDispatcherSend =
                     this.ObserveDetachedSend key sessionId sendTask onDetachedFailure
                     return key
                 | PromptDispatcher.AwaitMode.Await ->
-                    let! outcome = sendTask |> TaskResultCE.ofTask
-                    return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
+                    return!
+                        awaitPhysicalAwareSend key sendTask (fun outcome ->
+                            this.RecordSendOutcome key sessionId outcome acceptFn)
             }
 
         member this.SendAgentOwnerRoot
@@ -407,6 +425,10 @@ module PromptDispatcherSend =
                       Tools = tools
                       BindingIntent = bindingIntent }
 
+                match awaitMode, onAccepted with
+                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
+                | _ -> ()
+
                 let sendTask = port.SendPrompt(sessionId, text, options)
 
                 let acceptFn physicalId =
@@ -419,8 +441,9 @@ module PromptDispatcherSend =
                     this.ObserveDetachedSend key sessionId sendTask None
                     return key
                 | PromptDispatcher.AwaitMode.Await ->
-                    let! outcome = sendTask |> TaskResultCE.ofTask
-                    return! this.RecordSendOutcome key sessionId outcome awaitMode onAccepted acceptFn
+                    return!
+                        awaitPhysicalAwareSend key sendTask (fun outcome ->
+                            this.RecordSendOutcome key sessionId outcome acceptFn)
             }
 
         member this.SendContinuation

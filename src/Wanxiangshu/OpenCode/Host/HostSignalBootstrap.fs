@@ -290,10 +290,6 @@ module HostSignalBootstrap =
             CurrentPhysicalUserMessage: string -> string option
             ChatMessageHook: obj
             ObserveEvent: obj -> unit
-            /// REVIEW-010 deferred-binding park: challenge requests have no
-            /// assistant to bind at transform time; VerdictTool bindToRun resolves
-            /// the parked seal evidence against the tool ProviderRunId (fail-closed).
-            PendingReviewSeals: Dictionary<string, SharedState.PendingSeal>
         }
 
     let wire
@@ -672,6 +668,5 @@ module HostSignalBootstrap =
                   ObserveEvent =
                     (fun raw ->
                         observeSyncDelegateBatch scope raw
-                        signalRouter.ObserveLocal raw)
-                  PendingReviewSeals = SharedState.PendingReviewSeals }
+                        signalRouter.ObserveLocal raw) }
         }

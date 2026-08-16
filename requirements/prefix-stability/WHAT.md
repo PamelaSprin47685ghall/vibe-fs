@@ -87,7 +87,7 @@ seal/绑定**之前**原子提交；provider Failed/Aborted **不**回滚已 sea
 提交后 provider 结局不影响 epoch。
 
 **含义/动机**：若 provider 失败能回滚 epoch，同一段历史会在两次 attempt 间「换世界」，
-已 seal 的 ReviewSeal / 前缀证明全部失真。
+provider-visible prefix evidence / 前缀证明全部失真。
 
 **边界**：desired cutoff 的推导归 obligation-ledger（仅从首次 accepted `planComplete=true` 起的
 committed Accepted 子链；Pre-T1 planning checkpoints 不参与）；本命题拥有「commit 后不可逆」。
@@ -234,7 +234,7 @@ model、variant、tools、system 与完整 message 序列。任一改变（即�
 **规范**（HOST-013 行为约束 4）：pair 正文不得进入 XTrace / Companion decode / Blogger delta /
 work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。
 
-**含义/动机**：synthetic pair 是影响 prompt bytes / Prefix Cache / ReviewSeal 的合成历史，
+**含义/动机**：synthetic pair 是影响 prompt bytes / Prefix Cache 的合成历史，
 但它是 provider 边界的机制；语义历史（XTrace）只记真实材料。
 
 **边界**：XTrace 的 capture 边界归 semantic-trace（SEMANTIC-TRACE-002）；本命题拥有

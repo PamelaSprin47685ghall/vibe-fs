@@ -69,7 +69,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review.Assurance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -764,7 +763,7 @@ module StrengthSpeculate =
         (messages: SessionMessage list)
         : Task<unit> =
         task {
-            match ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages with
+            match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
             | Error _ -> return ()
             | Ok assistant -> return! applyWithAssistant scope ports owner rawMessages output assistant
         }

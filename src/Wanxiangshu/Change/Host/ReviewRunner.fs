@@ -16,6 +16,7 @@ open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -74,43 +75,69 @@ module OrchestratorHostReview =
     let private openingPrompt (managerSessionId: SessionId) =
         ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty
 
-    /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
-    ///
-    /// `forkReviewer` returns the reviewer's Host session id; `awaitReviewer` waits for
     let private describeBarrierFailure =
         function
-        | ReviewBarrierFailure.CannotCreateReviewer reason -> sprintf "Cannot create reviewer: %s" reason
-        | ReviewBarrierFailure.CannotOpenBarrier reason -> sprintf "Cannot open review barrier: %s" reason
+        | ReviewBarrierFailure.JournalUnavailable -> "Review journal is unavailable"
+        | ReviewBarrierFailure.CannotStartReviewer reason -> sprintf "Cannot start reviewer: %s" reason
         | ReviewBarrierFailure.CannotAwaitReviewer reason -> sprintf "Cannot await reviewer: %s" reason
-        | ReviewBarrierFailure.ReviewerProducedNoVerdict -> "Reviewer produced no verdict"
-        | ReviewBarrierFailure.ConfirmationUnproven -> "Reviewer produced no confirmed verdict"
+        | ReviewBarrierFailure.CannotAwaitJudgement reason -> sprintf "Cannot await reviewer judgement: %s" reason
+        | ReviewBarrierFailure.CannotRecordJudgement reason -> sprintf "Cannot record reviewer judgement: %s" reason
+        | ReviewBarrierFailure.InvalidJudgement reason -> sprintf "Invalid reviewer judgement: %s" reason
 
-    /// that run to reach terminal. They are separate because the barrier fact must be
-    /// written between them — after the session exists, before any verdict arrives.
+    let private runBarrierWithChannel
+        (durable: AgentJournal)
+        (channel: ReviewJudgementChannel)
+        (host: ReviewHostPort)
+        (request: ReviewBarrierRequest)
+        : Task<Result<ReviewBarrierOutcome, string>> =
+        taskResult {
+            try
+                return!
+                    ReviewBarrierWorkflow.reverify (Some durable) host request
+                    |> TaskResult.mapError describeBarrierFailure
+            finally
+                channel.Dispose()
+        }
+
     let reverify
         (journal: AgentJournal option)
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
+        (startReviewer: ManagerJobId -> Task<Result<unit, string>>)
         (awaitReviewer: ManagerJobId -> Task<Result<unit, string>>)
         (jobId: ManagerJobId)
         (managerSessionId: SessionId)
         (worktree: WorktreePath)
         (barrierId: ReviewBarrierId)
         : Task<Result<unit, string>> =
-        task {
-            // Read once, use for both the barrier fact and every guard read. ORCH-008
-            // fail closed lives in GitTree: an unreadable tree yields a sentinel that
-            // `satisfiesGuard` can never match, so it cannot pass as confirmed.
-            let tree =
-                GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
+        taskResult {
+            let! durable = journal |> Result.requireSome "Review journal is unavailable"
+            let tree = GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
+            let! reviewerSessionId = forkReviewer jobId worktree (openingPrompt managerSessionId)
+
+            do!
+                ReviewBarrier.openBarrier (Some durable) managerSessionId reviewerSessionId barrierId tree
+
+            let! channel =
+                ReviewJudgementInbox.acquire reviewerSessionId
+                |> Result.mapError (sprintf "Cannot await reviewer judgement: %s")
 
             let host: ReviewHostPort =
-                { ForkReviewer = fun () -> forkReviewer jobId worktree (openingPrompt managerSessionId)
+                { StartReview = fun () -> startReviewer jobId
+                  AwaitJudgement = channel.AwaitJudgement
                   AwaitReviewer = fun () -> awaitReviewer jobId }
 
-            let! outcome = ReviewBarrierWorkflow.reverify journal host managerSessionId barrierId tree
+            let request =
+                { ManagerSessionId = managerSessionId
+                  ManagerJobId = Some jobId
+                  WorktreeIdentity = Some(WorktreeCommands.identityOf jobId)
+                  ReviewerSessionId = reviewerSessionId
+                  BarrierId = barrierId
+                  GitTreeHash = tree }
 
-            match outcome with
-            | Ok(ReviewBarrierOutcome.Confirmed _) -> return Ok()
-            | Ok(ReviewBarrierOutcome.RevisionRequired _) -> return Error "Reviewer requested revision"
-            | Error failure -> return Error(describeBarrierFailure failure)
+            let! outcome = runBarrierWithChannel durable channel host request
+
+            return!
+                match outcome with
+                | ReviewBarrierOutcome.Confirmed _ -> Ok()
+                | ReviewBarrierOutcome.RevisionRequired _ -> Error "Reviewer requested revision"
         }

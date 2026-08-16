@@ -219,6 +219,7 @@ module FinalityHostPort =
         let reviewerPort: FinalityReviewerPort =
             { PrepareSession = prepareSession
               StartReview = startReview
+              OpenJudgementChannel = ReviewJudgementInbox.acquire
               AwaitTerminal = awaitTerminal
               SendRevisionSteer = sendRevisionSteer
               AbortReviewer = fun reviewerSessionId -> scope.Sessions.AbortSession reviewerSessionId |> ignore }

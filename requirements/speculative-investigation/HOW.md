@@ -52,7 +52,7 @@ src/Wanxiangshu/Infrastructure/OpenCode/Host/
 
 ```text
 StrengthReplay → XTraceCapture → Companion → XWire → EnforcerHost → StrengthSpeculate
-→ PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages → ReviewSeal
+→ PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages
 ```
 
 - `StrengthReplay` 只读 durable Promoted view，把 frame 插在 TargetProviderRun 对应 assistant

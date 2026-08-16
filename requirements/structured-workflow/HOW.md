@@ -35,14 +35,14 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（owner 的 Open
 | 文件 | 导出 | 角色 |
 |---|---|---|
 | `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | `observe`、`observeIdle` | Manager 终态业务故事：handoff → background → idle labor，全部 CE 顺序表达 |
-| `src/Wanxiangshu/Application/Review/ReviewerWorkflow.fs` | `observe` | Reviewer turn 唯一 continuation writer：`ReviewerEvidence.classifyNeed` 分派 → 具名 Vocabulary 发送承诺，无存储 State/Stage 计数器 |
+| `src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs` | `ReviewBarrierWorkflow.reverify` | Finality dual-PERFECT 唯一 temporal owner：first judgement → physical challenge → second judgement 时序在 CE 栈表达 |
+| `src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs` | `observe` | Reviewer terminal observer 只报告物理 completion；Finality CE ownership 下不决定 challenge/confirmation 工作 |
 | `src/Wanxiangshu/Composition/Turn/Workflow.fs` | `observe` | 极薄 router：按 bounded context 委派（Manager/Reviewer/Ordinary），不计算 pending/shouldContinue/phase |
 
 Manager 词汇：`ManagerBackground.ensureSettled`、
 `ManagerIdle.encourageLabor`、`ManagerJobHandoff.completeIfTransferred`、
 `ManagerFinality.admitLabor` / `classifyEnding`。
-Reviewer 词汇：`ReviewerContinuation.ensurePerfectConfirmed` / `ensureVerdictSubmitted`、
-`ReviewerEvidence.classifyNeed`。
+Reviewer 词汇：`ReviewBarrierWorkflow.reverify`、`ReviewJudgementInbox.acquire/tryDeliver`（物理 rendezvous）、`ReviewerContinuation.ensureVerdictSubmitted`（仅 process review 缺失 repair）。
 恢复词汇：`SessionRecoveryWorkflow.recoverFamilyDirect`（Application/Reconciliation）、
 `ProviderRecoveryWorkflow.continueAfterConfirmedFailure` / `continueAfterLoopKill` /
 `awaitRecoveryMaterial`（Application/Recovery）。
@@ -153,8 +153,7 @@ node scripts/check.mjs
 |---|---|
 | `ManagerBackground.ensureSettled` | completion / join / wake permutations |
 | `ManagerIdle.encourageLabor` | independent idle occasions / stale permit |
-| `ReviewerContinuation.ensurePerfectConfirmed` | first PERFECT / challenge / second PERFECT |
-| `ReviewBarrierWorkflow.reverify` | verdict absence / revision / confirmation |
+| `ReviewBarrierWorkflow.reverify` | first PERFECT / challenge PhysicalAccepted / second PERFECT / REVISE / terminal ordering |
 | `FallbackLedger.recordConfirmedFailure` | dedupe / AABB / exhaustion |
 | `ProviderRecoveryWorkflow.continueAfterConfirmedFailure` | failure → material → continuation |
 | `FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed` | cohort interleavings |
@@ -238,12 +237,11 @@ materialize one bounded WorkRecord。provider 顺序第一项是 canonical invoc
 只消费一个 active call。无 joint-registry PC、无到达时序分支、无 queue-on-session，因此
 「批次尚未收齐」与「callee 正在执行」是两个互斥物理 lifetime，而不是隐式业务阶段。
 
-举一反三（同仓联合 presence / park→bind 对照）：`BloggerRuntime.decideMaterial`、
+举一反三（同仓物理 presence 对照）：`BloggerRuntime.decideMaterial`、
 `PluginRuntimeScope` parked∩pendingOffer、`Reconciler` active∩queued、`BloggerCrashRecovery`
-多 presence、`ReviewSeal` PendingReviewSeals park→bind 均属**物理资源路由 / 投递握手 /
+多 presence、`ReviewJudgementInbox` owners∩waiters 均属**物理资源路由 / 投递握手 /
 调度 latch**，不是用 mailbox presence 推导 lifecycle stage 的 PC；保持 ACCEPT-as-physical，
-不套用 CE collapse。ReviewSeal 消费面是 VerdictTool fail-closed resolve，不是 HandleTurn 上的
-nudge-vs-complete 分支。
+不套用 CE collapse。
 
 ### 3.5 Vocabulary 命名 review（DSL-013 五问）
 

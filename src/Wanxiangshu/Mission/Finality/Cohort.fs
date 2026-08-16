@@ -96,28 +96,18 @@ module CohortWorkflow =
                 return None
         }
 
-    let private hasDurableRevisionRequired
+    let private runMemberChannel
         (journal: AgentJournal)
-        (reviewerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        =
-        AgentProjection.tryFind reviewerSessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.ReviewGuard)
-        |> Option.exists (fun guard ->
-            match guard.CurrentBarrierId, guard.Witness with
-            | Some current, ReviewWitness.RevisionWitness _ when current = barrierId -> true
-            | _ -> false)
-
-    let private promoteCancelledDecision (hasDurable: unit -> bool) (error: string) =
-        if hasDurable () then Ok() else Error error
-
-    let private resolveReverifyOutcome hasDurable (outcome: Result<unit, string> option) (isCancelled: bool) =
-        match outcome, isCancelled with
-        | None, _ -> promoteCancelledDecision hasDurable "review attempt cancelled"
-        | Some(Error error), true -> promoteCancelledDecision hasDurable error
-        | Some(Error error), false -> Error error
-        | Some(Ok()), true -> promoteCancelledDecision hasDurable "review attempt cancelled"
-        | Some(Ok()), false -> Ok()
+        (channel: ReviewJudgementChannel)
+        (host: ReviewHostPort)
+        (request: ReviewBarrierRequest)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        task {
+            try
+                return! ReviewBarrierWorkflow.reverify (Some journal) host request
+            finally
+                channel.Dispose()
+        }
 
     let private driveMember
         (reviewerPort: FinalityReviewerPort)
@@ -129,20 +119,27 @@ module CohortWorkflow =
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         let awaitOrCancel () =
             task {
-                let hasDurable () =
-                    hasDurableRevisionRequired journal memberInfo.ReviewerSessionId memberInfo.BarrierId
-
                 let! outcome = raceWithCancel cancel (reviewerPort.AwaitTerminal memberInfo.ReviewerSessionId)
-                return resolveReverifyOutcome hasDurable outcome cancel.IsCancelled
+                return outcome |> Option.defaultValue (Error "review attempt cancelled")
             }
 
-        ReviewBarrierWorkflow.reverify
-            (Some journal)
-            { ForkReviewer = fun () -> Task.FromResult(Ok memberInfo.ReviewerSessionId)
-              AwaitReviewer = awaitOrCancel }
-            managerSessionId
-            memberInfo.BarrierId
-            tree
+        match reviewerPort.OpenJudgementChannel memberInfo.ReviewerSessionId with
+        | Error error -> Task.FromResult(Error(ReviewBarrierFailure.CannotAwaitJudgement error))
+        | Ok channel ->
+            let host =
+                { StartReview = fun () -> reviewerPort.StartReview memberInfo
+                  AwaitJudgement = channel.AwaitJudgement
+                  AwaitReviewer = awaitOrCancel }
+
+            let request =
+                { ManagerSessionId = managerSessionId
+                  ManagerJobId = None
+                  WorktreeIdentity = None
+                  ReviewerSessionId = memberInfo.ReviewerSessionId
+                  BarrierId = memberInfo.BarrierId
+                  GitTreeHash = tree }
+
+            runMemberChannel journal channel host request
 
     let private recordWinner (cancel: CancelToken) (winnerOpt: 'a option ref) (result: 'a) =
         match winnerOpt.Value with
@@ -194,28 +191,7 @@ module CohortWorkflow =
             return! tcs.Task
         }
 
-    let private startReviewStep
-        (reviewerPort: FinalityReviewerPort)
-        (prepared: PreparedReviewer)
-        (barrierId: ReviewBarrierId)
-        (slot: FinalityReviewCohort.CohortSlot)
-        (members: EnlistedMember list)
-        =
-        task {
-            let memberInfo: EnlistedMember =
-                { ReviewerSessionId = prepared.ReviewerSessionId
-                  BarrierId = barrierId
-                  ReviewerOrdinal = slot.ReviewerOrdinal
-                  AgentId = slot.AgentId
-                  IsNew = prepared.IsNew }
-
-            match! reviewerPort.StartReview memberInfo with
-            | Error error -> return Error error
-            | Ok() -> return Ok(members @ [ memberInfo ])
-        }
-
-    let private openBarrierAndStartReview
-        (reviewerPort: FinalityReviewerPort)
+    let private openBarrierAndRememberMember
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (requestTree: GitTreeHash)
@@ -234,7 +210,16 @@ module CohortWorkflow =
                     requestTree
             with
             | Error error -> return Error error
-            | Ok() -> return! startReviewStep reviewerPort prepared barrierId slot members
+            | Ok() ->
+                return
+                    Ok(
+                        members
+                        @ [ { ReviewerSessionId = prepared.ReviewerSessionId
+                              BarrierId = barrierId
+                              ReviewerOrdinal = slot.ReviewerOrdinal
+                              AgentId = slot.AgentId
+                              IsNew = prepared.IsNew } ]
+                    )
         }
 
     let private recordEnlistedFact
@@ -294,8 +279,7 @@ module CohortWorkflow =
                     do! recordEnlistedFact journal managerSessionId life request slot prepared barrierId
 
                 return!
-                    openBarrierAndStartReview
-                        reviewerPort
+                    openBarrierAndRememberMember
                         journal
                         managerSessionId
                         request.GitTreeHash

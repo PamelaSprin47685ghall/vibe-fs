@@ -12,7 +12,7 @@
 
 ## DISPATCH-PROTOCOL-001 — PromptDispatcher 是唯一写入口
 
-所有插件产生的 user-shaped message（Guard、repair、ReviewConfirmation、busy nudge、provider
+所有插件产生的 user-shaped message（Guard、repair、Finality steer、busy nudge、provider
 failure continuation、Orchestrator 冲突提示、SyncDelegate 首发与 idle nudge 等）必须经过同一个
 `PromptDispatcher`；禁止第二 writer 直接 `prompt_async`（PROMPT-005 / 历史 shape/prompt 条款）。
 

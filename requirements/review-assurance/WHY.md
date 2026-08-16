@@ -33,9 +33,9 @@
 
 HANDOFF §6.4 / §7.6：
 
-> 判断哲学可以整体重写，而 witness/seal/finality 协议不变；反之亦然。
+> 判断哲学可以整体重写，而 witness/finality 因果协议不变；反之亦然。
 
-具体：你可以把 dual-PERFECT+seal 换成另一种因果可验证的确认协议（例如 threshold signature 或 fresh witness 轮换），judgement 的 discrimination 语义一行不改；你也可以重写 Role Law / Examiner's Ledger 的判断方向，challenge digest、attempt identity、tree invalidation、record-ready 代数一行不改。两个 failure meaning 完全不同：
+具体：你可以重写 dual-PERFECT 的 direct-CE 因果协议，judgement 的 discrimination 语义一行不改；你也可以重写 Role Law / Examiner's Ledger 的判断方向，typed physical challenge edge、attempt identity、tree invalidation、record-ready 代数一行不改。两个 failure meaning 完全不同：
 
 - `review-judgement` RED = reviewer 可以凭表演/checklist/偏好决定 accept/reject；
 - `review-assurance` RED = 系统可以消费针对旧 tree / 未看 challenge / 缺报告 的 judgement。
@@ -48,14 +48,14 @@ HANDOFF §6.4 / §7.6：
 | 1:1 Rk 派生、lag-1 节拍、CurrentObligations | `obligation-ledger` | 账本规则；assurance 只管「何时可消费」 |
 | 终末 cohort / rejection / blessing / rest / drain | `finality` | 不可逆结束资格；assurance 提供证据原语 |
 | canonical LWR 的表示/物化/三标题 | `work-record` | 记录表示；assurance 只拥有「record-ready 才可消费」与 request 绑定 |
-| Host 因果读的传输侧（HOST-010 读实现） | `host-boundary` | 传输能力；seal 的 fail-closed 语义是本包 |
+| Host 因果读的传输侧（physical execution binding / PromptKey acceptance） | `host-boundary` / `interaction-authority` | 传输能力；本包只消费 typed physical identity 并 fail closed |
 | 等待的因果可观测性（awaitChangeFrom） | `causal-wait` | 等待机制；「record-ready 等待必须事件驱动」的 review 用法是本包 |
 | tool 语法红字分类 | `capability-enforcement` | 三态失败分型的工具侧；「infra 不伪装 REVISE」的 review 侧是本包 |
 | infra fatal fail-fast / 崩溃恢复 | `host-boundary` / `crash-reconciliation` | 系统故障处置；本包只要求不伪 REVISE、义务保持 outstanding |
 
 ## 历史教训（考古）
 
-- 历史 why/review 条款：单 PERFECT 可被模型随口同意 → 双 PERFECT + seal 把确认从口头变成因果消费证据；Witness 自包含（拒外围 Map）；tree 变化作废（审的是代码状态不是 Session 情绪）；seal 绑定 fail closed（拒 same-root 猜测）。
+- 历史 why/review 条款：单 PERFECT 可被模型随口同意。旧实现曾用双 PERFECT + provider-input seal 证明 challenge 消费；本轮已废弃该文本/digest 推断，改由 direct CE + PromptKey→PhysicalUserMessageId 的 typed physical edge 建立因果。Witness 自包含（拒外围 Map）；tree 变化作废（审的是代码状态不是 Session 情绪）。
 - 历史 why/review「VerdictKnown 与 ConsumableReview 分型」：把「只有判断、尚无 report」挤进同一个 `TodoReviewConcluded`，恢复路径无法区分「已可 settle」与「已可展示报告」。
 - 历史 why/review「为何基础设施失败不是 REVISE」：伪装成 REVISE 会触发错误 semantic merge、推进虚假 ConsumableReview，让 Manager 去修系统故障。
 - 历史 why/review「为何禁止 wall-clock polling」：sleep/timer 把 Journal 因果等待退化成运气；本地 waiter 崩溃后无法从 durable facts 重建同一等待。

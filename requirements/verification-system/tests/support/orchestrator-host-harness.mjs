@@ -33,20 +33,17 @@ export const fakeGitPort = (behaviour = {}) => ({
 export const fakeSessions = (behaviour = {}) => {
   const calls = []
   let childSeq = 0
+  let sendSeq = 0
   const terminalListeners = new Map()
   const stickyTerminals = new Map()
 
-  const sessionKey = (value) => (typeof value === 'object' && value !== null ? (value.fields?.[0] ?? value.value ?? String(value)) : String(value))
-  const toTerminalOutcome = (outcome) => {
-    if (outcome && typeof outcome.tag === 'number') return outcome
-    if (outcome?.kind === 'Failed' || outcome?.error) return { tag: 2, fields: [outcome.error ?? outcome.reason ?? 'failed'] }
-    if (outcome?.kind === 'Aborted' || outcome?.reason) return { tag: 1, fields: [outcome.reason ?? 'aborted'] }
-    return { tag: 0, fields: [outcome?.result ?? outcome?.value ?? outcome] }
-  }
+  const sessionKey = (value) =>
+    typeof value === 'object' && value !== null
+      ? (value.fields?.[0] ?? value.value ?? String(value))
+      : String(value)
   const invokeTerminalCallback = (callback, session, outcome) => {
-    const norm = toTerminalOutcome(outcome)
-    const res = callback(session, norm)
-    if (typeof res === 'function') res(norm)
+    const first = callback(session, outcome)
+    if (typeof first === 'function') first(outcome)
   }
   const notifyTerminal = (session, outcome) => {
     const key = sessionKey(session)
@@ -56,6 +53,7 @@ export const fakeSessions = (behaviour = {}) => {
 
   return {
     calls,
+    notifyTerminal,
     CreateChildSession: async (parentId, options) => {
       childSeq += 1
       calls.push(['CreateChildSession', options])
@@ -80,12 +78,16 @@ export const fakeSessions = (behaviour = {}) => {
     TryGetParentSession: async () => ({ ok: true, value: undefined }),
     SendPrompt: async (...args) => {
       calls.push(['SendPrompt', ...args])
-      behaviour.onSendPrompt?.(...args)
+      sendSeq += 1
+      const physical =
+        behaviour.physicalMessageForSend?.(sendSeq, ...args) ?? `msg_fake_prompt_${sendSeq}`
+
+      behaviour.onSendPrompt?.(...args, { sendSeq, physical })
       if (behaviour.sendPromptError) return { kind: 'Fatal', reason: behaviour.sendPromptError }
       if (behaviour.terminalAfterSend) {
         queueMicrotask(() => notifyTerminal(args[0], { kind: 'Failed', error: behaviour.terminalAfterSend }))
       }
-      return { kind: 'Physical', value: 'msg_fake_prompt' }
+      return { kind: 'Physical', value: physical }
     },
     SubscribeTerminal: (childId, callback) => {
       calls.push(['SubscribeTerminal', childId])

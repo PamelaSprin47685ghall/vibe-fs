@@ -45,24 +45,20 @@ type VerdictWitness =
       GitTreeHash: GitTreeHash
       ReviewerSessionId: SessionId }
 
-/// Review state, derived only from witnessed verdicts.
-///
-/// REVIEW-005 forbids a persisted boolean for "confirmed": confirmation is a
-/// property of the evidence, so it is a union case carrying that evidence
-/// rather than a flag next to it.
+/// Completed review evidence. Execution position never appears here: a first
+/// PERFECT is a local value inside ReviewBarrierWorkflow and is not durable state.
 type ReviewWitness =
     | NoReview
     | RevisionWitness of
         {| Report: string
            GitTreeHash: GitTreeHash |}
-    | PerfectPending of first: VerdictWitness
     | Confirmed of
         {| BarrierId: ReviewBarrierId
            First: VerdictWitness
            Second: VerdictWitness
            GitTreeHash: GitTreeHash
-           ChallengeResultDigest: SealDigest
-           SecondProviderInputDigest: SealDigest |}
+           FirstPhysicalUserMessageId: PhysicalUserMessageId
+           SecondPhysicalUserMessageId: PhysicalUserMessageId |}
 
 module ReviewWitness =
 
@@ -70,27 +66,17 @@ module ReviewWitness =
         match witness with
         | Confirmed _ -> true
         | NoReview
-        | RevisionWitness _
-        | PerfectPending _ -> false
-
-    let isPerfectPending (witness: ReviewWitness) : bool =
-        match witness with
-        | PerfectPending _ -> true
-        | NoReview
-        | RevisionWitness _
-        | Confirmed _ -> false
+        | RevisionWitness _ -> false
 
     let isRevision (witness: ReviewWitness) : bool =
         match witness with
         | RevisionWitness _ -> true
         | NoReview
-        | PerfectPending _
         | Confirmed _ -> false
 
     let gitTreeHash (witness: ReviewWitness) : GitTreeHash option =
         match witness with
         | Confirmed confirmed -> Some confirmed.GitTreeHash
-        | PerfectPending pending -> Some pending.GitTreeHash
         | RevisionWitness revision -> Some revision.GitTreeHash
         | NoReview -> None
 
@@ -104,8 +90,7 @@ module ReviewWitness =
         match witness with
         | Confirmed confirmed -> Some confirmed.Second.ReviewerSessionId
         | NoReview
-        | RevisionWitness _
-        | PerfectPending _ -> None
+        | RevisionWitness _ -> None
 
     /// REVIEW-008: any Git tree change makes a pending challenge stale and a
     /// confirmed witness no longer sufficient for the Guard.
@@ -126,32 +111,22 @@ module ReviewWitness =
           ProviderRun = witness.ProviderRun
           ToolCallId = witness.ToolCallId }
 
-    /// REVIEW-003 conditions 1-5: same reviewer session, same barrier, same
-    /// tree, different provider run, different tool call.
-    ///
-    /// This is necessary but NOT sufficient. Condition 6 — the second provider
-    /// input seal demonstrably contains the first challenge result — is the
-    /// causal proof, and it lives with the seal (REVIEW-010), not here. A
-    /// witness pair passing this check is a candidate, not a confirmation.
+    /// Same reviewer session, same barrier/tree, distinct provider run and tool call.
     let isDistinctAttempt (barrierId: ReviewBarrierId) (first: VerdictWitness) (second: VerdictWitness) : bool =
         ReviewAttemptIdentity.isDistinctAttempt (attemptIdentity barrierId first) (attemptIdentity barrierId second)
 
-    /// Build a confirmed witness from a proven pair.
-    ///
-    /// The causal proof is a parameter this function cannot fabricate: the caller
-    /// must already hold the challenge digest and the second run's input digest,
-    /// and must have checked that the former appears in the latter's seal
-    /// (REVIEW-010). Passing the digests rather than a boolean means the witness
-    /// carries its own evidence, so REVIEW-006's self-containment does not
-    /// depend on a caller remembering to copy them.
+    /// Build completed confirmation only from the direct CE's typed physical edge.
     let confirm
         (barrierId: ReviewBarrierId)
-        (challengeResultDigest: SealDigest)
-        (secondProviderInputDigest: SealDigest)
+        (firstPhysicalUserMessageId: PhysicalUserMessageId)
+        (secondPhysicalUserMessageId: PhysicalUserMessageId)
         (first: VerdictWitness)
         (second: VerdictWitness)
         : ReviewWitness option =
-        if not (isDistinctAttempt barrierId first second) then
+        if
+            firstPhysicalUserMessageId <> secondPhysicalUserMessageId
+            || not (isDistinctAttempt barrierId first second)
+        then
             None
         else
             Some(
@@ -160,6 +135,6 @@ module ReviewWitness =
                        First = first
                        Second = second
                        GitTreeHash = second.GitTreeHash
-                       ChallengeResultDigest = challengeResultDigest
-                       SecondProviderInputDigest = secondProviderInputDigest |}
+                       FirstPhysicalUserMessageId = firstPhysicalUserMessageId
+                       SecondPhysicalUserMessageId = secondPhysicalUserMessageId |}
             )

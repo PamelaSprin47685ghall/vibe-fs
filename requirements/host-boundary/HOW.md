@@ -60,8 +60,7 @@ subscriber sticky replay、listener disposal。
 
 ### 其它
 
-- `HostMessageProjection.sanitizeMessages`（HOST-016）在 PairProgrammingThought 之后、
-  ReviewSeal 之前执行（历史 how/host 链序）。
+- `HostMessageProjection.sanitizeMessages`（HOST-016）在 PairProgrammingThought 之后执行；Finality review 不再对 provider message bytes 建 seal。
 - `HostDigest.sha256Hex`：全仓唯一 sha256（durable digest 单点定义）。
 - `NeedHelpSensor`（`Host/NeedHelpSensor.fs`）：rolling suffix + reasoning PartId 集 + armed
   identity（SessionId × ProviderRun）；`NeedHelpEventCodec` 先登记 `part.type=reasoning` 再适配

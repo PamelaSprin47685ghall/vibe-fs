@@ -1,185 +1,274 @@
 namespace Wanxiangshu.Mission.Review.Barrier
 
-open Wanxiangshu.Change
-open Wanxiangshu.Mission.Obligation
-open Wanxiangshu.Strength.Persistence
-
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Persistence.Journal
+open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type ReviewBarrierOutcome =
     | Confirmed of reviewerSessionId: SessionId * barrierId: ReviewBarrierId * gitTreeHash: GitTreeHash
     | RevisionRequired of reviewerSessionId: SessionId * barrierId: ReviewBarrierId * gitTreeHash: GitTreeHash
 
-type ReviewBarrierFailure =
-    | CannotCreateReviewer of string
-    | CannotOpenBarrier of string
-    | CannotAwaitReviewer of string
-    | ReviewerProducedNoVerdict
-    | ConfirmationUnproven
+type ReviewBarrierRequest =
+    { ManagerSessionId: SessionId
+      ManagerJobId: ManagerJobId option
+      WorktreeIdentity: WorktreeIdentity option
+      ReviewerSessionId: SessionId
+      BarrierId: ReviewBarrierId
+      GitTreeHash: GitTreeHash }
 
-/// Application CE for one review barrier. Host creation/waiting are injected;
-/// durable evidence decides whether the barrier is confirmed or revised.
+[<RequireQualifiedAccess>]
+type ReviewBarrierFailure =
+    | JournalUnavailable
+    | CannotStartReviewer of string
+    | CannotAwaitReviewer of string
+    | CannotAwaitJudgement of string
+    | CannotRecordJudgement of string
+    | InvalidJudgement of string
+
+/// Finality dual-PERFECT temporal owner. First/challenge/second exist only as CE
+/// locals; durable review facts are outputs and are never read back to select a step.
 module ReviewBarrierWorkflow =
 
     [<RequireQualifiedAccess>]
-    type private ReviewStatus =
-        | Confirmed
-        | PendingConfirmation
-        | NeedsReview
-        | RevisionRequired
+    type private DeliveryFailure =
+        | Invalid of string
+        | RecordFailed of string
 
-    let private classifyGuard tree value =
-        if ReviewProjection.satisfiesGuard tree value then
-            ReviewStatus.Confirmed
-        elif
-            ReviewWitness.isRevision value.Witness
-            && value.LastGitTreeHash = Some tree
-            && value.CurrentBarrierId.IsSome
-        then
-            ReviewStatus.RevisionRequired
-        elif
-            ReviewWitness.isPerfectPending value.Witness
-            && value.LastGitTreeHash = Some tree
-        then
-            ReviewStatus.PendingConfirmation
+    let private submission (request: ReviewBarrierRequest) (judgement: ReviewJudgement) : VerdictSubmission =
+        { BarrierId = request.BarrierId
+          GitTreeHash = request.GitTreeHash
+          ManagerSessionId = request.ManagerSessionId
+          ReviewerSessionId = judgement.ReviewerSessionId
+          ProviderRun = judgement.ProviderRun
+          ToolCallId = judgement.ToolCallId
+          Verdict = judgement.Verdict }
+
+    let private validateReviewer (request: ReviewBarrierRequest) (judgement: ReviewJudgement) =
+        if judgement.ReviewerSessionId = request.ReviewerSessionId then
+            Ok()
         else
-            ReviewStatus.NeedsReview
+            Error "judge delivery came from a different Reviewer session"
 
-    let private readStatus (journal: AgentJournal option) (reviewerSessionId: SessionId) (tree: GitTreeHash) =
-        let guard =
-            journal
-            |> Option.bind (fun durable ->
-                AgentProjection.tryFind reviewerSessionId (AgentJournal.snapshot durable).AgentProjections)
-            |> Option.bind (fun session -> session.ReviewGuard)
+    let private validateSecond
+        (request: ReviewBarrierRequest)
+        (first: ReviewJudgement)
+        (second: ReviewJudgement)
+        =
+        if second.PhysicalUserMessageId <> first.PhysicalUserMessageId then
+            Error "second judgement came from a different physical review prompt"
+        elif first.ProviderRun = second.ProviderRun then
+            Error "second judgement reused the first ProviderRunIdentity"
+        elif first.ToolCallId = second.ToolCallId then
+            Error "second judgement reused the first ToolCallId"
+        else
+            validateReviewer request second
 
-        match guard with
-        | None -> ReviewStatus.NeedsReview
-        | Some value -> classifyGuard tree value
+    let private validateDelivery
+        (validation: ReviewJudgement -> Result<unit, string>)
+        (delivery: ReviewJudgementDelivery)
+        : Result<unit, DeliveryFailure> =
+        match validation delivery.Judgement with
+        | Ok() -> Ok()
+        | Error error ->
+            delivery.Reject()
+            Error(DeliveryFailure.Invalid error)
 
-    let private readOutcome
-        (journal: AgentJournal option)
-        (barrierId: ReviewBarrierId)
-        (reviewerSessionId: SessionId)
-        (tree: GitTreeHash)
-        : Result<ReviewBarrierOutcome, ReviewBarrierFailure> =
-        match readStatus journal reviewerSessionId tree with
-        | ReviewStatus.Confirmed -> Ok(ReviewBarrierOutcome.Confirmed(reviewerSessionId, barrierId, tree))
-        | ReviewStatus.RevisionRequired -> Ok(ReviewBarrierOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
-        | ReviewStatus.PendingConfirmation -> Error ReviewBarrierFailure.ConfirmationUnproven
-        | ReviewStatus.NeedsReview -> Error ReviewBarrierFailure.ReviewerProducedNoVerdict
+    let private persistDelivery
+        (journal: AgentJournal)
+        (request: ReviewBarrierRequest)
+        (delivery: ReviewJudgementDelivery)
+        : Task<Result<ReviewJudgement, DeliveryFailure>> =
+        task {
+            match! VerdictWorkflow.recordJudgement journal (submission request delivery.Judgement) with
+            | Ok() -> return Ok delivery.Judgement
+            | Error error ->
+                delivery.Reject()
+                return Error(DeliveryFailure.RecordFailed error)
+        }
 
-    /// Fork/enlist reviewer, open durable barrier, then re-enter on each reviewer
-    /// terminal until durable evidence becomes decisive.
+    let private recordDelivery
+        (journal: AgentJournal)
+        (request: ReviewBarrierRequest)
+        (validation: ReviewJudgement -> Result<unit, string>)
+        (delivery: ReviewJudgementDelivery)
+        : Task<Result<ReviewJudgement, DeliveryFailure>> =
+        taskResult {
+            do! validateDelivery validation delivery
+            return! persistDelivery journal request delivery
+        }
+
+    let private deliveryFailure =
+        function
+        | DeliveryFailure.Invalid error -> ReviewBarrierFailure.InvalidJudgement error
+        | DeliveryFailure.RecordFailed error -> ReviewBarrierFailure.CannotRecordJudgement error
+
+    let private revision (request: ReviewBarrierRequest) =
+        ReviewBarrierOutcome.RevisionRequired(request.ReviewerSessionId, request.BarrierId, request.GitTreeHash)
+
+    let private confirmed (request: ReviewBarrierRequest) =
+        ReviewBarrierOutcome.Confirmed(request.ReviewerSessionId, request.BarrierId, request.GitTreeHash)
+
+    let private awaitJudgementBeforeTerminal
+        (judgement: Task<Result<ReviewJudgementDelivery, string>>)
+        (finalTerminal: Task<Result<unit, string>>)
+        : Task<Result<ReviewJudgementDelivery, ReviewBarrierFailure>> =
+        task {
+            let taggedJudgement: Task<obj> =
+                task {
+                    let! result = judgement
+                    return box (Choice1Of2 result)
+                }
+
+            let taggedTerminal: Task<obj> =
+                task {
+                    let! result = finalTerminal
+                    return box (Choice2Of2 result)
+                }
+
+            let! winner = emitJsExpr (taggedJudgement, taggedTerminal) "Promise.race([$0, $1])": Task<obj>
+
+            return
+                match unbox<Choice<Result<ReviewJudgementDelivery, string>, Result<unit, string>>> winner with
+                | Choice1Of2(Ok delivery) -> Ok delivery
+                | Choice1Of2(Error error) -> Error(ReviewBarrierFailure.CannotAwaitJudgement error)
+                | Choice2Of2(Error error) -> Error(ReviewBarrierFailure.CannotAwaitReviewer error)
+                | Choice2Of2(Ok()) ->
+                    Error(ReviewBarrierFailure.CannotAwaitJudgement "reviewer terminated before submitting judgement")
+        }
+
+    let private finishAfterTerminal
+        (finalTerminal: Task<Result<unit, string>>)
+        (outcome: ReviewBarrierOutcome)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        taskResult {
+            do! finalTerminal |> TaskResult.mapError ReviewBarrierFailure.CannotAwaitReviewer
+            return outcome
+        }
+
+    let private recordConfirmation
+        (journal: AgentJournal)
+        (request: ReviewBarrierRequest)
+        (first: ReviewJudgement)
+        (secondDelivery: ReviewJudgementDelivery)
+        (second: ReviewJudgement)
+        : Task<Result<unit, ReviewBarrierFailure>> =
+        task {
+            match!
+                VerdictWorkflow.recordConfirmation
+                    journal
+                    request.ManagerJobId
+                    request.WorktreeIdentity
+                    request.ManagerSessionId
+                    request.BarrierId
+                    request.GitTreeHash
+                    first
+                    second
+            with
+            | Ok() ->
+                secondDelivery.Accept()
+                return Ok()
+            | Error error ->
+                secondDelivery.Reject()
+                return Error(ReviewBarrierFailure.InvalidJudgement error)
+        }
+
+    let private concludeSecondPerfect
+        (journal: AgentJournal)
+        (request: ReviewBarrierRequest)
+        (finalTerminal: Task<Result<unit, string>>)
+        (first: ReviewJudgement)
+        (secondDelivery: ReviewJudgementDelivery)
+        (second: ReviewJudgement)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        taskResult {
+            do! recordConfirmation journal request first secondDelivery second
+            return! finishAfterTerminal finalTerminal (confirmed request)
+        }
+
+    let private concludeSecond
+        (journal: AgentJournal)
+        (request: ReviewBarrierRequest)
+        (finalTerminal: Task<Result<unit, string>>)
+        (first: ReviewJudgement)
+        (secondDelivery: ReviewJudgementDelivery)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        taskResult {
+            let! second =
+                recordDelivery journal request (validateSecond request first) secondDelivery
+                |> TaskResult.mapError deliveryFailure
+
+            return!
+                match second.Verdict with
+                | ReviewGuardVerdict.Revise ->
+                    secondDelivery.Accept()
+                    finishAfterTerminal finalTerminal (revision request)
+                | ReviewGuardVerdict.Perfect ->
+                    concludeSecondPerfect journal request finalTerminal first secondDelivery second
+        }
+
+    let private continueAfterFirstPerfect
+        (journal: AgentJournal)
+        (host: ReviewHostPort)
+        (request: ReviewBarrierRequest)
+        (finalTerminal: Task<Result<unit, string>>)
+        (firstDelivery: ReviewJudgementDelivery)
+        (first: ReviewJudgement)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        let secondAwait = host.AwaitJudgement()
+        firstDelivery.Challenge()
+
+        taskResult {
+            let! secondDelivery = awaitJudgementBeforeTerminal secondAwait finalTerminal
+            return! concludeSecond journal request finalTerminal first secondDelivery
+        }
+
+    let private continueAfterFirst
+        (journal: AgentJournal)
+        (host: ReviewHostPort)
+        (request: ReviewBarrierRequest)
+        (finalTerminal: Task<Result<unit, string>>)
+        (firstDelivery: ReviewJudgementDelivery)
+        (first: ReviewJudgement)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        match first.Verdict with
+        | ReviewGuardVerdict.Revise ->
+            firstDelivery.Accept()
+            finishAfterTerminal finalTerminal (revision request)
+        | ReviewGuardVerdict.Perfect ->
+            continueAfterFirstPerfect journal host request finalTerminal firstDelivery first
+
+    let private run
+        (journal: AgentJournal)
+        (host: ReviewHostPort)
+        (request: ReviewBarrierRequest)
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
+        let finalTerminal = host.AwaitReviewer()
+
+        let firstAwait = host.AwaitJudgement()
+
+        taskResult {
+            do! host.StartReview() |> TaskResult.mapError ReviewBarrierFailure.CannotStartReviewer
+
+            let! firstDelivery = awaitJudgementBeforeTerminal firstAwait finalTerminal
+
+            let! first =
+                recordDelivery journal request (validateReviewer request) firstDelivery
+                |> TaskResult.mapError deliveryFailure
+
+            return! continueAfterFirst journal host request finalTerminal firstDelivery first
+        }
+
     let reverify
         (journal: AgentJournal option)
         (host: ReviewHostPort)
-        (managerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        (tree: GitTreeHash)
+        (request: ReviewBarrierRequest)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
-        let rec awaitWitness reviewerSessionId =
-            taskResult {
-                let descriptor =
-                    DiagnosticWait.create
-                        "reviewer-terminal"
-                        (CausalOwner.create
-                            "ReviewBarrierWorkflow"
-                            [ "manager", SessionId.value managerSessionId
-                              "barrier", ReviewBarrierId.value barrierId ])
-                        [ "manager", SessionId.value managerSessionId
-                          "reviewer", SessionId.value reviewerSessionId
-                          "barrier", ReviewBarrierId.value barrierId ]
-                        (WorkflowProducer(
-                            CausalOwner.create
-                                "ReviewerWorkflow"
-                                [ "session", SessionId.value reviewerSessionId
-                                  "barrier", ReviewBarrierId.value barrierId ]
-                        ))
-                        [ WaitEscape.SessionLifetime
-                          WaitEscape.CancelledBy(
-                              CausalOwner.create "ReviewBarrierWorkflow" [ "manager", SessionId.value managerSessionId ]
-                          ) ]
-                        "ReviewBarrierWorkflow.awaitWitness"
-
-                do!
-                    CausalAwait.awaitTask CausalWaitHub.observer descriptor (host.AwaitReviewer())
-                    |> TaskResult.mapError ReviewBarrierFailure.CannotAwaitReviewer
-
-                match readOutcome journal barrierId reviewerSessionId tree with
-                | Ok outcome -> return outcome
-                | Error ReviewBarrierFailure.ReviewerProducedNoVerdict
-                | Error ReviewBarrierFailure.ConfirmationUnproven -> return! awaitWitness reviewerSessionId
-                | Error failure -> return! Error failure
-            }
-
-        taskResult {
-            let! reviewerSessionId =
-                host.ForkReviewer()
-                |> TaskResult.mapError ReviewBarrierFailure.CannotCreateReviewer
-
-            do!
-                ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree
-                |> TaskResult.mapError ReviewBarrierFailure.CannotOpenBarrier
-
-            return! awaitWitness reviewerSessionId
-        }
+        match journal with
+        | None -> Task.FromResult(Error ReviewBarrierFailure.JournalUnavailable)
+        | Some durable -> run durable host request

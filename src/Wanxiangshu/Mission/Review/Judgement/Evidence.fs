@@ -110,54 +110,13 @@ module ReviewerEvidence =
         | Some durable, Some reviewGuard -> reviewerFinality durable reviewGuard reviewerKey |> Option.defaultValue true
         | _ -> true
 
-    /// Whether this reviewer has produced any verdict for the current barrier.
-    ///
-    /// Asked of the integrated typed attempts rather than of the witness:
-    /// REVIEW-004 records every counted attempt there, including a REVISE that
-    /// later got superseded, so no consumer has to reconstruct verdict identity.
-    let verdictSubmitted journal reviewerKey =
-        guard journal reviewerKey
-        |> Option.exists (fun reviewGuard -> not (List.isEmpty reviewGuard.ObservedAttempts))
-
-    /// REVIEW-003: a first PERFECT landed and its challenge is outstanding.
-    let confirmationPending journal reviewerKey =
-        guard journal reviewerKey
-        |> Option.exists (fun reviewGuard ->
-            ReviewWitness.isPerfectPending reviewGuard.Witness
-            && not reviewGuard.IsConfirmed)
-
-    /// True once this reviewer's own dual-PERFECT is durably confirmed.
-    ///
-    /// Used to finish tool-only confirmation turns without waiting for a separate
-    /// natural-language stop frame. The reviewer identity comes from the witness
-    /// itself (REVIEW-006 self-containment), not from a stored
-    /// `ConfirmedReviewerSessionId` beside it — a stored id can name a reviewer
-    /// while the witness says there was no confirmation.
-    let confirmed journal reviewerKey =
-        guard journal reviewerKey
-        |> Option.exists (fun reviewGuard ->
-            ReviewWitness.confirmedReviewer reviewGuard.Witness = Some(SessionId.create reviewerKey))
-
-    /// Single evidence classification for ReviewerWorkflow (avoids behaviour-bool
-    /// chain at the CE call site — DSL ownership). Order matches rabbit §9.2.
+    /// Process-review-only terminal classification. Finality is owned by the
+    /// active ReviewBarrierWorkflow CE and never enters this projection-driven path.
     [<RequireQualifiedAccess>]
     type Need =
-        | CompleteConfirmed
-        | EnsurePerfectConfirmed
+        | NotProcessReview
         | EnsureVerdictSubmitted
-        | CompleteRevision
-
-    let private classifyUnconfirmed (reviewGuard: ReviewGuardProjection) =
-        match reviewGuard.Witness with
-        | witness when ReviewWitness.isPerfectPending witness && not reviewGuard.IsConfirmed ->
-            Need.EnsurePerfectConfirmed
-        | _ when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
-        | _ -> Need.CompleteRevision
-
-    let private classifyWithGuard (reviewerId: SessionId) (reviewGuard: ReviewGuardProjection) =
-        match ReviewWitness.confirmedReviewer reviewGuard.Witness with
-        | Some id when id = reviewerId -> Need.CompleteConfirmed
-        | _ -> classifyUnconfirmed reviewGuard
+        | CompleteProcessReview
 
     let classifyNeed journal reviewerKey =
         let reviewerId = SessionId.create reviewerKey
@@ -171,10 +130,7 @@ module ReviewerEvidence =
                     (AgentJournal.snapshot durable).AgentProjections.MagicTodo
 
         match processReviewEvidence, guard journal reviewerKey with
+        | None, _ -> Need.NotProcessReview
         | Some _, None -> Need.EnsureVerdictSubmitted
         | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
-        | Some _, Some _ ->
-            // REVIEW-013: process PERFECT/REVISE is terminal. No confirmation nudge.
-            Need.CompleteRevision
-        | None, None -> Need.EnsureVerdictSubmitted
-        | None, Some reviewGuard -> classifyWithGuard reviewerId reviewGuard
+        | Some _, Some _ -> Need.CompleteProcessReview

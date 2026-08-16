@@ -14,7 +14,7 @@ Pure Projection Planner（Domain/ProjectionPlanner.fs）
     汇总各功能 ProjectionIntent → canonical rank 排序 → 冲突检查（reduce* 族）→ 有序 intent 序列
 
 Canonical Renderer（Domain/ProjectionRenderer.fs + CompanionProjectionBuilder.fs）
-    逐 intent 落语义树 → 渲染 provider wire bytes → digest/seal
+    逐 intent 落语义树 → 渲染 provider wire bytes / deterministic prefix representation
 ```
 
 - 禁令落点：功能模块只声明 intent（`Domain/ProjectionIntent.fs` 的 `ProjectionIntent`
@@ -25,13 +25,13 @@ Canonical Renderer（Domain/ProjectionRenderer.fs + CompanionProjectionBuilder.f
 
 ### Intent 排序与冲突（PROJ-005/006）
 
-- 九种 intent：`KeepPhysicalPrefix` / `ActivatePrefixEpoch` / `InsertBlogFrames` /
-  `InsertRepair` / `UseStrengthMirror` / `InsertStrengthFrames` / `SuppressTransportOnly`
-  / `AppendReviewChallenge` / `ReanchorAfterCompaction`。
+- 八种 intent：`KeepPhysicalPrefix` / `ActivatePrefixEpoch` / `InsertBlogFrames` /
+  `InsertRepair` / `UseStrengthMirror` / `InsertStrengthFrames` / `SuppressTransportOnly` /
+  `ReanchorAfterCompaction`。Review challenge 是 PromptAuthority continuation，不进入投影 DSL。
 - `ProjectionPlanner`：同锚 intent 先按稳定总序归一化（canonical rank），再显式合并
   （幂等类 intent 合并）或返回 `ProjectionConflict`（`ConflictingPrefixSelection` /
   `ConflictingPrefixLifecycle` / `ConflictingBlogFrames` / `ConflictingRepair` /
-  `ConflictingReviewChallenge` / Strength 专属冲突族）。**禁止依赖模块注册顺序**。
+  Strength 专属冲突族）。**禁止依赖模块注册顺序**。
 - 合并性质：重放型幂等；有序追加型保 canonical order；未定义组合 fail-closed。
 - HOST-013 pair marker 不占 intent：`PairProgrammingThoughtTransform` 在 raw 域按
   durable gap anchor replay（wire 级无消息地址）。
@@ -40,7 +40,7 @@ Canonical Renderer（Domain/ProjectionRenderer.fs + CompanionProjectionBuilder.f
 
 ```text
 ProviderSemanticProjection    // 去 ID：语义等价、跨会话可比较、canonical digest 唯一来源
-ProviderWireProjection        // 含 ID、字节相等、本地时间线、seal 与前缀缓存用
+ProviderWireProjection        // 含 ID、字节相等、本地时间线与前缀缓存用
 ```
 
 - Semantic：过滤 transport-only 字段（timestamp/cost/usage/runtimeId…），TEXT 序列化
@@ -55,8 +55,8 @@ CanonicalDigest = SHA-256(规范序列化(ProviderSemanticProjection(tree)))
 ```
 
 规范序列化：固定字段序、UTF-8、无空白歧义；同语义跨 ID 同一 digest。使用点：
-CoveredPrefixDigest（失配 fail-closed）、canary `LegacyDigest = DslDigest` 切换判据、
-Review 双 PERFECT（消费点归各 owner）。
+CoveredPrefixDigest（失配 fail-closed）、canary `LegacyDigest = DslDigest` 切换判据。
+Finality dual-PERFECT 不消费 provider-projection digest。
 
 ### SyntheticToml（ARCH-010，唯一写法 owner）
 

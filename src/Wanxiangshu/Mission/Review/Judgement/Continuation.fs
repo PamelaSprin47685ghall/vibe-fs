@@ -21,9 +21,11 @@ open Wanxiangshu.Foundation.Identity
 
 /// Vocabulary: Reviewer continuation sends (rabbit §9.2).
 ///
-/// These verbs own the business promise of "a missing verdict is nudged" /
-/// "a pending PERFECT is challenged" exactly once when continuation capability
-/// is still open. Physical Host delivery is an injected port.
+/// This vocabulary owns the business promise that a missing verdict is nudged
+/// exactly once while continuation capability is still open. Finality's
+/// PERFECT→Challenge→PERFECT ordering belongs exclusively to the direct CE in
+/// ReviewBarrierWorkflow, never to continuation repair. Physical Host delivery
+/// is an injected port.
 module ReviewerContinuation =
 
     /// Ensure a reviewer who has not yet called `judge` receives the
@@ -43,21 +45,4 @@ module ReviewerContinuation =
                 return Ok()
             else
                 return! port.NudgeMissingVerdict sessionId
-        }
-
-    /// Ensure a first PERFECT awaiting confirmation receives the challenge
-    /// exactly once. Fail closed when the send fails with nothing outstanding —
-    /// otherwise the run would wait forever for a confirmation that never left.
-    let ensurePerfectConfirmed
-        (port: ReviewerContinuationPort)
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (reviewerKey: string)
-        : Task<Result<unit, string>> =
-        task {
-            if not (ReviewerEvidence.continuationOpen journal reviewerKey) then
-                return Ok()
-            else
-                return! port.SendPerfectChallenge sessionId providerRun
         }

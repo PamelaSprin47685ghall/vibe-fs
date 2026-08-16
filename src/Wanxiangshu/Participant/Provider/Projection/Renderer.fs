@@ -371,9 +371,6 @@ module ProjectionRenderer =
         | ProjectionIntent.InsertRepair _ -> appendSynthetic "user" ProjectionConstants.RepairInstruction acc
         | ProjectionIntent.InsertStrengthFrames payload -> applyStrengthFrames sha256 payload acc
         | ProjectionIntent.SuppressTransportOnly -> applySuppressWithIds snapshot acc
-        | ProjectionIntent.AppendReviewChallenge intent ->
-            // REVIEW-003 生产可见字节 = 已本地化 Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
-            appendSynthetic "user" intent.Prompt acc
         // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
         | ProjectionIntent.ReanchorAfterCompaction -> acc
 

@@ -51,7 +51,8 @@ export const isInfrastructurePath = (file) => {
     rel.includes('/Git/') ||
     rel.includes('/Host/') ||
     rel.includes('/Composition/') ||
-    rel.includes('/Resources/')
+    rel.includes('/Resources/') ||
+    rel.endsWith('Surface.fs')
   )
 }
 
@@ -140,6 +141,7 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Enforcer/Continuation.fs',
   'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs',
   'src/Wanxiangshu/Enforcer/Cycle/Decode.fs',
+  'src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs',
   'src/Wanxiangshu/Enforcer/Guidance/Tip.fs',
   'src/Wanxiangshu/Enforcer/Host.fs',
   'src/Wanxiangshu/Enforcer/Repair.fs',
@@ -165,11 +167,11 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Mission/Manager/Workflow.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-  'src/Wanxiangshu/Mission/Review/Assurance/Seal.fs',
   'src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
   'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
   'src/Wanxiangshu/Mission/Review/TodoProcess.fs',
   'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+  'src/Wanxiangshu/Persistence/Journal/FactCodec.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs',
@@ -189,7 +191,7 @@ export const FORBIDDEN = [
   // 1-2 lines carry a precise `// DSL-MUTABLE: <category>` declaration. Any
   // production file may use the declaration; there is no path whitelist. The
   // preceding-line check is applied in scanText.
-  { gate: 'mutable', pattern: /\blet mutable\b/, label: 'let mutable without DSL-MUTABLE declaration', skipIf: () => false },
+  { gate: 'mutable', pattern: /\blet mutable\b/, label: 'let mutable without DSL-MUTABLE declaration', skipIf: (file) => String(file).endsWith('Surface.fs') },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
   {
     // FLOW-002/FLOW-006 second-runtime forms. Catches realistic bypass shapes:

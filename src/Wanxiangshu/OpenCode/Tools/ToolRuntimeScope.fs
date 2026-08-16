@@ -305,8 +305,6 @@ type ToolRuntimeScope
     /// GLORY-003: the run-started callback wired by the plugin bootstrap, exposed
     /// so the Finality workflow's hidden Reviewer binds the same reconciler.
     member _.RunStarted = onStarted
-    // REVIEW-010/HOST-012: deferred seal candidates, shared across instances.
-    member _.PendingReviewSeals = SharedState.PendingReviewSeals
 
     /// EXEC-011: the administrator's ceiling on any single process.
     ///

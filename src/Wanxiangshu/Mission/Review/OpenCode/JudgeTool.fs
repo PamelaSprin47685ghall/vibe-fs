@@ -1,94 +1,20 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
 
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Change.Host
-open Wanxiangshu.Context.Companion.Blogger.OpenCode
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
-open Wanxiangshu.Execution.Delegation.OpenCode
-open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
-open Wanxiangshu.Execution.Fission.OpenCode
-open Wanxiangshu.Execution.Session.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
-open Wanxiangshu.Mission.Manager.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Persistence
-
 open System
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
+open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
-open Wanxiangshu.Change
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Mission.Review.Assurance
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Resources
 
-/// judge(verdict) — Reviewer judgment surface. Durable identity/witness details
-/// stay internal; provider-visible outcomes are natural review consequences.
+/// judge(verdict) — Reviewer judgment surface. Finality sequencing belongs to
+/// ReviewBarrierWorkflow; this tool only emits one typed judgement delivery.
 module JudgeTool =
 
     [<RequireQualifiedAccess>]
@@ -101,9 +27,6 @@ module JudgeTool =
 
         [<Literal>]
         let NotReceived = "tool/judge/not-received"
-
-        [<Literal>]
-        let ChallengeUnproven = "tool/judge/challenge-unproven"
 
         [<Literal>]
         let NotFromReviewer = "tool/judge/not-from-reviewer"
@@ -129,44 +52,86 @@ module JudgeTool =
         else
             ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
 
-    let private line (ctx: HostToolContext) path =
-        ProviderProse.render (lang ctx) path Map.empty
+    let private line (ctx: HostToolContext) path = ProviderProse.render (lang ctx) path Map.empty
 
-    let private jobIdentity (scope: ToolRuntimeScope) (managerSessionId: SessionId) =
-        match scope.Journal with
-        | None -> None, None
-        | Some journal ->
-            match
-                OrchestratorProjection.tryFindByManagerSession
-                    managerSessionId
-                    (AgentJournal.snapshot journal).AgentProjections.Orchestrator
-            with
-            | None -> None, None
-            | Some job -> Some job.ManagerJobId, Some job.WorktreeIdentity
+    let private received ctx = ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
 
-    let private received ctx =
-        ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
+    let private challenged ctx =
+        ToolHostCodec.tomlObjectWithInstructions
+            [ line ctx Path.Received
+              ProviderProse.render (lang ctx) ReviewChallenge.Path Map.empty ]
+            []
 
     let private notReceived ctx reasonPath =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.NotReceived; line ctx reasonPath ] []
 
-    let private challengeUnproven ctx = notReceived ctx Path.ChallengeUnproven
+    let private processSubmission
+        (journal: AgentJournal)
+        (judgement: ReviewJudgement)
+        : VerdictSubmission option =
+        let snapshot = AgentJournal.snapshot journal
 
-    let private report ctx (decision: VerdictDecision) =
-        match decision with
-        | VerdictDecision.Revised -> received ctx
-        | VerdictDecision.ChallengeIssued challenge ->
-            let instructions =
-                if String.IsNullOrWhiteSpace challenge then
-                    [ line ctx Path.Received ]
-                else
-                    [ line ctx Path.Received; challenge ]
+        MagicTodoProjection.pendingProcessReviewForReviewer judgement.ReviewerSessionId snapshot.AgentProjections.MagicTodo
+        |> Option.bind (fun checkpoint ->
+            checkpoint.Assignment
+            |> Option.bind (fun assignment ->
+                AgentProjection.tryFind judgement.ReviewerSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.ReviewGuard)
+                |> Option.bind (fun guard ->
+                    guard.LastGitTreeHash
+                    |> Option.map (fun tree ->
+                        { BarrierId = ReviewBarrierId.create (MagicTodo.TodoReviewId.value assignment.TodoReviewId)
+                          GitTreeHash = tree
+                          ManagerSessionId = checkpoint.ManagerSessionId
+                          ReviewerSessionId = judgement.ReviewerSessionId
+                          ProviderRun = judgement.ProviderRun
+                          ToolCallId = judgement.ToolCallId
+                          Verdict = judgement.Verdict }))))
 
-            ToolHostCodec.tomlObjectWithInstructions instructions []
-        | VerdictDecision.Confirmed -> received ctx
-        | VerdictDecision.ChallengeUnproven -> challengeUnproven ctx
-        | VerdictDecision.AlreadyCounted -> received ctx
-        | VerdictDecision.ProcessTerminal -> received ctx
+    let private recordProcessJudgement
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (judgement: ReviewJudgement)
+        =
+        task {
+            match scope.Journal with
+            | None -> return notReceived context Path.ContextIncomplete
+            | Some journal ->
+                match processSubmission journal judgement with
+                | None -> return notReceived context Path.ContextIncomplete
+                | Some submission ->
+                    match! VerdictWorkflow.recordJudgement journal submission with
+                    | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
+                    | Ok() ->
+                        scope.MarkVerdictSubmitted context.SessionId
+                        return received context
+        }
+
+    let private deliverFinalityJudgement
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (judgement: ReviewJudgement)
+        =
+        task {
+            let completed =
+                TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let finish value = AsyncSupport.trySetResult completed value |> ignore
+
+            let accept () =
+                scope.MarkVerdictSubmitted context.SessionId
+                finish (received context)
+
+            let challenge () =
+                scope.MarkVerdictSubmitted context.SessionId
+                finish (challenged context)
+
+            let reject () = finish (notReceived context Path.JudgmentCouldNotBeRecorded)
+
+            match ReviewJudgementInbox.tryDeliver judgement accept challenge reject with
+            | None -> return notReceived context Path.CouldNotBind
+            | Some() -> return! completed.Task
+        }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
@@ -178,56 +143,31 @@ module JudgeTool =
                 elif String.IsNullOrWhiteSpace context.SessionId then
                     Error Path.NoActiveIdentity
                 else
-                    match verdict, context.ToolCallId, context.ProviderRunId with
-                    | Error _, _, _ -> Error Path.VerdictMustBePerfectOrRevise
-                    | _, None, _
-                    | _, _, None -> Error Path.CouldNotBind
-                    | Ok value, Some toolCallId, Some providerRunId -> Ok(value, toolCallId, providerRunId)
-
-            match validated with
-            | Error reason -> return notReceived context reason
-            | Ok(value, toolCallId, providerRunId) ->
-                let reviewerId = context.SessionId
-
-                match scope.Journal with
-                | None -> return notReceived context Path.ContextIncomplete
-                | Some journal ->
-                    // REVIEW-013: bind this run's seal first. The parked seal
-                    // carries the manager/barrier/tree frozen at transform
-                    // time — the only identity this submission may carry. A
-                    // current-barrier or current-tree read here could
-                    // re-identify an old attempt under a barrier opened after
-                    // the request started.
-                    match!
-                        ReviewSeal.bindToRun
-                            journal
-                            scope.PendingReviewSeals
-                            (SessionId.create reviewerId)
-                            providerRunId
+                    match
+                        verdict,
+                        context.ToolCallId,
+                        context.ProviderRunId,
+                        scope.CurrentPhysicalUserMessage context.SessionId
                     with
-                    | Error ReviewSeal.NoPendingSeal -> return notReceived context Path.ContextIncomplete
-                    | Error(ReviewSeal.AppendFailed _) -> return notReceived context Path.JudgmentCouldNotBeRecorded
-                    | Ok bound ->
-                        let managerJobId, worktreeIdentity = jobIdentity scope bound.ManagerSessionId
-
-                        let submission: VerdictSubmission =
-                            { BarrierId = bound.BarrierId
-                              GitTreeHash = bound.GitTreeHash
-                              ManagerSessionId = bound.ManagerSessionId
-                              ReviewerSessionId = SessionId.create reviewerId
-                              ManagerJobId = managerJobId
-                              WorktreeIdentity = worktreeIdentity
+                    | Error _, _, _, _ -> Error Path.VerdictMustBePerfectOrRevise
+                    | _, None, _, _
+                    | _, _, None, _
+                    | _, _, _, None -> Error Path.CouldNotBind
+                    | Ok value, Some toolCallId, Some providerRunId, Some physicalUserMessageId ->
+                        Ok
+                            { ReviewerSessionId = SessionId.create context.SessionId
+                              PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId
                               ProviderRun = providerRunId
                               ToolCallId = toolCallId
                               Verdict = value }
 
-                        match! VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
-                        | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
-                        | Ok VerdictDecision.ChallengeUnproven -> return challengeUnproven context
-                        | Ok decision ->
-                            scope.PendingReviewSeals.Remove reviewerId |> ignore
-                            scope.MarkVerdictSubmitted reviewerId
-                            return report context decision
+            match validated with
+            | Error reason -> return notReceived context reason
+            | Ok judgement ->
+                if ReviewJudgementInbox.isOwned judgement.ReviewerSessionId then
+                    return! deliverFinalityJudgement scope context judgement
+                else
+                    return! recordProcessJudgement scope context judgement
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

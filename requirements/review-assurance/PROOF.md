@@ -1,47 +1,35 @@
 # PROOF — review-assurance
 
-> 每条 WHAT 命题一行落点。类型：`MOVE`（物理移入本包 tests/）、`REUSE`（留在原处，cutover 拆分）、`NEW`（本包新写）、`MECHANISM`（共享 gate）。
-> 运行命令：`node --test requirements/review-assurance/tests/<file>`；套件级 `node requirements/verification-system/tests/run.mjs`。
+> 运行：`node --test requirements/review-assurance/tests/*.test.mjs`；权威全量：`node requirements/verification-system/tests/run.mjs`。
 
 ## 落点表
 
-| 命题 | 落点测试（文件 + test 锚点） | 类型 | 运行命令 |
-|---|---|---|---|
-| REVIEW-ASSURANCE-001（九条件、禁 same-root、REVISE 中断链） | `tests/witness.test.mjs` → `REVIEW_003_confirmation_requires_two_distinct_attempts`、`REVIEW_003_two_attempts_are_distinct_only_when_run_AND_call_both_differ`、`REVIEW_002_a_REVISE_clears_an_unfinished_confirmation`、`REVIEW_006_the_witness_has_no_authority_root_field_at_all`；`tests/review-guard.test.mjs` → `RVGD_nudgeReviewer_sends_verdict_guard_then_dedupes`（judge 工具形态：唯一 judge 工具名、typed verdict 参数、禁 prose 伪提交） | MOVE | `node --test requirements/review-assurance/tests/witness.test.mjs`；`node --test requirements/review-assurance/tests/review-guard.test.mjs` |
-| REVIEW-ASSURANCE-002（单次 PERFECT 不足；challenge 因果消费） | `tests/witness.test.mjs` → `REVIEW_003_the_challenge_text_and_its_version_are_pinned`、`REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text`、`REVIEW_003_challenge_follows_session_language`、`REVIEW_005_a_first_PERFECT_becomes_a_pending_witness_the_fold_can_produce`、`REVIEW_005_recording_a_PERFECT_verdict_alone_does_not_make_it_pending`、`REVIEW_003_the_witness_carries_the_digests_rather_than_a_boolean`；`tests/projection-algebra-challenge.test.mjs` → `PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt`、`PROJ_008_step5_AppendReviewChallenge_emits_intent_Prompt`（ChallengeIntent 字节 = seal/nudge 同源）；`tests/review-guard.test.mjs` → `RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge`（confirmation 只启动下一 provider request，不是确认事实） | MOVE | 同上 |
-| REVIEW-ASSURANCE-003（attempt identity、同 run 不计数、窗口有界） | `tests/witness.test.mjs` → `REVIEW_004_the_attempt_identity_names_all_five_components`、`REVIEW_004_a_repeated_attempt_is_refused_as_a_duplicate`、`REVIEW_004_the_attempt_window_is_bounded`、`REVIEW_010_the_seal_window_is_bounded` | MOVE | 同上 |
-| REVIEW-ASSURANCE-004（confirmed 派生、禁布尔） | `tests/witness.test.mjs` → `REVIEW_005_confirmedReviewer_is_derived_from_the_witness_not_stored_beside_it`、`REVIEW_005_an_empty_guard_is_NoReview_and_satisfies_nothing` | MOVE | 同上 |
-| REVIEW-ASSURANCE-005（witness 自包含、无外围 Map） | `tests/witness.test.mjs` → `REVIEW_006_a_confirmed_witness_answers_every_identity_question_inline`、`REVIEW_006_the_witness_has_no_authority_root_field_at_all` | MOVE | 同上 |
-| REVIEW-ASSURANCE-006（tree 失效、不删除、新 barrier 新链） | `tests/witness.test.mjs` → `REVIEW_008_a_tree_change_makes_a_confirmed_witness_insufficient`、`REVIEW_008_a_new_barrier_clears_the_pending_challenge_but_keeps_the_witness`、`REVIEW_008_a_new_barrier_invalidates_a_witness_even_when_the_tree_hash_is_unchanged`、`REVIEW_008_a_late_confirmation_cannot_rewind_the_current_barrier`、`REVIEW_008_re_entering_the_same_barrier_changes_nothing`、`REVIEW_008_every_witness_state_reports_the_tree_it_belongs_to`；`tests/review-guard.test.mjs` → `RVGD_nudgeReviewer_new_barrier_receives_a_fresh_single_repair_budget`（新 barrier 重置一次修复预算）、`RVGD_openBarrier_is_the_shared_review_barrier_writer`；`tests/host-reverify.test.mjs` → `HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt`、`HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal`（fresh barrier 语义、无 journal 在 lane start 前 fail closed） | MOVE | 同上 |
-| REVIEW-ASSURANCE-007（seal fail-closed、HOST-010 四条件） | `tests/seal-bind.test.mjs` → `HOST_010_positive_unique_incomplete_assistant_with_matching_parent`、`HOST_010_parent_id_mismatch_is_no_bindable_run`、`HOST_010_completed_assistant_is_no_bindable_run`、`HOST_010_non_assistant_never_binds`、`HOST_010_ambiguous_run_when_two_incomplete_children`、`HOST_010_not_latest_run_when_newer_assistant_exists`、`HOST_010_compaction_assistant_is_no_bindable_run`、`HOST_010_summary_true_is_compaction`；`tests/witness.test.mjs` → `REVIEW_010_a_seal_records_the_tool_result_digests_the_run_actually_saw`；`tests/shared-state.test.mjs` → `SHARED_pending_seal_record_carries_the_binding_candidate`（parked seal 候选冻结 binding candidate 并经共享 map round-trip） | MOVE | `node --test requirements/review-assurance/tests/seal-bind.test.mjs` + witness 命令 |
-| REVIEW-ASSURANCE-008（VerdictKnown vs ConsumableReview 两段式、typed verdict identity 只来自积分 projection） | `tests/consumable-review.test.mjs` → `REVIEW_014_concluded_marker_is_durable_and_consumable`（只有 durable TodoReviewConcluded 才形成可消费标记） | NEW + REWRITE | `node --test requirements/review-assurance/tests/consumable-review.test.mjs` |
-| REVIEW-ASSURANCE-009（同 snapshot、排他 frontier、事件驱动、waiter fail-closed 恢复语义） | `tests/consumable-review.test.mjs` → `REVIEW_013_verdict_requires_closed_reviewer_turn_before_conclusion`（reviewer turn 未关闭时保持 Pending） | NEW + REWRITE | 同上 |
-| REVIEW-ASSURANCE-010（infra ≠ REVISE、不伪 Concluded） | `tests/consumable-review.test.mjs` → `REVIEW_018_concluded_without_accepted_is_rejected`、`REVIEW_018_concluded_without_assignment_is_rejected`、`REVIEW_018_concluded_binds_to_assignment_identity`、`REVIEW_018_absent_reviewer_fails_closed_without_fabricated_conclusion`；`tests/review-guard.test.mjs` → `RVGD_nudgeReviewer_fails_closed_without_journal`、`RVGD_nudgeReviewer_fails_without_open_review_barrier`、`RVGD_nudgeReviewer_fails_without_active_authority_profile`、`RVGD_nudgeReviewer_cross_instance_reservation_suppresses_twin_send`、`RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead`、`RVGD_nudgeReviewer_sends_when_recorded_worktree_is_alive`（missing-verdict 修复 fail closed / 不伪 REVISE / 不向死 worktree 发修复） | NEW | 同上 + review-guard 命令 |
-| REVIEW-ASSURANCE-011（process ≠ terminal witness 代数分离） | `tests/consumable-review.test.mjs` → `REVIEW_014_a_process_verdict_is_not_a_consumable_marker`；`tests/witness.test.mjs` → `REVIEW_005_recording_a_PERFECT_verdict_alone_does_not_make_it_pending` | NEW + MOVE | 同上 + witness 命令 |
-| REVIEW-ASSURANCE-012（request-bounded 证据、frontier 冻结） | `tests/consumable-review.test.mjs` → `REVIEW_016_concluded_fact_freezes_the_request_frontier`（`ReviewerRecordFrontier` 冻结值保留在 durable fact，且不被 manager request frontier 替代） | NEW | 同上 |
-| REVIEW-ASSURANCE-013（requirement 以 Authority Root 标识、覆盖清除幂等） | `tests/witness.test.mjs` → `REVIEW_007_a_requirement_is_keyed_by_authority_root_and_deduped`、`REVIEW_007_a_confirmed_review_clears_the_requirements_it_covered`、`REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard` | MOVE | witness 命令 |
+| 命题 | 可执行 proof |
+|---|---|
+| REVIEW-ASSURANCE-001 | `tests/witness.test.mjs` → `REVIEW_003_two_attempts_require_distinct_run_and_call`、`REVIEW_003_confirmation_still_requires_distinct_attempts`；`tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_003_reverify_is_the_direct_ce_temporal_owner` |
+| REVIEW-ASSURANCE-002 | `tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_001_finality_dual_perfect_has_no_persisted_program_position`；`tests/host-reverify.test.mjs` → `HOST_reverify_terminal_before_first_judgement_fails_closed_without_hanging`、`HOST_reverify_terminal_before_second_judgement_fails_closed_without_hanging`、typed challenge dual-PERFECT Host case；`tests/witness.test.mjs` → `REVIEW_005_single_PERFECT_is_not_a_durable_pending_witness`、`REVIEW_003_confirmation_requires_exact_challenge_physical_identity`、`REVIEW_003_challenge_text_is_presentation_only_and_localized`；`tests/shared-state.test.mjs` → `SHARED_judgement_rendezvous_is_physical_not_a_business_stage` |
+| REVIEW-ASSURANCE-003 | `tests/witness.test.mjs` → `REVIEW_004_attempt_identity_names_all_five_components`、`REVIEW_004_duplicate_attempt_is_refused` |
+| REVIEW-ASSURANCE-004 | `tests/witness.test.mjs` → `REVIEW_005_confirmedReviewer_is_derived_from_witness` |
+| REVIEW-ASSURANCE-005 | `tests/witness.test.mjs` → `REVIEW_006_confirmed_witness_is_self_contained_typed_evidence` |
+| REVIEW-ASSURANCE-006 | `tests/witness.test.mjs` → `REVIEW_008_tree_change_invalidates_completed_witness`、`REVIEW_008_new_barrier_requires_a_fresh_completed_CE`、`REVIEW_008_late_old_confirmation_cannot_satisfy_current_barrier`；`tests/review-guard.test.mjs` → `RVGD_openBarrier_is_the_shared_review_barrier_writer` |
+| REVIEW-ASSURANCE-007 | `tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_002_finality_confirmation_never_parses_provider_text_or_seals_it`；`tests/shared-state.test.mjs` → `SHARED_finality_has_no_pending_provider_input_seal_registry`；`tests/seal-bind.test.mjs` → HOST-010 generic ProviderRunBinding fail-closed cases |
+| REVIEW-ASSURANCE-008 | `tests/consumable-review.test.mjs` → `REVIEW_014_a_durable_verdict_alone_never_makes_the_review_consumable`、`REVIEW_014_only_todo_review_concluded_marks_the_review_consumable`、`REVIEW_017_process_verdict_identity_comes_from_the_integrated_projection_not_a_judge_tool_call_trace` |
+| REVIEW-ASSURANCE-009 | `tests/consumable-review.test.mjs` → `REVIEW_018_producer_presence_is_present_when_reviewer_handle_is_CompletedAwaitingJoin`、`REVIEW_017 durable verdict keeps record-ready producer present after the reviewer work-unit is Retired`；源码结构 = sample revision → tryConclude → presence → awaitChangeFrom sampled revision |
+| REVIEW-ASSURANCE-010 | `tests/witness.test.mjs` → `REVIEW_002_REVISE_is_a_completed_revision_fact`；`tests/consumable-review.test.mjs` → concluded/assignment/producer fail-closed cases；`tests/review-guard.test.mjs` → process missing-judge repair fail-closed cases |
+| REVIEW-ASSURANCE-011 | `tests/consumable-review.test.mjs` → `REVIEW_020_a_process_revise_is_a_revision_witness_not_a_finality_rejection`；`tests/witness.test.mjs` → `REVIEW_005_single_PERFECT_is_not_a_durable_pending_witness` |
+| REVIEW-ASSURANCE-012 | `tests/consumable-review.test.mjs` → `REVIEW_016_the_concluded_review_evidence_is_bounded_to_the_frozen_request_frontier` |
+| REVIEW-ASSURANCE-013 | `tests/review-requirement.test.mjs` → `requirement identity is the Authority Root and duplicate roots collapse`、`confirmation clears its covered batch but replay cannot clear a later requirement` |
 
-## 本包拥有的 semantic anchor id
+## 行为级 canary
 
-`review-assurance` 在 `scripts/checks/semantic-anchors.mjs` 中无专属 anchor family（reviewer family 归 `review-judgement`）；本包语义由 witness/seal/projection 可执行代数证明，不依赖 prompt anchors。
+`requirements/verification-system/tests/e2e/scenarios/long-stroke.toml` 的 Finality reviewer 段包含两个独立 provider requests：第一次 `judge(PERFECT)`，随后 skeptical challenge continuation，再次 `judge(PERFECT)`。权威 e2e 必须证明第二次直接形成 completed witness；不存在第三次“再尝试让状态机认账”的路径。
 
-## REUSE / cutover 拆分计划（SPLIT@cutover）
+## 可红性
 
-| 现有测试 | 现状 | 计划 |
-|---|---|---|
-| `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs` | 多 owner（obligation-ledger 主 + review-assurance 交叉）；`TODO-006 T2 prepare succeeds once T1 process review is Concluded` 断言 ConsumableReview 消费门槛 | cutover 时把 `AwaitingConsumableReview` 阻塞/放行断言按 assertion 拆出（review-assurance 侧）或标注 obligation-ledger 消费侧 |
-| `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` | `await ConsumableReview failed: fatalInfrastructure` 断言 REVIEW-018 的 infra fail-fast 出口 | cutover 时确认 fail-fast 分类归 `host-boundary`/`crash-reconciliation`，review 侧负边界归本包 |
-| `requirements/finality/tests/lifecycle.test.mjs` | GLORY-057（`FinalityUndecided` / undecidable golden bytes）、GLORY-055（REVISE 关 request）、GLORY-060（blessing 顺序重读 tree）为 finality 主 + review-assurance 交叉 | cutover 时按断言拆分；GLORY-059 tree 重读 → 本包 REVIEW-ASSURANCE-006 交叉 |
-| `tests/unit/temporal/finality-cohort-law.test.mjs` | roster/graduate 代数 → finality 主 | 无本包 assertion 冲突；challenge/witness 断言如出现按 PROOF 归属拆分 |
-| `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`（已随 obligation-ledger 迁移） | `TODO-006 rejects a conclusion with no matching assignment` 与本包 `REVIEW_018_concluded_without_assignment_is_rejected` 同源 | 保留 obligation-ledger 版本；本包版本以 review 视角断言（fold 拒绝 = 不伪 Concluded） |
-
-## 可红性说明
-
-- `witness.test.mjs` / `seal-bind.test.mjs`（MOVE）：若确认链允许 same-root、attempt 去重失效、witness 失去自包含、tree 失效规则松动、seal 绑定放宽任一条，对应断言即红。
-- `consumable-review.test.mjs`（NEW）：若 verdict 单独产生 Concluded、fold 接受无 assignment 的 Concluded、过程 REVISE 产出 Confirmed witness、消费者重新依赖 Journal/XTrace 猜 verdict identity、或 producer 缺失时 waiter 悬挂/伪 Concluded，断言即红。
-
-## 未覆盖与理由
-
-- 终末双 PERFECT 端到端（cohort 全员确认 → blessing）与 REVISE 关 cohort 的 canary 在 `tests/e2e/cases/finality-cohort-law.test.mjs`（`verification-system` e2e 阶梯，cutover 阶段由 lead 处理）。
-- `awaitChangeFrom` 底层订阅语义由 `causal-wait` 包覆盖；本包拥有 review 侧握手顺序（先采样 revision，再判定，再 await sampled revision）与 fail-closed 分型。
-- record-ready 的 Blogger coverage 前进/`Chronicle` 渲染细节归 `work-record`/`context-compression`；本包只拥有「同 snapshot 判定 + 排他 frontier + 消费门槛」。
+- 把 first PERFECT 恢复成 durable pending state → `REVIEW_CE_001` 红。
+- Finality control path重新引用 provider wire/text/digest → `REVIEW_CE_002` 红。
+- `Reverify.fs` 重新读 Journal projection 决定下一步 → `REVIEW_CE_003` 红。
+- challenge physical id 与 second judgement physical id 不同仍确认 → witness physical-causality case 红。
+- 同 run / 同 call 仍确认 → distinct-attempt cases 红。
+- 新 barrier/tree 复用旧 witness → REVIEW-008 cases 红。
+- process verdict 直接变 ConsumableReview 或伪 Finality confirmation → consumable-review cases 红。

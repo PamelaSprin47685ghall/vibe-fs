@@ -258,6 +258,7 @@
     <Compile Include="Execution/Fission/Runtime.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Evidence.fs"/>
     <Compile Include="Mission/Review/Ports.fs"/>
+    <Compile Include="Mission/Review/OpenCode/JudgementInbox.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
     <Compile Include="Process/NodeProcessHost.fs"/>
@@ -346,6 +347,7 @@
     <Compile Include="Strength/Lifecycle.fs"/>
     <Compile Include="Strength/Replica/TraceRecovery.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
+    <Compile Include="OpenCode/Host/ProviderRunBinding.fs"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
@@ -363,6 +365,7 @@
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
     <Compile Include="Interaction/Dispatch/Dispatcher.fs"/>
     <Compile Include="Interaction/Dispatch/Send.fs"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
@@ -439,7 +442,6 @@
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
     <Compile Include="Context/Companion/Transform.fs"/>
-    <Compile Include="Mission/Review/Assurance/Seal.fs"/>
     <Compile Include="Mission/Review/OpenCode/HostGuard.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
     <Compile Include="Composition/Turn/TurnReconcile.fs"/>

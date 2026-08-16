@@ -52,9 +52,9 @@
   - `ReviewRequestKind = TodoProcessReview(TodoWriteId) | FinalityReview(FinalityRequestId × ReviewBarrierId)`——typed 分型，禁止用 `pendingChallenge` 运行时猜测混用两种业务（REVIEW-013）。
   - `renderAssignmentUserMessage` 生成过程 assignment 指令（一次判断、有界 LWR 输入、old/proposed todo；不含 challenge/2N/cohort 编排）。
   - `needsEnsureReview(accepted, concluded) = accepted ∧ ¬concluded`——Rk 义务待完成标记（节拍规则归 `obligation-ledger`）。
-- `src/Wanxiangshu/Application/Review/VerdictWorkflow.fs`：
-  - `VerdictSubmission` 携带一次判断的全部身份（barrier/tree/manager/reviewer/job/run/call/verdict）。
-  - `submit` 对过程评审路径返回 `VerdictDecision.ProcessTerminal`：一次 durable `judge` 即 terminal，**不** append `PerfectChallengeIssued` / `ConfirmedReviewWitness`（REVIEW-JUDGEMENT-008；确认代数归 `review-assurance`）。
+- `src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs`：
+  - `VerdictSubmission` 携带一次已由 owner CE 接受的判断身份（barrier/tree/manager/reviewer/run/call/verdict）。
+  - `recordJudgement` 只 append `ReviewVerdictRecorded`，不返回“下一步” opcode。TodoProcessReview 一次 durable `judge` 即其 verdict；Finality 的 first/challenge/second 时序归 `ReviewBarrierWorkflow` direct CE（REVIEW-JUDGEMENT-008 / `review-assurance`）。
 - 过程判断的 prose 义务：`TodoProcessReviewProgram.tryConclude` 只在 `ReviewerRecordFrontier` 内有非空 canonical LWR 时才 append `TodoReviewConcluded`；无 prose → `Pending "process-review LWR not record-ready"`（REVIEW-JUDGEMENT-008 的「无 prose 的 PERFECT 无效」→ 可消费侧归 `review-assurance`）。
 - process PERFECT 不进入 terminal dual-PERFECT 代数：见 `review-assurance` HOW（REVIEW-020 / GLORY-058）。
 
@@ -64,9 +64,9 @@
 
 ```text
 Reviewer prose + judge(verdict)
-  → VerdictWorkflow.submit
-     ├─ FinalityReview：challenge/dual-PERFECT 确认代数（review-assurance）
-     └─ TodoProcessReview：ProcessTerminal → VerdictKnown → record-ready → ConsumableReview
+  ├─ FinalityReview：JudgeTool typed delivery → ReviewBarrierWorkflow CE → recordJudgement
+  │                  → physical challenge → second typed delivery → completed witness
+  └─ TodoProcessReview：recordJudgement → VerdictKnown → record-ready → ConsumableReview
 ```
 
 ## 依赖（DEPENDS ON）

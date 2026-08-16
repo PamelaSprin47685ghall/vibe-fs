@@ -133,20 +133,6 @@ test('WHAT[REVIEW-ASSURANCE-006] RVGD_nudgeReviewer_new_barrier_receives_a_fresh
   } finally { cleanup() }
 })
 
-test('WHAT[REVIEW-ASSURANCE-002] RVGD_requestPerfectConfirmation_sends_review_confirmation_challenge', async () => {
-  const sid = 'ses_rv2'
-  const { opened, cleanup } = await openSeeded(sid)
-  try {
-    const captured = []
-    const first = await reviewHost.requestPerfectConfirmation(capturingPort(captured), opened.journal, sid, 'run_2')
-    assert.equal(first.outcome, 'Sent')
-    assert.equal(captured.length, 1)
-    assert.ok(captured[0].text.length > 0)
-    assert.notEqual(captured[0].text, VERDICT_NUDGE)
-    assert.equal((await reviewHost.requestPerfectConfirmation(capturingPort([]), opened.journal, sid, 'run_2')).outcome, 'AlreadyOutstanding')
-  } finally { cleanup() }
-})
-
 test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_no_longer_required_when_recorded_worktree_is_dead', async () => {
   const sid = 'ses_rv3'
   const { opened, cleanup } = await openSeeded(sid)

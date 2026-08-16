@@ -237,18 +237,20 @@ type SyncDelegateRuntime
             return finishCompletedCall turn.SessionId call workRecord
         }
 
+    let tryConsumeReadyCall (store: SyncDelegateCallStore) (sessionId: SessionId) =
+        match store.TryPeekCallByDelegate sessionId with
+        | Some call when call.Invocations |> List.exists (fun invocation -> invocation.StartCursor.IsNone) ->
+            // The provider prompt owns the opening capture and cursor
+            // assignment. A synthetic or early completion observation must
+            // not consume the call before that bounded range exists.
+            None
+        | Some _ -> store.TryPopCallByDelegate sessionId
+        | None -> None
+
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
-            match store.TryPeekCallByDelegate turn.SessionId with
-            | Some call when call.Invocations |> List.exists (fun invocation -> invocation.StartCursor.IsNone) ->
-                // The provider prompt owns the opening capture and cursor
-                // assignment. A synthetic or early completion observation must
-                // not consume the call before that bounded range exists.
-                return false
-            | Some _ ->
-                match store.TryPopCallByDelegate turn.SessionId with
-                | Some call -> return! handleCompletedCall turn call
-                | None -> return false
+            match tryConsumeReadyCall store turn.SessionId with
+            | Some call -> return! handleCompletedCall turn call
             | None -> return false
         }
 

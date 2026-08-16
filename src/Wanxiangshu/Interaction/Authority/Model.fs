@@ -51,7 +51,6 @@ module PromptAuthority =
         | JoinGuard
         | ManagerGuard
         | ReviewerGuard
-        | ReviewConfirmation
         | BusyAgentNudge
         | ProviderRetryAttempt
         /// AGENT-031/PROMPT-018: same-run collaboration, never fallback retry.
@@ -245,7 +244,6 @@ module PromptAuthority =
         | Continuation JoinGuard -> "JoinGuard"
         | Continuation ManagerGuard -> "ManagerGuard"
         | Continuation ReviewerGuard -> "ReviewerGuard"
-        | Continuation ReviewConfirmation -> "ReviewConfirmation"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation NeedHelpEscalation -> "NeedHelpEscalation"
@@ -263,7 +261,6 @@ module PromptAuthority =
         | "JoinGuard" -> Some JoinGuard
         | "ManagerGuard" -> Some ManagerGuard
         | "ReviewerGuard" -> Some ReviewerGuard
-        | "ReviewConfirmation" -> Some ReviewConfirmation
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "NeedHelpEscalation" -> Some NeedHelpEscalation
