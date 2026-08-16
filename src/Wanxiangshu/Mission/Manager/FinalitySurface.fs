@@ -510,6 +510,14 @@ module FinalitySurface =
         | None -> false
         | Some life -> ManagerLifecycleProjection.isLifeArchived life
 
+    let private slotView (slot: FinalityReviewCohort.CohortSlot) : obj =
+        box
+            {| agentId = slot.AgentId
+               session =
+                   slot.ReviewerSessionId |> Option.map SessionId.value |> Option.defaultValue null
+               ordinal = slot.ReviewerOrdinal
+               isNew = slot.IsNew |}
+
     /// GLORY-045 roster algebra: ungraduated historical Reviewers + exactly one
     /// new slot, derived from durable facts only. JS-shaped slots.
     let cohortRoster (world: obj) : obj array =
@@ -522,20 +530,41 @@ module FinalitySurface =
         match activeRequest with
         | None -> [||]
         | Some(life, request) ->
-            let slots =
-                Wanxiangshu.Composition.Bridges.FinalityReview.FinalityReviewCohort.rosterOf
-                    world.Projection.AgentProjections
-                    life
-                    request
+            Wanxiangshu.Composition.Bridges.FinalityReview.FinalityReviewCohort.rosterOf
+                world.Projection.AgentProjections
+                life
+                request
+            |> List.map slotView
+            |> List.toArray
 
-            slots
-            |> List.map (fun slot ->
-                box
-                    {| agentId = slot.AgentId
-                       reviewerSessionId =
-                           slot.ReviewerSessionId |> Option.map SessionId.value |> Option.defaultValue null
-                       ordinal = slot.ReviewerOrdinal
-                       isNew = slot.IsNew |})
+    /// GLORY-045 roster algebra from a durable `AgentJournal.snapshot`:
+    /// the projection is an opaque snapshot, lifeId / requestId are plain
+    /// strings, and the answer is JS-shaped slots. No Fable types cross the
+    /// boundary beyond the snapshot handle itself.
+    let cohortRosterFromSnapshot (snapshot: obj) (lifeId: string) (requestId: string) : obj array =
+        let ps = unbox<AgentProjectionSet> snapshot
+        let lifeId = ManagerLifeId.create lifeId
+        let requestId = FinalityRequestId.create requestId
+
+        let found =
+            ps.Sessions
+            |> Map.toList
+            |> List.tryPick (fun (_, projection) ->
+                projection.ManagerLife
+                |> Option.bind (fun managerLife -> managerLife.CurrentLife)
+                |> Option.bind (fun life ->
+                    if life.LifeId = lifeId then
+                        life.ActiveFinality
+                        |> Option.bind (fun request ->
+                            if request.RequestId = requestId then Some(life, request) else None)
+                    else
+                        None))
+
+        match found with
+        | None -> [||]
+        | Some(life, request) ->
+            Wanxiangshu.Composition.Bridges.FinalityReview.FinalityReviewCohort.rosterOf ps life request
+            |> List.map slotView
             |> List.toArray
 
     /// GLORY-045: a Reviewer graduated iff it has a confirmed witness on one of

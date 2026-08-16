@@ -1,5 +1,4 @@
 [
-  "requirements/finality/tests/support/finality-contract.mjs",
   "requirements/intra-participant-parallelism/tests/support/fission-contract.mjs",
   "requirements/knowledge-reuse/tests/support/casebook-contract.mjs",
   "requirements/output-distillation/tests/support/distiller-contract.mjs"

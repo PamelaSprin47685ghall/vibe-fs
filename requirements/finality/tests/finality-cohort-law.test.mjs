@@ -32,7 +32,6 @@ import {
   fold,
   gitTreeHash,
   idValue,
-  listItems,
   managerLifeId,
   managerLifecycleFact,
   mapEntries,
@@ -45,7 +44,6 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
-import { finalityCohort } from './support/finality-contract.mjs'
 import * as finalitySurface from './support/finality-surface.mjs'
 import {
   DeterministicEventQueue,
@@ -249,14 +247,6 @@ const confirmWitness = (reviewer, barrier) => [
 
 const currentLife = (projection) => fold.session(projection, 'mgr')?.ManagerLife?.CurrentLife
 
-const slotView = (slots) =>
-  listItems(slots).map((slot) => ({
-    agentId: slot.AgentId,
-    session: slot.ReviewerSessionId == null ? null : idValue.session(slot.ReviewerSessionId),
-    ordinal: slot.ReviewerOrdinal,
-    isNew: slot.IsNew,
-  }))
-
 const membersView = (request) =>
   mapEntries(request.Members)
     .map(([sid, member]) => ({
@@ -295,7 +285,7 @@ const surface = finalitySurface
 const sv = (world) =>
   surface.cohortRoster(world).map((slot) => ({
     agentId: slot.agentId,
-    session: slot.reviewerSessionId,
+    session: slot.session,
     ordinal: slot.ordinal,
     isNew: slot.isNew,
   }))
@@ -508,8 +498,10 @@ test('WHAT[FINALITY-008] drop ephemeral preserves durable finality facts: no dup
 
   // Roster algebra still reachable from recovered durable projection:
   // ungraduated hist-a (not in Members) + crash-reentry new slot (IsNew=false).
-  const recoveredRoster = slotView(
-    finalityCohort.rosterOf(agentJournal.snapshot(world2.journal).AgentProjections, still, still.ActiveFinality),
+  const recoveredRoster = surface.cohortRosterFromSnapshot(
+    agentJournal.snapshot(world2.journal),
+    idValue.managerLife(LIFE),
+    idValue.finalityRequest(still.ActiveFinality.RequestId),
   )
   assert.deepEqual(recoveredRoster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
@@ -540,8 +532,10 @@ test('WHAT[FINALITY-009] drop ephemeral preserves open finality roster source', 
   const beforeSnap = agentJournal.snapshot(world1.journal)
   const beforeLife = currentLife(beforeSnap)
   assert.equal(beforeLife.ActiveFinality.Resolution.name, 'Open')
-  const beforeRoster = slotView(
-    finalityCohort.rosterOf(beforeSnap.AgentProjections, beforeLife, beforeLife.ActiveFinality),
+  const beforeRoster = surface.cohortRosterFromSnapshot(
+    beforeSnap,
+    idValue.managerLife(LIFE),
+    idValue.finalityRequest(beforeLife.ActiveFinality.RequestId),
   )
   assert.deepEqual(beforeRoster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
@@ -555,7 +549,11 @@ test('WHAT[FINALITY-009] drop ephemeral preserves open finality roster source', 
   assert.equal(idValue.finalityRequest(afterLife.ActiveFinality.RequestId), 'req-2')
   assert.equal(mapEntries(afterLife.ActiveFinality.Members).length, 0)
   assert.deepEqual(
-    slotView(finalityCohort.rosterOf(afterSnap.AgentProjections, afterLife, afterLife.ActiveFinality)),
+    surface.cohortRosterFromSnapshot(
+      afterSnap,
+      idValue.managerLife(LIFE),
+      idValue.finalityRequest(afterLife.ActiveFinality.RequestId),
+    ),
     beforeRoster,
   )
 
